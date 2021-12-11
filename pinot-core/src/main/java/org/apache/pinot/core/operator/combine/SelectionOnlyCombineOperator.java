@@ -41,12 +41,13 @@ import org.slf4j.LoggerFactory;
 public class SelectionOnlyCombineOperator extends BaseCombineOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SelectionOnlyCombineOperator.class);
   private static final String OPERATOR_NAME = "SelectionOnlyCombineOperator";
+  private static final String EXPLAIN_NAME = "COMBINE_SELECT";
 
   private final int _numRowsToKeep;
 
   public SelectionOnlyCombineOperator(List<Operator> operators, QueryContext queryContext,
-      ExecutorService executorService, long endTimeMs) {
-    super(operators, queryContext, executorService, endTimeMs);
+      ExecutorService executorService) {
+    super(operators, queryContext, executorService);
     _numRowsToKeep = queryContext.getLimit();
   }
 
@@ -56,11 +57,16 @@ public class SelectionOnlyCombineOperator extends BaseCombineOperator {
   }
 
   @Override
+  public String toExplainString() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
   protected IntermediateResultsBlock getNextBlock() {
     // For LIMIT 0 query, only process one segment to get the data schema
     if (_numRowsToKeep == 0) {
       IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) _operators.get(0).nextBlock();
-      CombineOperatorUtils.setExecutionStatistics(resultsBlock, _operators, 0);
+      CombineOperatorUtils.setExecutionStatistics(resultsBlock, _operators, 0, 1);
       return resultsBlock;
     }
 
@@ -80,13 +86,13 @@ public class SelectionOnlyCombineOperator extends BaseCombineOperator {
     DataSchema dataSchemaToMerge = blockToMerge.getDataSchema();
     assert mergedDataSchema != null && dataSchemaToMerge != null;
     if (!mergedDataSchema.equals(dataSchemaToMerge)) {
-      String errorMessage = String
-          .format("Data schema mismatch between merged block: %s and block to merge: %s, drop block to merge",
+      String errorMessage =
+          String.format("Data schema mismatch between merged block: %s and block to merge: %s, drop block to merge",
               mergedDataSchema, dataSchemaToMerge);
       // NOTE: This is segment level log, so log at debug level to prevent flooding the log.
       LOGGER.debug(errorMessage);
-      mergedBlock
-          .addToProcessingExceptions(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, errorMessage));
+      mergedBlock.addToProcessingExceptions(
+          QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, errorMessage));
       return;
     }
 

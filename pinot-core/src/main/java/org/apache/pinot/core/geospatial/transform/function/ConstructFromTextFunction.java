@@ -22,16 +22,15 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKTReader;
 
@@ -46,18 +45,18 @@ abstract class ConstructFromTextFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    Preconditions
-        .checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s", getName());
+    Preconditions.checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s",
+        getName());
     TransformFunction transformFunction = arguments.get(0);
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
         "The argument must be single-valued for transform function: %s", getName());
     Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.STRING,
         "The argument must be of string type");
     _transformFunction = transformFunction;
-    _reader = new WKTReader(getGeometryFactory());
+    _reader = getWKTReader();
   }
 
-  abstract protected GeometryFactory getGeometryFactory();
+  abstract protected WKTReader getWKTReader();
 
   @Override
   public TransformResultMetadata getResultMetadata() {

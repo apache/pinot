@@ -31,16 +31,16 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
-import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
-import org.apache.pinot.common.utils.CommonConstants.Segment.AssignmentStrategy;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
+import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.BeforeClass;
@@ -115,8 +115,7 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
     List<ZNRecord> segmentZKMetadataZNRecords = new ArrayList<>(NUM_SEGMENTS);
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
       String segmentName = SEGMENTS.get(segmentId);
-      OfflineSegmentZKMetadata segmentZKMetadata = new OfflineSegmentZKMetadata();
-      segmentZKMetadata.setSegmentName(segmentName);
+      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
       int partitionId = segmentId % NUM_PARTITIONS;
       segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap(PARTITION_COLUMN,
           new ColumnPartitionMetadata(null, NUM_PARTITIONS, Collections.singleton(partitionId)))));
@@ -264,7 +263,8 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Current assignment should already be balanced
     assertEquals(_segmentAssignmentWithoutPartition
-            .rebalanceTable(currentAssignment, _instancePartitionsMapWithoutPartition, null, null, new BaseConfiguration()),
+            .rebalanceTable(currentAssignment, _instancePartitionsMapWithoutPartition, null, null,
+                new BaseConfiguration()),
         currentAssignment);
   }
 
@@ -293,7 +293,8 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Current assignment should already be balanced
     assertEquals(_segmentAssignmentWithPartition
-            .rebalanceTable(currentAssignment, _instancePartitionsMapWithPartition, null, null, new BaseConfiguration()),
+            .rebalanceTable(currentAssignment, _instancePartitionsMapWithPartition, null, null,
+                new BaseConfiguration()),
         currentAssignment);
   }
 

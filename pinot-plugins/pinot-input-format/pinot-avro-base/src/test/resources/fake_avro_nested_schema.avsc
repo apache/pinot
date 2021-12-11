@@ -1,0 +1,70 @@
+{
+    "fields": [
+        {
+            "doc": "array",
+            "name": "entries",
+            "type": {
+                "type": "array",
+                "items": {
+                    "type": "record",
+                    "name": "TUPLE_1",
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": "long"
+                        },
+                        {
+                            "name": "description",
+                            "type": "string"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "doc": "nested record",
+            "name": "tuple",
+            "type": [{
+                "type" : "record",
+                "name" : "address",
+                "fields" : [
+                    {"name": "streetaddress", "type": "string"},
+                    {"name": "city", "type": "string"}
+                ]
+            }]
+        },
+        {
+            "doc": "array1",
+            "name": "d2",
+            "type": {
+                "type": "array",
+                "items": {
+                    "type": "int"
+                }
+            }
+        },
+        {
+            "doc": "dimension 1",
+            "name": "d1",
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        {
+            "doc": "hours since epoch",
+            "name": "hoursSinceEpoch",
+            "type": "long"
+        },
+        {
+            "doc": "metric 1",
+            "name": "m1",
+            "type": [
+                "null",
+                "int"
+            ]
+        }
+    ],
+    "name": "TUPLE_0",
+    "type": "record"
+}

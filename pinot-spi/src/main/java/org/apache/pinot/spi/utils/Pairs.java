@@ -22,6 +22,8 @@ import java.util.Comparator;
 
 
 public class Pairs {
+  private Pairs() {
+  }
 
   public static IntPair intPair(int a, int b) {
     return new IntPair(a, b);
@@ -85,47 +87,6 @@ public class Pairs {
       } else {
         return Integer.compare(pair1._right, pair2._right);
       }
-    }
-  }
-
-  public static Comparator<Number2ObjectPair> getAscendingnumber2ObjectPairComparator() {
-    return new AscendingNumber2ObjectPairComparator();
-  }
-
-  public static Comparator<Number2ObjectPair> getDescendingnumber2ObjectPairComparator() {
-    return new DescendingNumber2ObjectPairComparator();
-  }
-
-  public static class Number2ObjectPair<T> {
-    Number a;
-
-    T b;
-
-    public Number2ObjectPair(Number a, T b) {
-      this.a = a;
-      this.b = b;
-    }
-
-    public Number getA() {
-      return a;
-    }
-
-    public T getB() {
-      return b;
-    }
-  }
-
-  public static class AscendingNumber2ObjectPairComparator implements Comparator<Number2ObjectPair> {
-    @Override
-    public int compare(Number2ObjectPair o1, Number2ObjectPair o2) {
-      return new Double(o1.a.doubleValue()).compareTo(new Double(o2.a.doubleValue()));
-    }
-  }
-
-  public static class DescendingNumber2ObjectPairComparator implements Comparator<Number2ObjectPair> {
-    @Override
-    public int compare(Number2ObjectPair o1, Number2ObjectPair o2) {
-      return new Double(o2.a.doubleValue()).compareTo(new Double(o1.a.doubleValue()));
     }
   }
 
@@ -272,9 +233,9 @@ public class Pairs {
       Comparable c2 = (Comparable) pair2.getObjectValue();
 
       int cmpValue = c1.compareTo(c2);
-      if (cmpValue == -1) {
+      if (cmpValue < 0) {
         return (_descending) ? 1 : -1;
-      } else if (cmpValue == 1) {
+      } else if (cmpValue > 0) {
         return (_descending) ? -1 : 1;
       } else {
         return 0;

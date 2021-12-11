@@ -10,18 +10,15 @@
     },
     {
       "name": "actor",
-      "dataType": "STRING",
-      "maxLength": 2147483647
+      "dataType": "JSON"
     },
     {
       "name": "repo",
-      "dataType": "STRING",
-      "maxLength": 2147483647
+      "dataType": "JSON"
     },
     {
       "name": "payload",
-      "dataType": "STRING",
-      "maxLength": 2147483647
+      "dataType": "JSON"
     },
     {
       "name": "public",
@@ -33,6 +30,12 @@
       "name": "created_at",
       "dataType": "STRING",
       "format": "1:SECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd'T'HH:mm:ss'Z'",
+      "granularity": "1:SECONDS"
+    },
+    {
+      "name": "created_at_timestamp",
+      "dataType": "TIMESTAMP",
+      "format": "1:MILLISECONDS:TIMESTAMP",
       "granularity": "1:SECONDS"
     }
   ],

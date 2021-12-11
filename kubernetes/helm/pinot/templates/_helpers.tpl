@@ -17,14 +17,12 @@
 # under the License.
 #
 
-{{/* vim: set filetype=mustache: */}}
 {{/*
 Expand the name of the chart.
 */}}
 {{- define "pinot.name" -}}
-{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
-
+{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- end }}
 
 {{/*
 Create a default fully qualified app name.
@@ -32,25 +30,128 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this 
 If release name contains chart name it will be used as a full name.
 */}}
 {{- define "pinot.fullname" -}}
-{{- if .Values.fullnameOverride -}}
-{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
-{{- else -}}
-{{- $name := default .Chart.Name .Values.nameOverride -}}
-{{- if contains $name .Release.Name -}}
-{{- .Release.Name | trunc 63 | trimSuffix "-" -}}
-{{- else -}}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
-{{- end -}}
-{{- end -}}
+{{- if .Values.fullnameOverride }}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- $name := default .Chart.Name .Values.nameOverride }}
+{{- if contains $name .Release.Name }}
+{{- .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
+{{- end }}
+{{- end }}
+{{- end }}
 
 
 {{/*
 Create chart name and version as used by the chart label.
 */}}
 {{- define "pinot.chart" -}}
-{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
+{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+Match Selector labels
+*/}}
+{{- define "pinot.matchLabels" -}}
+app: {{ include "pinot.name" . }}
+chart: {{ include "pinot.chart" . }}
+release: {{ .Release.Name }}
+{{- end }}
+
+{{/*
+Common labels
+*/}}
+{{- define "pinot.labels" -}}
+helm.sh/chart: {{ include "pinot.chart" . }}
+{{ include "pinot.matchLabels" . }}
+{{- if .Chart.AppVersion }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+heritage: {{ .Release.Service }}
+{{- end }}
+
+{{/*
+Broker labels
+*/}}
+{{- define "pinot.brokerLabels" -}}
+{{- include "pinot.labels" . }}
+component: {{ .Values.broker.name }}
+{{- end }}
+
+
+{{/*
+Controller labels
+*/}}
+{{- define "pinot.controllerLabels" -}}
+{{- include "pinot.labels" . }}
+component: {{ .Values.controller.name }}
+{{- end }}
+
+{{/*
+Minion labels
+*/}}
+{{- define "pinot.minionLabels" -}}
+{{- include "pinot.labels" . }}
+component: {{ .Values.minion.name }}
+{{- end }}
+
+{{/*
+Server labels
+*/}}
+{{- define "pinot.serverLabels" -}}
+{{- include "pinot.labels" . }}
+component: {{ .Values.server.name }}
+{{- end }}
+
+
+
+{{/*
+Broker Match Selector labels
+*/}}
+{{- define "pinot.brokerMatchLabels" -}}
+{{- include "pinot.matchLabels" . }}
+component: {{ .Values.broker.name }}
+{{- end }}
+
+{{/*
+Controller Match Selector labels
+*/}}
+{{- define "pinot.controllerMatchLabels" -}}
+{{- include "pinot.matchLabels" . }}
+component: {{ .Values.controller.name }}
+{{- end }}
+
+
+{{/*
+Minion Match Selector labels
+*/}}
+{{- define "pinot.minionMatchLabels" -}}
+{{- include "pinot.matchLabels" . }}
+component: {{ .Values.minion.name }}
+{{- end }}
+
+
+{{/*
+Server Match Selector labels
+*/}}
+{{- define "pinot.serverMatchLabels" -}}
+{{- include "pinot.matchLabels" . }}
+component: {{ .Values.server.name }}
+{{- end }}
+
+
+{{/*
+Create the name of the service account to use for pinot components
+*/}}
+{{- define "pinot.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create }}
+{{- default (include "pinot.fullname" .) .Values.serviceAccount.name }}
+{{- else }}
+{{- default "default" .Values.serviceAccount.name }}
+{{- end }}
+{{- end }}
 
 
 {{/*
@@ -75,9 +176,7 @@ else use user-provided URL
 {{- if .Values.zookeeper.enabled -}}
 {{- printf "%s:%s" (include "pinot.zookeeper.fullname" .) $port }}
 {{- else -}}
-{{- $zookeeperConnect := printf "%s:%s" .Values.zookeeper.url $port }}
-{{- $zookeeperConnectOverride := index .Values "configurationOverrides" "zookeeper.connect" }}
-{{- default $zookeeperConnect $zookeeperConnectOverride }}
+{{- required "Missing 'zookeeper.urlOverride' entry zookeeper is disabled!"  .Values.zookeeper.urlOverride }}
 {{- end -}}
 {{- end -}}
 

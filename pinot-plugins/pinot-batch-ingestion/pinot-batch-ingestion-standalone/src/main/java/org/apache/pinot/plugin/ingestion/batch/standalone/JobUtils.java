@@ -19,6 +19,8 @@
 package org.apache.pinot.plugin.ingestion.batch.standalone;
 
 public class JobUtils {
+  private JobUtils() {
+  }
 
   public static int getNumThreads(int jobParallelism) {
     int numCores = Math.max(Runtime.getRuntime().availableProcessors(), 1);

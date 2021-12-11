@@ -29,13 +29,13 @@ class TestSchedulerGroup extends AbstractSchedulerGroup {
   }
 
   private ConcurrentLinkedQueue<SchedulerQueryContext> getQueue() {
-    return pendingQueries;
+    return _pendingQueries;
   }
 
   @Override
   public int compareTo(SchedulerGroupAccountant o) {
-    int lhs = Integer.parseInt(name);
-    int rhs = Integer.parseInt(((TestSchedulerGroup) o).name);
+    int lhs = Integer.parseInt(_name);
+    int rhs = Integer.parseInt(((TestSchedulerGroup) o)._name);
     if (lhs < rhs) {
       return 1;
     } else if (lhs > rhs) {

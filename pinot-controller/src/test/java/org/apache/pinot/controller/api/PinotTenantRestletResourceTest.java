@@ -28,21 +28,25 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class PinotTenantRestletResourceTest {
   private static final String TABLE_NAME = "restletTable_OFFLINE";
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     ControllerTestUtils.setupClusterAndValidate();
   }
 
   @Test
-  public void testTableListForTenant() throws Exception {
+  public void testTableListForTenant()
+      throws Exception {
     // Check that no tables on tenant works
-    String listTablesUrl = ControllerTestUtils.getControllerRequestURLBuilder().forTablesFromTenant(TagNameUtils.DEFAULT_TENANT_NAME);
+    String listTablesUrl =
+        ControllerTestUtils.getControllerRequestURLBuilder().forTablesFromTenant(TagNameUtils.DEFAULT_TENANT_NAME);
     JsonNode tableList = JsonUtils.stringToJsonNode(ControllerTestUtils.sendGetRequest(listTablesUrl));
     assertEquals(tableList.get("tables").size(), 0);
 

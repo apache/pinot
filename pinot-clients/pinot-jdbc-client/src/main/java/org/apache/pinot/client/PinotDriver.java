@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.client;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import java.net.URI;
 import java.sql.Connection;
@@ -29,27 +28,52 @@ import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.utils.DriverUtils;
 import org.slf4j.LoggerFactory;
 
 
 public class PinotDriver implements Driver {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(PinotDriver.class);
-  private final String SCHEME = "pinot";
-  public static final String TENANT = "tenant";
+  private static final String URI_SCHEME = "pinot";
+  public static final String INFO_TENANT = "tenant";
   public static final String DEFAULT_TENANT = "DefaultTenant";
+  public static final String INFO_SCHEME = "scheme";
+  public static final String INFO_HEADERS = "headers";
 
   @Override
   public Connection connect(String url, Properties info)
       throws SQLException {
     try {
       LOGGER.info("Initiating connection to database for url: " + url);
-      PinotClientTransport pinotClientTransport = new JsonAsyncHttpPinotClientTransportFactory().buildTransport();
+      JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
+
+      if (info.contains(INFO_SCHEME)) {
+        factory.setScheme(info.getProperty(INFO_SCHEME));
+      }
+
+      Map<String, String> headers =
+          info.entrySet().stream().filter(entry -> entry.getKey().toString().startsWith(INFO_HEADERS + ".")).map(
+                  entry -> Pair
+                      .of(entry.getKey().toString().substring(INFO_HEADERS.length() + 1), entry.getValue().toString()))
+              .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+      if (!headers.isEmpty()) {
+        factory.setHeaders(headers);
+      }
+
+      PinotClientTransport pinotClientTransport = factory.buildTransport();
       String controllerUrl = DriverUtils.getControllerFromURL(url);
-      String tenant = info.getProperty(TENANT, DEFAULT_TENANT);
-      return new PinotConnection(controllerUrl, pinotClientTransport, tenant);
+      String tenant = info.getProperty(INFO_TENANT, DEFAULT_TENANT);
+      if (!headers.isEmpty()) {
+        PinotControllerTransport pinotControllerTransport = new PinotControllerTransport(headers);
+        return new PinotConnection(info, controllerUrl, pinotClientTransport, tenant, pinotControllerTransport);
+      }
+      return new PinotConnection(info, controllerUrl, pinotClientTransport, tenant);
     } catch (Exception e) {
       throw new SQLException(String.format("Failed to connect to url : %s", url), e);
     }
@@ -60,7 +84,7 @@ public class PinotDriver implements Driver {
       throws SQLException {
     String cleanURI = url.substring(5);
     URI uri = URI.create(cleanURI);
-    return uri.getScheme().contentEquals(SCHEME);
+    return uri.getScheme().contentEquals(URI_SCHEME);
   }
 
   @Override
@@ -70,7 +94,8 @@ public class PinotDriver implements Driver {
     DriverPropertyInfo tenantPropertyInfo = new DriverPropertyInfo("tenant", null);
     tenantPropertyInfo.required = true;
     tenantPropertyInfo.description =
-        "Name of the tenant for which to create the JDBC connection. You can only query the tables belonging to the specified tenant";
+        "Name of the tenant for which to create the JDBC connection. You can only query the tables belonging to the "
+            + "specified tenant";
     propertyInfoList.add(tenantPropertyInfo);
     return Iterables.toArray(propertyInfoList, DriverPropertyInfo.class);
   }

@@ -27,6 +27,7 @@ public enum FilterKind {
   GREATER_THAN_OR_EQUAL,
   LESS_THAN,
   LESS_THAN_OR_EQUAL,
+  LIKE,
   BETWEEN,
   RANGE,
   IN,

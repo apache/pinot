@@ -23,9 +23,10 @@ import java.io.IOException;
 import org.I0Itec.zkclient.IDefaultNameSpace;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.Option;
+import org.apache.pinot.tools.utils.PinotConfigUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
@@ -33,16 +34,18 @@ import org.slf4j.LoggerFactory;
  *
  *
  */
+@CommandLine.Command(name = "StartZookeeper")
 public class StartZookeeperCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartZookeeperCommand.class);
 
-  @Option(name = "-zkPort", required = false, metaVar = "<int>", usage = "Port to start zookeeper server on.")
+  @CommandLine.Option(names = {"-zkPort"}, required = false, description = "Port to start zookeeper server on.")
   private int _zkPort = 2181;
 
-  @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Directory for zookeper data.")
-  private String _dataDir = TMP_DIR + "PinotAdmin/zkData";
+  @CommandLine.Option(names = {"-dataDir"}, required = false, description = "Directory for zookeper data.")
+  private String _dataDir = PinotConfigUtils.TMP_DIR + "PinotAdmin/zkData";
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -69,12 +72,12 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
     return "Start the Zookeeper process at the specified port.";
   }
 
-  StartZookeeperCommand setPort(int port) {
+  public StartZookeeperCommand setPort(int port) {
     _zkPort = port;
     return this;
   }
 
-  StartZookeeperCommand setDataDir(String dataDir) {
+  public StartZookeeperCommand setDataDir(String dataDir) {
     _dataDir = dataDir;
     return this;
   }
@@ -91,7 +94,7 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
       throws IOException {
     LOGGER.info("Executing command: " + toString());
 
-    IDefaultNameSpace _defaultNameSpace = new IDefaultNameSpace() {
+    IDefaultNameSpace defaultNameSpace = new IDefaultNameSpace() {
       @Override
       public void createDefaultNameSpace(org.I0Itec.zkclient.ZkClient zkClient) {
         // init any zk paths if needed

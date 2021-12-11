@@ -21,8 +21,8 @@ package org.apache.pinot.integration.tests;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.spi.utils.ReadMode;
 
 
 public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends RealtimeClusterIntegrationTest {
@@ -43,7 +43,8 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends RealtimeClus
   }
 
   @Override
-  public void startController() {
+  public void startController()
+      throws Exception {
     Map<String, Object> properties = getDefaultControllerConfiguration();
 
     properties.put(ControllerConf.ALLOW_HLC_TABLES, false);
@@ -55,11 +56,11 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends RealtimeClus
       throws Exception {
     // the first transaction of kafka messages are aborted
     ClusterIntegrationTestUtils
-        .pushAvroIntoKafkaWithTransaction(avroFiles, "localhost:" + getBaseKafkaPort(), getKafkaTopic(),
+        .pushAvroIntoKafkaWithTransaction(avroFiles, "localhost:" + getKafkaPort(), getKafkaTopic(),
             getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(), false);
     // the second transaction of kafka messages are committed
     ClusterIntegrationTestUtils
-        .pushAvroIntoKafkaWithTransaction(avroFiles, "localhost:" + getBaseKafkaPort(), getKafkaTopic(),
+        .pushAvroIntoKafkaWithTransaction(avroFiles, "localhost:" + getKafkaPort(), getKafkaTopic(),
             getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(), true);
   }
 }

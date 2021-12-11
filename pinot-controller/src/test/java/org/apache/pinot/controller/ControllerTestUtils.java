@@ -61,14 +61,12 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.api.AccessControlTest;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -76,15 +74,20 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 
-import static org.apache.pinot.common.utils.CommonConstants.Helix.Instance.*;
-import static org.apache.pinot.common.utils.CommonConstants.Helix.*;
-import static org.apache.pinot.common.utils.CommonConstants.Server.*;
-import static org.testng.Assert.*;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.Instance.ADMIN_PORT_KEY;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 
 /**
@@ -106,7 +109,7 @@ public abstract class ControllerTestUtils {
   public static final int TOTAL_NUM_SERVER_INSTANCES = 2 * NUM_SERVER_INSTANCES;
   public static final int TOTAL_NUM_BROKER_INSTANCES = 2 * NUM_BROKER_INSTANCES;
 
-  protected static final List<HelixManager> _fakeInstanceHelixManagers = new ArrayList<>();
+  protected static final List<HelixManager> FAKE_INSTANCE_HELIX_MANAGERS = new ArrayList<>();
   protected static int _controllerPort;
   protected static String _controllerBaseApiUrl;
 
@@ -145,23 +148,25 @@ public abstract class ControllerTestUtils {
     properties.put(ControllerConf.CONTROLLER_HOST, LOCAL_HOST);
     properties.put(ControllerConf.CONTROLLER_PORT, DEFAULT_CONTROLLER_PORT);
     properties.put(ControllerConf.DATA_DIR, DEFAULT_DATA_DIR);
-    properties.put(ControllerConf.ZK_STR, ZkStarter.DEFAULT_ZK_STR);
+    properties.put(ControllerConf.ZK_STR, _zookeeperInstance.getZkUrl());
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, getHelixClusterName());
 
     return properties;
   }
 
-  public static void startController(Map<String, Object> properties) {
+  public static void startController(Map<String, Object> properties)
+      throws Exception {
     Preconditions.checkState(_controllerStarter == null);
 
     _controllerConfig = new ControllerConf(properties);
 
-    _controllerPort = Integer.valueOf(_controllerConfig.getControllerPort());
+    _controllerPort = Integer.parseInt(_controllerConfig.getControllerPort());
     _controllerBaseApiUrl = "http://localhost:" + _controllerPort;
     _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
     _controllerDataDir = _controllerConfig.getDataDir();
 
-    _controllerStarter = getControllerStarter(_controllerConfig);
+    _controllerStarter = new ControllerStarter();
+    _controllerStarter.init(new PinotConfiguration(properties));
     _controllerStarter.start();
     _helixResourceManager = _controllerStarter.getHelixResourceManager();
     _helixManager = _controllerStarter.getHelixControllerManager();
@@ -185,15 +190,13 @@ public abstract class ControllerTestUtils {
         _helixAdmin = _helixManager.getClusterManagmentTool();
         _propertyStore = _helixManager.getHelixPropertyStore();
         break;
+      default:
+        break;
     }
     //enable case insensitive pql for test cases.
     configAccessor.set(scope, CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(true));
     //Set hyperloglog log2m value to 12.
     configAccessor.set(scope, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
-  }
-
-  protected static ControllerStarter getControllerStarter(ControllerConf config) {
-    return new ControllerStarter(config);
   }
 
   public static ControllerConf getControllerConfig() {
@@ -230,9 +233,8 @@ public abstract class ControllerTestUtils {
 
   public static void addFakeBrokerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant)
       throws Exception {
-    HelixManager helixManager =
-        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
-            ZkStarter.DEFAULT_ZK_STR);
+    HelixManager helixManager = HelixManagerFactory
+        .getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT, _zookeeperInstance.getZkUrl());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeBrokerResourceOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
             FakeBrokerResourceOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
@@ -243,7 +245,7 @@ public abstract class ControllerTestUtils {
     } else {
       helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, UNTAGGED_BROKER_INSTANCE);
     }
-    _fakeInstanceHelixManagers.add(helixManager);
+    FAKE_INSTANCE_HELIX_MANAGERS.add(helixManager);
   }
 
   public static class FakeBrokerResourceOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
@@ -314,7 +316,8 @@ public abstract class ControllerTestUtils {
 
   /** Add fake server instances until total number of server instances reaches maxCount */
   public static void addMoreFakeServerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant,
-      int baseAdminPort) throws Exception {
+      int baseAdminPort)
+      throws Exception {
 
     // get current instance count
     int currentCount = getFakeServerInstanceCount();
@@ -328,10 +331,10 @@ public abstract class ControllerTestUtils {
   }
 
   protected static void addFakeServerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant,
-      int adminPort) throws Exception {
-    HelixManager helixManager =
-        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
-            ZkStarter.DEFAULT_ZK_STR);
+      int adminPort)
+      throws Exception {
+    HelixManager helixManager = HelixManagerFactory
+        .getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT, _zookeeperInstance.getZkUrl());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeSegmentOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
             FakeSegmentOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
@@ -343,10 +346,11 @@ public abstract class ControllerTestUtils {
     } else {
       helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, UNTAGGED_SERVER_INSTANCE);
     }
-    HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT,
-        getHelixClusterName()).forParticipant(instanceId).build();
+    HelixConfigScope configScope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT, getHelixClusterName())
+            .forParticipant(instanceId).build();
     helixAdmin.setConfig(configScope, Collections.singletonMap(ADMIN_PORT_KEY, Integer.toString(adminPort)));
-    _fakeInstanceHelixManagers.add(helixManager);
+    FAKE_INSTANCE_HELIX_MANAGERS.add(helixManager);
   }
 
   public static class FakeSegmentOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
@@ -420,17 +424,17 @@ public abstract class ControllerTestUtils {
   }
 
   public static void stopFakeInstances() {
-    for (HelixManager helixManager : _fakeInstanceHelixManagers) {
+    for (HelixManager helixManager : FAKE_INSTANCE_HELIX_MANAGERS) {
       helixManager.disconnect();
     }
-    _fakeInstanceHelixManagers.clear();
+    FAKE_INSTANCE_HELIX_MANAGERS.clear();
   }
 
   public static void stopFakeInstance(String instanceId) {
-    for (HelixManager helixManager : _fakeInstanceHelixManagers) {
+    for (HelixManager helixManager : FAKE_INSTANCE_HELIX_MANAGERS) {
       if (helixManager.getInstanceName().equalsIgnoreCase(instanceId)) {
         helixManager.disconnect();
-        _fakeInstanceHelixManagers.remove(helixManager);
+        FAKE_INSTANCE_HELIX_MANAGERS.remove(helixManager);
         return;
       }
     }
@@ -447,14 +451,16 @@ public abstract class ControllerTestUtils {
     return schema;
   }
 
-  public static void addDummySchema(String tableName) throws IOException {
+  public static void addDummySchema(String tableName)
+      throws IOException {
     addSchema(createDummySchema(tableName));
   }
 
   /**
    * Add a schema to the controller.
    */
-  public static void addSchema(Schema schema) throws IOException {
+  public static void addSchema(Schema schema)
+      throws IOException {
     String url = _controllerRequestURLBuilder.forSchemaCreate();
     PostMethod postMethod = sendMultipartPostRequest(url, schema.toSingleLineJsonString());
     assertEquals(postMethod.getStatusCode(), 200);
@@ -466,7 +472,8 @@ public abstract class ControllerTestUtils {
     return schema;
   }
 
-  protected static void addTableConfig(TableConfig tableConfig) throws IOException {
+  protected static void addTableConfig(TableConfig tableConfig)
+      throws IOException {
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
   }
 
@@ -474,12 +481,14 @@ public abstract class ControllerTestUtils {
     return new Tenant(TenantRole.BROKER, tenantName, numBrokers, 0, 0).toJsonString();
   }
 
-  public static void createBrokerTenant(String tenantName, int numBrokers) throws IOException {
+  public static void createBrokerTenant(String tenantName, int numBrokers)
+      throws IOException {
     sendPostRequest(_controllerRequestURLBuilder.forTenantCreate(),
         getBrokerTenantRequestPayload(tenantName, numBrokers));
   }
 
-  public static void updateBrokerTenant(String tenantName, int numBrokers) throws IOException {
+  public static void updateBrokerTenant(String tenantName, int numBrokers)
+      throws IOException {
     sendPutRequest(_controllerRequestURLBuilder.forTenantCreate(),
         getBrokerTenantRequestPayload(tenantName, numBrokers));
   }
@@ -506,15 +515,18 @@ public abstract class ControllerTestUtils {
     }
   }
 
-  public static String sendGetRequest(String urlString) throws IOException {
+  public static String sendGetRequest(String urlString)
+      throws IOException {
     return constructResponse(new URL(urlString).openStream());
   }
 
-  public static String sendGetRequestRaw(String urlString) throws IOException {
+  public static String sendGetRequestRaw(String urlString)
+      throws IOException {
     return IOUtils.toString(new URL(urlString).openStream());
   }
 
-  public static String sendPostRequest(String urlString, String payload) throws IOException {
+  public static String sendPostRequest(String urlString, String payload)
+      throws IOException {
     return sendPostRequest(urlString, payload, Collections.EMPTY_MAP);
   }
 
@@ -540,7 +552,8 @@ public abstract class ControllerTestUtils {
     return constructResponse(httpConnection.getInputStream());
   }
 
-  public static String sendPutRequest(String urlString, String payload) throws IOException {
+  public static String sendPutRequest(String urlString, String payload)
+      throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
     httpConnection.setDoOutput(true);
     httpConnection.setRequestMethod("PUT");
@@ -554,14 +567,36 @@ public abstract class ControllerTestUtils {
     return constructResponse(httpConnection.getInputStream());
   }
 
-  public static String sendPutRequest(String urlString) throws IOException {
+  public static String sendPutRequest(String urlString, Map<String, String> headers, String payload)
+      throws IOException {
+    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
+    httpConnection.setDoOutput(true);
+    httpConnection.setRequestMethod("PUT");
+    if (headers != null) {
+      for (Map.Entry<String, String> kv : headers.entrySet()) {
+        httpConnection.setRequestProperty(kv.getKey(), kv.getValue());
+      }
+    }
+
+    try (BufferedWriter writer = new BufferedWriter(
+        new OutputStreamWriter(httpConnection.getOutputStream(), StandardCharsets.UTF_8))) {
+      writer.write(payload);
+      writer.flush();
+    }
+
+    return constructResponse(httpConnection.getInputStream());
+  }
+
+  public static String sendPutRequest(String urlString)
+      throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
     httpConnection.setDoOutput(true);
     httpConnection.setRequestMethod("PUT");
     return constructResponse(httpConnection.getInputStream());
   }
 
-  public static String sendDeleteRequest(String urlString) throws IOException {
+  public static String sendDeleteRequest(String urlString)
+      throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
     httpConnection.setRequestMethod("DELETE");
     httpConnection.connect();
@@ -569,7 +604,8 @@ public abstract class ControllerTestUtils {
     return constructResponse(httpConnection.getInputStream());
   }
 
-  private static String constructResponse(InputStream inputStream) throws IOException {
+  private static String constructResponse(InputStream inputStream)
+      throws IOException {
     try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
       StringBuilder responseBuilder = new StringBuilder();
       String line;
@@ -580,7 +616,8 @@ public abstract class ControllerTestUtils {
     }
   }
 
-  public static PostMethod sendMultipartPostRequest(String url, String body) throws IOException {
+  public static PostMethod sendMultipartPostRequest(String url, String body)
+      throws IOException {
     HttpClient httpClient = new HttpClient();
     PostMethod postMethod = new PostMethod(url);
     // our handlers ignore key...so we can put anything here
@@ -590,7 +627,8 @@ public abstract class ControllerTestUtils {
     return postMethod;
   }
 
-  public static PutMethod sendMultipartPutRequest(String url, String body) throws IOException {
+  public static PutMethod sendMultipartPutRequest(String url, String body)
+      throws IOException {
     HttpClient httpClient = new HttpClient();
     PutMethod putMethod = new PutMethod(url);
     // our handlers ignore key...so we can put anything here
@@ -667,15 +705,28 @@ public abstract class ControllerTestUtils {
     // Used in PinotTableRestletResourceTest
     properties.put(ControllerConf.TABLE_MIN_REPLICAS, MIN_NUM_REPLICAS);
 
+    // Used in PinotControllerAppConfigsTest to test obfuscation
+    properties.put("controller.segment.fetcher.auth.token", "*personal*");
+    properties.put("controller.admin.access.control.principals.user.password", "*personal*");
+
     return properties;
+  }
+
+  public static void startSuiteRun()
+      throws Exception {
+    startSuiteRun(Collections.emptyMap());
   }
 
   /**
    * Initialize shared state for the TestNG suite.
    */
-  public static void startSuiteRun() throws Exception {
+  public static void startSuiteRun(Map<String, Object> extraProperties)
+      throws Exception {
     startZk();
-    startController(getSuiteControllerConfiguration());
+
+    Map<String, Object> suiteControllerConfiguration = getSuiteControllerConfiguration();
+    suiteControllerConfiguration.putAll(extraProperties);
+    startController(suiteControllerConfiguration);
 
     addMoreFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
     addMoreFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, true);
@@ -698,12 +749,18 @@ public abstract class ControllerTestUtils {
   /**
    * Make sure shared state is setup and valid before each test case class is run.
    */
-  public static void setupClusterAndValidate() throws Exception {
+  public static void setupClusterAndValidate()
+      throws Exception {
+    setupClusterAndValidate(Collections.emptyMap());
+  }
+
+  public static void setupClusterAndValidate(Map<String, Object> extraProperties)
+      throws Exception {
     if (_zookeeperInstance == null || _helixResourceManager == null) {
       // this is expected to happen only when running a single test case outside of testNG suite, i.e when test
       // cases are run one at a time within IntelliJ or through maven command line. When running under a testNG
       // suite, state will have already been setup by @BeforeSuite method in ControllerTestSetup.
-      startSuiteRun();
+      startSuiteRun(extraProperties);
     }
 
     // Check number of tenants

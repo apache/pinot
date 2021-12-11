@@ -23,7 +23,7 @@ metadata:
   name: {{ include "pinot.minion.config" . }}
 data:
   pinot-minion.conf: |-
-    pinot.minion.port={{ .Values.minion.port }}
+    pinot.minion.port={{ .Values.minion.service.port }}
     {{- if .Values.minion.dataDir }}
     dataDir={{ .Values.minion.dataDir }}
     {{- end }}

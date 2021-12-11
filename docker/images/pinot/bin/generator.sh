@@ -26,17 +26,23 @@ TEMP_DIR=$(mktemp -d -t pinotGenerator-XXXXXXXX)
 TEMPLATE_BASEDIR="$TEMP_DIR/generator"
 CONTROLLER_HOST="localhost"
 CONTROLLER_PORT="9000"
+CONTROLLER_SCHEME="http"
+AUTH_TOKEN=""
 
-USAGE="$(basename "$0") [-h] [-a PATH] [-c HOST:PORT] [-j PATH] [-n ROWS] TEMPLATE_NAME [TABLE_NAME]
+export JAVA_OPTS="$(echo $JAVA_OPTS | sed -E 's/-javaagent\S+//')"
+
+USAGE="$(basename "$0") [-h] [-a PATH] [-c HOST:PORT] [-s SCHEME] [-t AUTH_TOKEN] [-j PATH] [-n ROWS] TEMPLATE_NAME [TABLE_NAME]
 
   where:
       -h  show this help text
       -a  set pinot-admin path for segement creation
-      -c  set the controller host and port (default: 'localhost:9000')
+      -c  set controller host and port (default: 'localhost:9000')
       -j  set jar path for resource extraction
-      -n  number of rows to generate. (optional)"
+      -n  set number of rows to generate (optional)
+      -s  set connection scheme (default: 'http')
+      -t  set auth token (optional)"
 
-while getopts ':ha:c:j:n:' OPTION; do
+while getopts ':ha:c:j:n:s:t:' OPTION; do
   case "$OPTION" in
     h) echo "$USAGE"
        exit
@@ -51,6 +57,10 @@ while getopts ':ha:c:j:n:' OPTION; do
     j) JAR_PATH="$OPTARG"
        ;;
     n) NUM_RECORDS="$OPTARG"
+       ;;
+    s) CONTROLLER_SCHEME="$OPTARG"
+       ;;
+    t) AUTH_TOKEN="$OPTARG"
        ;;
     :) printf "missing argument for -%s\n" "$OPTARG" >&2
        echo "$USAGE" >&2
@@ -120,8 +130,8 @@ if [ "$TEMPLATE_NAME" = "complexWebsite" ]; then
 fi
 
 echo "Generating data for ${TEMPLATE_NAME} in ${DATA_DIR}"
-JAVA_OPTS="" ${ADMIN_PATH} GenerateData \
--numFiles 1 -numRecords $NUM_RECORDS -format csv \
+${ADMIN_PATH} GenerateData \
+-numFiles 1 -numRecords $NUM_RECORDS -format CSV \
 -schemaFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json" \
 -schemaAnnotationFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_generator.json" \
 -outDir "$DATA_DIR"
@@ -133,8 +143,8 @@ if [ ! -d "${DATA_DIR}" ]; then
 fi
 
 echo "Creating segment for ${TEMPLATE_NAME} in ${SEGMENT_DIR}"
-JAVA_OPTS="" ${ADMIN_PATH} CreateSegment \
--format csv \
+${ADMIN_PATH} CreateSegment \
+-format CSV \
 -tableConfigFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_config.json" \
 -schemaFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json" \
 -dataDir "${DATA_DIR}" \
@@ -147,11 +157,13 @@ if [ ! -d "${SEGMENT_DIR}" ]; then
 fi
 
 echo "Adding table ${TABLE_NAME} from template ${TEMPLATE_NAME}"
-JAVA_OPTS="" ${ADMIN_PATH} AddTable -exec \
+${ADMIN_PATH} AddTable -exec \
+-authToken "${AUTH_TOKEN}" \
 -tableConfigFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_config.json" \
 -schemaFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json" \
 -controllerHost "${CONTROLLER_HOST}" \
--controllerPort "${CONTROLLER_PORT}"
+-controllerPort "${CONTROLLER_PORT}" \
+-controllerProtocol "${CONTROLLER_SCHEME}"
 
 if [ $? != 0 ]; then
   echo "Adding table failed. Aborting."
@@ -160,11 +172,13 @@ if [ $? != 0 ]; then
 fi
 
 echo "Uploading segment for ${TEMPLATE_NAME}"
-JAVA_OPTS="" ${ADMIN_PATH} UploadSegment \
+${ADMIN_PATH} UploadSegment \
+-authToken "${AUTH_TOKEN}" \
 -tableName "${TABLE_NAME}" \
 -segmentDir "${SEGMENT_DIR}" \
 -controllerHost "${CONTROLLER_HOST}" \
--controllerPort "${CONTROLLER_PORT}"
+-controllerPort "${CONTROLLER_PORT}" \
+-controllerProtocol "${CONTROLLER_SCHEME}"
 
 if [ $? != 0 ]; then
   echo "Segment upload failed. Aborting."
@@ -175,4 +189,4 @@ fi
 echo "Deleting temp directory"
 rm -rf "$TEMP_DIR"
 
-echo "Succesfully created table ${TABLE_NAME} from template ${TEMPLATE_NAME}"
+echo "Successfully created table ${TABLE_NAME} from template ${TEMPLATE_NAME}"

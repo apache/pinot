@@ -19,8 +19,8 @@
 package org.apache.pinot.controller.util;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.joda.time.Duration;
 
 
@@ -28,6 +28,8 @@ import org.joda.time.Duration;
  * Helper methods for segment interval validations
  */
 public class SegmentIntervalUtils {
+  private SegmentIntervalUtils() {
+  }
 
   /**
    * We only want to check missing segments if the table has at least 2 segments and a time column

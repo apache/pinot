@@ -33,18 +33,23 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 @SuppressWarnings("rawtypes")
 public class DistinctCombineOperator extends BaseCombineOperator {
   private static final String OPERATOR_NAME = "DistinctCombineOperator";
+  private static final String EXPLAIN_NAME = "COMBINE_DISTINCT";
 
   private final boolean _hasOrderBy;
 
-  public DistinctCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
-      long endTimeMs) {
-    super(operators, queryContext, executorService, endTimeMs);
+  public DistinctCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
+    super(operators, queryContext, executorService);
     _hasOrderBy = queryContext.getOrderByExpressions() != null;
   }
 
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String toExplainString() {
+    return EXPLAIN_NAME;
   }
 
   @Override

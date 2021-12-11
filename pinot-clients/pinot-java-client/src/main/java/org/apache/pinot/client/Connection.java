@@ -19,6 +19,7 @@
 package org.apache.pinot.client;
 
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -31,21 +32,32 @@ import org.slf4j.LoggerFactory;
  * A connection to Pinot, normally created through calls to the {@link ConnectionFactory}.
  */
 public class Connection {
+  public static final String FAIL_ON_EXCEPTIONS = "failOnExceptions";
   private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
+
   private final PinotClientTransport _transport;
   private final BrokerSelector _brokerSelector;
-  private List<String> _brokerList;
+  private final boolean _failOnExceptions;
 
   Connection(List<String> brokerList, PinotClientTransport transport) {
-    _brokerList = brokerList;
-    LOGGER.info("Creating connection to broker list {}", brokerList);
-    _brokerSelector = new SimpleBrokerSelector(brokerList);
-    _transport = transport;
+    this(new Properties(), new SimpleBrokerSelector(brokerList), transport);
+  }
+
+  Connection(Properties properties, List<String> brokerList, PinotClientTransport transport) {
+    this(properties, new SimpleBrokerSelector(brokerList), transport);
+    LOGGER.info("Created connection to broker list {}", brokerList);
   }
 
   Connection(BrokerSelector brokerSelector, PinotClientTransport transport) {
+    this(new Properties(), brokerSelector, transport);
+  }
+
+  Connection(Properties properties, BrokerSelector brokerSelector, PinotClientTransport transport) {
     _brokerSelector = brokerSelector;
     _transport = transport;
+
+    // Default fail Pinot query if response contains any exception.
+    _failOnExceptions = Boolean.parseBoolean(properties.getProperty(FAIL_ON_EXCEPTIONS, "TRUE"));
   }
 
   /**
@@ -125,7 +137,7 @@ public class Connection {
           "Could not find broker to query for table: " + (tableName == null ? "null" : tableName));
     }
     BrokerResponse response = _transport.executeQuery(brokerHostPort, request);
-    if (response.hasExceptions()) {
+    if (response.hasExceptions() && _failOnExceptions) {
       throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
     }
     return new ResultSetGroup(response);
@@ -171,7 +183,7 @@ public class Connection {
    * @return The list of brokers to which this connection can connect to.
    */
   List<String> getBrokerList() {
-    return _brokerList;
+    return _brokerSelector.getBrokers();
   }
 
   /**
@@ -182,6 +194,7 @@ public class Connection {
   public void close()
       throws PinotClientException {
     _transport.close();
+    _brokerSelector.close();
   }
 
   private static class ResultSetGroupFuture implements Future<ResultSetGroup> {

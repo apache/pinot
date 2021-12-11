@@ -30,33 +30,30 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockDocIdIterator;
-import org.apache.pinot.segment.spi.Constants;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
-import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.core.data.aggregator.ValueAggregator;
-import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.plan.FilterPlanNode;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.core.startree.CompositePredicateEvaluator;
+import org.apache.pinot.core.startree.StarTreeUtils;
+import org.apache.pinot.core.startree.plan.StarTreeFilterPlanNode;
+import org.apache.pinot.segment.local.aggregator.ValueAggregator;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
-import org.apache.pinot.core.startree.StarTreeUtils;
-import org.apache.pinot.core.startree.plan.StarTreeFilterPlanNode;
-import org.apache.pinot.core.startree.v2.builder.MultipleTreesBuilder;
-import org.apache.pinot.core.startree.v2.builder.MultipleTreesBuilder.BuildMode;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -64,6 +61,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -95,7 +93,15 @@ abstract class BaseStarTreeV2Test<R, A> {
   private static final String DIMENSION_D2 = "d2";
   private static final int DIMENSION_CARDINALITY = 100;
   private static final String METRIC = "m";
-  private static final String QUERY_FILTER = " WHERE d1 = 0 AND d2 < 10";
+  private static final String QUERY_FILTER_AND = " WHERE d1 = 0 AND d2 < 10";
+  // StarTree supports OR predicates only on a single dimension
+  private static final String QUERY_FILTER_OR = " WHERE d1 > 10 OR d1 < 50";
+  private static final String QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS = " WHERE d2 < 95 AND (d1 > 10 OR d1 < 50)";
+  private static final String QUERY_FILTER_COMPLEX_AND_MULTIPLE_DIMENSIONS_THREE_PREDICATES =
+      " WHERE d2 < 95 AND d2 > 25 AND (d1 > 10 OR d1 < 50)";
+  private static final String QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS_THREE_PREDICATES =
+      " WHERE (d2 > 95 OR d2 < 25) AND (d1 > 10 OR d1 < 50)";
+  private static final String QUERY_FILTER_COMPLEX_OR_SINGLE_DIMENSION = " WHERE d1 = 95 AND (d1 > 90 OR d1 < 100)";
   private static final String QUERY_GROUP_BY = " GROUP BY d2";
 
   private ValueAggregator _valueAggregator;
@@ -143,7 +149,8 @@ abstract class BaseStarTreeV2Test<R, A> {
         MAX_LEAF_RECORDS);
     File indexDir = new File(TEMP_DIR, SEGMENT_NAME);
     // Randomly build star-tree using on-heap or off-heap mode
-    BuildMode buildMode = RANDOM.nextBoolean() ? BuildMode.ON_HEAP : BuildMode.OFF_HEAP;
+    MultipleTreesBuilder.BuildMode buildMode =
+        RANDOM.nextBoolean() ? MultipleTreesBuilder.BuildMode.ON_HEAP : MultipleTreesBuilder.BuildMode.OFF_HEAP;
     try (MultipleTreesBuilder builder = new MultipleTreesBuilder(Collections.singletonList(starTreeIndexConfig), false,
         indexDir, buildMode)) {
       builder.build();
@@ -170,9 +177,19 @@ abstract class BaseStarTreeV2Test<R, A> {
 
     String baseQuery = String.format("SELECT %s FROM %s", aggregation, TABLE_NAME);
     testQuery(baseQuery);
-    testQuery(baseQuery + QUERY_FILTER);
+    testQuery(baseQuery + QUERY_FILTER_AND);
+    testQuery(baseQuery + QUERY_FILTER_OR);
+    testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS);
+    testQuery(baseQuery + QUERY_FILTER_COMPLEX_AND_MULTIPLE_DIMENSIONS_THREE_PREDICATES);
+    testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS_THREE_PREDICATES);
+    testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR_SINGLE_DIMENSION);
     testQuery(baseQuery + QUERY_GROUP_BY);
-    testQuery(baseQuery + QUERY_FILTER + QUERY_GROUP_BY);
+    testQuery(baseQuery + QUERY_FILTER_AND + QUERY_GROUP_BY);
+    testQuery(baseQuery + QUERY_FILTER_OR + QUERY_GROUP_BY);
+    testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS + QUERY_GROUP_BY);
+    testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS_THREE_PREDICATES + QUERY_GROUP_BY);
+    testQuery(baseQuery + QUERY_FILTER_COMPLEX_AND_MULTIPLE_DIMENSIONS_THREE_PREDICATES + QUERY_GROUP_BY);
+    testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR_SINGLE_DIMENSION + QUERY_GROUP_BY);
   }
 
   @AfterClass
@@ -184,7 +201,7 @@ abstract class BaseStarTreeV2Test<R, A> {
 
   void testQuery(String query)
       throws IOException {
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(query);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
 
     // Aggregations
     AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
@@ -206,9 +223,11 @@ abstract class BaseStarTreeV2Test<R, A> {
     List<String> groupByColumns = new ArrayList<>(groupByColumnSet);
 
     // Filter
-    FilterContext filter = queryContext.getFilter();
-    Map<String, List<PredicateEvaluator>> predicateEvaluatorsMap =
-        StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, filter);
+    FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, queryContext);
+    filterPlanNode.run();
+    Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
+        StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, queryContext.getFilter(),
+            filterPlanNode.getPredicateEvaluatorMap());
     assertNotNull(predicateEvaluatorsMap);
 
     // Extract values with star-tree
@@ -216,8 +235,8 @@ abstract class BaseStarTreeV2Test<R, A> {
         new StarTreeFilterPlanNode(_starTreeV2, predicateEvaluatorsMap, groupByColumnSet, null);
     List<ForwardIndexReader> starTreeAggregationColumnReaders = new ArrayList<>(numAggregations);
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
-      starTreeAggregationColumnReaders
-          .add(_starTreeV2.getDataSource(aggregationFunctionColumnPair.toColumnName()).getForwardIndex());
+      starTreeAggregationColumnReaders.add(
+          _starTreeV2.getDataSource(aggregationFunctionColumnPair.toColumnName()).getForwardIndex());
     }
     List<ForwardIndexReader> starTreeGroupByColumnReaders = new ArrayList<>(numGroupByColumns);
     for (String groupByColumn : groupByColumns) {

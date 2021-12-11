@@ -23,19 +23,15 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ template "pinot.broker.external" . }}
+  annotations:
+{{ toYaml .Values.broker.external.annotations | indent 4 }}
   labels:
-    app: {{ include "pinot.name" . }}
-    chart: {{ include "pinot.chart" . }}
-    component: {{ .Values.broker.name }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    {{- include "pinot.brokerLabels" . | nindent 4 }}
 spec:
   type: {{ .Values.broker.external.type }}
   ports:
     - name: external-broker
       port: {{ .Values.broker.external.port }}
   selector:
-    app: {{ include "pinot.name" . }}
-    release: {{ .Release.Name }}
-    component: {{ .Values.broker.name }}
+    {{- include "pinot.brokerMatchLabels" . | nindent 4 }}
 {{- end }}

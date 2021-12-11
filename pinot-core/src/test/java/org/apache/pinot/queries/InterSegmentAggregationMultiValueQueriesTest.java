@@ -42,6 +42,9 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
   private static final String MV_GROUP_BY = " group by column7";
   private static final String ORDER_BY_ALIAS = " order by cnt_column6 DESC";
 
+  // Allow 5% quantile error due to the randomness of TDigest merge
+  private static final double PERCENTILE_TDIGEST_DELTA = 0.05 * Integer.MAX_VALUE;
+
   @Test
   public void testCountMV() {
     String query = "SELECT COUNTMV(column6) FROM testTable";
@@ -76,7 +79,8 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         aggregations);
 
     query =
-        "SELECT VALUEIN(column7, 363, 469, 246, 100000), COUNTMV(column6) FROM testTable GROUP BY VALUEIN(column7, 363, 469, 246, 100000)";
+        "SELECT VALUEIN(column7, 363, 469, 246, 100000), COUNTMV(column6) FROM testTable GROUP BY VALUEIN(column7, "
+            + "363, 469, 246, 100000)";
     brokerResponse = getBrokerResponseForSqlQuery(query);
     DataSchema expectedDataSchema =
         new DataSchema(new String[]{"valuein(column7,'363','469','246','100000')", "countmv(column6)"},
@@ -86,21 +90,24 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
             new Object[]{363, (long) 35436}), 3, expectedDataSchema);
 
     query =
-        "SELECT VALUEIN(column7, 363, 469, 246, 100000), COUNTMV(column6) FROM testTable GROUP BY VALUEIN(column7, 363, 469, 246, 100000) ORDER BY COUNTMV(column6)";
+        "SELECT VALUEIN(column7, 363, 469, 246, 100000), COUNTMV(column6) FROM testTable GROUP BY VALUEIN(column7, "
+            + "363, 469, 246, 100000) ORDER BY COUNTMV(column6)";
     brokerResponse = getBrokerResponseForSqlQuery(query);
     QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, Lists
         .newArrayList(new Object[]{246, (long) 24300}, new Object[]{469, (long) 33576},
             new Object[]{363, (long) 35436}), 3, expectedDataSchema);
 
     query =
-        "SELECT VALUEIN(column7, 363, 469, 246, 100000), COUNTMV(column6) FROM testTable GROUP BY VALUEIN(column7, 363, 469, 246, 100000) ORDER BY COUNTMV(column6) DESC";
+        "SELECT VALUEIN(column7, 363, 469, 246, 100000), COUNTMV(column6) FROM testTable GROUP BY VALUEIN(column7, "
+            + "363, 469, 246, 100000) ORDER BY COUNTMV(column6) DESC";
     brokerResponse = getBrokerResponseForSqlQuery(query);
     QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, Lists
         .newArrayList(new Object[]{363, (long) 35436}, new Object[]{469, (long) 33576},
             new Object[]{246, (long) 24300}), 3, expectedDataSchema);
 
     query =
-        "SELECT VALUEIN(column7, 363, 469, 246, 100000) AS value_in_col, COUNTMV(column6) FROM testTable GROUP BY value_in_col ORDER BY COUNTMV(column6) DESC";
+        "SELECT VALUEIN(column7, 363, 469, 246, 100000) AS value_in_col, COUNTMV(column6) FROM testTable GROUP BY "
+            + "value_in_col ORDER BY COUNTMV(column6) DESC";
     expectedDataSchema = new DataSchema(new String[]{"value_in_col", "countmv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG});
     brokerResponse = getBrokerResponseForSqlQuery(query);
@@ -137,7 +144,8 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         aggregations);
 
     query =
-        "SELECT timeconvert(daysSinceEpoch, 'DAYS', 'HOURS'), COUNTMV(column6) FROM testTable GROUP BY timeconvert(daysSinceEpoch, 'DAYS', 'HOURS') ORDER BY COUNTMV(column6) DESC";
+        "SELECT timeconvert(daysSinceEpoch, 'DAYS', 'HOURS'), COUNTMV(column6) FROM testTable GROUP BY timeconvert"
+            + "(daysSinceEpoch, 'DAYS', 'HOURS') ORDER BY COUNTMV(column6) DESC";
     expectedDataSchema = new DataSchema(new String[]{"timeconvert(daysSinceEpoch,'DAYS','HOURS')", "countmv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.LONG});
     brokerResponse = getBrokerResponseForSqlQuery(query);
@@ -520,13 +528,126 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
   }
 
   @Test
+  public void testPercentileRawEst50MV() {
+    testPercentileRawEstAggregationFunction(50);
+  }
+
+  @Test
+  public void testPercentileRawEst90MV() {
+    testPercentileRawEstAggregationFunction(90);
+  }
+
+  @Test
+  public void testPercentileRawEst95MV() {
+    testPercentileRawEstAggregationFunction(95);
+  }
+
+  @Test
+  public void testPercentileRawEst99MV() {
+    testPercentileRawEstAggregationFunction(99);
+  }
+
+  private void testPercentileRawEstAggregationFunction(int percentile) {
+    Function<Serializable, String> quantileExtractor = value -> String.valueOf(
+        ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
+            .getQuantile(percentile / 100.0));
+
+    String rawQuery =
+        String.format("SELECT PERCENTILERAWEST%dMV(column6) FROM testTable", percentile);
+
+    String query =
+        String.format("SELECT PERCENTILEEST%dMV(column6) FROM testTable", percentile);
+
+    queryAndTestAggregationResult(rawQuery, getExpectedQueryResults(query), quantileExtractor);
+
+    queryAndTestAggregationResult(rawQuery + getFilter(), getExpectedQueryResults(query + getFilter()),
+        quantileExtractor);
+
+    queryAndTestAggregationResult(rawQuery + SV_GROUP_BY, getExpectedQueryResults(query + SV_GROUP_BY),
+        quantileExtractor);
+
+    queryAndTestAggregationResult(rawQuery + MV_GROUP_BY, getExpectedQueryResults(query + MV_GROUP_BY),
+        quantileExtractor);
+  }
+
+  private void testPercentileRawTDigestAggregationFunction(int percentile) {
+    Function<Serializable, String> quantileExtractor = value -> String.valueOf(
+        ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
+            .quantile(percentile / 100.0));
+
+    String rawQuery =
+        String.format("SELECT PERCENTILERAWTDIGEST%dMV(column6) FROM testTable", percentile);
+
+    String query =
+        String.format("SELECT PERCENTILETDIGEST%dMV(column6) FROM testTable", percentile);
+
+    queryAndTestAggregationResultWithDelta(rawQuery, getExpectedQueryResults(query), quantileExtractor);
+
+    queryAndTestAggregationResultWithDelta(rawQuery + getFilter(), getExpectedQueryResults(query + getFilter()),
+        quantileExtractor);
+
+    queryAndTestAggregationResultWithDelta(rawQuery + SV_GROUP_BY, getExpectedQueryResults(query + SV_GROUP_BY),
+        quantileExtractor);
+
+    queryAndTestAggregationResultWithDelta(rawQuery + MV_GROUP_BY, getExpectedQueryResults(query + MV_GROUP_BY),
+        quantileExtractor);
+  }
+
+  private ExpectedQueryResult<String> getExpectedQueryResults(String query) {
+    return QueriesTestUtils.buildExpectedResponse(getBrokerResponseForPqlQuery(query));
+  }
+
+  private void queryAndTestAggregationResultWithDelta(String query, ExpectedQueryResult<String> expectedQueryResults,
+      Function<Serializable, String> responseMapper) {
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
+
+    QueriesTestUtils
+        .testInterSegmentApproximateAggregationResult(brokerResponse, expectedQueryResults.getNumDocsScanned(),
+            expectedQueryResults.getNumEntriesScannedInFilter(), expectedQueryResults.getNumEntriesScannedPostFilter(),
+            expectedQueryResults.getNumTotalDocs(), responseMapper, expectedQueryResults.getResults(),
+            PERCENTILE_TDIGEST_DELTA);
+  }
+
+  private void queryAndTestAggregationResult(String query, ExpectedQueryResult<String> expectedQueryResults,
+      Function<Serializable, String> responseMapper) {
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, expectedQueryResults.getNumDocsScanned(),
+            expectedQueryResults.getNumEntriesScannedInFilter(), expectedQueryResults.getNumEntriesScannedPostFilter(),
+            expectedQueryResults.getNumTotalDocs(), responseMapper, expectedQueryResults.getResults());
+  }
+
+  @Test
+  public void testPercentileRawTDigest50MV() {
+    testPercentileRawTDigestAggregationFunction(50);
+  }
+
+  @Test
+  public void testPercentileRawTDigest90MV() {
+    testPercentileRawTDigestAggregationFunction(90);
+  }
+
+  @Test
+  public void testPercentileRawTDigest95MV() {
+    testPercentileRawTDigestAggregationFunction(95);
+  }
+
+  @Test
+  public void testPercentileRawTDigest99MV() {
+    testPercentileRawTDigestAggregationFunction(99);
+  }
+
+  @Test
   public void testNumGroupsLimit() {
     String query = "SELECT COUNT(*) FROM testTable GROUP BY column6";
 
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
     assertFalse(brokerResponse.isNumGroupsLimitReached());
 
-    brokerResponse = getBrokerResponseForPqlQuery(query, new InstancePlanMakerImplV2(1000, 1000));
+    brokerResponse = getBrokerResponseForPqlQuery(query,
+        new InstancePlanMakerImplV2(1000, 1000, InstancePlanMakerImplV2.DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE,
+            InstancePlanMakerImplV2.DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE,
+            InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD));
     assertTrue(brokerResponse.isNumGroupsLimitReached());
   }
 

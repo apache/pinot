@@ -20,17 +20,19 @@ package org.apache.pinot.broker.queryquota;
 
 import com.google.common.annotations.VisibleForTesting;
 
+
 /**
  * A stateful version of hit counter. Similar to the default hit counter, it maintains a list of buckets.
  * Whereas it maintains an extra variable called _lastAccessTimestamp which tracks the last access time.
  * If the stateful hit counter gets queried, it firstly compares the current timestamp and the last access timestamp,
- * calculating the start index and end index among the buckets. Then, it traverses through all the valid candidate buckets.
+ * calculating the start index and end index among the buckets. Then, it traverses through all the valid candidate
+ * buckets.
  * If the current timestamp has exceeded the current time range of all the buckets, this hit counter will use
  * the current timestamp minus the default time queried time range to calculate the start time index.
  */
 public class MaxHitRateTracker extends HitCounter {
-  private static int ONE_SECOND_BUCKET_WIDTH_MS = 1000;
-  private static int MAX_TIME_RANGE_FACTOR = 2;
+  private static final int ONE_SECOND_BUCKET_WIDTH_MS = 1000;
+  private static final int MAX_TIME_RANGE_FACTOR = 2;
 
   private final long _maxTimeRangeMs;
   private final long _defaultTimeRangeMs;
@@ -68,7 +70,7 @@ public class MaxHitRateTracker extends HitCounter {
 
     int maxCount = 0;
     // Skipping the end index here as its bucket hasn't fully gathered all the hits yet.
-    for (int i = startIndex; i != endIndex; i = (++i % _bucketCount)) {
+    for (int i = startIndex; i != endIndex; i = ((i + 1) % _bucketCount)) {
       if (numTimeUnits - _bucketStartTime.get(i) < _bucketCount) {
         maxCount = Math.max(_bucketHitCount.get(i), maxCount);
       }

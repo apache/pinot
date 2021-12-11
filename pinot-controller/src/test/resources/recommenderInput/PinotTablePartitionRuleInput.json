@@ -12,12 +12,14 @@
         "name": "b",
         "dataType": "DOUBLE",
         "cardinality":6,
+        "singleValueField": false,
         "numValuesPerEntry":1.5
       },
       {
         "name": "c",
         "dataType": "STRING",
         "cardinality": 100000000,
+        "singleValueField": false,
         "numValuesPerEntry":2,
         "averageLength" : 100
       },
@@ -32,18 +34,21 @@
         "name": "e",
         "dataType": "LONG",
         "cardinality":10000000,
+        "singleValueField": false,
         "numValuesPerEntry":4
       },
       {
         "name": "f",
         "dataType": "DOUBLE",
         "cardinality":20,
+        "singleValueField": false,
         "numValuesPerEntry":3
       },
       {
         "name": "g",
         "dataType": "STRING",
         "cardinality":6,
+        "singleValueField": false,
         "numValuesPerEntry":2,
         "averageLength" : 100
       },
@@ -73,7 +78,7 @@
         "name": "k",
         "dataType": "DOUBLE",
         "cardinality":10000,
-        "numValuesPerEntry":2,
+        "numValuesPerEntry":1,
         "averageLength" : 100
       },
       {

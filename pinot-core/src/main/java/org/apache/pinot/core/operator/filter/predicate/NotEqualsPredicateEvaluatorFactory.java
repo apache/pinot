@@ -18,12 +18,13 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
-import org.apache.pinot.core.query.request.context.predicate.NotEqPredicate;
-import org.apache.pinot.core.query.request.context.predicate.Predicate;
+import java.util.Arrays;
+import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.TimestampUtils;
 
 
 /**
@@ -38,11 +39,12 @@ public class NotEqualsPredicateEvaluatorFactory {
    *
    * @param notEqPredicate NOT_EQ predicate to evaluate
    * @param dictionary Dictionary for the column
+   * @param dataType Data type for the column
    * @return Dictionary based NOT_EQ predicate evaluator
    */
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(NotEqPredicate notEqPredicate,
-      Dictionary dictionary) {
-    return new DictionaryBasedNeqPredicateEvaluator(notEqPredicate, dictionary);
+      Dictionary dictionary, DataType dataType) {
+    return new DictionaryBasedNeqPredicateEvaluator(notEqPredicate, dictionary, dataType);
   }
 
   /**
@@ -54,21 +56,26 @@ public class NotEqualsPredicateEvaluatorFactory {
    */
   public static BaseRawValueBasedPredicateEvaluator newRawValueBasedEvaluator(NotEqPredicate notEqPredicate,
       DataType dataType) {
+    String value = notEqPredicate.getValue();
     switch (dataType) {
       case INT:
-        return new IntRawValueBasedNeqPredicateEvaluator(notEqPredicate);
+        return new IntRawValueBasedNeqPredicateEvaluator(notEqPredicate, Integer.parseInt(value));
       case LONG:
-        return new LongRawValueBasedNeqPredicateEvaluator(notEqPredicate);
+        return new LongRawValueBasedNeqPredicateEvaluator(notEqPredicate, Long.parseLong(value));
       case FLOAT:
-        return new FloatRawValueBasedNeqPredicateEvaluator(notEqPredicate);
+        return new FloatRawValueBasedNeqPredicateEvaluator(notEqPredicate, Float.parseFloat(value));
       case DOUBLE:
-        return new DoubleRawValueBasedNeqPredicateEvaluator(notEqPredicate);
+        return new DoubleRawValueBasedNeqPredicateEvaluator(notEqPredicate, Double.parseDouble(value));
+      case BOOLEAN:
+        return new IntRawValueBasedNeqPredicateEvaluator(notEqPredicate, BooleanUtils.toInt(value));
+      case TIMESTAMP:
+        return new LongRawValueBasedNeqPredicateEvaluator(notEqPredicate, TimestampUtils.toMillisSinceEpoch(value));
       case STRING:
-        return new StringRawValueBasedNeqPredicateEvaluator(notEqPredicate);
+        return new StringRawValueBasedNeqPredicateEvaluator(notEqPredicate, value);
       case BYTES:
-        return new BytesRawValueBasedNeqPredicateEvaluator(notEqPredicate);
+        return new BytesRawValueBasedNeqPredicateEvaluator(notEqPredicate, BytesUtils.toBytes(value));
       default:
-        throw new UnsupportedOperationException("Unsupported data type: " + dataType);
+        throw new IllegalStateException("Unsupported data type: " + dataType);
     }
   }
 
@@ -78,8 +85,10 @@ public class NotEqualsPredicateEvaluatorFactory {
     final Dictionary _dictionary;
     int[] _matchingDictIds;
 
-    DictionaryBasedNeqPredicateEvaluator(NotEqPredicate nEqPredicate, Dictionary dictionary) {
-      _nonMatchingDictId = dictionary.indexOf(nEqPredicate.getValue());
+    DictionaryBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, Dictionary dictionary, DataType dataType) {
+      super(notEqPredicate);
+      String predicateValue = PredicateUtils.getStoredValue(notEqPredicate.getValue(), dataType);
+      _nonMatchingDictId = dictionary.indexOf(predicateValue);
       if (_nonMatchingDictId >= 0) {
         _nonMatchingDictIds = new int[]{_nonMatchingDictId};
         if (dictionary.length() == 1) {
@@ -90,11 +99,6 @@ public class NotEqualsPredicateEvaluatorFactory {
         _alwaysTrue = true;
       }
       _dictionary = dictionary;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.NOT_EQ;
     }
 
     @Override
@@ -133,13 +137,9 @@ public class NotEqualsPredicateEvaluatorFactory {
   private static final class IntRawValueBasedNeqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final int _nonMatchingValue;
 
-    IntRawValueBasedNeqPredicateEvaluator(NotEqPredicate nEqPredicate) {
-      _nonMatchingValue = Integer.parseInt(nEqPredicate.getValue());
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.NOT_EQ;
+    IntRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, int nonMatchingValue) {
+      super(notEqPredicate);
+      _nonMatchingValue = nonMatchingValue;
     }
 
     @Override
@@ -156,13 +156,9 @@ public class NotEqualsPredicateEvaluatorFactory {
   private static final class LongRawValueBasedNeqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final long _nonMatchingValue;
 
-    LongRawValueBasedNeqPredicateEvaluator(NotEqPredicate nEqPredicate) {
-      _nonMatchingValue = Long.parseLong(nEqPredicate.getValue());
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.NOT_EQ;
+    LongRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, long nonMatchingValue) {
+      super(notEqPredicate);
+      _nonMatchingValue = nonMatchingValue;
     }
 
     @Override
@@ -179,13 +175,9 @@ public class NotEqualsPredicateEvaluatorFactory {
   private static final class FloatRawValueBasedNeqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final float _nonMatchingValue;
 
-    FloatRawValueBasedNeqPredicateEvaluator(NotEqPredicate nEqPredicate) {
-      _nonMatchingValue = Float.parseFloat(nEqPredicate.getValue());
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.NOT_EQ;
+    FloatRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, float nonMatchingValue) {
+      super(notEqPredicate);
+      _nonMatchingValue = nonMatchingValue;
     }
 
     @Override
@@ -202,13 +194,9 @@ public class NotEqualsPredicateEvaluatorFactory {
   private static final class DoubleRawValueBasedNeqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final double _nonMatchingValue;
 
-    DoubleRawValueBasedNeqPredicateEvaluator(NotEqPredicate nEqPredicate) {
-      _nonMatchingValue = Double.parseDouble(nEqPredicate.getValue());
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.NOT_EQ;
+    DoubleRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, double nonMatchingValue) {
+      super(notEqPredicate);
+      _nonMatchingValue = nonMatchingValue;
     }
 
     @Override
@@ -225,13 +213,9 @@ public class NotEqualsPredicateEvaluatorFactory {
   private static final class StringRawValueBasedNeqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final String _nonMatchingValue;
 
-    StringRawValueBasedNeqPredicateEvaluator(NotEqPredicate nEqPredicate) {
-      _nonMatchingValue = nEqPredicate.getValue();
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.NOT_EQ;
+    StringRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, String nonMatchingValue) {
+      super(notEqPredicate);
+      _nonMatchingValue = nonMatchingValue;
     }
 
     @Override
@@ -248,13 +232,9 @@ public class NotEqualsPredicateEvaluatorFactory {
   private static final class BytesRawValueBasedNeqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final byte[] _nonMatchingValue;
 
-    BytesRawValueBasedNeqPredicateEvaluator(NotEqPredicate nEqPredicate) {
-      _nonMatchingValue = BytesUtils.toBytes(nEqPredicate.getValue());
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.NOT_EQ;
+    BytesRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, byte[] nonMatchingValue) {
+      super(notEqPredicate);
+      _nonMatchingValue = nonMatchingValue;
     }
 
     @Override
@@ -264,7 +244,7 @@ public class NotEqualsPredicateEvaluatorFactory {
 
     @Override
     public boolean applySV(byte[] value) {
-      return ByteArray.compare(_nonMatchingValue, value) != 0;
+      return !Arrays.equals(_nonMatchingValue, value);
     }
   }
 }

@@ -19,11 +19,12 @@
 package org.apache.pinot.tools.segment.processor;
 
 import java.util.List;
-import org.apache.pinot.core.segment.processing.collector.CollectorConfig;
-import org.apache.pinot.core.segment.processing.filter.RecordFilterConfig;
+import java.util.Map;
+import org.apache.pinot.core.segment.processing.framework.MergeType;
 import org.apache.pinot.core.segment.processing.framework.SegmentConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
-import org.apache.pinot.core.segment.processing.transformer.RecordTransformerConfig;
+import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerConfig;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 /**
@@ -36,10 +37,10 @@ public class SegmentProcessorFrameworkSpec {
   private String _tableConfigFile;
   private String _schemaFile;
 
-  private RecordTransformerConfig _recordTransformerConfig;
-  private RecordFilterConfig _recordFilterConfig;
+  private TimeHandlerConfig _timeHandlerConfig;
   private List<PartitionerConfig> _partitionerConfigs;
-  private CollectorConfig _collectorConfig;
+  private MergeType _mergeType;
+  private Map<String, AggregationFunctionType> _aggregationTypes;
   private SegmentConfig _segmentConfig;
 
   public String getInputSegmentsDir() {
@@ -74,20 +75,12 @@ public class SegmentProcessorFrameworkSpec {
     _schemaFile = schemaFile;
   }
 
-  public RecordTransformerConfig getRecordTransformerConfig() {
-    return _recordTransformerConfig;
+  public TimeHandlerConfig getTimeHandlerConfig() {
+    return _timeHandlerConfig;
   }
 
-  public void setRecordTransformerConfig(RecordTransformerConfig recordTransformerConfig) {
-    _recordTransformerConfig = recordTransformerConfig;
-  }
-
-  public RecordFilterConfig getRecordFilterConfig() {
-    return _recordFilterConfig;
-  }
-
-  public void setRecordFilterConfig(RecordFilterConfig recordFilterConfig) {
-    _recordFilterConfig = recordFilterConfig;
+  public void setTimeHandlerConfig(TimeHandlerConfig timeHandlerConfig) {
+    _timeHandlerConfig = timeHandlerConfig;
   }
 
   public List<PartitionerConfig> getPartitionerConfigs() {
@@ -98,12 +91,20 @@ public class SegmentProcessorFrameworkSpec {
     _partitionerConfigs = partitionerConfigs;
   }
 
-  public CollectorConfig getCollectorConfig() {
-    return _collectorConfig;
+  public MergeType getMergeType() {
+    return _mergeType;
   }
 
-  public void setCollectorConfig(CollectorConfig collectorConfig) {
-    _collectorConfig = collectorConfig;
+  public void setMergeType(MergeType mergeType) {
+    _mergeType = mergeType;
+  }
+
+  public Map<String, AggregationFunctionType> getAggregationTypes() {
+    return _aggregationTypes;
+  }
+
+  public void setAggregationTypes(Map<String, AggregationFunctionType> aggregationTypes) {
+    _aggregationTypes = aggregationTypes;
   }
 
   public SegmentConfig getSegmentConfig() {

@@ -31,6 +31,8 @@ import java.nio.file.Paths;
  * Utility class containing helper method for accessing a particular resource
  */
 public class ResourceFinder {
+  private ResourceFinder() {
+  }
 
   /**
    * Access a resource for a particular URI

@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 

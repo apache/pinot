@@ -21,22 +21,28 @@ package org.apache.pinot.core.minion;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.core.segment.store.ColumnIndexType;
-import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
+import org.apache.pinot.segment.spi.store.ColumnIndexType;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -155,8 +161,12 @@ public class SegmentPurgerTest {
     }
 
     // Check inverted index
-    try (SegmentDirectory segmentDirectory = SegmentDirectory
-        .createFromLocalFS(purgedIndexDir, purgedSegmentMetadata, ReadMode.mmap);
+    Map<String, Object> props = new HashMap<>();
+    props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap.toString());
+    try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
+        .load(purgedIndexDir.toURI(),
+            new SegmentDirectoryLoaderContext(_tableConfig, null, purgedSegmentMetadata.getName(),
+                new PinotConfiguration(props)));
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
       assertTrue(reader.hasIndexFor(D1, ColumnIndexType.INVERTED_INDEX));
       assertFalse(reader.hasIndexFor(D2, ColumnIndexType.INVERTED_INDEX));

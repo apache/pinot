@@ -20,6 +20,8 @@ package org.apache.pinot.broker.broker;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -28,8 +30,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import java.util.HashMap;
-import java.util.Map;
 
 
 public class BasicAuthAccessControlTest {

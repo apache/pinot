@@ -61,7 +61,8 @@ public abstract class AbstractRecordReaderTest {
     return records;
   }
 
-  protected static List<Object[]> generatePrimaryKeys(List<Map<String, Object>> records, List<String> primaryKeyColumns) {
+  protected static List<Object[]> generatePrimaryKeys(List<Map<String, Object>> records,
+      List<String> primaryKeyColumns) {
     List<Object[]> primaryKeys = Lists.newArrayList();
     for (Map<String, Object> record : records) {
       Object[] primaryKey = new Object[primaryKeyColumns.size()];
@@ -149,7 +150,9 @@ public abstract class AbstractRecordReaderTest {
   }
 
   protected Set<String> getSourceFields(Schema schema) {
-    return Sets.newHashSet(schema.getColumnNames());
+    Set<String> sourceFields = Sets.newHashSet(schema.getColumnNames());
+    sourceFields.add("column_not_in_source");
+    return sourceFields;
   }
 
   @BeforeClass

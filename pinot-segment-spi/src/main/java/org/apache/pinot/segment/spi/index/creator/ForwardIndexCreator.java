@@ -173,4 +173,13 @@ public interface ForwardIndexCreator extends Closeable {
   default void putStringMV(String[] values) {
     throw new UnsupportedOperationException();
   }
+
+  /**
+   * Writes the next byte[] type multi-value into the forward index.
+   *
+   * @param values Values to write
+   */
+  default void putBytesMV(byte[][] values) {
+    throw new UnsupportedOperationException();
+  }
 }

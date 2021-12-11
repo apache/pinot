@@ -25,10 +25,8 @@ import java.io.File;
 import java.io.FileReader;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -36,7 +34,7 @@ import org.testng.annotations.Test;
 
 public class KafkaJSONMessageDecoderTest {
 
-  private static ObjectMapper objectMapper = new ObjectMapper();
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   @Test
   public void testJsonDecoderWithoutOutgoingTimeSpec()
@@ -87,7 +85,7 @@ public class KafkaJSONMessageDecoderTest {
       GenericRow r = new GenericRow();
       String line = reader.readLine();
       while (line != null) {
-        JsonNode jsonNode = objectMapper.reader().readTree(line);
+        JsonNode jsonNode = OBJECT_MAPPER.reader().readTree(line);
         decoder.decode(line.getBytes(), r);
         for (String field : sourceFields.keySet()) {
           Object actualValue = r.getValue(field);
@@ -110,6 +108,7 @@ public class KafkaJSONMessageDecoderTest {
               break;
             default:
               Assert.assertTrue(false, "Shouldn't arrive here.");
+              break;
           }
         }
         line = reader.readLine();

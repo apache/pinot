@@ -27,17 +27,6 @@ docs/_build
 **/.factorypath
 kubernetes/examples/helm/charts/
 
-# Site Dependencies
-/node_modules
-package-lock.json
-yarn.lock
-.node_modules/
-# Production
-/build
-# Generated files
-.docusaurus
-.cache-loader
-
 # Misc
 .envrc
 .env.local

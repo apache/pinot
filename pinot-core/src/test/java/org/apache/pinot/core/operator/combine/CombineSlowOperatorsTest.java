@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.combine;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -30,9 +31,9 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
-import org.apache.pinot.core.query.exception.EarlyTerminationException;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -64,9 +65,10 @@ public class CombineSlowOperatorsTest {
   @Test
   public void testSelectionOnlyCombineOperator() {
     List<Operator> operators = getOperators();
-    SelectionOnlyCombineOperator combineOperator = new SelectionOnlyCombineOperator(operators,
-        QueryContextConverterUtils.getQueryContextFromPQL("SELECT * FROM table"),
-        _executorService, TIMEOUT_MS);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable");
+    queryContext.setEndTimeMs(System.currentTimeMillis() + TIMEOUT_MS);
+    SelectionOnlyCombineOperator combineOperator =
+        new SelectionOnlyCombineOperator(operators, queryContext, _executorService);
     testCombineOperator(operators, combineOperator);
   }
 
@@ -76,27 +78,31 @@ public class CombineSlowOperatorsTest {
   @Test
   public void testAggregationOnlyCombineOperator() {
     List<Operator> operators = getOperators();
-    AggregationOnlyCombineOperator combineOperator = new AggregationOnlyCombineOperator(operators,
-        QueryContextConverterUtils.getQueryContextFromPQL("SELECT COUNT(*) FROM table"), _executorService,
-        TIMEOUT_MS);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT COUNT(*) FROM testTable");
+    queryContext.setEndTimeMs(System.currentTimeMillis() + TIMEOUT_MS);
+    AggregationOnlyCombineOperator combineOperator =
+        new AggregationOnlyCombineOperator(operators, queryContext, _executorService);
     testCombineOperator(operators, combineOperator);
   }
 
   @Test
   public void testGroupByCombineOperator() {
     List<Operator> operators = getOperators();
-    GroupByCombineOperator combineOperator = new GroupByCombineOperator(operators,
-        QueryContextConverterUtils.getQueryContextFromPQL("SELECT COUNT(*) FROM table GROUP BY column"),
-        _executorService, TIMEOUT_MS, InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContextFromSQL("SELECT COUNT(*) FROM testTable GROUP BY column");
+    queryContext.setEndTimeMs(System.currentTimeMillis() + TIMEOUT_MS);
+    GroupByCombineOperator combineOperator = new GroupByCombineOperator(operators, queryContext, _executorService);
     testCombineOperator(operators, combineOperator);
   }
 
   @Test
   public void testGroupByOrderByCombineOperator() {
     List<Operator> operators = getOperators();
-    GroupByOrderByCombineOperator combineOperator = new GroupByOrderByCombineOperator(operators,
-        QueryContextConverterUtils.getQueryContextFromPQL("SELECT COUNT(*) FROM table GROUP BY column"),
-        _executorService, TIMEOUT_MS, InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContextFromSQL("SELECT COUNT(*) FROM testTable GROUP BY column");
+    queryContext.setEndTimeMs(System.currentTimeMillis() + TIMEOUT_MS);
+    GroupByOrderByCombineOperator combineOperator =
+        new GroupByOrderByCombineOperator(operators, queryContext, _executorService);
     testCombineOperator(operators, combineOperator);
   }
 
@@ -134,6 +140,8 @@ public class CombineSlowOperatorsTest {
   }
 
   private static class SlowOperator extends BaseOperator {
+    private static final String EXPLAIN_NAME = "SLOW";
+
     final AtomicBoolean _operationInProgress = new AtomicBoolean();
     final AtomicBoolean _notInterrupted = new AtomicBoolean();
 
@@ -161,6 +169,16 @@ public class CombineSlowOperatorsTest {
     @Override
     public String getOperatorName() {
       return "SlowOperator";
+    }
+
+    @Override
+    public String toExplainString() {
+      return EXPLAIN_NAME;
+    }
+
+    @Override
+    public List<Operator> getChildOperators() {
+      return Collections.emptyList();
     }
 
     @Override

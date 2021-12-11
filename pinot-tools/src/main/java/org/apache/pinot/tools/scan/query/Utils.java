@@ -24,6 +24,8 @@ import java.util.List;
 
 
 public class Utils {
+  private Utils() {
+  }
 
   public static List<List<Object>> cartesianProduct(List<List<Object>> lists) {
     int numElements = 1;

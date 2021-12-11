@@ -1,0 +1,28 @@
+{
+  "tableName": "testTable",
+  "segmentsConfig": {
+    "replication": "1",
+    "schemaName": "testTable",
+    "timeColumnName": "time"
+  },
+  "fieldConfigList": [
+    {
+      "encodingType": "DICTIONARY",
+      "indexType": "RANGE",
+      "name": "hits"
+    }
+  ],
+  "tableIndexConfig": {
+    "invertedIndexColumns": [],
+    "rangeIndexColumns": [
+      "hits"
+    ],
+    "loadMode": "HEAP"
+  },
+  "tenants": {
+    "broker": "DefaultTenant",
+    "server": "DefaultTenant"
+  },
+  "tableType": "OFFLINE",
+  "metadata": {}
+}

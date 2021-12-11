@@ -34,7 +34,7 @@ public class TrieNode {
   }
 
   public void setNextGroupedColumnValues(Int2ObjectOpenHashMap<TrieNode> nextGroupedColumnValues) {
-    this._nextGroupedColumnValues = nextGroupedColumnValues;
+    _nextGroupedColumnValues = nextGroupedColumnValues;
   }
 
   public List<Serializable> getAggregationResults() {
@@ -42,7 +42,7 @@ public class TrieNode {
   }
 
   public void setAggregationResults(List<Serializable> aggregationResults) {
-    this._aggregationResults = aggregationResults;
+    _aggregationResults = aggregationResults;
   }
 
   public Serializable getAggregationResult() {
@@ -58,6 +58,6 @@ public class TrieNode {
   }
 
   public void setIsLeaf(boolean isLeaf) {
-    this._isLeaf = isLeaf;
+    _isLeaf = isLeaf;
   }
 }

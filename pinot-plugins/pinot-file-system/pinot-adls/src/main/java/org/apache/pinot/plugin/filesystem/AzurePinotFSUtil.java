@@ -43,7 +43,8 @@ public class AzurePinotFSUtil {
    * @return path in Azure Data Lake Gen2 format
    * @throws IOException
    */
-  public static String convertUriToAzureStylePath(URI uri) throws IOException {
+  public static String convertUriToAzureStylePath(URI uri)
+      throws IOException {
     // Pinot side code uses `URLEncoder` when building uri
     String path = URLDecoder.decode(uri.getRawPath(), "UTF-8");
     if (path.startsWith(DIRECTORY_DELIMITER)) {
@@ -65,7 +66,8 @@ public class AzurePinotFSUtil {
    * @return url encoded path in Azure Data Lake Gen2 format
    * @throws IOException
    */
-  public static String convertUriToUrlEncodedAzureStylePath(URI uri) throws IOException {
+  public static String convertUriToUrlEncodedAzureStylePath(URI uri)
+      throws IOException {
     return Utility.urlEncode(convertUriToAzureStylePath(uri));
   }
 

@@ -18,10 +18,6 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
-
-
 /**
  * Interface for mutable forward index (for CONSUMING segment).
  * NOTE: Mutable forward index does not use reader context to accelerate the reads.

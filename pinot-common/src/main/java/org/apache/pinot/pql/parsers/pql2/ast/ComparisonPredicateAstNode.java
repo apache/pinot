@@ -22,10 +22,10 @@ import java.util.Collections;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
-import org.apache.pinot.common.utils.CommonConstants.Query.Range;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
+import org.apache.pinot.spi.utils.CommonConstants.Query.Range;
 
 
 /**
@@ -77,7 +77,7 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
   /**
    * This function creates a standard unified shaped string for the value and operand side of the comparison
    *
-   * @returns A String containing the range representation of the predicate
+   * @return A String containing the range representation of the predicate
    */
   private String createRangeStringForComparison() {
     String comparison = null;

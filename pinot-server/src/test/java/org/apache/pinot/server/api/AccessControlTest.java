@@ -18,23 +18,27 @@
  */
 package org.apache.pinot.server.api;
 
+import io.netty.channel.ChannelHandlerContext;
 import java.io.File;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.NetUtil;
-import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.TlsConfig;
-import org.apache.pinot.server.api.access.AccessControl;
-import org.apache.pinot.server.api.access.AccessControlFactory;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.server.access.AccessControl;
+import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.helix.AdminApiApplication;
+import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -61,12 +65,21 @@ public class AccessControlTest {
     // Mock the server instance
     ServerInstance serverInstance = mock(ServerInstance.class);
 
-    _adminApiApplication = new AdminApiApplication(serverInstance, new DenyAllAccessFactory());
-    _adminApiApplication.start(Collections.singletonList(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, "0.0.0.0",
-        CommonConstants.Server.DEFAULT_ADMIN_API_PORT, CommonConstants.HTTP_PROTOCOL, new TlsConfig())));
+    PinotConfiguration serverConf = DefaultHelixStarterServerConfig.loadDefaultServerConf();
+    String hostname = serverConf.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,
+        serverConf.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false)
+            ? NetUtils.getHostnameOrAddress() : NetUtils.getHostAddress());
+    int port = serverConf.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT,
+        CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
+    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID,
+        CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port);
+    _adminApiApplication = new AdminApiApplication(serverInstance, new DenyAllAccessFactory(), serverConf);
+    _adminApiApplication.start(Collections.singletonList(
+        new ListenerConfig(CommonConstants.HTTP_PROTOCOL, "0.0.0.0", CommonConstants.Server.DEFAULT_ADMIN_API_PORT,
+            CommonConstants.HTTP_PROTOCOL, new TlsConfig())));
 
-    _webTarget = ClientBuilder.newClient().target(String.format("http://%s:%d", NetUtil.getHostAddress(),
-        CommonConstants.Server.DEFAULT_ADMIN_API_PORT));
+    _webTarget = ClientBuilder.newClient().target(
+        String.format("http://%s:%d", NetUtils.getHostAddress(), CommonConstants.Server.DEFAULT_ADMIN_API_PORT));
   }
 
   @AfterClass
@@ -84,7 +97,17 @@ public class AccessControlTest {
   }
 
   public static class DenyAllAccessFactory implements AccessControlFactory {
-    private static final AccessControl DENY_ALL_ACCESS = (httpHeaders, tableName) -> false;
+    private static final AccessControl DENY_ALL_ACCESS = new AccessControl() {
+      @Override
+      public boolean isAuthorizedChannel(ChannelHandlerContext channelHandlerContext) {
+        return false;
+      }
+
+      @Override
+      public boolean hasDataAccess(HttpHeaders httpHeaders, String tableName) {
+        return false;
+      }
+    };
 
     @Override
     public AccessControl create() {

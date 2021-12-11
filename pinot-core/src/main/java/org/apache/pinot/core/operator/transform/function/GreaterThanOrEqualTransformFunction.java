@@ -18,10 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import java.util.List;
-import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
 /**
@@ -43,18 +40,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
  */
 public class GreaterThanOrEqualTransformFunction extends BinaryOperatorTransformFunction {
 
-  @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    super.init(arguments, dataSourceMap);
-  }
-
-  @Override
-  int getBinaryFuncResult(int result) {
-    return (result >= 0) ? 1 : 0;
-  }
-
-  @Override
-  public String getName() {
-    return TransformFunctionType.GREATER_THAN_OR_EQUAL.getName();
+  public GreaterThanOrEqualTransformFunction() {
+    super(TransformFunctionType.GREATER_THAN_OR_EQUAL);
   }
 }

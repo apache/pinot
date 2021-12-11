@@ -39,7 +39,7 @@
         "name": "k",
         "dataType": "DOUBLE",
         "cardinality":10000,
-        "numValuesPerEntry":2,
+        "numValuesPerEntry":1,
         "averageLength" : 100
       },
       {

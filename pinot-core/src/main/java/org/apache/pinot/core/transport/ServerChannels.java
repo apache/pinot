@@ -30,12 +30,14 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.SslProvider;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.util.TlsUtils;
 import org.apache.thrift.TSerializer;
@@ -78,9 +80,11 @@ public class ServerChannels {
     _tlsConfig = tlsConfig;
   }
 
-  public void sendRequest(ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest)
+  public void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
+      ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest)
       throws Exception {
-    _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new).sendRequest(instanceRequest);
+    _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new)
+        .sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, instanceRequest);
   }
 
   public void shutDown() {
@@ -118,7 +122,8 @@ public class ServerChannels {
 
     private void attachSSLHandler(SocketChannel ch) {
       try {
-        SslContextBuilder sslContextBuilder = SslContextBuilder.forClient();
+        SslContextBuilder sslContextBuilder = SslContextBuilder.forClient()
+            .sslProvider(SslProvider.valueOf(_tlsConfig.getSslProvider()));
 
         if (_tlsConfig.getKeyStorePath() != null) {
           sslContextBuilder.keyManager(TlsUtils.createKeyManagerFactory(_tlsConfig));
@@ -129,13 +134,13 @@ public class ServerChannels {
         }
 
         ch.pipeline().addLast("ssl", sslContextBuilder.build().newHandler(ch.alloc()));
-
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }
 
-    synchronized void sendRequest(InstanceRequest instanceRequest)
+    synchronized void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
+        ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest)
         throws Exception {
       if (_channel == null || !_channel.isActive()) {
         long startTime = System.currentTimeMillis();
@@ -144,7 +149,14 @@ public class ServerChannels {
             System.currentTimeMillis() - startTime);
       }
       byte[] requestBytes = _serializer.serialize(instanceRequest);
-      _channel.writeAndFlush(Unpooled.wrappedBuffer(requestBytes), _channel.voidPromise());
+      long sendRequestStartTimeMs = System.currentTimeMillis();
+      _channel.writeAndFlush(Unpooled.wrappedBuffer(requestBytes)).addListener(f -> {
+        long requestSentLatencyMs = System.currentTimeMillis() - sendRequestStartTimeMs;
+        _brokerMetrics
+            .addTimedTableValue(rawTableName, BrokerTimer.NETTY_CONNECTION_SEND_REQUEST_LATENCY, requestSentLatencyMs,
+                TimeUnit.MILLISECONDS);
+        asyncQueryResponse.markRequestSent(serverRoutingInstance, requestSentLatencyMs);
+      });
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_REQUESTS_SENT, 1);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_BYTES_SENT, requestBytes.length);
     }

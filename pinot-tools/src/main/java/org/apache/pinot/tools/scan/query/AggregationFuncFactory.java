@@ -19,6 +19,9 @@
 package org.apache.pinot.tools.scan.query;
 
 public class AggregationFuncFactory {
+  private AggregationFuncFactory() {
+  }
+
   private static final String COUNT = "COUNT";
   private static final String MIN = "MIN";
   private static final String MAX = "MAX";

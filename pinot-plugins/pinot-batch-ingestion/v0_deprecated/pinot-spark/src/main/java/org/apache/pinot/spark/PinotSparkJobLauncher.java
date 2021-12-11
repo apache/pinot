@@ -28,6 +28,8 @@ import org.apache.pinot.spark.jobs.SparkSegmentUriPushJob;
 
 
 public class PinotSparkJobLauncher {
+  private PinotSparkJobLauncher() {
+  }
 
   private static final String USAGE = "usage: [job_type] [job.properties]";
   private static final String SUPPORT_JOB_TYPES =

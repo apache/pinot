@@ -20,8 +20,8 @@ package org.apache.pinot.perf;
 
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.common.BlockDocIdIterator;
-import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.core.operator.dociditerators.OrDocIdIterator;
+import org.apache.pinot.segment.spi.Constants;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Mode;

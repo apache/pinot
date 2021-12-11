@@ -1,1 +1,78 @@
-{"traceInfo":{},"numDocsScanned":22598,"aggregationResults":[{"groupByResult":[{"value":"3604","group":["30194"]},{"value":"1804","group":["31057"]},{"value":"1316","group":["32467"]},{"value":"1278","group":["30977"]},{"value":"1276","group":["30466"]},{"value":"1186","group":["32575"]},{"value":"1167","group":["31703"]},{"value":"1054","group":["30559"]},{"value":"975","group":["34100"]},{"value":"828","group":["30852"]}],"function":"count_star","groupByColumns":["DestCityMarketID"]}],"timeUsedMs":13,"segmentStatistics":[],"exceptions":[],"totalDocs":115545}
+{
+  "traceInfo": {},
+  "numDocsScanned": 22598,
+  "aggregationResults": [
+    {
+      "groupByResult": [
+        {
+          "value": "3604",
+          "group": [
+            "30194"
+          ]
+        },
+        {
+          "value": "1804",
+          "group": [
+            "31057"
+          ]
+        },
+        {
+          "value": "1316",
+          "group": [
+            "32467"
+          ]
+        },
+        {
+          "value": "1278",
+          "group": [
+            "30977"
+          ]
+        },
+        {
+          "value": "1276",
+          "group": [
+            "30466"
+          ]
+        },
+        {
+          "value": "1186",
+          "group": [
+            "32575"
+          ]
+        },
+        {
+          "value": "1167",
+          "group": [
+            "31703"
+          ]
+        },
+        {
+          "value": "1054",
+          "group": [
+            "30559"
+          ]
+        },
+        {
+          "value": "975",
+          "group": [
+            "34100"
+          ]
+        },
+        {
+          "value": "828",
+          "group": [
+            "30852"
+          ]
+        }
+      ],
+      "function": "count_star",
+      "groupByColumns": [
+        "DestCityMarketID"
+      ]
+    }
+  ],
+  "timeUsedMs": 13,
+  "segmentStatistics": [],
+  "exceptions": [],
+  "totalDocs": 115545
+}

@@ -32,15 +32,21 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class AggregationOnlyCombineOperator extends BaseCombineOperator {
   private static final String OPERATOR_NAME = "AggregationOnlyCombineOperator";
+  private static final String EXPLAIN_NAME = "COMBINE_AGGREGATE";
 
   public AggregationOnlyCombineOperator(List<Operator> operators, QueryContext queryContext,
-      ExecutorService executorService, long endTimeMs) {
-    super(operators, queryContext, executorService, endTimeMs);
+      ExecutorService executorService) {
+    super(operators, queryContext, executorService);
   }
 
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String toExplainString() {
+    return EXPLAIN_NAME;
   }
 
   @Override

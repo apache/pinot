@@ -20,8 +20,8 @@ package org.apache.pinot.tools.scan.query;
 
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.utils.CommonConstants.Query.Range;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.spi.utils.CommonConstants.Query.Range;
 
 
 public class RangePredicateFilter implements PredicateFilter {
@@ -57,7 +57,7 @@ public class RangePredicateFilter implements PredicateFilter {
     if (_endIndex < 0) {
       _endIndex = -(_endIndex + 1) - 1;
     } else if (!includeEnd) {
-      --_endIndex;
+      _endIndex--;
     }
   }
 
@@ -69,7 +69,7 @@ public class RangePredicateFilter implements PredicateFilter {
   @Override
   public boolean apply(int[] dictIds, int length) {
     // length <= dictIds.length
-    for (int i = 0; i < length; ++i) {
+    for (int i = 0; i < length; i++) {
       if (apply(dictIds[i])) {
         return true;
       }

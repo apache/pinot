@@ -28,6 +28,9 @@ import org.slf4j.LoggerFactory;
 
 
 public class PinotSparkJobPreparationHelper {
+  private PinotSparkJobPreparationHelper() {
+  }
+
   private static final Logger _logger = LoggerFactory.getLogger(PinotSparkJobPreparationHelper.class);
 
   public static void addDepsJarToDistributedCacheHelper(FileSystem fileSystem, JavaSparkContext sparkContext,

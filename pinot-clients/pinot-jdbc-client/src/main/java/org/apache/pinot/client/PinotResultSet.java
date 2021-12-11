@@ -39,7 +39,6 @@ import java.util.Map;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.client.base.AbstractBaseResultSet;
 import org.apache.pinot.client.utils.DateTimeUtils;
-import org.apache.pinot.client.utils.DriverUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -20,60 +20,43 @@ package org.apache.pinot.tools.admin.command;
 
 import java.util.Arrays;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TlsSpec;
-import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.GroovyTemplateUtils;
 import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.CmdLineException;
-import org.kohsuke.args4j.CmdLineParser;
-import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
  * Class to implement LaunchDataIngestionJob command.
  *
  */
+@CommandLine.Command(name = "LaunchDataIngestionJob")
 public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(LaunchDataIngestionJobCommand.class);
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help = false;
-  @Option(name = "-jobSpecFile", required = true, metaVar = "<string>", usage = "Ingestion job spec file")
+  @CommandLine.Option(names = {"-jobSpecFile", "-jobSpec"}, required = true,
+      description = "Ingestion job spec file")
   private String _jobSpecFile;
-  @Option(name = "-values", required = false, metaVar = "<template context>", handler = StringArrayOptionHandler.class, usage = "Context values set to the job spec template")
+  @CommandLine.Option(names = {"-values"}, required = false, arity = "1..*",
+      description = "Context values set to the job spec template")
   private List<String> _values;
-  @Option(name = "-propertyFile", required = false, metaVar = "<template context file>", usage = "A property file contains context values to set the job spec template")
+  @CommandLine.Option(names = {"-propertyFile"}, required = false,
+      description = "A property file contains context values to set the job spec template")
   private String _propertyFile;
-
-  public static void main(String[] args) {
-    PluginManager.get().init();
-    LaunchDataIngestionJobCommand cmd = new LaunchDataIngestionJobCommand();
-    CmdLineParser parser = new CmdLineParser(cmd);
-    if (args.length == 0) {
-      cmd.printUsage();
-      return;
-    }
-    try {
-      parser.parseArgument(args);
-      if (cmd.getHelp()) {
-        cmd.printUsage();
-        return;
-      }
-      boolean status = cmd.execute();
-      if (System.getProperties().getProperty("pinot.admin.system.exit", "false").equalsIgnoreCase("true")) {
-        System.exit(status ? 0 : 1);
-      }
-    } catch (CmdLineException e) {
-      LOGGER.error("Error: {}", e.getMessage());
-    } catch (Exception e) {
-      LOGGER.error("Exception caught: ", e);
-    }
-  }
+  @CommandLine.Option(names = {"-user"}, required = false, description = "Username for basic auth.")
+  private String _user;
+  @CommandLine.Option(names = {"-password"}, required = false, description = "Password for basic auth.")
+  private String _password;
+  @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
+  private String _authToken;
 
   public String getJobSpecFile() {
     return _jobSpecFile;
@@ -124,8 +107,13 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
 
     TlsSpec tlsSpec = spec.getTlsSpec();
     if (tlsSpec != null) {
-      TlsUtils.installDefaultSSLSocketFactory(tlsSpec.getKeyStorePath(), tlsSpec.getKeyStorePassword(),
-          tlsSpec.getTrustStorePath(), tlsSpec.getTrustStorePassword());
+      TlsUtils.installDefaultSSLSocketFactory(tlsSpec.getKeyStoreType(), tlsSpec.getKeyStorePath(),
+          tlsSpec.getKeyStorePassword(), tlsSpec.getTrustStoreType(), tlsSpec.getTrustStorePath(),
+          tlsSpec.getTrustStorePassword());
+    }
+
+    if (StringUtils.isBlank(spec.getAuthToken())) {
+      spec.setAuthToken(makeAuthToken(_authToken, _user, _password));
     }
 
     try {

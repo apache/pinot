@@ -29,6 +29,8 @@ import org.apache.pinot.ingestion.jobs.SegmentUriPushJob;
 
 
 public class PinotHadoopJobLauncher {
+  private PinotHadoopJobLauncher() {
+  }
 
   private static final String USAGE = "usage: [job_type] [job.properties]";
   private static final String SUPPORT_JOB_TYPES =

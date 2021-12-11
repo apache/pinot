@@ -20,10 +20,8 @@ package org.apache.pinot.core.query.request.context.utils;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -36,12 +34,13 @@ import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.FilterContext;
-import org.apache.pinot.core.query.request.context.FunctionContext;
-import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
@@ -62,28 +61,50 @@ public class BrokerRequestToQueryContextConverter {
 
     // SELECT
     List<ExpressionContext> selectExpressions;
-    Map<ExpressionContext, String> aliasMap = new HashMap<>();
     List<Expression> selectList = pinotQuery.getSelectList();
+    List<String> aliasList = new ArrayList<>(selectList.size());
     selectExpressions = new ArrayList<>(selectList.size());
     for (Expression thriftExpression : selectList) {
-      ExpressionContext expression;
-      if (thriftExpression.getType() == ExpressionType.FUNCTION && thriftExpression.getFunctionCall().getOperator()
-          .equalsIgnoreCase("AS")) {
-        // Handle alias
-        List<Expression> operands = thriftExpression.getFunctionCall().getOperands();
-        expression = QueryContextConverterUtils.getExpression(operands.get(0));
-        aliasMap.put(expression, operands.get(1).getIdentifier().getName());
+      // Handle alias
+      Expression expressionWithoutAlias = thriftExpression;
+      if (thriftExpression.getType() == ExpressionType.FUNCTION) {
+        Function function = thriftExpression.getFunctionCall();
+        List<Expression> operands = function.getOperands();
+        switch (function.getOperator().toUpperCase()) {
+          case "AS":
+            expressionWithoutAlias = operands.get(0);
+            aliasList.add(operands.get(1).getIdentifier().getName());
+            break;
+          case "DISTINCT":
+            int numOperands = operands.size();
+            for (int i = 0; i < numOperands; i++) {
+              Expression operand = operands.get(i);
+              Function operandFunction = operand.getFunctionCall();
+              if (operandFunction != null && operandFunction.getOperator().equalsIgnoreCase("AS")) {
+                operands.set(i, operandFunction.getOperands().get(0));
+                aliasList.add(operandFunction.getOperands().get(1).getIdentifier().getName());
+              } else {
+                aliasList.add(null);
+              }
+            }
+            break;
+          default:
+            // Add null as a placeholder for alias.
+            aliasList.add(null);
+            break;
+        }
       } else {
-        expression = QueryContextConverterUtils.getExpression(thriftExpression);
+        // Add null as a placeholder for alias.
+        aliasList.add(null);
       }
-      selectExpressions.add(expression);
+      selectExpressions.add(RequestContextUtils.getExpression(expressionWithoutAlias));
     }
 
     // WHERE
     FilterContext filter = null;
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
-      filter = QueryContextConverterUtils.getFilter(pinotQuery.getFilterExpression());
+      filter = RequestContextUtils.getFilter(pinotQuery.getFilterExpression());
     }
 
     // GROUP BY
@@ -92,7 +113,7 @@ public class BrokerRequestToQueryContextConverter {
     if (CollectionUtils.isNotEmpty(groupByList)) {
       groupByExpressions = new ArrayList<>(groupByList.size());
       for (Expression thriftExpression : groupByList) {
-        groupByExpressions.add(QueryContextConverterUtils.getExpression(thriftExpression));
+        groupByExpressions.add(RequestContextUtils.getExpression(thriftExpression));
       }
     }
 
@@ -106,7 +127,7 @@ public class BrokerRequestToQueryContextConverter {
       for (Expression orderBy : orderByList) {
         // NOTE: Order-by is always a Function with the ordering of the Expression
         Function thriftFunction = orderBy.getFunctionCall();
-        ExpressionContext expression = QueryContextConverterUtils.getExpression(thriftFunction.getOperands().get(0));
+        ExpressionContext expression = RequestContextUtils.getExpression(thriftFunction.getOperands().get(0));
         if (expressionSet.add(expression)) {
           boolean isAsc = thriftFunction.getOperator().equalsIgnoreCase("ASC");
           orderByExpressions.add(new OrderByExpressionContext(expression, isAsc));
@@ -118,11 +139,11 @@ public class BrokerRequestToQueryContextConverter {
     FilterContext havingFilter = null;
     Expression havingExpression = pinotQuery.getHavingExpression();
     if (havingExpression != null) {
-      havingFilter = QueryContextConverterUtils.getFilter(havingExpression);
+      havingFilter = RequestContextUtils.getFilter(havingExpression);
     }
 
     return new QueryContext.Builder().setTableName(pinotQuery.getDataSource().getTableName())
-        .setSelectExpressions(selectExpressions).setAliasMap(aliasMap).setFilter(filter)
+        .setSelectExpressions(selectExpressions).setAliasList(aliasList).setFilter(filter)
         .setGroupByExpressions(groupByExpressions).setOrderByExpressions(orderByExpressions)
         .setHavingFilter(havingFilter).setLimit(pinotQuery.getLimit()).setOffset(pinotQuery.getOffset())
         .setQueryOptions(pinotQuery.getQueryOptions()).setDebugOptions(pinotQuery.getDebugOptions())
@@ -140,7 +161,7 @@ public class BrokerRequestToQueryContextConverter {
       List<String> selectionColumns = selections.getSelectionColumns();
       selectExpressions = new ArrayList<>(selectionColumns.size());
       for (String expression : selectionColumns) {
-        selectExpressions.add(QueryContextConverterUtils.getExpression(expression));
+        selectExpressions.add(RequestContextUtils.getExpressionFromPQL(expression));
       }
 
       // NOTE: Some old Pinot clients (E.g. Presto segment level query) set LIMIT in Selection object.
@@ -161,13 +182,20 @@ public class BrokerRequestToQueryContextConverter {
         if (functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
           // For DISTINCT query, all arguments are expressions
           for (String expression : stringExpressions) {
-            arguments.add(QueryContextConverterUtils.getExpression(expression));
+            arguments.add(RequestContextUtils.getExpressionFromPQL(expression));
+          }
+        } else if (functionName.equalsIgnoreCase(AggregationFunctionType.LASTWITHTIME.getName())) {
+          // For LASTWITHTIME query, only the first two arguments are expression, third one is literal if available
+          arguments.add(RequestContextUtils.getExpressionFromPQL(stringExpressions.get(0)));
+          arguments.add(RequestContextUtils.getExpressionFromPQL(stringExpressions.get(1)));
+          for (int i = 2; i < numArguments; i++) {
+            arguments.add(ExpressionContext.forLiteral(stringExpressions.get(i)));
           }
         } else {
           // For non-DISTINCT query, only the first argument is expression, others are literals
           // NOTE: We directly use the string as the literal value because of the legacy behavior of PQL compiler
           //       treating string literal as identifier in the aggregation function.
-          arguments.add(QueryContextConverterUtils.getExpression(stringExpressions.get(0)));
+          arguments.add(RequestContextUtils.getExpressionFromPQL(stringExpressions.get(0)));
           for (int i = 1; i < numArguments; i++) {
             arguments.add(ExpressionContext.forLiteral(stringExpressions.get(i)));
           }
@@ -182,7 +210,7 @@ public class BrokerRequestToQueryContextConverter {
         List<String> stringExpressions = groupBy.getExpressions();
         groupByExpressions = new ArrayList<>(stringExpressions.size());
         for (String stringExpression : stringExpressions) {
-          groupByExpressions.add(QueryContextConverterUtils.getExpression(stringExpression));
+          groupByExpressions.add(RequestContextUtils.getExpressionFromPQL(stringExpression));
         }
 
         // NOTE: Use TOP in GROUP-BY clause as LIMIT for backward-compatibility.
@@ -193,7 +221,7 @@ public class BrokerRequestToQueryContextConverter {
     FilterContext filter = null;
     FilterQueryTree rootFilterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
     if (rootFilterQueryTree != null) {
-      filter = QueryContextConverterUtils.getFilter(rootFilterQueryTree);
+      filter = RequestContextUtils.getFilter(rootFilterQueryTree);
     }
 
     List<OrderByExpressionContext> orderByExpressions = null;
@@ -203,7 +231,7 @@ public class BrokerRequestToQueryContextConverter {
       orderByExpressions = new ArrayList<>(orderBy.size());
       Set<ExpressionContext> expressionSet = new HashSet<>();
       for (SelectionSort selectionSort : orderBy) {
-        ExpressionContext expression = QueryContextConverterUtils.getExpression(selectionSort.getColumn());
+        ExpressionContext expression = RequestContextUtils.getExpressionFromPQL(selectionSort.getColumn());
         if (expressionSet.add(expression)) {
           orderByExpressions.add(new OrderByExpressionContext(expression, selectionSort.isIsAsc()));
         }
@@ -211,7 +239,7 @@ public class BrokerRequestToQueryContextConverter {
     }
 
     return new QueryContext.Builder().setTableName(brokerRequest.getQuerySource().getTableName())
-        .setSelectExpressions(selectExpressions).setAliasMap(Collections.emptyMap()).setFilter(filter)
+        .setSelectExpressions(selectExpressions).setAliasList(Collections.emptyList()).setFilter(filter)
         .setGroupByExpressions(groupByExpressions).setOrderByExpressions(orderByExpressions).setLimit(limit)
         .setOffset(offset).setQueryOptions(brokerRequest.getQueryOptions())
         .setDebugOptions(brokerRequest.getDebugOptions()).setBrokerRequest(brokerRequest).build();

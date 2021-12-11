@@ -29,19 +29,33 @@ public enum ServerTimer implements AbstractMetrics.Timer {
   // metric tracking the freshness lag for consuming segments
   FRESHNESS_LAG_MS("freshnessLagMs", false),
 
-  NETTY_CONNECTION_SEND_RESPONSE_LATENCY("nettyConnection", true);
+  // The latency of sending the response from server to broker
+  NETTY_CONNECTION_SEND_RESPONSE_LATENCY("nettyConnection", false),
 
-  private final String timerName;
-  private final boolean global;
+  // Query cost (execution thread cpu time) for query processing on server
+  EXECUTION_THREAD_CPU_TIME_NS("nanoseconds", false),
+
+  // Query cost (system activities cpu time) for query processing on server
+  SYSTEM_ACTIVITIES_CPU_TIME_NS("nanoseconds", false),
+
+  // Query cost (response serialization cpu time) for query processing on server
+  RESPONSE_SER_CPU_TIME_NS("nanoseconds", false),
+
+  // Total query cost (thread cpu time + system activities cpu time + response serialization cpu time) for query
+  // processing on server
+  TOTAL_CPU_TIME_NS("nanoseconds", false);
+
+  private final String _timerName;
+  private final boolean _global;
 
   ServerTimer(String unit, boolean global) {
-    this.global = global;
-    this.timerName = Utils.toCamelCase(name().toLowerCase());
+    _global = global;
+    _timerName = Utils.toCamelCase(name().toLowerCase());
   }
 
   @Override
   public String getTimerName() {
-    return timerName;
+    return _timerName;
   }
 
   /**
@@ -51,6 +65,6 @@ public enum ServerTimer implements AbstractMetrics.Timer {
    */
   @Override
   public boolean isGlobal() {
-    return global;
+    return _global;
   }
 }

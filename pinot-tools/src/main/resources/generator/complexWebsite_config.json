@@ -1,18 +1,18 @@
 {
   "tableName": "complexWebsite",
-  "segmentsConfig" : {
-    "replication" : "1",
-    "schemaName" : "complexWebsite",
+  "segmentsConfig": {
+    "replication": "1",
+    "schemaName": "complexWebsite",
     "timeColumnName": "hoursSinceEpoch"
   },
-  "tableIndexConfig" : {
-    "invertedIndexColumns" : [],
-    "loadMode"  : "HEAP"
+  "tableIndexConfig": {
+    "invertedIndexColumns": [],
+    "loadMode": "HEAP"
   },
-  "tenants" : {
-    "broker":"DefaultTenant",
-    "server":"DefaultTenant"
+  "tenants": {
+    "broker": "DefaultTenant",
+    "server": "DefaultTenant"
   },
-  "tableType":"OFFLINE",
+  "tableType": "OFFLINE",
   "metadata": {}
 }

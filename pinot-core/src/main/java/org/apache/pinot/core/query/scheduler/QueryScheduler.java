@@ -28,7 +28,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAccumulator;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -53,6 +52,7 @@ import org.slf4j.LoggerFactory;
  * Abstract class providing common scheduler functionality
  * including query runner and query worker pool
  */
+@SuppressWarnings("UnstableApiUsage")
 public abstract class QueryScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryScheduler.class);
 
@@ -63,14 +63,14 @@ public abstract class QueryScheduler {
   private static final String INVALID_RESIZE_TIME_MS = "-1";
   private static final String QUERY_LOG_MAX_RATE_KEY = "query.log.maxRatePerSecond";
   private static final double DEFAULT_QUERY_LOG_MAX_RATE = 10_000d;
-  protected final ServerMetrics serverMetrics;
-  protected final QueryExecutor queryExecutor;
-  protected final ResourceManager resourceManager;
-  protected final LongAccumulator latestQueryTime;
-  private final RateLimiter queryLogRateLimiter;
-  private final RateLimiter numDroppedLogRateLimiter;
-  private final AtomicInteger numDroppedLogCounter;
-  protected volatile boolean isRunning = false;
+  protected final ServerMetrics _serverMetrics;
+  protected final QueryExecutor _queryExecutor;
+  protected final ResourceManager _resourceManager;
+  protected final LongAccumulator _latestQueryTime;
+  private final RateLimiter _queryLogRateLimiter;
+  private final RateLimiter _numDroppedLogRateLimiter;
+  private final AtomicInteger _numDroppedLogCounter;
+  protected volatile boolean _isRunning = false;
 
   /**
    * Constructor to initialize QueryScheduler
@@ -78,24 +78,23 @@ public abstract class QueryScheduler {
    * @param resourceManager for managing server thread resources
    * @param serverMetrics server metrics collector
    */
-  public QueryScheduler(@Nonnull PinotConfiguration config, @Nonnull QueryExecutor queryExecutor,
-      @Nonnull ResourceManager resourceManager, @Nonnull ServerMetrics serverMetrics,
-      @Nonnull LongAccumulator latestQueryTime) {
+  public QueryScheduler(PinotConfiguration config, QueryExecutor queryExecutor, ResourceManager resourceManager,
+      ServerMetrics serverMetrics, LongAccumulator latestQueryTime) {
     Preconditions.checkNotNull(config);
     Preconditions.checkNotNull(queryExecutor);
     Preconditions.checkNotNull(resourceManager);
     Preconditions.checkNotNull(serverMetrics);
+    Preconditions.checkNotNull(latestQueryTime);
 
-    this.serverMetrics = serverMetrics;
-    this.resourceManager = resourceManager;
-    this.queryExecutor = queryExecutor;
-    this.latestQueryTime = latestQueryTime;
-    this.queryLogRateLimiter =
-        RateLimiter.create(config.getProperty(QUERY_LOG_MAX_RATE_KEY, DEFAULT_QUERY_LOG_MAX_RATE));
-    this.numDroppedLogRateLimiter = RateLimiter.create(1.0d);
-    this.numDroppedLogCounter = new AtomicInteger(0);
+    _serverMetrics = serverMetrics;
+    _resourceManager = resourceManager;
+    _queryExecutor = queryExecutor;
+    _latestQueryTime = latestQueryTime;
+    _queryLogRateLimiter = RateLimiter.create(config.getProperty(QUERY_LOG_MAX_RATE_KEY, DEFAULT_QUERY_LOG_MAX_RATE));
+    _numDroppedLogRateLimiter = RateLimiter.create(1.0d);
+    _numDroppedLogCounter = new AtomicInteger(0);
 
-    LOGGER.info("Query log max rate: {}", queryLogRateLimiter.getRate());
+    LOGGER.info("Query log max rate: {}", _queryLogRateLimiter.getRate());
   }
 
   /**
@@ -104,8 +103,7 @@ public abstract class QueryScheduler {
    * @return Listenable future for query result representing serialized response. It is possible that the
    *    future may return immediately or be scheduled for execution at a later time.
    */
-  @Nonnull
-  public abstract ListenableFuture<byte[]> submit(@Nonnull ServerQueryRequest queryRequest);
+  public abstract ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest);
 
   /**
    * Query scheduler name for logging
@@ -116,7 +114,7 @@ public abstract class QueryScheduler {
    * Start query scheduler thread
    */
   public void start() {
-    isRunning = true;
+    _isRunning = true;
   }
 
   /**
@@ -124,7 +122,7 @@ public abstract class QueryScheduler {
    */
   public void stop() {
     // don't stop resourcemanager yet...we need to wait for all running queries to finish
-    isRunning = false;
+    _isRunning = false;
   }
 
   /**
@@ -134,8 +132,8 @@ public abstract class QueryScheduler {
    * @return Future task that can be scheduled for execution on an ExecutorService. Ideally, this future
    * should be executed on a different executor service than {@code e} to avoid deadlock.
    */
-  protected ListenableFutureTask<byte[]> createQueryFutureTask(@Nonnull ServerQueryRequest queryRequest,
-      @Nonnull ExecutorService executorService) {
+  protected ListenableFutureTask<byte[]> createQueryFutureTask(ServerQueryRequest queryRequest,
+      ExecutorService executorService) {
     return ListenableFutureTask.create(() -> processQueryAndSerialize(queryRequest, executorService));
   }
 
@@ -145,70 +143,86 @@ public abstract class QueryScheduler {
    * @param executorService Executor service to use for parallelizing query processing
    * @return serialized query response
    */
-  @SuppressWarnings("Duplicates")
   @Nullable
-  protected byte[] processQueryAndSerialize(@Nonnull ServerQueryRequest queryRequest,
-      @Nonnull ExecutorService executorService) {
-    latestQueryTime.accumulate(System.currentTimeMillis());
+  protected byte[] processQueryAndSerialize(ServerQueryRequest queryRequest, ExecutorService executorService) {
+    _latestQueryTime.accumulate(System.currentTimeMillis());
     DataTable dataTable;
     try {
-      dataTable = queryExecutor.processQuery(queryRequest, executorService);
+      dataTable = _queryExecutor.processQuery(queryRequest, executorService);
     } catch (Exception e) {
       LOGGER.error("Encountered exception while processing requestId {} from broker {}", queryRequest.getRequestId(),
           queryRequest.getBrokerId(), e);
       // For not handled exceptions
-      serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
       dataTable = DataTableBuilder.getEmptyDataTable();
       dataTable.addException(QueryException.getException(QueryException.INTERNAL_ERROR, e));
     }
     long requestId = queryRequest.getRequestId();
     Map<String, String> dataTableMetadata = dataTable.getMetadata();
-    dataTableMetadata.put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(requestId));
+    dataTableMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
 
     byte[] responseBytes = serializeDataTable(queryRequest, dataTable);
 
     // Log the statistics
     String tableNameWithType = queryRequest.getTableNameWithType();
     long numDocsScanned =
-        Long.parseLong(dataTableMetadata.getOrDefault(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, INVALID_NUM_SCANNED));
+        Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.NUM_DOCS_SCANNED.getName(), INVALID_NUM_SCANNED));
     long numEntriesScannedInFilter = Long.parseLong(
-        dataTableMetadata.getOrDefault(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, INVALID_NUM_SCANNED));
+        dataTableMetadata.getOrDefault(MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName(), INVALID_NUM_SCANNED));
     long numEntriesScannedPostFilter = Long.parseLong(
-        dataTableMetadata.getOrDefault(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, INVALID_NUM_SCANNED));
-    long numSegmentsProcessed =
-        Long.parseLong(dataTableMetadata.getOrDefault(DataTable.NUM_SEGMENTS_PROCESSED, INVALID_SEGMENTS_COUNT));
-    long numSegmentsMatched =
-        Long.parseLong(dataTableMetadata.getOrDefault(DataTable.NUM_SEGMENTS_MATCHED, INVALID_SEGMENTS_COUNT));
+        dataTableMetadata.getOrDefault(MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(), INVALID_NUM_SCANNED));
+    long numSegmentsProcessed = Long.parseLong(
+        dataTableMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_PROCESSED.getName(), INVALID_SEGMENTS_COUNT));
+    long numSegmentsMatched = Long.parseLong(
+        dataTableMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_MATCHED.getName(), INVALID_SEGMENTS_COUNT));
     long numSegmentsConsuming = Long.parseLong(
-        dataTableMetadata.getOrDefault(DataTable.NUM_CONSUMING_SEGMENTS_PROCESSED, INVALID_SEGMENTS_COUNT));
-    long minConsumingFreshnessMs =
-        Long.parseLong(dataTableMetadata.getOrDefault(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS, INVALID_FRESHNESS_MS));
+        dataTableMetadata.getOrDefault(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(), INVALID_SEGMENTS_COUNT));
+    long minConsumingFreshnessMs = Long.parseLong(
+        dataTableMetadata.getOrDefault(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(), INVALID_FRESHNESS_MS));
     int numResizes =
-        Integer.parseInt(dataTableMetadata.getOrDefault(DataTable.NUM_RESIZES_METADATA_KEY, INVALID_NUM_RESIZES));
+        Integer.parseInt(dataTableMetadata.getOrDefault(MetadataKey.NUM_RESIZES.getName(), INVALID_NUM_RESIZES));
     long resizeTimeMs =
-        Long.parseLong(dataTableMetadata.getOrDefault(DataTable.RESIZE_TIME_MS_METADATA_KEY, INVALID_RESIZE_TIME_MS));
+        Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.RESIZE_TIME_MS.getName(), INVALID_RESIZE_TIME_MS));
     long threadCpuTimeNs =
         Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.THREAD_CPU_TIME_NS.getName(), "0"));
+    long systemActivitiesCpuTimeNs =
+        Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName(), "0"));
+    long responseSerializationCpuTimeNs =
+        Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(), "0"));
+    long totalCpuTimeNs = threadCpuTimeNs + systemActivitiesCpuTimeNs + responseSerializationCpuTimeNs;
 
     if (numDocsScanned > 0) {
-      serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_DOCS_SCANNED, numDocsScanned);
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_DOCS_SCANNED, numDocsScanned);
     }
     if (numEntriesScannedInFilter > 0) {
-      serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_ENTRIES_SCANNED_IN_FILTER,
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_ENTRIES_SCANNED_IN_FILTER,
           numEntriesScannedInFilter);
     }
     if (numEntriesScannedPostFilter > 0) {
-      serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_ENTRIES_SCANNED_POST_FILTER,
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_ENTRIES_SCANNED_POST_FILTER,
           numEntriesScannedPostFilter);
     }
     if (numResizes > 0) {
-      serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_RESIZES, numResizes);
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_RESIZES, numResizes);
     }
     if (resizeTimeMs > 0) {
-      serverMetrics.addValueToTableGauge(tableNameWithType, ServerGauge.RESIZE_TIME_MS, resizeTimeMs);
+      _serverMetrics.addValueToTableGauge(tableNameWithType, ServerGauge.RESIZE_TIME_MS, resizeTimeMs);
     }
     if (threadCpuTimeNs > 0) {
-      serverMetrics.addValueToTableGauge(tableNameWithType, ServerGauge.EXECUTION_THREAD_CPU_TIME_NS, threadCpuTimeNs);
+      _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.EXECUTION_THREAD_CPU_TIME_NS, threadCpuTimeNs,
+          TimeUnit.NANOSECONDS);
+    }
+    if (systemActivitiesCpuTimeNs > 0) {
+      _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.SYSTEM_ACTIVITIES_CPU_TIME_NS,
+          systemActivitiesCpuTimeNs, TimeUnit.NANOSECONDS);
+    }
+    if (responseSerializationCpuTimeNs > 0) {
+      _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.RESPONSE_SER_CPU_TIME_NS,
+          responseSerializationCpuTimeNs, TimeUnit.NANOSECONDS);
+    }
+    if (totalCpuTimeNs > 0) {
+      _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.TOTAL_CPU_TIME_NS, totalCpuTimeNs,
+          TimeUnit.NANOSECONDS);
     }
 
     TimerContext timerContext = queryRequest.getTimerContext();
@@ -217,40 +231,41 @@ public abstract class QueryScheduler {
 
     // Please keep the format as name=value comma-separated with no spaces
     // Please add new entries at the end
-    if (queryLogRateLimiter.tryAcquire() || forceLog(schedulerWaitMs, numDocsScanned)) {
+    if (_queryLogRateLimiter.tryAcquire() || forceLog(schedulerWaitMs, numDocsScanned)) {
       LOGGER.info("Processed requestId={},table={},segments(queried/processed/matched/consuming)={}/{}/{}/{},"
-              + "schedulerWaitMs={},reqDeserMs={},totalExecMs={},resSerMs={},totalTimeMs={},minConsumingFreshnessMs={},broker={},"
-              + "numDocsScanned={},scanInFilter={},scanPostFilter={},sched={},threadCpuTimeNs={}", requestId,
-          tableNameWithType, numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched, numSegmentsConsuming,
-          schedulerWaitMs, timerContext.getPhaseDurationMs(ServerQueryPhase.REQUEST_DESERIALIZATION),
+              + "schedulerWaitMs={},reqDeserMs={},totalExecMs={},resSerMs={},totalTimeMs={},minConsumingFreshnessMs={},"
+              + "broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={},"
+              + "threadCpuTimeNs(total/thread/sysActivity/resSer)={}/{}/{}/{}", requestId, tableNameWithType,
+          numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched, numSegmentsConsuming, schedulerWaitMs,
+          timerContext.getPhaseDurationMs(ServerQueryPhase.REQUEST_DESERIALIZATION),
           timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
           timerContext.getPhaseDurationMs(ServerQueryPhase.RESPONSE_SERIALIZATION),
           timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), minConsumingFreshnessMs,
           queryRequest.getBrokerId(), numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, name(),
-          threadCpuTimeNs);
+          totalCpuTimeNs, threadCpuTimeNs, systemActivitiesCpuTimeNs, responseSerializationCpuTimeNs);
 
       // Limit the dropping log message at most once per second.
-      if (numDroppedLogRateLimiter.tryAcquire()) {
+      if (_numDroppedLogRateLimiter.tryAcquire()) {
         // NOTE: the reported number may not be accurate since we will be missing some increments happened between
         // get() and set().
-        int numDroppedLog = numDroppedLogCounter.get();
+        int numDroppedLog = _numDroppedLogCounter.get();
         if (numDroppedLog > 0) {
           LOGGER.info("{} logs were dropped. (log max rate per second: {})", numDroppedLog,
-              queryLogRateLimiter.getRate());
-          numDroppedLogCounter.set(0);
+              _queryLogRateLimiter.getRate());
+          _numDroppedLogCounter.set(0);
         }
       }
     } else {
-      numDroppedLogCounter.incrementAndGet();
+      _numDroppedLogCounter.incrementAndGet();
     }
 
     if (minConsumingFreshnessMs > -1) {
-      serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.FRESHNESS_LAG_MS,
+      _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.FRESHNESS_LAG_MS,
           (System.currentTimeMillis() - minConsumingFreshnessMs), TimeUnit.MILLISECONDS);
     }
-    serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_QUERIED, numSegmentsQueried);
-    serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_PROCESSED, numSegmentsProcessed);
-    serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_MATCHED, numSegmentsMatched);
+    _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_QUERIED, numSegmentsQueried);
+    _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_PROCESSED, numSegmentsProcessed);
+    _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_MATCHED, numSegmentsMatched);
 
     return responseBytes;
   }
@@ -278,7 +293,7 @@ public abstract class QueryScheduler {
    * @return serialized response bytes
    */
   @Nullable
-  private byte[] serializeDataTable(@Nonnull ServerQueryRequest queryRequest, @Nonnull DataTable dataTable) {
+  private byte[] serializeDataTable(ServerQueryRequest queryRequest, DataTable dataTable) {
     TimerContext timerContext = queryRequest.getTimerContext();
     TimerContext.Timer responseSerializationTimer =
         timerContext.startNewPhaseTimer(ServerQueryPhase.RESPONSE_SERIALIZATION);
@@ -287,7 +302,7 @@ public abstract class QueryScheduler {
     try {
       responseByte = dataTable.toBytes();
     } catch (Exception e) {
-      serverMetrics.addMeteredGlobalValue(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
       LOGGER.error("Caught exception while serializing response for requestId: {}, brokerId: {}",
           queryRequest.getRequestId(), queryRequest.getBrokerId(), e);
     }
@@ -300,18 +315,15 @@ public abstract class QueryScheduler {
   }
 
   /**
-   * Error response future in case of internal error where query response is not available. This can happen
-   * if the query can not be executed or
-   * @param queryRequest
-   * @param error error code to send
-   * @return
+   * Error response future in case of internal error where query response is not available. This can happen if the query
+   * can not be executed.
    */
   protected ListenableFuture<byte[]> immediateErrorResponse(ServerQueryRequest queryRequest,
       ProcessingException error) {
     DataTable result = DataTableBuilder.getEmptyDataTable();
 
     Map<String, String> dataTableMetadata = result.getMetadata();
-    dataTableMetadata.put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(queryRequest.getRequestId()));
+    dataTableMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(queryRequest.getRequestId()));
 
     result.addException(error);
     return Futures.immediateFuture(serializeDataTable(queryRequest, result));

@@ -44,7 +44,10 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 public class PinotInstanceAssignmentRestletResourceTest {
@@ -55,7 +58,8 @@ public class PinotInstanceAssignmentRestletResourceTest {
   private static final String TIME_COLUMN_NAME = "daysSinceEpoch";
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     ControllerTestUtils.setupClusterAndValidate();
 
     // Create broker and server tenant
@@ -67,7 +71,8 @@ public class PinotInstanceAssignmentRestletResourceTest {
   }
 
   @Test
-  public void testInstanceAssignment() throws Exception {
+  public void testInstanceAssignment()
+      throws Exception {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
         .addDateTime(TIME_COLUMN_NAME, DataType.INT, "1:DAYS:EPOCH", "1:DAYS")
         .build();
@@ -248,7 +253,8 @@ public class PinotInstanceAssignmentRestletResourceTest {
     // Assign instances for COMPLETED segments
     instancePartitionsMap = deserializeInstancePartitionsMap(ControllerTestUtils.sendPostRequest(
         ControllerTestUtils
-            .getControllerRequestURLBuilder().forInstanceAssign(RAW_TABLE_NAME, InstancePartitionsType.COMPLETED, false),
+            .getControllerRequestURLBuilder()
+            .forInstanceAssign(RAW_TABLE_NAME, InstancePartitionsType.COMPLETED, false),
         null));
     assertEquals(instancePartitionsMap.size(), 1);
     assertTrue(instancePartitionsMap.containsKey(InstancePartitionsType.COMPLETED));
@@ -261,8 +267,9 @@ public class PinotInstanceAssignmentRestletResourceTest {
 
     // Replace OFFLINE instance with CONSUMING instance for COMPLETED instance partitions
     instancePartitionsMap = deserializeInstancePartitionsMap(ControllerTestUtils.sendPostRequest(
-        ControllerTestUtils.getControllerRequestURLBuilder().forInstanceReplace(RAW_TABLE_NAME, InstancePartitionsType.COMPLETED,
-            offlineInstanceId, consumingInstanceId), null));
+        ControllerTestUtils.getControllerRequestURLBuilder()
+            .forInstanceReplace(RAW_TABLE_NAME, InstancePartitionsType.COMPLETED,
+                offlineInstanceId, consumingInstanceId), null));
     assertEquals(instancePartitionsMap.size(), 1);
     assertEquals(instancePartitionsMap.get(InstancePartitionsType.COMPLETED).getInstances(0, 0),
         Collections.singletonList(consumingInstanceId));
@@ -314,14 +321,16 @@ public class PinotInstanceAssignmentRestletResourceTest {
     }
   }
 
-  private Map<InstancePartitionsType, InstancePartitions> getInstancePartitionsMap() throws Exception {
+  private Map<InstancePartitionsType, InstancePartitions> getInstancePartitionsMap()
+      throws Exception {
     return deserializeInstancePartitionsMap(
         ControllerTestUtils.sendGetRequest(
             ControllerTestUtils.getControllerRequestURLBuilder().forInstancePartitions(RAW_TABLE_NAME, null)));
   }
 
   private Map<InstancePartitionsType, InstancePartitions> deserializeInstancePartitionsMap(
-      String instancePartitionsMapString) throws Exception {
+      String instancePartitionsMapString)
+      throws Exception {
     return JsonUtils.stringToObject(instancePartitionsMapString,
         new TypeReference<Map<InstancePartitionsType, InstancePartitions>>() {
         });

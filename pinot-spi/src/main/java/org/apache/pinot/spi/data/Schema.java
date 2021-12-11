@@ -38,14 +38,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.spi.data.FieldSpec.DataType.STRING;
 
 
 /**
@@ -78,6 +77,10 @@ public final class Schema implements Serializable {
   private transient final List<String> _dimensionNames = new ArrayList<>();
   private transient final List<String> _metricNames = new ArrayList<>();
   private transient final List<String> _dateTimeNames = new ArrayList<>();
+
+  // Set to true if this schema has a JSON column (used to quickly decide whether to run JsonStatementOptimizer on
+  // queries or not).
+  private boolean _hasJSONColumn;
 
   public static Schema fromFile(File schemaFile)
       throws IOException {
@@ -210,6 +213,7 @@ public final class Schema implements Serializable {
         throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
     }
 
+    _hasJSONColumn |= fieldSpec.getDataType().equals(DataType.JSON);
     _fieldSpecMap.put(columnName, fieldSpec);
   }
 
@@ -253,6 +257,10 @@ public final class Schema implements Serializable {
 
   public boolean hasColumn(String columnName) {
     return _fieldSpecMap.containsKey(columnName);
+  }
+
+  public boolean hasJSONColumn() {
+    return _hasJSONColumn;
   }
 
   @JsonIgnore
@@ -421,8 +429,9 @@ public final class Schema implements Serializable {
    * Validates a pinot schema.
    * <p>The following validations are performed:
    * <ul>
-   *   <li>For dimension, time, date time fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, STRING, BYTES</li>
-   *   <li>For non-derived metric fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE</li>
+   *   <li>For dimension, time, date time fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BOOLEAN,
+   *   TIMESTAMP, STRING, BYTES</li>
+   *   <li>For metric fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BYTES</li>
    * </ul>
    */
   public void validate() {
@@ -439,7 +448,10 @@ public final class Schema implements Serializable {
             case LONG:
             case FLOAT:
             case DOUBLE:
+            case BOOLEAN:
+            case TIMESTAMP:
             case STRING:
+            case JSON:
             case BYTES:
               break;
             default:
@@ -468,6 +480,7 @@ public final class Schema implements Serializable {
             default:
               throw new IllegalStateException("Unsupported data type: " + dataType + " in COMPLEX field: " + fieldName);
           }
+          break;
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType + " for field: " + fieldName);
       }
@@ -507,7 +520,8 @@ public final class Schema implements Serializable {
      */
     public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType, int maxLength,
         Object defaultNullValue) {
-      Preconditions.checkArgument(dataType == STRING, "The maxLength field only applies to STRING field right now");
+      Preconditions
+          .checkArgument(dataType == DataType.STRING, "The maxLength field only applies to STRING field right now");
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, true, maxLength, defaultNullValue));
       return this;
     }
@@ -533,7 +547,8 @@ public final class Schema implements Serializable {
      */
     public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType, int maxLength,
         Object defaultNullValue) {
-      Preconditions.checkArgument(dataType == STRING, "The maxLength field only applies to STRING field right now");
+      Preconditions
+          .checkArgument(dataType == DataType.STRING, "The maxLength field only applies to STRING field right now");
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, false, maxLength, defaultNullValue));
       return this;
     }
@@ -557,7 +572,9 @@ public final class Schema implements Serializable {
     /**
      * @deprecated in favor of {@link SchemaBuilder#addDateTime(String, DataType, String, String)}
      * Adds timeFieldSpec with incoming and outgoing granularity spec
-     * This will continue to exist for a while in several tests, as it helps to test backward compatibility of schemas containing TimeFieldSpec
+     * This will continue to exist for a while in several tests, as it helps to test backward compatibility of
+     * schemas containing
+     * TimeFieldSpec
      */
     @Deprecated
     public SchemaBuilder addTime(TimeGranularitySpec incomingTimeGranularitySpec,
@@ -637,7 +654,30 @@ public final class Schema implements Serializable {
         .isEqualIgnoreOrder(_metricFieldSpecs, that._metricFieldSpecs) && EqualityUtils
         .isEqual(_timeFieldSpec, that._timeFieldSpec) && EqualityUtils
         .isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs) && EqualityUtils
-        .isEqual(_primaryKeyColumns, that._primaryKeyColumns);
+        .isEqualIgnoreOrder(_complexFieldSpecs, that._complexFieldSpecs) && EqualityUtils
+        .isEqualMap(_fieldSpecMap, that._fieldSpecMap) && EqualityUtils
+        .isEqual(_primaryKeyColumns, that._primaryKeyColumns) && EqualityUtils
+        .isEqual(_hasJSONColumn, that._hasJSONColumn);
+  }
+
+  /**
+   * Updates fields with BOOLEAN data type to STRING if the data type in the old schema is STRING.
+   *
+   * BOOLEAN data type was stored as STRING within the schema before release 0.8.0. In release 0.8.0, we introduced
+   * native BOOLEAN support and BOOLEAN data type is no longer replaced with STRING.
+   * To keep the existing schema backward compatible, when the new field spec has BOOLEAN data type and the old field
+   * spec has STRING data type, set the new field spec's data type to STRING.
+   */
+  public void updateBooleanFieldsIfNeeded(Schema oldSchema) {
+    for (Map.Entry<String, FieldSpec> entry : _fieldSpecMap.entrySet()) {
+      FieldSpec fieldSpec = entry.getValue();
+      if (fieldSpec.getDataType() == DataType.BOOLEAN) {
+        FieldSpec oldFieldSpec = oldSchema.getFieldSpecFor(entry.getKey());
+        if (oldFieldSpec != null && oldFieldSpec.getDataType() == DataType.STRING) {
+          fieldSpec.setDataType(DataType.STRING);
+        }
+      }
+    }
   }
 
   /**
@@ -646,7 +686,6 @@ public final class Schema implements Serializable {
    *
    * @param oldSchema old schema
    */
-
   public boolean isBackwardCompatibleWith(Schema oldSchema) {
     Set<String> columnNames = getColumnNames();
     for (Map.Entry<String, FieldSpec> entry : oldSchema.getFieldSpecMap().entrySet()) {
@@ -670,14 +709,18 @@ public final class Schema implements Serializable {
     result = EqualityUtils.hashCodeOf(result, _metricFieldSpecs);
     result = EqualityUtils.hashCodeOf(result, _timeFieldSpec);
     result = EqualityUtils.hashCodeOf(result, _dateTimeFieldSpecs);
+    result = EqualityUtils.hashCodeOf(result, _complexFieldSpecs);
+    result = EqualityUtils.hashCodeOf(result, _fieldSpecMap);
     result = EqualityUtils.hashCodeOf(result, _primaryKeyColumns);
+    result = EqualityUtils.hashCodeOf(result, _hasJSONColumn);
     return result;
   }
 
   /**
    * Helper method that converts a {@link TimeFieldSpec} to {@link DateTimeFieldSpec}
    * 1) If timeFieldSpec contains only incoming granularity spec, directly convert it to a dateTimeFieldSpec
-   * 2) If timeFieldSpec contains incoming aas well as outgoing granularity spec, use the outgoing spec to construct the dateTimeFieldSpec,
+   * 2) If timeFieldSpec contains incoming aas well as outgoing granularity spec, use the outgoing spec to construct
+   * the dateTimeFieldSpec,
    *    and configure a transform function for the conversion from incoming
    */
   @VisibleForTesting
@@ -692,7 +735,7 @@ public final class Schema implements Serializable {
     int outgoingTimeSize = outgoingGranularitySpec.getTimeUnitSize();
     TimeUnit outgoingTimeUnit = outgoingGranularitySpec.getTimeType();
     String outgoingTimeFormat = outgoingGranularitySpec.getTimeFormat();
-    String[] split = outgoingTimeFormat.split(DateTimeFormatSpec.COLON_SEPARATOR);
+    String[] split = StringUtils.split(outgoingTimeFormat, DateTimeFormatSpec.COLON_SEPARATOR, 2);
     DateTimeFormatSpec formatSpec;
     if (split[0].equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString())) {
       formatSpec = new DateTimeFormatSpec(outgoingTimeSize, outgoingTimeUnit.toString(), split[0]);
@@ -734,7 +777,6 @@ public final class Schema implements Serializable {
 
     String innerFunction = incomingName;
     switch (incomingTimeUnit) {
-
       case MILLISECONDS:
         // do nothing
         break;
@@ -766,11 +808,12 @@ public final class Schema implements Serializable {
           innerFunction = String.format("fromEpochDays(%s)", incomingName);
         }
         break;
+      default:
+        throw new IllegalStateException("Unsupported incomingTimeUnit - " + incomingTimeUnit);
     }
 
     String outerFunction = innerFunction;
     switch (outgoingTimeUnit) {
-
       case MILLISECONDS:
         break;
       case SECONDS:
@@ -801,6 +844,8 @@ public final class Schema implements Serializable {
           outerFunction = String.format("toEpochDays(%s)", innerFunction);
         }
         break;
+      default:
+        throw new IllegalStateException("Unsupported outgoingTimeUnit - " + outgoingTimeUnit);
     }
     return outerFunction;
   }

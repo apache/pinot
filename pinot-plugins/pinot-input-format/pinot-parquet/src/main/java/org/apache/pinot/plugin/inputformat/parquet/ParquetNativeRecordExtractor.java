@@ -114,7 +114,7 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
       }
     } else {
       for (String fieldName : _fields) {
-        Object value = extractValue(from, fromType.getFieldIndex(fieldName));
+        Object value = fromType.containsField(fieldName) ? extractValue(from, fromType.getFieldIndex(fieldName)) : null;
         if (value != null) {
           value = convert(value);
         }
@@ -172,6 +172,10 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
           long dateTime = (buf.getInt(8) - JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH) * DateTimeConstants.MILLIS_PER_DAY
               + buf.getLong(0) / NANOS_PER_MILLISECOND;
           return dateTime;
+        default:
+          throw new IllegalArgumentException(
+              "Unsupported field type: " + fieldType + ", primitive type: " + fieldType.asPrimitiveType()
+                  .getPrimitiveTypeName());
       }
     } else if ((fieldType.isRepetition(Type.Repetition.OPTIONAL)) || (fieldType.isRepetition(Type.Repetition.REQUIRED))
         || (fieldType.isRepetition(Type.Repetition.REPEATED))) {

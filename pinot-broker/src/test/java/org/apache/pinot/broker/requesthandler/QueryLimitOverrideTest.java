@@ -19,8 +19,9 @@
 package org.apache.pinot.broker.requesthandler;
 
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
-import org.apache.pinot.parsers.AbstractCompiler;
+import org.apache.pinot.parsers.QueryCompiler;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -29,17 +30,17 @@ public class QueryLimitOverrideTest {
 
   @Test
   public void testPql() {
-    AbstractCompiler pqlCompiler = PinotQueryParserFactory.get("PQL");
+    QueryCompiler pqlCompiler = PinotQueryParserFactory.get("PQL");
     testFixedQuerySetWithCompiler(pqlCompiler);
   }
 
   @Test
   public void testCalciteSql() {
-    AbstractCompiler sqlCompiler = PinotQueryParserFactory.get("SQL");
+    QueryCompiler sqlCompiler = PinotQueryParserFactory.get("SQL");
     testFixedQuerySetWithCompiler(sqlCompiler);
   }
 
-  private void testFixedQuerySetWithCompiler(AbstractCompiler compiler) {
+  private void testFixedQuerySetWithCompiler(QueryCompiler compiler) {
     // Selections
     testSelectionQueryWithCompiler(compiler, "select * from vegetables LIMIT 999", 1000, 999);
     testSelectionQueryWithCompiler(compiler, "select * from vegetables LIMIT 1000", 1000, 1000);
@@ -53,25 +54,33 @@ public class QueryLimitOverrideTest {
     testGroupByQueryWithCompiler(compiler, "select count(*) from vegetables group by a LIMIT 10000", 1000, 1000);
   }
 
-  private void testSelectionQueryWithCompiler(AbstractCompiler compiler, String query, int maxQuerySelectionLimit,
+  private void testSelectionQueryWithCompiler(QueryCompiler compiler, String query, int maxQuerySelectionLimit,
       int expectedLimit) {
-    BrokerRequest brokerRequest;
-    brokerRequest = compiler.compileToBrokerRequest(query);
-    BaseBrokerRequestHandler.handleQueryLimitOverride(brokerRequest, maxQuerySelectionLimit);
-    Assert.assertEquals(brokerRequest.getLimit(), expectedLimit);
-    if (brokerRequest.getPinotQuery() != null) {
-      Assert.assertEquals(brokerRequest.getPinotQuery().getLimit(), expectedLimit);
+    BrokerRequest brokerRequest = compiler.compileToBrokerRequest(query);
+    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
+    if (pinotQuery != null) {
+      // SQL
+      BaseBrokerRequestHandler.handleQueryLimitOverride(pinotQuery, maxQuerySelectionLimit);
+      Assert.assertEquals(pinotQuery.getLimit(), expectedLimit);
+    } else {
+      // PQL
+      BaseBrokerRequestHandler.handleQueryLimitOverride(brokerRequest, maxQuerySelectionLimit);
+      Assert.assertEquals(brokerRequest.getLimit(), expectedLimit);
     }
   }
 
-  private void testGroupByQueryWithCompiler(AbstractCompiler compiler, String query, int maxQuerySelectionLimit,
+  private void testGroupByQueryWithCompiler(QueryCompiler compiler, String query, int maxQuerySelectionLimit,
       int expectedLimit) {
-    BrokerRequest brokerRequest;
-    brokerRequest = compiler.compileToBrokerRequest(query);
-    BaseBrokerRequestHandler.handleQueryLimitOverride(brokerRequest, maxQuerySelectionLimit);
-    Assert.assertEquals(brokerRequest.getGroupBy().getTopN(), expectedLimit);
-    if (brokerRequest.getPinotQuery() != null) {
-      Assert.assertEquals(brokerRequest.getPinotQuery().getLimit(), expectedLimit);
+    BrokerRequest brokerRequest = compiler.compileToBrokerRequest(query);
+    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
+    if (pinotQuery != null) {
+      // SQL
+      BaseBrokerRequestHandler.handleQueryLimitOverride(pinotQuery, maxQuerySelectionLimit);
+      Assert.assertEquals(pinotQuery.getLimit(), expectedLimit);
+    } else {
+      // PQL
+      BaseBrokerRequestHandler.handleQueryLimitOverride(brokerRequest, maxQuerySelectionLimit);
+      Assert.assertEquals(brokerRequest.getGroupBy().getTopN(), expectedLimit);
     }
   }
 }

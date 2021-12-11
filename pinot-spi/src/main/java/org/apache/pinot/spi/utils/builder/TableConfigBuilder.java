@@ -25,7 +25,6 @@ import java.util.Map;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
@@ -44,6 +43,7 @@ import org.apache.pinot.spi.config.table.TunerConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 
 
 public class TableConfigBuilder {
@@ -64,9 +64,12 @@ public class TableConfigBuilder {
   private String _numReplicas = DEFAULT_NUM_REPLICAS;
   private String _timeColumnName;
   private String _timeType;
+  private boolean _allowNullTimeValue;
   private String _retentionTimeUnit;
   private String _retentionTimeValue;
+  @Deprecated
   private String _segmentPushFrequency;
+  @Deprecated
   private String _segmentPushType = DEFAULT_SEGMENT_PUSH_TYPE;
   private String _segmentAssignmentStrategy = DEFAULT_SEGMENT_ASSIGNMENT_STRATEGY;
   private String _peerSegmentDownloadScheme;
@@ -107,7 +110,7 @@ public class TableConfigBuilder {
   private UpsertConfig _upsertConfig;
   private IngestionConfig _ingestionConfig;
   private List<TierConfig> _tierConfigList;
-  private TunerConfig _tunerConfig;
+  private List<TunerConfig> _tunerConfigList;
 
   public TableConfigBuilder(TableType tableType) {
     _tableType = tableType;
@@ -150,6 +153,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setAllowNullTimeValue(boolean allowNullTimeValue) {
+    _allowNullTimeValue = allowNullTimeValue;
+    return this;
+  }
+
   public TableConfigBuilder setRetentionTimeUnit(String retentionTimeUnit) {
     _retentionTimeUnit = retentionTimeUnit;
     return this;
@@ -160,6 +168,9 @@ public class TableConfigBuilder {
     return this;
   }
 
+  /**
+   * @deprecated Use {@code segmentIngestionType} from {@link IngestionConfig#getBatchIngestionConfig()}
+   */
   public TableConfigBuilder setSegmentPushType(String segmentPushType) {
     if (REFRESH_SEGMENT_PUSH_TYPE.equalsIgnoreCase(segmentPushType)) {
       _segmentPushType = REFRESH_SEGMENT_PUSH_TYPE;
@@ -169,6 +180,9 @@ public class TableConfigBuilder {
     return this;
   }
 
+  /**
+   * @deprecated Use {@code segmentIngestionFrequency} from {@link IngestionConfig#getBatchIngestionConfig()}
+   */
   public TableConfigBuilder setSegmentPushFrequency(String segmentPushFrequency) {
     _segmentPushFrequency = segmentPushFrequency;
     return this;
@@ -346,8 +360,8 @@ public class TableConfigBuilder {
     return this;
   }
 
-  public TableConfigBuilder setTunerConfig(TunerConfig tunerConfig) {
-    _tunerConfig = tunerConfig;
+  public TableConfigBuilder setTunerConfigList(List<TunerConfig> tunerConfigList) {
+    _tunerConfigList = tunerConfigList;
     return this;
   }
 
@@ -356,6 +370,7 @@ public class TableConfigBuilder {
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
     validationConfig.setTimeColumnName(_timeColumnName);
     validationConfig.setTimeType(_timeType);
+    validationConfig.setAllowNullTimeValue(_allowNullTimeValue);
     validationConfig.setRetentionTimeUnit(_retentionTimeUnit);
     validationConfig.setRetentionTimeValue(_retentionTimeValue);
     validationConfig.setSegmentPushFrequency(_segmentPushFrequency);
@@ -400,6 +415,6 @@ public class TableConfigBuilder {
 
     return new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
         _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
-        _fieldConfigList, _upsertConfig, _ingestionConfig, _tierConfigList, _isDimTable, _tunerConfig);
+        _fieldConfigList, _upsertConfig, _ingestionConfig, _tierConfigList, _isDimTable, _tunerConfigList);
   }
 }

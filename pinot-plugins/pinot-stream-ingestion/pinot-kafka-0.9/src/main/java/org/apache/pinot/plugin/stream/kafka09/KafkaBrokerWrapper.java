@@ -47,7 +47,7 @@ public class KafkaBrokerWrapper {
   private final Object _kafkaBroker;
 
   public KafkaBrokerWrapper(Object kafkaBroker) {
-    this._kafkaBroker = kafkaBroker;
+    _kafkaBroker = kafkaBroker;
   }
 
   public String host() {

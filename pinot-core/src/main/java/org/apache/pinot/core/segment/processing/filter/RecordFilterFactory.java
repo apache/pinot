@@ -53,6 +53,8 @@ public final class RecordFilterFactory {
             "Must provide filterFunction for FILTER_FUNCTION record filter");
         recordFilter = new FunctionEvaluatorRecordFilter(config.getFilterFunction());
         break;
+      default:
+        break;
     }
     return recordFilter;
   }

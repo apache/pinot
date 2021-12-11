@@ -23,11 +23,11 @@ import java.util.List;
 import java.util.PriorityQueue;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.slf4j.Logger;
@@ -45,18 +45,24 @@ import org.slf4j.LoggerFactory;
 public class SelectionOrderByCombineOperator extends BaseCombineOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SelectionOrderByCombineOperator.class);
   private static final String OPERATOR_NAME = "SelectionOrderByCombineOperator";
+  private static final String EXPLAIN_NAME = "COMBINE_SELECT_ORDERBY";
 
   private final int _numRowsToKeep;
 
   public SelectionOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
-      ExecutorService executorService, long endTimeMs) {
-    super(operators, queryContext, executorService, endTimeMs);
+      ExecutorService executorService) {
+    super(operators, queryContext, executorService);
     _numRowsToKeep = queryContext.getLimit() + queryContext.getOffset();
   }
 
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String toExplainString() {
+    return EXPLAIN_NAME;
   }
 
   /**
@@ -74,8 +80,8 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator {
     assert orderByExpressions != null;
     if (orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
       try {
-        return new MinMaxValueBasedSelectionOrderByCombineOperator(_operators, _queryContext, _executorService,
-            _endTimeMs).getNextBlock();
+        return new MinMaxValueBasedSelectionOrderByCombineOperator(_operators, _queryContext,
+            _executorService).getNextBlock();
       } catch (Exception e) {
         LOGGER.warn("Caught exception while using min/max value based combine, using the default combine", e);
       }
@@ -89,13 +95,13 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator {
     DataSchema dataSchemaToMerge = blockToMerge.getDataSchema();
     assert mergedDataSchema != null && dataSchemaToMerge != null;
     if (!mergedDataSchema.equals(dataSchemaToMerge)) {
-      String errorMessage = String
-          .format("Data schema mismatch between merged block: %s and block to merge: %s, drop block to merge",
+      String errorMessage =
+          String.format("Data schema mismatch between merged block: %s and block to merge: %s, drop block to merge",
               mergedDataSchema, dataSchemaToMerge);
       // NOTE: This is segment level log, so log at debug level to prevent flooding the log.
       LOGGER.debug(errorMessage);
-      mergedBlock
-          .addToProcessingExceptions(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, errorMessage));
+      mergedBlock.addToProcessingExceptions(
+          QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, errorMessage));
       return;
     }
 

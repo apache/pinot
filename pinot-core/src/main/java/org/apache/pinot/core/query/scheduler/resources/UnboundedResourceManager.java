@@ -39,18 +39,18 @@ public class UnboundedResourceManager extends ResourceManager {
     return new QueryExecutorService() {
       @Override
       public void execute(Runnable command) {
-        queryWorkers.submit(command);
+        _queryWorkers.submit(command);
       }
     };
   }
 
   @Override
   public int getTableThreadsHardLimit() {
-    return numQueryRunnerThreads + numQueryWorkerThreads;
+    return _numQueryRunnerThreads + _numQueryWorkerThreads;
   }
 
   @Override
   public int getTableThreadsSoftLimit() {
-    return numQueryRunnerThreads + numQueryWorkerThreads;
+    return _numQueryRunnerThreads + _numQueryWorkerThreads;
   }
 }

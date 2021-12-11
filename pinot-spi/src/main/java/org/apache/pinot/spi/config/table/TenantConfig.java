@@ -21,9 +21,8 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
-import org.apache.pinot.spi.config.BaseJsonConfig;
-
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
 public class TenantConfig extends BaseJsonConfig {

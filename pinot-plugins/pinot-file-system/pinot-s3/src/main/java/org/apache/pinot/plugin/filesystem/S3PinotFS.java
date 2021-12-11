@@ -152,7 +152,7 @@ public class S3PinotFS extends PinotFS {
   }
 
   boolean isNullOrEmpty(String target) {
-    return target == null || "".equals(target);
+    return target == null || target.isEmpty();
   }
 
   private HeadObjectResponse getS3ObjectMetadata(URI uri)

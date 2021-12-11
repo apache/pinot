@@ -28,7 +28,8 @@ import org.apache.pinot.spi.stream.StreamLevelConsumer;
  */
 public class FakeStreamLevelConsumer implements StreamLevelConsumer {
   @Override
-  public void start() throws Exception {
+  public void start()
+      throws Exception {
 
   }
 
@@ -43,7 +44,8 @@ public class FakeStreamLevelConsumer implements StreamLevelConsumer {
   }
 
   @Override
-  public void shutdown() throws Exception {
+  public void shutdown()
+      throws Exception {
 
   }
 }

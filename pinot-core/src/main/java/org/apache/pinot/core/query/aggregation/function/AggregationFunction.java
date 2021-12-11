@@ -21,11 +21,11 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
@@ -52,7 +52,8 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   String getColumnName();
 
   /**
-   * Returns the column name to be used in the data schema of results. e.g. 'MINMAXRANGEMV( foo)' -> 'minmaxrangemv(foo)', 'PERCENTILE75(bar)' -> 'percentile75(bar)'
+   * Returns the column name to be used in the data schema of results.
+   * e.g. 'MINMAXRANGEMV( foo)' -> 'minmaxrangemv(foo)', 'PERCENTILE75(bar)' -> 'percentile75(bar)'
    */
   String getResultColumnName();
 
@@ -111,11 +112,6 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   IntermediateResult merge(IntermediateResult intermediateResult1, IntermediateResult intermediateResult2);
 
   /**
-   * Returns whether the intermediate result is comparable.
-   */
-  boolean isIntermediateResultComparable();
-
-  /**
    * Returns the {@link ColumnDataType} of the intermediate result.
    * <p>This column data type is used for transferring data in data table.
    */
@@ -132,4 +128,7 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
    * TODO: Support serializing/deserializing null values in DataTable and use null as the empty intermediate result
    */
   FinalResult extractFinalResult(IntermediateResult intermediateResult);
+
+  /** @return Description of this operator for Explain Plan */
+  String toExplainString();
 }

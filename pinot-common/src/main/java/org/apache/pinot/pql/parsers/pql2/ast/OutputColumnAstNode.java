@@ -19,7 +19,6 @@
 package org.apache.pinot.pql.parsers.pql2.ast;
 
 import org.apache.pinot.common.function.FunctionDefinitionRegistry;
-import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;

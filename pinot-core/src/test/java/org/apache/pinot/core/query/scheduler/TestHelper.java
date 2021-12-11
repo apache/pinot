@@ -29,6 +29,8 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 
 
 public class TestHelper {
+  private TestHelper() {
+  }
 
   public static ServerQueryRequest createServerQueryRequest(String table, ServerMetrics metrics,
       long queryArrivalTimeMs) {

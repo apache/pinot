@@ -405,8 +405,9 @@ public class StreamConfigTest {
         (long) TimeUtils.convertPeriodToMillis(flushThresholdTime));
 
     // llc overrides provided, but base values will be picked in base StreamConfigs
-    streamConfigMap.put(StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_THRESHOLD_ROWS + StreamConfigProperties.LLC_SUFFIX,
-        flushThresholdRowsLLC);
+    streamConfigMap
+        .put(StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_THRESHOLD_ROWS + StreamConfigProperties.LLC_SUFFIX,
+            flushThresholdRowsLLC);
     streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME + StreamConfigProperties.LLC_SUFFIX,
         flushThresholdTimeLLC);
     streamConfig = new StreamConfig(tableName, streamConfigMap);
@@ -428,7 +429,8 @@ public class StreamConfigTest {
         (long) TimeUtils.convertPeriodToMillis(flushThresholdTimeLLC));
 
     // PartitionLevelStreamConfig should use base values if llc overrides not provided
-    streamConfigMap.remove(StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_THRESHOLD_ROWS + StreamConfigProperties.LLC_SUFFIX);
+    streamConfigMap
+        .remove(StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_THRESHOLD_ROWS + StreamConfigProperties.LLC_SUFFIX);
     streamConfigMap.remove(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME + StreamConfigProperties.LLC_SUFFIX);
     streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, flushThresholdRows);
     streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, flushThresholdTime);

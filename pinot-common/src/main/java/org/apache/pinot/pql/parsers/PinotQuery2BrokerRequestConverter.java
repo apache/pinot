@@ -106,7 +106,7 @@ public class PinotQuery2BrokerRequestConverter {
 
   private void convertGroupBy(PinotQuery pinotQuery, BrokerRequest brokerRequest) {
     List<Expression> groupByList = pinotQuery.getGroupByList();
-    if (groupByList != null && groupByList.size() > 0) {
+    if (groupByList != null && !groupByList.isEmpty()) {
       GroupBy groupBy = new GroupBy();
       for (Expression expression : groupByList) {
         String expressionStr = ParserUtils.standardizeExpression(expression, true);
@@ -120,12 +120,15 @@ public class PinotQuery2BrokerRequestConverter {
   private void convertSelectList(PinotQuery pinotQuery, BrokerRequest brokerRequest) {
     Selection selection = null;
     List<AggregationInfo> aggregationInfoList = null;
-    for (Expression expression : pinotQuery.getSelectList()) {
-      ExpressionType type = expression.getType();
-      if (type == ExpressionType.FUNCTION && expression.getFunctionCall().getOperator()
+    for (Expression selectExpression : pinotQuery.getSelectList()) {
+      ExpressionType type = selectExpression.getType();
+      Expression expression;
+      if (type == ExpressionType.FUNCTION && selectExpression.getFunctionCall().getOperator()
           .equalsIgnoreCase(SqlKind.AS.toString())) {
-        expression = expression.getFunctionCall().getOperands().get(0);
+        expression = selectExpression.getFunctionCall().getOperands().get(0);
         type = expression.getType();
+      } else {
+        expression = selectExpression;
       }
       switch (type) {
         case LITERAL:
@@ -156,10 +159,12 @@ public class PinotQuery2BrokerRequestConverter {
             selection.addToSelectionColumns(ParserUtils.standardizeExpression(expression, false));
           }
           break;
+        default:
+          throw new IllegalArgumentException("Unrecognized expression type - " + type);
       }
     }
 
-    if (aggregationInfoList != null && aggregationInfoList.size() > 0) {
+    if (aggregationInfoList != null && !aggregationInfoList.isEmpty()) {
       brokerRequest.setAggregationsInfo(aggregationInfoList);
     } else if (selection != null) {
       if (pinotQuery.isSetOffset()) {
@@ -246,7 +251,8 @@ public class PinotQuery2BrokerRequestConverter {
     filterQuery.setId(id);
     filterSubQueryMap.putToFilterQueryMap(id, filterQuery);
     List<Integer> childFilterIds = new ArrayList<>();
-    switch (filterExpression.getType()) {
+    final ExpressionType filterExpressionType = filterExpression.getType();
+    switch (filterExpressionType) {
       case LITERAL:
       case IDENTIFIER:
         break;
@@ -285,6 +291,8 @@ public class PinotQuery2BrokerRequestConverter {
             throw new UnsupportedOperationException("Filter UDF not supported");
         }
         break;
+      default:
+        throw new IllegalArgumentException("Unrecognized filter expression type - " + filterExpressionType);
     }
 
     filterQuery.setNestedFilterQueryIds(childFilterIds);

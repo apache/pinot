@@ -42,28 +42,27 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   REALTIME_SEGMENT_NUM_PARTITIONS("realtimeSegmentNumPartitions", false),
   LLC_SIMULTANEOUS_SEGMENT_BUILDS("llcSimultaneousSegmentBuilds", true),
   RESIZE_TIME_MS("milliseconds", false),
-  EXECUTION_THREAD_CPU_TIME_NS("nanoseconds", false),
   // Upsert metrics
   UPSERT_PRIMARY_KEYS_COUNT("upsertPrimaryKeysCount", false);
 
-  private final String gaugeName;
-  private final String unit;
-  private final boolean global;
+  private final String _gaugeName;
+  private final String _unit;
+  private final boolean _global;
 
   ServerGauge(String unit, boolean global) {
-    this.unit = unit;
-    this.global = global;
-    this.gaugeName = Utils.toCamelCase(name().toLowerCase());
+    _unit = unit;
+    _global = global;
+    _gaugeName = Utils.toCamelCase(name().toLowerCase());
   }
 
   @Override
   public String getGaugeName() {
-    return gaugeName;
+    return _gaugeName;
   }
 
   @Override
   public String getUnit() {
-    return unit;
+    return _unit;
   }
 
   /**
@@ -73,6 +72,6 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
    */
   @Override
   public boolean isGlobal() {
-    return global;
+    return _global;
   }
 }

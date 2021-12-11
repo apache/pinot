@@ -12,6 +12,7 @@
         "name": "b",
         "dataType": "DOUBLE",
         "cardinality":6,
+        "singleValueField": false,
         "numValuesPerEntry":1.5
       },
       {
@@ -24,6 +25,7 @@
         "name": "d",
         "dataType": "STRING",
         "cardinality":41,
+        "singleValueField": false,
         "numValuesPerEntry":2,
         "averageLength" : 27
       },
@@ -31,18 +33,21 @@
         "name": "e",
         "dataType": "LONG",
         "cardinality":18,
+        "singleValueField": false,
         "numValuesPerEntry":4
       },
       {
         "name": "f",
         "dataType": "DOUBLE",
         "cardinality":13,
+        "singleValueField": false,
         "numValuesPerEntry":3
       },
       {
         "name": "g",
         "dataType": "STRING",
         "cardinality":6,
+        "singleValueField": false,
         "numValuesPerEntry":2,
         "averageLength" : 100
       },
@@ -73,7 +78,7 @@
         "name": "k",
         "dataType": "DOUBLE",
         "cardinality":10000,
-        "numValuesPerEntry":2,
+        "numValuesPerEntry":1,
         "averageLength" : 100
       },
       {
@@ -110,6 +115,15 @@
         "numValuesPerEntry":1
       }
     ],
+    "dateTimeFieldSpecs": [
+      {
+        "name": "x",
+        "dataType": "INT",
+        "format": "1:DAYS:EPOCH",
+        "granularity": "1:DAYS",
+        "cardinality": 1000
+      }
+    ],
     "timeFieldSpec": {
       "incomingGranularitySpec": {
         "dataType": "INT",
@@ -123,8 +137,10 @@
   "queriesWithWeights":{
     "select f from tableName": 0.1,
     "select f from tableName where a =3": 0.1,
-    "not a valid query": 0.1,
-    "select g from tableName LIMIT 1000000000": 0.1
+    "select * from tableName": 0.1,
+    "select g from tableName LIMIT 1000000000": 0.1,
+    "select f from tableName where x = 2": 0.2,
+    "select f from tableName where t = 3": 0.3
   },
   "numRecordsPerPush":1000000000
 }

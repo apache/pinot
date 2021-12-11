@@ -21,9 +21,16 @@ package org.apache.pinot.core.plan;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
+import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
+import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
@@ -37,28 +44,23 @@ import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
-import org.apache.pinot.core.query.exception.BadQueryRequestException;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.FilterContext;
-import org.apache.pinot.core.query.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.predicate.JsonMatchPredicate;
-import org.apache.pinot.core.query.request.context.predicate.Predicate;
-import org.apache.pinot.core.query.request.context.predicate.RegexpLikePredicate;
-import org.apache.pinot.core.query.request.context.predicate.TextMatchPredicate;
-import org.apache.pinot.core.segment.index.datasource.MutableDataSource;
-import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
-import org.apache.pinot.segment.spi.index.reader.ValidDocIndexReader;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
 public class FilterPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;
   private final int _numDocs;
+
+  // Cache the predicate evaluators
+  private final Map<Predicate, PredicateEvaluator> _predicateEvaluatorMap = new HashMap<>();
 
   public FilterPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
     _indexSegment = indexSegment;
@@ -71,26 +73,30 @@ public class FilterPlanNode implements PlanNode {
   @Override
   public BaseFilterOperator run() {
     FilterContext filter = _queryContext.getFilter();
-    ValidDocIndexReader validDocIndexReader = _indexSegment.getValidDocIndex();
-    boolean upsertSkipped = false;
-    if (_queryContext.getQueryOptions() != null) {
-      upsertSkipped = new QueryOptions(_queryContext.getQueryOptions()).isSkipUpsert();
-    }
+    ThreadSafeMutableRoaringBitmap validDocIds = _indexSegment.getValidDocIds();
+    boolean applyValidDocIds = validDocIds != null && !QueryOptionsUtils.isSkipUpsert(_queryContext.getQueryOptions());
     if (filter != null) {
-      BaseFilterOperator filterOperator = constructPhysicalOperator(filter, _queryContext.getDebugOptions());
-      if (validDocIndexReader != null && !upsertSkipped) {
+      BaseFilterOperator filterOperator = constructPhysicalOperator(filter);
+      if (applyValidDocIds) {
         BaseFilterOperator validDocFilter =
-            new BitmapBasedFilterOperator(validDocIndexReader.getValidDocBitmap(), false, _numDocs);
+            new BitmapBasedFilterOperator(validDocIds.getMutableRoaringBitmap(), false, _numDocs);
         return FilterOperatorUtils.getAndFilterOperator(Arrays.asList(filterOperator, validDocFilter), _numDocs,
             _queryContext.getDebugOptions());
       } else {
         return filterOperator;
       }
-    } else if (validDocIndexReader != null && !upsertSkipped) {
-      return new BitmapBasedFilterOperator(validDocIndexReader.getValidDocBitmap(), false, _numDocs);
+    } else if (applyValidDocIds) {
+      return new BitmapBasedFilterOperator(validDocIds.getMutableRoaringBitmap(), false, _numDocs);
     } else {
       return new MatchAllFilterOperator(_numDocs);
     }
+  }
+
+  /**
+   * Returns a map from predicates to their evaluators.
+   */
+  public Map<Predicate, PredicateEvaluator> getPredicateEvaluatorMap() {
+    return _predicateEvaluatorMap;
   }
 
   /**
@@ -129,14 +135,13 @@ public class FilterPlanNode implements PlanNode {
   /**
    * Helper method to build the operator tree from the filter.
    */
-  private BaseFilterOperator constructPhysicalOperator(FilterContext filter,
-      @Nullable Map<String, String> debugOptions) {
+  private BaseFilterOperator constructPhysicalOperator(FilterContext filter) {
     switch (filter.getType()) {
       case AND:
         List<FilterContext> childFilters = filter.getChildren();
         List<BaseFilterOperator> childFilterOperators = new ArrayList<>(childFilters.size());
         for (FilterContext childFilter : childFilters) {
-          BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter, debugOptions);
+          BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter);
           if (childFilterOperator.isResultEmpty()) {
             // Return empty filter operator if any of the child filter operator's result is empty
             return EmptyFilterOperator.getInstance();
@@ -145,12 +150,13 @@ public class FilterPlanNode implements PlanNode {
             childFilterOperators.add(childFilterOperator);
           }
         }
-        return FilterOperatorUtils.getAndFilterOperator(childFilterOperators, _numDocs, debugOptions);
+        return FilterOperatorUtils.getAndFilterOperator(childFilterOperators, _numDocs,
+            _queryContext.getDebugOptions());
       case OR:
         childFilters = filter.getChildren();
         childFilterOperators = new ArrayList<>(childFilters.size());
         for (FilterContext childFilter : childFilters) {
-          BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter, debugOptions);
+          BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter);
           if (childFilterOperator.isResultMatchingAll()) {
             // Return match all filter operator if any of the child filter operator matches all records
             return new MatchAllFilterOperator(_numDocs);
@@ -159,7 +165,7 @@ public class FilterPlanNode implements PlanNode {
             childFilterOperators.add(childFilterOperator);
           }
         }
-        return FilterOperatorUtils.getOrFilterOperator(childFilterOperators, _numDocs, debugOptions);
+        return FilterOperatorUtils.getOrFilterOperator(childFilterOperators, _numDocs, _queryContext.getDebugOptions());
       case PREDICATE:
         Predicate predicate = filter.getPredicate();
         ExpressionContext lhs = predicate.getLhs();
@@ -173,10 +179,13 @@ public class FilterPlanNode implements PlanNode {
         } else {
           String column = lhs.getIdentifier();
           DataSource dataSource = _indexSegment.getDataSource(column);
+          PredicateEvaluator predicateEvaluator = _predicateEvaluatorMap.get(predicate);
+          if (predicateEvaluator != null) {
+            return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, _numDocs);
+          }
           switch (predicate.getType()) {
             case TEXT_MATCH:
-              return new TextMatchFilterOperator(dataSource.getTextIndex(), ((TextMatchPredicate) predicate).getValue(),
-                  _numDocs);
+              return new TextMatchFilterOperator(dataSource.getTextIndex(), (TextMatchPredicate) predicate, _numDocs);
             case REGEXP_LIKE:
               // FST Index is available only for rolled out segments. So, we use different evaluator for rolled out and
               // consuming segments.
@@ -186,25 +195,22 @@ public class FilterPlanNode implements PlanNode {
               //
               // Consuming segments: When FST is enabled, use AutomatonBasedEvaluator so that regexp matching logic is
               // similar to that of FSTBasedEvaluator, else use regular flow of getting predicate evaluator.
-              PredicateEvaluator evaluator;
               if (dataSource.getFSTIndex() != null) {
-                evaluator = FSTBasedRegexpPredicateEvaluatorFactory
-                    .newFSTBasedEvaluator(dataSource.getFSTIndex(), dataSource.getDictionary(),
-                        ((RegexpLikePredicate) predicate).getValue());
-              } else if (dataSource instanceof MutableDataSource && ((MutableDataSource) dataSource).isFSTEnabled()) {
-                evaluator = FSTBasedRegexpPredicateEvaluatorFactory
-                    .newAutomatonBasedEvaluator(dataSource.getDictionary(),
-                        ((RegexpLikePredicate) predicate).getValue());
+                predicateEvaluator =
+                    FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator((RegexpLikePredicate) predicate,
+                        dataSource.getFSTIndex(), dataSource.getDictionary());
               } else {
-                evaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
-                    dataSource.getDataSourceMetadata().getDataType());
+                predicateEvaluator =
+                    PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
+                        dataSource.getDataSourceMetadata().getDataType());
               }
-              return FilterOperatorUtils.getLeafFilterOperator(evaluator, dataSource, _numDocs);
+              _predicateEvaluatorMap.put(predicate, predicateEvaluator);
+              return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, _numDocs);
             case JSON_MATCH:
               JsonIndexReader jsonIndex = dataSource.getJsonIndex();
               Preconditions
                   .checkState(jsonIndex != null, "Cannot apply JSON_MATCH on column: %s without json index", column);
-              return new JsonMatchFilterOperator(jsonIndex, ((JsonMatchPredicate) predicate).getValue(), _numDocs);
+              return new JsonMatchFilterOperator(jsonIndex, (JsonMatchPredicate) predicate, _numDocs);
             case IS_NULL:
               NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
               if (nullValueVector != null) {
@@ -220,9 +226,10 @@ public class FilterPlanNode implements PlanNode {
                 return new MatchAllFilterOperator(_numDocs);
               }
             default:
-              PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider
-                  .getPredicateEvaluator(predicate, dataSource.getDictionary(),
+              predicateEvaluator =
+                  PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
                       dataSource.getDataSourceMetadata().getDataType());
+              _predicateEvaluatorMap.put(predicate, predicateEvaluator);
               return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, _numDocs);
           }
         }

@@ -22,6 +22,9 @@ package org.apache.pinot.spi.ingestion.batch;
  * Defines all the keys used in the batch configs map
  */
 public class BatchConfigProperties {
+  private BatchConfigProperties() {
+  }
+
   public static final String TABLE_NAME = "tableName";
 
   public static final String INPUT_DIR_URI = "inputDirURI";

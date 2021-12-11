@@ -29,19 +29,18 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
-import org.apache.pinot.segment.spi.ImmutableSegment;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
-import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.customobject.AvgPair;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -49,6 +48,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -198,11 +198,13 @@ public class TransformQueriesTest extends BaseQueriesTest {
   @Test
   public void testTransformWithDateTruncInnerSegment() {
     String query =
-        "SELECT COUNT(*) FROM testTable GROUP BY DATETRUNC('week', ADD(SUB(DIV(T, 1000), INT_COL2), INT_COL2), 'SECONDS', 'Europe/Berlin')";
+        "SELECT COUNT(*) FROM testTable GROUP BY DATETRUNC('week', ADD(SUB(DIV(T, 1000), INT_COL2), INT_COL2), "
+            + "'SECONDS', 'Europe/Berlin')";
     verifyDateTruncationResult(query, "95295600");
 
     query =
-        "SELECT COUNT(*) FROM testTable GROUP BY DATETRUNC('week', DIV(MULT(DIV(ADD(SUB(T, 5), 5), 1000), INT_COL2), INT_COL2), 'SECONDS', 'Europe/Berlin', 'MILLISECONDS')";
+        "SELECT COUNT(*) FROM testTable GROUP BY DATETRUNC('week', DIV(MULT(DIV(ADD(SUB(T, 5), 5), 1000), INT_COL2), "
+            + "INT_COL2), 'SECONDS', 'Europe/Berlin', 'MILLISECONDS')";
     verifyDateTruncationResult(query, "95295600000");
 
     query = "SELECT COUNT(*) FROM testTable GROUP BY DATETRUNC('quarter', T, 'MILLISECONDS')";

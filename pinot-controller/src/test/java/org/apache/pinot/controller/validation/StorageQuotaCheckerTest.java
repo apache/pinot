@@ -61,7 +61,7 @@ public class StorageQuotaCheckerTest {
   private boolean isSegmentWithinQuota()
       throws InvalidConfigException {
     return _storageQuotaChecker
-        .isSegmentStorageWithinQuota(SEGMENT_NAME, SEGMENT_SIZE_IN_BYTES, 1000).isSegmentWithinQuota;
+        .isSegmentStorageWithinQuota(SEGMENT_NAME, SEGMENT_SIZE_IN_BYTES, 1000)._isSegmentWithinQuota;
   }
 
   @Test
@@ -81,9 +81,9 @@ public class StorageQuotaCheckerTest {
   public void mockTableSizeResult(long tableSizeInBytes, int numMissingSegments)
       throws InvalidConfigException {
     TableSizeReader.TableSubTypeSizeDetails tableSizeResult = new TableSizeReader.TableSubTypeSizeDetails();
-    tableSizeResult.estimatedSizeInBytes = tableSizeInBytes;
-    tableSizeResult.segments = Collections.emptyMap();
-    tableSizeResult.missingSegments = numMissingSegments;
+    tableSizeResult._estimatedSizeInBytes = tableSizeInBytes;
+    tableSizeResult._segments = Collections.emptyMap();
+    tableSizeResult._missingSegments = numMissingSegments;
     when(_tableSizeReader.getTableSubtypeSize(OFFLINE_TABLE_NAME, 1000)).thenReturn(tableSizeResult);
   }
 

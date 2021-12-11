@@ -25,9 +25,7 @@ import java.util.concurrent.TimeUnit;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
-import org.apache.pinot.core.requesthandler.OptimizationFlags;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.tools.perf.PerfBenchmarkDriver;
 import org.apache.pinot.tools.perf.PerfBenchmarkDriverConf;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -52,15 +50,9 @@ public class BenchmarkQueryEngine {
   /** List of query patterns used in the benchmark */
   private static final String[] QUERY_PATTERNS = new String[]{"SELECT count(*) from myTable"};
 
-  /** List of optimization flags to test,
-   * see {@link OptimizationFlags#getOptimizationFlags(BrokerRequest)} for the syntax
-   * used here. */
-  @Param({"", "-multipleOrEqualitiesToInClause"})
-  public String optimizationFlags;
-
   /** List of query patterns indices to run */
   @Param({"0"})
-  public int queryPattern;
+  public int _queryPattern;
 
   /** The table name which contains the offline data, for example "myTable_OFFLINE." */
   private static final String TABLE_NAME = "myTable_OFFLINE";
@@ -78,7 +70,7 @@ public class BenchmarkQueryEngine {
   private static final boolean ENABLE_PROFILING = false;
 
   PerfBenchmarkDriver _perfBenchmarkDriver;
-  boolean ranOnce = false;
+  boolean _ranOnce = false;
 
   @Setup
   public void startPinot()
@@ -133,9 +125,9 @@ public class BenchmarkQueryEngine {
       record = client.readData("/PinotPerfTestCluster/EXTERNALVIEW/" + TABLE_NAME);
     }
 
-    ranOnce = false;
+    _ranOnce = false;
 
-    System.out.println(_perfBenchmarkDriver.postQuery(QUERY_PATTERNS[queryPattern], optimizationFlags).toString());
+    System.out.println(_perfBenchmarkDriver.postQuery(QUERY_PATTERNS[_queryPattern]).toString());
   }
 
   @Benchmark
@@ -143,7 +135,7 @@ public class BenchmarkQueryEngine {
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public int sendQueryToPinot()
       throws Exception {
-    return _perfBenchmarkDriver.postQuery(QUERY_PATTERNS[queryPattern], optimizationFlags).get("totalDocs").asInt();
+    return _perfBenchmarkDriver.postQuery(QUERY_PATTERNS[_queryPattern]).get("totalDocs").asInt();
   }
 
   public static void main(String[] args)
@@ -154,7 +146,8 @@ public class BenchmarkQueryEngine {
 
     if (ENABLE_PROFILING) {
       opt = opt.addProfiler(StackProfiler.class,
-          "excludePackages=true;excludePackageNames=sun.,java.net.,io.netty.,org.apache.zookeeper.,org.eclipse.jetty.;lines=5;period=1;top=20");
+          "excludePackages=true;excludePackageNames=sun.,java.net.,io.netty.,org.apache.zookeeper.,org.eclipse.jetty"
+              + ".;lines=5;period=1;top=20");
     }
 
     new Runner(opt.build()).run();

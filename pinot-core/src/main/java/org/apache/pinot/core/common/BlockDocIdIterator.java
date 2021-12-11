@@ -41,4 +41,10 @@ public interface BlockDocIdIterator {
    * <p>NOTE: There should be no more calls to this method after it returns {@link Constants#EOF}.
    */
   int advance(int targetDocId);
+
+  /**
+   * Empirically determined to be the best batch size for batch iterators.
+   * @see {https://github.com/RoaringBitmap/RoaringBitmap/pull/243#issuecomment-381278304}
+   */
+  int OPTIMAL_ITERATOR_BATCH_SIZE = 256;
 }

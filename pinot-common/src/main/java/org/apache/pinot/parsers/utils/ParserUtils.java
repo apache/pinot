@@ -27,8 +27,8 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Literal;
-import org.apache.pinot.common.utils.CommonConstants.Query.Range;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
+import org.apache.pinot.spi.utils.CommonConstants.Query.Range;
 
 
 /**

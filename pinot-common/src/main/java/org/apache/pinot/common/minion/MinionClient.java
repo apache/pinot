@@ -102,8 +102,9 @@ public class MinionClient {
     int statusCode = response.getStatusLine().getStatusCode();
     String responseString = IOUtils.toString(response.getEntity().getContent());
     if (statusCode >= 400) {
-      throw new HttpException(
-          String.format("Unable to get state for task: %s. Error code %d, Error message: %s", taskName, statusCode, responseString));
+      throw new HttpException(String
+          .format("Unable to get state for task: %s. Error code %d, Error message: %s", taskName, statusCode,
+              responseString));
     }
     return responseString;
   }

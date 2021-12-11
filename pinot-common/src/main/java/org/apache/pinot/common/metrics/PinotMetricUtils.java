@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.common.metrics;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -41,18 +43,27 @@ import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTORY_CLASS_NAME;
+import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_METRICS_FACTORY_CLASS_NAME;
+
 
 public class PinotMetricUtils {
+  private PinotMetricUtils() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotMetricUtils.class);
   private static final String METRICS_PACKAGE_REGEX_PATTERN = ".*\\.plugin\\.metrics\\..*";
+  private static final Map<PinotMetricsRegistry, Boolean> METRICS_REGISTRY_MAP = new ConcurrentHashMap<>();
+  private static final Map<MetricsRegistryRegistrationListener, Boolean> METRICS_REGISTRY_REGISTRATION_LISTENERS_MAP =
+      new ConcurrentHashMap<>();
 
   private static PinotMetricsFactory _pinotMetricsFactory = null;
 
-  private static final Map<PinotMetricsRegistry, Boolean> metricsRegistryMap = new ConcurrentHashMap<>();
-  private static final Map<MetricsRegistryRegistrationListener, Boolean> metricsRegistryRegistrationListenersMap =
-      new ConcurrentHashMap<>();
-
-  public static void init(PinotConfiguration metricsConfiguration) {
+  /**
+   * Initialize the metricsFactory ad registers the metricsRegistry
+   */
+  @VisibleForTesting
+  public synchronized static void init(PinotConfiguration metricsConfiguration) {
     // Initializes PinotMetricsFactory.
     initializePinotMetricsFactory(metricsConfiguration);
 
@@ -68,22 +79,34 @@ public class PinotMetricUtils {
   private static void initializePinotMetricsFactory(PinotConfiguration metricsConfiguration) {
     Set<Class<?>> classes = getPinotMetricsFactoryClasses();
     if (classes.size() > 1) {
-      LOGGER.warn("More than one PinotMetricsFactory is initialized: {}", classes);
+      LOGGER.warn("More than one PinotMetricsFactory was found: {}", classes);
     }
-    for (Class<?> clazz : classes) {
-      MetricsFactory annotation = clazz.getAnnotation(MetricsFactory.class);
-      if (annotation.enabled()) {
-        try {
-          PinotMetricsFactory pinotMetricsFactory = (PinotMetricsFactory) clazz.newInstance();
-          pinotMetricsFactory.init(metricsConfiguration);
-          registerMetricsFactory(pinotMetricsFactory);
-        } catch (Exception e) {
-          LOGGER.error("Caught exception while initializing pinot metrics registry: {}, skipping it", clazz, e);
+
+    String metricsFactoryClassName = metricsConfiguration.getProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME,
+        DEFAULT_METRICS_FACTORY_CLASS_NAME);
+    LOGGER.info("{} will be initialized as the PinotMetricsFactory", metricsFactoryClassName);
+
+    Optional<Class<?>> clazzFound = classes.stream().filter(c -> c.getName().equals(metricsFactoryClassName))
+        .findFirst();
+
+    clazzFound.ifPresent(clazz -> {
+          MetricsFactory annotation = clazz.getAnnotation(MetricsFactory.class);
+          LOGGER.info("Trying to init PinotMetricsFactory: {} and MetricsFactory: {}", clazz, annotation);
+          if (annotation.enabled()) {
+            try {
+              PinotMetricsFactory pinotMetricsFactory = (PinotMetricsFactory) clazz.newInstance();
+              pinotMetricsFactory.init(metricsConfiguration);
+              registerMetricsFactory(pinotMetricsFactory);
+            } catch (Exception e) {
+              LOGGER.error("Caught exception while initializing pinot metrics registry: {}, skipping it", clazz, e);
+            }
+          }
         }
-      }
-    }
+    );
+
     Preconditions.checkState(_pinotMetricsFactory != null,
-        "Failed to initialize PinotMetricsFactory. Please check if any pinot-metrics related jar is actually added to the classpath.");
+        "Failed to initialize PinotMetricsFactory. Please check if any pinot-metrics related jar is actually added to"
+            + " the classpath.");
   }
 
   private static Set<Class<?>> getPinotMetricsFactoryClasses() {
@@ -117,7 +140,7 @@ public class PinotMetricUtils {
         }
       }
     }
-    LOGGER.info("Number of listeners got registered: {}", metricsRegistryRegistrationListenersMap.size());
+    LOGGER.info("Number of listeners got registered: {}", METRICS_REGISTRY_REGISTRATION_LISTENERS_MAP.size());
   }
 
   /**
@@ -129,10 +152,10 @@ public class PinotMetricUtils {
    */
   private static void addMetricsRegistryRegistrationListener(MetricsRegistryRegistrationListener listener) {
     synchronized (PinotMetricUtils.class) {
-      metricsRegistryRegistrationListenersMap.put(listener, Boolean.TRUE);
+      METRICS_REGISTRY_REGISTRATION_LISTENERS_MAP.put(listener, Boolean.TRUE);
 
       // Fire events to register all previously registered metrics registries
-      Set<PinotMetricsRegistry> metricsRegistries = metricsRegistryMap.keySet();
+      Set<PinotMetricsRegistry> metricsRegistries = METRICS_REGISTRY_MAP.keySet();
       LOGGER.info("Number of metrics registry: {}", metricsRegistries.size());
       for (PinotMetricsRegistry metricsRegistry : metricsRegistries) {
         listener.onMetricsRegistryRegistered(metricsRegistry);
@@ -147,12 +170,13 @@ public class PinotMetricUtils {
    */
   private static void registerMetricsRegistry(PinotMetricsRegistry registry) {
     synchronized (PinotMetricUtils.class) {
-      metricsRegistryMap.put(registry, Boolean.TRUE);
+      METRICS_REGISTRY_MAP.put(registry, Boolean.TRUE);
 
       // Fire event to all registered listeners
       Set<MetricsRegistryRegistrationListener> metricsRegistryRegistrationListeners =
-          metricsRegistryRegistrationListenersMap.keySet();
-      for (MetricsRegistryRegistrationListener metricsRegistryRegistrationListener : metricsRegistryRegistrationListeners) {
+          METRICS_REGISTRY_REGISTRATION_LISTENERS_MAP.keySet();
+      for (MetricsRegistryRegistrationListener metricsRegistryRegistrationListener
+          : metricsRegistryRegistrationListeners) {
         metricsRegistryRegistrationListener.onMetricsRegistryRegistered(registry);
       }
     }
@@ -166,10 +190,19 @@ public class PinotMetricUtils {
     _pinotMetricsFactory = metricsFactory;
   }
 
+  @VisibleForTesting
   public static PinotMetricsRegistry getPinotMetricsRegistry() {
+    return getPinotMetricsRegistry(new PinotConfiguration(Collections.emptyMap()));
+  }
+
+  /**
+   * Returns the metricsRegistry from the initialised metricsFactory.
+   * If the metricsFactory is null, first creates and initializes the metricsFactory and registers the metrics registry.
+   * @param metricsConfiguration metrics configs
+   */
+  public static synchronized PinotMetricsRegistry getPinotMetricsRegistry(PinotConfiguration metricsConfiguration) {
     if (_pinotMetricsFactory == null) {
-      // If init method didn't get called previously, just simply init with an empty hashmap. This is commonly used in tests.
-      init(new PinotConfiguration(Collections.emptyMap()));
+      init(metricsConfiguration);
     }
     return _pinotMetricsFactory.getPinotMetricsRegistry();
   }

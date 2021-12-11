@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.query;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -26,30 +27,28 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
-import org.apache.pinot.common.utils.CommonConstants.Segment.BuiltInVirtualColumn;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
 import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.operator.BitmapDocIdSetOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.ProjectionOperator;
-import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.roaringbitmap.IntIterator;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -72,6 +71,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  */
 public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "SelectionOrderByOperator";
+  private static final String EXPLAIN_NAME = "SELECT_ORDERBY";
 
   private final IndexSegment _indexSegment;
   // Deduped order-by expressions followed by output expressions from SelectionOperatorUtils.extractExpressions()
@@ -105,6 +105,18 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
         getComparator());
   }
 
+  @Override
+  public String toExplainString() {
+    StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(selectList:");
+    if (!_expressions.isEmpty()) {
+      stringBuilder.append(_expressions.get(0));
+      for (int i = 1; i < _expressions.size(); i++) {
+        stringBuilder.append(", ").append(_expressions.get(i));
+      }
+    }
+    return stringBuilder.append(')').toString();
+  }
+
   private Comparator<Object[]> getComparator() {
     // Compare all single-value columns
     int numOrderByExpressions = _orderByExpressions.size();
@@ -117,13 +129,13 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
     int numValuesToCompare = valueIndexList.size();
     int[] valueIndices = new int[numValuesToCompare];
-    DataType[] dataTypes = new DataType[numValuesToCompare];
+    DataType[] storedTypes = new DataType[numValuesToCompare];
     // Use multiplier -1 or 1 to control ascending/descending order
     int[] multipliers = new int[numValuesToCompare];
     for (int i = 0; i < numValuesToCompare; i++) {
       int valueIndex = valueIndexList.get(i);
       valueIndices[i] = valueIndex;
-      dataTypes[i] = _orderByExpressionMetadata[valueIndex].getDataType();
+      storedTypes[i] = _orderByExpressionMetadata[valueIndex].getDataType().getStoredType();
       multipliers[i] = _orderByExpressions.get(valueIndex).isAsc() ? -1 : 1;
     }
 
@@ -135,7 +147,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
         Object v1 = o1[index];
         Object v2 = o2[index];
         int result;
-        switch (dataTypes[i]) {
+        switch (storedTypes[i]) {
           case INT:
             result = ((Integer) v1).compareTo((Integer) v2);
             break;
@@ -164,10 +176,6 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       }
       return 0;
     };
-  }
-
-  public IndexSegment getIndexSegment() {
-    return _indexSegment;
   }
 
   @Override
@@ -252,7 +260,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     // and store the document ids into a bitmap
     int numRows = _rows.size();
     List<Object[]> rowList = new ArrayList<>(numRows);
-    MutableRoaringBitmap docIds = new MutableRoaringBitmap();
+    RoaringBitmap docIds = new RoaringBitmap();
     for (Object[] row : _rows) {
       rowList.add(row);
       int docId = (int) row[numOrderByExpressions];
@@ -322,40 +330,19 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
   }
 
   @Override
+  public List<Operator> getChildOperators() {
+    return Collections.singletonList(_transformOperator);
+  }
+
+  public IndexSegment getIndexSegment() {
+    return _indexSegment;
+  }
+
+  @Override
   public ExecutionStatistics getExecutionStatistics() {
     long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, _numEntriesScannedPostFilter,
         numTotalDocs);
-  }
-
-  private static class BitmapDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
-    static final String OPERATOR_NAME = "BitmapDocIdSetOperator";
-
-    final IntIterator _docIdIterator;
-    final int[] _docIdBuffer;
-
-    BitmapDocIdSetOperator(ImmutableRoaringBitmap docIds, int numDocs) {
-      _docIdIterator = docIds.getIntIterator();
-      _docIdBuffer = new int[Math.min(numDocs, DocIdSetPlanNode.MAX_DOC_PER_CALL)];
-    }
-
-    @Override
-    protected DocIdSetBlock getNextBlock() {
-      int numDocIdsFilled = 0;
-      while (numDocIdsFilled < DocIdSetPlanNode.MAX_DOC_PER_CALL && _docIdIterator.hasNext()) {
-        _docIdBuffer[numDocIdsFilled++] = _docIdIterator.next();
-      }
-      if (numDocIdsFilled > 0) {
-        return new DocIdSetBlock(_docIdBuffer, numDocIdsFilled);
-      } else {
-        return null;
-      }
-    }
-
-    @Override
-    public String getOperatorName() {
-      return OPERATOR_NAME;
-    }
   }
 }

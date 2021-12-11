@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -27,15 +27,13 @@ public class LiteralTransformFunctionTest {
 
   @Test
   public void testLiteralTransformFunction() {
-    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType(new LiteralTransformFunction("abc")),
-        FieldSpec.DataType.STRING);
-    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType(new LiteralTransformFunction("123")),
-        FieldSpec.DataType.INT);
-    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType(new LiteralTransformFunction("2147483649")),
-        FieldSpec.DataType.LONG);
-    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType(new LiteralTransformFunction("1.2")),
-        FieldSpec.DataType.FLOAT);
-    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType(new LiteralTransformFunction("41241241.2412")),
-        FieldSpec.DataType.DOUBLE);
+    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("abc"), DataType.STRING);
+    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("123"), DataType.INT);
+    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("2147483649"), DataType.LONG);
+    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("1.2"), DataType.FLOAT);
+    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("41241241.2412"), DataType.DOUBLE);
+    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("true"), DataType.BOOLEAN);
+    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("false"), DataType.BOOLEAN);
+    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("2020-02-02 20:20:20.20"), DataType.TIMESTAMP);
   }
 }

@@ -27,7 +27,6 @@ import javax.websocket.Endpoint;
 import javax.websocket.EndpointConfig;
 import javax.websocket.MessageHandler;
 import javax.websocket.Session;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -35,6 +34,8 @@ import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.glassfish.tyrus.client.ClientManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class MeetupRsvpStream {
@@ -96,7 +97,7 @@ public class MeetupRsvpStream {
         String eventId = "";
         if (event != null) {
           extractedJson.set("event_name", event.get("event_name"));
-          eventId = event.get("event_id").toString();
+          eventId = event.get("event_id").asText();
           extractedJson.put("event_id", eventId);
           extractedJson.set("event_time", event.get("time"));
         }
@@ -116,10 +117,10 @@ public class MeetupRsvpStream {
 
         if (_keepPublishing) {
           if (_partitionByKey) {
-            _producer.produce("meetupRSVPEvents", StringUtil.encodeUtf8(eventId),
-                StringUtil.encodeUtf8(extractedJson.toString()));
+            _producer.produce("meetupRSVPEvents", eventId.getBytes(UTF_8),
+                extractedJson.toString().getBytes(UTF_8));
           } else {
-            _producer.produce("meetupRSVPEvents", StringUtil.encodeUtf8(extractedJson.toString()));
+            _producer.produce("meetupRSVPEvents", extractedJson.toString().getBytes(UTF_8));
           }
         }
       } catch (Exception e) {

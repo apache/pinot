@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.routing.segmentpruner.interval;
 
 import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 
 
 /**
@@ -29,29 +30,24 @@ public class Interval implements Comparable<Interval> {
   public final long _max;
 
   public Interval(long min, long max) {
-    Preconditions.checkState(min <= max, "invalid interval [{}, {}]", min, max);
+    Preconditions.checkState(min <= max, "invalid interval [%s, %s]", min, max);
     _min = min;
     _max = max;
   }
 
   public boolean intersects(Interval o) {
-    Preconditions.checkNotNull(o, "Invalid interval: null");
     return _max >= o._min && o._max >= _min;
   }
 
   @Override
   public int compareTo(Interval o) {
-    Preconditions.checkNotNull(o, "Compare to invalid interval: null");
     if (_min < o._min) {
       return -1;
     } else if (_min > o._min) {
       return 1;
-    } else if (_max < o._max) {
-      return -1;
-    } else if (_max > o._max) {
-      return 1;
+    } else {
+      return Long.compare(_max, o._max);
     }
-    else return 0;
   }
 
   @Override
@@ -78,19 +74,17 @@ public class Interval implements Comparable<Interval> {
     return result;
   }
 
+  @Nullable
   public static Interval getIntersection(Interval a, Interval b) {
-    Preconditions.checkNotNull(a, "Intersect invalid intervals {} and {}", a, b);
-    Preconditions.checkNotNull(b, "Intersect invalid intervals {} and {}", a, b);
     if (!a.intersects(b)) {
       return null;
     }
     return new Interval(Math.max(a._min, b._min), Math.min(a._max, b._max));
   }
 
+  @Nullable
   public static Interval getUnion(Interval a, Interval b) {
     // Can only merge two intervals if they overlap
-    Preconditions.checkNotNull(a, "Union invalid intervals {} and {}", a, b);
-    Preconditions.checkNotNull(b, "Union invalid intervals {} and {}", a, b);
     if (!a.intersects(b)) {
       return null;
     }

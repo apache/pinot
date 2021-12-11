@@ -116,7 +116,7 @@ h3.accordion-subtitle:before, h3.accordion-subtitle:after {
 }
 
 .MuiListItem-root.Mui-selected, .MuiListItem-root.Mui-selected:hover {
-  background-color: rgb(66 133 244 / 0.3) !important;
+  background-color: #c0d5f8 !important;
 }
 .box-border{
   border: 1px #ccc solid;

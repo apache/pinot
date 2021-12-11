@@ -42,7 +42,7 @@ public class NotInPredicateFilter implements PredicateFilter {
   @Override
   public boolean apply(int[] dictIds, int length) {
     // length <= dictIds.length
-    for (int i = 0; i < length; ++i) {
+    for (int i = 0; i < length; i++) {
       if (_notInSet.contains(dictIds[i])) {
         return false;
       }

@@ -24,7 +24,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class TimeGeneratorTest {

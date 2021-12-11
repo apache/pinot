@@ -32,25 +32,25 @@ import org.apache.datasketches.theta.UpdateSketchBuilder;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByResult;
-import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
-import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
-import org.apache.pinot.segment.spi.ImmutableSegment;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
-import org.apache.pinot.core.query.exception.BadQueryRequestException;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -318,11 +318,13 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
     testInvalidQuery(
         "select DISTINCT_COUNT_THETA_SKETCH(intSVColumn, '', 'longSVColumn < 100', 'SET_UNION($1)') from testTable");
     testInvalidQuery(
-        "select DISTINCT_COUNT_THETA_SKETCH(intSVColumn, '', 'longSVColumn < 100', 'SET_INTERSECT($1)') from testTable");
+        "select DISTINCT_COUNT_THETA_SKETCH(intSVColumn, '', 'longSVColumn < 100', 'SET_INTERSECT($1)') from "
+            + "testTable");
     testInvalidQuery(
         "select DISTINCT_COUNT_THETA_SKETCH(intSVColumn, '', 'longSVColumn < 100', 'SET_DIFF($1)') from testTable");
     testInvalidQuery(
-        "select DISTINCT_COUNT_THETA_SKETCH(intSVColumn, '', 'longSVColumn < 100', 'floatSVColumn > 500', 'SET_DIFF($0,$1,$2)') from testTable");
+        "select DISTINCT_COUNT_THETA_SKETCH(intSVColumn, '', 'longSVColumn < 100', 'floatSVColumn > 500', 'SET_DIFF"
+            + "($0,$1,$2)') from testTable");
   }
 
   private void testInvalidQuery(String query) {

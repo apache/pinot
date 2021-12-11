@@ -20,14 +20,15 @@ package org.apache.pinot.core.segment.processing.transformer;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.core.data.function.FunctionEvaluator;
-import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
+import org.apache.pinot.segment.local.function.FunctionEvaluator;
+import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
  * RecordTransformer which executes transform functions to transform columns of record
- * Does not follow any particular order, and hence cannot support transformations where strict order of execution is needed
+ * Does not follow any particular order, and hence cannot support transformations where strict order of execution is
+ * needed
  */
 public class TransformFunctionRecordTransformer implements RecordTransformer {
 

@@ -37,11 +37,11 @@ public interface RecordReader extends Closeable, Serializable {
    * Initializes the record reader with data file, schema and (optional) record reader config.
    *
    * @param dataFile Data file
-   * @param fieldsToRead The fields to read from the data file. If blank, reads all fields.
+   * @param fieldsToRead The fields to read from the data file. If null or empty, reads all fields
    * @param recordReaderConfig Config for the reader specific to the format. e.g. delimiter for csv format etc
    * @throws IOException If an I/O error occurs
    */
-  void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
+  void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException;
 
   /**
@@ -51,13 +51,17 @@ public interface RecordReader extends Closeable, Serializable {
 
   /**
    * Get the next record.
+   *
+   * TODO: Add default implementation because all the override implementations are the same
    */
   GenericRow next()
       throws IOException;
 
   /**
-   * Get the next record. Re-use the given row if possible to reduce garbage.
-   * <p>The passed in row should be returned by previous call to {@link #next()}.
+   * Get the next record. Re-use the given row to reduce garbage.
+   * <p>The passed in row should be cleared before calling this method.
+   *
+   * TODO: Consider clearing the row within the record reader to simplify the caller
    */
   GenericRow next(GenericRow reuse)
       throws IOException;

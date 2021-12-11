@@ -60,13 +60,11 @@ public class BrokerResponseNativeTest {
     QueryProcessingException processingException = new QueryProcessingException(400, errorMsgStr);
     expected.addToExceptions(processingException);
     String brokerString = expected.toJsonString();
-//    System.out.println(brokerString);
     BrokerResponseNative newBrokerResponse = BrokerResponseNative.fromJsonString(brokerString);
     Assert.assertEquals(newBrokerResponse.getProcessingExceptions().get(0).getErrorCode(),
         QueryException.BROKER_RESOURCE_MISSING_ERROR.getErrorCode());
     Assert.assertEquals(newBrokerResponse.getProcessingExceptions().get(0).getMessage(),
         QueryException.BROKER_RESOURCE_MISSING_ERROR.getMessage());
-//    System.out.println(newBrokerResponse.getProcessingExceptions().get(1));
     Assert.assertEquals(newBrokerResponse.getProcessingExceptions().get(1).getErrorCode(), 400);
     Assert.assertEquals(newBrokerResponse.getProcessingExceptions().get(1).getMessage(), errorMsgStr);
   }

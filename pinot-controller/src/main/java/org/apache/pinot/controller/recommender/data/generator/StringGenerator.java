@@ -19,12 +19,9 @@
 package org.apache.pinot.controller.recommender.data.generator;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Random;
-import java.util.Set;
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.commons.lang.StringUtils;
 
 
 /**
@@ -35,48 +32,47 @@ public class StringGenerator implements Generator {
   private static final double DEFAULT_NUMBER_OF_VALUES_PER_ENTRY = 1;
   private static final int DEFAULT_LENGTH_OF_EACH_STRING = 10;
 
-  private final int cardinality;
-  private final Random rand;
-  private final double numberOfValuesPerEntry;
-  private final int lengthOfEachString;
+  private final int _cardinality;
+  private final Random _rand;
+  private final double _numberOfValuesPerEntry;
 
-  private List<String> vals;
-  private int counter = 0;
+  private final String _initialValue;
+  private final int _counterLength;
+  private int _counter = 0;
 
   public StringGenerator(Integer cardinality, Double numberOfValuesPerEntry, Integer lengthOfEachString) {
-    this.cardinality = cardinality;
-    this.numberOfValuesPerEntry =
+    _cardinality = cardinality;
+    _numberOfValuesPerEntry =
         numberOfValuesPerEntry != null ? numberOfValuesPerEntry : DEFAULT_NUMBER_OF_VALUES_PER_ENTRY;
-    this.lengthOfEachString = lengthOfEachString != null ? lengthOfEachString : DEFAULT_LENGTH_OF_EACH_STRING;
-    Preconditions.checkState(this.numberOfValuesPerEntry >= 1,
-        "Number of values per entry (should be >= 1): " + this.numberOfValuesPerEntry);
-    rand = new Random(System.currentTimeMillis());
+    lengthOfEachString = lengthOfEachString != null ? lengthOfEachString : DEFAULT_LENGTH_OF_EACH_STRING;
+    Preconditions.checkState(_numberOfValuesPerEntry >= 1,
+        "Number of values per entry (should be >= 1): " + _numberOfValuesPerEntry);
+    _counterLength = String.valueOf(_cardinality).length();
+    int initValueSize = lengthOfEachString - _counterLength;
+    Preconditions.checkState(initValueSize >= 0,
+        String.format("Cannot generate %d unique string with length %d", _cardinality, lengthOfEachString));
+    _initialValue = RandomStringUtils.randomAlphabetic(initValueSize);
+    _rand = new Random(System.currentTimeMillis());
   }
 
   @Override
   public void init() {
-    final Set<String> uniqueStrings = new HashSet<>();
-    for (int i = 0; i < cardinality; i++) {
-      while (!uniqueStrings.add(RandomStringUtils.randomAlphabetic(lengthOfEachString))) {
-        uniqueStrings.add(RandomStringUtils.randomAlphabetic(lengthOfEachString));
-      }
-    }
-    vals = new ArrayList<>(uniqueStrings);
   }
 
   @Override
   public Object next() {
-    if (numberOfValuesPerEntry == 1) {
+    if (_numberOfValuesPerEntry == 1) {
       return getNextString();
     }
-    return MultiValueGeneratorHelper.generateMultiValueEntries(numberOfValuesPerEntry, rand, this::getNextString);
+    return MultiValueGeneratorHelper.generateMultiValueEntries(_numberOfValuesPerEntry, _rand, this::getNextString);
   }
 
   private String getNextString() {
-    if (counter == cardinality) {
-      counter = 0;
+    if (_counter == _cardinality) {
+      _counter = 0;
     }
-    return vals.get(counter++);
+    _counter++;
+    return _initialValue + StringUtils.leftPad(String.valueOf(_counter), _counterLength, '0');
   }
 
   public static void main(String[] args) {

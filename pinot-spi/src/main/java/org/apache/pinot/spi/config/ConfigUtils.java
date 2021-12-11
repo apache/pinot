@@ -29,6 +29,9 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class ConfigUtils {
+  private ConfigUtils() {
+  }
+
   private static final Map<String, String> ENVIRONMENT_VARIABLES = System.getenv();
 
   /**
@@ -57,7 +60,7 @@ public class ConfigUtils {
     final JsonNodeType nodeType = jsonNode.getNodeType();
     switch (nodeType) {
       case OBJECT:
-        if (jsonNode.size() > 0) {
+        if (!jsonNode.isEmpty()) {
           Iterator<Map.Entry<String, JsonNode>> iterator = jsonNode.fields();
           while (iterator.hasNext()) {
             final Map.Entry<String, JsonNode> next = iterator.next();

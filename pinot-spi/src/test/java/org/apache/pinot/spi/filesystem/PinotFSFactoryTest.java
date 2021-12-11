@@ -24,7 +24,6 @@ import java.io.InputStream;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
-
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -60,17 +59,17 @@ public class PinotFSFactoryTest {
   }
 
   public static class TestPinotFS extends PinotFS {
-    public int initCalled = 0;
+    public int _initCalled = 0;
     private PinotConfiguration _configuration;
 
     public int getInitCalled() {
-      return initCalled;
+      return _initCalled;
     }
 
     @Override
     public void init(PinotConfiguration configuration) {
       _configuration = configuration;
-      initCalled++;
+      _initCalled++;
     }
 
     public PinotConfiguration getConfiguration() {

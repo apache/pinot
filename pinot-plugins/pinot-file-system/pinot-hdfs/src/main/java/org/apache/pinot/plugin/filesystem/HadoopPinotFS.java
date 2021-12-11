@@ -19,6 +19,7 @@
 
 package org.apache.pinot.plugin.filesystem;
 
+import com.google.common.base.Strings;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -26,7 +27,6 @@ import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -39,7 +39,6 @@ import org.apache.pinot.spi.filesystem.PinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Strings;
 
 /**
  * Implementation of PinotFS for the Hadoop Filesystem
@@ -148,10 +147,10 @@ public class HadoopPinotFS extends PinotFS {
       // _hadoopFS.listFiles(path, false) will not return directories as files, thus use listStatus(path) here.
       List<FileStatus> files = listStatus(path, recursive);
       for (FileStatus file : files) {
-        filePathStrings.add(file.getPath().toUri().getRawPath());
+        filePathStrings.add(file.getPath().toString());
       }
     } else {
-      throw new IllegalArgumentException("segmentUri is not valid");
+      throw new IllegalArgumentException("fileUri does not exist: " + fileUri);
     }
     String[] retArray = new String[filePathStrings.size()];
     filePathStrings.toArray(retArray);
@@ -240,8 +239,7 @@ public class HadoopPinotFS extends PinotFS {
     return _hadoopFS.open(path);
   }
 
-  private void authenticate(Configuration hadoopConf,
-      PinotConfiguration configs) {
+  private void authenticate(Configuration hadoopConf, PinotConfiguration configs) {
     String principal = configs.getProperty(PRINCIPAL);
     String keytab = configs.getProperty(KEYTAB);
     if (!Strings.isNullOrEmpty(principal) && !Strings.isNullOrEmpty(keytab)) {

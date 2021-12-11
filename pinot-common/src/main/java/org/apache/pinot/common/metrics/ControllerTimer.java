@@ -28,17 +28,17 @@ import org.apache.pinot.common.Utils;
 public enum ControllerTimer implements AbstractMetrics.Timer {
   CRON_SCHEDULER_JOB_EXECUTION_TIME_MS("cronSchedulerJobExecutionTimeMs", false);
 
-  private final String timerName;
-  private final boolean global;
+  private final String _timerName;
+  private final boolean _global;
 
   ControllerTimer(String unit, boolean global) {
-    this.global = global;
-    this.timerName = Utils.toCamelCase(name().toLowerCase());
+    _global = global;
+    _timerName = Utils.toCamelCase(name().toLowerCase());
   }
 
   @Override
   public String getTimerName() {
-    return timerName;
+    return _timerName;
   }
 
   /**
@@ -48,6 +48,6 @@ public enum ControllerTimer implements AbstractMetrics.Timer {
    */
   @Override
   public boolean isGlobal() {
-    return global;
+    return _global;
   }
 }

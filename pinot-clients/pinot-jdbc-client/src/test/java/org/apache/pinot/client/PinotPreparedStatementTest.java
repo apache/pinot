@@ -23,12 +23,10 @@ import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.Time;
 import java.sql.Timestamp;
-import java.util.Collections;
+import java.util.Properties;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.client.utils.DateTimeUtils;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
@@ -39,12 +37,13 @@ public class PinotPreparedStatementTest {
   public static final String SINGLE_STRING_QUERY = "SELECT * FROM dummy WHERE value = ?";
   private DummyPinotClientTransport _dummyPinotClientTransport = new DummyPinotClientTransport();
   private DummyPinotControllerTransport _dummyPinotControllerTransport = new DummyPinotControllerTransport();
-  private PinotClientTransportFactory _previousTransportFactory = null;
 
   @Test
   public void testSetAndClearValues()
       throws Exception {
-    PinotConnection connection = new PinotConnection("dummy", _dummyPinotClientTransport, "dummy" ,_dummyPinotControllerTransport);
+    PinotConnection connection =
+        new PinotConnection(new Properties(), "dummy", _dummyPinotClientTransport, "dummy",
+            _dummyPinotControllerTransport);
     PreparedStatement preparedStatement = connection.prepareStatement(QUERY);
 
     preparedStatement.setString(1, "foo");
@@ -55,8 +54,11 @@ public class PinotPreparedStatementTest {
     preparedStatement.setFloat(6, 1.4f);
     preparedStatement.executeQuery();
 
-    Assert.assertEquals(_dummyPinotClientTransport.getLastQuery(),
-        "SELECT * FROM dummy WHERE name = 'foo' and age = 20 and score = 98.1 and ts = 123456789 and eligible = 'true' and sub_score = 1.4");
+    String lastExecutedQuery = _dummyPinotClientTransport.getLastQuery();
+
+    Assert.assertEquals(lastExecutedQuery.substring(0, lastExecutedQuery.indexOf("LIMIT")).trim(),
+        "SELECT * FROM dummy WHERE name = 'foo' and age = 20 and score = 98.1 and ts = 123456789 and eligible = "
+            + "'true' and sub_score = 1.4");
 
     preparedStatement.clearParameters();
     preparedStatement.setString(1, "");
@@ -67,14 +69,18 @@ public class PinotPreparedStatementTest {
     preparedStatement.setFloat(6, 0);
     preparedStatement.executeQuery();
 
-    Assert.assertEquals(_dummyPinotClientTransport.getLastQuery(),
-        "SELECT * FROM dummy WHERE name = '' and age = 0 and score = 0.0 and ts = 0 and eligible = 'false' and sub_score = 0.0");
+    lastExecutedQuery = _dummyPinotClientTransport.getLastQuery();
+
+    Assert.assertEquals(lastExecutedQuery.substring(0, lastExecutedQuery.indexOf("LIMIT")).trim(),
+        "SELECT * FROM dummy WHERE name = '' and age = 0 and score = 0.0 and ts = 0 and eligible = 'false' and "
+            + "sub_score = 0.0");
   }
 
   @Test
   public void testSetDateTime()
       throws Exception {
-    PinotConnection connection = new PinotConnection("dummy", _dummyPinotClientTransport, "dummy" ,_dummyPinotControllerTransport);
+    PinotConnection connection =
+        new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
     PreparedStatement preparedStatement = connection.prepareStatement(DATE_QUERY);
 
     Long currentTimestamp = System.currentTimeMillis();
@@ -85,8 +91,9 @@ public class PinotPreparedStatementTest {
 
     String expectedDate = DateTimeUtils.dateToString(new Date(currentTimestamp));
     String expectedTime = DateTimeUtils.timeStampToString(new Timestamp(currentTimestamp));
+    String lastExecutedQuery = _dummyPinotClientTransport.getLastQuery();
 
-    Assert.assertEquals(_dummyPinotClientTransport.getLastQuery(), String
+    Assert.assertEquals(lastExecutedQuery.substring(0, lastExecutedQuery.indexOf("LIMIT")).trim(), String
         .format("SELECT * FROM dummy WHERE date = '%s' and updated_at = '%s' and created_at = '%s'", expectedDate,
             expectedTime, expectedTime));
   }
@@ -94,30 +101,23 @@ public class PinotPreparedStatementTest {
   @Test
   public void testSetAdditionalDataTypes()
       throws Exception {
-    PinotConnection connection = new PinotConnection("dummy", _dummyPinotClientTransport, "dummy" ,_dummyPinotControllerTransport);
+    PinotConnection connection =
+        new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
     PreparedStatement preparedStatement = connection.prepareStatement(SINGLE_STRING_QUERY);
 
     String value = "1234567891011121314151617181920";
     preparedStatement.setBigDecimal(1, new BigDecimal(value));
     preparedStatement.executeQuery();
-    Assert.assertEquals(_dummyPinotClientTransport.getLastQuery(),
+
+    String lastExecutedQuery = _dummyPinotClientTransport.getLastQuery();
+    Assert.assertEquals(lastExecutedQuery.substring(0, lastExecutedQuery.indexOf("LIMIT")).trim(),
         String.format("SELECT * FROM dummy WHERE value = '%s'", value));
 
     preparedStatement.clearParameters();
     preparedStatement.setBytes(1, value.getBytes());
     preparedStatement.executeQuery();
-    Assert.assertEquals(_dummyPinotClientTransport.getLastQuery(),
+    lastExecutedQuery = _dummyPinotClientTransport.getLastQuery();
+    Assert.assertEquals(lastExecutedQuery.substring(0, lastExecutedQuery.indexOf("LIMIT")).trim(),
         String.format("SELECT * FROM dummy WHERE value = '%s'", Hex.encodeHexString(value.getBytes())));
-  }
-
-  @BeforeClass
-  public void overridePinotClientTransport() {
-    _previousTransportFactory = ConnectionFactory._transportFactory;
-    ConnectionFactory._transportFactory = new DummyPinotClientTransportFactory(_dummyPinotClientTransport);
-  }
-
-  @AfterClass
-  public void resetPinotClientTransport() {
-    ConnectionFactory._transportFactory = _previousTransportFactory;
   }
 }

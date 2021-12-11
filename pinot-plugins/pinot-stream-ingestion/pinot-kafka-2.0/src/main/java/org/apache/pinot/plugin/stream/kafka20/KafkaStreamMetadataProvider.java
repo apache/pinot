@@ -22,8 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Collections;
-import java.util.concurrent.TimeoutException;
-import javax.annotation.Nonnull;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -31,7 +29,8 @@ import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
-public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHandler implements StreamMetadataProvider {
+public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHandler
+    implements StreamMetadataProvider {
 
   public KafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig) {
     this(clientId, streamConfig, Integer.MIN_VALUE);
@@ -46,24 +45,18 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     return _consumer.partitionsFor(_topic, Duration.ofMillis(timeoutMillis)).size();
   }
 
-  public synchronized long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
-      throws java.util.concurrent.TimeoutException {
-    throw new UnsupportedOperationException("The use of this method is not supported");
-  }
-
   @Override
-  public StreamPartitionMsgOffset fetchStreamPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
-      throws TimeoutException {
+  public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
     Preconditions.checkNotNull(offsetCriteria);
-    long offset = -1;
+    long offset;
     if (offsetCriteria.isLargest()) {
-      offset =  _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+      offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
           .get(_topicPartition);
     } else if (offsetCriteria.isSmallest()) {
-      offset =  _consumer.beginningOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+      offset = _consumer.beginningOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
           .get(_topicPartition);
     } else {
-      throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria.toString());
+      throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria);
     }
     return new LongMsgOffset(offset);
   }

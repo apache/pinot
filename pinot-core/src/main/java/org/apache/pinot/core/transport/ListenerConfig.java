@@ -30,11 +30,11 @@ public class ListenerConfig {
   private final TlsConfig _tlsConfig;
 
   public ListenerConfig(String name, String host, int port, String protocol, TlsConfig tlsConfig) {
-    this._name = name;
-    this._host = host;
-    this._port = port;
-    this._protocol = protocol;
-    this._tlsConfig = tlsConfig;
+    _name = name;
+    _host = host;
+    _port = port;
+    _protocol = protocol;
+    _tlsConfig = tlsConfig;
   }
 
   public String getName() {

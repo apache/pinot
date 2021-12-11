@@ -88,7 +88,7 @@ public class DateTimeGranularitySpec {
    * </ul>
    * </ul>
    */
-  public Long granularityToMillis() {
+  public long granularityToMillis() {
     return TimeUnit.MILLISECONDS.convert(_size, _timeUnit);
   }
 

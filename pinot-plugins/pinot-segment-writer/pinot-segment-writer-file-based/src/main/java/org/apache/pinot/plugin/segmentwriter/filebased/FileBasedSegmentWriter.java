@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -36,10 +37,10 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
-import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
-import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.core.util.SegmentProcessorAvroUtils;
+import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
+import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
@@ -81,7 +82,12 @@ public class FileBasedSegmentWriter implements SegmentWriter {
   private GenericData.Record _reusableRecord;
 
   @Override
-  public void init(TableConfig tableConfig, Schema schema)
+  public void init(TableConfig tableConfig, Schema schema) throws Exception {
+    init(tableConfig, schema, Collections.emptyMap());
+  }
+
+  @Override
+  public void init(TableConfig tableConfig, Schema schema, Map<String, String> batchConfigOverride)
       throws Exception {
     _tableConfig = tableConfig;
     _tableNameWithType = _tableConfig.getTableName();
@@ -95,7 +101,11 @@ public class FileBasedSegmentWriter implements SegmentWriter {
     _batchIngestionConfig = _tableConfig.getIngestionConfig().getBatchIngestionConfig();
     Preconditions.checkState(_batchIngestionConfig.getBatchConfigMaps().size() == 1,
         "batchConfigMaps must contain only 1 BatchConfig for table: %s", _tableNameWithType);
-    _batchConfig = new BatchConfig(_tableNameWithType, _batchIngestionConfig.getBatchConfigMaps().get(0));
+
+    // apply config override provided by user.
+    Map<String, String> batchConfigMap = new HashMap<>(_batchIngestionConfig.getBatchConfigMaps().get(0));
+    batchConfigMap.putAll(batchConfigOverride);
+    _batchConfig = new BatchConfig(_tableNameWithType, batchConfigMap);
 
     Preconditions.checkState(StringUtils.isNotBlank(_batchConfig.getOutputDirURI()),
         "Must provide: %s in batchConfigs for table: %s", BatchConfigProperties.OUTPUT_DIR_URI, _tableNameWithType);

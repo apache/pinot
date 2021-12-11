@@ -18,23 +18,32 @@
  */
 package org.apache.pinot.core.query.pruner;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.core.query.exception.BadQueryRequestException;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.FilterContext;
+import java.util.UUID;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.predicate.EqPredicate;
+import org.apache.pinot.common.request.context.predicate.InPredicate;
+import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.predicate.EqPredicate;
-import org.apache.pinot.core.query.request.context.predicate.Predicate;
-import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
+import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
 /**
@@ -56,23 +65,138 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  *   </li>
  * </ul>
  */
-@SuppressWarnings({"rawtypes", "unchecked"})
+@SuppressWarnings({"rawtypes", "unchecked", "RedundantIfStatement"})
 public class ColumnValueSegmentPruner implements SegmentPruner {
+
+  public static final String IN_PREDICATE_THRESHOLD = "inpredicate.threshold";
+
+  private int _inPredicateThreshold;
 
   @Override
   public void init(PinotConfiguration config) {
+    _inPredicateThreshold =
+        config.getProperty(IN_PREDICATE_THRESHOLD, Server.DEFAULT_VALUE_PRUNER_IN_PREDICATE_THRESHOLD);
   }
 
   @Override
-  public boolean prune(IndexSegment segment, QueryContext query) {
+  public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query) {
+    if (segments.isEmpty()) {
+      return segments;
+    }
     FilterContext filter = query.getFilter();
     if (filter == null) {
-      return false;
+      return segments;
     }
 
-    // This map caches the data sources
-    Map<String, DataSource> dataSourceCache = new HashMap<>();
-    return pruneSegment(segment, filter, dataSourceCache);
+    // Extract EQ/IN/RANGE predicate columns
+    Set<String> eqInColumns = new HashSet<>();
+    Set<String> rangeColumns = new HashSet<>();
+    extractPredicateColumns(filter, eqInColumns, rangeColumns);
+
+    if (eqInColumns.isEmpty() && rangeColumns.isEmpty()) {
+      return segments;
+    }
+
+    int numSegments = segments.size();
+    List<IndexSegment> selectedSegments = new ArrayList<>(numSegments);
+    if (!eqInColumns.isEmpty() && query.isEnablePrefetch()) {
+      Map[] dataSourceCaches = new Map[numSegments];
+      FetchContext[] fetchContexts = new FetchContext[numSegments];
+      try {
+        // Prefetch bloom filter for columns within the EQ/IN predicate if exists
+        for (int i = 0; i < numSegments; i++) {
+          IndexSegment segment = segments.get(i);
+          Map<String, DataSource> dataSourceCache = new HashMap<>();
+          Map<String, List<ColumnIndexType>> columnToIndexList = new HashMap<>();
+          for (String column : eqInColumns) {
+            DataSource dataSource = segment.getDataSource(column);
+            // NOTE: Column must exist after DataSchemaSegmentPruner
+            assert dataSource != null;
+            dataSourceCache.put(column, dataSource);
+            if (dataSource.getBloomFilter() != null) {
+              columnToIndexList.put(column, Collections.singletonList(ColumnIndexType.BLOOM_FILTER));
+            }
+          }
+          dataSourceCaches[i] = dataSourceCache;
+          if (!columnToIndexList.isEmpty()) {
+            FetchContext fetchContext =
+                new FetchContext(UUID.randomUUID(), segment.getSegmentName(), columnToIndexList);
+            segment.prefetch(fetchContext);
+            fetchContexts[i] = fetchContext;
+          }
+        }
+
+        // Prune segments
+        for (int i = 0; i < numSegments; i++) {
+          IndexSegment segment = segments.get(i);
+          FetchContext fetchContext = fetchContexts[i];
+          if (fetchContext != null) {
+            segment.acquire(fetchContext);
+            try {
+              if (!pruneSegment(segment, filter, dataSourceCaches[i])) {
+                selectedSegments.add(segment);
+              }
+            } finally {
+              segment.release(fetchContext);
+            }
+          } else {
+            if (!pruneSegment(segment, filter, dataSourceCaches[i])) {
+              selectedSegments.add(segment);
+            }
+          }
+        }
+      } finally {
+        // Release the prefetched bloom filters
+        for (int i = 0; i < numSegments; i++) {
+          FetchContext fetchContext = fetchContexts[i];
+          if (fetchContext != null) {
+            segments.get(i).release(fetchContext);
+          }
+        }
+      }
+    } else {
+      for (IndexSegment segment : segments) {
+        Map<String, DataSource> dataSourceCache = new HashMap<>();
+        if (!pruneSegment(segment, filter, dataSourceCache)) {
+          selectedSegments.add(segment);
+        }
+      }
+    }
+    return selectedSegments;
+  }
+
+  /**
+   * Extracts predicate columns from the given filter.
+   */
+  private void extractPredicateColumns(FilterContext filter, Set<String> eqInColumns, Set<String> rangeColumns) {
+    switch (filter.getType()) {
+      case AND:
+      case OR:
+        for (FilterContext child : filter.getChildren()) {
+          extractPredicateColumns(child, eqInColumns, rangeColumns);
+        }
+        break;
+      case PREDICATE:
+        Predicate predicate = filter.getPredicate();
+
+        // Only prune columns
+        ExpressionContext lhs = predicate.getLhs();
+        if (lhs.getType() != ExpressionContext.Type.IDENTIFIER) {
+          break;
+        }
+        String column = lhs.getIdentifier();
+
+        Predicate.Type predicateType = predicate.getType();
+        if (predicateType == Predicate.Type.EQ || (predicateType == Predicate.Type.IN
+            && ((InPredicate) predicate).getValues().size() <= _inPredicateThreshold)) {
+          eqInColumns.add(column);
+        } else if (predicateType == Predicate.Type.RANGE) {
+          rangeColumns.add(column);
+        }
+        break;
+      default:
+        throw new IllegalStateException();
+    }
   }
 
   private boolean pruneSegment(IndexSegment segment, FilterContext filter, Map<String, DataSource> dataSourceCache) {
@@ -100,6 +224,8 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
         Predicate.Type predicateType = predicate.getType();
         if (predicateType == Predicate.Type.EQ) {
           return pruneEqPredicate(segment, (EqPredicate) predicate, dataSourceCache);
+        } else if (predicateType == Predicate.Type.IN) {
+          return pruneInPredicate(segment, (InPredicate) predicate, dataSourceCache);
         } else if (predicateType == Predicate.Type.RANGE) {
           return pruneRangePredicate(segment, (RangePredicate) predicate, dataSourceCache);
         } else {
@@ -111,7 +237,7 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
   }
 
   /**
-   * For EQ predicate, prune the segment based on:
+   * For EQ predicate, prune the segments based on:
    * <ul>
    *   <li>Column min/max value</li>
    *   <li>Column partition</li>
@@ -128,17 +254,8 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
     Comparable value = convertValue(eqPredicate.getValue(), dataSourceMetadata.getDataType());
 
     // Check min/max value
-    Comparable minValue = dataSourceMetadata.getMinValue();
-    if (minValue != null) {
-      if (value.compareTo(minValue) < 0) {
-        return true;
-      }
-    }
-    Comparable maxValue = dataSourceMetadata.getMaxValue();
-    if (maxValue != null) {
-      if (value.compareTo(maxValue) > 0) {
-        return true;
-      }
+    if (!checkMinMaxRange(dataSourceMetadata, value)) {
+      return true;
     }
 
     // Check column partition
@@ -163,7 +280,69 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
   }
 
   /**
-   * For RANGE predicate, prune the segment based on:
+   * For IN predicate, prune the segments based on:
+   * <ul>
+   *   <li>Column min/max value</li>
+   *   <li>Column bloom filter</li>
+   * </ul>
+   * <p>NOTE: segments will not be pruned if the number of values is greater than the threshold.
+   */
+  private boolean pruneInPredicate(IndexSegment segment, InPredicate inPredicate,
+      Map<String, DataSource> dataSourceCache) {
+    String column = inPredicate.getLhs().getIdentifier();
+    DataSource dataSource = dataSourceCache.computeIfAbsent(column, segment::getDataSource);
+    // NOTE: Column must exist after DataSchemaSegmentPruner
+    assert dataSource != null;
+    DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
+    List<String> values = inPredicate.getValues();
+
+    // Skip pruning when there are too many values in the IN predicate
+    if (values.size() > _inPredicateThreshold) {
+      return false;
+    }
+
+    // Check min/max value
+    for (String value : values) {
+      Comparable inValue = convertValue(value, dataSourceMetadata.getDataType());
+      if (checkMinMaxRange(dataSourceMetadata, inValue)) {
+        return false;
+      }
+    }
+
+    // Check bloom filter
+    BloomFilterReader bloomFilter = dataSource.getBloomFilter();
+    if (bloomFilter != null) {
+      for (String value : values) {
+        if (bloomFilter.mightContain(value)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Returns {@code true} if the value is within the column's min/max value range, {@code false} otherwise.
+   */
+  private boolean checkMinMaxRange(DataSourceMetadata dataSourceMetadata, Comparable value) {
+    Comparable minValue = dataSourceMetadata.getMinValue();
+    if (minValue != null) {
+      if (value.compareTo(minValue) < 0) {
+        return false;
+      }
+    }
+    Comparable maxValue = dataSourceMetadata.getMaxValue();
+    if (maxValue != null) {
+      if (value.compareTo(maxValue) > 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * For RANGE predicate, prune the segments based on:
    * <ul>
    *   <li>Column min/max value</li>
    * </ul>

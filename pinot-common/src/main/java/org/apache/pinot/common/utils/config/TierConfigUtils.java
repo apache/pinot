@@ -64,9 +64,22 @@ public final class TierConfigUtils {
   }
 
   /**
+   * Gets sorted list of tiers from provided list of TierConfig
+   */
+  public static List<Tier> getSortedTiers(List<TierConfig> tierConfigList, HelixManager helixManager) {
+    List<Tier> sortedTiers = new ArrayList<>();
+    for (TierConfig tierConfig : tierConfigList) {
+      sortedTiers.add(TierFactory.getTier(tierConfig, helixManager));
+    }
+    sortedTiers.sort(TierConfigUtils.getTierComparator());
+    return sortedTiers;
+  }
+
+  /**
    * Comparator for sorting the {@link Tier}.
    * As of now, we have only 1 type of {@link TierSegmentSelector} and 1 type of {@link TierStorage}.
-   * Tier with an older age bucket in {@link TimeBasedTierSegmentSelector} should appear before a younger age bucket, in sort order
+   * Tier with an older age bucket in {@link TimeBasedTierSegmentSelector} should appear before a younger age bucket,
+   * in sort order
    * TODO: As we add more types, this logic needs to be upgraded
    */
   public static Comparator<Tier> getTierComparator() {

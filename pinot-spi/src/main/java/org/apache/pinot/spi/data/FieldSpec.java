@@ -21,10 +21,13 @@ package org.apache.pinot.spi.data;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.Serializable;
+import java.sql.Timestamp;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.TimestampUtils;
 
 
 /**
@@ -40,13 +43,16 @@ import org.apache.pinot.spi.utils.JsonUtils;
  */
 @SuppressWarnings("unused")
 public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
-  private static final int DEFAULT_MAX_LENGTH = 512;
+  public static final int DEFAULT_MAX_LENGTH = 512;
 
   public static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
   public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
   public static final Float DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT = Float.NEGATIVE_INFINITY;
   public static final Double DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE = Double.NEGATIVE_INFINITY;
+  public static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN = 0;
+  public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP = 0L;
   public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_STRING = "null";
+  public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_JSON = "null";
   public static final byte[] DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = new byte[0];
 
   public static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = 0;
@@ -87,7 +93,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public FieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength,
       @Nullable Object defaultNullValue) {
     _name = name;
-    _dataType = dataType.getStoredType();
+    _dataType = dataType;
     _isSingleValueField = isSingleValueField;
     _maxLength = maxLength;
     setDefaultNullValue(defaultNullValue);
@@ -110,7 +116,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setDataType(DataType dataType) {
-    _dataType = dataType.getStoredType();
+    _dataType = dataType;
     _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, _stringDefaultNullValue);
   }
 
@@ -218,8 +224,14 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
               return DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT;
             case DOUBLE:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE;
+            case BOOLEAN:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN;
+            case TIMESTAMP:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP;
             case STRING:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_STRING;
+            case JSON:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_JSON;
             case BYTES:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES;
             default:
@@ -241,6 +253,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
+
   /**
    * Deprecated. Use TableConfig -> IngestionConfig -> TransformConfigs
    */
@@ -286,7 +299,14 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         case DOUBLE:
           jsonNode.put(key, (Double) _defaultNullValue);
           break;
+        case BOOLEAN:
+          jsonNode.put(key, (Integer) _defaultNullValue == 1);
+          break;
+        case TIMESTAMP:
+          jsonNode.put(key, new Timestamp((Long) _defaultNullValue).toString());
+          break;
         case STRING:
+        case JSON:
           jsonNode.put(key, (String) _defaultNullValue);
           break;
         case BYTES:
@@ -319,7 +339,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType) && EqualityUtils
         .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils
         .isEqual(getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils
-        .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction);
+        .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction)
+        && EqualityUtils.isEqual(_virtualColumnProvider, that._virtualColumnProvider);
   }
 
   @Override
@@ -330,6 +351,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     result = EqualityUtils.hashCodeOf(result, getStringValue(_defaultNullValue));
     result = EqualityUtils.hashCodeOf(result, _maxLength);
     result = EqualityUtils.hashCodeOf(result, _transformFunction);
+    result = EqualityUtils.hashCodeOf(result, _virtualColumnProvider);
     return result;
   }
 
@@ -338,7 +360,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
    * <p><code>DIMENSION</code>: columns used to filter records.
    * <p><code>METRIC</code>: columns used to apply aggregation on. <code>METRIC</code> field only contains numeric data.
    * <p><code>TIME</code>: time column (at most one per {@link Schema}). <code>TIME</code> field can be used to prune
-   * <p><code>DATE_TIME</code>: time column (at most one per {@link Schema}). <code>TIME</code> field can be used to prune
+   * <p><code>DATE_TIME</code>: time column (at most one per {@link Schema}). <code>TIME</code> field can be used to
+   * prune
    * segments, otherwise treated the same as <code>DIMENSION</code> field.
    */
   public enum FieldType {
@@ -352,13 +375,44 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public enum DataType {
     // LIST is for complex lists which is different from multi-value column of primitives
     // STRUCT, MAP and LIST are composable to form a COMPLEX field
-    INT, LONG, FLOAT, DOUBLE, BOOLEAN/* Stored as STRING */, STRING, BYTES, STRUCT, MAP, LIST;
+    INT,
+    LONG,
+    FLOAT,
+    DOUBLE,
+    BOOLEAN /* Stored as INT */,
+    TIMESTAMP /* Stored as LONG */,
+    STRING,
+    JSON /* Stored as STRING */,
+    BYTES,
+    STRUCT,
+    MAP,
+    LIST;
 
     /**
      * Returns the data type stored in Pinot.
+     * <p>Pinot internally stores data (physical) in INT, LONG, FLOAT, DOUBLE, STRING, BYTES type, other data types
+     * (logical) will be stored as one of these types.
+     * <p>Stored type should be used when reading the physical stored values from Dictionary, Forward Index etc.
      */
     public DataType getStoredType() {
-      return this == BOOLEAN ? STRING : this;
+      switch (this) {
+        case BOOLEAN:
+          return INT;
+        case TIMESTAMP:
+          return LONG;
+        case JSON:
+          return STRING;
+        default:
+          return this;
+      }
+    }
+
+    /**
+     * Returns {@code true} if the data type is of fixed width (INT, LONG, FLOAT, DOUBLE, BOOLEAN, TIMESTAMP),
+     * {@code false} otherwise.
+     */
+    public boolean isFixedWidth() {
+      return this.ordinal() < STRING.ordinal();
     }
 
     /**
@@ -367,8 +421,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     public int size() {
       switch (this) {
         case INT:
+        case BOOLEAN:
           return Integer.BYTES;
         case LONG:
+        case TIMESTAMP:
           return Long.BYTES;
         case FLOAT:
           return Float.BYTES;
@@ -380,13 +436,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
 
     /**
-     * Check if the data type is for fixed width data (INT, LONG, FLOAT, DOUBLE)
-     * or variable width data (STRING, BYTES)
+     * Returns {@code true} if the data type is numeric (INT, LONG, FLOAT, DOUBLE), {@code false} otherwise.
      */
-    public boolean isFixedWidth() {
-      return this != STRING && this != BYTES;
-    }
-
     public boolean isNumeric() {
       return this == INT || this == LONG || this == FLOAT || this == DOUBLE;
     }
@@ -405,7 +456,12 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return Float.valueOf(value);
           case DOUBLE:
             return Double.valueOf(value);
+          case BOOLEAN:
+            return BooleanUtils.toInt(value);
+          case TIMESTAMP:
+            return TimestampUtils.toMillisSinceEpoch(value);
           case STRING:
+          case JSON:
             return value;
           case BYTES:
             return BytesUtils.toBytes(value);
@@ -431,7 +487,12 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return Float.valueOf(value);
           case DOUBLE:
             return Double.valueOf(value);
+          case BOOLEAN:
+            return BooleanUtils.toInt(value);
+          case TIMESTAMP:
+            return TimestampUtils.toMillisSinceEpoch(value);
           case STRING:
+          case JSON:
             return value;
           case BYTES:
             return BytesUtils.toByteArray(value);
@@ -441,6 +502,13 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       } catch (Exception e) {
         throw new IllegalArgumentException(String.format("Cannot convert value: '%s' to type: %s", value, this));
       }
+    }
+
+    /**
+     * Checks whether the data type can be a sorted column.
+     */
+    public boolean canBeASortedColumn() {
+      return this != BYTES && this != JSON && this != STRUCT && this != MAP && this != LIST;
     }
   }
 

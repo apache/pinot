@@ -29,113 +29,111 @@ import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.readers.FileFormat;
 
 
-/**
- * Sep 12, 2014
- */
-
 public class DataGeneratorSpec {
-  private final List<String> columns;
-  private final Map<String, Integer> cardinalityMap;
-  private final Map<String, IntRange> rangeMap;
-  private final Map<String, Map<String, Object>> patternMap;
-  private final Map<String, Double> mvCountMap; // map of column name to average number of values per entry
-  private final Map<String, Integer> lengthMap; // map of column name to average length of th entry (used for string/byte generator)
+  private final List<String> _columns;
+  private final Map<String, Integer> _cardinalityMap;
+  private final Map<String, IntRange> _rangeMap;
+  private final Map<String, Map<String, Object>> _patternMap;
+  private final Map<String, Double> _mvCountMap; // map of column name to average number of values per entry
+  private final Map<String, Integer> _lengthMap;
+  // map of column name to average length of th entry (used for string/byte generator)
 
-  private final Map<String, DataType> dataTypesMap;
-  private final Map<String, FieldType> fieldTypesMap;
-  private final Map<String, TimeUnit> timeUnitMap;
+  private final Map<String, DataType> _dataTypeMap;
+  private final Map<String, FieldType> _fieldTypeMap;
+  private final Map<String, TimeUnit> _timeUnitMap;
 
-  private final FileFormat outputFileFormat;
-  private final String outputDir;
-  private final boolean overrideOutDir;
+  private final FileFormat _outputFileFormat;
+  private final String _outputDir;
+  private final boolean _overrideOutDir;
 
   public DataGeneratorSpec() {
     this(new ArrayList<String>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(),
-        new HashMap<>(), new HashMap<>(), new HashMap<>(),
-        FileFormat.AVRO, "/tmp/dataGen", true);
+        new HashMap<>(), new HashMap<>(), new HashMap<>(), FileFormat.AVRO, "/tmp/dataGen", true);
   }
 
   public DataGeneratorSpec(List<String> columns, Map<String, Integer> cardinalityMap, Map<String, IntRange> rangeMap,
-      Map<String, Map<String, Object>> patternMap, Map<String, Double> mvCountMap, Map<String, Integer> lengthMap, Map<String, DataType> dataTypesMap, Map<String, FieldType> fieldTypesMap, Map<String, TimeUnit> timeUnitMap,
+      Map<String, Map<String, Object>> patternMap, Map<String, Double> mvCountMap, Map<String, Integer> lengthMap,
+      Map<String, DataType> dataTypesMap, Map<String, FieldType> fieldTypesMap, Map<String, TimeUnit> timeUnitMap,
       FileFormat format, String outputDir, boolean override) {
-    this.columns = columns;
-    this.cardinalityMap = cardinalityMap;
-    this.rangeMap = rangeMap;
-    this.patternMap = patternMap;
-    this.mvCountMap = mvCountMap;
-    this.lengthMap = lengthMap;
+    _columns = columns;
+    _cardinalityMap = cardinalityMap;
+    _rangeMap = rangeMap;
+    _patternMap = patternMap;
+    _mvCountMap = mvCountMap;
+    _lengthMap = lengthMap;
 
-    outputFileFormat = format;
-    this.outputDir = outputDir;
-    overrideOutDir = override;
+    _outputFileFormat = format;
+    _outputDir = outputDir;
+    _overrideOutDir = override;
 
-    this.dataTypesMap = dataTypesMap;
-    this.fieldTypesMap = fieldTypesMap;
-    this.timeUnitMap = timeUnitMap;
+    _dataTypeMap = dataTypesMap;
+    _fieldTypeMap = fieldTypesMap;
+    _timeUnitMap = timeUnitMap;
   }
 
-  public Map<String, DataType> getDataTypesMap() {
-    return dataTypesMap;
+  public Map<String, DataType> getDataTypeMap() {
+    return _dataTypeMap;
   }
 
-  public Map<String, FieldType> getFieldTypesMap() {
-    return fieldTypesMap;
+  public Map<String, FieldType> getFieldTypeMap() {
+    return _fieldTypeMap;
   }
 
   public Map<String, TimeUnit> getTimeUnitMap() {
-    return timeUnitMap;
+    return _timeUnitMap;
   }
 
   public boolean isOverrideOutDir() {
-    return overrideOutDir;
+    return _overrideOutDir;
   }
 
   public List<String> getColumns() {
-    return columns;
+    return _columns;
   }
 
   public Map<String, Integer> getCardinalityMap() {
-    return cardinalityMap;
+    return _cardinalityMap;
   }
 
   public Map<String, IntRange> getRangeMap() {
-    return rangeMap;
+    return _rangeMap;
   }
 
   public Map<String, Map<String, Object>> getPatternMap() {
-    return patternMap;
+    return _patternMap;
   }
 
   public Map<String, Double> getMvCountMap() {
-    return mvCountMap;
+    return _mvCountMap;
   }
 
   public Map<String, Integer> getLengthMap() {
-    return lengthMap;
+    return _lengthMap;
   }
 
   public FileFormat getOutputFileFormat() {
-    return outputFileFormat;
+    return _outputFileFormat;
   }
 
   public String getOutputDir() {
-    return outputDir;
+    return _outputDir;
   }
 
   @Override
   public String toString() {
     final StringBuilder builder = new StringBuilder();
-    for (final String column : columns) {
-      if (cardinalityMap.get(column) != null) {
-        builder.append(column + " : " + cardinalityMap.get(column) + " : " + dataTypesMap.get(column));
-      } else if (rangeMap.get(column) != null) {
-        builder.append(column + " : " + rangeMap.get(column) + " : " + dataTypesMap.get(column));
+    for (final String column : _columns) {
+      if (_cardinalityMap.get(column) != null) {
+        builder.append(column + " : " + _cardinalityMap.get(column) + " : " + _dataTypeMap.get(column));
+      } else if (_rangeMap.get(column) != null) {
+        builder.append(column + " : " + _rangeMap.get(column) + " : " + _dataTypeMap.get(column));
       } else {
-        builder.append(column + " : " + patternMap.get(column));
+        builder.append(column + " : " + _patternMap.get(column));
       }
+      builder.append(", ");
     }
-    builder.append("output file format : " + outputFileFormat);
-    builder.append("output file format : " + outputDir);
+    builder.append("output file format : " + _outputFileFormat);
+    builder.append(", output dir : " + _outputDir);
     return builder.toString();
   }
 }

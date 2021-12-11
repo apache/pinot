@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.tools.perf;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.base.Preconditions;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -28,21 +31,19 @@ import java.io.OutputStreamWriter;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import javax.annotation.Nullable;
-
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.tools.ClusterVerifiers.StrictMatchExternalViewVerifier;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
@@ -55,16 +56,13 @@ import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.base.Preconditions;
 
 
 public class PerfBenchmarkDriver {
@@ -191,15 +189,30 @@ public class PerfBenchmarkDriver {
     ZkStarter.startLocalZkServer(zkPort);
   }
 
-  private void startController() {
+  private void startController()
+      throws Exception {
     if (!_conf.shouldStartController()) {
       LOGGER.info("Skipping start controller step. Assumes controller is already started.");
       return;
     }
-    ControllerConf conf = getControllerConf();
+
     LOGGER.info("Starting controller at {}", _controllerAddress);
-    _controllerStarter = new ControllerStarter(conf);
+    _controllerStarter = new ControllerStarter();
+    _controllerStarter.init(new PinotConfiguration(getControllerProperties()));
     _controllerStarter.start();
+  }
+
+  private Map<String, Object> getControllerProperties() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
+    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
+    properties.put(ControllerConf.CONTROLLER_HOST, _controllerHost);
+    properties.put(ControllerConf.CONTROLLER_PORT, String.valueOf(_controllerPort));
+    properties.put(ControllerConf.DATA_DIR, _controllerDataDir);
+    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
+    properties.put(ControllerConf.CONTROLLER_VIP_HOST, "localhost");
+    properties.put(ControllerConf.CONTROLLER_VIP_PROTOCOL, CommonConstants.HTTP_PROTOCOL);
+    return properties;
   }
 
   private ControllerConf getControllerConf() {
@@ -226,10 +239,14 @@ public class PerfBenchmarkDriver {
     Map<String, Object> properties = new HashMap<>();
     properties.put(CommonConstants.Helix.Instance.INSTANCE_ID_KEY, brokerInstanceName);
     properties.put(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS, BROKER_TIMEOUT_MS);
+    properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
+    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
 
     LOGGER.info("Starting broker instance: {}", brokerInstanceName);
 
-    new HelixBrokerStarter(new PinotConfiguration(properties), _clusterName, _zkAddress).start();
+    HelixBrokerStarter helixBrokerStarter = new HelixBrokerStarter();
+    helixBrokerStarter.init(new PinotConfiguration(properties));
+    helixBrokerStarter.start();
   }
 
   private void startServer()
@@ -244,14 +261,16 @@ public class PerfBenchmarkDriver {
     properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, _serverInstanceSegmentTarDir);
     properties.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, "localhost");
     properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_ID, _serverInstanceName);
+    properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
+    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
     if (_segmentFormatVersion != null) {
       properties.put(CommonConstants.Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, _segmentFormatVersion);
     }
 
     LOGGER.info("Starting server instance: {}", _serverInstanceName);
 
-    HelixServerStarter helixServerStarter =
-        new HelixServerStarter(_clusterName, _zkAddress, new PinotConfiguration(properties));
+    HelixServerStarter helixServerStarter = new HelixServerStarter();
+    helixServerStarter.init(new PinotConfiguration(properties));
     helixServerStarter.start();
   }
 
@@ -332,10 +351,9 @@ public class PerfBenchmarkDriver {
    *
    * @param segmentMetadata segment metadata.
    */
-  public void addSegment(String tableName, SegmentMetadata segmentMetadata) {
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    _helixResourceManager
-        .addNewSegment(rawTableName, segmentMetadata, "http://" + _controllerAddress + "/" + segmentMetadata.getName());
+  public void addSegment(String tableNameWithType, SegmentMetadata segmentMetadata) {
+    _helixResourceManager.addNewSegment(tableNameWithType, segmentMetadata,
+        "http://" + _controllerAddress + "/" + segmentMetadata.getName());
   }
 
   public static void waitForExternalViewUpdate(String zkAddress, final String clusterName, long timeoutInMilliseconds) {
@@ -386,22 +404,23 @@ public class PerfBenchmarkDriver {
 
   public JsonNode postQuery(String query)
       throws Exception {
-    return postQuery(_conf.getDialect(), query, null);
+    return postQuery(_conf.getDialect(), query);
   }
 
-  public JsonNode postQuery(String query, String optimizationFlags)
-          throws Exception {
-    return postQuery(_conf.getDialect(), query, optimizationFlags);
+  public JsonNode postQuery(String query, Map<String, String> headers)
+      throws Exception {
+    return postQuery(_conf.getDialect(), query, headers);
   }
 
-  public JsonNode postQuery(String dialect, String query, String optimizationFlags)
+  public JsonNode postQuery(String dialect, String query)
+      throws Exception {
+    return postQuery(dialect, query, Collections.emptyMap());
+  }
+
+  public JsonNode postQuery(String dialect, String query, Map<String, String> headers)
       throws Exception {
     ObjectNode requestJson = JsonUtils.newObjectNode();
     requestJson.put(dialect, query);
-
-    if (optimizationFlags != null && !optimizationFlags.isEmpty()) {
-      requestJson.put("debugOptions", "optimizationFlags=" + optimizationFlags);
-    }
 
     long start = System.currentTimeMillis();
     String queryUrl = _brokerBaseApiUrl + "/query";
@@ -411,17 +430,19 @@ public class PerfBenchmarkDriver {
 
     URLConnection conn = new URL(queryUrl).openConnection();
     conn.setDoOutput(true);
-
-    try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(),
-      StandardCharsets.UTF_8))) {
+    for (Map.Entry<String, String> header : headers.entrySet()) {
+      conn.setRequestProperty(header.getKey(), header.getValue());
+    }
+    try (BufferedWriter writer = new BufferedWriter(
+        new OutputStreamWriter(conn.getOutputStream(), StandardCharsets.UTF_8))) {
       String requestString = requestJson.toString();
       writer.write(requestString);
       writer.flush();
 
       try {
         StringBuilder stringBuilder = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(),
-                StandardCharsets.UTF_8))) {
+        try (BufferedReader reader = new BufferedReader(
+            new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
           String line;
           while ((line = reader.readLine()) != null) {
             stringBuilder.append(line);

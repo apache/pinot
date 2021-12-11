@@ -58,7 +58,7 @@ public class ArrayAverageTransformFunction extends BaseTransformFunction {
       throw new IllegalArgumentException(
           "The argument of ArrayAverage transform function must be a multi-valued column or a transform function");
     }
-    if (!firstArgument.getResultMetadata().getDataType().isNumeric()) {
+    if (!firstArgument.getResultMetadata().getDataType().getStoredType().isNumeric()) {
       throw new IllegalArgumentException("The argument of ArrayAverage transform function must be numeric");
     }
     _argument = firstArgument;
@@ -76,7 +76,7 @@ public class ArrayAverageTransformFunction extends BaseTransformFunction {
     }
 
     int numDocs = projectionBlock.getNumDocs();
-    switch (_argument.getResultMetadata().getDataType()) {
+    switch (_argument.getResultMetadata().getDataType().getStoredType()) {
       case INT:
         int[][] intValuesMV = _argument.transformToIntValuesMV(projectionBlock);
         for (int i = 0; i < numDocs; i++) {

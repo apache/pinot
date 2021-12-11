@@ -33,11 +33,10 @@ import org.slf4j.LoggerFactory;
 // https://jersey.github.io/documentation/latest/logging_chapter.html#d0e15719
 @Provider
 public class ControllerResponseFilter implements ContainerResponseFilter {
+  public static final Logger LOGGER = LoggerFactory.getLogger(ControllerResponseFilter.class);
 
   @Inject
-  private javax.inject.Provider<org.glassfish.grizzly.http.server.Request> request;
-
-  public static final Logger LOGGER = LoggerFactory.getLogger(ControllerResponseFilter.class);
+  private javax.inject.Provider<org.glassfish.grizzly.http.server.Request> _request;
 
   @Override
   public void filter(ContainerRequestContext requestContext, ContainerResponseContext responseContext)
@@ -46,7 +45,7 @@ public class ControllerResponseFilter implements ContainerResponseFilter {
     final String uri = requestContext.getUriInfo().getRequestUri().toString();
     final int respStatus = responseContext.getStatus();
     final String reasonPhrase = responseContext.getStatusInfo().getReasonPhrase();
-    final String srcIpAddr = request.get().getRemoteAddr();
+    final String srcIpAddr = _request.get().getRemoteAddr();
     final String contentType = requestContext.getHeaderString(HttpHeaders.CONTENT_TYPE);
     LOGGER.info("Handled request from {} {} {}, content-type {} status code {} {}", srcIpAddr, method, uri, contentType,
         respStatus, reasonPhrase);

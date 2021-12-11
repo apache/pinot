@@ -19,9 +19,9 @@
 package org.apache.pinot.core.startree.v2;
 
 import java.util.Random;
+import org.apache.pinot.segment.local.aggregator.SumValueAggregator;
+import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.core.data.aggregator.SumValueAggregator;
-import org.apache.pinot.core.data.aggregator.ValueAggregator;
 
 import static org.testng.Assert.assertEquals;
 

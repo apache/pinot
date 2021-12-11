@@ -23,14 +23,21 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.net.URL;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 
-public class Quickstart {
+public class Quickstart extends QuickStartBase {
+  @Override
+  public List<String> types() {
+    return Arrays.asList("OFFLINE", "BATCH");
+  }
+
   private static final String TAB = "\t\t";
   private static final String NEW_LINE = "\n";
 
@@ -58,6 +65,12 @@ public class Quickstart {
 
   public Map<String, Object> getConfigOverrides() {
     return null;
+  }
+
+  protected void waitForBootstrapToComplete(QuickstartRunner runner)
+      throws Exception {
+    printStatus(Color.CYAN, "***** Waiting for 5 seconds for the server to fetch the assigned segment *****");
+    Thread.sleep(5000);
   }
 
   public static void printStatus(Color color, String message) {
@@ -150,7 +163,7 @@ public class Quickstart {
 
   public void execute()
       throws Exception {
-    File quickstartTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
+    File quickstartTmpDir = new File(_tmpDir, String.valueOf(System.currentTimeMillis()));
     File baseDir = new File(quickstartTmpDir, "baseballStats");
     File dataDir = new File(baseDir, "rawdata");
     Preconditions.checkState(dataDir.mkdirs());
@@ -194,8 +207,7 @@ public class Quickstart {
     printStatus(Color.CYAN, "***** Bootstrap baseballStats table *****");
     runner.bootstrapTable();
 
-    printStatus(Color.CYAN, "***** Waiting for 5 seconds for the server to fetch the assigned segment *****");
-    Thread.sleep(5000);
+    waitForBootstrapToComplete(runner);
 
     printStatus(Color.YELLOW, "***** Offline quickstart setup complete *****");
 
@@ -212,14 +224,16 @@ public class Quickstart {
     printStatus(Color.GREEN, "***************************************************");
 
     String q3 =
-        "select playerName, sum(runs) from baseballStats where yearID=2000 group by playerName order by sum(runs) desc limit 5";
+        "select playerName, sum(runs) from baseballStats where yearID=2000 group by playerName order by sum(runs) "
+            + "desc limit 5";
     printStatus(Color.YELLOW, "Top 5 run scorers of the year 2000");
     printStatus(Color.CYAN, "Query : " + q3);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q3)));
     printStatus(Color.GREEN, "***************************************************");
 
     String q4 =
-        "select playerName, sum(runs) from baseballStats where yearID>=2000 group by playerName order by sum(runs) desc limit 10";
+        "select playerName, sum(runs) from baseballStats where yearID>=2000 group by playerName order by sum(runs) "
+            + "desc limit 10";
     printStatus(Color.YELLOW, "Top 10 run scorers after 2000");
     printStatus(Color.CYAN, "Query : " + q4);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q4)));
@@ -236,7 +250,9 @@ public class Quickstart {
 
   public static void main(String[] args)
       throws Exception {
-    PluginManager.get().init();
-    new Quickstart().execute();
+    List<String> arguments = new ArrayList<>();
+    arguments.addAll(Arrays.asList("QuickStart", "-type", "BATCH"));
+    arguments.addAll(Arrays.asList(args));
+    PinotAdministrator.main(arguments.toArray(new String[arguments.size()]));
   }
 }

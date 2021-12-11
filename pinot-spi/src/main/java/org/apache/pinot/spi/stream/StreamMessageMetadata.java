@@ -40,5 +40,4 @@ public class StreamMessageMetadata implements RowMetadata {
   public long getIngestionTimeMs() {
     return _ingestionTimeMs;
   }
-
 }

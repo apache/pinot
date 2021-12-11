@@ -22,9 +22,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.FilterContext;
-import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -74,7 +74,7 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
     }
 
     // Skip pruning segments for upsert table because valid doc index is equivalent to a filter
-    if (segments.get(0).getValidDocIndex() != null) {
+    if (segments.get(0).getValidDocIds() != null) {
       return segments;
     }
 

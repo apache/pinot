@@ -18,9 +18,15 @@
  */
 package org.apache.pinot.segment.spi;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.data.Schema;
 import org.joda.time.Duration;
@@ -39,6 +45,8 @@ public interface SegmentMetadata {
   @Deprecated
   String getTableName();
 
+  String getName();
+
   String getTimeColumn();
 
   long getStartTime();
@@ -53,29 +61,18 @@ public interface SegmentMetadata {
 
   String getCrc();
 
-  String getVersion();
+  SegmentVersion getVersion();
 
   Schema getSchema();
-
-  String getShardingKey();
 
   int getTotalDocs();
 
   File getIndexDir();
 
-  String getName();
+  @Nullable
+  String getCreatorName();
 
   long getIndexCreationTime();
-
-  /**
-   * Get the last time that this segment was pushed or <code>Long.MIN_VALUE</code> if it has never been pushed.
-   */
-  long getPushTime();
-
-  /**
-   * Get the last time that this segment was refreshed or <code>Long.MIN_VALUE</code> if it has never been refreshed.
-   */
-  long getRefreshTime();
 
   /**
    * Return the last time a record was indexed in this segment. Applicable for MutableSegments.
@@ -93,25 +90,29 @@ public interface SegmentMetadata {
    */
   long getLatestIngestionTimestamp();
 
-  boolean hasDictionary(String columnName);
-
-  String getForwardIndexFileName(String column);
-
-  String getDictionaryFileName(String column);
-
-  String getBitmapInvertedIndexFileName(String column);
-
-  String getBitmapRangeIndexFileName(String column);
-
-  String getBloomFilterFileName(String column);
-
-  String getNullValueVectorFileName(String column);
-
-  String getCreatorName();
-
-  char getPaddingCharacter();
-
-  boolean close();
+  List<StarTreeV2Metadata> getStarTreeV2MetadataList();
 
   Map<String, String> getCustomMap();
+
+  default Set<String> getAllColumns() {
+    return getSchema().getColumnNames();
+  }
+
+  Map<String, ColumnMetadata> getColumnMetadataMap();
+
+  default ColumnMetadata getColumnMetadataFor(String column) {
+    return getColumnMetadataMap().get(column);
+  }
+
+  /**
+   * Removes a column from the segment metadata.
+   */
+  void removeColumn(String column);
+
+  /**
+   * Converts segment metadata to json.
+   * @param columnFilter list only the columns in the set. Lists all the columns if the parameter value is null.
+   * @return json representation of segment metadata.
+   */
+  JsonNode toJson(@Nullable Set<String> columnFilter);
 }

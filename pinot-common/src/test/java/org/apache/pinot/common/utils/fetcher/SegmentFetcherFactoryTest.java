@@ -18,21 +18,20 @@
  */
 package org.apache.pinot.common.utils.fetcher;
 
-import static org.apache.pinot.common.utils.CommonConstants.HTTPS_PROTOCOL;
-import static org.apache.pinot.common.utils.CommonConstants.HTTP_PROTOCOL;
-import static org.testng.Assert.assertEquals;
-
 import java.io.File;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.pinot.spi.crypt.PinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.Test;
+
+import static org.apache.pinot.spi.utils.CommonConstants.HTTPS_PROTOCOL;
+import static org.apache.pinot.spi.utils.CommonConstants.HTTP_PROTOCOL;
+import static org.testng.Assert.assertEquals;
 
 
 public class SegmentFetcherFactoryTest {

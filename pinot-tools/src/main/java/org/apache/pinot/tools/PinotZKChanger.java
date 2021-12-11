@@ -45,28 +45,28 @@ import org.slf4j.LoggerFactory;
 public class PinotZKChanger {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotZKChanger.class);
 
-  protected ZKHelixAdmin helixAdmin;
-  protected HelixManager helixManager;
-  protected String clusterName;
-  protected ZkHelixPropertyStore<ZNRecord> propertyStore;
+  protected ZKHelixAdmin _helixAdmin;
+  protected HelixManager _helixManager;
+  protected String _clusterName;
+  protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   public PinotZKChanger(String zkAddress, String clusterName) {
-    this.clusterName = clusterName;
-    helixAdmin = new ZKHelixAdmin(zkAddress);
-    helixManager = HelixManagerFactory
+    _clusterName = clusterName;
+    _helixAdmin = new ZKHelixAdmin(zkAddress);
+    _helixManager = HelixManagerFactory
         .getZKHelixManager(clusterName, "PinotNumReplicaChanger", InstanceType.ADMINISTRATOR, zkAddress);
     try {
-      helixManager.connect();
+      _helixManager.connect();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
     ZNRecordSerializer serializer = new ZNRecordSerializer();
     String path = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, clusterName);
-    propertyStore = new ZkHelixPropertyStore<>(zkAddress, serializer, path);
+    _propertyStore = new ZkHelixPropertyStore<>(zkAddress, serializer, path);
   }
 
   public ZKHelixAdmin getHelixAdmin() {
-    return helixAdmin;
+    return _helixAdmin;
   }
 
   /**
@@ -74,8 +74,8 @@ public class PinotZKChanger {
    * @return
    */
   public int isStable(String tableName) {
-    IdealState idealState = helixAdmin.getResourceIdealState(clusterName, tableName);
-    ExternalView externalView = helixAdmin.getResourceExternalView(clusterName, tableName);
+    IdealState idealState = _helixAdmin.getResourceIdealState(_clusterName, tableName);
+    ExternalView externalView = _helixAdmin.getResourceExternalView(_clusterName, tableName);
     Map<String, Map<String, String>> mapFieldsIS = idealState.getRecord().getMapFields();
     Map<String, Map<String, String>> mapFieldsEV = externalView.getRecord().getMapFields();
     int numDiff = 0;
@@ -142,6 +142,6 @@ public class PinotZKChanger {
   }
 
   public HelixManager getHelixManager() {
-    return helixManager;
+    return _helixManager;
   }
 }

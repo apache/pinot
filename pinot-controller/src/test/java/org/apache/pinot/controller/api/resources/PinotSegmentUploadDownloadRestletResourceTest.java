@@ -18,19 +18,19 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNull;
-
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
-
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.spi.crypt.NoOpPinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
 
 public class PinotSegmentUploadDownloadRestletResourceTest {
@@ -59,7 +59,7 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
   }
 
   @Test
-  public void testEncryptSegmentIfNeeded_crypterInTableConfig() {
+  public void testEncryptSegmentIfNeededCrypterInTableConfig() {
 
     // arrange
     boolean uploadedSegmentIsEncrypted = false;
@@ -77,7 +77,7 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
   }
 
   @Test
-  public void testEncryptSegmentIfNeeded_uploadedSegmentIsEncrypted() {
+  public void testEncryptSegmentIfNeededUploadedSegmentIsEncrypted() {
 
     // arrange
     boolean uploadedSegmentIsEncrypted = true;
@@ -96,7 +96,7 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
 
   @Test(expectedExceptions = ControllerApplicationException.class, expectedExceptionsMessageRegExp = "Uploaded segment"
       + " is encrypted with 'FancyCrypter' while table config requires 'NoOpPinotCrypter' as crypter .*")
-  public void testEncryptSegmentIfNeeded_differentCrypters() {
+  public void testEncryptSegmentIfNeededDifferentCrypters() {
 
     // arrange
     boolean uploadedSegmentIsEncrypted = true;
@@ -109,7 +109,7 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
   }
 
   @Test
-  public void testEncryptSegmentIfNeeded_noEncryption() {
+  public void testEncryptSegmentIfNeededNoEncryption() {
 
     // arrange
     boolean uploadedSegmentIsEncrypted = false;

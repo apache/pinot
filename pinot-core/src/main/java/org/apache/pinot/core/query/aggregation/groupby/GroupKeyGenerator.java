@@ -78,6 +78,11 @@ public interface GroupKeyGenerator {
   Iterator<StringGroupKey> getStringGroupKeys();
 
   /**
+   * Return current number of unique keys
+   */
+  int getNumKeys();
+
+  /**
    * This class encapsulates the integer group id and the group keys.
    */
   class GroupKey {

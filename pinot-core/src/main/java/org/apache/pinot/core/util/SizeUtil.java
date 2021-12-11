@@ -22,7 +22,10 @@ package org.apache.pinot.core.util;
  * Util class to encapsulate all math required to compute storage space.
  */
 public class SizeUtil {
-  public static int BIT_UNPACK_BATCH_SIZE = 32;
+  private SizeUtil() {
+  }
+
+  public static final int BIT_UNPACK_BATCH_SIZE = 32;
 
   public static int computeBytesRequired(int numValues, int numBits, int entriesPerBatch) {
     int bitsRequiredPerBatch = entriesPerBatch * numBits;

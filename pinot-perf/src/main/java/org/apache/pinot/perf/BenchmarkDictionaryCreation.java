@@ -23,9 +23,9 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.core.segment.creator.impl.SegmentDictionaryCreator;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Mode;
@@ -134,8 +134,8 @@ public class BenchmarkDictionaryCreation {
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public int benchmarkVarLengthStringDictionaryCreation()
       throws IOException {
-    try (SegmentDictionaryCreator dictionaryCreator =
-        new SegmentDictionaryCreator(_sortedStrings, STRING_FIELD, INDEX_DIR, true)) {
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_sortedStrings, STRING_FIELD,
+        INDEX_DIR, true)) {
       dictionaryCreator.build();
       return dictionaryCreator.indexOfSV("0");
     }

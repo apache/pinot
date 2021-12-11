@@ -19,17 +19,16 @@
 package org.apache.pinot.server.starter.helix;
 
 import java.util.Optional;
-
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.http.auth.AUTH;
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.common.utils.CommonConstants.Server;
-import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.utils.CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI;
 
 
 /**
@@ -65,12 +64,15 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String INSTANCE_RELOAD_CONSUMING_SEGMENT = "reload.consumingSegment";
   // Key of the auth token
   public static final String AUTH_TOKEN = "auth.token";
+  // Key of segment directory loader
+  public static final String SEGMENT_DIRECTORY_LOADER = "segment.directory.loader";
 
   // Key of how many parallel realtime segments can be built.
   // A value of <= 0 indicates unlimited.
   // Unlimited parallel builds can cause high GC pauses during segment builds, causing
   // response times to suffer.
   private static final String MAX_PARALLEL_SEGMENT_BUILDS = "realtime.max.parallel.segment.builds";
+  private static final int DEFAULT_MAX_PARALLEL_SEGMENT_BUILDS = 4;
 
   // Key of whether to enable split commit
   private static final String ENABLE_SPLIT_COMMIT = "enable.split.commit";
@@ -98,14 +100,18 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   //
   private static final String MAX_PARALLEL_REFRESH_THREADS = "max.parallel.refresh.threads";
 
+  // Size of cache that holds errors.
+  private static final String ERROR_CACHE_SIZE = "error.cache.size";
+
   private final static String[] REQUIRED_KEYS = {INSTANCE_ID, INSTANCE_DATA_DIR, READ_MODE};
+  private static final long DEFAULT_ERROR_CACHE_SIZE = 100L;
   private PinotConfiguration _instanceDataManagerConfiguration = null;
 
   public HelixInstanceDataManagerConfig(PinotConfiguration serverConfig)
       throws ConfigurationException {
     _instanceDataManagerConfiguration = serverConfig;
 
-    for (String key: serverConfig.getKeys()) {
+    for (String key : serverConfig.getKeys()) {
       LOGGER.info("InstanceDataManagerConfig, key: {} , value: {}", key, serverConfig.getProperty(key));
     }
 
@@ -168,7 +174,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   @Override
   public boolean isEnableSplitCommit() {
-    return _instanceDataManagerConfiguration.getProperty(ENABLE_SPLIT_COMMIT, false);
+    return _instanceDataManagerConfiguration.getProperty(ENABLE_SPLIT_COMMIT, true);
   }
 
   @Override
@@ -201,12 +207,24 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   public int getMaxParallelSegmentBuilds() {
-    return _instanceDataManagerConfiguration.getProperty(MAX_PARALLEL_SEGMENT_BUILDS, 0);
+    return _instanceDataManagerConfiguration
+        .getProperty(MAX_PARALLEL_SEGMENT_BUILDS, DEFAULT_MAX_PARALLEL_SEGMENT_BUILDS);
   }
 
   @Override
   public String getAuthToken() {
     return _instanceDataManagerConfiguration.getProperty(AUTH_TOKEN);
+  }
+
+  @Override
+  public String getSegmentDirectoryLoader() {
+    return _instanceDataManagerConfiguration.getProperty(SEGMENT_DIRECTORY_LOADER,
+        SegmentDirectoryLoaderRegistry.DEFAULT_SEGMENT_DIRECTORY_LOADER_NAME);
+  }
+
+  @Override
+  public long getErrorCacheSize() {
+    return _instanceDataManagerConfiguration.getProperty(ERROR_CACHE_SIZE, DEFAULT_ERROR_CACHE_SIZE);
   }
 
   @Override

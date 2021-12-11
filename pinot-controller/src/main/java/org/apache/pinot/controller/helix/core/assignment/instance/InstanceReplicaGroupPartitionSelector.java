@@ -132,8 +132,8 @@ public class InstanceReplicaGroupPartitionSelector {
       int numInstancesPerPartition = _replicaGroupPartitionConfig.getNumInstancesPerPartition();
       if (numInstancesPerPartition > 0) {
         Preconditions.checkState(numInstancesPerPartition <= numInstancesPerReplicaGroup,
-            "Number of instances per partition: %s must be smaller or equal to number of instances per replica-group: %s",
-            numInstancesPerPartition, numInstancesPerReplicaGroup);
+            "Number of instances per partition: %s must be smaller or equal to number of instances per replica-group:"
+                + " %s", numInstancesPerPartition, numInstancesPerReplicaGroup);
       } else {
         numInstancesPerPartition = numInstancesPerReplicaGroup;
       }

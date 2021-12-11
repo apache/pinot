@@ -18,10 +18,11 @@
  */
 package org.apache.pinot.core.query.distinct.raw;
 
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -29,8 +30,8 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
  */
 public class RawLongSingleColumnDistinctOnlyExecutor extends BaseRawLongSingleColumnDistinctExecutor {
 
-  public RawLongSingleColumnDistinctOnlyExecutor(ExpressionContext expression, int limit) {
-    super(expression, limit);
+  public RawLongSingleColumnDistinctOnlyExecutor(ExpressionContext expression, DataType dataType, int limit) {
+    super(expression, dataType, limit);
   }
 
   @Override

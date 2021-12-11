@@ -18,24 +18,33 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 import org.apache.pinot.spi.plugin.PluginManager;
-import org.apache.pinot.tools.BatchQuickstartWithMinion;
 import org.apache.pinot.tools.Command;
-import org.apache.pinot.tools.HybridQuickstart;
-import org.apache.pinot.tools.Quickstart;
-import org.apache.pinot.tools.RealtimeQuickStart;
-import org.kohsuke.args4j.Option;
+import org.apache.pinot.tools.QuickStartBase;
+import org.reflections.Reflections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
+@CommandLine.Command(name = "QuickStart")
 public class QuickStartCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(QuickStartCommand.class.getName());
 
-  @Option(name = "-type", required = false, metaVar = "<String>", usage = "Type of quickstart, supported: STREAM/BATCH/HYBRID")
+  @CommandLine.Option(names = "-type", required = false,
+      description = "Type of quickstart, supported: STREAM/BATCH/HYBRID")
   private String _type;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @CommandLine.Option(names = {"-tmpDir", "-quickstartDir", "-dataDir"}, required = false,
+      description = "Temp Directory to host quickstart data")
+  private String _tmpDir;
+
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false,
+      description = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -53,6 +62,14 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
     return this;
   }
 
+  public String getTmpDir() {
+    return _tmpDir;
+  }
+
+  public void setTmpDir(String tmpDir) {
+    _tmpDir = tmpDir;
+  }
+
   @Override
   public String toString() {
     return ("QuickStart -type " + _type);
@@ -60,7 +77,6 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
 
   @Override
   public void cleanup() {
-
   }
 
   @Override
@@ -68,31 +84,50 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
     return "Run Pinot QuickStart.";
   }
 
-  @Override
-  public boolean execute()
-      throws Exception {
-    PluginManager.get().init();
-    switch (_type.toUpperCase()) {
-      case "OFFLINE":
-      case "BATCH":
-        new Quickstart().execute();
-        break;
-      case "OFFLINE_MINION":
-      case "BATCH_MINION":
-      case "OFFLINE-MINION":
-      case "BATCH-MINION":
-        new BatchQuickstartWithMinion().execute();
-        break;
-      case "REALTIME":
-      case "STREAM":
-        new RealtimeQuickStart().execute();
-        break;
-      case "HYBRID":
-        new HybridQuickstart().execute();
-        break;
-      default:
-        throw new UnsupportedOperationException("Unsupported QuickStart type: " + _type);
+  public static QuickStartBase selectQuickStart(String type)
+          throws NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
+    Set<Class<? extends QuickStartBase>> quickStarts = allQuickStarts();
+    for (Class<? extends QuickStartBase> quickStart : quickStarts) {
+      QuickStartBase quickStartBase = quickStart.getDeclaredConstructor().newInstance();
+      if (quickStartBase.types().contains(type.toUpperCase())) {
+        return quickStartBase;
+      }
     }
+    throw new UnsupportedOperationException("Unsupported QuickStart type: " + type + ". "
+            + "Valid types are: " + errroMessageFor(quickStarts));
+  }
+
+  @Override
+  public boolean execute() throws Exception {
+    PluginManager.get().init();
+
+    if (_type == null) {
+      Set<Class<? extends QuickStartBase>> quickStarts = allQuickStarts();
+
+      throw new UnsupportedOperationException("No QuickStart type provided. "
+              + "Valid types are: " + errroMessageFor(quickStarts));
+    }
+
+    QuickStartBase quickstart = selectQuickStart(_type);
+
+    if (_tmpDir != null) {
+      quickstart.setTmpDir(_tmpDir);
+    }
+    quickstart.execute();
     return true;
+  }
+
+  private static List<String> errroMessageFor(Set<Class<? extends QuickStartBase>> quickStarts)
+          throws InstantiationException, IllegalAccessException, InvocationTargetException, NoSuchMethodException {
+    List<String> validTypes = new ArrayList<>();
+    for (Class<? extends QuickStartBase> quickStart : quickStarts) {
+      validTypes.addAll(quickStart.getDeclaredConstructor().newInstance().types());
+    }
+    return validTypes;
+  }
+
+  private static Set<Class<? extends QuickStartBase>> allQuickStarts() {
+    Reflections reflections = new Reflections("org.apache.pinot.tools");
+    return reflections.getSubTypesOf(QuickStartBase.class);
   }
 }

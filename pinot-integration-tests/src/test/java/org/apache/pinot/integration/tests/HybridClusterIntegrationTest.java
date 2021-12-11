@@ -18,14 +18,13 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.net.URLEncoder;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -38,8 +37,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import com.fasterxml.jackson.databind.JsonNode;
 
 
 /**
@@ -63,7 +60,6 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
   @Override
   protected void overrideServerConf(PinotConfiguration configuration) {
-    configuration.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_RELOAD_CONSUMING_SEGMENT, true);
   }
 
   @BeforeClass
@@ -127,8 +123,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testSegmentListApi()
       throws Exception {
     {
-      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.
-          forSegmentListAPIWithTableType(getTableName(), TableType.OFFLINE.toString()));
+      String jsonOutputStr = sendGetRequest(
+          _controllerRequestURLBuilder.forSegmentListAPIWithTableType(getTableName(), TableType.OFFLINE.toString()));
       JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
       // There should be one element in the array
       JsonNode element = array.get(0);
@@ -136,8 +132,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
       Assert.assertEquals(segments.size(), 8);
     }
     {
-      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.
-          forSegmentListAPIWithTableType(getTableName(), TableType.REALTIME.toString()));
+      String jsonOutputStr = sendGetRequest(
+          _controllerRequestURLBuilder.forSegmentListAPIWithTableType(getTableName(), TableType.REALTIME.toString()));
       JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
       // There should be one element in the array
       JsonNode element = array.get(0);
@@ -186,7 +182,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
   @Test
   public void testBrokerDebugRoutingTableSQL()
-          throws Exception {
+      throws Exception {
     String tableName = getTableName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);

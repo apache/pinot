@@ -265,7 +265,7 @@ spec:
           args: [ "StreamGitHubEvents", "-topic", "pullRequestMergedEvents", "-personalAccessToken", "token_value", "-kafkaBrokerList", "kafka:9092", "-schemaFile", "/var/pinot/examples/pullRequestMergedEvents_schema.json" ]
           env:
             - name: JAVA_OPTS
-              value: "-Dlog4j2.configurationFile=/opt/pinot/conf/pinot-admin-log4j2.xml -Dplugins.dir=/opt/pinot/plugins"
+              value: "-Dlog4j2.configurationFile=/opt/pinot/conf/log4j2.xml -Dplugins.dir=/opt/pinot/plugins"
           volumeMounts:
             - name: examples
               mountPath: /var/pinot/examples

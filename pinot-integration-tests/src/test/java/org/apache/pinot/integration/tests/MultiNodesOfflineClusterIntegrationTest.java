@@ -43,20 +43,6 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     startServers(NUM_SERVERS);
   }
 
-  // Disabled because with multiple servers, there is no guarantee that all servers get all segments reloaded
-  @Test(enabled = false)
-  @Override
-  public void testStarTreeTriggering() {
-    // Ignored
-  }
-
-  // Disabled because with multiple servers, there is no guarantee that all servers get all segments reloaded
-  @Test(enabled = false)
-  @Override
-  public void testDefaultColumns() {
-    // Ignored
-  }
-
   // Disabled because gRPC query server is not enabled
   @Test(enabled = false)
   @Override

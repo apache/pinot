@@ -19,7 +19,6 @@
 package org.apache.pinot.tools.service.api.resources;
 
 import java.util.Map;
-
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.services.ServiceRole;

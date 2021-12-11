@@ -19,7 +19,6 @@
 package org.apache.pinot.spi.env;
 
 import java.io.Reader;
-
 import org.apache.commons.configuration.PropertiesConfiguration.PropertiesReader;
 
 

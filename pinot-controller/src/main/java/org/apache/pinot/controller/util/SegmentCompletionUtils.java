@@ -24,7 +24,10 @@ import org.slf4j.LoggerFactory;
 
 
 public class SegmentCompletionUtils {
-  private static Logger LOGGER = LoggerFactory.getLogger(SegmentCompletionUtils.class);
+  private SegmentCompletionUtils() {
+  }
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentCompletionUtils.class);
   // Used to create temporary segment file names
   private static final String TMP = ".tmp.";
 

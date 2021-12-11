@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
 public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
 
   private StreamMessageDecoder _messageDecoder;
-  private Logger INSTANCE_LOGGER;
+  private Logger _instanceLogger;
 
   private String _clientId;
   private String _tableAndStreamName;
@@ -44,12 +44,12 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   private StreamConfig _streamConfig;
   private KafkaHighLevelStreamConfig _kafkaHighLevelStreamConfig;
 
-  private ConsumerConnector consumer;
-  private ConsumerIterator<byte[], byte[]> kafkaIterator;
-  private ConsumerAndIterator consumerAndIterator;
-  private long lastLogTime = 0;
-  private long lastCount = 0;
-  private long currentCount = 0L;
+  private ConsumerConnector _consumer;
+  private ConsumerIterator<byte[], byte[]> _kafkaIterator;
+  private ConsumerAndIterator _consumerAndIterator;
+  private long _lastLogTime = 0;
+  private long _lastCount = 0;
+  private long _currentCount = 0L;
 
   public KafkaStreamLevelConsumer(String clientId, String tableName, StreamConfig streamConfig,
       Set<String> fieldsToRead, String groupId) {
@@ -60,41 +60,42 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
     _messageDecoder = StreamDecoderProvider.create(streamConfig, fieldsToRead);
 
     _tableAndStreamName = tableName + "-" + streamConfig.getTopicName();
-    INSTANCE_LOGGER = LoggerFactory
+    _instanceLogger = LoggerFactory
         .getLogger(KafkaStreamLevelConsumer.class.getName() + "_" + tableName + "_" + streamConfig.getTopicName());
   }
 
   @Override
   public void start()
       throws Exception {
-    consumerAndIterator = KafkaConsumerManager.acquireConsumerAndIteratorForConfig(_kafkaHighLevelStreamConfig);
-    kafkaIterator = consumerAndIterator.getIterator();
-    consumer = consumerAndIterator.getConsumer();
+    _consumerAndIterator = KafkaConsumerManager.acquireConsumerAndIteratorForConfig(_kafkaHighLevelStreamConfig);
+    _kafkaIterator = _consumerAndIterator.getIterator();
+    _consumer = _consumerAndIterator.getConsumer();
   }
 
   @Override
   public GenericRow next(GenericRow destination) {
 
-    if (kafkaIterator.hasNext()) {
+    if (_kafkaIterator.hasNext()) {
       try {
-        destination = _messageDecoder.decode(kafkaIterator.next().message(), destination);
-        ++currentCount;
+        destination = _messageDecoder.decode(_kafkaIterator.next().message(), destination);
+        _currentCount++;
 
         final long now = System.currentTimeMillis();
         // Log every minute or 100k events
-        if (now - lastLogTime > 60000 || currentCount - lastCount >= 100000) {
-          if (lastCount == 0) {
-            INSTANCE_LOGGER.info("Consumed {} events from kafka stream {}", currentCount, _streamConfig.getTopicName());
+        if (now - _lastLogTime > 60000 || _currentCount - _lastCount >= 100000) {
+          if (_lastCount == 0) {
+            _instanceLogger
+                .info("Consumed {} events from kafka stream {}", _currentCount, _streamConfig.getTopicName());
           } else {
-            INSTANCE_LOGGER.info("Consumed {} events from kafka stream {} (rate:{}/s)", currentCount - lastCount,
-                _streamConfig.getTopicName(), (float) (currentCount - lastCount) * 1000 / (now - lastLogTime));
+            _instanceLogger.info("Consumed {} events from kafka stream {} (rate:{}/s)", _currentCount - _lastCount,
+                _streamConfig.getTopicName(), (float) (_currentCount - _lastCount) * 1000 / (now - _lastLogTime));
           }
-          lastCount = currentCount;
-          lastLogTime = now;
+          _lastCount = _currentCount;
+          _lastLogTime = now;
         }
         return destination;
       } catch (Exception e) {
-        INSTANCE_LOGGER.warn("Caught exception while consuming events", e);
+        _instanceLogger.warn("Caught exception while consuming events", e);
         throw e;
       }
     }
@@ -103,18 +104,18 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
 
   @Override
   public void commit() {
-    consumer.commitOffsets();
+    _consumer.commitOffsets();
   }
 
   @Override
   public void shutdown()
       throws Exception {
-    if (consumerAndIterator != null) {
-      kafkaIterator = null;
-      consumer = null;
+    if (_consumerAndIterator != null) {
+      _kafkaIterator = null;
+      _consumer = null;
 
-      KafkaConsumerManager.releaseConsumerAndIterator(consumerAndIterator);
-      consumerAndIterator = null;
+      KafkaConsumerManager.releaseConsumerAndIterator(_consumerAndIterator);
+      _consumerAndIterator = null;
     }
   }
 }

@@ -24,13 +24,15 @@ import java.util.concurrent.atomic.AtomicLongArray;
 
 
 /**
- * This hit counter is for counting the number of hits within a range of time. Right now the granularity we use is second.
+ * This hit counter is for counting the number of hits within a range of time. Right now the granularity we use is
+ * second.
  * In order to save the space and time, we store the number of hits over the last 100 time buckets. When the method hit
- * gets called, we put the timestamp to the specified bucket. When the method getHitCount gets called, we sum all the number
+ * gets called, we put the timestamp to the specified bucket. When the method getHitCount gets called, we sum all the
+ * number
  * of hits within the last 100 time buckets.
  */
 public class HitCounter {
-  private static int DEFAULT_BUCKET_COUNT = 100;
+  private static final int DEFAULT_BUCKET_COUNT = 100;
   final int _timeBucketWidthMs;
   final int _bucketCount;
   final AtomicLongArray _bucketStartTime;

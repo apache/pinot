@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import java.util.Collections;
+import java.util.List;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.MVScanDocIdSet;
 import org.apache.pinot.core.operator.docidsets.SVScanDocIdSet;
@@ -28,6 +31,7 @@ import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 
 public class ScanBasedFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "ScanBasedFilterOperator";
+  private static final String EXPLAIN_NAME = "FILTER_FULL_SCAN";
 
   private final PredicateEvaluator _predicateEvaluator;
   private final DataSource _dataSource;
@@ -53,6 +57,19 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Collections.emptyList();
+  }
+
+  @Override
+  public String toExplainString() {
+    StringBuilder stringBuilder =
+        new StringBuilder(EXPLAIN_NAME).append("(operator:").append(_predicateEvaluator.getPredicateType());
+    stringBuilder.append(",predicate:").append(_predicateEvaluator.getPredicate().toString());
+    return stringBuilder.append(')').toString();
   }
 
   /**

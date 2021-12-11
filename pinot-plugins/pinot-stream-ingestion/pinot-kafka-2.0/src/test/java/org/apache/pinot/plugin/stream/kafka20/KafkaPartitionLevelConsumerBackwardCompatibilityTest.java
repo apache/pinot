@@ -18,30 +18,6 @@
  */
 package org.apache.pinot.plugin.stream.kafka20;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
-import java.util.concurrent.TimeoutException;
-import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.serialization.StringSerializer;
-import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
-import org.apache.pinot.plugin.stream.kafka20.utils.MiniKafkaCluster;
-import org.apache.pinot.spi.stream.MessageBatch;
-import org.apache.pinot.spi.stream.OffsetCriteria;
-import org.apache.pinot.spi.stream.PartitionLevelConsumer;
-import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.stream.StreamConsumerFactory;
-import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
-
-
 /**
  * Tests for the KafkaPartitionLevelConsumer with old kafka consumer factory name.
  */
@@ -51,5 +27,4 @@ public class KafkaPartitionLevelConsumerBackwardCompatibilityTest extends KafkaP
   protected String getKafkaConsumerFactoryName() {
     return "org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory";
   }
-
 }

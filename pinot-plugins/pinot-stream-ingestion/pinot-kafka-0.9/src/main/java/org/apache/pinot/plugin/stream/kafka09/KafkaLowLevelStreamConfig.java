@@ -22,8 +22,8 @@ import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
-import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.EqualityUtils;
 
 
 /**
@@ -109,8 +109,8 @@ public class KafkaLowLevelStreamConfig {
   public String toString() {
     return "KafkaLowLevelStreamConfig{" + "_kafkaTopicName='" + _kafkaTopicName + '\'' + ", _bootstrapHosts='"
         + _bootstrapHosts + '\'' + ", _kafkaBufferSize='" + _kafkaBufferSize + '\'' + ", _kafkaSocketTimeout='"
-        + _kafkaSocketTimeout + '\'' + ", _kafkaFetcherSizeBytes='" + _kafkaFetcherSizeBytes + '\'' + ", _kafkaFetcherMinBytes='"
-        + _kafkaFetcherMinBytes + '\'' + '}';
+        + _kafkaSocketTimeout + '\'' + ", _kafkaFetcherSizeBytes='" + _kafkaFetcherSizeBytes + '\''
+        + ", _kafkaFetcherMinBytes='" + _kafkaFetcherMinBytes + '\'' + '}';
   }
 
   @Override

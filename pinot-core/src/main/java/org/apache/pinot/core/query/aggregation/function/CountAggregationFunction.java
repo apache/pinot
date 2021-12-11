@@ -21,13 +21,13 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.DoubleAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 
@@ -73,7 +73,7 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    if (blockValSetMap.size() == 0) {
+    if (blockValSetMap.isEmpty()) {
       aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + length);
     } else {
       // Star-tree pre-aggregated values
@@ -89,7 +89,7 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    if (blockValSetMap.size() == 0) {
+    if (blockValSetMap.isEmpty()) {
       for (int i = 0; i < length; i++) {
         int groupKey = groupKeyArray[i];
         groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
@@ -107,7 +107,7 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    if (blockValSetMap.size() == 0) {
+    if (blockValSetMap.isEmpty()) {
       for (int i = 0; i < length; i++) {
         for (int groupKey : groupKeysArray[i]) {
           groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
@@ -141,11 +141,6 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   }
 
   @Override
-  public boolean isIntermediateResultComparable() {
-    return true;
-  }
-
-  @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.LONG;
   }
@@ -158,5 +153,20 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   @Override
   public Long extractFinalResult(Long intermediateResult) {
     return intermediateResult;
+  }
+
+  @Override
+  public String toExplainString() {
+    StringBuilder stringBuilder = new StringBuilder(getType().getName()).append('(');
+    int numArguments = getInputExpressions().size();
+    if (numArguments > 0) {
+      stringBuilder.append(getInputExpressions().get(0).toString());
+      for (int i = 1; i < numArguments; i++) {
+        stringBuilder.append(", ").append(getInputExpressions().get(i).toString());
+      }
+    } else {
+      stringBuilder.append("*");
+    }
+    return stringBuilder.append(')').toString();
   }
 }

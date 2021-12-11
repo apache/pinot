@@ -19,7 +19,7 @@
       "name": "event_id"
     },
     {
-      "dataType": "LONG",
+      "dataType": "TIMESTAMP",
       "name": "event_time"
     },
     {
@@ -55,8 +55,8 @@
   "dateTimeFieldSpecs": [
     {
       "name": "mtime",
-      "dataType": "LONG",
-      "format": "1:MILLISECONDS:EPOCH",
+      "dataType": "TIMESTAMP",
+      "format": "1:MILLISECONDS:TIMESTAMP",
       "granularity": "1:MILLISECONDS"
     }
   ],

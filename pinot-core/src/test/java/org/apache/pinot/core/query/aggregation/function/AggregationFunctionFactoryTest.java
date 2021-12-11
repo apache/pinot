@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import org.apache.pinot.core.query.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -32,7 +33,7 @@ import static org.testng.Assert.assertTrue;
 public class AggregationFunctionFactoryTest {
   private static final String ARGUMENT = "(column)";
   private static final QueryContext DUMMY_QUERY_CONTEXT =
-      QueryContextConverterUtils.getQueryContextFromPQL("SELECT * FROM testTable");
+      QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable");
 
   @Test
   public void testGetAggregationFunction() {
@@ -77,6 +78,55 @@ public class AggregationFunctionFactoryTest {
     assertTrue(aggregationFunction instanceof AvgAggregationFunction);
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.AVG);
     assertEquals(aggregationFunction.getColumnName(), "avg_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("MoDe");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof ModeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.MODE);
+    assertEquals(aggregationFunction.getColumnName(), "mode_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("LaStWiThTiMe", "(column,timeColumn,'BOOLEAN')");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof LastIntValueWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.LASTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "lastWithTime_column_timeColumn_BOOLEAN");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("LaStWiThTiMe", "(column,timeColumn,'INT')");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof LastIntValueWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.LASTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "lastWithTime_column_timeColumn_INT");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("LaStWiThTiMe", "(column,timeColumn,'LONG')");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof LastLongValueWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.LASTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "lastWithTime_column_timeColumn_LONG");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("LaStWiThTiMe", "(column,timeColumn,'FLOAT')");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof LastFloatValueWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.LASTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "lastWithTime_column_timeColumn_FLOAT");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("LaStWiThTiMe", "(column,timeColumn,'DOUBLE')");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof LastDoubleValueWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.LASTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "lastWithTime_column_timeColumn_DOUBLE");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("LaStWiThTiMe", "(column,timeColumn,'STRING')");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof LastStringValueWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.LASTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "lastWithTime_column_timeColumn_STRING");
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
     function = getFunction("MiNmAxRaNgE");
@@ -128,11 +178,25 @@ public class AggregationFunctionFactoryTest {
     assertEquals(aggregationFunction.getColumnName(), "percentileEst50_column");
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
+    function = getFunction("PeRcEnTiLeRaWEsT50");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileRawEstAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILERAWEST);
+    assertEquals(aggregationFunction.getColumnName(), "percentileRawEst50_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
     function = getFunction("PeRcEnTiLeTdIgEsT99");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
     assertTrue(aggregationFunction instanceof PercentileTDigestAggregationFunction);
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILETDIGEST);
     assertEquals(aggregationFunction.getColumnName(), "percentileTDigest99_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("PeRcEnTiLeRaWTdIgEsT99");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileRawTDigestAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILERAWTDIGEST);
+    assertEquals(aggregationFunction.getColumnName(), "percentileRawTDigest99_column");
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
     function = getFunction("PeRcEnTiLe", "(column, 5)");
@@ -156,12 +220,26 @@ public class AggregationFunctionFactoryTest {
     assertEquals(aggregationFunction.getColumnName(), "percentileEst50.0_column");
     assertEquals(aggregationFunction.getResultColumnName(), "percentileest(column, 50.0)");
 
+    function = getFunction("PeRcEnTiLeRaWeSt", "(column, 50)");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileRawEstAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILERAWEST);
+    assertEquals(aggregationFunction.getColumnName(), "percentileRawEst50.0_column");
+    assertEquals(aggregationFunction.getResultColumnName(), "percentilerawest(column, 50.0)");
+
     function = getFunction("PeRcEnTiLeEsT", "(column, 55.555)");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
     assertTrue(aggregationFunction instanceof PercentileEstAggregationFunction);
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILEEST);
     assertEquals(aggregationFunction.getColumnName(), "percentileEst55.555_column");
     assertEquals(aggregationFunction.getResultColumnName(), "percentileest(column, 55.555)");
+
+    function = getFunction("PeRcEnTiLeRaWeSt", "(column, 55.555)");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileRawEstAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILERAWEST);
+    assertEquals(aggregationFunction.getColumnName(), "percentileRawEst55.555_column");
+    assertEquals(aggregationFunction.getResultColumnName(), "percentilerawest(column, 55.555)");
 
     function = getFunction("PeRcEnTiLeTdIgEsT", "(column, 99)");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
@@ -176,6 +254,20 @@ public class AggregationFunctionFactoryTest {
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILETDIGEST);
     assertEquals(aggregationFunction.getColumnName(), "percentileTDigest99.9999_column");
     assertEquals(aggregationFunction.getResultColumnName(), "percentiletdigest(column, 99.9999)");
+
+    function = getFunction("PeRcEnTiLeRaWtDiGeSt", "(column, 99)");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileRawTDigestAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILERAWTDIGEST);
+    assertEquals(aggregationFunction.getColumnName(), "percentileRawTDigest99.0_column");
+    assertEquals(aggregationFunction.getResultColumnName(), "percentilerawtdigest(column, 99.0)");
+
+    function = getFunction("PeRcEnTiLeRaWtDiGeSt", "(column, 99.9999)");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileRawTDigestAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILERAWTDIGEST);
+    assertEquals(aggregationFunction.getColumnName(), "percentileRawTDigest99.9999_column");
+    assertEquals(aggregationFunction.getResultColumnName(), "percentilerawtdigest(column, 99.9999)");
 
     function = getFunction("CoUnTmV");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
@@ -316,13 +408,13 @@ public class AggregationFunctionFactoryTest {
   }
 
   private FunctionContext getFunction(String functionName, String args) {
-    return QueryContextConverterUtils.getExpression(functionName + args).getFunction();
+    return RequestContextUtils.getExpressionFromSQL(functionName + args).getFunction();
   }
 
   @Test
   public void testAggregationFunctionWithMultipleArgs() {
     QueryContext queryContext =
-        QueryContextConverterUtils.getQueryContextFromPQL("SELECT distinct(column1, column2, column3) FROM testTable");
+        QueryContextConverterUtils.getQueryContextFromSQL("SELECT DISTINCT column1, column2, column3 FROM testTable");
     AggregationFunction aggregationFunction = AggregationFunctionFactory
         .getAggregationFunction(queryContext.getSelectExpressions().get(0).getFunction(), queryContext);
     assertTrue(aggregationFunction instanceof DistinctAggregationFunction);

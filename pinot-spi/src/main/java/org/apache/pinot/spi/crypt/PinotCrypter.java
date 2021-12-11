@@ -19,7 +19,6 @@
 package org.apache.pinot.spi.crypt;
 
 import java.io.File;
-
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 

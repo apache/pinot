@@ -40,7 +40,8 @@ import static org.testng.Assert.assertEquals;
 public class MemoryEstimatorTest {
 
   @Test
-  public void testSegmentGenerator() throws Exception {
+  public void testSegmentGenerator()
+      throws Exception {
     runTest("memory_estimation/schema-with-metadata.json", metadata -> {
       assertEquals(extract(metadata, "segment.total.docs = (\\d+)"), "100000");
       assertEquals(extract(metadata, "column.colInt.cardinality = (\\d+)"), "100");
@@ -75,7 +76,8 @@ public class MemoryEstimatorTest {
   }
 
   @Test
-  public void testSegmentGenerator_withDateTimeFieldSpec() throws Exception {
+  public void testSegmentGeneratorWithDateTimeFieldSpec()
+      throws Exception {
     runTest("memory_estimation/schema-with-metadata__dateTimeFieldSpec.json", metadata -> {
       assertEquals(extract(metadata, "segment.total.docs = (\\d+)"), "100000");
       assertEquals(extract(metadata, "column.colInt.cardinality = (\\d+)"), "500");
@@ -95,9 +97,11 @@ public class MemoryEstimatorTest {
     });
   }
 
-  private void runTest(String schemaFileName, Consumer<String> assertFunc) throws Exception {
+  private void runTest(String schemaFileName, Consumer<String> assertFunc)
+      throws Exception {
 
     // arrange inputs
+    File workingDir = Files.createTempDirectory("working-dir").toFile();
     File schemaFile = readFile(schemaFileName);
     File tableConfigFile = readFile("memory_estimation/table-config.json");
     Schema schema = JsonUtils.fileToObject(schemaFile, Schema.class);
@@ -107,7 +111,7 @@ public class MemoryEstimatorTest {
 
     // act
     MemoryEstimator.SegmentGenerator segmentGenerator =
-        new MemoryEstimator.SegmentGenerator(schemaWithMetadata, schema, tableConfig, numberOfRows, true);
+        new MemoryEstimator.SegmentGenerator(schemaWithMetadata, schema, tableConfig, numberOfRows, true, workingDir);
     File generatedSegment = segmentGenerator.generate();
 
     // assert
@@ -116,7 +120,7 @@ public class MemoryEstimatorTest {
     assertFunc.accept(metadata);
 
     // cleanup
-    FileUtils.deleteDirectory(generatedSegment);
+    FileUtils.deleteDirectory(workingDir);
   }
 
   private String extract(String metadataContent, String patternStr) {
@@ -126,7 +130,8 @@ public class MemoryEstimatorTest {
     return matcher.group(1);
   }
 
-  private File readFile(String fileName) throws Exception {
+  private File readFile(String fileName)
+      throws Exception {
     URL resource = getClass().getClassLoader().getResource(fileName);
     return new File(resource.toURI());
   }

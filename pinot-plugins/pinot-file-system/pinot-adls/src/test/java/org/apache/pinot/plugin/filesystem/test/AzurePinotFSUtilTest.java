@@ -32,7 +32,8 @@ public class AzurePinotFSUtilTest {
   private static final String BASE_PATH = "abfss://test.dfs.core.windows.net";
 
   @Test
-  public void testConvertUriToAzureStylePath() throws Exception {
+  public void testConvertUriToAzureStylePath()
+      throws Exception {
     testUriToAzureStylePath("table_0", "segment_1", false);
     testUriToAzureStylePath("table_0", "segment %", false);
     testUriToAzureStylePath("table %", "segment_1", false);
@@ -40,7 +41,8 @@ public class AzurePinotFSUtilTest {
   }
 
   @Test
-  public void testConvertUriToUrlEncodedAzureStylePath() throws Exception {
+  public void testConvertUriToUrlEncodedAzureStylePath()
+      throws Exception {
     testUriToAzureStylePath("table_0", "segment_1", true);
     testUriToAzureStylePath("table_0", "segment %", true);
     testUriToAzureStylePath("table %", "segment_1", true);
@@ -48,7 +50,8 @@ public class AzurePinotFSUtilTest {
   }
 
   @Test
-  public void testConvertAzureStylePathToUriStylePath() throws Exception {
+  public void testConvertAzureStylePathToUriStylePath()
+      throws Exception {
     Assert.assertEquals(AzurePinotFSUtil.convertAzureStylePathToUriStylePath("a/b"), "/a/b");
     Assert.assertEquals(AzurePinotFSUtil.convertAzureStylePathToUriStylePath("a/b/"), "/a/b");
     Assert.assertEquals(AzurePinotFSUtil.convertAzureStylePathToUriStylePath("/a/b"), "/a/b");
@@ -60,7 +63,8 @@ public class AzurePinotFSUtilTest {
     Assert.assertEquals(AzurePinotFSUtil.convertAzureStylePathToUriStylePath("/table/segment %/"), "/table/segment %");
   }
 
-  public void testUriToAzureStylePath(String tableName, String segmentName, boolean urlEncoded) throws Exception {
+  public void testUriToAzureStylePath(String tableName, String segmentName, boolean urlEncoded)
+      throws Exception {
     // "/encode(dir)/encode(segment)"
     String expectedPath = String.join(File.separator, tableName, segmentName);
     URI uri = createUri(URLEncoder.encode(tableName, "UTF-8"), URLEncoder.encode(segmentName, "UTF-8"));
@@ -81,7 +85,8 @@ public class AzurePinotFSUtilTest {
     checkUri(uri, expectedPath, urlEncoded);
   }
 
-  private void checkUri(URI uri, String expectedPath, boolean urlEncoded) throws IOException {
+  private void checkUri(URI uri, String expectedPath, boolean urlEncoded)
+      throws IOException {
     if (urlEncoded) {
       Assert.assertEquals(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(uri), Utility.urlEncode(expectedPath));
     } else {

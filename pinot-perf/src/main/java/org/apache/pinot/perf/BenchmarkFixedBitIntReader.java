@@ -22,10 +22,10 @@ import java.io.File;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.io.reader.impl.FixedBitIntReader;
-import org.apache.pinot.core.io.util.PinotDataBitSet;
-import org.apache.pinot.core.io.writer.impl.FixedBitSVForwardIndexWriter;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.local.io.reader.impl.FixedBitIntReader;
+import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
+import org.apache.pinot.segment.local.io.writer.impl.FixedBitSVForwardIndexWriter;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -57,7 +57,10 @@ public class BenchmarkFixedBitIntReader {
   private PinotDataBitSet _bitSet;
   private FixedBitIntReader _intReader;
 
-  @Param({"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31"})
+  @Param({
+      "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
+      "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31"
+  })
   public int _numBits;
 
   @Setup

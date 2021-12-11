@@ -27,12 +27,13 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.tools.admin.command.AbstractBaseAdminCommand;
 import org.apache.pinot.tools.admin.command.AddTableCommand;
 import org.apache.pinot.tools.admin.command.CreateSegmentCommand;
 import org.apache.pinot.tools.admin.command.DeleteClusterCommand;
@@ -45,8 +46,6 @@ import org.apache.pinot.tools.admin.command.UploadSegmentCommand;
 import org.apache.pinot.tools.perf.PerfBenchmarkDriver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.tools.admin.command.AbstractBaseAdminCommand.sendPostRequest;
 
 
 public class ClusterStarter {
@@ -83,7 +82,7 @@ public class ClusterStarter {
     _inputDataDir = config.getInputDataDir();
     _segmentDirName = config.getSegmentsDir();
 
-    _localhost = NetUtil.getHostAddress();
+    _localhost = NetUtils.getHostAddress();
 
     _zkAddress = config.getZookeeperAddress();
     _clusterName = config.getClusterName();
@@ -201,7 +200,7 @@ public class ClusterStarter {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(_tableName).setTimeColumnName(_timeColumnName)
             .setTimeType(_timeUnit).setNumReplicas(3).setBrokerTenant("broker").setServerTenant("server").build();
-    sendPostRequest(ControllerRequestURLBuilder.baseUrl(controllerAddress).forTableCreate(),
+    AbstractBaseAdminCommand.sendPostRequest(ControllerRequestURLBuilder.baseUrl(controllerAddress).forTableCreate(),
         tableConfig.toJsonString());
   }
 

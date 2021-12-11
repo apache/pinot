@@ -18,13 +18,12 @@
  */
 package org.apache.pinot.core.query.scheduler.resources;
 
+import com.google.common.base.Preconditions;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.base.Preconditions;
 
 
 /**
@@ -33,11 +32,11 @@ import com.google.common.base.Preconditions;
 public class PolicyBasedResourceManager extends ResourceManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PolicyBasedResourceManager.class);
 
-  private final ResourceLimitPolicy resourcePolicy;
+  private final ResourceLimitPolicy _resourcePolicy;
 
   public PolicyBasedResourceManager(PinotConfiguration config) {
     super(config);
-    this.resourcePolicy = new ResourceLimitPolicy(config, numQueryWorkerThreads);
+    _resourcePolicy = new ResourceLimitPolicy(config, _numQueryWorkerThreads);
   }
 
   /**
@@ -52,8 +51,8 @@ public class PolicyBasedResourceManager extends ResourceManager {
   @Override
   public QueryExecutorService getExecutorService(ServerQueryRequest query, SchedulerGroupAccountant accountant) {
     int numSegments = query.getSegmentsToQuery().size();
-    int queryThreadLimit = Math.max(1, Math.min(resourcePolicy.getMaxThreadsPerQuery(), numSegments));
-    int spareThreads = resourcePolicy.getTableThreadsHardLimit() - accountant.totalReservedThreads();
+    int queryThreadLimit = Math.max(1, Math.min(_resourcePolicy.getMaxThreadsPerQuery(), numSegments));
+    int spareThreads = _resourcePolicy.getTableThreadsHardLimit() - accountant.totalReservedThreads();
     if (spareThreads <= 0) {
       LOGGER.warn("UNEXPECTED: Attempt to schedule query uses more than the configured hard limit on threads");
       spareThreads = 1;
@@ -72,16 +71,16 @@ public class PolicyBasedResourceManager extends ResourceManager {
     accountant.addReservedThreads(spareThreads);
     // TODO: For 1 thread we should have the query run in the same queryRunner thread
     // by supplying an executor service that similar to Guava' directExecutor()
-    return new BoundedAccountingExecutor(queryWorkers, spareThreads, accountant);
+    return new BoundedAccountingExecutor(_queryWorkers, spareThreads, accountant);
   }
 
   @Override
   public int getTableThreadsHardLimit() {
-    return resourcePolicy.getTableThreadsHardLimit();
+    return _resourcePolicy.getTableThreadsHardLimit();
   }
 
   @Override
   public int getTableThreadsSoftLimit() {
-    return resourcePolicy.getTableThreadsSoftLimit();
+    return _resourcePolicy.getTableThreadsSoftLimit();
   }
 }

@@ -53,4 +53,9 @@ public interface StreamDataServerStartable {
    * @param topicProps
    */
   void createTopic(String topic, Properties topicProps);
+
+  /**
+   * Get the port of the server.
+   */
+  int getPort();
 }

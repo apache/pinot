@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.segment.spi.creator.name;
 
+import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 
 
 /**
@@ -34,24 +34,34 @@ import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
  *   <li>Sequence id</li>
  * </ul>
  */
+@SuppressWarnings("serial")
 public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
-  private final String _tableName;
+  private final String _segmentNamePrefix;
   private final String _segmentNamePostfix;
 
-  public SimpleSegmentNameGenerator(String tableName, String segmentNamePostfix) {
-    _tableName = tableName;
+  public SimpleSegmentNameGenerator(String segmentNamePrefix, @Nullable String segmentNamePostfix) {
+    Preconditions.checkArgument(
+        segmentNamePrefix != null && isValidSegmentName(segmentNamePrefix));
+    Preconditions.checkArgument(
+        segmentNamePostfix == null || isValidSegmentName(segmentNamePostfix));
+    _segmentNamePrefix = segmentNamePrefix;
     _segmentNamePostfix = segmentNamePostfix;
   }
 
   @Override
   public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue) {
+    Preconditions.checkArgument(
+        minTimeValue == null || isValidSegmentName(minTimeValue.toString()));
+    Preconditions.checkArgument(
+        maxTimeValue == null || isValidSegmentName(maxTimeValue.toString()));
     return JOINER
-        .join(_tableName, minTimeValue, maxTimeValue, _segmentNamePostfix, sequenceId >= 0 ? sequenceId : null);
+        .join(_segmentNamePrefix, minTimeValue, maxTimeValue, _segmentNamePostfix, sequenceId >= 0 ? sequenceId : null);
   }
 
   @Override
   public String toString() {
-    StringBuilder stringBuilder = new StringBuilder("SimpleSegmentNameGenerator: tableName=").append(_tableName);
+    StringBuilder stringBuilder =
+        new StringBuilder("SimpleSegmentNameGenerator: tableName=").append(_segmentNamePrefix);
     if (_segmentNamePostfix != null) {
       stringBuilder.append(", segmentNamePostfix=").append(_segmentNamePostfix);
     }

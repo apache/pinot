@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.spark.jobs;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -29,11 +33,6 @@ import org.apache.spark.SparkContext;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Properties;
-
 
 public class SparkSegmentTarPushJob extends SegmentTarPushJob {
   private final boolean _enableParallelPush;
@@ -42,12 +41,12 @@ public class SparkSegmentTarPushJob extends SegmentTarPushJob {
 
   public SparkSegmentTarPushJob(Properties properties) {
     super(properties);
-    _enableParallelPush =
-        Boolean.parseBoolean(properties.getProperty(JobConfigConstants.ENABLE_PARALLEL_PUSH, JobConfigConstants.DEFAULT_ENABLE_PARALLEL_PUSH));
-    _pushJobParallelism =
-        Integer.parseInt(properties.getProperty(JobConfigConstants.PUSH_JOB_PARALLELISM, JobConfigConstants.DEFAULT_PUSH_JOB_PARALLELISM));
-    _pushJobRetry =
-        Integer.parseInt(properties.getProperty(JobConfigConstants.PUSH_JOB_RETRY, JobConfigConstants.DEFAULT_PUSH_JOB_RETRY));
+    _enableParallelPush = Boolean.parseBoolean(properties
+        .getProperty(JobConfigConstants.ENABLE_PARALLEL_PUSH, JobConfigConstants.DEFAULT_ENABLE_PARALLEL_PUSH));
+    _pushJobParallelism = Integer.parseInt(properties
+        .getProperty(JobConfigConstants.PUSH_JOB_PARALLELISM, JobConfigConstants.DEFAULT_PUSH_JOB_PARALLELISM));
+    _pushJobRetry = Integer
+        .parseInt(properties.getProperty(JobConfigConstants.PUSH_JOB_RETRY, JobConfigConstants.DEFAULT_PUSH_JOB_RETRY));
   }
 
   @Override

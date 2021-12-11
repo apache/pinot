@@ -16,13 +16,15 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-ARG JAVA_VERSION=8
-FROM openjdk:${JAVA_VERSION} AS pinot_build_env
+ARG JAVA_VERSION=11
+ARG OPENJDK_IMAGE=openjdk
+FROM ${OPENJDK_IMAGE}:${JAVA_VERSION} AS pinot_build_env
 
 LABEL MAINTAINER=dev@pinot.apache.org
 
 ARG PINOT_BRANCH=master
 ARG KAFKA_VERSION=2.0
+ARG JDK_VERSION=11
 ARG PINOT_GIT_URL="https://github.com/apache/incubator-pinot.git"
 RUN echo "Trying to build Pinot from [ ${PINOT_GIT_URL} ] on branch [ ${PINOT_BRANCH} ] with Kafka version [ ${KAFKA_VERSION} ]"
 ENV PINOT_HOME=/opt/pinot
@@ -35,7 +37,7 @@ RUN apt-get update && \
 
 # install maven
 RUN mkdir -p /usr/share/maven /usr/share/maven/ref \
-  && wget https://www-us.apache.org/dist/maven/maven-3/3.6.3/binaries/apache-maven-3.6.3-bin.tar.gz -P /tmp \
+  && wget https://downloads.apache.org/maven/maven-3/3.6.3/binaries/apache-maven-3.6.3-bin.tar.gz -P /tmp \
   && tar -xzf /tmp/apache-maven-*.tar.gz -C /usr/share/maven --strip-components=1 \
   && rm -f /tmp/apache-maven-*.tar.gz \
   && ln -s /usr/share/maven/bin/mvn /usr/bin/mvn
@@ -53,17 +55,18 @@ RUN  wget http://archive.apache.org/dist/thrift/0.12.0/thrift-0.12.0.tar.gz -O /
 RUN git clone ${PINOT_GIT_URL} ${PINOT_BUILD_DIR} && \
     cd ${PINOT_BUILD_DIR} && \
     git checkout ${PINOT_BRANCH} && \
-    mvn install package -DskipTests -Pbin-dist -Pbuild-shaded-jar -Dkafka.version=${KAFKA_VERSION} && \
+    mvn install package -DskipTests -Pbin-dist -Pbuild-shaded-jar -Dkafka.version=${KAFKA_VERSION} -Djdk.version=${JDK_VERSION} && \
     mkdir -p ${PINOT_HOME}/configs && \
     mkdir -p ${PINOT_HOME}/data && \
     cp -r pinot-distribution/target/apache-pinot-*-bin/apache-pinot-*-bin/* ${PINOT_HOME}/. && \
     chmod +x ${PINOT_HOME}/bin/*.sh
 
-FROM openjdk:${JAVA_VERSION}-jdk-slim
+FROM ${OPENJDK_IMAGE}:${JAVA_VERSION}-jdk-slim
 
 LABEL MAINTAINER=dev@pinot.apache.org
 
 ENV PINOT_HOME=/opt/pinot
+ENV JAVA_OPTS="-Xms4G -Xmx4G -Dpinot.admin.system.exit=false"
 
 VOLUME ["${PINOT_HOME}/configs", "${PINOT_HOME}/data"]
 
@@ -83,4 +86,4 @@ WORKDIR ${PINOT_HOME}
 
 ENTRYPOINT ["./bin/pinot-admin.sh"]
 
-CMD ["run"]
+CMD ["-help"]

@@ -23,6 +23,6 @@ metadata:
   name: {{ include "pinot.broker.config" . }}
 data:
   pinot-broker.conf: |-
-    pinot.broker.client.queryPort={{ .Values.broker.port }}
+    pinot.broker.client.queryPort={{ .Values.broker.service.port }}
     pinot.broker.routing.table.builder.class={{ .Values.broker.routingTable.builderClass }}
 {{ .Values.broker.extra.configs | indent 4 }}

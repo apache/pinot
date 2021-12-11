@@ -19,6 +19,9 @@
 package org.apache.pinot.ingestion.common;
 
 public class JobConfigConstants {
+  private JobConfigConstants() {
+  }
+
   public static final String PATH_TO_INPUT = "path.to.input";
   public static final String PATH_TO_OUTPUT = "path.to.output";
   public static final String PREPROCESS_PATH_TO_OUTPUT = "preprocess.path.to.output";

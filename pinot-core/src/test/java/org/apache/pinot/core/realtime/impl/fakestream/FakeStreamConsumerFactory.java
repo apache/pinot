@@ -19,7 +19,7 @@
 package org.apache.pinot.core.realtime.impl.fakestream;
 
 import java.util.Set;
-import org.apache.pinot.core.util.IngestionUtils;
+import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -93,7 +93,8 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
     // Partition level consumer
     PartitionLevelConsumer partitionLevelConsumer =
         streamConsumerFactory.createPartitionLevelConsumer(clientId, partition);
-    MessageBatch messageBatch = partitionLevelConsumer.fetchMessages(new LongMsgOffset(10), new LongMsgOffset(40), 10_000);
+    MessageBatch messageBatch =
+        partitionLevelConsumer.fetchMessages(new LongMsgOffset(10), new LongMsgOffset(40), 10_000);
 
     // Message decoder
     Schema pinotSchema = FakeStreamConfigUtils.getPinotSchema();

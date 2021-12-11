@@ -23,12 +23,14 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -37,22 +39,28 @@ import org.apache.pinot.common.utils.ServiceStatus;
 @Api(tags = "Health")
 @Path("/")
 public class PinotBrokerHealthCheck {
+  @Inject
+  @Named(BrokerAdminApiApplication.BROKER_INSTANCE_ID)
+  private String _instanceId;
 
   @Inject
-  private BrokerMetrics brokerMetrics;
+  private BrokerMetrics _brokerMetrics;
 
   @GET
   @Produces(MediaType.TEXT_PLAIN)
   @Path("health")
   @ApiOperation(value = "Checking broker health")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Broker is healthy"), @ApiResponse(code = 503, message = "Broker is not healthy")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Broker is healthy"),
+      @ApiResponse(code = 503, message = "Broker is not healthy")
+  })
   public String getBrokerHealth() {
-    ServiceStatus.Status status = ServiceStatus.getServiceStatus();
+    ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
     if (status == ServiceStatus.Status.GOOD) {
-      brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_OK_CALLS, 1);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_OK_CALLS, 1);
       return "OK";
     }
-    brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_BAD_CALLS, 1);
+    _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_BAD_CALLS, 1);
     throw new WebApplicationException(String.format("Pinot broker status is %s", status),
         Response.Status.SERVICE_UNAVAILABLE);
   }

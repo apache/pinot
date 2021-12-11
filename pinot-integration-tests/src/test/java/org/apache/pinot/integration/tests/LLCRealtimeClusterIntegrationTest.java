@@ -18,31 +18,31 @@
  */
 package org.apache.pinot.integration.tests;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
-
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-
 import org.apache.commons.io.FileUtils;
-import org.apache.helix.ZNRecord;
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -74,12 +74,13 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   }
 
   @Override
-  public void startController() {
+  public void startController()
+      throws Exception {
     Map<String, Object> properties = getDefaultControllerConfiguration();
-    
+
     properties.put(ControllerConf.ALLOW_HLC_TABLES, false);
     properties.put(ControllerConf.ENABLE_SPLIT_COMMIT, _enableSplitCommit);
-    
+
     startController(properties);
     enableResourceConfigForLeadControllerResource(_enableLeadControllerResource);
   }
@@ -95,7 +96,6 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
       configuration.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_SPLIT_COMMIT, true);
       configuration.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_COMMIT_END_WITH_METADATA, true);
     }
-    configuration.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_RELOAD_CONSUMING_SEGMENT, true);
   }
 
   @BeforeClass
@@ -103,13 +103,22 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   public void setUp()
       throws Exception {
     System.out.println(String.format(
-        "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableSplitCommit: %s, enableLeadControllerResource: %s",
+        "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableSplitCommit: %s, "
+            + "enableLeadControllerResource: %s",
         RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableSplitCommit, _enableLeadControllerResource));
 
     // Remove the consumer directory
     FileUtils.deleteQuietly(new File(CONSUMER_DIRECTORY));
 
     super.setUp();
+  }
+
+  @AfterClass
+  @Override
+  public void tearDown()
+      throws Exception {
+    FileUtils.deleteDirectory(new File(CONSUMER_DIRECTORY));
+    super.tearDown();
   }
 
   @Test
@@ -121,13 +130,12 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
 
   @Test
   public void testSegmentFlushSize() {
-    String zkSegmentsPath = "/SEGMENTS/" + TableNameBuilder.REALTIME.tableNameWithType(getTableName());
-    List<String> segmentNames = _propertyStore.getChildNames(zkSegmentsPath, 0);
-    for (String segmentName : segmentNames) {
-      ZNRecord znRecord = _propertyStore.get(zkSegmentsPath + "/" + segmentName, null, 0);
-      assertEquals(znRecord.getSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE),
-          Integer.toString(getRealtimeSegmentFlushSize() / getNumKafkaPartitions()),
-          "Segment: " + segmentName + " does not have the expected flush size");
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    List<SegmentZKMetadata> segmentsZKMetadata =
+        ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, realtimeTableName);
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      assertEquals(segmentZKMetadata.getSizeThresholdToFlushSegment(),
+          getRealtimeSegmentFlushSize() / getNumKafkaPartitions());
     }
   }
 

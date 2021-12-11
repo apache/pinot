@@ -68,7 +68,6 @@ public interface SegmentAssignment {
    * @return Rebalanced assignment for the segments
    */
   Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
-      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap,
-      @Nullable List<Tier> sortedTiers, @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap,
-      Configuration config);
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, @Nullable List<Tier> sortedTiers,
+      @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, Configuration config);
 }

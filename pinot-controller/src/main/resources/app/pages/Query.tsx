@@ -45,6 +45,7 @@ import TableToolbar from '../components/TableToolbar';
 import SimpleAccordion from '../components/SimpleAccordion';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import '../styles/styles.css';
+import {Resizable} from "re-resizable";
 
 const useStyles = makeStyles((theme) => ({
   title: {
@@ -53,8 +54,9 @@ const useStyles = makeStyles((theme) => ({
   },
   rightPanel: {},
   codeMirror: {
+    height: '100%',
     '& .CodeMirror': {
-      height: 100,
+      height: '100%',
       border: '1px solid #BDCCD9',
       fontSize: '13px',
     },
@@ -78,9 +80,11 @@ const useStyles = makeStyles((theme) => ({
     paddingLeft: '74px',
   },
   sqlDiv: {
+    height: '100%',
     border: '1px #BDCCD9 solid',
     borderRadius: 4,
     marginBottom: '20px',
+    paddingBottom: '48px',
   },
   sqlError: {
     whiteSpace: 'pre-wrap',
@@ -132,7 +136,15 @@ const responseStatCols = [
   'numEntriesScannedPostFilter',
   'numGroupsLimitReached',
   'partialResponse',
-  'minConsumingFreshnessTimeMs'
+  'minConsumingFreshnessTimeMs',
+  'offlineThreadCpuTimeNs',
+  'realtimeThreadCpuTimeNs',
+  'offlineSystemActivitiesCpuTimeNs',
+  'realtimeSystemActivitiesCpuTimeNs',
+  'offlineResponseSerializationCpuTimeNs',
+  'realtimeResponseSerializationCpuTimeNs',
+  'offlineTotalCpuTimeNs',
+  'realtimeTotalCpuTimeNs'
 ];
 
 const QueryPage = () => {
@@ -184,6 +196,62 @@ const QueryPage = () => {
     setInputQuery(value);
   };
 
+  const handleQueryInterfaceKeyDown = (editor, event) => {
+    // Map Cmd + Enter KeyPress to executing the query
+    if (event.metaKey == true && event.keyCode == 13) {
+      handleRunNow(editor.getValue());
+    }
+    // Map Cmd + / KeyPress to toggle commenting the query
+    if (event.metaKey == true && event.keyCode == 191) {
+      handleComment(editor);
+    }
+  }
+
+  const handleComment = (cm: NativeCodeMirror.Editor) => {
+    const selections = cm.listSelections();
+    if (!selections) {
+      return;
+    }
+    const query = cm.getValue();
+    const querySplit = query.split(/\r?\n/);
+    _.forEach(selections, (range) => {
+      // anchor and head are based on where the selection starts/ends, but for the purpose
+      // of determining the line number range of the selection, we need start/end in order.
+      const start = Math.min(range.anchor.line, range.head.line);
+      let end = Math.max(range.anchor.line, range.head.line);
+
+      const isSingleLineSelection = start === end;
+      const isLastLineFirstChar = (range.anchor.line === end && range.anchor.ch === 0) ||
+          (range.head.line === end && range.head.ch === 0);
+      // If the selection is on the last line and the first character, we do not comment that line.
+      // This happens if you are using shift + down to select lines.
+      if (isLastLineFirstChar && !isSingleLineSelection) {
+        end = end - 1;
+      }
+      const isEntireSelectionCommented = _.range(start, end + 1).every((line) => {
+        return querySplit[line].startsWith("--") || querySplit[line].trim().length === 0;
+      });
+
+      for (let line = start; line <= end; line++) {
+        const lineIsCommented = querySplit[line].startsWith("--");
+        const lineIsEmpty = querySplit[line].trim().length === 0;
+        if (isEntireSelectionCommented) {
+          // If the entire range is commented, then we uncomment all the lines
+          if (lineIsCommented) {
+            querySplit[line] = querySplit[line].replace(/^--\s*/, '');
+          }
+        }
+        else {
+          // If the range is not commented, then we comment all the uncommented lines
+          if (!lineIsEmpty && !lineIsCommented) {
+            querySplit[line] = `-- ${querySplit[line]}`;
+          }
+        }
+      }
+    });
+    setInputQuery(querySplit.join("\n"));
+  }
+
   const handleRunNow = async (query?: string) => {
     setQueryLoader(true);
     let url;
@@ -219,6 +287,7 @@ const QueryPage = () => {
   };
 
   const fetchSQLData = async (tableName) => {
+    setQueryLoader(true);
     const result = await PinotMethodUtils.getTableSchemaData(tableName);
     const tableSchema = Utils.syncTableSchemaData(result, false);
     setTableSchema(tableSchema);
@@ -308,6 +377,8 @@ const QueryPage = () => {
     return defaultHint;
   };
 
+  const sqlEditorTooltip = "This editor supports auto-completion feature. Type @ in the editor to see the list of SQL keywords, functions, table name and column names."
+
   return fetching ? (
     <AppLoader />
   ) : (
@@ -318,6 +389,7 @@ const QueryPage = () => {
           fetchSQLData={fetchSQLData}
           tableSchema={tableSchema}
           selectedTable={selectedTable}
+          queryLoader={queryLoader}
         />
       </Grid>
       <Grid
@@ -332,21 +404,32 @@ const QueryPage = () => {
       >
         <Grid container>
           <Grid item xs={12} className={classes.rightPanel}>
-            <div className={classes.sqlDiv}>
-              <TableToolbar name="SQL Editor" showSearchBox={false} />
-              <CodeMirror
-                options={{
-                  ...sqloptions,
-                  hintOptions: {
-                    hint: handleSqlHints,
-                  },
+            <Resizable
+                defaultSize={{
+                  width: '100%',
+                  height: 148,
                 }}
-                value={inputQuery}
-                onChange={handleOutputDataChange}
-                className={classes.codeMirror}
-                autoCursor={false}
-              />
-            </div>
+                minHeight={148}
+                maxWidth={'100%'}
+                maxHeight={'50vh'}
+                enable={{bottom: true}}>
+              <div className={classes.sqlDiv}>
+                <TableToolbar name="SQL Editor" showSearchBox={false} showTooltip={true} tooltipText={sqlEditorTooltip} />
+                <CodeMirror
+                  options={{
+                    ...sqloptions,
+                    hintOptions: {
+                      hint: handleSqlHints,
+                    },
+                  }}
+                  value={inputQuery}
+                  onChange={handleOutputDataChange}
+                  onKeyDown={handleQueryInterfaceKeyDown}
+                  className={classes.codeMirror}
+                  autoCursor={false}
+                />
+              </div>
+            </Resizable>
 
             <Grid container className={classes.checkBox}>
               <Grid item xs={2}>

@@ -22,10 +22,7 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 
-@JsonTypeInfo(
-    use = JsonTypeInfo.Id.NAME,
-    include = JsonTypeInfo.As.PROPERTY,
-    property = "type")
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
 @JsonSubTypes({
     @JsonSubTypes.Type(value = SegmentOp.class, name = "segmentOp"),
     @JsonSubTypes.Type(value = TableOp.class, name = "tableOp"),
@@ -34,16 +31,15 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 })
 public abstract class BaseOp {
   enum OpType {
-    TABLE_OP,
-    SEGMENT_OP,
-    QUERY_OP,
-    STREAM_OP,
+    TABLE_OP, SEGMENT_OP, QUERY_OP, STREAM_OP,
   }
 
   private String _name;
   private final OpType _opType;
   private String _description = "No description provided";
   protected static final String GENERATION_NUMBER_PLACEHOLDER = "__GENERATION_NUMBER__";
+  protected static final String CONFIG_PLACEHOLDER = "/config/";
+  private String _parentDir;
 
   protected BaseOp(OpType opType) {
     _opType = opType;
@@ -65,7 +61,19 @@ public abstract class BaseOp {
     return _description;
   }
 
-  public  boolean run(int generationNumber) {
+  public String getParentDir() {
+    return _parentDir;
+  }
+
+  public void setParentDir(String parentDir) {
+    _parentDir = parentDir;
+  }
+
+  public String getAbsoluteFileName(String fileName) {
+    return _parentDir + CONFIG_PLACEHOLDER + fileName;
+  }
+
+  public boolean run(int generationNumber) {
     System.out.println("Running OpType " + _opType.toString() + ": " + getDescription());
     return runOp(generationNumber);
   }

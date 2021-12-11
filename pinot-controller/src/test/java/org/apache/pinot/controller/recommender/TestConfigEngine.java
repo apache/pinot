@@ -36,6 +36,7 @@ import org.apache.pinot.controller.recommender.io.InputManager;
 import org.apache.pinot.controller.recommender.rules.AbstractRule;
 import org.apache.pinot.controller.recommender.rules.RulesToExecute;
 import org.apache.pinot.controller.recommender.rules.impl.InvertedSortedIndexJointRule;
+import org.apache.pinot.controller.recommender.rules.io.configs.SegmentSizeRecommendations;
 import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
 import org.apache.pinot.controller.recommender.rules.utils.QueryInvertedSortedIndexRecommender;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -44,22 +45,18 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.controller.recommender.rules.impl.RealtimeProvisioningRule.CONSUMING_MEMORY_PER_HOST;
-import static org.apache.pinot.controller.recommender.rules.impl.RealtimeProvisioningRule.OPTIMAL_SEGMENT_SIZE;
-import static org.apache.pinot.controller.recommender.rules.impl.RealtimeProvisioningRule.TOTAL_MEMORY_USED_PER_HOST;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
+import static org.apache.pinot.controller.recommender.rules.impl.RealtimeProvisioningRule.*;
+import static org.testng.Assert.*;
 
 
 public class TestConfigEngine {
-  private final Logger LOGGER = LoggerFactory.getLogger(TestConfigEngine.class);
-  InputManager _input;
-  ObjectMapper objectMapper = new ObjectMapper();
+  private static final Logger LOGGER = LoggerFactory.getLogger(TestConfigEngine.class);
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private InputManager _input;
 
   void loadInput(String fName)
       throws InvalidInputException, IOException {
-    _input = objectMapper.readValue(readInputToStr(fName), InputManager.class);
+    _input = OBJECT_MAPPER.readValue(readInputToStr(fName), InputManager.class);
     _input.init();
   }
 
@@ -77,7 +74,7 @@ public class TestConfigEngine {
     assertEquals(_input.getSchema().getDimensionNames().toString(), "[a, b, c, d, e, f, g, h, i, j]");
     assertEquals(_input.getOverWrittenConfigs().getIndexConfig().getInvertedIndexColumns().toString(),
         "[a, b]");
-    assertEquals(_input.getBloomFilterRuleParams().getTHRESHOLD_MIN_PERCENT_EQ_BLOOMFILTER().toString(),
+    assertEquals(_input.getBloomFilterRuleParams().getThresholdMinPercentEqBloomfilter().toString(),
         "0.51");
     assertEquals(_input.getLatencySLA(), 500);
     assertEquals(_input.getColNameToIntMap().size(), 17);
@@ -89,18 +86,18 @@ public class TestConfigEngine {
     assertEquals(_input.getAverageDataLen("g"), 100);
     assertTrue(_input.isSingleValueColumn("j"));
     assertFalse(_input.isSingleValueColumn("i"));
-    assertEquals(_input.getPrimaryTimeCol(),"t");
+    assertTrue(_input.getTimeColumns().contains("t"));
   }
 
   @Test
   void testDataSizeCalculation()
       throws InvalidInputException, IOException {
     loadInput("recommenderInput/DataSizeCalculationInput.json");
-    assertEquals(_input.getDictionaryEncodedForwardIndexSize("a"),1);
-    assertEquals(_input.getDictionaryEncodedForwardIndexSize("b"),2);
-    assertEquals(_input.getDictionaryEncodedForwardIndexSize("t"),2);
-    assertEquals(_input.getColRawSizePerDoc("a"),4);
-    assertEquals(_input.getColRawSizePerDoc("b"),8);
+    assertEquals(_input.getDictionaryEncodedForwardIndexSize("a"), 1);
+    assertEquals(_input.getDictionaryEncodedForwardIndexSize("b"), 2);
+    assertEquals(_input.getDictionaryEncodedForwardIndexSize("t"), 2);
+    assertEquals(_input.getColRawSizePerDoc("a"), 4);
+    assertEquals(_input.getColRawSizePerDoc("b"), 8);
     try {
       _input.getColRawSizePerDoc("c");
       Assert.fail("Getting raw size from MV column does not fail");
@@ -108,10 +105,10 @@ public class TestConfigEngine {
       // Expected 409 Conflict
       assertTrue(e.getMessage().startsWith("Column c is MV column should not have raw encoding"));
     }
-    assertEquals(_input.getDictionarySize("k"),65537*8);
-    assertEquals(_input.getDictionarySize("d"),1000*27*2);
+    assertEquals(_input.getDictionarySize("k"), 65537 * 8);
+    assertEquals(_input.getDictionarySize("d"), 1000 * 27 * 2);
     _input.estimateSizePerRecord();
-    assertEquals(_input.getSizePerRecord(),26);
+    assertEquals(_input.getSizePerRecord(), 26);
   }
 
   @Test
@@ -124,6 +121,18 @@ public class TestConfigEngine {
     abstractRule.run();
     assertEquals(output.getIndexConfig().getInvertedIndexColumns().toString(), "[e, f, j]");
     assertEquals(output.getIndexConfig().getSortedColumn(), "c");
+  }
+
+  @Test
+  void testSortedInvertedIndexJointRuleWithMetricAndDateTimeColumn()
+      throws InvalidInputException, IOException {
+    loadInput("recommenderInput/SortedInvertedIndexInputWithMetricAndDateTimeColumn.json");
+    ConfigManager output = new ConfigManager();
+    AbstractRule abstractRule =
+        RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.InvertedSortedIndexJointRule, _input, output);
+    abstractRule.run();
+    assertEquals(output.getIndexConfig().getInvertedIndexColumns().toString(), "[c, t, x]");
+    assertEquals(output.getIndexConfig().getSortedColumn(), "p");
   }
 
   @Test
@@ -145,25 +154,43 @@ public class TestConfigEngine {
             .build();
 
     Set<String> results = new HashSet<String>() {{
-      add("[[PredicateParseResult{dims{[1]}, AND, BITMAP, nESI=1.568, selected=0.068, nESIWithIdx=0.618}, PredicateParseResult{dims{[0]}, AND, BITMAP, nESI=1.568, selected=0.068, nESIWithIdx=0.767}, PredicateParseResult{dims{[]}, AND, NESTED, nESI=1.568, selected=0.068, nESIWithIdx=1.568}]]");
-      add("[[PredicateParseResult{dims{[5]}, AND, BITMAP, nESI=0.150, selected=0.015, nESIWithIdx=0.058}, PredicateParseResult{dims{[]}, AND, NESTED, nESI=0.150, selected=0.015, nESIWithIdx=0.150}], [PredicateParseResult{dims{[3, 7]}, AND, BITMAP, nESI=12.000, selected=0.500, nESIWithIdx=4.000}, PredicateParseResult{dims{[]}, AND, NESTED, nESI=12.000, selected=0.500, nESIWithIdx=12.000}]]");
-      add("[[PredicateParseResult{dims{[0, 2]}, AND, BITMAP, nESI=7.250, selected=0.047, nESIWithIdx=1.122}, PredicateParseResult{dims{[]}, AND, NESTED, nESI=7.250, selected=0.047, nESIWithIdx=7.250}]]");
+      add("[[PredicateParseResult{dims{[3]}, AND, BITMAP, nESI=1.645, selected=0.034, nESIWithIdx=0.695}, "
+          + "PredicateParseResult{dims{[2]},"
+          + " AND, BITMAP, nESI=1.645, selected=0.034, nESIWithIdx=0.835}, PredicateParseResult{dims{[]}, AND, "
+          + "NESTED, nESI=1.645, "
+          + "selected=0.034, nESIWithIdx=1.645}]]");
+      add("[[PredicateParseResult{dims{[7]}, AND, BITMAP, nESI=0.150, selected=0.015, nESIWithIdx=0.058}, "
+          + "PredicateParseResult{dims{[]}, "
+          + "AND, NESTED, nESI=0.150, selected=0.015, nESIWithIdx=0.150}], [PredicateParseResult{dims{[5, 9]}, AND, "
+          + "BITMAP, nESI=12.000, "
+          + "selected=0.500, nESIWithIdx=4.000}, PredicateParseResult{dims{[]}, AND, NESTED, nESI=12.000, selected=0"
+          + ".500, nESIWithIdx=12"
+          + ".000}]]");
+      add("[[PredicateParseResult{dims{[2, 4]}, AND, BITMAP, nESI=7.625, selected=0.023, nESIWithIdx=1.309}, "
+          + "PredicateParseResult{dims{[]}, AND, NESTED, nESI=7.625, selected=0.023, nESIWithIdx=7.625}]]");
     }};
 
-    String q1 = "select i from tableName where b in (2,4) and ((a in (1,2,3) and e = 4) or c = 7) and d in ('#VALUES', 23) and t > 500";
-    String q2 = "select j from tableName where (a=3 and (h = 5 or f >34) and REGEXP_LIKE(i, 'as*')) or ((f = 3  or j in ('#VALUES', 4)) and REGEXP_LIKE(d, 'fl*'))";
-    String q3 = "select f from tableName where (a=0 or (b=1 and (e in ('#VALUES',2) or c=7))) and TEXT_MATCH(d, 'dasd') and MAX(MAX(h,i),j)=4 and t<3";
+    String q1 =
+        "select i from tableName where b in (2,4) and ((a in (1,2,3) and e = 4) or c = 7) and d in ('#VALUES', 23) "
+            + "and t > 500";
+    String q2 =
+        "select j from tableName where (a=3 and (h = 5 or f >34) and REGEXP_LIKE(i, 'as*')) or ((f = 3  or j in "
+            + "('#VALUES', 4)) and "
+            + "REGEXP_LIKE(d, 'fl*'))";
+    String q3 =
+        "select f from tableName where (a=0 or (b=1 and (e in ('#VALUES',2) or c=7))) and TEXT_MATCH(d, 'dasd') and "
+            + "MAX(MAX(h,i),j)=4 and"
+            + " t<3";
     assertTrue(results.contains(totalNESICounter
         .parseQuery(_input.getQueryContext(q1), _input.getQueryWeight(q1))
         .toString()));
     assertTrue(results.contains(totalNESICounter
         .parseQuery(_input.getQueryContext(q2), _input.getQueryWeight(q2))
-            .toString()));
+        .toString()));
     assertTrue(results.contains(totalNESICounter
         .parseQuery(_input.getQueryContext(q3), _input.getQueryWeight(q3))
         .toString()));
   }
-
 
   @Test(expectedExceptions = InvalidInputException.class)
   void testInvalidInput1()
@@ -177,7 +204,6 @@ public class TestConfigEngine {
     loadInput("recommenderInput/InvalidInput2.json");
   }
 
-
   @Test
   void testFlagQueryRule()
       throws InvalidInputException, IOException {
@@ -186,8 +212,13 @@ public class TestConfigEngine {
     AbstractRule abstractRule =
         RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.FlagQueryRule, _input, output);
     abstractRule.run();
-    assertEquals(output.getFlaggedQueries().getFlaggedQueries().toString(),
-        "{select g from tableName LIMIT 1000000000=Warning: The size of LIMIT is longer than 100000 | Warning: No filtering in ths query, not a valid query=Error: query not able to parse, skipped, select f from tableName=Warning: No filtering in ths query, select f from tableName where a =3=Warning: No time column used in ths query}");
+
+    assertFalse(output.getFlaggedQueries().getFlaggedQueries().containsKey("select f from tableName where x = 2"));
+    assertFalse(output.getFlaggedQueries().getFlaggedQueries().containsKey("select f from tableName where t = 3"));
+    assertTrue(output.getFlaggedQueries().getFlaggedQueries().containsKey("select * from tableName"));
+    assertTrue(output.getFlaggedQueries().getFlaggedQueries().containsKey("select f from tableName"));
+    assertTrue(output.getFlaggedQueries().getFlaggedQueries().containsKey("select f from tableName where a =3"));
+    assertTrue(output.getFlaggedQueries().getFlaggedQueries().containsKey("select g from tableName LIMIT 1000000000"));
   }
 
   @Test
@@ -198,7 +229,7 @@ public class TestConfigEngine {
     AbstractRule abstractRule =
         RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.VariedLengthDictionaryRule, _input, output);
     abstractRule.run();
-    assertEquals(output.getIndexConfig().getVariedLengthDictionaryColumns().toString(), "[a, d, m]");
+    assertEquals(output.getIndexConfig().getVarLengthDictionaryColumns().toString(), "[a, d, m]");
   }
 
   @Test
@@ -209,7 +240,33 @@ public class TestConfigEngine {
     AbstractRule abstractRule =
         RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.BloomFilterRule, _input, output);
     abstractRule.run();
-    assertEquals(output.getIndexConfig().getBloomFilterColumns().toString(), "[c]");
+    assertEquals(output.getIndexConfig().getBloomFilterColumns().toString(), "[b, c, e]");
+  }
+
+  @Test
+  void testBloomFilterRuleWithTimeSpecColumn()
+      throws InvalidInputException, IOException {
+    loadInput("recommenderInput/BloomFilterInputWithDateTimeColumn.json");
+    ConfigManager output = new ConfigManager();
+    AbstractRule abstractRule =
+        RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.BloomFilterRule, _input, output);
+    abstractRule.run();
+    assertEquals(output.getIndexConfig().getBloomFilterColumns().toString(), "[b, t, x]");
+  }
+
+  @Test
+  void testRangeIndexRule()
+      throws InvalidInputException, IOException {
+    loadInput("recommenderInput/RangeIndexInput.json");
+    ConfigManager output = new ConfigManager();
+    AbstractRule abstractRule =
+        RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.RangeIndexRule, _input, output);
+    abstractRule.run();
+    // Although column i has highest weight, it being string column, range index recommender will skip it and select
+    // next winner
+    assertNotEquals(output.getIndexConfig().getRangeIndexColumns().toString(), "[i]");
+    // index can be supported on dimension, date-time and metric columns
+    assertEquals(output.getIndexConfig().getRangeIndexColumns().toString(), "[t, j]");
   }
 
   @Test
@@ -228,6 +285,10 @@ public class TestConfigEngine {
   void testPinotTablePartitionRule()
       throws InvalidInputException, IOException {
     loadInput("recommenderInput/PinotTablePartitionRuleInput.json");
+
+    // segment size recommendations get populated by SegmentSize Rule; hard-coding the values here
+    _input._overWrittenConfigs.setSegmentSizeRecommendations(
+        new SegmentSizeRecommendations(/*numRows=*/1_000_000, /*numSegments=*/4, /*segmentSize=*/1_000_000));
 
     AbstractRule abstractRule = RulesToExecute.RuleFactory
         .getRule(RulesToExecute.Rule.KafkaPartitionRule, _input, _input._overWrittenConfigs);
@@ -361,23 +422,87 @@ public class TestConfigEngine {
   }
 
   @Test
-  void testRealtimeProvisioningRule_withTimeColumn() throws Exception {
+  void testRealtimeProvisioningRuleWithTimeColumn()
+      throws Exception {
     testRealtimeProvisioningRule("recommenderInput/RealtimeProvisioningInput_timeColumn.json");
   }
 
   @Test
-  void testRealtimeProvisioningRule_withDateTimeColumn() throws Exception {
+  void testRealtimeProvisioningRuleWithDateTimeColumn()
+      throws Exception {
     testRealtimeProvisioningRule("recommenderInput/RealtimeProvisioningInput_dateTimeColumn.json");
   }
 
-  private void testRealtimeProvisioningRule(String fileName) throws Exception {
-    String input = readInputToStr(fileName);
-    String output = RecommenderDriver.run(input);
-    ConfigManager configManager = objectMapper.readValue(output, ConfigManager.class);
-    Map<String, Map<String, String>> recommendations = configManager.getRealtimeProvisioningRecommendations();
+  @Test
+  void testRealtimeProvisioningRuleWithHighIngestionRate() throws Exception {
+    // Total memory for some of the options are greater than the provided max memory in a host.
+    // For those option, the returned values is "NA"
+    testRealtimeProvisioningRule("recommenderInput/RealtimeProvisioningInput_highIngestionRate.json");
+  }
+
+  @Test
+  void testAggregateMetricsRule()
+      throws Exception {
+    ConfigManager output = runRecommenderDriver("recommenderInput/AggregateMetricsRuleInput.json");
+    assertTrue(output.isAggregateMetrics());
+  }
+
+  @Test
+  void testSegmentSizeRule()
+      throws Exception {
+    ConfigManager output = runRecommenderDriver("recommenderInput/SegmentSizeRuleInput.json");
+    SegmentSizeRecommendations segmentSizeRecommendations = output.getSegmentSizeRecommendations();
+    assertEquals(segmentSizeRecommendations.getNumSegments(), 2);
+    assertEquals(segmentSizeRecommendations.getNumRowsPerSegment(), 50_000);
+  }
+
+  @Test
+  void testSegmentSizeRuleNoNeedToGenerateSegment()
+      throws Exception {
+    ConfigManager output = runRecommenderDriver("recommenderInput/SegmentSizeRuleInput_noNeedToGenerateSegment.json");
+    SegmentSizeRecommendations segmentSizeRecommendations = output.getSegmentSizeRecommendations();
+    assertEquals(segmentSizeRecommendations.getNumSegments(), 2);
+    assertEquals(segmentSizeRecommendations.getNumRowsPerSegment(), 50_000);
+  }
+
+  @Test
+  void testSegmentSizeRuleRuleIsDisabledButItNeedsToBeSilentlyRun()
+      throws Exception {
+    ConfigManager output =
+        runRecommenderDriver("recommenderInput/SegmentSizeRuleInput_ruleIsDisableButItNeedsToBeSilentlyRun.json");
+    assertNull(output.getSegmentSizeRecommendations()); // output is null because the rule silently ran
+    assertEquals(output.getPartitionConfig().getPartitionDimension(), "e");
+    assertEquals(output.getPartitionConfig().getNumPartitionsOffline(), 2);
+  }
+
+  @Test
+  void testSegmentSizeRuleRealtimeOnlyTable()
+      throws Exception {
+    ConfigManager output =
+        runRecommenderDriver("recommenderInput/SegmentSizeRuleInput_realtimeOnlyTable.json");
+    assertEquals(output.getSegmentSizeRecommendations().getMessage(),
+        "Segment sizing for realtime-only tables is done via Realtime Provisioning Rule");
+    assertEquals(output.getSegmentSizeRecommendations().getNumSegments(), 0);
+    assertEquals(output.getSegmentSizeRecommendations().getSegmentSize(), 0);
+    assertEquals(output.getSegmentSizeRecommendations().getNumRowsPerSegment(), 0);
+  }
+
+  private void testRealtimeProvisioningRule(String fileName)
+      throws Exception {
+    ConfigManager output = runRecommenderDriver(fileName);
+    Map<String, Map<String, String>> recommendations = output.getRealtimeProvisioningRecommendations();
     assertRealtimeProvisioningRecommendation(recommendations.get(OPTIMAL_SEGMENT_SIZE));
+    assertRealtimeProvisioningRecommendation(recommendations.get(NUM_ROWS_IN_SEGMENT));
+    assertRealtimeProvisioningRecommendation(recommendations.get(NUM_SEGMENTS_QUERIED_PER_HOST));
     assertRealtimeProvisioningRecommendation(recommendations.get(CONSUMING_MEMORY_PER_HOST));
     assertRealtimeProvisioningRecommendation(recommendations.get(TOTAL_MEMORY_USED_PER_HOST));
+  }
+
+  private ConfigManager runRecommenderDriver(String fileName)
+      throws IOException, InvalidInputException {
+    String input = readInputToStr(fileName);
+    String output = RecommenderDriver.run(input);
+    return OBJECT_MAPPER.readValue(output, ConfigManager.class);
   }
 
   private void assertRealtimeProvisioningRecommendation(Map<String, String> matrix) {

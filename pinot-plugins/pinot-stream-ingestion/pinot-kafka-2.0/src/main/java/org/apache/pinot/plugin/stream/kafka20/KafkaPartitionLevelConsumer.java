@@ -35,7 +35,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHandler implements PartitionLevelConsumer {
+public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHandler
+    implements PartitionLevelConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionLevelConsumer.class);
 
   public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
@@ -46,8 +47,8 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
   public MessageBatch fetchMessages(StreamPartitionMsgOffset startMsgOffset, StreamPartitionMsgOffset endMsgOffset,
       int timeoutMillis)
       throws TimeoutException {
-    final long startOffset = ((LongMsgOffset)startMsgOffset).getOffset();
-    final long endOffset = endMsgOffset == null ? Long.MAX_VALUE : ((LongMsgOffset)endMsgOffset).getOffset();
+    final long startOffset = ((LongMsgOffset) startMsgOffset).getOffset();
+    final long endOffset = endMsgOffset == null ? Long.MAX_VALUE : ((LongMsgOffset) endMsgOffset).getOffset();
     return fetchMessages(startOffset, endOffset, timeoutMillis);
   }
 
@@ -64,7 +65,8 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       final List<ConsumerRecord<String, Bytes>> messageAndOffsets, final long startOffset, final long endOffset) {
     return Iterables.filter(messageAndOffsets, input -> {
       // Filter messages that are either null or have an offset ∉ [startOffset, endOffset]
-      return input != null && input.offset() >= startOffset && (endOffset > input.offset() || endOffset == -1);
+      return input != null && input.value() != null && input.offset() >= startOffset && (endOffset > input.offset()
+          || endOffset == -1);
     });
   }
 

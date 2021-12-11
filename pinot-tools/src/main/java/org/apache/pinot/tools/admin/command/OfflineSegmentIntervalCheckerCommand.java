@@ -29,36 +29,38 @@ import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.util.SegmentIntervalUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
  * Pinot admin command to list all offline segments with invalid intervals, group by table name
  */
+@CommandLine.Command(name = "OfflineSegmentIntervalChecker")
 public class OfflineSegmentIntervalCheckerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(OfflineSegmentIntervalCheckerCommand.class);
 
   private ZKHelixAdmin _helixAdmin;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
-  @Option(name = "-zkAddress", required = true, metaVar = "<http>", usage = "Zookeeper server:port/cluster")
+  @CommandLine.Option(names = {"-zkAddress"}, required = true, description = "Zookeeper server:port/cluster")
   private String _zkAddress;
 
-  @Option(name = "-clusterName", required = true, metaVar = "<String>", usage = "Helix cluster name")
+  @CommandLine.Option(names = {"-clusterName"}, required = true, description = "Helix cluster name")
   private String _clusterName;
 
-  @Option(name = "-tableNames", metaVar = "<string>", usage = "Comma separated list of tables to check for invalid segment intervals")
+  @CommandLine.Option(names = {"-tableNames"}, 
+      description = "Comma separated list of tables to check for invalid segment intervals")
   private String _tableNames;
 
-  @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -132,17 +134,17 @@ public class OfflineSegmentIntervalCheckerCommand extends AbstractBaseAdminComma
    */
   private List<String> checkOfflineTablesSegmentIntervals(String offlineTableName) {
     TableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, offlineTableName);
-    List<OfflineSegmentZKMetadata> offlineSegmentZKMetadataList =
-        ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(_propertyStore, offlineTableName);
+    List<SegmentZKMetadata> segmentsZKMetadata =
+        ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, offlineTableName);
 
     // Collect segments with invalid start/end time
     List<String> segmentsWithInvalidIntervals = new ArrayList<>();
     if (SegmentIntervalUtils.eligibleForSegmentIntervalCheck(tableConfig.getValidationConfig())) {
-      for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadataList) {
-        long startTimeMs = offlineSegmentZKMetadata.getStartTimeMs();
-        long endTimeMs = offlineSegmentZKMetadata.getEndTimeMs();
+      for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+        long startTimeMs = segmentZKMetadata.getStartTimeMs();
+        long endTimeMs = segmentZKMetadata.getEndTimeMs();
         if (!TimeUtils.timeValueInValidRange(startTimeMs) || !TimeUtils.timeValueInValidRange(endTimeMs)) {
-          segmentsWithInvalidIntervals.add(offlineSegmentZKMetadata.getSegmentName());
+          segmentsWithInvalidIntervals.add(segmentZKMetadata.getSegmentName());
         }
       }
     }

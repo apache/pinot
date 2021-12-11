@@ -65,7 +65,8 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
     const serversData = await PinotMethodUtils.getServerOfTenant(tenantName);
     setTableData(tenantData);
     setBrokerData(brokersData || []);
-    setServerData(serversData || []);
+    let separatedServers = Array.isArray(serversData) ? serversData.map((elm) => [elm]) : [];
+    setServerData(separatedServers || []);
     setFetching(false);
   };
   useEffect(() => {
@@ -132,7 +133,7 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
             title="Servers"
             data={{
               columns: ['Instance Name'],
-              records: serverData.length > 0 ? [serverData] : []
+              records: serverData.length > 0 ? serverData : []
             }}
             isPagination
             addLinks

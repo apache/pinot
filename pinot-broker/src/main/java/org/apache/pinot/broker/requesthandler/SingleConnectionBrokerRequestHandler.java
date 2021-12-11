@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,12 +34,12 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.helix.TableCache;
+import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.transport.AsyncQueryResponse;
 import org.apache.pinot.core.transport.QueryRouter;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -55,12 +56,15 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
  */
 @ThreadSafe
 public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandler {
+  private final BrokerReduceService _brokerReduceService;
   private final QueryRouter _queryRouter;
 
   public SingleConnectionBrokerRequestHandler(PinotConfiguration config, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       BrokerMetrics brokerMetrics, TlsConfig tlsConfig) {
     super(config, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
+
+    _brokerReduceService = new BrokerReduceService(_config);
     _queryRouter = new QueryRouter(_brokerId, brokerMetrics, tlsConfig);
   }
 
@@ -75,7 +79,7 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
   }
 
   @Override
-  protected BrokerResponse processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
+  protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
       long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
@@ -96,12 +100,15 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
     int numServersQueried = response.size();
     long totalResponseSize = 0;
     Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>(HashUtil.getHashMapCapacity(numServersQueried));
+    List<ServerRoutingInstance> serversNotResponded = new ArrayList<>();
     for (Map.Entry<ServerRoutingInstance, ServerResponse> entry : response.entrySet()) {
       ServerResponse serverResponse = entry.getValue();
       DataTable dataTable = serverResponse.getDataTable();
       if (dataTable != null) {
         dataTableMap.put(entry.getKey(), dataTable);
         totalResponseSize += serverResponse.getResponseSize();
+      } else {
+        serversNotResponded.add(entry.getKey());
       }
     }
     int numServersResponded = dataTableMap.size();
@@ -123,11 +130,14 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
       brokerResponse
           .addToExceptions(new QueryProcessingException(QueryException.BROKER_REQUEST_SEND_ERROR_CODE, errorMsg));
     }
+    int numServersNotResponded = serversNotResponded.size();
+    if (numServersNotResponded != 0) {
+      brokerResponse.addToExceptions(new QueryProcessingException(QueryException.SERVER_NOT_RESPONDING_ERROR_CODE,
+          String.format("%d servers %s not responded", numServersNotResponded, serversNotResponded)));
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED, 1);
+    }
     if (brokerResponse.getExceptionsSize() > 0) {
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS, 1);
-    }
-    if (numServersQueried > numServersResponded) {
-      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED, 1);
     }
     _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE, totalResponseSize);
 

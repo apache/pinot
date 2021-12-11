@@ -21,7 +21,7 @@ package org.apache.pinot.client;
 /**
  * Shared implementation between the different ResultSets.
  */
-abstract class AbstractResultSet implements ResultSet {
+public abstract class AbstractResultSet implements ResultSet {
 
   @Override
   public String getColumnDataType(int columnIndex) {

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.api.events;
 
-import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

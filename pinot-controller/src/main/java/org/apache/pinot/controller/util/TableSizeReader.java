@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.util;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import java.util.ArrayList;
@@ -97,15 +98,15 @@ public class TableSizeReader {
 
     if (hasRealtimeTable) {
       String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-      tableSizeDetails.realtimeSegments = getTableSubtypeSize(realtimeTableName, timeoutMsec);
-      tableSizeDetails.reportedSizeInBytes += tableSizeDetails.realtimeSegments.reportedSizeInBytes;
-      tableSizeDetails.estimatedSizeInBytes += tableSizeDetails.realtimeSegments.estimatedSizeInBytes;
+      tableSizeDetails._realtimeSegments = getTableSubtypeSize(realtimeTableName, timeoutMsec);
+      tableSizeDetails._reportedSizeInBytes += tableSizeDetails._realtimeSegments._reportedSizeInBytes;
+      tableSizeDetails._estimatedSizeInBytes += tableSizeDetails._realtimeSegments._estimatedSizeInBytes;
     }
     if (hasOfflineTable) {
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-      tableSizeDetails.offlineSegments = getTableSubtypeSize(offlineTableName, timeoutMsec);
-      tableSizeDetails.reportedSizeInBytes += tableSizeDetails.offlineSegments.reportedSizeInBytes;
-      tableSizeDetails.estimatedSizeInBytes += tableSizeDetails.offlineSegments.estimatedSizeInBytes;
+      tableSizeDetails._offlineSegments = getTableSubtypeSize(offlineTableName, timeoutMsec);
+      tableSizeDetails._reportedSizeInBytes += tableSizeDetails._offlineSegments._reportedSizeInBytes;
+      tableSizeDetails._estimatedSizeInBytes += tableSizeDetails._offlineSegments._estimatedSizeInBytes;
     }
     return tableSizeDetails;
   }
@@ -116,35 +117,59 @@ public class TableSizeReader {
   //
   @JsonIgnoreProperties(ignoreUnknown = true)
   static public class TableSizeDetails {
-    public String tableName;
-    public long reportedSizeInBytes = 0;
+
+    @JsonProperty("tableName")
+    public String _tableName;
+
+    @JsonProperty("reportedSizeInBytes")
+    public long _reportedSizeInBytes = 0;
+
     // estimated size if servers are down
-    public long estimatedSizeInBytes = 0;
-    public TableSubTypeSizeDetails offlineSegments;
-    public TableSubTypeSizeDetails realtimeSegments;
+    @JsonProperty("estimatedSizeInBytes")
+    public long _estimatedSizeInBytes = 0;
+
+    @JsonProperty("offlineSegments")
+    public TableSubTypeSizeDetails _offlineSegments;
+
+    @JsonProperty("realtimeSegments")
+    public TableSubTypeSizeDetails _realtimeSegments;
 
     public TableSizeDetails(String tableName) {
-      this.tableName = tableName;
+      _tableName = tableName;
     }
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   static public class TableSubTypeSizeDetails {
 
-    public long reportedSizeInBytes = 0; // actual sizes reported by servers
+    // actual sizes reported by servers
+    @JsonProperty("reportedSizeInBytes")
+    public long _reportedSizeInBytes = 0;
+
     /* Actual reported size + missing replica sizes filled in from other reachable replicas
      * for segments
      */
-    public long estimatedSizeInBytes = 0;
-    public int missingSegments = 0; // segments for which no replica provided a report
-    public Map<String, SegmentSizeDetails> segments = new HashMap<>();
+    @JsonProperty("estimatedSizeInBytes")
+    public long _estimatedSizeInBytes = 0;
+
+    // segments for which no replica provided a report
+    @JsonProperty("missingSegments")
+    public int _missingSegments = 0;
+
+    @JsonProperty("segments")
+    public Map<String, SegmentSizeDetails> _segments = new HashMap<>();
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   static public class SegmentSizeDetails {
-    public long reportedSizeInBytes = 0;
-    public long estimatedSizeInBytes = 0;
-    public Map<String, SegmentSizeInfo> serverInfo = new HashMap<>();
+    @JsonProperty("reportedSizeInBytes")
+    public long _reportedSizeInBytes = 0;
+
+    @JsonProperty("estimatedSizeInBytes")
+    public long _estimatedSizeInBytes = 0;
+
+    @JsonProperty("serverInfo")
+    public Map<String, SegmentSizeInfo> _serverInfo = new HashMap<>();
   }
 
   public TableSubTypeSizeDetails getTableSubtypeSize(String tableNameWithType, int timeoutMs)
@@ -156,7 +181,7 @@ public class TableSizeReader {
         serverTableSizeReader.getSegmentSizeInfoFromServers(endpoints, tableNameWithType, timeoutMs);
 
     TableSubTypeSizeDetails subTypeSizeDetails = new TableSubTypeSizeDetails();
-    Map<String, SegmentSizeDetails> segmentToSizeDetailsMap = subTypeSizeDetails.segments;
+    Map<String, SegmentSizeDetails> segmentToSizeDetailsMap = subTypeSizeDetails._segments;
 
     // Convert map from (server -> List<SegmentSizeInfo>) to (segment -> SegmentSizeDetails (server -> SegmentSizeInfo))
     // If no response returned from a server, put -1 as size for all the segments on the server
@@ -167,15 +192,15 @@ public class TableSizeReader {
       if (segmentSizeInfoList != null) {
         for (SegmentSizeInfo segmentSizeInfo : segmentSizeInfoList) {
           SegmentSizeDetails segmentSizeDetails =
-              segmentToSizeDetailsMap.computeIfAbsent(segmentSizeInfo.segmentName, k -> new SegmentSizeDetails());
-          segmentSizeDetails.serverInfo.put(server, segmentSizeInfo);
+              segmentToSizeDetailsMap.computeIfAbsent(segmentSizeInfo.getSegmentName(), k -> new SegmentSizeDetails());
+          segmentSizeDetails._serverInfo.put(server, segmentSizeInfo);
         }
       } else {
         List<String> segments = entry.getValue();
         for (String segment : segments) {
           SegmentSizeDetails segmentSizeDetails =
               segmentToSizeDetailsMap.computeIfAbsent(segment, k -> new SegmentSizeDetails());
-          segmentSizeDetails.serverInfo.put(server, new SegmentSizeInfo(segment, -1L));
+          segmentSizeDetails._serverInfo.put(server, new SegmentSizeInfo(segment, -1L));
         }
       }
     }
@@ -195,42 +220,42 @@ public class TableSizeReader {
       // Iterate over all segment size info, update reported size, track max segment size and number of errored servers
       long segmentLevelMax = -1L;
       int errors = 0;
-      for (SegmentSizeInfo sizeInfo : sizeDetails.serverInfo.values()) {
-        if (sizeInfo.diskSizeInBytes != -1) {
-          sizeDetails.reportedSizeInBytes += sizeInfo.diskSizeInBytes;
-          segmentLevelMax = Math.max(segmentLevelMax, sizeInfo.diskSizeInBytes);
+      for (SegmentSizeInfo sizeInfo : sizeDetails._serverInfo.values()) {
+        if (sizeInfo.getDiskSizeInBytes() != -1) {
+          sizeDetails._reportedSizeInBytes += sizeInfo.getDiskSizeInBytes();
+          segmentLevelMax = Math.max(segmentLevelMax, sizeInfo.getDiskSizeInBytes());
         } else {
           errors++;
         }
       }
       // Update estimated size, track segments that are missing from all servers
-      if (errors != sizeDetails.serverInfo.size()) {
+      if (errors != sizeDetails._serverInfo.size()) {
         // Use max segment size from other servers to estimate the segment size not reported
-        sizeDetails.estimatedSizeInBytes = sizeDetails.reportedSizeInBytes + errors * segmentLevelMax;
-        subTypeSizeDetails.reportedSizeInBytes += sizeDetails.reportedSizeInBytes;
-        subTypeSizeDetails.estimatedSizeInBytes += sizeDetails.estimatedSizeInBytes;
+        sizeDetails._estimatedSizeInBytes = sizeDetails._reportedSizeInBytes + errors * segmentLevelMax;
+        subTypeSizeDetails._reportedSizeInBytes += sizeDetails._reportedSizeInBytes;
+        subTypeSizeDetails._estimatedSizeInBytes += sizeDetails._estimatedSizeInBytes;
       } else {
         // Segment is missing from all servers
         missingSegments.add(segment);
-        sizeDetails.reportedSizeInBytes = -1L;
-        sizeDetails.estimatedSizeInBytes = -1L;
-        subTypeSizeDetails.missingSegments++;
+        sizeDetails._reportedSizeInBytes = -1L;
+        sizeDetails._estimatedSizeInBytes = -1L;
+        subTypeSizeDetails._missingSegments++;
       }
     }
 
     // Update metrics for missing segments
-    if (subTypeSizeDetails.missingSegments > 0) {
+    if (subTypeSizeDetails._missingSegments > 0) {
       int numSegments = segmentToSizeDetailsMap.size();
-      int missingPercent = subTypeSizeDetails.missingSegments * 100 / numSegments;
+      int missingPercent = subTypeSizeDetails._missingSegments * 100 / numSegments;
       _controllerMetrics
           .setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT,
               missingPercent);
-      if (subTypeSizeDetails.missingSegments == numSegments) {
+      if (subTypeSizeDetails._missingSegments == numSegments) {
         LOGGER.warn("Failed to get size report for all {} segments of table: {}", numSegments, tableNameWithType);
-        subTypeSizeDetails.reportedSizeInBytes = -1;
-        subTypeSizeDetails.estimatedSizeInBytes = -1;
+        subTypeSizeDetails._reportedSizeInBytes = -1;
+        subTypeSizeDetails._estimatedSizeInBytes = -1;
       } else {
-        LOGGER.warn("Missing size report for {} out of {} segments for table {}", subTypeSizeDetails.missingSegments,
+        LOGGER.warn("Missing size report for {} out of {} segments for table {}", subTypeSizeDetails._missingSegments,
             numSegments, tableNameWithType);
       }
     } else {

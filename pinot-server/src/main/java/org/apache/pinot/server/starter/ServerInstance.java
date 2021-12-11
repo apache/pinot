@@ -24,10 +24,8 @@ import java.util.Set;
 import java.util.concurrent.atomic.LongAccumulator;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.function.FunctionRegistry;
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
@@ -38,8 +36,11 @@ import org.apache.pinot.core.transport.QueryServer;
 import org.apache.pinot.core.transport.TlsConfig;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.core.util.TlsUtils;
+import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,17 +60,16 @@ public class ServerInstance {
   private final QueryServer _nettyQueryServer;
   private final QueryServer _nettyTlsQueryServer;
   private final GrpcQueryServer _grpcQueryServer;
+  private final AccessControlFactory _accessControlFactory;
 
   private boolean _started = false;
 
-  public ServerInstance(ServerConf serverConf, HelixManager helixManager)
+  public ServerInstance(ServerConf serverConf, HelixManager helixManager, AccessControlFactory accessControlFactory)
       throws Exception {
     LOGGER.info("Initializing server instance");
 
     LOGGER.info("Initializing server metrics");
-    PinotConfiguration metricsConfiguration = serverConf.getMetricsConfig();
-    PinotMetricUtils.init(metricsConfiguration);
-    PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
+    PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry(serverConf.getMetricsConfig());
     _serverMetrics =
         new ServerMetrics(serverConf.getMetricsPrefix(), metricsRegistry, serverConf.emitTableLevelMetrics(),
             serverConf.getAllowedTablesForEmittingMetrics());
@@ -93,7 +93,9 @@ public class ServerInstance {
     _queryScheduler =
         QuerySchedulerFactory.create(serverConf.getSchedulerConfig(), _queryExecutor, _serverMetrics, _latestQueryTime);
 
-    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_TLS_PREFIX);
+    TlsConfig tlsConfig =
+        TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_TLS_PREFIX);
+    _accessControlFactory = accessControlFactory;
 
     if (serverConf.isNettyServerEnabled()) {
       int nettyPort = serverConf.getNettyPort();
@@ -106,7 +108,8 @@ public class ServerInstance {
     if (serverConf.isNettyTlsServerEnabled()) {
       int nettySecPort = serverConf.getNettyTlsPort();
       LOGGER.info("Initializing TLS-secured Netty query server on port: {}", nettySecPort);
-      _nettyTlsQueryServer = new QueryServer(nettySecPort, _queryScheduler, _serverMetrics, tlsConfig);
+      _nettyTlsQueryServer = new QueryServer(nettySecPort, _queryScheduler, _serverMetrics, tlsConfig,
+          _accessControlFactory);
     } else {
       _nettyTlsQueryServer = null;
     }

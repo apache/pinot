@@ -102,7 +102,8 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
     TransformFunction firstArgument = arguments.get(0);
     if (firstArgument instanceof LiteralTransformFunction || !firstArgument.getResultMetadata().isSingleValue()) {
       throw new IllegalArgumentException(
-          "The first argument of DATE_TIME_CONVERT transform function must be a single-valued column or a transform function");
+          "The first argument of DATE_TIME_CONVERT transform function must be a single-valued column or a transform "
+              + "function");
     }
     _mainTransformFunction = firstArgument;
 

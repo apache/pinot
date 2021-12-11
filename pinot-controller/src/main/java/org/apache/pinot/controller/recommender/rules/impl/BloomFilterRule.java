@@ -19,16 +19,15 @@
 package org.apache.pinot.controller.recommender.rules.impl;
 
 import com.google.common.util.concurrent.AtomicDouble;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.controller.recommender.io.ConfigManager;
 import org.apache.pinot.controller.recommender.io.InputManager;
 import org.apache.pinot.controller.recommender.rules.AbstractRule;
 import org.apache.pinot.controller.recommender.rules.io.params.BloomFilterRuleParams;
 import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.predicate.Predicate;
-import org.apache.pinot.core.requesthandler.BrokerRequestOptimizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,10 +37,9 @@ import org.slf4j.LoggerFactory;
  *    The partitioned dimension should be frequently used in the “=”
  *    Skip the no dictionary columns
  */
-public class  BloomFilterRule extends AbstractRule {
-  private final Logger LOGGER = LoggerFactory.getLogger(BloomFilterRule.class);
+public class BloomFilterRule extends AbstractRule {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BloomFilterRule.class);
   private final BloomFilterRuleParams _params;
-  protected final BrokerRequestOptimizer _brokerRequestOptimizer = new BrokerRequestOptimizer();
 
   public BloomFilterRule(InputManager input, ConfigManager output) {
     super(input, output);
@@ -50,8 +48,8 @@ public class  BloomFilterRule extends AbstractRule {
 
   @Override
   public void run() {
-    int numDims = _input.getNumDims();
-    double[] weights = new double[numDims];
+    int numCols = _input.getNumCols();
+    double[] weights = new double[numCols];
     AtomicDouble totalWeight = new AtomicDouble(0);
 
     // For each query, find out the dimensions used in 'EQ'
@@ -67,12 +65,12 @@ public class  BloomFilterRule extends AbstractRule {
     });
     LOGGER.debug("Weight: {}, Total {}", weights, totalWeight);
 
-    for (int i = 0; i < numDims; i++) {
+    for (int i = 0; i < numCols; i++) {
       String dimName = _input.intToColName(i);
-      if (((weights[i] / totalWeight.get()) > _params.THRESHOLD_MIN_PERCENT_EQ_BLOOMFILTER)
+      if (((weights[i] / totalWeight.get()) > _params._thresholdMinPercentEqBloomfilter)
           //The partitioned dimension should be frequently > P used
           && (_input.getCardinality(dimName)
-          < _params.THRESHOLD_MAX_CARDINALITY_BLOOMFILTER)) { //The Cardinality < C (1 million for 1MB size)
+          < _params._thresholdMaxCardinalityBloomfilter)) { //The Cardinality < C (1 million for 1MB size)
         _output.getIndexConfig().getBloomFilterColumns().add(dimName);
       }
     }
@@ -88,13 +86,14 @@ public class  BloomFilterRule extends AbstractRule {
   }
 
   /**
-   * TODO: The partitioned dimension should used in the “=” （IN, NOT IN, != are not using bloom filter in Pinot for now) filter.
+   * TODO: The partitioned dimension should used in the “=” （IN, NOT IN, != are not using bloom filter in Pinot for
+   * now) filter.
    * @param filterContext filterContext
    * @return dimension used in eq in this query
    */
   private FixedLenBitset parsePredicateList(FilterContext filterContext) {
     FilterContext.Type type = filterContext.getType();
-    FixedLenBitset ret = MUTABLE_EMPTY_SET();
+    FixedLenBitset ret = mutableEmptySet();
     if (type == FilterContext.Type.AND) {
       for (int i = 0; i < filterContext.getChildren().size(); i++) {
         FixedLenBitset childResult = parsePredicateList(filterContext.getChildren().get(i));
@@ -110,18 +109,15 @@ public class  BloomFilterRule extends AbstractRule {
       String colName = lhs.toString();
       if (lhs.getType() == ExpressionContext.Type.FUNCTION) {
         LOGGER.trace("Skipping the function {}", colName);
-      } else if (_input.isPrimaryDateTime(colName)) {
-        LOGGER.trace("Skipping the DateTime column {}", colName);
-      } else if (!_input.isDim(colName)) {
-        LOGGER.error("Error: Column {} should not appear in filter", colName);
-      } else if (filterContext.getPredicate().getType() == Predicate.Type.EQ) {
+      } else if (filterContext.getPredicate().getType() == Predicate.Type.EQ
+          || filterContext.getPredicate().getType() == Predicate.Type.IN) {
         ret.add(_input.colNameToInt(colName));
       }
     }
     return ret;
   }
 
-  private FixedLenBitset MUTABLE_EMPTY_SET() {
-    return new FixedLenBitset(_input.getNumDims());
+  private FixedLenBitset mutableEmptySet() {
+    return new FixedLenBitset(_input.getNumCols());
   }
 }

@@ -21,17 +21,16 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import org.apache.pinot.spi.config.BaseJsonConfig;
-
 import java.util.Map;
+import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
 public class TableTaskConfig extends BaseJsonConfig {
   private final Map<String, Map<String, String>> _taskTypeConfigsMap;
 
   @JsonCreator
-  public TableTaskConfig(
-      @JsonProperty(value = "taskTypeConfigsMap", required = true) Map<String, Map<String, String>> taskTypeConfigsMap) {
+  public TableTaskConfig(@JsonProperty(value = "taskTypeConfigsMap", required = true)
+      Map<String, Map<String, String>> taskTypeConfigsMap) {
     Preconditions.checkArgument(taskTypeConfigsMap != null, "'taskTypeConfigsMap' must be configured");
     _taskTypeConfigsMap = taskTypeConfigsMap;
   }

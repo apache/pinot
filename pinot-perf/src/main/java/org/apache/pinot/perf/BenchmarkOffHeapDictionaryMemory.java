@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.perf;
 
-import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
-import org.apache.pinot.core.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
-import org.apache.pinot.core.realtime.impl.dictionary.LongOffHeapMutableDictionary;
+import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
+import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.segment.local.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
+import org.apache.pinot.segment.local.realtime.impl.dictionary.LongOffHeapMutableDictionary;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.TearDown;
 

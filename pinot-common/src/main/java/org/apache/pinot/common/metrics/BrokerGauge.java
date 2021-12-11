@@ -33,24 +33,24 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   REQUEST_SIZE("requestSize", false),
   RESIZE_TIME_MS("milliseconds", false);
 
-  private final String brokerGaugeName;
-  private final String unit;
-  private final boolean global;
+  private final String _brokerGaugeName;
+  private final String _unit;
+  private final boolean _global;
 
   BrokerGauge(String unit, boolean global) {
-    this.unit = unit;
-    this.global = global;
-    this.brokerGaugeName = Utils.toCamelCase(name().toLowerCase());
+    _unit = unit;
+    _global = global;
+    _brokerGaugeName = Utils.toCamelCase(name().toLowerCase());
   }
 
   @Override
   public String getGaugeName() {
-    return brokerGaugeName;
+    return _brokerGaugeName;
   }
 
   @Override
   public String getUnit() {
-    return unit;
+    return _unit;
   }
 
   /**
@@ -60,6 +60,6 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
    */
   @Override
   public boolean isGlobal() {
-    return global;
+    return _global;
   }
 }

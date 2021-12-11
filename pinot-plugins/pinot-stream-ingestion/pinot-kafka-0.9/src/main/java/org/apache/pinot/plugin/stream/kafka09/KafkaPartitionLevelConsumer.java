@@ -35,7 +35,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Implementation of PartitionLevelConsumer using Kafka's SimpleConsumer which ensures that we're connected to the appropriate broker for consumption.
+ * Implementation of PartitionLevelConsumer using Kafka's SimpleConsumer which ensures that we're connected to the
+ * appropriate broker for consumption.
  */
 public class KafkaPartitionLevelConsumer extends KafkaConnectionHandler implements PartitionLevelConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionLevelConsumer.class);

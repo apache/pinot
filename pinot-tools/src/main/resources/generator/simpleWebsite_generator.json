@@ -16,7 +16,15 @@
       "trend": 0.0005,
       "wavelength": 24,
       "amplitude": 65,
-      "scalingFactors": [ 0.4, 0.9, 1.0, 1.0, 1.0, 0.8, 0.4 ]
+      "scalingFactors": [
+        0.4,
+        0.9,
+        1.0,
+        1.0,
+        1.0,
+        0.8,
+        0.4
+      ]
     }
   },
   {
@@ -28,7 +36,15 @@
       "trend": 0.0001,
       "wavelength": 24,
       "amplitude": 15,
-      "scalingFactors": [ 0.4, 0.9, 1.0, 1.0, 1.0, 0.8, 0.4 ]
+      "scalingFactors": [
+        0.4,
+        0.9,
+        1.0,
+        1.0,
+        1.0,
+        0.8,
+        0.4
+      ]
     }
   },
   {

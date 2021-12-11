@@ -1,0 +1,64 @@
+{
+  "schema":{
+    "schemaName": "tableSchema",
+    "dimensionFieldSpecs": [
+      {
+        "name": "b",
+        "dataType": "DOUBLE",
+        "cardinality":6,
+        "singleValueField": false,
+        "numValuesPerEntry":1.5
+      },
+      {
+        "name": "c",
+        "dataType": "FLOAT",
+        "cardinality":7,
+        "numValuesPerEntry":1
+      },
+      {
+        "name": "d",
+        "dataType": "STRING",
+        "cardinality": 41,
+        "singleValueField": false,
+        "numValuesPerEntry": 2,
+        "averageLength": 27
+      }
+    ],
+    "metricFieldSpecs": [
+      {
+        "name": "p",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":1
+      }
+    ],
+    "dateTimeFieldSpecs": [
+      {
+        "name": "x",
+        "dataType": "INT",
+        "format": "1:DAYS:EPOCH",
+        "granularity": "1:DAYS",
+        "cardinality": 3
+      }
+    ],
+    "timeFieldSpec": {
+      "incomingGranularitySpec": {
+        "dataType": "INT",
+        "name": "t",
+        "cardinality": 1,
+        "timeType": "DAYS",
+        "numValuesPerEntry":1
+      }
+    }
+  },
+  "queriesWithWeights":{
+    "select d from tableName where (x=0 and b=1) or t=16": 3.5,
+    "select d from tableName where (x=12 and p=4) ": 3,
+    "select d from tableName where (t=7 and b=12) ": 1.5
+  },
+  "qps": 250,
+  "numMessagesPerSecInKafkaTopic":1000,
+  "numRecordsPerPush":1000000000,
+  "tableType": "HYBRID",
+  "latencySLA": 500
+}

@@ -19,9 +19,7 @@
 package org.apache.pinot.client.base;
 
 import java.sql.ResultSetMetaData;
-import java.sql.SQLData;
 import java.sql.SQLException;
-import java.sql.Types;
 import org.apache.pinot.client.utils.Constants;
 
 

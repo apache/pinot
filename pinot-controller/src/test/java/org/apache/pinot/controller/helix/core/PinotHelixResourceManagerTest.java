@@ -47,9 +47,7 @@ import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.ControllerTestUtils;
@@ -60,6 +58,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -68,8 +67,11 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.utils.CommonConstants.Helix.*;
-import static org.apache.pinot.common.utils.CommonConstants.Server.*;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
 
 
 public class PinotHelixResourceManagerTest {
@@ -90,7 +92,8 @@ public class PinotHelixResourceManagerTest {
   private static final long TIMEOUT_IN_MS = 10_000L;
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     ControllerTestUtils.setupClusterAndValidate();
 
     // Create server tenant on all Servers
@@ -102,9 +105,12 @@ public class PinotHelixResourceManagerTest {
   }
 
   @Test
-  public void testGetInstanceEndpoints() throws InvalidConfigException {
-    Set<String> servers = ControllerTestUtils.getHelixResourceManager().getAllInstancesForServerTenant(SERVER_TENANT_NAME);
-    BiMap<String, String> endpoints = ControllerTestUtils.getHelixResourceManager().getDataInstanceAdminEndpoints(servers);
+  public void testGetInstanceEndpoints()
+      throws InvalidConfigException {
+    Set<String> servers =
+        ControllerTestUtils.getHelixResourceManager().getAllInstancesForServerTenant(SERVER_TENANT_NAME);
+    BiMap<String, String> endpoints =
+        ControllerTestUtils.getHelixResourceManager().getDataInstanceAdminEndpoints(servers);
 
     // check that we have endpoints for all instances.
     Assert.assertEquals(endpoints.size(), NUM_INSTANCES);
@@ -117,17 +123,21 @@ public class PinotHelixResourceManagerTest {
   }
 
   @Test
-  public void testGetInstanceConfigs() throws Exception {
-    Set<String> servers = ControllerTestUtils.getHelixResourceManager().getAllInstancesForServerTenant(SERVER_TENANT_NAME);
+  public void testGetInstanceConfigs()
+      throws Exception {
+    Set<String> servers =
+        ControllerTestUtils.getHelixResourceManager().getAllInstancesForServerTenant(SERVER_TENANT_NAME);
     for (String server : servers) {
-      InstanceConfig cachedInstanceConfig = ControllerTestUtils.getHelixResourceManager().getHelixInstanceConfig(server);
-      InstanceConfig realInstanceConfig = ControllerTestUtils
-          .getHelixAdmin().getInstanceConfig(ControllerTestUtils.getHelixClusterName(), server);
+      InstanceConfig cachedInstanceConfig =
+          ControllerTestUtils.getHelixResourceManager().getHelixInstanceConfig(server);
+      InstanceConfig realInstanceConfig =
+          ControllerTestUtils.getHelixAdmin().getInstanceConfig(ControllerTestUtils.getHelixClusterName(), server);
       Assert.assertEquals(cachedInstanceConfig, realInstanceConfig);
     }
 
-    ZkClient zkClient = new ZkClient(ControllerTestUtils.getHelixResourceManager().getHelixZkURL(), CONNECTION_TIMEOUT_IN_MILLISECOND,
-        CONNECTION_TIMEOUT_IN_MILLISECOND, new ZNRecordSerializer());
+    ZkClient zkClient =
+        new ZkClient(ControllerTestUtils.getHelixResourceManager().getHelixZkURL(), CONNECTION_TIMEOUT_IN_MILLISECOND,
+            CONNECTION_TIMEOUT_IN_MILLISECOND, new ZNRecordSerializer());
 
     modifyExistingInstanceConfig(zkClient);
     addAndRemoveNewInstanceConfig(zkClient);
@@ -135,13 +145,16 @@ public class PinotHelixResourceManagerTest {
     zkClient.close();
   }
 
-  private void modifyExistingInstanceConfig(ZkClient zkClient) throws InterruptedException {
+  private void modifyExistingInstanceConfig(ZkClient zkClient)
+      throws InterruptedException {
     String instanceName = "Server_localhost_" + new Random().nextInt(NUM_INSTANCES);
-    String instanceConfigPath = PropertyPathBuilder.instanceConfig(ControllerTestUtils.getHelixClusterName(), instanceName);
+    String instanceConfigPath =
+        PropertyPathBuilder.instanceConfig(ControllerTestUtils.getHelixClusterName(), instanceName);
     Assert.assertTrue(zkClient.exists(instanceConfigPath));
     ZNRecord znRecord = zkClient.readData(instanceConfigPath, null);
 
-    InstanceConfig cachedInstanceConfig = ControllerTestUtils.getHelixResourceManager().getHelixInstanceConfig(instanceName);
+    InstanceConfig cachedInstanceConfig =
+        ControllerTestUtils.getHelixResourceManager().getHelixInstanceConfig(instanceName);
     String originalPort = cachedInstanceConfig.getPort();
     Assert.assertNotNull(originalPort);
     String newPort = Long.toString(System.currentTimeMillis());
@@ -152,7 +165,8 @@ public class PinotHelixResourceManagerTest {
     zkClient.writeData(instanceConfigPath, znRecord);
 
     long maxTime = System.currentTimeMillis() + MAX_TIMEOUT_IN_MILLISECOND;
-    InstanceConfig latestCachedInstanceConfig = ControllerTestUtils.getHelixResourceManager().getHelixInstanceConfig(instanceName);
+    InstanceConfig latestCachedInstanceConfig =
+        ControllerTestUtils.getHelixResourceManager().getHelixInstanceConfig(instanceName);
     String latestPort = latestCachedInstanceConfig.getPort();
     while (!newPort.equals(latestPort) && System.currentTimeMillis() < maxTime) {
       Thread.sleep(100L);
@@ -167,10 +181,11 @@ public class PinotHelixResourceManagerTest {
   }
 
   private void addAndRemoveNewInstanceConfig(ZkClient zkClient) {
-    int biggerRandomNumber = ControllerTestUtils.TOTAL_NUM_SERVER_INSTANCES + new Random().nextInt(
-        ControllerTestUtils.TOTAL_NUM_SERVER_INSTANCES);
+    int biggerRandomNumber = ControllerTestUtils.TOTAL_NUM_SERVER_INSTANCES + new Random()
+        .nextInt(ControllerTestUtils.TOTAL_NUM_SERVER_INSTANCES);
     String instanceName = "Server_localhost_" + biggerRandomNumber;
-    String instanceConfigPath = PropertyPathBuilder.instanceConfig(ControllerTestUtils.getHelixClusterName(), instanceName);
+    String instanceConfigPath =
+        PropertyPathBuilder.instanceConfig(ControllerTestUtils.getHelixClusterName(), instanceName);
     Assert.assertFalse(zkClient.exists(instanceConfigPath));
     List<String> instances = ControllerTestUtils.getHelixResourceManager().getAllInstances();
     Assert.assertFalse(instances.contains(instanceName));
@@ -191,34 +206,35 @@ public class PinotHelixResourceManagerTest {
   }
 
   @Test
-  public void testRebuildBrokerResourceFromHelixTags() throws Exception {
+  public void testRebuildBrokerResourceFromHelixTags()
+      throws Exception {
     // Create broker tenant
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, NUM_INSTANCES, 0, 0);
-    PinotResourceManagerResponse response = ControllerTestUtils.getHelixResourceManager().createBrokerTenant(brokerTenant);
+    PinotResourceManagerResponse response =
+        ControllerTestUtils.getHelixResourceManager().createBrokerTenant(brokerTenant);
     Assert.assertTrue(response.isSuccessful());
 
     // Create the table
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setNumReplicas(ControllerTestUtils.MIN_NUM_REPLICAS)
-        .setBrokerTenant(BROKER_TENANT_NAME)
-        .setServerTenant(SERVER_TENANT_NAME)
-        .build();
+        .setNumReplicas(ControllerTestUtils.MIN_NUM_REPLICAS).setBrokerTenant(BROKER_TENANT_NAME)
+        .setServerTenant(SERVER_TENANT_NAME).build();
     ControllerTestUtils.getHelixResourceManager().addTable(tableConfig);
 
     IdealState idealState = ControllerTestUtils.getHelixResourceManager().getHelixAdmin()
-        .getResourceIdealState(ControllerTestUtils.getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+        .getResourceIdealState(ControllerTestUtils.getHelixClusterName(),
+            CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
 
     // Untag all Brokers assigned to broker tenant
     untagBrokers();
 
-    Assert.assertEquals(ControllerTestUtils.getHelixResourceManager().getOnlineUnTaggedBrokerInstanceList().size(), ControllerTestUtils.NUM_BROKER_INSTANCES);
+    Assert.assertEquals(ControllerTestUtils.getHelixResourceManager().getOnlineUnTaggedBrokerInstanceList().size(),
+        ControllerTestUtils.NUM_BROKER_INSTANCES);
 
     // Rebuilding the broker tenant should update the ideal state size
     response = ControllerTestUtils.getHelixResourceManager().rebuildBrokerResourceFromHelixTags(OFFLINE_TABLE_NAME);
     Assert.assertTrue(response.isSuccessful());
-    idealState =
-        ControllerTestUtils
-            .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    idealState = ControllerTestUtils.getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(),
+        CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     Assert.assertEquals(idealState.getInstanceStateMap(OFFLINE_TABLE_NAME).size(), 0);
 
     // Create broker tenant on Brokers
@@ -229,46 +245,47 @@ public class PinotHelixResourceManagerTest {
     // Rebuilding the broker tenant should update the ideal state size
     response = ControllerTestUtils.getHelixResourceManager().rebuildBrokerResourceFromHelixTags(OFFLINE_TABLE_NAME);
     Assert.assertTrue(response.isSuccessful());
-    idealState =
-        ControllerTestUtils
-            .getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-    Assert.assertEquals(idealState.getInstanceStateMap(OFFLINE_TABLE_NAME).size(), ControllerTestUtils.NUM_BROKER_INSTANCES);
+    idealState = ControllerTestUtils.getHelixAdmin().getResourceIdealState(ControllerTestUtils.getHelixClusterName(),
+        CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    Assert.assertEquals(idealState.getInstanceStateMap(OFFLINE_TABLE_NAME).size(),
+        ControllerTestUtils.NUM_BROKER_INSTANCES);
 
     // Delete the table
     ControllerTestUtils.getHelixResourceManager().deleteOfflineTable(TABLE_NAME);
 
     // Untag the brokers
     untagBrokers();
-    Assert.assertEquals(ControllerTestUtils.getHelixResourceManager().getOnlineUnTaggedBrokerInstanceList().size(), ControllerTestUtils.NUM_BROKER_INSTANCES);
+    Assert.assertEquals(ControllerTestUtils.getHelixResourceManager().getOnlineUnTaggedBrokerInstanceList().size(),
+        ControllerTestUtils.NUM_BROKER_INSTANCES);
   }
 
   @Test
-  public void testRetrieveMetadata() {
+  public void testRetrieveSegmentZKMetadata() {
     String segmentName = "testSegment";
 
     // Test retrieving OFFLINE segment ZK metadata
     {
-      OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
-      offlineSegmentZKMetadata.setSegmentName(segmentName);
-      ZKMetadataProvider.setOfflineSegmentZKMetadata(ControllerTestUtils.getPropertyStore(), OFFLINE_TABLE_NAME, offlineSegmentZKMetadata);
-      List<OfflineSegmentZKMetadata> retrievedMetadataList =
-          ControllerTestUtils.getHelixResourceManager().getOfflineSegmentMetadata(OFFLINE_TABLE_NAME);
-      Assert.assertEquals(retrievedMetadataList.size(), 1);
-      OfflineSegmentZKMetadata retrievedMetadata = retrievedMetadataList.get(0);
-      Assert.assertEquals(retrievedMetadata.getSegmentName(), segmentName);
+      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
+      ZKMetadataProvider
+          .setSegmentZKMetadata(ControllerTestUtils.getPropertyStore(), OFFLINE_TABLE_NAME, segmentZKMetadata);
+      List<SegmentZKMetadata> retrievedSegmentsZKMetadata =
+          ControllerTestUtils.getHelixResourceManager().getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
+      Assert.assertEquals(retrievedSegmentsZKMetadata.size(), 1);
+      SegmentZKMetadata retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
+      Assert.assertEquals(retrievedSegmentZKMetadata.getSegmentName(), segmentName);
     }
 
     // Test retrieving REALTIME segment ZK metadata
     {
-      RealtimeSegmentZKMetadata realtimeMetadata = new RealtimeSegmentZKMetadata();
-      realtimeMetadata.setSegmentName(segmentName);
+      SegmentZKMetadata realtimeMetadata = new SegmentZKMetadata(segmentName);
       realtimeMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
-      ZKMetadataProvider.setRealtimeSegmentZKMetadata(ControllerTestUtils.getPropertyStore(), REALTIME_TABLE_NAME, realtimeMetadata);
-      List<RealtimeSegmentZKMetadata> retrievedMetadataList =
-          ControllerTestUtils.getHelixResourceManager().getRealtimeSegmentMetadata(REALTIME_TABLE_NAME);
-      Assert.assertEquals(retrievedMetadataList.size(), 1);
-      RealtimeSegmentZKMetadata retrievedMetadata = retrievedMetadataList.get(0);
-      Assert.assertEquals(retrievedMetadata.getSegmentName(), segmentName);
+      ZKMetadataProvider
+          .setSegmentZKMetadata(ControllerTestUtils.getPropertyStore(), REALTIME_TABLE_NAME, realtimeMetadata);
+      List<SegmentZKMetadata> retrievedSegmentsZKMetadata =
+          ControllerTestUtils.getHelixResourceManager().getSegmentsZKMetadata(REALTIME_TABLE_NAME);
+      Assert.assertEquals(retrievedSegmentsZKMetadata.size(), 1);
+      SegmentZKMetadata retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
+      Assert.assertEquals(retrievedSegmentZKMetadata.getSegmentName(), segmentName);
       Assert.assertEquals(realtimeMetadata.getStatus(), CommonConstants.Segment.Realtime.Status.DONE);
     }
   }
@@ -277,7 +294,8 @@ public class PinotHelixResourceManagerTest {
   void testRetrieveTenantNames() {
     // Create broker tenant on 1 Broker
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 1, 0, 0);
-    PinotResourceManagerResponse response = ControllerTestUtils.getHelixResourceManager().createBrokerTenant(brokerTenant);
+    PinotResourceManagerResponse response =
+        ControllerTestUtils.getHelixResourceManager().createBrokerTenant(brokerTenant);
     Assert.assertTrue(response.isSuccessful());
 
     Set<String> brokerTenantNames = ControllerTestUtils.getHelixResourceManager().getAllBrokerTenantNames();
@@ -286,16 +304,17 @@ public class PinotHelixResourceManagerTest {
     Assert.assertTrue(brokerTenantNames.contains(BROKER_TENANT_NAME));
 
     String testBrokerInstance =
-        ControllerTestUtils.getHelixResourceManager().getAllInstancesForBrokerTenant(BROKER_TENANT_NAME).iterator().next();
-    ControllerTestUtils
-        .getHelixAdmin().addInstanceTag(ControllerTestUtils.getHelixClusterName(), testBrokerInstance, "wrong_tag");
+        ControllerTestUtils.getHelixResourceManager().getAllInstancesForBrokerTenant(BROKER_TENANT_NAME).iterator()
+            .next();
+    ControllerTestUtils.getHelixAdmin()
+        .addInstanceTag(ControllerTestUtils.getHelixClusterName(), testBrokerInstance, "wrong_tag");
 
     brokerTenantNames = ControllerTestUtils.getHelixResourceManager().getAllBrokerTenantNames();
     Assert.assertEquals(brokerTenantNames.size(), 2);
     Assert.assertTrue(brokerTenantNames.contains(BROKER_TENANT_NAME));
 
-    ControllerTestUtils
-        .getHelixAdmin().removeInstanceTag(ControllerTestUtils.getHelixClusterName(), testBrokerInstance, "wrong_tag");
+    ControllerTestUtils.getHelixAdmin()
+        .removeInstanceTag(ControllerTestUtils.getHelixClusterName(), testBrokerInstance, "wrong_tag");
 
     // Server tenant is already created during setup.
     Set<String> serverTenantNames = ControllerTestUtils.getHelixResourceManager().getAllServerTenantNames();
@@ -304,25 +323,28 @@ public class PinotHelixResourceManagerTest {
     Assert.assertTrue(serverTenantNames.contains(SERVER_TENANT_NAME));
 
     String testServerInstance =
-        ControllerTestUtils.getHelixResourceManager().getAllInstancesForServerTenant(SERVER_TENANT_NAME).iterator().next();
-    ControllerTestUtils
-        .getHelixAdmin().addInstanceTag(ControllerTestUtils.getHelixClusterName(), testServerInstance, "wrong_tag");
+        ControllerTestUtils.getHelixResourceManager().getAllInstancesForServerTenant(SERVER_TENANT_NAME).iterator()
+            .next();
+    ControllerTestUtils.getHelixAdmin()
+        .addInstanceTag(ControllerTestUtils.getHelixClusterName(), testServerInstance, "wrong_tag");
 
     serverTenantNames = ControllerTestUtils.getHelixResourceManager().getAllServerTenantNames();
     Assert.assertEquals(serverTenantNames.size(), 2);
     Assert.assertTrue(serverTenantNames.contains(SERVER_TENANT_NAME));
 
-    ControllerTestUtils
-        .getHelixAdmin().removeInstanceTag(ControllerTestUtils.getHelixClusterName(), testServerInstance, "wrong_tag");
+    ControllerTestUtils.getHelixAdmin()
+        .removeInstanceTag(ControllerTestUtils.getHelixClusterName(), testServerInstance, "wrong_tag");
 
     untagBrokers();
-    Assert.assertEquals(ControllerTestUtils.getHelixResourceManager().getOnlineUnTaggedBrokerInstanceList().size(), ControllerTestUtils.NUM_BROKER_INSTANCES);
+    Assert.assertEquals(ControllerTestUtils.getHelixResourceManager().getOnlineUnTaggedBrokerInstanceList().size(),
+        ControllerTestUtils.NUM_BROKER_INSTANCES);
   }
 
   @Test
   public void testLeadControllerResource() {
     IdealState leadControllerResourceIdealState = ControllerTestUtils.getHelixResourceManager().getHelixAdmin()
-        .getResourceIdealState(ControllerTestUtils.getHelixClusterName(), CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+        .getResourceIdealState(ControllerTestUtils.getHelixClusterName(),
+            CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
     Assert.assertTrue(leadControllerResourceIdealState.isValid());
     Assert.assertTrue(leadControllerResourceIdealState.isEnabled());
     Assert.assertEquals(leadControllerResourceIdealState.getInstanceGroupTag(),
@@ -332,18 +354,19 @@ public class PinotHelixResourceManagerTest {
     Assert.assertEquals(leadControllerResourceIdealState.getReplicas(),
         Integer.toString(LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT));
     Assert.assertEquals(leadControllerResourceIdealState.getRebalanceMode(), IdealState.RebalanceMode.FULL_AUTO);
-    Assert.assertTrue(leadControllerResourceIdealState.getInstanceSet(
-        leadControllerResourceIdealState.getPartitionSet().iterator().next()).isEmpty());
+    Assert.assertTrue(leadControllerResourceIdealState
+        .getInstanceSet(leadControllerResourceIdealState.getPartitionSet().iterator().next()).isEmpty());
 
     TestUtils.waitForCondition(aVoid -> {
       ExternalView leadControllerResourceExternalView = ControllerTestUtils.getHelixResourceManager().getHelixAdmin()
-          .getResourceExternalView(ControllerTestUtils.getHelixClusterName(), CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+          .getResourceExternalView(ControllerTestUtils.getHelixClusterName(),
+              CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
       for (String partition : leadControllerResourceExternalView.getPartitionSet()) {
         Map<String, String> stateMap = leadControllerResourceExternalView.getStateMap(partition);
         Map.Entry<String, String> entry = stateMap.entrySet().iterator().next();
-        boolean result =
-            (LeadControllerUtils.generateParticipantInstanceId(
-                ControllerTestUtils.LOCAL_HOST, ControllerTestUtils.getControllerPort())).equals(entry.getKey());
+        boolean result = (LeadControllerUtils
+            .generateParticipantInstanceId(ControllerTestUtils.LOCAL_HOST, ControllerTestUtils.getControllerPort()))
+            .equals(entry.getKey());
         result &= MasterSlaveSMD.States.MASTER.name().equals(entry.getValue());
         if (!result) {
           return false;
@@ -388,13 +411,12 @@ public class PinotHelixResourceManagerTest {
         String instanceName = instanceNames.get(i);
         int port = ports.get(i);
         instanceConfigMap.put(instanceName, new InstanceConfig(instanceName
-            + ", {HELIX_ENABLED=true, HELIX_ENABLED_TIMESTAMP=1559546216610, HELIX_HOST=Controller_localhost, HELIX_PORT="
-            + port + "}{}{TAG_LIST=[controller]}"));
+            + ", {HELIX_ENABLED=true, HELIX_ENABLED_TIMESTAMP=1559546216610, HELIX_HOST=Controller_localhost, "
+            + "HELIX_PORT=" + port + "}{}{TAG_LIST=[controller]}"));
       }
       clusterDataCache.setInstanceConfigMap(instanceConfigMap);
-      ZNRecord znRecord =
-          crushEdRebalanceStrategy.computePartitionAssignment(instanceNames, instanceNames, new HashMap<>(0),
-              clusterDataCache);
+      ZNRecord znRecord = crushEdRebalanceStrategy
+          .computePartitionAssignment(instanceNames, instanceNames, new HashMap<>(0), clusterDataCache);
 
       Assert.assertNotNull(znRecord);
       Map<String, List<String>> listFields = znRecord.getListFields();
@@ -407,8 +429,8 @@ public class PinotHelixResourceManagerTest {
         if (!instanceToMasterAssignmentCountMap.containsKey(assignments.get(0))) {
           instanceToMasterAssignmentCountMap.put(assignments.get(0), 1);
         } else {
-          instanceToMasterAssignmentCountMap.put(assignments.get(0),
-              instanceToMasterAssignmentCountMap.get(assignments.get(0)) + 1);
+          instanceToMasterAssignmentCountMap
+              .put(assignments.get(0), instanceToMasterAssignmentCountMap.get(assignments.get(0)) + 1);
         }
         maxCount = Math.max(instanceToMasterAssignmentCountMap.get(assignments.get(0)), maxCount);
       }
@@ -421,19 +443,18 @@ public class PinotHelixResourceManagerTest {
   }
 
   @Test
-  public void testSegmentReplacement() throws IOException {
+  public void testSegmentReplacement()
+      throws IOException {
     // Create broker tenant on 1 Brokers
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 1, 0, 0);
-    PinotResourceManagerResponse response = ControllerTestUtils.getHelixResourceManager().createBrokerTenant(brokerTenant);
+    PinotResourceManagerResponse response =
+        ControllerTestUtils.getHelixResourceManager().createBrokerTenant(brokerTenant);
     Assert.assertTrue(response.isSuccessful());
 
     // Create the table
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME)
-            .setNumReplicas(2)
-            .setBrokerTenant(BROKER_TENANT_NAME)
-            .setServerTenant(SERVER_TENANT_NAME)
-            .build();
+            .setNumReplicas(2).setBrokerTenant(BROKER_TENANT_NAME).setServerTenant(SERVER_TENANT_NAME).build();
 
     ControllerTestUtils.getHelixResourceManager().addTable(tableConfig);
 
@@ -442,18 +463,17 @@ public class PinotHelixResourceManagerTest {
           SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "s" + i),
           "downloadUrl");
     }
-    List<String> segmentsForTable = ControllerTestUtils.getHelixResourceManager().getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
+    List<String> segmentsForTable =
+        ControllerTestUtils.getHelixResourceManager().getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
     Assert.assertEquals(segmentsForTable.size(), 5);
 
     List<String> segmentsFrom = new ArrayList<>();
     List<String> segmentsTo = Arrays.asList("s5", "s6");
 
-    String lineageEntryId =
-        ControllerTestUtils
-            .getHelixResourceManager().startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom,
-            segmentsTo);
-    SegmentLineage segmentLineage =
-        SegmentLineageAccessHelper.getSegmentLineage(ControllerTestUtils.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
+    String lineageEntryId = ControllerTestUtils.getHelixResourceManager()
+        .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo, false);
+    SegmentLineage segmentLineage = SegmentLineageAccessHelper
+        .getSegmentLineage(ControllerTestUtils.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
     Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 1);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getSegmentsFrom(), new ArrayList<>());
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getSegmentsTo(), segmentsTo);
@@ -463,49 +483,25 @@ public class PinotHelixResourceManagerTest {
     segmentsFrom = Arrays.asList("s1", "s2");
     segmentsTo = Arrays.asList("s3", "s4");
     try {
-      ControllerTestUtils
-          .getHelixResourceManager().startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom,
-          segmentsTo);
+      ControllerTestUtils.getHelixResourceManager()
+          .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo, false);
     } catch (Exception e) {
       // expected
     }
     segmentsFrom = Arrays.asList("s1", "s2");
     segmentsTo = Arrays.asList("s2");
     try {
-      ControllerTestUtils
-          .getHelixResourceManager().startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom,
-          segmentsTo);
+      ControllerTestUtils.getHelixResourceManager()
+          .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo, false);
     } catch (Exception e) {
       // expected
     }
 
     // Check invalid segmentsFrom
     segmentsFrom = Arrays.asList("s1", "s6");
-    segmentsTo = Arrays.asList("merged1", "merged2");
     try {
-      ControllerTestUtils
-          .getHelixResourceManager().startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom,
-          segmentsTo);
-    } catch (Exception e) {
-      // expected
-    }
-
-    segmentsFrom = Arrays.asList("s1", "s2");
-    String lineageEntryId2 =
-        ControllerTestUtils
-            .getHelixResourceManager().startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom,
-            segmentsTo);
-    segmentLineage =
-        SegmentLineageAccessHelper.getSegmentLineage(ControllerTestUtils.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
-    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 2);
-    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getSegmentsFrom(), segmentsFrom);
-    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getSegmentsTo(), segmentsTo);
-    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getState(), LineageEntryState.IN_PROGRESS);
-
-    try {
-      ControllerTestUtils
-          .getHelixResourceManager().startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom,
-          segmentsTo);
+      ControllerTestUtils.getHelixResourceManager()
+          .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo, false);
     } catch (Exception e) {
       // expected
     }
@@ -526,8 +522,8 @@ public class PinotHelixResourceManagerTest {
 
     // Merged segment not available in the table
     try {
-      ControllerTestUtils
-          .getHelixResourceManager().endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, lineageEntryId);
+      ControllerTestUtils.getHelixResourceManager()
+          .endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, lineageEntryId);
     } catch (Exception e) {
       // expected
     }
@@ -538,35 +534,169 @@ public class PinotHelixResourceManagerTest {
     ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME,
         SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "s6"), "downloadUrl");
 
-    ControllerTestUtils
-        .getHelixResourceManager().endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, lineageEntryId);
-    segmentLineage =
-        SegmentLineageAccessHelper.getSegmentLineage(ControllerTestUtils.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
-    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 2);
+    ControllerTestUtils.getHelixResourceManager()
+        .endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, lineageEntryId);
+    segmentLineage = SegmentLineageAccessHelper
+        .getSegmentLineage(ControllerTestUtils.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
+    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 1);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getSegmentsFrom(), new ArrayList<>());
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getSegmentsTo(), Arrays.asList("s5", "s6"));
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getState(), LineageEntryState.COMPLETED);
 
-    ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "merged1"),
-        "downloadUrl");
-    ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "merged2"),
-        "downloadUrl");
-
-    ControllerTestUtils
-        .getHelixResourceManager().endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, lineageEntryId2);
-    segmentLineage =
-        SegmentLineageAccessHelper.getSegmentLineage(ControllerTestUtils.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
+    // Start the new segment replacement
+    segmentsFrom = Arrays.asList("s1", "s2");
+    segmentsTo = Arrays.asList("merged_t1_0", "merged_t1_1");
+    String lineageEntryId2 = ControllerTestUtils.getHelixResourceManager()
+        .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo, false);
+    segmentLineage = SegmentLineageAccessHelper
+        .getSegmentLineage(ControllerTestUtils.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
     Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 2);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getSegmentsFrom(), Arrays.asList("s1", "s2"));
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getSegmentsTo(),
-        Arrays.asList("merged1", "merged2"));
-    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getState(), LineageEntryState.COMPLETED);
+        Arrays.asList("merged_t1_0", "merged_t1_1"));
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getState(), LineageEntryState.IN_PROGRESS);
+
+    // Upload partial data
+    ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "merged_t1_0"),
+        "downloadUrl");
+
+    IdealState idealState =
+        ControllerTestUtils.getHelixResourceManager().getTableIdealState(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
+    Assert.assertTrue(!idealState.getInstanceSet("merged_t1_0").isEmpty());
+
+    // Try to revert the entry with partial data uploaded without forceRevert
+    try {
+      ControllerTestUtils.getHelixResourceManager()
+          .revertReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, lineageEntryId2, false);
+    } catch (Exception e) {
+      // expected
+    }
+
+    // Try to revert the entry with partial data uploaded with forceRevert
+    ControllerTestUtils.getHelixResourceManager()
+        .revertReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, lineageEntryId2, true);
+    segmentLineage = SegmentLineageAccessHelper
+        .getSegmentLineage(ControllerTestUtils.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getState(), LineageEntryState.REVERTED);
+
+    // 'merged_t1_0' segment should be proactively cleaned up
+    idealState =
+        ControllerTestUtils.getHelixResourceManager().getTableIdealState(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
+    Assert.assertTrue(idealState.getInstanceSet("merged_t1_0").isEmpty());
+
+    // Start new segment replacement since the above entry is reverted
+    segmentsFrom = Arrays.asList("s1", "s2");
+    segmentsTo = Arrays.asList("merged_t2_0", "merged_t2_1");
+    String lineageEntryId3 = ControllerTestUtils.getHelixResourceManager()
+        .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo, false);
+    segmentLineage = SegmentLineageAccessHelper
+        .getSegmentLineage(ControllerTestUtils.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
+    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 3);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId3).getSegmentsFrom(), segmentsFrom);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId3).getSegmentsTo(), segmentsTo);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId3).getState(), LineageEntryState.IN_PROGRESS);
+
+    // Upload partial data
+    ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "merged_t2_0"),
+        "downloadUrl");
+
+    // Without force cleanup, 'startReplaceSegments' should fail because of duplicate segments on 'segmentFrom'.
+    segmentsTo = Arrays.asList("merged_t3_0", "merged_t3_1");
+    try {
+      ControllerTestUtils.getHelixResourceManager()
+          .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo, false);
+    } catch (Exception e) {
+      // expected
+    }
+
+    // Test force clean up case
+    String lineageEntryId4 = ControllerTestUtils.getHelixResourceManager()
+        .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo, true);
+    segmentLineage = SegmentLineageAccessHelper
+        .getSegmentLineage(ControllerTestUtils.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
+    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 4);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId3).getSegmentsFrom(), Arrays.asList("s1", "s2"));
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId3).getSegmentsTo(),
+        Arrays.asList("merged_t2_0", "merged_t2_1"));
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId3).getState(), LineageEntryState.REVERTED);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId4).getSegmentsFrom(), Arrays.asList("s1", "s2"));
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId4).getSegmentsTo(),
+        Arrays.asList("merged_t3_0", "merged_t3_1"));
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId4).getState(), LineageEntryState.IN_PROGRESS);
+
+    // 'merged_t2_0' segment should be proactively cleaned up
+    idealState =
+        ControllerTestUtils.getHelixResourceManager().getTableIdealState(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
+    Assert.assertTrue(idealState.getInstanceSet("merged_t2_0").isEmpty());
+
+    // Upload segments again
+    ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "merged_t3_0"),
+        "downloadUrl");
+    ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "merged_t3_1"),
+        "downloadUrl");
+
+    // Finish the replacement
+    ControllerTestUtils.getHelixResourceManager()
+        .endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, lineageEntryId4);
+    segmentLineage = SegmentLineageAccessHelper
+        .getSegmentLineage(ControllerTestUtils.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
+    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 4);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId4).getSegmentsFrom(), Arrays.asList("s1", "s2"));
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId4).getSegmentsTo(),
+        Arrays.asList("merged_t3_0", "merged_t3_1"));
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId4).getState(), LineageEntryState.COMPLETED);
+  }
+
+  @Test
+  public void testGetLiveBrokersForTable()
+      throws IOException {
+    // Create broker tenant
+    Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 2, 0, 0);
+    PinotResourceManagerResponse response =
+        ControllerTestUtils.getHelixResourceManager().createBrokerTenant(brokerTenant);
+    Assert.assertTrue(response.isSuccessful());
+    // Create the table
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNumReplicas(ControllerTestUtils.MIN_NUM_REPLICAS).setBrokerTenant(BROKER_TENANT_NAME)
+        .setServerTenant(SERVER_TENANT_NAME).build();
+    ControllerTestUtils.getHelixResourceManager().addTable(tableConfig);
+    // Introduce a wait here for the EV is updated with live brokers for a table.
+    TestUtils.waitForCondition(aVoid -> {
+      ExternalView externalView = ControllerTestUtils.getHelixResourceManager().getHelixAdmin()
+          .getResourceExternalView(ControllerTestUtils.getHelixClusterName(),
+              CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+      int onlineBrokersCnt = 0;
+      Map<String, String> brokerToStateMap = externalView.getStateMap(OFFLINE_TABLE_NAME);
+      if (brokerToStateMap == null) {
+        return false;
+      }
+      for (Map.Entry<String, String> entry : brokerToStateMap.entrySet()) {
+        if ("ONLINE".equalsIgnoreCase(entry.getValue())) {
+          onlineBrokersCnt++;
+        }
+      }
+      return onlineBrokersCnt == 2;
+    }, TIMEOUT_IN_MS, "");
+    // Test retrieving the live broker for table
+    List<String> liveBrokersForTable =
+        ControllerTestUtils.getHelixResourceManager().getLiveBrokersForTable(OFFLINE_TABLE_NAME);
+    Assert.assertEquals(liveBrokersForTable.size(), 2);
+    for (String broker: liveBrokersForTable) {
+      Assert.assertTrue(broker.startsWith("Broker_localhost"));
+    }
+    // Delete the table
+    ControllerTestUtils.getHelixResourceManager().deleteOfflineTable(TABLE_NAME);
+    // Clean up.
+    untagBrokers();
   }
 
   private void untagBrokers() {
-    for (String brokerInstance : ControllerTestUtils.getHelixResourceManager().getAllInstancesForBrokerTenant(BROKER_TENANT_NAME)) {
+    for (String brokerInstance : ControllerTestUtils.getHelixResourceManager()
+        .getAllInstancesForBrokerTenant(BROKER_TENANT_NAME)) {
       ControllerTestUtils.getHelixAdmin().removeInstanceTag(ControllerTestUtils.getHelixClusterName(), brokerInstance,
           TagNameUtils.getBrokerTagForTenant(BROKER_TENANT_NAME));
       ControllerTestUtils.getHelixAdmin().addInstanceTag(ControllerTestUtils.getHelixClusterName(), brokerInstance,

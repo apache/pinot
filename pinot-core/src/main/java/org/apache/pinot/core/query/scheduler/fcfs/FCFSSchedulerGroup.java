@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.scheduler.fcfs;
 
-import javax.annotation.Nonnull;
 import org.apache.pinot.core.query.scheduler.AbstractSchedulerGroup;
 import org.apache.pinot.core.query.scheduler.SchedulerGroup;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
@@ -27,7 +26,7 @@ import org.apache.pinot.core.query.scheduler.SchedulerQueryContext;
 
 public class FCFSSchedulerGroup extends AbstractSchedulerGroup {
 
-  public FCFSSchedulerGroup(@Nonnull String group) {
+  public FCFSSchedulerGroup(String group) {
     super(group);
   }
 

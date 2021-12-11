@@ -23,12 +23,13 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctTable;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -36,12 +37,14 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
  */
 abstract class BaseRawLongSingleColumnDistinctExecutor implements DistinctExecutor {
   final ExpressionContext _expression;
+  final DataType _dataType;
   final int _limit;
 
   final LongSet _valueSet;
 
-  BaseRawLongSingleColumnDistinctExecutor(ExpressionContext expression, int limit) {
+  BaseRawLongSingleColumnDistinctExecutor(ExpressionContext expression, DataType dataType, int limit) {
     _expression = expression;
+    _dataType = dataType;
     _limit = limit;
 
     _valueSet = new LongOpenHashSet(Math.min(limit, MAX_INITIAL_CAPACITY));
@@ -49,8 +52,8 @@ abstract class BaseRawLongSingleColumnDistinctExecutor implements DistinctExecut
 
   @Override
   public DistinctTable getResult() {
-    DataSchema dataSchema =
-        new DataSchema(new String[]{_expression.toString()}, new ColumnDataType[]{ColumnDataType.LONG});
+    DataSchema dataSchema = new DataSchema(new String[]{_expression.toString()},
+        new ColumnDataType[]{ColumnDataType.fromDataTypeSV(_dataType)});
     List<Record> records = new ArrayList<>(_valueSet.size());
     LongIterator valueIterator = _valueSet.iterator();
     while (valueIterator.hasNext()) {

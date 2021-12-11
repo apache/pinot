@@ -46,12 +46,12 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -204,14 +204,16 @@ public class PinotQueryResource {
       return QueryException.INTERNAL_ERROR.toString();
     }
 
-    String hostNameWithPrefix = instanceConfig.getHostName();
+    String hostName = instanceConfig.getHostName();
+    // Backward-compatible with legacy hostname of format 'Broker_<hostname>'
+    if (hostName.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
+      hostName = hostName.substring(CommonConstants.Helix.BROKER_INSTANCE_PREFIX_LENGTH);
+    }
 
     String protocol = _controllerConf.getControllerBrokerProtocol();
     int port = _controllerConf.getControllerBrokerPortOverride() > 0 ? _controllerConf.getControllerBrokerPortOverride()
         : Integer.parseInt(instanceConfig.getPort());
-    String url =
-        getQueryURL(protocol, hostNameWithPrefix.substring(hostNameWithPrefix.indexOf("_") + 1), String.valueOf(port),
-            querySyntax);
+    String url = getQueryURL(protocol, hostName, String.valueOf(port), querySyntax);
     ObjectNode requestJson = getRequestJson(query, traceEnabled, queryOptions, querySyntax);
 
     // forward client-supplied headers
@@ -282,7 +284,7 @@ public class PinotQueryResource {
       conn.setRequestProperty("http.keepAlive", String.valueOf(true));
       conn.setRequestProperty("default", String.valueOf(true));
 
-      if (headers != null && headers.size() > 0) {
+      if (headers != null && !headers.isEmpty()) {
         final Set<Entry<String, String>> entries = headers.entrySet();
         for (final Entry<String, String> entry : entries) {
           conn.setRequestProperty(entry.getKey(), entry.getValue());

@@ -22,17 +22,12 @@ kind: Service
 metadata:
   name: {{ template "pinot.broker.headless" . }}
   labels:
-    app: {{ include "pinot.name" . }}
-    chart: {{ include "pinot.chart" . }}
-    component: {{ .Values.broker.name }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    {{- include "pinot.brokerLabels" . | nindent 4 }}
 spec:
   clusterIP: None
   ports:
     # [pod_name].[service_name].[namespace].svc.cluster.local
-    - port: {{ .Values.broker.service.port }}
+    - name: {{ .Values.broker.service.name }}
+      port: {{ .Values.broker.service.port }}
   selector:
-    app: {{ include "pinot.name" . }}
-    release: {{ .Release.Name }}
-    component: {{ .Values.broker.name }}
+    {{- include "pinot.brokerMatchLabels" . | nindent 4 }}

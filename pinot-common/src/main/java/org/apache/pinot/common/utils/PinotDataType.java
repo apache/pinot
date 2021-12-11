@@ -18,11 +18,16 @@
  */
 package org.apache.pinot.common.utils;
 
+import java.sql.Timestamp;
+import java.util.Base64;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.TimestampUtils;
 
 
 /**
@@ -39,6 +44,24 @@ import org.apache.pinot.spi.utils.BytesUtils;
  */
 public enum PinotDataType {
 
+  /**
+   * When converting from BOOLEAN to other types:
+   * - Numeric types:
+   *   - true -> 1
+   *   - false -> 0
+   * - String:
+   *   - true -> "true"
+   *   - false -> "false"
+   *
+   * When converting to BOOLEAN from other types:
+   * - Numeric types:
+   *   - 0 -> false
+   *   - Others -> true
+   * - String:
+   *   - "true" (case-insensitive) -> true
+   *   - "1" -> true (for backward-compatibility where we used to use integer 1 to represent true)
+   *   - Others ->  false
+   */
   BOOLEAN {
     @Override
     public int toInt(Object value) {
@@ -61,6 +84,16 @@ public enum PinotDataType {
     }
 
     @Override
+    public boolean toBoolean(Object value) {
+      return (Boolean) value;
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BOOLEAN to TIMESTAMP");
+    }
+
+    @Override
     public String toString(Object value) {
       return value.toString();
     }
@@ -69,27 +102,47 @@ public enum PinotDataType {
     public byte[] toBytes(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from BOOLEAN to BYTES");
     }
+
+    @Override
+    public Boolean convert(Object value, PinotDataType sourceType) {
+      return sourceType.toBoolean(value);
+    }
+
+    @Override
+    public Integer toInternal(Object value) {
+      return ((Boolean) value) ? 1 : 0;
+    }
   },
 
   BYTE {
     @Override
     public int toInt(Object value) {
-      return ((Byte) value).intValue();
+      return ((Number) value).intValue();
     }
 
     @Override
     public long toLong(Object value) {
-      return ((Byte) value).longValue();
+      return ((Number) value).longValue();
     }
 
     @Override
     public float toFloat(Object value) {
-      return ((Byte) value).floatValue();
+      return ((Number) value).floatValue();
     }
 
     @Override
     public double toDouble(Object value) {
-      return ((Byte) value).doubleValue();
+      return ((Number) value).doubleValue();
+    }
+
+    @Override
+    public boolean toBoolean(Object value) {
+      return (Byte) value != 0;
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BOOLEAN to TIMESTAMP");
     }
 
     @Override
@@ -125,6 +178,16 @@ public enum PinotDataType {
     }
 
     @Override
+    public boolean toBoolean(Object value) {
+      return (Character) value != 0;
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from CHARACTER to TIMESTAMP");
+    }
+
+    @Override
     public String toString(Object value) {
       return value.toString();
     }
@@ -138,22 +201,32 @@ public enum PinotDataType {
   SHORT {
     @Override
     public int toInt(Object value) {
-      return ((Short) value).intValue();
+      return ((Number) value).intValue();
     }
 
     @Override
     public long toLong(Object value) {
-      return ((Short) value).longValue();
+      return ((Number) value).longValue();
     }
 
     @Override
     public float toFloat(Object value) {
-      return ((Short) value).floatValue();
+      return ((Number) value).floatValue();
     }
 
     @Override
     public double toDouble(Object value) {
-      return ((Short) value).doubleValue();
+      return ((Number) value).doubleValue();
+    }
+
+    @Override
+    public boolean toBoolean(Object value) {
+      return (Short) value != 0;
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from SHORT to TIMESTAMP");
     }
 
     @Override
@@ -175,17 +248,27 @@ public enum PinotDataType {
 
     @Override
     public long toLong(Object value) {
-      return ((Integer) value).longValue();
+      return ((Number) value).longValue();
     }
 
     @Override
     public float toFloat(Object value) {
-      return ((Integer) value).floatValue();
+      return ((Number) value).floatValue();
     }
 
     @Override
     public double toDouble(Object value) {
-      return ((Integer) value).doubleValue();
+      return ((Number) value).doubleValue();
+    }
+
+    @Override
+    public boolean toBoolean(Object value) {
+      return (Integer) value != 0;
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from INTEGER to TIMESTAMP");
     }
 
     @Override
@@ -207,7 +290,7 @@ public enum PinotDataType {
   LONG {
     @Override
     public int toInt(Object value) {
-      return ((Long) value).intValue();
+      return ((Number) value).intValue();
     }
 
     @Override
@@ -217,12 +300,22 @@ public enum PinotDataType {
 
     @Override
     public float toFloat(Object value) {
-      return ((Long) value).floatValue();
+      return ((Number) value).floatValue();
     }
 
     @Override
     public double toDouble(Object value) {
-      return ((Long) value).doubleValue();
+      return ((Number) value).doubleValue();
+    }
+
+    @Override
+    public boolean toBoolean(Object value) {
+      return (Long) value != 0;
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      return new Timestamp((Long) value);
     }
 
     @Override
@@ -244,12 +337,12 @@ public enum PinotDataType {
   FLOAT {
     @Override
     public int toInt(Object value) {
-      return ((Float) value).intValue();
+      return ((Number) value).intValue();
     }
 
     @Override
     public long toLong(Object value) {
-      return ((Float) value).longValue();
+      return ((Number) value).longValue();
     }
 
     @Override
@@ -259,7 +352,17 @@ public enum PinotDataType {
 
     @Override
     public double toDouble(Object value) {
-      return ((Float) value).doubleValue();
+      return ((Number) value).doubleValue();
+    }
+
+    @Override
+    public boolean toBoolean(Object value) {
+      return (Float) value != 0;
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from FLOAT to TIMESTAMP");
     }
 
     @Override
@@ -281,22 +384,32 @@ public enum PinotDataType {
   DOUBLE {
     @Override
     public int toInt(Object value) {
-      return ((Double) value).intValue();
+      return ((Number) value).intValue();
     }
 
     @Override
     public long toLong(Object value) {
-      return ((Double) value).longValue();
+      return ((Number) value).longValue();
     }
 
     @Override
     public float toFloat(Object value) {
-      return ((Double) value).floatValue();
+      return ((Number) value).floatValue();
     }
 
     @Override
     public double toDouble(Object value) {
       return (Double) value;
+    }
+
+    @Override
+    public boolean toBoolean(Object value) {
+      return (Double) value != 0;
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      return new Timestamp(((Double) value).longValue());
     }
 
     @Override
@@ -312,6 +425,69 @@ public enum PinotDataType {
     @Override
     public Double convert(Object value, PinotDataType sourceType) {
       return sourceType.toDouble(value);
+    }
+  },
+
+  /**
+   * When converting from TIMESTAMP to other types:
+   * - LONG/DOUBLE: millis since epoch value
+   * - String: SQL timestamp format (e.g. "2021-01-01 01:01:01.001")
+   *
+   * When converting to TIMESTAMP from other types:
+   * - LONG/DOUBLE: read long value as millis since epoch
+   * - String:
+   *   - SQL timestamp format (e.g. "2021-01-01 01:01:01.001")
+   *   - Millis since epoch value (e.g. "1609491661001")
+   */
+  TIMESTAMP {
+    @Override
+    public int toInt(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMP to INTEGER");
+    }
+
+    @Override
+    public long toLong(Object value) {
+      return ((Timestamp) value).getTime();
+    }
+
+    @Override
+    public float toFloat(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMP to FLOAT");
+    }
+
+    @Override
+    public double toDouble(Object value) {
+      return ((Timestamp) value).getTime();
+    }
+
+    @Override
+    public boolean toBoolean(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMP to BOOLEAN");
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      return (Timestamp) value;
+    }
+
+    @Override
+    public String toString(Object value) {
+      return value.toString();
+    }
+
+    @Override
+    public byte[] toBytes(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMP to BYTES");
+    }
+
+    @Override
+    public Timestamp convert(Object value, PinotDataType sourceType) {
+      return sourceType.toTimestamp(value);
+    }
+
+    @Override
+    public Long toInternal(Object value) {
+      return ((Timestamp) value).getTime();
     }
   },
 
@@ -339,6 +515,16 @@ public enum PinotDataType {
     }
 
     @Override
+    public boolean toBoolean(Object value) {
+      return BooleanUtils.toBoolean(value.toString().trim());
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      return TimestampUtils.toTimestamp(value.toString().trim());
+    }
+
+    @Override
     public String toString(Object value) {
       return value.toString();
     }
@@ -351,6 +537,60 @@ public enum PinotDataType {
     @Override
     public String convert(Object value, PinotDataType sourceType) {
       return sourceType.toString(value);
+    }
+  },
+
+  JSON {
+    @Override
+    public int toInt(Object value) {
+      return Integer.parseInt(value.toString().trim());
+    }
+
+    @Override
+    public long toLong(Object value) {
+      return Long.parseLong(value.toString().trim());
+    }
+
+    @Override
+    public float toFloat(Object value) {
+      return Float.parseFloat(value.toString());
+    }
+
+    @Override
+    public double toDouble(Object value) {
+      return Double.parseDouble(value.toString());
+    }
+
+    @Override
+    public boolean toBoolean(Object value) {
+      return Boolean.parseBoolean(value.toString().trim());
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      return TimestampUtils.toTimestamp(value.toString().trim());
+    }
+
+    @Override
+    public String toString(Object value) {
+      return value.toString();
+    }
+
+    @Override
+    public byte[] toBytes(Object value) {
+      // Base64 encoding is the commonly used mechanism for encoding binary data in JSON documents. Note that
+      // toJson function converts byte[] into a Base64 encoded json string value.
+      try {
+        return Base64.getDecoder().decode(value.toString());
+      } catch (Exception e) {
+        throw new RuntimeException("Unable to convert JSON base64 encoded string value to BYTES. Input value: " + value,
+            e);
+      }
+    }
+
+    @Override
+    public String convert(Object value, PinotDataType sourceType) {
+      return sourceType.toJson(value);
     }
   },
 
@@ -373,6 +613,16 @@ public enum PinotDataType {
     @Override
     public double toDouble(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from BYTES to DOUBLE");
+    }
+
+    @Override
+    public boolean toBoolean(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BYTES to BOOLEAN");
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BYTES to TIMESTAMP");
     }
 
     @Override
@@ -410,6 +660,16 @@ public enum PinotDataType {
     @Override
     public double toDouble(Object value) {
       return ((Number) value).doubleValue();
+    }
+
+    @Override
+    public boolean toBoolean(Object value) {
+      return ((Number) value).doubleValue() != 0;
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      return new Timestamp(((Number) value).longValue());
     }
 
     @Override
@@ -503,6 +763,20 @@ public enum PinotDataType {
     }
   },
 
+  BOOLEAN_ARRAY {
+    @Override
+    public boolean[] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toBooleanArray(value);
+    }
+  },
+
+  TIMESTAMP_ARRAY {
+    @Override
+    public Object convert(Object value, PinotDataType sourceType) {
+      return sourceType.toTimestampArray(value);
+    }
+  },
+
   STRING_ARRAY {
     @Override
     public String[] convert(Object value, PinotDataType sourceType) {
@@ -510,10 +784,18 @@ public enum PinotDataType {
     }
   },
 
+  BYTES_ARRAY {
+    @Override
+    public byte[][] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toBytesArray(value);
+    }
+  },
+
   OBJECT_ARRAY;
 
   /**
-   * NOTE: override toInt(), toLong(), toFloat(), toDouble(), toString() and toBytes() for single-value types.
+   * NOTE: override toInt(), toLong(), toFloat(), toDouble(), toBoolean(), toTimestamp(), toString(), and
+   * toBytes() for single-value types.
    */
 
   public int toInt(Object value) {
@@ -532,8 +814,33 @@ public enum PinotDataType {
     return getSingleValueType().toDouble(toObjectArray(value)[0]);
   }
 
+  public boolean toBoolean(Object value) {
+    return getSingleValueType().toBoolean(((Object[]) value)[0]);
+  }
+
+  public Timestamp toTimestamp(Object value) {
+    return getSingleValueType().toTimestamp(((Object[]) value)[0]);
+  }
+
   public String toString(Object value) {
     return getSingleValueType().toString(toObjectArray(value)[0]);
+  }
+
+  public String toJson(Object value) {
+    if (value instanceof String) {
+      try {
+        return JsonUtils.stringToJsonNode((String) value).toString();
+      } catch (Exception e) {
+        throw new RuntimeException("Unable to convert String into JSON. Input value: " + value, e);
+      }
+    } else {
+      try {
+        return JsonUtils.objectToString(value);
+      } catch (Exception e) {
+        throw new RuntimeException(
+            "Unable to convert " + value.getClass().getCanonicalName() + " to JSON. Input value: " + value, e);
+      }
+    }
   }
 
   public byte[] toBytes(Object value) {
@@ -552,7 +859,11 @@ public enum PinotDataType {
       int[] intArray = new int[length];
       PinotDataType singleValueType = getSingleValueType();
       for (int i = 0; i < length; i++) {
-        intArray[i] = singleValueType.toInt(valueArray[i]);
+        try {
+          intArray[i] = singleValueType.toInt(valueArray[i]);
+        } catch (ClassCastException e) {
+          intArray[i] = anyToInt(valueArray[i]);
+        }
       }
       return intArray;
     }
@@ -570,7 +881,11 @@ public enum PinotDataType {
       Integer[] integerArray = new Integer[length];
       PinotDataType singleValueType = getSingleValueType();
       for (int i = 0; i < length; i++) {
-        integerArray[i] = singleValueType.toInt(valueArray[i]);
+        try {
+          integerArray[i] = singleValueType.toInt(valueArray[i]);
+        } catch (ClassCastException e) {
+          integerArray[i] = anyToInt(valueArray[i]);
+        }
       }
       return integerArray;
     }
@@ -588,7 +903,11 @@ public enum PinotDataType {
       long[] longArray = new long[length];
       PinotDataType singleValueType = getSingleValueType();
       for (int i = 0; i < length; i++) {
-        longArray[i] = singleValueType.toLong(valueArray[i]);
+        try {
+          longArray[i] = singleValueType.toLong(valueArray[i]);
+        } catch (ClassCastException e) {
+          longArray[i] = anyToLong(valueArray[i]);
+        }
       }
       return longArray;
     }
@@ -606,7 +925,11 @@ public enum PinotDataType {
       Long[] longArray = new Long[length];
       PinotDataType singleValueType = getSingleValueType();
       for (int i = 0; i < length; i++) {
-        longArray[i] = singleValueType.toLong(valueArray[i]);
+        try {
+          longArray[i] = singleValueType.toLong(valueArray[i]);
+        } catch (ClassCastException e) {
+          longArray[i] = anyToLong(valueArray[i]);
+        }
       }
       return longArray;
     }
@@ -624,7 +947,11 @@ public enum PinotDataType {
       float[] floatArray = new float[length];
       PinotDataType singleValueType = getSingleValueType();
       for (int i = 0; i < length; i++) {
-        floatArray[i] = singleValueType.toFloat(valueArray[i]);
+        try {
+          floatArray[i] = singleValueType.toFloat(valueArray[i]);
+        } catch (ClassCastException e) {
+          floatArray[i] = anyToFloat(valueArray[i]);
+        }
       }
       return floatArray;
     }
@@ -642,7 +969,11 @@ public enum PinotDataType {
       Float[] floatArray = new Float[length];
       PinotDataType singleValueType = getSingleValueType();
       for (int i = 0; i < length; i++) {
-        floatArray[i] = singleValueType.toFloat(valueArray[i]);
+        try {
+          floatArray[i] = singleValueType.toFloat(valueArray[i]);
+        } catch (ClassCastException e) {
+          floatArray[i] = anyToFloat(valueArray[i]);
+        }
       }
       return floatArray;
     }
@@ -660,7 +991,11 @@ public enum PinotDataType {
       double[] doubleArray = new double[length];
       PinotDataType singleValueType = getSingleValueType();
       for (int i = 0; i < length; i++) {
-        doubleArray[i] = singleValueType.toDouble(valueArray[i]);
+        try {
+          doubleArray[i] = singleValueType.toDouble(valueArray[i]);
+        } catch (ClassCastException e) {
+          doubleArray[i] = anyToDouble(valueArray[i]);
+        }
       }
       return doubleArray;
     }
@@ -678,7 +1013,11 @@ public enum PinotDataType {
       Double[] doubleArray = new Double[length];
       PinotDataType singleValueType = getSingleValueType();
       for (int i = 0; i < length; i++) {
-        doubleArray[i] = singleValueType.toDouble(valueArray[i]);
+        try {
+          doubleArray[i] = singleValueType.toDouble(valueArray[i]);
+        } catch (ClassCastException e) {
+          doubleArray[i] = anyToDouble(valueArray[i]);
+        }
       }
       return doubleArray;
     }
@@ -699,6 +1038,24 @@ public enum PinotDataType {
         stringArray[i] = singleValueType.toString(valueArray[i]);
       }
       return stringArray;
+    }
+  }
+
+  public byte[][] toBytesArray(Object value) {
+    if (value instanceof byte[][]) {
+      return (byte[][]) value;
+    }
+    if (isSingleValue()) {
+      return new byte[][]{toBytes(value)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      byte[][] bytesArray = new byte[length][];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        bytesArray[i] = singleValueType.toBytes(valueArray[i]);
+      }
+      return bytesArray;
     }
   }
 
@@ -723,8 +1080,55 @@ public enum PinotDataType {
     }
   }
 
+  public boolean[] toBooleanArray(Object value) {
+    if (value instanceof boolean[]) {
+      return (boolean[]) value;
+    }
+    if (isSingleValue()) {
+      return new boolean[] {toBoolean(value)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      boolean[] booleanArray = new boolean[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        booleanArray[i] = singleValueType.toBoolean(valueArray[i]);
+      }
+      return booleanArray;
+    }
+  }
+
+  public Timestamp[] toTimestampArray(Object value) {
+    if (value instanceof Timestamp[]) {
+      return (Timestamp[]) value;
+    }
+    if (isSingleValue()) {
+      return new Timestamp[] {toTimestamp(value)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      Timestamp[] booleanArray = new Timestamp[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        booleanArray[i] = singleValueType.toTimestamp(valueArray[i]);
+      }
+      return booleanArray;
+    }
+  }
+
   public Object convert(Object value, PinotDataType sourceType) {
-    throw new UnsupportedOperationException("Cannot convert value form " + sourceType + " to " + this);
+    throw new UnsupportedOperationException("Cannot convert value from " + sourceType + " to " + this);
+  }
+
+  /**
+   * Converts to the internal representation of the value.
+   * <ul>
+   *   <li>BOOLEAN -> int</li>
+   *   <li>TIMESTAMP -> long</li>
+   * </ul>
+   */
+  public Object toInternal(Object value) {
+    return value;
   }
 
   public boolean isSingleValue() {
@@ -753,11 +1157,107 @@ public enum PinotDataType {
         return DOUBLE;
       case STRING_ARRAY:
         return STRING;
+      case BYTES_ARRAY:
+        return BYTES;
       case OBJECT_ARRAY:
         return OBJECT;
+      case BOOLEAN_ARRAY:
+        return BOOLEAN;
+      case TIMESTAMP_ARRAY:
+        return TIMESTAMP;
       default:
         throw new IllegalStateException("There is no single-value type for " + this);
     }
+  }
+
+  public static PinotDataType getSingleValueType(Class<?> cls) {
+    if (cls == Integer.class) {
+      return INTEGER;
+    }
+    if (cls == Long.class) {
+      return LONG;
+    }
+    if (cls == Float.class) {
+      return FLOAT;
+    }
+    if (cls == Double.class) {
+      return DOUBLE;
+    }
+    if (cls == String.class) {
+      return STRING;
+    }
+    if (cls == byte[].class) {
+      return BYTES;
+    }
+    if (cls == Boolean.class) {
+      return BOOLEAN;
+    }
+    if (cls == Timestamp.class) {
+      return TIMESTAMP;
+    }
+    if (cls == Byte.class) {
+      return BYTE;
+    }
+    if (cls == Character.class) {
+      return CHARACTER;
+    }
+    if (cls == Short.class) {
+      return SHORT;
+    }
+    return OBJECT;
+  }
+
+  public static PinotDataType getMultiValueType(Class<?> cls) {
+    if (cls == Integer.class) {
+      return INTEGER_ARRAY;
+    }
+    if (cls == Long.class) {
+      return LONG_ARRAY;
+    }
+    if (cls == Float.class) {
+      return FLOAT_ARRAY;
+    }
+    if (cls == Double.class) {
+      return DOUBLE_ARRAY;
+    }
+    if (cls == String.class) {
+      return STRING_ARRAY;
+    }
+    if (cls == Byte.class) {
+      return BYTE_ARRAY;
+    }
+    if (cls == Character.class) {
+      return CHARACTER_ARRAY;
+    }
+    if (cls == Short.class) {
+      return SHORT_ARRAY;
+    }
+    if (cls == byte[].class) {
+      return BYTES_ARRAY;
+    }
+    if (cls == Boolean.class) {
+      return BOOLEAN_ARRAY;
+    }
+    if (cls == Timestamp.class) {
+      return TIMESTAMP_ARRAY;
+    }
+    return OBJECT_ARRAY;
+  }
+
+  private static int anyToInt(Object val) {
+    return getSingleValueType(val.getClass()).toInt(val);
+  }
+
+  private static long anyToLong(Object val) {
+    return getSingleValueType(val.getClass()).toLong(val);
+  }
+
+  private static float anyToFloat(Object val) {
+    return getSingleValueType(val.getClass()).toFloat(val);
+  }
+
+  private static double anyToDouble(Object val) {
+    return getSingleValueType(val.getClass()).toDouble(val);
   }
 
   /**
@@ -768,21 +1268,27 @@ public enum PinotDataType {
     DataType dataType = fieldSpec.getDataType();
     switch (dataType) {
       case INT:
-        return fieldSpec.isSingleValueField() ? PinotDataType.INTEGER : PinotDataType.INTEGER_ARRAY;
+        return fieldSpec.isSingleValueField() ? INTEGER : INTEGER_ARRAY;
       case LONG:
-        return fieldSpec.isSingleValueField() ? PinotDataType.LONG : PinotDataType.LONG_ARRAY;
+        return fieldSpec.isSingleValueField() ? LONG : LONG_ARRAY;
       case FLOAT:
-        return fieldSpec.isSingleValueField() ? PinotDataType.FLOAT : PinotDataType.FLOAT_ARRAY;
+        return fieldSpec.isSingleValueField() ? FLOAT : FLOAT_ARRAY;
       case DOUBLE:
-        return fieldSpec.isSingleValueField() ? PinotDataType.DOUBLE : PinotDataType.DOUBLE_ARRAY;
-      case STRING:
-        return fieldSpec.isSingleValueField() ? PinotDataType.STRING : PinotDataType.STRING_ARRAY;
-      case BYTES:
+        return fieldSpec.isSingleValueField() ? DOUBLE : DOUBLE_ARRAY;
+      case BOOLEAN:
+        return fieldSpec.isSingleValueField() ? BOOLEAN : BOOLEAN_ARRAY;
+      case TIMESTAMP:
+        return fieldSpec.isSingleValueField() ? TIMESTAMP : TIMESTAMP_ARRAY;
+      case JSON:
         if (fieldSpec.isSingleValueField()) {
-          return PinotDataType.BYTES;
+          return JSON;
         } else {
-          throw new IllegalStateException("There is no multi-value type for BYTES");
+          throw new IllegalStateException("There is no multi-value type for JSON");
         }
+      case STRING:
+        return fieldSpec.isSingleValueField() ? STRING : STRING_ARRAY;
+      case BYTES:
+        return fieldSpec.isSingleValueField() ? BYTES : BYTES_ARRAY;
       default:
         throw new UnsupportedOperationException(
             "Unsupported data type: " + dataType + " in field: " + fieldSpec.getName());
@@ -803,8 +1309,14 @@ public enum PinotDataType {
         return FLOAT;
       case DOUBLE:
         return DOUBLE;
+      case BOOLEAN:
+        return BOOLEAN;
+      case TIMESTAMP:
+        return TIMESTAMP;
       case STRING:
         return STRING;
+      case JSON:
+        return JSON;
       case BYTES:
         return BYTES;
       case INT_ARRAY:

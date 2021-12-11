@@ -29,10 +29,19 @@ import org.apache.pinot.controller.recommender.io.InputManager;
 public abstract class AbstractRule {
   protected InputManager _input;
   protected ConfigManager _output;
-  public abstract void run() throws InvalidInputException;
+
+  public abstract void run()
+      throws InvalidInputException;
 
   public AbstractRule(InputManager input, ConfigManager output) {
     _input = input;
     _output = output;
+  }
+
+  /**
+   * Some rules have to be run even if user has disabled them. The reason is the output of these rules are used in other
+   * rules. This method is used to hide the output from the final result that's going to be presented to the user.
+   */
+  public void hideOutput() {
   }
 }

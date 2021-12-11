@@ -18,13 +18,19 @@
  */
 package org.apache.pinot.tools;
 
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.plugin.PluginManager;
 
 
 public class AuthQuickstart extends Quickstart {
+  @Override
+  public List<String> types() {
+    return Collections.singletonList("AUTH");
+  }
 
   @Override
   public String getAuthToken() {
@@ -36,8 +42,9 @@ public class AuthQuickstart extends Quickstart {
     Map<String, Object> properties = new HashMap<>();
 
     // controller
-    properties.put("controller.segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
-    properties.put("controller.admin.access.control.factory.class", "org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory");
+    properties.put("pinot.controller.segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
+    properties.put("controller.admin.access.control.factory.class",
+        "org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory");
     properties.put("controller.admin.access.control.principals", "admin, user");
     properties.put("controller.admin.access.control.principals.admin.password", "verysecret");
     properties.put("controller.admin.access.control.principals.user.password", "secret");

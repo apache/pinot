@@ -18,24 +18,24 @@
  */
 package org.apache.pinot.core.operator.transform;
 
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
  * The <code>TransformResultMetadata</code> class contains the metadata for the transform result.
  */
 public class TransformResultMetadata {
-  private final FieldSpec.DataType _dataType;
+  private final DataType _dataType;
   private final boolean _isSingleValue;
   private final boolean _hasDictionary;
 
-  public TransformResultMetadata(FieldSpec.DataType dataType, boolean isSingleValue, boolean hasDictionary) {
+  public TransformResultMetadata(DataType dataType, boolean isSingleValue, boolean hasDictionary) {
     _dataType = dataType;
     _isSingleValue = isSingleValue;
     _hasDictionary = hasDictionary;
   }
 
-  public FieldSpec.DataType getDataType() {
+  public DataType getDataType() {
     return _dataType;
   }
 

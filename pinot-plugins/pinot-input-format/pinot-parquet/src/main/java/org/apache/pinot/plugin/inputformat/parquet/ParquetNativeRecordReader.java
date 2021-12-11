@@ -77,7 +77,8 @@ public class ParquetNativeRecordReader implements RecordReader {
       return false;
     }
     if (_pageReadStore.getRowCount() - _currentPageIdx >= 1) {
-      // System.out.println("_pageReadStore.getRowCount() = " + _pageReadStore.getRowCount() + ", _currentPageIdx = " + _currentPageIdx);
+      // System.out.println("_pageReadStore.getRowCount() = " + _pageReadStore.getRowCount() + ", _currentPageIdx = "
+      // + _currentPageIdx);
       return true;
     }
     try {

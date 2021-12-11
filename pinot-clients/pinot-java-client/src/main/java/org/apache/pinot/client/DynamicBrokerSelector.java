@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.client;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -31,74 +33,86 @@ import org.I0Itec.zkclient.IZkDataListener;
 import org.I0Itec.zkclient.ZkClient;
 import org.I0Itec.zkclient.serialize.BytesPushThroughSerializer;
 
-import static org.apache.pinot.client.ExternalViewReader.OFFLINE_SUFFIX;
-import static org.apache.pinot.client.ExternalViewReader.REALTIME_SUFFIX;
-
 
 /**
  * Maintains a mapping between table name and list of brokers
  */
 public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
-  AtomicReference<Map<String, List<String>>> tableToBrokerListMapRef = new AtomicReference<Map<String, List<String>>>();
-  AtomicReference<List<String>> allBrokerListRef = new AtomicReference<List<String>>();
-  private final Random _random = new Random();
-  private ExternalViewReader evReader;
+  private static final Random RANDOM = new Random();
+
+  private final AtomicReference<Map<String, List<String>>> _tableToBrokerListMapRef = new AtomicReference<>();
+  private final AtomicReference<List<String>> _allBrokerListRef = new AtomicReference<>();
+  private final ZkClient _zkClient;
+  private final ExternalViewReader _evReader;
+  private final List<String> _brokerList;
 
   public DynamicBrokerSelector(String zkServers) {
-    ZkClient zkClient = getZkClient(zkServers);
-    zkClient.setZkSerializer(new BytesPushThroughSerializer());
-    zkClient.waitUntilConnected(60, TimeUnit.SECONDS);
-    zkClient.subscribeDataChanges(ExternalViewReader.BROKER_EXTERNAL_VIEW_PATH, this);
-    evReader = getEvReader(zkClient);
+    _zkClient = getZkClient(zkServers);
+    _zkClient.setZkSerializer(new BytesPushThroughSerializer());
+    _zkClient.waitUntilConnected(60, TimeUnit.SECONDS);
+    _zkClient.subscribeDataChanges(ExternalViewReader.BROKER_EXTERNAL_VIEW_PATH, this);
+    _evReader = getEvReader(_zkClient);
+    _brokerList = ImmutableList.of(zkServers);
     refresh();
   }
 
+  @VisibleForTesting
   protected ZkClient getZkClient(String zkServers) {
     return new ZkClient(zkServers);
   }
 
+  @VisibleForTesting
   protected ExternalViewReader getEvReader(ZkClient zkClient) {
     return new ExternalViewReader(zkClient);
   }
 
   private void refresh() {
-    Map<String, List<String>> tableToBrokerListMap = evReader.getTableToBrokersMap();
-    tableToBrokerListMapRef.set(tableToBrokerListMap);
+    Map<String, List<String>> tableToBrokerListMap = _evReader.getTableToBrokersMap();
+    _tableToBrokerListMapRef.set(tableToBrokerListMap);
     Set<String> brokerSet = new HashSet<>();
     for (List<String> brokerList : tableToBrokerListMap.values()) {
       brokerSet.addAll(brokerList);
     }
-    allBrokerListRef.set(new ArrayList<>(brokerSet));
+    _allBrokerListRef.set(new ArrayList<>(brokerSet));
   }
 
   @Nullable
   @Override
   public String selectBroker(String table) {
     if (table == null) {
-      List<String> list = allBrokerListRef.get();
+      List<String> list = _allBrokerListRef.get();
       if (list != null && !list.isEmpty()) {
-        return list.get(_random.nextInt(list.size()));
+        return list.get(RANDOM.nextInt(list.size()));
       } else {
         return null;
       }
     }
-    String tableName = table.replace(OFFLINE_SUFFIX, "").replace(REALTIME_SUFFIX, "");
-    List<String> list = tableToBrokerListMapRef.get().get(tableName);
+    String tableName = table.replace(ExternalViewReader.OFFLINE_SUFFIX, "")
+        .replace(ExternalViewReader.REALTIME_SUFFIX, "");
+    List<String> list = _tableToBrokerListMapRef.get().get(tableName);
     if (list != null && !list.isEmpty()) {
-      return list.get(_random.nextInt(list.size()));
+      return list.get(RANDOM.nextInt(list.size()));
     }
     return null;
   }
 
   @Override
-  public void handleDataChange(String dataPath, Object data)
-      throws Exception {
+  public List<String> getBrokers() {
+    return _brokerList;
+  }
+
+  @Override
+  public void close() {
+    _zkClient.close();
+  }
+
+  @Override
+  public void handleDataChange(String dataPath, Object data) {
     refresh();
   }
 
   @Override
-  public void handleDataDeleted(String dataPath)
-      throws Exception {
+  public void handleDataDeleted(String dataPath) {
     refresh();
   }
 }

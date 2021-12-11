@@ -1,18 +1,18 @@
 {
   "tableName": "simpleWebsite",
-  "segmentsConfig" : {
-    "replication" : "1",
-    "schemaName" : "simpleWebsite",
+  "segmentsConfig": {
+    "replication": "1",
+    "schemaName": "simpleWebsite",
     "timeColumnName": "hoursSinceEpoch"
   },
-  "tableIndexConfig" : {
-    "invertedIndexColumns" : [],
-    "loadMode"  : "HEAP"
+  "tableIndexConfig": {
+    "invertedIndexColumns": [],
+    "loadMode": "HEAP"
   },
-  "tenants" : {
-    "broker":"DefaultTenant",
-    "server":"DefaultTenant"
+  "tenants": {
+    "broker": "DefaultTenant",
+    "server": "DefaultTenant"
   },
-  "tableType":"OFFLINE",
+  "tableType": "OFFLINE",
   "metadata": {}
 }

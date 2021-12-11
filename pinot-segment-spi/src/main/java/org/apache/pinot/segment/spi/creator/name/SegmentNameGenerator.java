@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.creator.name;
 
 import com.google.common.base.Joiner;
 import java.io.Serializable;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 
 
@@ -27,7 +28,18 @@ import javax.annotation.Nullable;
  * Interface for segment name generator based on the segment sequence id and time range.
  */
 public interface SegmentNameGenerator extends Serializable {
+  Pattern INVALID_SEGMENT_NAME_REGEX = Pattern.compile(".*[\\\\/:\\*?\"<>|].*");
   Joiner JOINER = Joiner.on('_').skipNulls();
+
+  /**
+   * A handy util to validate if segment name is valid.
+   *
+   * @param segmentName provide segment name
+   * @return true if segmentName is valid.
+   */
+  default boolean isValidSegmentName(String segmentName) {
+    return !INVALID_SEGMENT_NAME_REGEX.matcher(segmentName).matches();
+  }
 
   /**
    * Generates the segment name.

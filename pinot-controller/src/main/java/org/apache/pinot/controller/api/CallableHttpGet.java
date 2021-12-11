@@ -26,11 +26,11 @@ import org.slf4j.LoggerFactory;
 
 public class CallableHttpGet {
   private static final Logger LOGGER = LoggerFactory.getLogger(CallableHttpGet.class);
-  private HttpClient client;
-  private GetMethod getMethod;
+  private HttpClient _client;
+  private GetMethod _getMethod;
 
   CallableHttpGet(HttpClient client, GetMethod getMethod) {
-    this.client = client;
-    this.getMethod = getMethod;
+    _client = client;
+    _getMethod = getMethod;
   }
 }

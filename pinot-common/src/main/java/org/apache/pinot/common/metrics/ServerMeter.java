@@ -70,24 +70,24 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NETTY_CONNECTION_RESPONSES_SENT("nettyConnection", true),
   NETTY_CONNECTION_BYTES_SENT("nettyConnection", true);
 
-  private final String meterName;
-  private final String unit;
-  private final boolean global;
+  private final String _meterName;
+  private final String _unit;
+  private final boolean _global;
 
   ServerMeter(String unit, boolean global) {
-    this.unit = unit;
-    this.global = global;
-    this.meterName = Utils.toCamelCase(name().toLowerCase());
+    _unit = unit;
+    _global = global;
+    _meterName = Utils.toCamelCase(name().toLowerCase());
   }
 
   @Override
   public String getMeterName() {
-    return meterName;
+    return _meterName;
   }
 
   @Override
   public String getUnit() {
-    return unit;
+    return _unit;
   }
 
   /**
@@ -97,6 +97,6 @@ public enum ServerMeter implements AbstractMetrics.Meter {
    */
   @Override
   public boolean isGlobal() {
-    return global;
+    return _global;
   }
 }

@@ -23,19 +23,20 @@ import com.fasterxml.jackson.annotation.Nulls;
 
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.FlagQueryRuleParams.DEFAULT_THRESHOLD_MAX_LIMIT_SIZE;
 
+
 /**
  * Thresholds and parameters used in FlagQueryRule
  */
 public class FlagQueryRuleParams {
   // Maximum x in predicate "LIMIT x" beyond that the query is too expensive
-  public Long THRESHOLD_MAX_LIMIT_SIZE = DEFAULT_THRESHOLD_MAX_LIMIT_SIZE;
+  public Long _thresholdMaxLimitSize = DEFAULT_THRESHOLD_MAX_LIMIT_SIZE;
 
-  public Long getTHRESHOLD_MAX_LIMIT_SIZE() {
-    return THRESHOLD_MAX_LIMIT_SIZE;
+  public Long getThresholdMaxLimitSize() {
+    return _thresholdMaxLimitSize;
   }
 
   @JsonSetter(value = "THRESHOLD_MAX_LIMIT_SIZE", nulls = Nulls.SKIP)
-  public void setTHRESHOLD_MAX_LIMIT_SIZE(Long THRESHOLD_MAX_LIMIT_SIZE) {
-    this.THRESHOLD_MAX_LIMIT_SIZE = THRESHOLD_MAX_LIMIT_SIZE;
+  public void setThresholdMaxLimitSize(Long thresholdMaxLimitSize) {
+    _thresholdMaxLimitSize = thresholdMaxLimitSize;
   }
 }

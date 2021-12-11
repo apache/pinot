@@ -34,6 +34,11 @@ import org.slf4j.LoggerFactory;
 public class EventObserverFactoryRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(EventObserverFactoryRegistry.class);
 
+  /**
+   * The package regex pattern for auto-registered {@link MinionEventObserverFactory}.
+   */
+  private static final String EVENT_OBSERVER_FACTORY_PACKAGE_REGEX_PATTERN = ".*\\.plugin\\.minion\\.tasks\\..*";
+
   private final Map<String, MinionEventObserverFactory> _eventObserverFactoryRegistry = new HashMap<>();
 
   /**
@@ -43,8 +48,8 @@ public class EventObserverFactoryRegistry {
    */
   public EventObserverFactoryRegistry(MinionTaskZkMetadataManager zkMetadataManager) {
     long startTimeMs = System.currentTimeMillis();
-    Set<Class<?>> classes =
-        PinotReflectionUtils.getClassesThroughReflection(".*\\.event\\..*", EventObserverFactory.class);
+    Set<Class<?>> classes = PinotReflectionUtils
+        .getClassesThroughReflection(EVENT_OBSERVER_FACTORY_PACKAGE_REGEX_PATTERN, EventObserverFactory.class);
     for (Class<?> clazz : classes) {
       EventObserverFactory annotation = clazz.getAnnotation(EventObserverFactory.class);
       if (annotation.enabled()) {

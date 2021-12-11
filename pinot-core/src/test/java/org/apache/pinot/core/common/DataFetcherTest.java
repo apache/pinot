@@ -27,10 +27,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -40,12 +39,14 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BytesUtils;
-import org.apache.pinot.spi.utils.StringUtils;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class DataFetcherTest {
@@ -97,7 +98,7 @@ public class DataFetcherTest {
       String stringValue = Integer.toString(value);
       row.putValue(STRING_COLUMN, stringValue);
       row.putValue(NO_DICT_STRING_COLUMN, stringValue);
-      byte[] bytesValue = StringUtils.encodeUtf8(stringValue);
+      byte[] bytesValue = stringValue.getBytes(UTF_8);
       row.putValue(BYTES_COLUMN, bytesValue);
       row.putValue(NO_DICT_BYTES_COLUMN, bytesValue);
       String hexStringValue = BytesUtils.toHexString(bytesValue);
@@ -313,7 +314,7 @@ public class DataFetcherTest {
     _dataFetcher.fetchBytesValues(column, docIds, length, bytesValues);
 
     for (int i = 0; i < length; i++) {
-      Assert.assertEquals(StringUtils.decodeUtf8(bytesValues[i]), Integer.toString(_values[docIds[i]]), ERROR_MESSAGE);
+      Assert.assertEquals(new String(bytesValues[i], UTF_8), Integer.toString(_values[docIds[i]]), ERROR_MESSAGE);
     }
   }
 
@@ -328,7 +329,7 @@ public class DataFetcherTest {
     _dataFetcher.fetchStringValues(column, docIds, length, hexStringValues);
 
     for (int i = 0; i < length; i++) {
-      Assert.assertEquals(StringUtils.decodeUtf8(BytesUtils.toBytes(hexStringValues[i])),
+      Assert.assertEquals(new String(BytesUtils.toBytes(hexStringValues[i]), UTF_8),
           Integer.toString(_values[docIds[i]]), ERROR_MESSAGE);
     }
   }

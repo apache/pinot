@@ -49,7 +49,8 @@ public class HavingFilterHandlerTest {
     // Nested having
     {
       QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-          "SELECT MAX(m1), MIN(m1) FROM testTable GROUP BY d1 HAVING MAX(m1) IN (15, 20, 25) AND (MIN(m1) > 10 OR MIN(m1) <= 3)");
+          "SELECT MAX(m1), MIN(m1) FROM testTable GROUP BY d1 HAVING MAX(m1) IN (15, 20, 25) AND (MIN(m1) > 10 OR MIN"
+              + "(m1) <= 3)");
       DataSchema dataSchema = new DataSchema(new String[]{"d1", "max(m1)", "min(m1)"},
           new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
       PostAggregationHandler postAggregationHandler = new PostAggregationHandler(queryContext, dataSchema);
@@ -77,9 +78,13 @@ public class HavingFilterHandlerTest {
     // Having with all data types
     {
       QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
-          "SELECT COUNT(*) FROM testTable GROUP BY d1, d2, d3, d4, d5, d6 HAVING d1 > 10 AND d2 > 10 AND d3 > 10 AND d4 > 10 AND d5 > 10 AND d6 > 10");
-      DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "d4", "d5", "d6", "count(*)"},
-          new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE, ColumnDataType.STRING, ColumnDataType.BYTES, ColumnDataType.LONG});
+          "SELECT COUNT(*) FROM testTable GROUP BY d1, d2, d3, d4, d5, d6 HAVING d1 > 10 AND d2 > 10 AND d3 > 10 AND "
+              + "d4 > 10 AND d5 > 10 AND d6 > 10");
+      DataSchema dataSchema =
+          new DataSchema(new String[]{"d1", "d2", "d3", "d4", "d5", "d6", "count(*)"}, new ColumnDataType[]{
+              ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE,
+              ColumnDataType.STRING, ColumnDataType.BYTES, ColumnDataType.LONG
+          });
       PostAggregationHandler postAggregationHandler = new PostAggregationHandler(queryContext, dataSchema);
       HavingFilterHandler havingFilterHandler =
           new HavingFilterHandler(queryContext.getHavingFilter(), postAggregationHandler);

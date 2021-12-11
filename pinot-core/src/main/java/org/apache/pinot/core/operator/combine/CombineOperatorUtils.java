@@ -38,17 +38,22 @@ public class CombineOperatorUtils {
       Math.max(1, Math.min(10, Runtime.getRuntime().availableProcessors() / 2));
 
   /**
-   * Returns the number of threads used to execute the query in parallel.
+   * Returns the number of tasks for the query execution. The tasks can be assigned to multiple execution threads so
+   * that they can run in parallel. The parallelism is bounded by the task count.
    */
-  public static int getNumThreadsForQuery(int numOperators) {
-    return Math.min(numOperators, MAX_NUM_THREADS_PER_QUERY);
+  public static int getNumTasksForQuery(int numOperators, int maxExecutionThreads) {
+    if (maxExecutionThreads > 0) {
+      return Math.min(numOperators, maxExecutionThreads);
+    } else {
+      return Math.min(numOperators, MAX_NUM_THREADS_PER_QUERY);
+    }
   }
 
   /**
    * Sets the execution statistics into the results block.
    */
   public static void setExecutionStatistics(IntermediateResultsBlock resultsBlock, List<Operator> operators,
-      long threadCpuTimeNs) {
+      long threadCpuTimeNs, int numServerThreads) {
     int numSegmentsProcessed = operators.size();
     int numSegmentsMatched = 0;
     long numDocsScanned = 0;
@@ -72,5 +77,6 @@ public class CombineOperatorUtils {
     resultsBlock.setNumEntriesScannedPostFilter(numEntriesScannedPostFilter);
     resultsBlock.setNumTotalDocs(numTotalDocs);
     resultsBlock.setExecutionThreadCpuTimeNs(threadCpuTimeNs);
+    resultsBlock.setNumServerThreads(numServerThreads);
   }
 }

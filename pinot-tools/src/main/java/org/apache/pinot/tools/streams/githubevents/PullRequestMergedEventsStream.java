@@ -156,10 +156,10 @@ public class PullRequestMergedEventsStream {
         }
         try {
           GitHubAPICaller.GitHubAPIResponse githubAPIResponse = _gitHubAPICaller.callEventsAPI(etag);
-          switch (githubAPIResponse.statusCode) {
+          switch (githubAPIResponse._statusCode) {
             case 200: // Read new events
-              etag = githubAPIResponse.etag;
-              JsonNode jsonArray = JsonUtils.stringToJsonNode(githubAPIResponse.responseString);
+              etag = githubAPIResponse._etag;
+              JsonNode jsonArray = JsonUtils.stringToJsonNode(githubAPIResponse._responseString);
               for (JsonNode eventElement : jsonArray) {
                 try {
                   GenericRecord genericRecord = convertToPullRequestMergedGenericRecord(eventElement);
@@ -182,20 +182,21 @@ public class PullRequestMergedEventsStream {
               break;
             case 403: // Rate Limit exceeded
               printStatus(Quickstart.Color.YELLOW,
-                  "Rate limit exceeded, sleeping until " + githubAPIResponse.resetTimeMs);
-              long sleepMs = Math.max(60_000L, githubAPIResponse.resetTimeMs - System.currentTimeMillis());
+                  "Rate limit exceeded, sleeping until " + githubAPIResponse._resetTimeMs);
+              long sleepMs = Math.max(60_000L, githubAPIResponse._resetTimeMs - System.currentTimeMillis());
               Thread.sleep(sleepMs);
               break;
             case 401: // Unauthorized
               printStatus(Quickstart.Color.YELLOW,
-                  "Unauthorized call to GitHub events API. Status message: " + githubAPIResponse.statusMessage
+                  "Unauthorized call to GitHub events API. Status message: " + githubAPIResponse._statusMessage
                       + ". Exiting.");
               return;
             default: // Unknown status code
               printStatus(Quickstart.Color.YELLOW,
-                  "Unknown status code " + githubAPIResponse.statusCode + " statusMessage "
-                      + githubAPIResponse.statusMessage + ". Retry in 10s");
+                  "Unknown status code " + githubAPIResponse._statusCode + " statusMessage "
+                      + githubAPIResponse._statusMessage + ". Retry in 10s");
               Thread.sleep(SLEEP_MILLIS);
+              break;
           }
         } catch (Exception e) {
           LOGGER.error("Exception in reading events data", e);
@@ -233,22 +234,22 @@ public class PullRequestMergedEventsStream {
           String commitsURL = pullRequest.get("commits_url").asText();
           GitHubAPICaller.GitHubAPIResponse commitsResponse = _gitHubAPICaller.callAPI(commitsURL);
 
-          if (commitsResponse.responseString != null) {
-            commits = JsonUtils.stringToJsonNode(commitsResponse.responseString);
+          if (commitsResponse._responseString != null) {
+            commits = JsonUtils.stringToJsonNode(commitsResponse._responseString);
           }
 
           JsonNode reviewComments = null;
           String reviewCommentsURL = pullRequest.get("review_comments_url").asText();
           GitHubAPICaller.GitHubAPIResponse reviewCommentsResponse = _gitHubAPICaller.callAPI(reviewCommentsURL);
-          if (reviewCommentsResponse.responseString != null) {
-            reviewComments = JsonUtils.stringToJsonNode(reviewCommentsResponse.responseString);
+          if (reviewCommentsResponse._responseString != null) {
+            reviewComments = JsonUtils.stringToJsonNode(reviewCommentsResponse._responseString);
           }
 
           JsonNode comments = null;
           String commentsURL = pullRequest.get("comments_url").asText();
           GitHubAPICaller.GitHubAPIResponse commentsResponse = _gitHubAPICaller.callAPI(commentsURL);
-          if (commentsResponse.responseString != null) {
-            comments = JsonUtils.stringToJsonNode(commentsResponse.responseString);
+          if (commentsResponse._responseString != null) {
+            comments = JsonUtils.stringToJsonNode(commentsResponse._responseString);
           }
 
           // get PullRequestMergeEvent

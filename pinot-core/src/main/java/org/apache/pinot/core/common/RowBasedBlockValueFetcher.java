@@ -49,9 +49,9 @@ public class RowBasedBlockValueFetcher {
   }
 
   private ValueFetcher createFetcher(BlockValSet blockValSet) {
-    DataType valueType = blockValSet.getValueType();
+    DataType storedType = blockValSet.getValueType().getStoredType();
     if (blockValSet.isSingleValue()) {
-      switch (valueType) {
+      switch (storedType) {
         case INT:
           return new IntSingleValueFetcher(blockValSet.getIntValuesSV());
         case LONG:
@@ -65,10 +65,10 @@ public class RowBasedBlockValueFetcher {
         case BYTES:
           return new BytesValueFetcher(blockValSet.getBytesValuesSV());
         default:
-          throw new IllegalStateException("Unsupported value type: " + valueType + " for single-value column");
+          throw new IllegalStateException("Unsupported value type: " + storedType + " for single-value column");
       }
     } else {
-      switch (valueType) {
+      switch (storedType) {
         case INT:
           return new IntMultiValueFetcher(blockValSet.getIntValuesMV());
         case LONG:
@@ -80,7 +80,7 @@ public class RowBasedBlockValueFetcher {
         case STRING:
           return new StringMultiValueFetcher(blockValSet.getStringValuesMV());
         default:
-          throw new IllegalStateException("Unsupported value type: " + valueType + " for multi-value column");
+          throw new IllegalStateException("Unsupported value type: " + storedType + " for multi-value column");
       }
     }
   }

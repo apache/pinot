@@ -21,7 +21,7 @@ package org.apache.pinot.tools.query.comparison;
 import java.io.File;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 public class QueryComparisonConfig extends PropertiesConfiguration {

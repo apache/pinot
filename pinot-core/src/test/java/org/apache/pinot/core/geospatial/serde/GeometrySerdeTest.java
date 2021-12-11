@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.geospatial.serde;
 
+import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.PrecisionModel;
@@ -25,7 +26,7 @@ import org.locationtech.jts.io.WKTReader;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.core.geospatial.GeometryUtils.GEOGRAPHY_SRID;
+import static org.apache.pinot.segment.local.utils.GeometryUtils.GEOGRAPHY_SRID;
 
 
 public class GeometrySerdeTest {
@@ -44,7 +45,7 @@ public class GeometrySerdeTest {
 
   @Test
   public void testMultiPoint()
-      throws Exception{
+      throws Exception {
     testSerde("MULTIPOINT (0 0)");
     testSerde("MULTIPOINT (0 0, 0 0)");
     testSerde("MULTIPOINT (0 0, 1 1, 2 3)");
@@ -102,17 +103,17 @@ public class GeometrySerdeTest {
         + "0.25, 0.25 0.75, 0.75 0.75, 0.75 0.25))");
     testSerde("MULTIPOLYGON (((30 20, 45 40, 10 40, 30 20)), ((0 0, 0 1, 1 1, 1 0, 0 0), (0.25 0.25, 0.25 0.75, 0"
         + ".75 0.75, 0.75 0.25, 0.25 0.25)))");
-    testSerde("MULTIPOLYGON (" + "((30 20, 45 40, 10 40, 30 20)), " +
+    testSerde("MULTIPOLYGON (" + "((30 20, 45 40, 10 40, 30 20)), "
         // clockwise, counter clockwise
-        "((0 0, 0 1, 1 1, 1 0, 0 0), (0.75 0.25, 0.75 0.75, 0.25 0.75, 0.25 0.25, 0.75 0.25)), " +
+        + "((0 0, 0 1, 1 1, 1 0, 0 0), (0.75 0.25, 0.75 0.75, 0.25 0.75, 0.25 0.25, 0.75 0.25)), "
         // clockwise, clockwise
-        "((0 0, 0 1, 1 1, 1 0, 0 0), (0.25 0.25, 0.25 0.75, 0.75 0.75, 0.75 0.25, 0.25 0.25)), " +
+        + "((0 0, 0 1, 1 1, 1 0, 0 0), (0.25 0.25, 0.25 0.75, 0.75 0.75, 0.75 0.25, 0.25 0.25)), "
         // counter clockwise, clockwise
-        "((0 0, 1 0, 1 1, 0 1, 0 0), (0.25 0.25, 0.25 0.75, 0.75 0.75, 0.75 0.25, 0.25 0.25)), " +
+        + "((0 0, 1 0, 1 1, 0 1, 0 0), (0.25 0.25, 0.25 0.75, 0.75 0.75, 0.75 0.25, 0.25 0.25)), "
         // counter clockwise, counter clockwise
-        "((0 0, 1 0, 1 1, 0 1, 0 0), (0.75 0.25, 0.75 0.75, 0.25 0.75, 0.25 0.25, 0.75 0.25)), " +
+        + "((0 0, 1 0, 1 1, 0 1, 0 0), (0.75 0.25, 0.75 0.75, 0.25 0.75, 0.25 0.25, 0.75 0.25)), "
         // counter clockwise, counter clockwise, clockwise
-        "((0 0, 1 0, 1 1, 0 1, 0 0), (0.75 0.25, 0.75 0.75, 0.25 0.75, 0.25 0.25, 0.75 0.25), (0.25 0.25, 0"
+        + "((0 0, 1 0, 1 1, 0 1, 0 0), (0.75 0.25, 0.75 0.75, 0.25 0.75, 0.25 0.25, 0.75 0.25), (0.25 0.25, 0"
         + ".25 0.75, 0.75 0.75, 0.75 0.25, 0.25 0.25)))");
     testSerde("MULTIPOLYGON EMPTY");
   }

@@ -31,9 +31,11 @@ ENV PRESTO_BUILD_DIR=/home/presto/build
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     build-essential vim wget curl git \
-    gcc libpq-dev python-dev python-pip python3-dev python3-pip python3-venv python3-wheel && \
+    gcc libpq-dev python3-dev python3-pip python3-venv python3-wheel && \
     pip3 install --upgrade pip setuptools wheel && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    ln -s /usr/bin/python3 /usr/bin/python
+
 RUN groupadd -g 999 presto && \
     useradd -r -u 999 -g presto --create-home --shell /bin/bash presto
 USER presto

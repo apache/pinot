@@ -26,19 +26,19 @@ import org.slf4j.LoggerFactory;
 public class ErrorInfo {
   private static final Logger LOGGER = LoggerFactory.getLogger(ErrorInfo.class);
 
-  private final String message;
-  private final int status;
+  private final String _message;
+  private final int _status;
 
   public ErrorInfo(WebApplicationException exception) {
-    this.message = exception.getMessage();
-    this.status = exception.getResponse().getStatus();
+    _message = exception.getMessage();
+    _status = exception.getResponse().getStatus();
   }
 
   public String getMessage() {
-    return message;
+    return _message;
   }
 
   public int getStatus() {
-    return status;
+    return _status;
   }
 }

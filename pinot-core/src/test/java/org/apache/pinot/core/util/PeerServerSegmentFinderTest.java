@@ -28,8 +28,8 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -99,13 +99,17 @@ public class PeerServerSegmentFinderTest {
     List<URI> httpServerURIs =
         PeerServerSegmentFinder.getPeerServerURIs(SEGMENT_1, CommonConstants.HTTP_PROTOCOL, _helixManager);
     assertEquals(2, httpServerURIs.size());
-    httpServerURIs.contains(new URI(StringUtil.join("/", "http://" + HOST_1_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1)));
-    httpServerURIs.contains(new URI(StringUtil.join("/", "http://" + HOST_3_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1)));
+    httpServerURIs.contains(new URI(
+        StringUtil.join("/", "http://" + HOST_1_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1)));
+    httpServerURIs.contains(new URI(
+        StringUtil.join("/", "http://" + HOST_3_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1)));
     List<URI> httpsServerURIs =
         PeerServerSegmentFinder.getPeerServerURIs(SEGMENT_1, CommonConstants.HTTPS_PROTOCOL, _helixManager);
     assertEquals(2, httpsServerURIs.size());
-    httpServerURIs.contains(new URI(StringUtil.join("/", "https://" + HOST_1_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1)));
-    httpServerURIs.contains(new URI(StringUtil.join("/", "https://" + HOST_3_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1)));
+    httpServerURIs.contains(new URI(StringUtil
+        .join("/", "https://" + HOST_1_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1)));
+    httpServerURIs.contains(new URI(StringUtil
+        .join("/", "https://" + HOST_3_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1)));
   }
 
   @Test

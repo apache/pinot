@@ -31,6 +31,9 @@ public class OffsetCriteria {
   public static final OffsetCriteria SMALLEST_OFFSET_CRITERIA =
       new OffsetCriteria.OffsetCriteriaBuilder().withOffsetSmallest();
 
+  public static final OffsetCriteria LARGEST_OFFSET_CRITERIA =
+      new OffsetCriteria.OffsetCriteriaBuilder().withOffsetLargest();
+
   /**
    * Enumerates the supported offset types
    */
@@ -47,7 +50,6 @@ public class OffsetCriteria {
 
     // Consumes from the custom offset criteria */
     CUSTOM
-
   }
 
   private OffsetType _offsetType;

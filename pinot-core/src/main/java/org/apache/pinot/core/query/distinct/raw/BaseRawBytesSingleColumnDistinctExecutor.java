@@ -22,12 +22,13 @@ import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctTable;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -36,12 +37,14 @@ import org.apache.pinot.spi.utils.ByteArray;
  */
 abstract class BaseRawBytesSingleColumnDistinctExecutor implements DistinctExecutor {
   final ExpressionContext _expression;
+  final DataType _dataType;
   final int _limit;
 
   final ObjectSet<ByteArray> _valueSet;
 
-  BaseRawBytesSingleColumnDistinctExecutor(ExpressionContext expression, int limit) {
+  BaseRawBytesSingleColumnDistinctExecutor(ExpressionContext expression, DataType dataType, int limit) {
     _expression = expression;
+    _dataType = dataType;
     _limit = limit;
 
     _valueSet = new ObjectOpenHashSet<>(Math.min(limit, MAX_INITIAL_CAPACITY));
@@ -49,8 +52,8 @@ abstract class BaseRawBytesSingleColumnDistinctExecutor implements DistinctExecu
 
   @Override
   public DistinctTable getResult() {
-    DataSchema dataSchema =
-        new DataSchema(new String[]{_expression.toString()}, new ColumnDataType[]{ColumnDataType.BYTES});
+    DataSchema dataSchema = new DataSchema(new String[]{_expression.toString()},
+        new ColumnDataType[]{ColumnDataType.fromDataTypeSV(_dataType)});
     List<Record> records = new ArrayList<>(_valueSet.size());
     for (ByteArray value : _valueSet) {
       records.add(new Record(new Object[]{value}));

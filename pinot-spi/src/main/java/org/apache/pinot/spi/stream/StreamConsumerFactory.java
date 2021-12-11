@@ -80,5 +80,4 @@ public abstract class StreamConsumerFactory {
       PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
     return createPartitionLevelConsumer(clientId, partitionGroupConsumptionStatus.getPartitionGroupId());
   }
-
 }

@@ -25,9 +25,5 @@ package org.apache.pinot.controller.recommender.data.generator;
  * @see GeneratorFactory
  */
 public enum PatternType {
-    SEASONAL,
-    SPIKE,
-    SEQUENCE,
-    STRING,
-    MIXTURE
+  SEASONAL, SPIKE, SEQUENCE, STRING, MIXTURE
 }

@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix;
 
 import java.util.List;
-import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.periodictask.PeriodicTask;
@@ -40,25 +39,27 @@ public class ControllerPeriodicTaskStarterStatelessTest extends ControllerTest {
    * Test that controller starts up and helixResourceManager is non null before initiating periodic tasks
    */
   @Test
-  public void testHelixResourceManagerDuringControllerStart() {
+  public void testHelixResourceManagerDuringControllerStart()
+      throws Exception {
     startController();
+    stopController();
   }
 
   @AfterClass
   public void teardown() {
-    stopController();
+    stopZk();
   }
 
   @Override
-  protected ControllerStarter getControllerStarter(ControllerConf config) {
-    return new MockControllerStarter(config);
+  protected ControllerStarter getControllerStarter() {
+    return new MockControllerStarter();
   }
 
   private class MockControllerStarter extends ControllerStarter {
-    private static final int NUM_PERIODIC_TASKS = 8;
+    private static final int NUM_PERIODIC_TASKS = 9;
 
-    public MockControllerStarter(ControllerConf conf) {
-      super(conf);
+    public MockControllerStarter() {
+      super();
     }
 
     @Override

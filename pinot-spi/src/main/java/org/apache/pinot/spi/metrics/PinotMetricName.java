@@ -30,7 +30,8 @@ public interface PinotMetricName {
 
   /**
    * Overrides the equals method. This is needed as {@link PinotMetricName} is used as the key of the key-value pair
-   * inside the hashmap in MetricsRegistry. Without overriding equals() and hashCode() methods, all the existing k-v pairs
+   * inside the hashmap in MetricsRegistry. Without overriding equals() and hashCode() methods, all the existing k-v
+   * pairs
    * stored in hashmap cannot be retrieved by initializing a new key.
    */
   boolean equals(Object obj);

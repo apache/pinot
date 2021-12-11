@@ -28,6 +28,9 @@ import org.slf4j.LoggerFactory;
 
 
 public class PinotHadoopJobPreparationHelper {
+  private PinotHadoopJobPreparationHelper() {
+  }
+
   private static final Logger _logger = LoggerFactory.getLogger(PinotHadoopJobPreparationHelper.class);
 
   public static void addDepsJarToDistributedCacheHelper(FileSystem fileSystem, Job job, Path depsJarDir)

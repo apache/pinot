@@ -18,13 +18,6 @@
  */
 package org.apache.pinot.spi.utils.retry;
 
-import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
-import org.apache.pinot.spi.utils.retry.ExponentialBackoffRetryPolicy;
-import org.apache.pinot.spi.utils.retry.FixedDelayRetryPolicy;
-import org.apache.pinot.spi.utils.retry.NoDelayRetryPolicy;
-import org.apache.pinot.spi.utils.retry.RetriableOperationException;
-import org.apache.pinot.spi.utils.retry.RetryPolicies;
-import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -69,18 +62,20 @@ public class RetryPolicyTest {
         Assert.assertTrue(randomDelayRetryPolicy.getDelayMs(j) < 100);
       }
     }
-    randomDelayRetryPolicy = new RandomDelayRetryPolicy(MAX_NUM_ATTEMPTS, Integer.MAX_VALUE, (long)Integer.MAX_VALUE + 1);
+    randomDelayRetryPolicy =
+        new RandomDelayRetryPolicy(MAX_NUM_ATTEMPTS, Integer.MAX_VALUE, (long) Integer.MAX_VALUE + 1);
     for (int i = 0; i < NUM_ROUNDS; i++) {
       for (int j = 0; j < MAX_NUM_ATTEMPTS; j++) {
         Assert.assertTrue(randomDelayRetryPolicy.getDelayMs(j) >= Integer.MAX_VALUE);
-        Assert.assertTrue(randomDelayRetryPolicy.getDelayMs(j) < (long)Integer.MAX_VALUE + 1);
+        Assert.assertTrue(randomDelayRetryPolicy.getDelayMs(j) < (long) Integer.MAX_VALUE + 1);
       }
     }
-    randomDelayRetryPolicy = new RandomDelayRetryPolicy(MAX_NUM_ATTEMPTS, (long)Integer.MAX_VALUE + 1, (long)Integer.MAX_VALUE + 10);
+    randomDelayRetryPolicy =
+        new RandomDelayRetryPolicy(MAX_NUM_ATTEMPTS, (long) Integer.MAX_VALUE + 1, (long) Integer.MAX_VALUE + 10);
     for (int i = 0; i < NUM_ROUNDS; i++) {
       for (int j = 0; j < MAX_NUM_ATTEMPTS; j++) {
-        Assert.assertTrue(randomDelayRetryPolicy.getDelayMs(j) >= (long)Integer.MAX_VALUE + 1);
-        Assert.assertTrue(randomDelayRetryPolicy.getDelayMs(j) < (long)Integer.MAX_VALUE + 10);
+        Assert.assertTrue(randomDelayRetryPolicy.getDelayMs(j) >= (long) Integer.MAX_VALUE + 1);
+        Assert.assertTrue(randomDelayRetryPolicy.getDelayMs(j) < (long) Integer.MAX_VALUE + 10);
       }
     }
   }

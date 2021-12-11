@@ -44,13 +44,14 @@ import software.amazon.awssdk.services.s3.model.S3Object;
 @Test
 @Listeners(com.adobe.testing.s3mock.testng.S3MockListener.class)
 public class S3PinotFSTest {
-  final String DELIMITER = "/";
-  S3PinotFS _s3PinotFS;
-  S3Client _s3Client;
-  final String BUCKET = "test-bucket";
-  final String SCHEME = "s3";
-  final String FILE_FORMAT = "%s://%s/%s";
-  final String DIR_FORMAT = "%s://%s";
+  private static final String DELIMITER = "/";
+  private static final String BUCKET = "test-bucket";
+  private static final String SCHEME = "s3";
+  private static final String FILE_FORMAT = "%s://%s/%s";
+  private static final String DIR_FORMAT = "%s://%s";
+
+  private S3PinotFS _s3PinotFS;
+  private S3Client _s3Client;
 
   @BeforeClass
   public void setUp() {
@@ -127,8 +128,7 @@ public class S3PinotFSTest {
 
     String[] actualFiles = _s3PinotFS.listFiles(URI.create(String.format(DIR_FORMAT, SCHEME, BUCKET)), false);
 
-    actualFiles =
-        Arrays.stream(actualFiles).filter(x -> x.contains("list")).toArray(String[]::new);
+    actualFiles = Arrays.stream(actualFiles).filter(x -> x.contains("list")).toArray(String[]::new);
     Assert.assertEquals(actualFiles.length, originalFiles.length);
 
     Assert.assertTrue(Arrays.equals(actualFiles, expectedFileNames.toArray()));
@@ -149,8 +149,9 @@ public class S3PinotFSTest {
     actualFiles = Arrays.stream(actualFiles).filter(x -> x.contains("list-2")).toArray(String[]::new);
     Assert.assertEquals(actualFiles.length, originalFiles.length);
 
-    Assert.assertTrue(
-        Arrays.equals(Arrays.stream(originalFiles).map(fileName -> String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + fileName)).toArray(), actualFiles));
+    Assert.assertTrue(Arrays.equals(Arrays.stream(originalFiles)
+            .map(fileName -> String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + fileName)).toArray(),
+        actualFiles));
   }
 
   @Test
@@ -317,5 +318,4 @@ public class S3PinotFSTest {
     HeadObjectResponse headObjectResponse = _s3Client.headObject(S3TestUtils.getHeadObjectRequest(BUCKET, folderName));
     Assert.assertTrue(headObjectResponse.sdkHttpResponse().isSuccessful());
   }
-
 }

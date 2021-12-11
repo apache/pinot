@@ -48,9 +48,9 @@ public class TierConfigUtilsTest {
             .build();
     Assert.assertFalse(TierConfigUtils.shouldRelocateToTiers(tableConfig));
 
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTierConfigList(Lists
-        .newArrayList(new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE"))).build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTierConfigList(
+        Lists.newArrayList(new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d",
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null, null))).build();
     Assert.assertTrue(TierConfigUtils.shouldRelocateToTiers(tableConfig));
 
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").build();
@@ -64,9 +64,9 @@ public class TierConfigUtilsTest {
             .build();
     Assert.assertFalse(TierConfigUtils.shouldRelocateToTiers(tableConfig));
 
-    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").setTierConfigList(Lists
-        .newArrayList(new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE"))).build();
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").setTierConfigList(
+        Lists.newArrayList(new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d",
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null, null))).build();
     Assert.assertTrue(TierConfigUtils.shouldRelocateToTiers(tableConfig));
   }
 
@@ -77,7 +77,7 @@ public class TierConfigUtilsTest {
   public void testGetTier() {
     TierConfig tierConfig =
         new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", TierFactory.PINOT_SERVER_STORAGE_TYPE,
-            "tier1_tag_OFFLINE");
+            "tier1_tag_OFFLINE", null, null);
     Tier tier = TierFactory.getTier(tierConfig, null);
     Assert.assertEquals(tier.getName(), "tier1");
     Assert.assertTrue(tier.getSegmentSelector() instanceof TimeBasedTierSegmentSelector);
@@ -86,9 +86,11 @@ public class TierConfigUtilsTest {
         30 * 24 * 60 * 60 * 1000L);
     Assert.assertTrue(tier.getStorage() instanceof PinotServerTierStorage);
     Assert.assertEquals(tier.getStorage().getType(), TierFactory.PINOT_SERVER_STORAGE_TYPE);
-    Assert.assertEquals(((PinotServerTierStorage) tier.getStorage()).getTag(), "tier1_tag_OFFLINE");
+    Assert.assertEquals(((PinotServerTierStorage) tier.getStorage()).getServerTag(), "tier1_tag_OFFLINE");
 
-    tierConfig = new TierConfig("tier1", "unknown", "30d", TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE");
+    tierConfig =
+        new TierConfig("tier1", "unknown", "30d", TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null,
+            null);
     try {
       TierFactory.getTier(tierConfig, null);
       Assert.fail("Should have failed due to unsupported segmentSelectorType");
@@ -96,7 +98,9 @@ public class TierConfigUtilsTest {
       // expected
     }
 
-    tierConfig = new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", "unknown", "tier1_tag_OFFLINE");
+    tierConfig =
+        new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", "unknown", "tier1_tag_OFFLINE", null,
+            null);
     try {
       TierFactory.getTier(tierConfig, null);
       Assert.fail("Should've failed due to unsupported storageType");
@@ -113,15 +117,20 @@ public class TierConfigUtilsTest {
     Comparator<Tier> tierComparator = TierConfigUtils.getTierComparator();
 
     Tier tier1 =
-        new Tier("tier1", new TimeBasedTierSegmentSelector(null, "30d"), new PinotServerTierStorage("tag_OFFLINE"));
+        new Tier("tier1", new TimeBasedTierSegmentSelector(null, "30d"), new PinotServerTierStorage(
+            "tag_OFFLINE", null, null));
     Tier tier2 =
-        new Tier("tier2", new TimeBasedTierSegmentSelector(null, "1000d"), new PinotServerTierStorage("tag_OFFLINE"));
+        new Tier("tier2", new TimeBasedTierSegmentSelector(null, "1000d"),
+            new PinotServerTierStorage("tag_OFFLINE", null, null));
     Tier tier3 =
-        new Tier("tier3", new TimeBasedTierSegmentSelector(null, "24h"), new PinotServerTierStorage("tag_OFFLINE"));
+        new Tier("tier3", new TimeBasedTierSegmentSelector(null, "24h"),
+            new PinotServerTierStorage("tag_OFFLINE", null, null));
     Tier tier4 =
-        new Tier("tier4", new TimeBasedTierSegmentSelector(null, "10m"), new PinotServerTierStorage("tag_OFFLINE"));
+        new Tier("tier4", new TimeBasedTierSegmentSelector(null, "10m"),
+            new PinotServerTierStorage("tag_OFFLINE", null, null));
     Tier tier5 =
-        new Tier("tier5", new TimeBasedTierSegmentSelector(null, "1d"), new PinotServerTierStorage("tag_OFFLINE"));
+        new Tier("tier5", new TimeBasedTierSegmentSelector(null, "1d"),
+            new PinotServerTierStorage("tag_OFFLINE", null, null));
 
     Assert.assertEquals(tierComparator.compare(tier1, tier2), 1);
     Assert.assertEquals(tierComparator.compare(tier1, tier3), -1);

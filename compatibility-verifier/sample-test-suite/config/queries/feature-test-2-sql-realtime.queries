@@ -1,0 +1,66 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+# Selection
+SELECT longDimSV1, intDimMV1 FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ AND (stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72))) ORDER BY longDimSV1, intDimMV1
+# This is a subset comparison query: there are 10 qualified records in total, the query limit the number of returned records as 5, the test compares the returned results to be a subset of total qualified results.
+# To generate the result file, use this query instead:
+# SELECT longDimSV1, intDimMV1 FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ AND (stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72)))
+SELECT longDimSV1, intDimMV1 FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ AND (stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72))) LIMIT 5
+# This is a query exhausting all records: there are 10 qualified records in total, the query limit the number of returned records as 200
+SELECT longDimSV1, intDimMV1 FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ AND (stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72))) LIMIT 200
+
+# Aggregation
+SELECT count(*) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__
+SELECT sum(intMetric1), sumMV(intDimMV1), min(intMetric1), minMV(intDimMV2), max(longDimSV1), maxMV(intDimMV1) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__
+SELECT count(longDimSV1), countMV(intDimMV1), avg(floatMetric1), avgMV(intDimMV2), minMaxRange(doubleMetric1), minMaxRangeMV(intDimMV2) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__
+SELECT percentile(longDimSV1, 80), percentileMV(intDimMV1, 90), percentileEst(longDimSV1, 80), percentileEstMV(intDimMV1, 90), percentileTDigest(longDimSV1, 80), percentileTDigestMV(intDimMV1, 90) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__
+SELECT percentile(longDimSV1, 80.01), percentileMV(intDimMV1, 99.99), percentileEst(longDimSV1, 80.01), percentileEstMV(intDimMV1, 99.99), percentileTDigest(longDimSV1, 80.01), percentileTDigestMV(intDimMV1, 99.99) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__
+SELECT distinctCount(longDimSV1), distinctCountMV(intDimMV1), distinctCountHLL(longDimSV1), distinctCountHLLMV(intDimMV1) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__
+
+# Selection & Filtering & Grouping on Aggregation
+SELECT longDimSV1, intDimMV1, count(*) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ AND (stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72))) GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1, intDimMV1 LIMIT 20
+SELECT longDimSV1, intDimMV1, sum(intMetric1), sumMV(intDimMV1), min(intMetric1), minMV(intDimMV2), max(longDimSV1), maxMV(intDimMV1) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ AND (stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72))) GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1, intDimMV1 LIMIT 20
+SELECT longDimSV1, intDimMV1, count(longDimSV1), countMV(intDimMV1), avg(floatMetric1), avgMV(intDimMV2), minMaxRange(doubleMetric1), minMaxRangeMV(intDimMV2) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ AND (stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72))) GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1, intDimMV1 LIMIT 20
+SELECT longDimSV1, intDimMV1, percentile(longDimSV1, 80), percentileMV(intDimMV1, 90), percentileEst(longDimSV1, 80), percentileEstMV(intDimMV1, 90), percentileTDigest(longDimSV1, 80), percentileTDigestMV(intDimMV1, 90) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ AND (stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72))) GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1, intDimMV1 LIMIT 20
+SELECT longDimSV1, intDimMV1, percentile(longDimSV1, 80.01), percentileMV(intDimMV1, 99.99), percentileEst(longDimSV1, 80.01), percentileEstMV(intDimMV1, 99.99), percentileTDigest(longDimSV1, 80.01), percentileTDigestMV(intDimMV1, 99.99) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ AND (stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72))) GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1, intDimMV1 LIMIT 20
+SELECT longDimSV1, intDimMV1, distinctCount(longDimSV1), distinctCountMV(intDimMV1), distinctCountHLL(longDimSV1), distinctCountHLLMV(intDimMV1) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ AND (stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72))) GROUP BY longDimSV1, intDimMV1 ORDER BY longDimSV1, intDimMV1 LIMIT 20
+
+# Transformation Functions
+SELECT DISTINCT add(longDimSV1, sub(longDimSV2, 3)), mod(intMetric1, 10), div(doubleMetric1, mult(floatMetric1, 5)) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ ORDER BY add(longDimSV1, sub(longDimSV2, 3)) DESC, mod(intMetric1, 10), div(doubleMetric1, mult(floatMetric1, 5))
+SELECT DISTINCT floor(sqrt(doubleMetric1)), ceil(ln(longDimSV1)), exp(mod(abs(longDimSV2), 3)) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ ORDER BY floor(sqrt(doubleMetric1)), ceil(ln(longDimSV1)), exp(mod(abs(longDimSV2), 3)) DESC
+SELECT arrayLength(intDimMV1), arrayLength(valueIn(stringDimMV2, 'm2-2-0', 'm2-3-0')), count(*) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ GROUP BY arrayLength(intDimMV1), arrayLength(valueIn(stringDimMV2, 'm2-2-0', 'm2-3-0'))
+SELECT valueIn(intDimMV1, 3, 32), count(*) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ GROUP BY valueIn(intDimMV1, 3, 32)
+SELECT DISTINCT upper(stringDimSV1), lower(textDim1), reverse(stringDimSV2), ltrim(substr(textDim1, 4, 9)), rtrim(substr(textDim1, 4, 9)) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ ORDER BY upper(stringDimSV1)
+SELECT DISTINCT stringDimSV2, replace(stringDimSV2, 'foo', 'bar'), codePoint(stringDimSV2), rpad(stringDimSV2, 11, 'abc'), lpad(stringDimSV2, 11, 'xyz') from FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ AND(strPos(stringDimSV2, '2', 2) > 1 OR startsWith(stringDimSV2, 'foo') = 'true') ORDER BY codePoint(stringDimSV2), replace(stringDimSV2, 'foo', 'bar')
+
+# Groovy Scripts
+SELECT DISTINCT longDimSV1, longDimSV2, groovy('{"returnType":"LONG","isSingleValue":true}', 'arg0 + arg1', longDimSV1, longDimSV2) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__
+SELECT count(*), groovy('{"returnType":"STRING", "isSingleValue":true}', 'def result; if (arg0 < 0) { result = "NEGATIVE"; } else if (arg0 < 10) { result = "SMALL";} else if (arg0 < 50) { result = "MEDIUM";} else{result = "LARGE"}; return result', longDimSV1) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ GROUP BY groovy('{"returnType":"STRING", "isSingleValue":true}', 'def result; if (arg0 < 0) { result = "NEGATIVE"; } else if (arg0 < 10) { result = "SMALL";} else if (arg0 < 50) { result = "MEDIUM";} else{result = "LARGE"}; return result', longDimSV1) ORDER BY count(*) DESC
+SELECT DISTINCT groovy('{"returnType":"INT","isSingleValue":true}', 'arg0.toList().max()', intDimMV1) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ ORDER BY groovy('{"returnType":"INT","isSingleValue":true}', 'arg0.toList().max()', intDimMV1)
+
+# Json Map
+SELECT DISTINCT stringDimSV1, mapValue(mapDim1__KEYS, 'k1', mapDim1__VALUES), mapValue(mapDim1__KEYS, 'k4', mapDim1__VALUES) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ LIMIT 20
+SELECT DISTINCT stringDimSV1, jsonExtractScalar(mapDim2json, '$.k1', 'INT'), jsonExtractScalar(mapDim2json, '$.k4', 'INT') FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ ORDER BY stringDimSV1, jsonExtractScalar(mapDim2json, '$.k1', 'INT'), jsonExtractScalar(mapDim2json, '$.k4', 'INT') LIMIT 20
+SELECT jsonExtractScalar(mapDim2json, '$.k1', 'INT'), max(jsonExtractScalar(mapDim2json, '$.k2', 'INT')), min(jsonExtractScalar(mapDim2json, '$.k3', 'INT')) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ GROUP BY jsonExtractScalar(mapDim2json, '$.k1', 'INT') ORDER BY max(jsonExtractScalar(mapDim2json, '$.k2', 'INT')) LIMIT 20
+
+# Misc
+SELECT longDimSV1, count(*) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ AND REGEXP_LIKE(textDim1, '^Java.*') GROUP BY longDimSV1
+SELECT stringDimMV2, count(*) FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ AND REGEXP_LIKE(stringDimMV2, 'm2.*0') GROUP BY stringDimMV2 LIMIT 20
+SELECT stringDimSV1, longDimSV1, intDimMV1, intDimMV2 FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__ AND (stringDimSV1 != 's1-6' AND longDimSV1 BETWEEN 10 AND 1000 OR (intDimMV1 < 42 AND stringDimMV2 IN ('m2-0-0', 'm2-2-0') AND intDimMV2 NOT IN (6,72))) ORDER BY longDimSV1 DESC, stringDimSV1 LIMIT 100

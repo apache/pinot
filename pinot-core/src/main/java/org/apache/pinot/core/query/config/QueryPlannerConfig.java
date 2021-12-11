@@ -30,7 +30,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 public class QueryPlannerConfig {
 
   private PinotConfiguration _queryPlannerConfig;
-  private static String[] REQUIRED_KEYS = {};
+  private static final String[] REQUIRED_KEYS = {};
 
   public QueryPlannerConfig(PinotConfiguration queryPlannerConfig)
       throws ConfigurationException {

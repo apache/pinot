@@ -26,7 +26,7 @@ import org.apache.pinot.common.exception.QueryException;
  */
 public class TopAstNode extends BaseAstNode {
   private int _count;
-  public static int DEFAULT_TOP_N = 50;
+  public static final int DEFAULT_TOP_N = 50;
 
   public TopAstNode(int count) {
     if (count < 0) {

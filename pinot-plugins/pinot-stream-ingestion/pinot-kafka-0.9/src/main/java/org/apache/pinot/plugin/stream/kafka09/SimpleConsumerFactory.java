@@ -21,7 +21,8 @@ package org.apache.pinot.plugin.stream.kafka09;
 /**
  * This class is deprecated, and is kept for backward compatibility. Use {@link KafkaConsumerFactory} instead
  * Usages of org.apache.pinot.plugin.stream.kafka09.SimpleConsumerFactory in the table configs,
- * should be changed to org.apache.pinot.plugin.stream.kafka09.KafkaConsumerFactory, as SimpleConsumerFactory will be deleted eventually
+ * should be changed to org.apache.pinot.plugin.stream.kafka09.KafkaConsumerFactory, as SimpleConsumerFactory will be
+ * deleted eventually
  */
 @Deprecated
 public class SimpleConsumerFactory extends KafkaConsumerFactory {

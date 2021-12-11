@@ -21,14 +21,15 @@ package org.apache.pinot.core.util;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
+import org.apache.pinot.segment.local.utils.CrcUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
-import org.apache.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import org.apache.pinot.segment.spi.SegmentMetadata;
-import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -41,7 +42,7 @@ import org.testng.annotations.Test;
 public class CrcUtilsTest {
 
   private static final String AVRO_DATA = "data/test_data-mv.avro";
-  private static File INDEX_DIR = new File("/tmp/testingCrc");
+  private static final File INDEX_DIR = new File("/tmp/testingCrc");
 
   @Test
   public void test1()
@@ -67,9 +68,6 @@ public class CrcUtilsTest {
 
     final IndexSegment segment = ImmutableSegmentLoader.load(new File(makeSegmentAndReturnPath()), ReadMode.mmap);
     final SegmentMetadata m = segment.getSegmentMetadata();
-
-//    System.out.println(m.getCrc());
-//    System.out.println(m.getIndexCreationTime());
 
     FileUtils.deleteQuietly(INDEX_DIR);
   }

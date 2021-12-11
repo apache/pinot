@@ -26,44 +26,42 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.CmdLineParser;
-import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.StringArrayOptionHandler;
+import org.apache.pinot.spi.utils.ReadMode;
+import picocli.CommandLine;
 
 
+@CommandLine.Command
 public class SegmentDumpTool extends AbstractBaseCommand implements Command {
-  @Argument
-  @Option(name = "-path", required = true, metaVar = "<string>", usage = "Path of the folder containing the segment"
-      + " file")
+  @CommandLine.Option(names = {"-path"}, required = true,
+      description = "Path of the folder containing the segment" + " file")
   private String _segmentDir = null;
 
-  @Argument(index = 1, multiValued = true)
-  @Option(name = "-columns", handler = StringArrayOptionHandler.class, usage = "Columns to dump")
+  @CommandLine.Option(names = {"-columns"}, arity = "1..*", description = "Columns to dump")
   private List<String> _columnNames;
 
-  @Option(name = "-dumpStarTree")
+  @CommandLine.Option(names = {"-dumpStarTree"})
   private boolean _dumpStarTree = false;
 
   public void doMain(String[] args)
       throws Exception {
-    CmdLineParser parser = new CmdLineParser(this);
-    parser.parseArgument(args);
+    CommandLine commandLine = new CommandLine(this);
+    commandLine.parseArgs(args);
     dump();
   }
 
   private void dump()
       throws Exception {
-    PinotSegmentRecordReader reader = new PinotSegmentRecordReader(new File(_segmentDir));
-    Schema schema = reader.getSchema();
+    File indexDir = new File(_segmentDir);
+    Schema schema = new SegmentMetadataImpl(indexDir).getSchema();
+    PinotSegmentRecordReader reader = new PinotSegmentRecordReader(indexDir);
     GenericRow reuse = new GenericRow();
 
     // All columns by default
@@ -124,6 +122,7 @@ public class SegmentDumpTool extends AbstractBaseCommand implements Command {
         }
       }
       System.out.println();
+      row.clear();
     }
   }
 

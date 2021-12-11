@@ -19,9 +19,9 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.core.query.exception.BadQueryRequestException;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -31,7 +31,7 @@ public class TimeConversionTransformFunctionTest extends BaseTransformFunctionTe
 
   @Test(dataProvider = "testTimeConversionTransformFunction")
   public void testTimeConversionTransformFunction(String expressionStr) {
-    ExpressionContext expression = QueryContextConverterUtils.getExpression(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof TimeConversionTransformFunction);
     Assert.assertEquals(transformFunction.getName(), TimeConversionTransformFunction.FUNCTION_NAME);
@@ -52,24 +52,35 @@ public class TimeConversionTransformFunctionTest extends BaseTransformFunctionTe
 
   @DataProvider(name = "testTimeConversionTransformFunction")
   public Object[][] testTimeConversionTransformFunction() {
-    return new Object[][]{new Object[]{String.format("timeConvert(%s,'MILLISECONDS','DAYS')",
-        TIME_COLUMN)}, new Object[]{String.format(
-        "timeConvert(timeConvert(timeConvert(%s,'MILLISECONDS','SECONDS'),'SECONDS','HOURS'),'HOURS','DAYS')",
-        TIME_COLUMN)}};
+    return new Object[][]{
+        new Object[]{
+            String.format("timeConvert(%s,'MILLISECONDS','DAYS')", TIME_COLUMN)
+        }, new Object[]{
+        String.format(
+            "timeConvert(timeConvert(timeConvert(%s,'MILLISECONDS','SECONDS'),'SECONDS','HOURS'),'HOURS','DAYS')",
+            TIME_COLUMN)
+    }
+    };
   }
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = QueryContextConverterUtils.getExpression(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 
   @DataProvider(name = "testIllegalArguments")
   public Object[][] testIllegalArguments() {
-    return new Object[][]{new Object[]{String.format("timeConvert(%s,'MILLISECONDS')",
-        TIME_COLUMN)}, new Object[]{"timeConvert(5,'MILLISECONDS','DAYS')"}, new Object[]{String.format(
-        "timeConvert(%s,'MILLISECONDS','DAYS')", INT_MV_COLUMN)}, new Object[]{String.format(
-        "timeConvert(%s,'MILLISECONDS','1:DAYS')", TIME_COLUMN)}, new Object[]{String.format(
-        "timeConvert(%s,%s,'DAYS')", TIME_COLUMN, INT_SV_COLUMN)}};
+    return new Object[][]{
+        new Object[]{
+            String.format("timeConvert(%s,'MILLISECONDS')", TIME_COLUMN)
+        }, new Object[]{"timeConvert(5,'MILLISECONDS','DAYS')"}, new Object[]{
+        String.format("timeConvert(%s,'MILLISECONDS','DAYS')", INT_MV_COLUMN)
+    }, new Object[]{
+        String.format("timeConvert(%s,'MILLISECONDS','1:DAYS')", TIME_COLUMN)
+    }, new Object[]{
+        String.format("timeConvert(%s,%s,'DAYS')", TIME_COLUMN, INT_SV_COLUMN)
+    }
+    };
   }
 }

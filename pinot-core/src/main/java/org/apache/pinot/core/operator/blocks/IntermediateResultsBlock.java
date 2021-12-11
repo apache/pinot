@@ -31,12 +31,14 @@ import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.BlockDocIdValueSet;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
+import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -56,6 +58,7 @@ public class IntermediateResultsBlock implements Block {
   private AggregationGroupByResult _aggregationGroupByResult;
   private List<Map<String, Object>> _combinedAggregationGroupByResult;
   private List<ProcessingException> _processingExceptions;
+  private Collection<IntermediateRecord> _intermediateRecords;
   private long _numDocsScanned;
   private long _numEntriesScannedInFilter;
   private long _numEntriesScannedPostFilter;
@@ -66,6 +69,7 @@ public class IntermediateResultsBlock implements Block {
   private int _numResizes;
   private long _resizeTimeMs;
   private long _executionThreadCpuTimeNs;
+  private int _numServerThreads;
 
   private Table _table;
 
@@ -113,6 +117,17 @@ public class IntermediateResultsBlock implements Block {
     _aggregationFunctions = aggregationFunctions;
     _aggregationGroupByResult = aggregationGroupByResults;
     _dataSchema = dataSchema;
+  }
+
+  /**
+   * Constructor for aggregation group-by order-by result with {@link AggregationGroupByResult} and
+   * with a collection of intermediate records.
+   */
+  public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions,
+      Collection<IntermediateRecord> intermediateRecords, DataSchema dataSchema) {
+    _aggregationFunctions = aggregationFunctions;
+    _dataSchema = dataSchema;
+    _intermediateRecords = intermediateRecords;
   }
 
   public IntermediateResultsBlock(Table table) {
@@ -208,6 +223,14 @@ public class IntermediateResultsBlock implements Block {
     _executionThreadCpuTimeNs = executionThreadCpuTimeNs;
   }
 
+  public int getNumServerThreads() {
+    return _numServerThreads;
+  }
+
+  public void setNumServerThreads(int numServerThreads) {
+    _numServerThreads = numServerThreads;
+  }
+
   @VisibleForTesting
   public long getNumDocsScanned() {
     return _numDocsScanned;
@@ -271,6 +294,14 @@ public class IntermediateResultsBlock implements Block {
     _numGroupsLimitReached = numGroupsLimitReached;
   }
 
+  /**
+   * Get the collection of intermediate records
+   */
+  @Nullable
+  public Collection<IntermediateRecord> getIntermediateRecords() {
+    return _intermediateRecords;
+  }
+
   public DataTable getDataTable()
       throws Exception {
 
@@ -297,15 +328,14 @@ public class IntermediateResultsBlock implements Block {
   private DataTable getResultDataTable()
       throws IOException {
     DataTableBuilder dataTableBuilder = new DataTableBuilder(_dataSchema);
-
+    ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     Iterator<Record> iterator = _table.iterator();
-    ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
     while (iterator.hasNext()) {
       Record record = iterator.next();
       dataTableBuilder.startRow();
       int columnIndex = 0;
       for (Object value : record.getValues()) {
-        setDataTableColumn(columnDataTypes[columnIndex], dataTableBuilder, columnIndex, value);
+        setDataTableColumn(storedColumnDataTypes[columnIndex], dataTableBuilder, columnIndex, value);
         columnIndex++;
       }
       dataTableBuilder.finishRow();
@@ -426,21 +456,21 @@ public class IntermediateResultsBlock implements Block {
   }
 
   private DataTable attachMetadataToDataTable(DataTable dataTable) {
-    dataTable.getMetadata().put(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, String.valueOf(_numDocsScanned));
+    dataTable.getMetadata().put(MetadataKey.NUM_DOCS_SCANNED.getName(), String.valueOf(_numDocsScanned));
     dataTable.getMetadata()
-        .put(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedInFilter));
+        .put(MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName(), String.valueOf(_numEntriesScannedInFilter));
     dataTable.getMetadata()
-        .put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedPostFilter));
-    dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_PROCESSED, String.valueOf(_numSegmentsProcessed));
-    dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_MATCHED, String.valueOf(_numSegmentsMatched));
-    dataTable.getMetadata().put(DataTable.NUM_RESIZES_METADATA_KEY, String.valueOf(_numResizes));
-    dataTable.getMetadata().put(DataTable.RESIZE_TIME_MS_METADATA_KEY, String.valueOf(_resizeTimeMs));
+        .put(MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(), String.valueOf(_numEntriesScannedPostFilter));
+    dataTable.getMetadata().put(MetadataKey.NUM_SEGMENTS_PROCESSED.getName(), String.valueOf(_numSegmentsProcessed));
+    dataTable.getMetadata().put(MetadataKey.NUM_SEGMENTS_MATCHED.getName(), String.valueOf(_numSegmentsMatched));
+    dataTable.getMetadata().put(MetadataKey.NUM_RESIZES.getName(), String.valueOf(_numResizes));
+    dataTable.getMetadata().put(MetadataKey.RESIZE_TIME_MS.getName(), String.valueOf(_resizeTimeMs));
 
-    dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(_numTotalDocs));
+    dataTable.getMetadata().put(MetadataKey.TOTAL_DOCS.getName(), String.valueOf(_numTotalDocs));
     if (_numGroupsLimitReached) {
-      dataTable.getMetadata().put(DataTable.NUM_GROUPS_LIMIT_REACHED_KEY, "true");
+      dataTable.getMetadata().put(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true");
     }
-    if (_processingExceptions != null && _processingExceptions.size() > 0) {
+    if (_processingExceptions != null && !_processingExceptions.isEmpty()) {
       for (ProcessingException exception : _processingExceptions) {
         dataTable.addException(exception);
       }

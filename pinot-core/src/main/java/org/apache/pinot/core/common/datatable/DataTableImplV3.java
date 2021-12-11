@@ -31,42 +31,43 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
  * Datatable V3 implementation.
  * The layout of serialized V3 datatable looks like:
- * 	+-----------------------------------------------+
- * 	| 13 integers of header:                        |
- * 	| VERSION                                       |
- * 	| NUM_ROWS                                      |
- * 	| NUM_COLUMNS                                   |
- * 	| EXCEPTIONS SECTION START OFFSET               |
- * 	| EXCEPTIONS SECTION LENGTH                     |
- * 	| DICTIONARY_MAP SECTION START OFFSET           |
- * 	| DICTIONARY_MAP SECTION LENGTH                 |
- * 	| DATA_SCHEMA SECTION START OFFSET              |
- * 	| DATA_SCHEMA SECTION LENGTH                    |
- * 	| FIXED_SIZE_DATA SECTION START OFFSET          |
- * 	| FIXED_SIZE_DATA SECTION LENGTH                |
- * 	| VARIABLE_SIZE_DATA SECTION START OFFSET       |
- * 	| VARIABLE_SIZE_DATA SECTION LENGTH             |
- * 	+-----------------------------------------------+
- * 	| EXCEPTIONS SECTION                            |
- * 	+-----------------------------------------------+
- * 	| DICTIONARY_MAP SECTION                        |
- * 	+-----------------------------------------------+
- * 	| DATA_SCHEMA SECTION                           |
- * 	+-----------------------------------------------+
- * 	| FIXED_SIZE_DATA SECTION                       |
- * 	+-----------------------------------------------+
- * 	| VARIABLE_SIZE_DATA SECTION                    |
- * 	+-----------------------------------------------+
- * 	| METADATA LENGTH                               |
- * 	| METADATA SECTION                              |
- * 	+-----------------------------------------------+
+ * +-----------------------------------------------+
+ * | 13 integers of header:                        |
+ * | VERSION                                       |
+ * | NUM_ROWS                                      |
+ * | NUM_COLUMNS                                   |
+ * | EXCEPTIONS SECTION START OFFSET               |
+ * | EXCEPTIONS SECTION LENGTH                     |
+ * | DICTIONARY_MAP SECTION START OFFSET           |
+ * | DICTIONARY_MAP SECTION LENGTH                 |
+ * | DATA_SCHEMA SECTION START OFFSET              |
+ * | DATA_SCHEMA SECTION LENGTH                    |
+ * | FIXED_SIZE_DATA SECTION START OFFSET          |
+ * | FIXED_SIZE_DATA SECTION LENGTH                |
+ * | VARIABLE_SIZE_DATA SECTION START OFFSET       |
+ * | VARIABLE_SIZE_DATA SECTION LENGTH             |
+ * +-----------------------------------------------+
+ * | EXCEPTIONS SECTION                            |
+ * +-----------------------------------------------+
+ * | DICTIONARY_MAP SECTION                        |
+ * +-----------------------------------------------+
+ * | DATA_SCHEMA SECTION                           |
+ * +-----------------------------------------------+
+ * | FIXED_SIZE_DATA SECTION                       |
+ * +-----------------------------------------------+
+ * | VARIABLE_SIZE_DATA SECTION                    |
+ * +-----------------------------------------------+
+ * | METADATA LENGTH                               |
+ * | METADATA SECTION                              |
+ * +-----------------------------------------------+
  */
 public class DataTableImplV3 extends BaseDataTable {
   private static final int HEADER_SIZE = Integer.BYTES * 13;
@@ -187,10 +188,29 @@ public class DataTableImplV3 extends BaseDataTable {
   public byte[] toBytes()
       throws IOException {
     ThreadTimer threadTimer = new ThreadTimer();
-    threadTimer.start();
 
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
+    writeLeadingSections(dataOutputStream);
+
+    // Add table serialization time metadata if thread timer is enabled.
+    if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
+      long responseSerializationCpuTimeNs = threadTimer.getThreadTimeNs();
+      getMetadata().put(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(), String.valueOf(responseSerializationCpuTimeNs));
+    }
+
+    // Write metadata: length followed by actual metadata bytes.
+    // NOTE: We ignore metadata serialization time in "responseSerializationCpuTimeNs" as it's negligible while
+    // considering it will bring a lot code complexity.
+    byte[] metadataBytes = serializeMetadata();
+    dataOutputStream.writeInt(metadataBytes.length);
+    dataOutputStream.write(metadataBytes);
+
+    return byteArrayOutputStream.toByteArray();
+  }
+
+  private void writeLeadingSections(DataOutputStream dataOutputStream)
+      throws IOException {
     dataOutputStream.writeInt(DataTableBuilder.VERSION_3);
     dataOutputStream.writeInt(_numRows);
     dataOutputStream.writeInt(_numColumns);
@@ -261,22 +281,6 @@ public class DataTableImplV3 extends BaseDataTable {
     if (_variableSizeDataBytes != null) {
       dataOutputStream.write(_variableSizeDataBytes);
     }
-
-    // Update the value of "threadCpuTimeNs" to account data table serialization time.
-    long responseSerializationCpuTimeNs = threadTimer.stopAndGetThreadTimeNs();
-    // TODO: currently log/emit a total thread cpu time for query execution time and data table serialization time.
-    //  Figure out a way to log/emit separately. Probably via providing an API on the DataTable to get/set query
-    //  context, which is supposed to be used at server side only.
-    long threadCpuTimeNs = Long.parseLong(getMetadata().getOrDefault(MetadataKey.THREAD_CPU_TIME_NS.getName(), "0"))
-        + responseSerializationCpuTimeNs;
-    getMetadata().put(MetadataKey.THREAD_CPU_TIME_NS.getName(), String.valueOf(threadCpuTimeNs));
-
-    // Write metadata: length followed by actual metadata bytes.
-    byte[] metadataBytes = serializeMetadata();
-    dataOutputStream.writeInt(metadataBytes.length);
-    dataOutputStream.write(metadataBytes);
-
-    return byteArrayOutputStream.toByteArray();
   }
 
   /**
@@ -311,7 +315,7 @@ public class DataTableImplV3 extends BaseDataTable {
       } else if (key.getValueType() == MetadataValueType.LONG) {
         dataOutputStream.write(Longs.toByteArray(Long.parseLong(value)));
       } else {
-        byte[] valueBytes = StringUtil.encodeUtf8(value);
+        byte[] valueBytes = value.getBytes(UTF_8);
         dataOutputStream.writeInt(valueBytes.length);
         dataOutputStream.write(valueBytes);
       }
@@ -366,7 +370,7 @@ public class DataTableImplV3 extends BaseDataTable {
     for (Map.Entry<Integer, String> entry : _errCodeToExceptionMap.entrySet()) {
       int key = entry.getKey();
       String value = entry.getValue();
-      byte[] valueBytes = StringUtil.encodeUtf8(value);
+      byte[] valueBytes = value.getBytes(UTF_8);
       dataOutputStream.writeInt(key);
       dataOutputStream.writeInt(valueBytes.length);
       dataOutputStream.write(valueBytes);

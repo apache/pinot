@@ -42,10 +42,11 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.exception.TableNotFoundException;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,7 +62,8 @@ public class PinotBrokerRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/brokers")
-  @ApiOperation(value = "List tenants and tables to brokers mappings", notes = "List tenants and tables to brokers mappings")
+  @ApiOperation(value = "List tenants and tables to brokers mappings",
+      notes = "List tenants and tables to brokers mappings")
   public Map<String, Map<String, List<String>>> listBrokersMapping(
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state) {
     Map<String, Map<String, List<String>>> resultMap = new HashMap<>();
@@ -90,8 +92,8 @@ public class PinotBrokerRestletResource {
       @ApiParam(value = "Name of the tenant", required = true) @PathParam("tenantName") String tenantName,
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state) {
     List<InstanceInfo> instanceInfoList = getBrokersForTenantV2(tenantName, state);
-    List<String> tenantBrokers = instanceInfoList.stream().map(InstanceInfo::getInstanceName)
-        .collect(Collectors.toList());
+    List<String> tenantBrokers =
+        instanceInfoList.stream().map(InstanceInfo::getInstanceName).collect(Collectors.toList());
     return tenantBrokers;
   }
 
@@ -116,14 +118,14 @@ public class PinotBrokerRestletResource {
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state) {
     List<InstanceInfo> instanceInfoList = getBrokersForTableV2(tableName, tableTypeStr, state);
-    return instanceInfoList.stream().map(InstanceInfo::getInstanceName)
-        .collect(Collectors.toList());
+    return instanceInfoList.stream().map(InstanceInfo::getInstanceName).collect(Collectors.toList());
   }
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/v2/brokers")
-  @ApiOperation(value = "List tenants and tables to brokers mappings", notes = "List tenants and tables to brokers mappings")
+  @ApiOperation(value = "List tenants and tables to brokers mappings",
+      notes = "List tenants and tables to brokers mappings")
   public Map<String, Map<String, List<InstanceInfo>>> listBrokersMappingV2(
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state) {
     Map<String, Map<String, List<InstanceInfo>>> resultMap = new HashMap<>();
@@ -211,30 +213,39 @@ public class PinotBrokerRestletResource {
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
-  @ApiOperation(value = "Enable/disable the query rate limiting for a broker instance", notes = "Enable/disable the query rate limiting for a broker instance")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 400, message = "Bad Request"), @ApiResponse(code = 404, message = "Instance not found"), @ApiResponse(code = 500, message = "Internal error")})
+  @ApiOperation(value = "Enable/disable the query rate limiting for a broker instance",
+      notes = "Enable/disable the query rate limiting for a broker instance")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 400, message = "Bad Request"),
+      @ApiResponse(code = 404, message = "Instance not found"),
+      @ApiResponse(code = 500, message = "Internal error")
+  })
   public SuccessResponse toggleQueryRateLimiting(
-      @ApiParam(value = "Broker instance name", required = true, example = "Broker_my.broker.com_30000") @PathParam("instanceName") String brokerInstanceName,
-      @ApiParam(value = "ENABLE|DISABLE", allowableValues = "ENABLE, DISABLE", required = true) @QueryParam("state") String state) {
+      @ApiParam(value = "Broker instance name", required = true, example = "Broker_my.broker.com_30000")
+      @PathParam("instanceName") String brokerInstanceName,
+      @ApiParam(value = "ENABLE|DISABLE", allowableValues = "ENABLE, DISABLE", required = true) @QueryParam("state")
+          String state) {
     if (brokerInstanceName == null || !brokerInstanceName.startsWith("Broker_")) {
       throw new ControllerApplicationException(LOGGER,
           String.format("'%s' is not a valid broker instance name.", brokerInstanceName), Response.Status.BAD_REQUEST);
     }
-    validateQueryQuotaStateChange(state);
+    String stateInUpperCases = state.toUpperCase();
+    validateQueryQuotaStateChange(stateInUpperCases);
     List<String> liveInstances = _pinotHelixResourceManager.getOnlineInstanceList();
     if (!liveInstances.contains(brokerInstanceName)) {
       throw new ControllerApplicationException(LOGGER, String.format("Instance '%s' not found.", brokerInstanceName),
           Response.Status.NOT_FOUND);
     }
-    _pinotHelixResourceManager.toggleQueryQuotaStateForBroker(brokerInstanceName, state);
-    String msg =
-        String.format("Set query rate limiting to: %s for all tables in broker: %s", state, brokerInstanceName);
+    _pinotHelixResourceManager.toggleQueryQuotaStateForBroker(brokerInstanceName, stateInUpperCases);
+    String msg = String
+        .format("Set query rate limiting to: %s for all tables in broker: %s", stateInUpperCases, brokerInstanceName);
     LOGGER.info(msg);
     return new SuccessResponse(msg);
   }
 
   private void validateQueryQuotaStateChange(String state) {
-    if (!"ENABLE".equalsIgnoreCase(state) && !"DISABLE".equalsIgnoreCase(state)) {
+    if (!"ENABLE".equals(state) && !"DISABLE".equals(state)) {
       throw new ControllerApplicationException(LOGGER, "Invalid query quota state: " + state,
           Response.Status.BAD_REQUEST);
     }
@@ -255,6 +266,8 @@ public class PinotBrokerRestletResource {
         break;
       case CommonConstants.Helix.StateModel.BrokerResourceStateModel.OFFLINE:
         brokers.removeAll(onlineBrokers);
+        break;
+      default:
         break;
     }
   }

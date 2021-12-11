@@ -31,24 +31,27 @@ import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.EnumUtils;
-import org.apache.pinot.core.data.function.GroovyFunctionEvaluator;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
  * The GroovyTransformFunction executes groovy expressions
- * 1st argument - json string containing returnType and isSingleValue e.g. '{"returnType":"LONG", "isSingleValue":false}'
- * 2nd argument - groovy script (string) using arg0, arg1, arg2... as arguments e.g. 'arg0 + " " + arg1', 'arg0 + arg1.toList().max() + arg2' etc
+ * 1st argument - json string containing returnType and isSingleValue e.g. '{"returnType":"LONG",
+ * "isSingleValue":false}'
+ * 2nd argument - groovy script (string) using arg0, arg1, arg2... as arguments e.g. 'arg0 + " " + arg1', 'arg0 +
+ * arg1.toList().max() + arg2' etc
  * rest of the arguments - identifiers/functions to the groovy script
  *
  * Sample queries:
  * SELECT GROOVY('{"returnType":"LONG", "isSingleValue":false}', 'arg0.findIndexValues{it==1}', products) FROM myTable
- * SELECT GROOVY('{"returnType":"INT", "isSingleValue":true}', 'arg0 * arg1 * 10', arraylength(units), columnB ) FROM bob
+ * SELECT GROOVY('{"returnType":"INT", "isSingleValue":true}', 'arg0 * arg1 * 10', arraylength(units), columnB ) FROM
+ * bob
  */
 public class GroovyTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "groovy";
@@ -76,7 +79,7 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   private int _numGroovyArgs;
   private TransformFunction[] _groovyArguments;
   private boolean[] _isSourceSingleValue;
-  private FieldSpec.DataType[] _sourceDataType;
+  private DataType[] _sourceStoredTypes;
   private BiFunction<TransformFunction, ProjectionBlock, Object>[] _transformToValuesFunctions;
   private BiFunction<Object, Integer, Object>[] _fetchElementFunctions;
   private Object[] _sourceArrays;
@@ -106,9 +109,10 @@ public class GroovyTransformFunction extends BaseTransformFunction {
       Preconditions.checkState(returnValueMetadataJson.hasNonNull(IS_SINGLE_VALUE_KEY),
           "The json string in the first argument of GROOVY transform function must have non-null 'isSingleValue'");
       String returnTypeStr = returnValueMetadataJson.get(RETURN_TYPE_KEY).asText();
-      Preconditions.checkState(EnumUtils.isValidEnum(FieldSpec.DataType.class, returnTypeStr),
-          "The 'returnType' in the json string which is the first argument of GROOVY transform function must be a valid FieldSpec.DataType enum value");
-      _resultMetadata = new TransformResultMetadata(FieldSpec.DataType.valueOf(returnTypeStr),
+      Preconditions.checkState(EnumUtils.isValidEnum(DataType.class, returnTypeStr),
+          "The 'returnType' in the json string which is the first argument of GROOVY transform function must be a "
+              + "valid FieldSpec.DataType enum value");
+      _resultMetadata = new TransformResultMetadata(DataType.valueOf(returnTypeStr),
           returnValueMetadataJson.get(IS_SINGLE_VALUE_KEY).asBoolean(true), false);
     } catch (IOException e) {
       throw new IllegalStateException(
@@ -125,7 +129,7 @@ public class GroovyTransformFunction extends BaseTransformFunction {
     if (_numGroovyArgs > 0) {
       _groovyArguments = new TransformFunction[_numGroovyArgs];
       _isSourceSingleValue = new boolean[_numGroovyArgs];
-      _sourceDataType = new FieldSpec.DataType[_numGroovyArgs];
+      _sourceStoredTypes = new DataType[_numGroovyArgs];
       int idx = 0;
       for (int i = 2; i < numArgs; i++) {
         TransformFunction argument = arguments.get(i);
@@ -134,7 +138,7 @@ public class GroovyTransformFunction extends BaseTransformFunction {
         _groovyArguments[idx] = argument;
         TransformResultMetadata resultMetadata = argument.getResultMetadata();
         _isSourceSingleValue[idx] = resultMetadata.isSingleValue();
-        _sourceDataType[idx++] = resultMetadata.getDataType();
+        _sourceStoredTypes[idx++] = resultMetadata.getDataType().getStoredType();
       }
       // construct arguments string for GroovyFunctionEvaluator
       String argumentsStr = IntStream.range(0, _numGroovyArgs).mapToObj(i -> ARGUMENT_PREFIX + i)
@@ -164,7 +168,7 @@ public class GroovyTransformFunction extends BaseTransformFunction {
       BiFunction<Object, Integer, Object> getElementFunction;
       BiFunction<TransformFunction, ProjectionBlock, Object> transformToValuesFunction;
       if (_isSourceSingleValue[i]) {
-        switch (_sourceDataType[i]) {
+        switch (_sourceStoredTypes[i]) {
           case INT:
             transformToValuesFunction = TransformFunction::transformToIntValuesSV;
             getElementFunction = (sourceArray, position) -> ((int[]) sourceArray)[position];
@@ -187,10 +191,10 @@ public class GroovyTransformFunction extends BaseTransformFunction {
             break;
           default:
             throw new IllegalStateException(
-                "Unsupported data type '" + _sourceDataType[i] + "' for GROOVY transform function");
+                "Unsupported data type '" + _sourceStoredTypes[i] + "' for GROOVY transform function");
         }
       } else {
-        switch (_sourceDataType[i]) {
+        switch (_sourceStoredTypes[i]) {
           case INT:
             transformToValuesFunction = TransformFunction::transformToIntValuesMV;
             getElementFunction = (sourceArray, position) -> ((int[][]) sourceArray)[position];
@@ -213,7 +217,7 @@ public class GroovyTransformFunction extends BaseTransformFunction {
             break;
           default:
             throw new IllegalStateException(
-                "Unsupported data type '" + _sourceDataType[i] + "' for GROOVY transform function");
+                "Unsupported data type '" + _sourceStoredTypes[i] + "' for GROOVY transform function");
         }
       }
       _transformToValuesFunctions[i] = transformToValuesFunction;

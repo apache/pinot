@@ -29,6 +29,7 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -40,7 +41,8 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
  * <ul>
  *   <li><b>TableName:</b> name of the dimension table which will be used</li>
  *   <li><b>ColumnName:</b> column name from the dimension table to look up</li>
- *   <li><b>JoinKey:</b> primary key column name for the dimension table. Note: Only primary key[s] are supported for JoinKey</li>
+ *   <li><b>JoinKey:</b> primary key column name for the dimension table. Note: Only primary key[s] are supported for
+ *   JoinKey</li>
  *   <li><b>JoinValue:</b> primary key value</li>
  *   ...<br>
  *   *[If the dimension table has more then one primary keys (composite pk)]
@@ -82,18 +84,17 @@ public class LookupTransformFunction extends BaseTransformFunction {
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     // Check that there are correct number of arguments
-    Preconditions
-        .checkArgument(arguments.size() >= 4,
-            "At least 4 arguments are required for LOOKUP transform function: " +
-            "LOOKUP(TableName, ColumnName, JoinKey, JoinValue [, JoinKey2, JoinValue2 ...])");
+    Preconditions.checkArgument(arguments.size() >= 4,
+        "At least 4 arguments are required for LOOKUP transform function: "
+            + "LOOKUP(TableName, ColumnName, JoinKey, JoinValue [, JoinKey2, JoinValue2 ...])");
     Preconditions
         .checkArgument(arguments.size() % 2 == 0, "Should have the same number of JoinKey and JoinValue arguments");
 
     TransformFunction dimTableNameFunction = arguments.get(0);
     Preconditions.checkArgument(dimTableNameFunction instanceof LiteralTransformFunction,
         "First argument must be a literal(string) representing the dimension table name");
-    _dimTableName = TableNameBuilder.OFFLINE.tableNameWithType(
-        ((LiteralTransformFunction) dimTableNameFunction).getLiteral());
+    _dimTableName =
+        TableNameBuilder.OFFLINE.tableNameWithType(((LiteralTransformFunction) dimTableNameFunction).getLiteral());
 
     TransformFunction dimColumnFunction = arguments.get(1);
     Preconditions.checkArgument(dimColumnFunction instanceof LiteralTransformFunction,
@@ -117,17 +118,17 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
     // Validate lookup table and relevant columns
     _dataManager = DimensionTableDataManager.getInstanceByTableName(_dimTableName);
-    Preconditions.checkArgument(_dataManager != null,
-        "Dimension table does not exist: %s", _dimTableName);
+    Preconditions.checkArgument(_dataManager != null, "Dimension table does not exist: %s", _dimTableName);
 
     _lookupColumnFieldSpec = _dataManager.getColumnFieldSpec(_dimColumnName);
-    Preconditions.checkArgument(_lookupColumnFieldSpec != null,
-        "Column does not exist in dimension table: %s:%s", _dimTableName, _dimColumnName);
+    Preconditions
+        .checkArgument(_lookupColumnFieldSpec != null, "Column does not exist in dimension table: %s:%s", _dimTableName,
+            _dimColumnName);
 
     for (String joinKey : _joinKeys) {
       FieldSpec pkColumnSpec = _dataManager.getColumnFieldSpec(joinKey);
-      Preconditions.checkArgument(pkColumnSpec != null,
-          "Primary key column doesn't exist in dimension table: %s:%s", _dimTableName, joinKey);
+      Preconditions.checkArgument(pkColumnSpec != null, "Primary key column doesn't exist in dimension table: %s:%s",
+          _dimTableName, joinKey);
       _joinValueFieldSpecs.add(pkColumnSpec);
     }
 
@@ -147,9 +148,9 @@ public class LookupTransformFunction extends BaseTransformFunction {
     int numDocuments = projectionBlock.getNumDocs();
     Object[][] pkColumns = new Object[numPkColumns][];
     for (int c = 0; c < numPkColumns; c++) {
-      FieldSpec.DataType colType = _joinValueFieldSpecs.get(c).getDataType();
+      DataType storedType = _joinValueFieldSpecs.get(c).getDataType().getStoredType();
       TransformFunction tf = _joinValueFunctions.get(c);
-      switch (colType) {
+      switch (storedType) {
         case INT:
           pkColumns[c] = ArrayUtils.toObject(tf.transformToIntValuesSV(projectionBlock));
           break;

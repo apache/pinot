@@ -35,5 +35,4 @@ public interface TierSegmentSelector {
    * @return true if eligible
    */
   boolean selectSegment(String tableNameWithType, String segmentName);
-
 }

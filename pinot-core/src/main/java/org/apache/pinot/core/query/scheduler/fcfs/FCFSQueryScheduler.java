@@ -18,10 +18,9 @@
  */
 package org.apache.pinot.core.query.scheduler.fcfs;
 
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListenableFutureTask;
 import java.util.concurrent.atomic.LongAccumulator;
-
-import javax.annotation.Nonnull;
-
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
@@ -32,9 +31,6 @@ import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
 import org.apache.pinot.core.query.scheduler.resources.UnboundedResourceManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListenableFutureTask;
-
 
 /**
  * First Come First Served(FCFS) query scheduler. The FCFS policy applies across all tables.
@@ -43,21 +39,20 @@ import com.google.common.util.concurrent.ListenableFutureTask;
  */
 public class FCFSQueryScheduler extends QueryScheduler {
 
-  public FCFSQueryScheduler(@Nonnull PinotConfiguration config, @Nonnull QueryExecutor queryExecutor,
-      @Nonnull ServerMetrics serverMetrics, @Nonnull LongAccumulator latestQueryTime) {
+  public FCFSQueryScheduler(PinotConfiguration config, QueryExecutor queryExecutor, ServerMetrics serverMetrics,
+      LongAccumulator latestQueryTime) {
     super(config, queryExecutor, new UnboundedResourceManager(config), serverMetrics, latestQueryTime);
   }
 
-  @Nonnull
   @Override
-  public ListenableFuture<byte[]> submit(@Nonnull ServerQueryRequest queryRequest) {
-    if (!isRunning) {
+  public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
+    if (!_isRunning) {
       return immediateErrorResponse(queryRequest, QueryException.SERVER_SCHEDULER_DOWN_ERROR);
     }
     queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
-    QueryExecutorService queryExecutorService = resourceManager.getExecutorService(queryRequest, null);
+    QueryExecutorService queryExecutorService = _resourceManager.getExecutorService(queryRequest, null);
     ListenableFutureTask<byte[]> queryTask = createQueryFutureTask(queryRequest, queryExecutorService);
-    resourceManager.getQueryRunners().submit(queryTask);
+    _resourceManager.getQueryRunners().submit(queryTask);
     return queryTask;
   }
 

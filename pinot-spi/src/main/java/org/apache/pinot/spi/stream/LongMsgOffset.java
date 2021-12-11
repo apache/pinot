@@ -1,8 +1,3 @@
-package org.apache.pinot.spi.stream;
-
-import com.google.common.annotations.VisibleForTesting;
-
-
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,6 +16,11 @@ import com.google.common.annotations.VisibleForTesting;
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.spi.stream;
+
+import com.google.common.annotations.VisibleForTesting;
+
+
 public class LongMsgOffset implements StreamPartitionMsgOffset {
   private final long _offset;
 
@@ -38,12 +38,12 @@ public class LongMsgOffset implements StreamPartitionMsgOffset {
   }
 
   public LongMsgOffset(StreamPartitionMsgOffset other) {
-    _offset = ((LongMsgOffset)other)._offset;
+    _offset = ((LongMsgOffset) other)._offset;
   }
 
   @Override
   public int compareTo(Object other) {
-    return Long.compare(_offset, ((LongMsgOffset)other)._offset);
+    return Long.compare(_offset, ((LongMsgOffset) other)._offset);
   }
 
   @Override

@@ -29,6 +29,9 @@ import org.apache.pinot.spi.plugin.PluginManager;
  *
  */
 public class StreamDataProvider {
+  private StreamDataProvider() {
+  }
+
   public static StreamDataServerStartable getServerDataStartable(String clazz, Properties props)
       throws Exception {
     final StreamDataServerStartable streamDataServerStartable = PluginManager.get().createInstance(clazz);
@@ -38,7 +41,7 @@ public class StreamDataProvider {
 
   public static StreamDataProducer getStreamDataProducer(String clazz, Properties props)
       throws Exception {
-    final StreamDataProducer streamDataProducer = PluginManager.get().createInstance(clazz);;
+    final StreamDataProducer streamDataProducer = PluginManager.get().createInstance(clazz);
     streamDataProducer.init(props);
     return streamDataProducer;
   }

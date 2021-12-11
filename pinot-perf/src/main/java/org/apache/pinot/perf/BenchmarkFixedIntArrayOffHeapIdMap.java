@@ -21,11 +21,11 @@ package org.apache.pinot.perf;
 import java.io.IOException;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
-import org.apache.pinot.core.util.FixedIntArray;
-import org.apache.pinot.core.util.FixedIntArrayOffHeapIdMap;
-import org.apache.pinot.core.util.IdMap;
+import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
+import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.segment.local.utils.FixedIntArrayOffHeapIdMap;
+import org.apache.pinot.segment.local.utils.IdMap;
+import org.apache.pinot.spi.utils.FixedIntArray;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Mode;
@@ -55,9 +55,9 @@ public class BenchmarkFixedIntArrayOffHeapIdMap {
 
     FixedIntArray[] uniqueValues = new FixedIntArray[CARDINALITY];
     for (int i = 0; i < uniqueValues.length; i++) {
-      uniqueValues[i] = new FixedIntArray(
-          new int[]{random.nextInt(COLUMN_CARDINALITY), random.nextInt(COLUMN_CARDINALITY), random.nextInt(
-              COLUMN_CARDINALITY)});
+      uniqueValues[i] = new FixedIntArray(new int[]{
+          random.nextInt(COLUMN_CARDINALITY), random.nextInt(COLUMN_CARDINALITY), random.nextInt(COLUMN_CARDINALITY)
+      });
     }
 
     _values = new FixedIntArray[ROW_COUNT];

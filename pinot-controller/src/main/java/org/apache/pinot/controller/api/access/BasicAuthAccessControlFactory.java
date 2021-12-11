@@ -31,7 +31,8 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
- * Basic Authentication based on http headers. Configured via the "controller.admin.access.control" family of properties.
+ * Basic Authentication based on http headers. Configured via the "controller.admin.access.control" family of
+ * properties.
  *
  * <pre>
  *     Example:
@@ -65,7 +66,7 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
     private final Map<String, BasicAuthPrincipal> _token2principal;
 
     public BasicAuthAccessControl(Collection<BasicAuthPrincipal> principals) {
-      this._token2principal = principals.stream().collect(Collectors.toMap(BasicAuthPrincipal::getToken, p -> p));
+      _token2principal = principals.stream().collect(Collectors.toMap(BasicAuthPrincipal::getToken, p -> p));
     }
 
     @Override

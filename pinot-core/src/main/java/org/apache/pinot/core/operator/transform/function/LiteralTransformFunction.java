@@ -18,26 +18,31 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
  * The <code>LiteralTransformFunction</code> class is a special transform function which is a wrapper on top of a
- * LITERAL, and only supports {@link #getLiteral()}.
+ * LITERAL. The data type is inferred from the literal string.
+ * TODO: Preserve the type of the literal instead of inferring the type from the string
  */
 public class LiteralTransformFunction implements TransformFunction {
   private final String _literal;
+  private final DataType _dataType;
+
+  // literals may be shared but values are intentionally not volatile as assignment races are benign
   private int[] _intResult;
   private long[] _longResult;
   private float[] _floatResult;
@@ -47,24 +52,45 @@ public class LiteralTransformFunction implements TransformFunction {
 
   public LiteralTransformFunction(String literal) {
     _literal = literal;
+    _dataType = inferLiteralDataType(literal);
   }
 
-  public static FieldSpec.DataType inferLiteralDataType(LiteralTransformFunction transformFunction) {
-    String literal = transformFunction.getLiteral();
+  @VisibleForTesting
+  static DataType inferLiteralDataType(String literal) {
+    // Try to interpret the literal as number
     try {
-      Number literalNum = NumberUtils.createNumber(literal);
-      if (literalNum instanceof Integer) {
-        return FieldSpec.DataType.INT;
-      } else if (literalNum instanceof Long) {
-        return FieldSpec.DataType.LONG;
-      } else if (literalNum instanceof Float) {
-        return FieldSpec.DataType.FLOAT;
-      } else if (literalNum instanceof Double) {
-        return FieldSpec.DataType.DOUBLE;
+      Number number = NumberUtils.createNumber(literal);
+      if (number instanceof Integer) {
+        return DataType.INT;
+      } else if (number instanceof Long) {
+        return DataType.LONG;
+      } else if (number instanceof Float) {
+        return DataType.FLOAT;
+      } else if (number instanceof Double) {
+        return DataType.DOUBLE;
+      } else {
+        return DataType.STRING;
       }
     } catch (Exception e) {
+      // Ignored
     }
-    return FieldSpec.DataType.STRING;
+
+    // Try to interpret the literal as BOOLEAN
+    // NOTE: Intentionally use equals() instead of equalsIgnoreCase() here because boolean literal will always be parsed
+    //       into lowercase string. We don't want to parse string "TRUE" as boolean.
+    if (literal.equals("true") || literal.equals("false")) {
+      return DataType.BOOLEAN;
+    }
+
+    // Try to interpret the literal as TIMESTAMP
+    try {
+      Timestamp.valueOf(literal);
+      return DataType.TIMESTAMP;
+    } catch (Exception e) {
+      // Ignored
+    }
+
+    return DataType.STRING;
   }
 
   public String getLiteral() {
@@ -82,7 +108,7 @@ public class LiteralTransformFunction implements TransformFunction {
 
   @Override
   public TransformResultMetadata getResultMetadata() {
-    return BaseTransformFunction.STRING_SV_NO_DICTIONARY_METADATA;
+    return new TransformResultMetadata(_dataType, true, false);
   }
 
   @Override
@@ -102,56 +128,82 @@ public class LiteralTransformFunction implements TransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    if (_intResult == null) {
-      _intResult = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-      Arrays.fill(_intResult, Integer.parseInt(_literal));
+    int numDocs = projectionBlock.getNumDocs();
+    int[] intResult = _intResult;
+    if (intResult == null || intResult.length < numDocs) {
+      intResult = new int[numDocs];
+      if (_dataType != DataType.BOOLEAN) {
+        Arrays.fill(intResult, new BigDecimal(_literal).intValue());
+      } else {
+        Arrays.fill(intResult, _literal.equals("true") ? 1 : 0);
+      }
+      _intResult = intResult;
     }
-    return _intResult;
+    return intResult;
   }
 
   @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    if (_longResult == null) {
-      _longResult = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-      Arrays.fill(_longResult, new BigDecimal(_literal).longValue());
+    int numDocs = projectionBlock.getNumDocs();
+    long[] longResult = _longResult;
+    if (longResult == null || longResult.length < numDocs) {
+      longResult = new long[numDocs];
+      if (_dataType != DataType.TIMESTAMP) {
+        Arrays.fill(longResult, new BigDecimal(_literal).longValue());
+      } else {
+        Arrays.fill(longResult, Timestamp.valueOf(_literal).getTime());
+      }
+      _longResult = longResult;
     }
-    return _longResult;
+    return longResult;
   }
 
   @Override
   public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
-    if (_floatResult == null) {
-      _floatResult = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-      Arrays.fill(_floatResult, new BigDecimal(_literal).floatValue());
+    int numDocs = projectionBlock.getNumDocs();
+    float[] floatResult = _floatResult;
+    if (floatResult == null || floatResult.length < numDocs) {
+      floatResult = new float[numDocs];
+      Arrays.fill(floatResult, new BigDecimal(_literal).floatValue());
+      _floatResult = floatResult;
     }
-    return _floatResult;
+    return floatResult;
   }
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_doubleResult == null) {
-      _doubleResult = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-      Arrays.fill(_doubleResult, new BigDecimal(_literal).doubleValue());
+    int numDocs = projectionBlock.getNumDocs();
+    double[] doubleResult = _doubleResult;
+    if (doubleResult == null || doubleResult.length < numDocs) {
+      doubleResult = new double[numDocs];
+      Arrays.fill(doubleResult, new BigDecimal(_literal).doubleValue());
+      _doubleResult = doubleResult;
     }
-    return _doubleResult;
+    return doubleResult;
   }
 
   @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    if (_stringResult == null) {
-      _stringResult = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-      Arrays.fill(_stringResult, _literal);
+    int numDocs = projectionBlock.getNumDocs();
+    String[] stringResult = _stringResult;
+    if (stringResult == null || stringResult.length < numDocs) {
+      stringResult = new String[numDocs];
+      Arrays.fill(stringResult, _literal);
+      _stringResult = stringResult;
     }
-    return _stringResult;
+    return stringResult;
   }
 
   @Override
   public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
-    if (_bytesResult == null) {
-      _bytesResult = new byte[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-      Arrays.fill(_bytesResult, BytesUtils.toBytes(_literal));
+    int numDocs = projectionBlock.getNumDocs();
+    byte[][] bytesResult = _bytesResult;
+    if (bytesResult == null || bytesResult.length < numDocs) {
+      bytesResult = new byte[numDocs][];
+      Arrays.fill(bytesResult, BytesUtils.toBytes(_literal));
+      _bytesResult = bytesResult;
     }
-    return _bytesResult;
+    return bytesResult;
   }
 
   @Override

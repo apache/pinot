@@ -26,6 +26,9 @@ import java.util.TreeSet;
 
 
 public class LLCUtils {
+  private LLCUtils() {
+  }
+
   /**
    * Compute the table of a sorted list of segments grouped by Kafka partition.
    *

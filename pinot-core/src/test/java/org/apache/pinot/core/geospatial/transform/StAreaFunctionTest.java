@@ -47,7 +47,8 @@ public class StAreaFunctionTest extends GeoFunctionTest {
 
     // Test nested geometry collection
     assertArea(
-        "GEOMETRYCOLLECTION (POLYGON ((0 0, 2 0, 2 2, 0 2, 0 0)), POLYGON ((1 1, 3 1, 3 3, 1 3, 1 1)), GEOMETRYCOLLECTION (POINT (8 8), LINESTRING (5 5, 6 6), POLYGON ((1 1, 3 1, 3 4, 1 4, 1 1))))",
+        "GEOMETRYCOLLECTION (POLYGON ((0 0, 2 0, 2 2, 0 2, 0 0)), POLYGON ((1 1, 3 1, 3 3, 1 3, 1 1)), "
+            + "GEOMETRYCOLLECTION (POINT (8 8), LINESTRING (5 5, 6 6), POLYGON ((1 1, 3 1, 3 4, 1 4, 1 1))))",
         14.0, true);
   }
 
@@ -57,7 +58,8 @@ public class StAreaFunctionTest extends GeoFunctionTest {
     assertArea("POLYGON((0 0, 0 1, 1 1, 1 0, 0 0))", 1.2364036567076416E10, false);
 
     assertArea(
-        "POLYGON((-122.150124 37.486095, -122.149201 37.486606,  -122.145725 37.486580, -122.145923 37.483961, -122.149324 37.482480,  -122.150837 37.483238,  -122.150901 37.485392, -122.150124 37.486095))",
+        "POLYGON((-122.150124 37.486095, -122.149201 37.486606,  -122.145725 37.486580, -122.145923 37.483961, -122"
+            + ".149324 37.482480,  -122.150837 37.483238,  -122.150901 37.485392, -122.150124 37.486095))",
         163290.93943479148, false);
 
     double angleOfOneKm = 0.008993201943349;

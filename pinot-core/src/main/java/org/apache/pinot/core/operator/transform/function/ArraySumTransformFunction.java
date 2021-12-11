@@ -58,7 +58,7 @@ public class ArraySumTransformFunction extends BaseTransformFunction {
       throw new IllegalArgumentException(
           "The argument of ArraySum transform function must be a multi-valued column or a transform function");
     }
-    if (!firstArgument.getResultMetadata().getDataType().isNumeric()) {
+    if (!firstArgument.getResultMetadata().getDataType().getStoredType().isNumeric()) {
       throw new IllegalArgumentException("The argument of ArraySum transform function must be numeric");
     }
     _argument = firstArgument;

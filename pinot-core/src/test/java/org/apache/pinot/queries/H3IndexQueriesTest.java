@@ -27,17 +27,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.core.geospatial.GeometryUtils;
-import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
-import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.utils.GeometrySerializer;
+import org.apache.pinot.segment.local.utils.GeometryUtils;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -71,7 +71,7 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
   private static final Map<String, String> H3_INDEX_PROPERTIES = Collections.singletonMap("resolutions", "5");
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
       .setFieldConfigList(Collections.singletonList(
-          new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3,
+          new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3, null,
               H3_INDEX_PROPERTIES))).build();
 
   private IndexSegment _indexSegment;
@@ -130,7 +130,8 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
     {
       for (String query : Arrays
           .asList("SELECT COUNT(*) FROM testTable WHERE ST_Distance(h3Column, ST_Point(-122, 37.5, 1)) < -1",
-              "SELECT COUNT(*) FROM testTable WHERE ST_Distance(h3Column, ST_Point(-122, 37.5, 1)) BETWEEN 100 AND 50")) {
+              "SELECT COUNT(*) FROM testTable WHERE ST_Distance(h3Column, ST_Point(-122, 37.5, 1)) BETWEEN 100 AND "
+                  + "50")) {
         AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
         IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
         // Expect 0 entries scanned in filter

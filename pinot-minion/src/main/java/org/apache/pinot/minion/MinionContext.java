@@ -22,8 +22,8 @@ import java.io.File;
 import javax.net.ssl.SSLContext;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.core.minion.SegmentPurger;
-import org.apache.pinot.minion.metrics.MinionMetrics;
 
 
 /**

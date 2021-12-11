@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
+import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
@@ -29,11 +32,18 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  */
 @SuppressWarnings("rawtypes")
 public final class ResultReducerFactory {
+  private ResultReducerFactory() {
+  }
 
   /**
    * Constructs the right result reducer based on the given query context.
    */
   public static DataTableReducer getResultReducer(QueryContext queryContext) {
+    BrokerRequest brokerRequest = queryContext.getBrokerRequest();
+    if (brokerRequest != null && brokerRequest.getPinotQuery() != null && brokerRequest.getPinotQuery().isExplain()) {
+      return new ExplainPlanDataTableReducer(queryContext);
+    }
+
     AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
     if (aggregationFunctions == null) {
       // Selection query
@@ -48,10 +58,21 @@ public final class ResultReducerFactory {
         } else {
           return new AggregationDataTableReducer(queryContext);
         }
+      } else if (GapfillUtils.isPostAggregateGapfill(queryContext)) {
+        return new GapFillGroupByDataTableReducer(queryContext);
       } else {
         // Aggregation group-by query
         return new GroupByDataTableReducer(queryContext);
       }
+    }
+  }
+
+  public static StreamingReducer getStreamingReducer(QueryContext queryContext) {
+    if (!QueryContextUtils.isSelectionQuery(queryContext) || queryContext.getOrderByExpressions() != null) {
+      throw new UnsupportedOperationException("Only selection queries are supported");
+    } else {
+      // Selection query
+      return new SelectionOnlyStreamingReducer(queryContext);
     }
   }
 }

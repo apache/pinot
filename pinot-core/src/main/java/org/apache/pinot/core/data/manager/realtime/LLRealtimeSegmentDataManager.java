@@ -39,29 +39,29 @@ import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.CompletionMode;
+import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
-import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
-import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
-import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
-import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import org.apache.pinot.core.realtime.converter.RealtimeSegmentConverter;
-import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
-import org.apache.pinot.core.segment.creator.impl.V1Constants;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
-import org.apache.pinot.core.upsert.PartitionUpsertMetadataManager;
-import org.apache.pinot.core.util.IngestionUtils;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
+import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
+import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
+import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
+import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.MutableSegment;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.CompletionConfig;
@@ -72,6 +72,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.stream.MessageBatch;
+import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
@@ -85,6 +86,8 @@ import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 import org.apache.pinot.spi.stream.TransientConsumerException;
+import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.CompletionMode;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -205,7 +208,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private static final int BUILD_TIME_LEASE_SECONDS = 30;
   private static final int MAX_CONSECUTIVE_ERROR_COUNT = 5;
 
-  private final LLCRealtimeSegmentZKMetadata _segmentZKMetadata;
+  private final SegmentZKMetadata _segmentZKMetadata;
   private final TableConfig _tableConfig;
   private final RealtimeTableDataManager _realtimeTableDataManager;
   private final StreamMessageDecoder _messageDecoder;
@@ -219,17 +222,18 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final Semaphore _partitionGroupConsumerSemaphore;
   // A boolean flag to check whether the current thread has acquired the semaphore.
   // This boolean is needed because the semaphore is shared by threads; every thread holding this semaphore can
-  // modify the permit. This boolean make sure the semaphore gets released only once when the partition group stops consuming.
+  // modify the permit. This boolean make sure the semaphore gets released only once when the partition group stops
+  // consuming.
   private final AtomicBoolean _acquiredConsumerSemaphore;
   private final String _metricKeyName;
   private final ServerMetrics _serverMetrics;
   private final MutableSegmentImpl _realtimeSegment;
-  private StreamPartitionMsgOffset _currentOffset;
+  private volatile StreamPartitionMsgOffset _currentOffset;
   private volatile State _state;
   private volatile int _numRowsConsumed = 0;
   private volatile int _numRowsIndexed = 0; // Can be different from _numRowsConsumed when metrics update is enabled.
   private volatile int _numRowsErrored = 0;
-  private volatile int consecutiveErrorCount = 0;
+  private volatile int _consecutiveErrorCount = 0;
   private long _startTimeMs = 0;
   private final String _segmentNameStr;
   private final SegmentVersion _segmentVersion;
@@ -255,6 +259,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   final String _clientId;
   private final LLCSegmentName _llcSegmentName;
   private final RecordTransformer _recordTransformer;
+  private final ComplexTypeTransformer _complexTypeTransformer;
   private PartitionGroupConsumer _partitionGroupConsumer = null;
   private StreamMetadataProvider _streamMetadataProvider = null;
   private final File _resourceTmpDir;
@@ -265,7 +270,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final List<String> _noDictionaryColumns;
   private final List<String> _varLengthDictionaryColumns;
   private final String _sortedColumn;
-  private final Logger segmentLogger;
+  private final Logger _segmentLogger;
   private final String _tableStreamName;
   private final PinotDataBufferMemoryManager _memoryManager;
   private final AtomicLong _lastUpdatedRowsIndexed = new AtomicLong(0);
@@ -283,6 +288,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final boolean _nullHandlingEnabled;
   private final SegmentCommitterFactory _segmentCommitterFactory;
 
+  private volatile StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime = null;
+
   // TODO each time this method is called, we print reason for stop. Good to print only once.
   private boolean endCriteriaReached() {
     Preconditions.checkState(_state.shouldConsume(), "Incorrect state %s", _state);
@@ -294,24 +301,23 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         // the max time we are allowed to consume.
         if (now >= _consumeEndTime) {
           if (_realtimeSegment.getNumDocsIndexed() == 0) {
-            segmentLogger.info("No events came in, extending time by {} hours", TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS);
+            _segmentLogger.info("No events came in, extending time by {} hours", TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS);
             _consumeEndTime += TimeUnit.HOURS.toMillis(TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS);
             return false;
           }
-          segmentLogger
+          _segmentLogger
               .info("Stopping consumption due to time limit start={} now={} numRowsConsumed={} numRowsIndexed={}",
                   _startTimeMs, now, _numRowsConsumed, _numRowsIndexed);
           _stopReason = SegmentCompletionProtocol.REASON_TIME_LIMIT;
           return true;
         } else if (_numRowsIndexed >= _segmentMaxRowCount) {
-          segmentLogger.info("Stopping consumption due to row limit nRows={} numRowsIndexed={}, numRowsConsumed={}",
+          _segmentLogger.info("Stopping consumption due to row limit nRows={} numRowsIndexed={}, numRowsConsumed={}",
               _numRowsIndexed, _numRowsConsumed, _segmentMaxRowCount);
           _stopReason = SegmentCompletionProtocol.REASON_ROW_LIMIT;
           return true;
         } else if (_endOfPartitionGroup) {
-          segmentLogger.info(
-              "Stopping consumption due to end of partitionGroup reached nRows={} numRowsIndexed={}, numRowsConsumed={}",
-              _numRowsIndexed, _numRowsConsumed, _segmentMaxRowCount);
+          _segmentLogger.info("Stopping consumption due to end of partitionGroup reached nRows={} numRowsIndexed={}, "
+              + "numRowsConsumed={}", _numRowsIndexed, _numRowsConsumed, _segmentMaxRowCount);
           _stopReason = SegmentCompletionProtocol.REASON_END_OF_PARTITION_GROUP;
           return true;
         }
@@ -319,15 +325,16 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
       case CATCHING_UP:
         _stopReason = null;
-        // We have posted segmentConsumed() at least once, and the controller is asking us to catch up to a certain offset.
+        // We have posted segmentConsumed() at least once, and the controller is asking us to catch up to a certain
+        // offset.
         // There is no time limit here, so just check to see that we are still within the offset we need to reach.
         // Going past the offset is an exception.
         if (_currentOffset.compareTo(_finalOffset) == 0) {
-          segmentLogger.info("Caught up to offset={}, state={}", _finalOffset, _state.toString());
+          _segmentLogger.info("Caught up to offset={}, state={}", _finalOffset, _state.toString());
           return true;
         }
         if (_currentOffset.compareTo(_finalOffset) > 0) {
-          segmentLogger.error("Offset higher in state={}, current={}, final={}", _state.toString(), _currentOffset,
+          _segmentLogger.error("Offset higher in state={}, current={}, final={}", _state.toString(), _currentOffset,
               _finalOffset);
           throw new RuntimeException("Past max offset");
         }
@@ -338,34 +345,34 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         // target offset. We have a time constraint, and need to stop consuming if we cannot get to the target offset
         // within that time.
         if (_currentOffset.compareTo(_finalOffset) == 0) {
-          segmentLogger.info("Caught up to offset={}, state={}", _finalOffset, _state.toString());
+          _segmentLogger.info("Caught up to offset={}, state={}", _finalOffset, _state.toString());
           return true;
         } else if (now >= _consumeEndTime) {
-          segmentLogger.info("Past max time budget: offset={}, state={}", _currentOffset, _state.toString());
+          _segmentLogger.info("Past max time budget: offset={}, state={}", _currentOffset, _state.toString());
           return true;
         }
         if (_currentOffset.compareTo(_finalOffset) > 0) {
-          segmentLogger.error("Offset higher in state={}, current={}, final={}", _state.toString(), _currentOffset,
+          _segmentLogger.error("Offset higher in state={}, current={}, final={}", _state.toString(), _currentOffset,
               _finalOffset);
           throw new RuntimeException("Past max offset");
         }
         return false;
       default:
-        segmentLogger.error("Illegal state {}" + _state.toString());
+        _segmentLogger.error("Illegal state {}" + _state.toString());
         throw new RuntimeException("Illegal state to consume");
     }
   }
 
   private void handleTransientStreamErrors(Exception e)
       throws Exception {
-    consecutiveErrorCount++;
-    if (consecutiveErrorCount > MAX_CONSECUTIVE_ERROR_COUNT) {
-      segmentLogger.warn("Stream transient exception when fetching messages, stopping consumption after {} attempts",
-          consecutiveErrorCount, e);
+    _consecutiveErrorCount++;
+    if (_consecutiveErrorCount > MAX_CONSECUTIVE_ERROR_COUNT) {
+      _segmentLogger.warn("Stream transient exception when fetching messages, stopping consumption after {} attempts",
+          _consecutiveErrorCount, e);
       throw e;
     } else {
-      segmentLogger
-          .warn("Stream transient exception when fetching messages, retrying (count={})", consecutiveErrorCount, e);
+      _segmentLogger
+          .warn("Stream transient exception when fetching messages, retrying (count={})", _consecutiveErrorCount, e);
       Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
       makeStreamConsumer("Too many transient errors");
     }
@@ -384,7 +391,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // anymore. Remove the file if it exists.
     removeSegmentFile();
 
-    segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
+    _segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
     while (!_shouldStop && !endCriteriaReached()) {
       // Consume for the next readTime ms, or we get to final offset, whichever happens earlier,
       // Update _currentOffset upon return from this method
@@ -393,7 +400,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         messageBatch = _partitionGroupConsumer
             .fetchMessages(_currentOffset, null, _partitionLevelStreamConfig.getFetchTimeoutMillis());
         _endOfPartitionGroup = messageBatch.isEndOfPartitionGroup();
-        consecutiveErrorCount = 0;
+        _consecutiveErrorCount = 0;
       } catch (TimeoutException e) {
         handleTransientStreamErrors(e);
         continue;
@@ -401,7 +408,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         handleTransientStreamErrors(e);
         continue;
       } catch (PermanentConsumerException e) {
-        segmentLogger.warn("Permanent exception from stream when fetching messages, stopping consumption", e);
+        _segmentLogger.warn("Permanent exception from stream when fetching messages, stopping consumption", e);
         throw e;
       } catch (Exception e) {
         // Unknown exception from stream. Treat as a transient exception.
@@ -416,14 +423,18 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         consecutiveIdleCount = 0;
         // We consumed something. Update the highest stream offset as well as partition-consuming metric.
         // TODO Issue 5359 Need to find a way to bump metrics without getting actual offset value.
-//        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_KAFKA_OFFSET_CONSUMED, _currentOffset.getOffset());
-//        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED, _currentOffset.getOffset());
+//        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_KAFKA_OFFSET_CONSUMED,
+//        _currentOffset.getOffset());
+//        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED,
+//        _currentOffset.getOffset());
         _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 1);
         lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(_currentOffset);
       } else {
-        // We did not consume any rows. Update the partition-consuming metric only if we have been idling for a long time.
+        // We did not consume any rows. Update the partition-consuming metric only if we have been idling for a long
+        // time.
         // Create a new stream consumer wrapper, in case we are stuck on something.
-        if (++consecutiveIdleCount > maxIdleCountBeforeStatUpdate) {
+        consecutiveIdleCount++;
+        if (consecutiveIdleCount > maxIdleCountBeforeStatUpdate) {
           _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 1);
           consecutiveIdleCount = 0;
           makeStreamConsumer("Idle for too long");
@@ -454,7 +465,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       if (!canTakeMore) {
         // The RealtimeSegmentImpl that we are pushing rows into has indicated that it cannot accept any more
         // rows. This can happen in one of two conditions:
-        // 1. We are in INITIAL_CONSUMING state, and we somehow exceeded the max number of rows we are allowed to consume
+        // 1. We are in INITIAL_CONSUMING state, and we somehow exceeded the max number of rows we are allowed to
+        // consume
         //    for this row. Something is seriously wrong, because endCriteriaReached() should have returned true when
         //    we hit the row limit.
         //    Throw an exception.
@@ -466,7 +478,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         //    is a rare case, and we really don't know how to handle this at this time.
         //    Throw an exception.
         //
-        segmentLogger
+        _segmentLogger
             .error("Buffer full with {} rows consumed (row limit {}, indexed {})", _numRowsConsumed, _numRowsIndexed,
                 _segmentMaxRowCount);
         throw new RuntimeException("Realtime segment full");
@@ -483,6 +495,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               messagesAndOffsets.getMessageLengthAtIndex(index), reuse);
       if (decodedRow != null) {
         try {
+          if (_complexTypeTransformer != null) {
+            // TODO: consolidate complex type transformer into composite type transformer
+            decodedRow = _complexTypeTransformer.transform(decodedRow);
+          }
           if (decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
             for (Object singleRow : (Collection) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
               GenericRow transformedRow = _recordTransformer.transform((GenericRow) singleRow);
@@ -513,8 +529,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             }
           }
         } catch (Exception e) {
-          segmentLogger.error("Caught exception while transforming the record: {}", decodedRow, e);
+          String errorMessage = String.format("Caught exception while transforming the record: %s", decodedRow);
+          _segmentLogger.error(errorMessage, e);
           _numRowsErrored++;
+          _realtimeTableDataManager
+              .addSegmentError(_segmentNameStr, new SegmentErrorInfo(System.currentTimeMillis(), errorMessage, e));
         }
       } else {
         realtimeRowsDroppedMeter = _serverMetrics
@@ -529,7 +548,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
     updateCurrentDocumentCountMetrics();
     if (streamMessageCount != 0) {
-      segmentLogger.debug("Indexed {} messages ({} messages read from stream) current offset {}", indexedMessageCount,
+      _segmentLogger.debug("Indexed {} messages ({} messages read from stream) current offset {}", indexedMessageCount,
           streamMessageCount, _currentOffset);
     } else {
       // If there were no messages to be fetched from stream, wait for a little bit as to avoid hammering the stream
@@ -574,13 +593,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           switch (status) {
             case NOT_LEADER:
               // Retain the same state
-              segmentLogger.warn("Got not leader response");
+              _segmentLogger.warn("Got not leader response");
               hold();
               break;
             case CATCH_UP:
               if (rspOffset.compareTo(_currentOffset) <= 0) {
                 // Something wrong with the controller. Back off and try again.
-                segmentLogger.error("Invalid catchup offset {} in controller response, current offset {}", rspOffset,
+                _segmentLogger.error("Invalid catchup offset {} in controller response, current offset {}", rspOffset,
                     _currentOffset);
                 hold();
               } else {
@@ -611,7 +630,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                   } else {
                     // Could not build segment for some reason. We can only download it.
                     _state = State.ERROR;
+                    _realtimeTableDataManager.addSegmentError(_segmentNameStr,
+                        new SegmentErrorInfo(System.currentTimeMillis(), "Could not build segment", null));
                   }
+                  break;
+                default:
                   break;
               }
               break;
@@ -622,6 +645,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               if (_segmentBuildDescriptor == null) {
                 // We could not build the segment. Go into error state.
                 _state = State.ERROR;
+                _realtimeTableDataManager.addSegmentError(_segmentNameStr,
+                    new SegmentErrorInfo(System.currentTimeMillis(), "Could not build segment", null));
               } else {
                 success = commitSegment(response.getControllerVipUrl(),
                     response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit());
@@ -631,21 +656,24 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                   // If for any reason commit failed, we don't want to be in COMMITTING state when we hold.
                   // Change the state to HOLDING before looping around.
                   _state = State.HOLDING;
-                  segmentLogger.info("Could not commit segment. Retrying after hold");
+                  _segmentLogger.info("Could not commit segment. Retrying after hold");
                   hold();
                 }
               }
               break;
             default:
-              segmentLogger.error("Holding after response from Controller: {}", response.toJsonString());
+              _segmentLogger.error("Holding after response from Controller: {}", response.toJsonString());
               hold();
               break;
           }
         }
       } catch (Exception e) {
-        segmentLogger.error("Exception while in work", e);
+        String errorMessage = "Exception while in work";
+        _segmentLogger.error(errorMessage, e);
         postStopConsumedMsg(e.getClass().getName());
         _state = State.ERROR;
+        _realtimeTableDataManager
+            .addSegmentError(_segmentNameStr, new SegmentErrorInfo(System.currentTimeMillis(), errorMessage, e));
         _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
         return;
       }
@@ -657,7 +685,15 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setValueOfTableGauge(_metricKeyName, ServerGauge.LAST_REALTIME_SEGMENT_COMPLETION_DURATION_SECONDS,
                 TimeUnit.MILLISECONDS.toSeconds(now() - initialConsumptionEnd));
       }
-      _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
+      // There is a race condition that the destroy() method can be called which ends up calling stop on the consumer.
+      // The destroy() method does not wait for the thread to terminate (and reasonably so, we dont want to wait
+      // forever).
+      // Since the _shouldStop variable is set to true only in stop() method, we know that the metric will be destroyed,
+      // so it is ok not to mark it non-consuming, as the main thread will clean up this metric in destroy() method
+      // as the final step.
+      if (!_shouldStop) {
+        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
+      }
     }
   }
 
@@ -730,9 +766,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return _lastLogTime;
   }
 
-  @VisibleForTesting
-  protected StreamPartitionMsgOffset getCurrentOffset() {
+  public StreamPartitionMsgOffset getCurrentOffset() {
     return _currentOffset;
+  }
+
+  public StreamPartitionMsgOffset getLatestStreamOffsetAtStartupTime() {
+    return _latestStreamOffsetAtStartupTime;
   }
 
   @VisibleForTesting
@@ -755,7 +794,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     try {
       final long startTimeMillis = now();
       if (_segBuildSemaphore != null) {
-        segmentLogger.info("Waiting to acquire semaphore for building segment");
+        _segmentLogger.info("Waiting to acquire semaphore for building segment");
         _segBuildSemaphore.acquire();
       }
       // Increment llc simultaneous segment builds.
@@ -771,17 +810,17 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(), _sortedColumn,
               _invertedIndexColumns, _textIndexColumns, _fstIndexColumns, _noDictionaryColumns,
               _varLengthDictionaryColumns, _nullHandlingEnabled);
-      segmentLogger.info("Trying to build segment");
+      _segmentLogger.info("Trying to build segment");
       try {
         converter.build(_segmentVersion, _serverMetrics);
       } catch (Exception e) {
-        segmentLogger.error("Could not build segment", e);
+        _segmentLogger.error("Could not build segment", e);
         FileUtils.deleteQuietly(tempSegmentFolder);
         return null;
       }
       final long buildTimeMillis = now() - lockAcquireTimeMillis;
       final long waitTimeMillis = lockAcquireTimeMillis - startTimeMillis;
-      segmentLogger
+      _segmentLogger
           .info("Successfully built segment in {} ms, after lockWaitTime {} ms", buildTimeMillis, waitTimeMillis);
 
       File dataDir = new File(_resourceDataDir);
@@ -794,7 +833,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       try {
         FileUtils.moveDirectory(tempIndexDir, indexDir);
       } catch (IOException e) {
-        segmentLogger.error("Caught exception while moving index directory from: {} to: {}", tempIndexDir, indexDir, e);
+        String errorMessage =
+            String.format("Caught exception while moving index directory from: %s to: %s", tempIndexDir, indexDir);
+        _segmentLogger.error(errorMessage, e);
+        _realtimeTableDataManager
+            .addSegmentError(_segmentNameStr, new SegmentErrorInfo(System.currentTimeMillis(), errorMessage, e));
         return null;
       } finally {
         FileUtils.deleteQuietly(tempSegmentFolder);
@@ -811,21 +854,24 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         try {
           TarGzCompressionUtils.createTarGzFile(indexDir, segmentTarFile);
         } catch (IOException e) {
-          segmentLogger
-              .error("Caught exception while taring index directory from: {} to: {}", indexDir, segmentTarFile, e);
+          String errorMessage =
+              String.format("Caught exception while taring index directory from: %s to: %s", indexDir, segmentTarFile);
+          _segmentLogger.error(errorMessage, e);
+          _realtimeTableDataManager
+              .addSegmentError(_segmentNameStr, new SegmentErrorInfo(System.currentTimeMillis(), errorMessage, e));
           return null;
         }
 
         File metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
         if (metadataFile == null) {
-          segmentLogger
+          _segmentLogger
               .error("Failed to find file: {} under index directory: {}", V1Constants.MetadataKeys.METADATA_FILE_NAME,
                   indexDir);
           return null;
         }
         File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
         if (creationMetaFile == null) {
-          segmentLogger
+          _segmentLogger
               .error("Failed to find file: {} under index directory: {}", V1Constants.SEGMENT_CREATION_META, indexDir);
           return null;
         }
@@ -840,7 +886,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             segmentSizeBytes);
       }
     } catch (InterruptedException e) {
-      segmentLogger.error("Interrupted while waiting for semaphore");
+      _segmentLogger.error("Interrupted while waiting for semaphore");
       return null;
     } finally {
       if (_segBuildSemaphore != null) {
@@ -883,7 +929,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     try {
       segmentCommitter = _segmentCommitterFactory.createSegmentCommitter(isSplitCommit, params, controllerVipUrl);
     } catch (URISyntaxException e) {
-      segmentLogger.error("Failed to create a segment committer: ", e);
+      _segmentLogger.error("Failed to create a segment committer: ", e);
       return SegmentCompletionProtocol.RESP_NOT_SENT;
     }
     return segmentCommitter.commit(_segmentBuildDescriptor);
@@ -911,7 +957,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     try {
       _partitionGroupConsumer.close();
     } catch (Exception e) {
-      segmentLogger.warn("Could not close stream consumer", e);
+      _segmentLogger.warn("Could not close stream consumer", e);
     }
   }
 
@@ -919,15 +965,28 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     try {
       _streamMetadataProvider.close();
     } catch (Exception e) {
-      segmentLogger.warn("Could not close stream metadata provider", e);
+      _segmentLogger.warn("Could not close stream metadata provider", e);
     }
+  }
+
+  /**
+   * Cleans up the metrics that reflects the state of the realtime segment.
+   * This step is essential as the instance may not be the target location for some of the partitions.
+   * E.g. if the number of partitions increases, or a host swap is needed, the target location for some partitions
+   * may change,
+   * and the current host remains to run. In this case, the current server would still keep the state of the old
+   * partitions,
+   * which no longer resides in this host any more, thus causes false positive information to the metric system.
+   */
+  private void cleanupMetrics() {
+    _serverMetrics.removeTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING);
   }
 
   protected void hold() {
     try {
       Thread.sleep(SegmentCompletionProtocol.MAX_HOLD_TIME_MS);
     } catch (InterruptedException e) {
-      segmentLogger.warn("Interrupted while holding");
+      _segmentLogger.warn("Interrupted while holding");
     }
   }
 
@@ -940,11 +999,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
       SegmentCompletionProtocol.Response response = _protocolHandler.segmentStoppedConsuming(params);
       if (response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED) {
-        segmentLogger.info("Got response {}", response.toJsonString());
+        _segmentLogger.info("Got response {}", response.toJsonString());
         break;
       }
       Uninterruptibles.sleepUninterruptibly(10, TimeUnit.SECONDS);
-      segmentLogger.info("Retrying after response {}", response.toJsonString());
+      _segmentLogger.info("Retrying after response {}", response.toJsonString());
     } while (!_shouldStop);
   }
 
@@ -967,31 +1026,31 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  public void goOnlineFromConsuming(RealtimeSegmentZKMetadata metadata)
+  public void goOnlineFromConsuming(SegmentZKMetadata segmentZKMetadata)
       throws InterruptedException {
     _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
     try {
-      LLCRealtimeSegmentZKMetadata llcMetadata = (LLCRealtimeSegmentZKMetadata) metadata;
       // Remove the segment file before we do anything else.
       removeSegmentFile();
       _leaseExtender.removeSegment(_segmentNameStr);
-      final StreamPartitionMsgOffset endOffset = _streamPartitionMsgOffsetFactory.create(llcMetadata.getEndOffset());
-      segmentLogger
+      final StreamPartitionMsgOffset endOffset =
+          _streamPartitionMsgOffsetFactory.create(segmentZKMetadata.getEndOffset());
+      _segmentLogger
           .info("State: {}, transitioning from CONSUMING to ONLINE (startOffset: {}, endOffset: {})", _state.toString(),
               _startOffset, endOffset);
       stop();
-      segmentLogger.info("Consumer thread stopped in state {}", _state.toString());
+      _segmentLogger.info("Consumer thread stopped in state {}", _state.toString());
 
       switch (_state) {
         case COMMITTED:
         case RETAINED:
           // Nothing to do. we already built local segment and swapped it with in-memory data.
-          segmentLogger.info("State {}. Nothing to do", _state.toString());
+          _segmentLogger.info("State {}. Nothing to do", _state.toString());
           break;
         case DISCARDED:
         case ERROR:
-          segmentLogger.info("State {}. Downloading to replace", _state.toString());
-          downloadSegmentAndReplace(llcMetadata);
+          _segmentLogger.info("State {}. Downloading to replace", _state.toString());
+          downloadSegmentAndReplace(segmentZKMetadata);
           break;
         case CATCHING_UP:
         case HOLDING:
@@ -999,41 +1058,43 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           CompletionMode segmentCompletionMode = getSegmentCompletionMode();
           switch (segmentCompletionMode) {
             case DOWNLOAD:
-              segmentLogger.info("State {}. CompletionMode {}. Downloading to replace", _state.toString(),
+              _segmentLogger.info("State {}. CompletionMode {}. Downloading to replace", _state.toString(),
                   segmentCompletionMode);
-              downloadSegmentAndReplace(llcMetadata);
+              downloadSegmentAndReplace(segmentZKMetadata);
               break;
             case DEFAULT:
               // Allow to catch up upto final offset, and then replace.
               if (_currentOffset.compareTo(endOffset) > 0) {
                 // We moved ahead of the offset that is committed in ZK.
-                segmentLogger
+                _segmentLogger
                     .warn("Current offset {} ahead of the offset in zk {}. Downloading to replace", _currentOffset,
                         endOffset);
-                downloadSegmentAndReplace(llcMetadata);
+                downloadSegmentAndReplace(segmentZKMetadata);
               } else if (_currentOffset.compareTo(endOffset) == 0) {
-                segmentLogger
+                _segmentLogger
                     .info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset, endOffset);
                 buildSegmentAndReplace();
               } else {
-                segmentLogger.info("Attempting to catch up from offset {} to {} ", _currentOffset, endOffset);
+                _segmentLogger.info("Attempting to catch up from offset {} to {} ", _currentOffset, endOffset);
                 boolean success = catchupToFinalOffset(endOffset,
                     TimeUnit.MILLISECONDS.convert(MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS, TimeUnit.SECONDS));
                 if (success) {
-                  segmentLogger.info("Caught up to offset {}", _currentOffset);
+                  _segmentLogger.info("Caught up to offset {}", _currentOffset);
                   buildSegmentAndReplace();
                 } else {
-                  segmentLogger
+                  _segmentLogger
                       .info("Could not catch up to offset (current = {}). Downloading to replace", _currentOffset);
-                  downloadSegmentAndReplace(llcMetadata);
+                  downloadSegmentAndReplace(segmentZKMetadata);
                 }
               }
+              break;
+            default:
               break;
           }
           break;
         default:
-          segmentLogger.info("Downloading to replace segment while in state {}", _state.toString());
-          downloadSegmentAndReplace(llcMetadata);
+          _segmentLogger.info("Downloading to replace segment while in state {}", _state.toString());
+          downloadSegmentAndReplace(segmentZKMetadata);
           break;
       }
     } catch (Exception e) {
@@ -1043,9 +1104,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  protected void downloadSegmentAndReplace(LLCRealtimeSegmentZKMetadata metadata) {
+  protected void downloadSegmentAndReplace(SegmentZKMetadata segmentZKMetadata) {
     closeStreamConsumers();
-    _realtimeTableDataManager.downloadAndReplaceSegment(_segmentNameStr, metadata, _indexLoadingConfig, _tableConfig);
+    _realtimeTableDataManager
+        .downloadAndReplaceSegment(_segmentNameStr, segmentZKMetadata, _indexLoadingConfig, _tableConfig);
   }
 
   protected long now() {
@@ -1061,14 +1123,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       consumeLoop();
     } catch (Exception e) {
       // We will end up downloading the segment, so this is not a serious problem
-      segmentLogger.warn("Exception when catching up to final offset", e);
+      _segmentLogger.warn("Exception when catching up to final offset", e);
       return false;
     } finally {
       _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
     }
     if (_currentOffset.compareTo(endOffset) != 0) {
       // Timeout?
-      segmentLogger.error("Could not consume up to {} (current offset {})", endOffset, _currentOffset);
+      _segmentLogger.error("Could not consume up to {} (current offset {})", endOffset, _currentOffset);
       return false;
     }
 
@@ -1079,15 +1141,16 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     try {
       stop();
     } catch (InterruptedException e) {
-      segmentLogger.error("Could not stop consumer thread");
+      _segmentLogger.error("Could not stop consumer thread");
     }
     _realtimeSegment.destroy();
     closeStreamConsumers();
+    cleanupMetrics();
   }
 
   protected void start() {
     _consumerThread = new Thread(new PartitionConsumer(), _segmentNameStr);
-    segmentLogger.info("Created new consumer thread {} for {}", _consumerThread, this.toString());
+    _segmentLogger.info("Created new consumer thread {} for {}", _consumerThread, this.toString());
     _consumerThread.start();
   }
 
@@ -1104,19 +1167,19 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       Uninterruptibles.joinUninterruptibly(_consumerThread, 10, TimeUnit.MINUTES);
 
       if (_consumerThread.isAlive()) {
-        segmentLogger.warn("Failed to stop consumer thread within 10 minutes");
+        _segmentLogger.warn("Failed to stop consumer thread within 10 minutes");
       }
     }
   }
 
   // Assume that this is called only on OFFLINE to CONSUMING transition.
   // If the transition is OFFLINE to ONLINE, the caller should have downloaded the segment and we don't reach here.
-  public LLRealtimeSegmentDataManager(RealtimeSegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
+  public LLRealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
       RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, IndexLoadingConfig indexLoadingConfig,
-      Schema schema, LLCSegmentName llcSegmentName, Semaphore partitionGroupConsumerSemaphore, ServerMetrics serverMetrics,
-      @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
+      Schema schema, LLCSegmentName llcSegmentName, Semaphore partitionGroupConsumerSemaphore,
+      ServerMetrics serverMetrics, @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
     _segBuildSemaphore = realtimeTableDataManager.getSegmentBuildSemaphore();
-    _segmentZKMetadata = (LLCRealtimeSegmentZKMetadata) segmentZKMetadata;
+    _segmentZKMetadata = segmentZKMetadata;
     _tableConfig = tableConfig;
     _tableNameWithType = _tableConfig.getTableName();
     _realtimeTableDataManager = realtimeTableDataManager;
@@ -1141,15 +1204,16 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _llcSegmentName = llcSegmentName;
     _partitionGroupId = _llcSegmentName.getPartitionGroupId();
-    _partitionGroupConsumptionStatus = new PartitionGroupConsumptionStatus(_partitionGroupId, _llcSegmentName.getSequenceNumber(),
-        _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset()),
-        _segmentZKMetadata.getEndOffset() == null ? null
-            : _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getEndOffset()),
-        _segmentZKMetadata.getStatus().toString());
+    _partitionGroupConsumptionStatus =
+        new PartitionGroupConsumptionStatus(_partitionGroupId, _llcSegmentName.getSequenceNumber(),
+            _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset()),
+            _segmentZKMetadata.getEndOffset() == null ? null
+                : _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getEndOffset()),
+            _segmentZKMetadata.getStatus().toString());
     _partitionGroupConsumerSemaphore = partitionGroupConsumerSemaphore;
     _acquiredConsumerSemaphore = new AtomicBoolean(false);
     _metricKeyName = _tableNameWithType + "-" + _streamTopic + "-" + _partitionGroupId;
-    segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
+    _segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
     _tableStreamName = _tableNameWithType + "_" + _streamTopic;
     _memoryManager = getMemoryManager(realtimeTableDataManager.getConsumerDir(), _segmentNameStr,
         indexLoadingConfig.isRealtimeOffHeapAllocation(), indexLoadingConfig.isDirectRealtimeOffHeapAllocation(),
@@ -1157,17 +1221,17 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
     if (sortedColumns.isEmpty()) {
-      segmentLogger.info("RealtimeDataResourceZKMetadata contains no information about sorted column for segment {}",
+      _segmentLogger.info("RealtimeDataResourceZKMetadata contains no information about sorted column for segment {}",
           _llcSegmentName);
       _sortedColumn = null;
     } else {
       String firstSortedColumn = sortedColumns.get(0);
       if (_schema.hasColumn(firstSortedColumn)) {
-        segmentLogger.info("Setting sorted column name: {} from RealtimeDataResourceZKMetadata for segment {}",
+        _segmentLogger.info("Setting sorted column name: {} from RealtimeDataResourceZKMetadata for segment {}",
             firstSortedColumn, _llcSegmentName);
         _sortedColumn = firstSortedColumn;
       } else {
-        segmentLogger
+        _segmentLogger
             .warn("Sorted column name: {} from RealtimeDataResourceZKMetadata is not existed in schema for segment {}.",
                 firstSortedColumn, _llcSegmentName);
         _sortedColumn = null;
@@ -1191,8 +1255,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     // Read the max number of rows
     int segmentMaxRowCount = _partitionLevelStreamConfig.getFlushThresholdRows();
-    if (0 < segmentZKMetadata.getSizeThresholdToFlushSegment()) {
-      segmentMaxRowCount = segmentZKMetadata.getSizeThresholdToFlushSegment();
+    int flushThresholdSize = segmentZKMetadata.getSizeThresholdToFlushSegment();
+    if (flushThresholdSize > 0) {
+      segmentMaxRowCount = flushThresholdSize;
     }
     _segmentMaxRowCount = segmentMaxRowCount;
 
@@ -1216,12 +1281,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
             .setInvertedIndexColumns(invertedIndexColumns).setTextIndexColumns(textIndexColumns)
             .setFSTIndexColumns(fstIndexColumns).setJsonIndexColumns(indexLoadingConfig.getJsonIndexColumns())
-            .setH3IndexConfigs(indexLoadingConfig.getH3IndexConfigs()).setRealtimeSegmentZKMetadata(segmentZKMetadata)
+            .setH3IndexConfigs(indexLoadingConfig.getH3IndexConfigs()).setSegmentZKMetadata(segmentZKMetadata)
             .setOffHeap(_isOffHeap).setMemoryManager(_memoryManager)
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
             .setAggregateMetrics(indexingConfig.isAggregateMetrics()).setNullHandlingEnabled(_nullHandlingEnabled)
             .setConsumerDir(consumerDir).setUpsertMode(tableConfig.getUpsertMode())
-            .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager);
+            .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
+            .setHashFunction(tableConfig.getHashFunction())
+            .setUpsertComparisonColumn(tableConfig.getUpsertComparisonColumn());
 
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);
@@ -1231,13 +1298,16 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // Create record transformer
     _recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
 
+    // Create complex type transformer
+    _complexTypeTransformer = ComplexTypeTransformer.getComplexTypeTransformer(tableConfig);
+
     // Acquire semaphore to create stream consumers
     try {
       _partitionGroupConsumerSemaphore.acquire();
       _acquiredConsumerSemaphore.set(true);
     } catch (InterruptedException e) {
       String errorMsg = "InterruptedException when acquiring the partitionConsumerSemaphore";
-      segmentLogger.error(errorMsg);
+      _segmentLogger.error(errorMsg);
       throw new RuntimeException(errorMsg + " for segment: " + _segmentNameStr);
     }
     makeStreamConsumer("Starting");
@@ -1261,21 +1331,22 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         try {
           // TODO: currentPartitionGroupConsumptionStatus should be fetched from idealState + segmentZkMetadata,
           //  so that we get back accurate partitionGroups info
-          //  However this is not an issue for Kafka, since partitionGroups never expire and every partitionGroup has a single partition
+          //  However this is not an issue for Kafka, since partitionGroups never expire and every partitionGroup has
+          //  a single partition
           //  Fix this before opening support for partitioning in Kinesis
           int numPartitionGroups = _streamMetadataProvider
               .computePartitionGroupMetadata(_clientId, _partitionLevelStreamConfig,
                   Collections.emptyList(), /*maxWaitTimeMs=*/5000).size();
 
           if (numPartitionGroups != numPartitions) {
-            segmentLogger.warn(
-                "Number of stream partitions: {} does not match number of partitions in the partition config: {}, using number of stream partitions",
-                numPartitionGroups, numPartitions);
+            _segmentLogger.warn(
+                "Number of stream partitions: {} does not match number of partitions in the partition config: {}, "
+                    + "using number of stream " + "partitions", numPartitionGroups, numPartitions);
             _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_PARTITION_MISMATCH, 1);
             numPartitions = numPartitionGroups;
           }
         } catch (Exception e) {
-          segmentLogger.warn(
+          _segmentLogger.warn(
               "Failed to get number of stream partitions in 5s, using number of partitions in the partition config: {}",
               numPartitions, e);
           makeStreamMetadataProvider("Timeout getting number of stream partitions");
@@ -1286,7 +1357,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setPartitionFunction(PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions));
         realtimeSegmentConfigBuilder.setPartitionId(_partitionGroupId);
       } else {
-        segmentLogger.warn("Cannot partition on multiple columns: {}", columnPartitionMap.keySet());
+        _segmentLogger.warn("Cannot partition on multiple columns: {}", columnPartitionMap.keySet());
       }
     }
 
@@ -1298,6 +1369,16 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _resourceTmpDir.mkdirs();
     }
     _state = State.INITIAL_CONSUMING;
+
+    // fetch latest stream offset
+    try (StreamMetadataProvider metadataProvider = _streamConsumerFactory
+        .createPartitionMetadataProvider(_clientId, _partitionGroupId)) {
+      _latestStreamOffsetAtStartupTime = metadataProvider
+          .fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, /*maxWaitTimeMs*/5000);
+    } catch (Exception e) {
+      _segmentLogger.warn("Cannot fetch latest stream offset for clientId {} and partitionGroupId {}", _clientId,
+          _partitionGroupId);
+    }
 
     long now = now();
     _consumeStartTime = now;
@@ -1319,9 +1400,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
 
     _segmentCommitterFactory =
-        new SegmentCommitterFactory(segmentLogger, _protocolHandler, tableConfig, indexLoadingConfig, serverMetrics);
+        new SegmentCommitterFactory(_segmentLogger, _protocolHandler, tableConfig, indexLoadingConfig, serverMetrics);
 
-    segmentLogger
+    _segmentLogger
         .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", _llcSegmentName,
             _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC).toString());
     start();
@@ -1334,9 +1415,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (_partitionGroupConsumer != null) {
       closePartitionGroupConsumer();
     }
-    segmentLogger.info("Creating new stream consumer, reason: {}", reason);
-    _partitionGroupConsumer = _streamConsumerFactory.createPartitionGroupConsumer(_clientId,
-        _partitionGroupConsumptionStatus);
+    _segmentLogger.info("Creating new stream consumer, reason: {}", reason);
+    _partitionGroupConsumer =
+        _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
   }
 
   /**
@@ -1346,7 +1427,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (_streamMetadataProvider != null) {
       closeStreamMetadataProvider();
     }
-    segmentLogger.info("Creating new stream metadata provider, reason: {}", reason);
+    _segmentLogger.info("Creating new stream metadata provider, reason: {}", reason);
     _streamMetadataProvider = _streamConsumerFactory.createStreamMetadataProvider(_clientId);
   }
 
@@ -1368,7 +1449,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // Log every minute or 100k events
     if (now - prevTime > TimeUnit.MINUTES.toMillis(TIME_THRESHOLD_FOR_LOG_MINUTES)
         || rowsConsumed >= MSG_COUNT_THRESHOLD_FOR_LOG) {
-      segmentLogger.info(
+      _segmentLogger.info(
           "Consumed {} events from (rate:{}/s), currentOffset={}, numRowsConsumedSoFar={}, numRowsIndexedSoFar={}",
           rowsConsumed, (float) (rowsConsumed) * 1000 / (now - prevTime), _currentOffset, _numRowsConsumed,
           _numRowsIndexed);

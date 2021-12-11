@@ -22,13 +22,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
 import java.sql.ResultSetMetaData;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.concurrent.Future;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.client.utils.DateTimeUtils;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
@@ -39,7 +38,6 @@ import org.testng.annotations.Test;
 public class PinotResultSetTest {
   public static final String TEST_RESULT_SET_RESOURCE = "result_table.json";
   private DummyJsonTransport _dummyJsonTransport = new DummyJsonTransport();
-  private PinotClientTransportFactory _previousTransportFactory = null;
 
   @Test
   public void testFetchValues()
@@ -164,19 +162,8 @@ public class PinotResultSetTest {
 
   private ResultSetGroup getResultSet(String resourceName) {
     _dummyJsonTransport._resource = resourceName;
-    Connection connection = ConnectionFactory.fromHostList("dummy");
+    Connection connection = ConnectionFactory.fromHostList(Collections.singletonList("dummy"), _dummyJsonTransport);
     return connection.execute("dummy");
-  }
-
-  @BeforeClass
-  public void overridePinotClientTransport() {
-    _previousTransportFactory = ConnectionFactory._transportFactory;
-    ConnectionFactory._transportFactory = new DummyJsonTransportFactory();
-  }
-
-  @AfterClass
-  public void resetPinotClientTransport() {
-    ConnectionFactory._transportFactory = _previousTransportFactory;
   }
 
   class DummyJsonTransport implements PinotClientTransport {

@@ -27,11 +27,13 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -94,14 +96,14 @@ public abstract class BaseDataTable implements DataTable {
     for (Map.Entry<String, Map<Integer, String>> dictionaryMapEntry : _dictionaryMap.entrySet()) {
       String columnName = dictionaryMapEntry.getKey();
       Map<Integer, String> dictionary = dictionaryMapEntry.getValue();
-      byte[] bytes = StringUtil.encodeUtf8(columnName);
+      byte[] bytes = columnName.getBytes(UTF_8);
       dataOutputStream.writeInt(bytes.length);
       dataOutputStream.write(bytes);
       dataOutputStream.writeInt(dictionary.size());
 
       for (Map.Entry<Integer, String> dictionaryEntry : dictionary.entrySet()) {
         dataOutputStream.writeInt(dictionaryEntry.getKey());
-        byte[] valueBytes = StringUtil.encodeUtf8(dictionaryEntry.getValue());
+        byte[] valueBytes = dictionaryEntry.getValue().getBytes(UTF_8);
         dataOutputStream.writeInt(valueBytes.length);
         dataOutputStream.write(valueBytes);
       }
@@ -264,10 +266,11 @@ public abstract class BaseDataTable implements DataTable {
     stringBuilder.append(_dataSchema.toString()).append('\n');
     stringBuilder.append("numRows: ").append(_numRows).append('\n');
 
+    ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     _fixedSizeData.position(0);
     for (int rowId = 0; rowId < _numRows; rowId++) {
       for (int colId = 0; colId < _numColumns; colId++) {
-        switch (_dataSchema.getColumnDataType(colId)) {
+        switch (storedColumnDataTypes[colId]) {
           case INT:
             stringBuilder.append(_fixedSizeData.getInt());
             break;

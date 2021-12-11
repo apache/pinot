@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.operator.BitmapDocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
@@ -29,8 +33,9 @@ import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.roaringbitmap.IntIterator;
+import org.roaringbitmap.BitmapDataProvider;
 import org.roaringbitmap.PeekableIntIterator;
+import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -46,7 +51,6 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   private final int _endDocId;
 
   private final int[] _docIdBuffer = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-  private int _numDocIdsFilled;
 
   private int _blockEndDocId = 0;
   private PeekableIntIterator _docIdIterator;
@@ -77,7 +81,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
       ProjectionBlock projectionBlock =
           new ProjectionOperator(_dataSourceMap, new RangeDocIdSetOperator(blockStartDocId, _blockEndDocId))
               .nextBlock();
-      MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
+      RoaringBitmap matchingDocIds = new RoaringBitmap();
       processProjectionBlock(projectionBlock, matchingDocIds);
       if (!matchingDocIds.isEmpty()) {
         _docIdIterator = matchingDocIds.getIntIterator();
@@ -108,7 +112,8 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
 
   @Override
   public MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
-    ProjectionOperator projectionOperator = new ProjectionOperator(_dataSourceMap, new BitmapDocIdSetOperator(docIds));
+    ProjectionOperator projectionOperator =
+        new ProjectionOperator(_dataSourceMap, new BitmapDocIdSetOperator(docIds, _docIdBuffer));
     MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
     ProjectionBlock projectionBlock;
     while ((projectionBlock = projectionOperator.nextBlock()) != null) {
@@ -117,23 +122,23 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     return matchingDocIds;
   }
 
-  @SuppressWarnings("DuplicatedCode")
-  private void processProjectionBlock(ProjectionBlock projectionBlock, MutableRoaringBitmap matchingDocIds) {
+  private void processProjectionBlock(ProjectionBlock projectionBlock, BitmapDataProvider matchingDocIds) {
+    int numDocs = projectionBlock.getNumDocs();
     TransformResultMetadata resultMetadata = _transformFunction.getResultMetadata();
     if (resultMetadata.isSingleValue()) {
-      _numEntriesScanned += _numDocIdsFilled;
+      _numEntriesScanned += numDocs;
       if (resultMetadata.hasDictionary()) {
         int[] dictIds = _transformFunction.transformToDictIdsSV(projectionBlock);
-        for (int i = 0; i < _numDocIdsFilled; i++) {
+        for (int i = 0; i < numDocs; i++) {
           if (_predicateEvaluator.applySV(dictIds[i])) {
             matchingDocIds.add(_docIdBuffer[i]);
           }
         }
       } else {
-        switch (resultMetadata.getDataType()) {
+        switch (resultMetadata.getDataType().getStoredType()) {
           case INT:
             int[] intValues = _transformFunction.transformToIntValuesSV(projectionBlock);
-            for (int i = 0; i < _numDocIdsFilled; i++) {
+            for (int i = 0; i < numDocs; i++) {
               if (_predicateEvaluator.applySV(intValues[i])) {
                 matchingDocIds.add(_docIdBuffer[i]);
               }
@@ -141,7 +146,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
             break;
           case LONG:
             long[] longValues = _transformFunction.transformToLongValuesSV(projectionBlock);
-            for (int i = 0; i < _numDocIdsFilled; i++) {
+            for (int i = 0; i < numDocs; i++) {
               if (_predicateEvaluator.applySV(longValues[i])) {
                 matchingDocIds.add(_docIdBuffer[i]);
               }
@@ -149,7 +154,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
             break;
           case FLOAT:
             float[] floatValues = _transformFunction.transformToFloatValuesSV(projectionBlock);
-            for (int i = 0; i < _numDocIdsFilled; i++) {
+            for (int i = 0; i < numDocs; i++) {
               if (_predicateEvaluator.applySV(floatValues[i])) {
                 matchingDocIds.add(_docIdBuffer[i]);
               }
@@ -157,7 +162,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
             break;
           case DOUBLE:
             double[] doubleValues = _transformFunction.transformToDoubleValuesSV(projectionBlock);
-            for (int i = 0; i < _numDocIdsFilled; i++) {
+            for (int i = 0; i < numDocs; i++) {
               if (_predicateEvaluator.applySV(doubleValues[i])) {
                 matchingDocIds.add(_docIdBuffer[i]);
               }
@@ -165,7 +170,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
             break;
           case STRING:
             String[] stringValues = _transformFunction.transformToStringValuesSV(projectionBlock);
-            for (int i = 0; i < _numDocIdsFilled; i++) {
+            for (int i = 0; i < numDocs; i++) {
               if (_predicateEvaluator.applySV(stringValues[i])) {
                 matchingDocIds.add(_docIdBuffer[i]);
               }
@@ -173,7 +178,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
             break;
           case BYTES:
             byte[][] bytesValues = _transformFunction.transformToBytesValuesSV(projectionBlock);
-            for (int i = 0; i < _numDocIdsFilled; i++) {
+            for (int i = 0; i < numDocs; i++) {
               if (_predicateEvaluator.applySV(bytesValues[i])) {
                 matchingDocIds.add(_docIdBuffer[i]);
               }
@@ -186,7 +191,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     } else {
       if (resultMetadata.hasDictionary()) {
         int[][] dictIdsArray = _transformFunction.transformToDictIdsMV(projectionBlock);
-        for (int i = 0; i < _numDocIdsFilled; i++) {
+        for (int i = 0; i < numDocs; i++) {
           int[] dictIds = dictIdsArray[i];
           int numDictIds = dictIds.length;
           _numEntriesScanned += numDictIds;
@@ -195,10 +200,10 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
           }
         }
       } else {
-        switch (resultMetadata.getDataType()) {
+        switch (resultMetadata.getDataType().getStoredType()) {
           case INT:
             int[][] intValuesArray = _transformFunction.transformToIntValuesMV(projectionBlock);
-            for (int i = 0; i < _numDocIdsFilled; i++) {
+            for (int i = 0; i < numDocs; i++) {
               int[] values = intValuesArray[i];
               int numValues = values.length;
               _numEntriesScanned += numValues;
@@ -209,7 +214,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
             break;
           case LONG:
             long[][] longValuesArray = _transformFunction.transformToLongValuesMV(projectionBlock);
-            for (int i = 0; i < _numDocIdsFilled; i++) {
+            for (int i = 0; i < numDocs; i++) {
               long[] values = longValuesArray[i];
               int numValues = values.length;
               _numEntriesScanned += numValues;
@@ -220,7 +225,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
             break;
           case FLOAT:
             float[][] floatValuesArray = _transformFunction.transformToFloatValuesMV(projectionBlock);
-            for (int i = 0; i < _numDocIdsFilled; i++) {
+            for (int i = 0; i < numDocs; i++) {
               float[] values = floatValuesArray[i];
               int numValues = values.length;
               _numEntriesScanned += numValues;
@@ -231,7 +236,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
             break;
           case DOUBLE:
             double[][] doubleValuesArray = _transformFunction.transformToDoubleValuesMV(projectionBlock);
-            for (int i = 0; i < _numDocIdsFilled; i++) {
+            for (int i = 0; i < numDocs; i++) {
               double[] values = doubleValuesArray[i];
               int numValues = values.length;
               _numEntriesScanned += numValues;
@@ -242,7 +247,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
             break;
           case STRING:
             String[][] valuesArray = _transformFunction.transformToStringValuesMV(projectionBlock);
-            for (int i = 0; i < _numDocIdsFilled; i++) {
+            for (int i = 0; i < numDocs; i++) {
               String[] values = valuesArray[i];
               int numValues = values.length;
               _numEntriesScanned += numValues;
@@ -268,15 +273,16 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
    */
   private class RangeDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
     static final String OPERATOR_NAME = "RangeDocIdSetOperator";
+    static final String EXPLAIN_NAME = "DOC_ID_SET_RANGE";
 
-    private DocIdSetBlock _docIdSetBlock;
+    DocIdSetBlock _docIdSetBlock;
 
     RangeDocIdSetOperator(int startDocId, int endDocId) {
-      _numDocIdsFilled = endDocId - startDocId;
-      for (int i = 0; i < _numDocIdsFilled; i++) {
+      int numDocs = endDocId - startDocId;
+      for (int i = 0; i < numDocs; i++) {
         _docIdBuffer[i] = startDocId + i;
       }
-      _docIdSetBlock = new DocIdSetBlock(_docIdBuffer, _numDocIdsFilled);
+      _docIdSetBlock = new DocIdSetBlock(_docIdBuffer, numDocs);
     }
 
     @Override
@@ -290,36 +296,15 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     public String getOperatorName() {
       return OPERATOR_NAME;
     }
-  }
 
-  /**
-   * NOTE: This operator may contain multiple blocks.
-   */
-  private class BitmapDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
-    static final String OPERATOR_NAME = "BitmapDocIdSetOperator";
-
-    final IntIterator _intIterator;
-
-    BitmapDocIdSetOperator(ImmutableRoaringBitmap bitmap) {
-      _intIterator = bitmap.getIntIterator();
+    @Override
+    public String toExplainString() {
+      return EXPLAIN_NAME;
     }
 
     @Override
-    protected DocIdSetBlock getNextBlock() {
-      _numDocIdsFilled = 0;
-      while (_numDocIdsFilled < DocIdSetPlanNode.MAX_DOC_PER_CALL && _intIterator.hasNext()) {
-        _docIdBuffer[_numDocIdsFilled++] = _intIterator.next();
-      }
-      if (_numDocIdsFilled > 0) {
-        return new DocIdSetBlock(_docIdBuffer, _numDocIdsFilled);
-      } else {
-        return null;
-      }
-    }
-
-    @Override
-    public String getOperatorName() {
-      return OPERATOR_NAME;
+    public List<Operator> getChildOperators() {
+      return Collections.emptyList();
     }
   }
 }

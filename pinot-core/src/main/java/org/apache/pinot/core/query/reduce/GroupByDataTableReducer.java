@@ -33,6 +33,8 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByResult;
@@ -50,12 +52,10 @@ import org.apache.pinot.core.operator.combine.GroupByOrderByCombineOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
-import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 
 
@@ -86,10 +86,10 @@ public class GroupByDataTableReducer implements DataTableReducer {
     assert _groupByExpressions != null;
     _numGroupByExpressions = _groupByExpressions.size();
     _numColumns = _numAggregationFunctions + _numGroupByExpressions;
-    QueryOptions queryOptions = new QueryOptions(queryContext.getQueryOptions());
-    _preserveType = queryOptions.isPreserveType();
-    _groupByModeSql = queryOptions.isGroupByModeSQL();
-    _responseFormatSql = queryOptions.isResponseFormatSQL();
+    Map<String, String> queryOptions = queryContext.getQueryOptions();
+    _preserveType = QueryOptionsUtils.isPreserveType(queryOptions);
+    _groupByModeSql = QueryOptionsUtils.isGroupByModeSQL(queryOptions);
+    _responseFormatSql = QueryOptionsUtils.isResponseFormatSQL(queryOptions);
     _sqlQuery = queryContext.getBrokerRequest().getPinotQuery() != null;
   }
 
@@ -164,7 +164,8 @@ public class GroupByDataTableReducer implements DataTableReducer {
       if (_responseFormatSql) {
         resultSize = brokerResponseNative.getResultTable().getRows().size();
       } else {
-        // We emit the group by size when the result isn't empty. All the sizes among group-by results should be the same.
+        // We emit the group by size when the result isn't empty. All the sizes among group-by results should be the
+        // same.
         // Thus, we can just emit the one from the 1st result.
         if (!brokerResponseNative.getAggregationResults().isEmpty()) {
           resultSize = brokerResponseNative.getAggregationResults().get(0).getGroupByResult().size();
@@ -293,20 +294,25 @@ public class GroupByDataTableReducer implements DataTableReducer {
     // Get the number of threads to use for reducing.
     // In case of single reduce thread, fall back to SimpleIndexedTable to avoid redundant locking/unlocking calls.
     int numReduceThreadsToUse = getNumReduceThreadsToUse(numDataTables, reducerContext.getMaxReduceThreadsPerQuery());
-    int trimSize = GroupByUtils.getTableCapacity(_queryContext);
+    int limit = _queryContext.getLimit();
+    // TODO: Make minTrimSize configurable
+    int trimSize = GroupByUtils.getTableCapacity(limit);
+    // NOTE: For query with HAVING clause, use trimSize as resultSize to ensure the result accuracy.
+    // TODO: Resolve the HAVING clause within the IndexedTable before returning the result
+    int resultSize = _queryContext.getHavingFilter() != null ? trimSize : limit;
     int trimThreshold = reducerContext.getGroupByTrimThreshold();
     IndexedTable indexedTable;
     if (numReduceThreadsToUse <= 1) {
-      indexedTable = new SimpleIndexedTable(dataSchema, _queryContext, trimSize, trimThreshold);
+      indexedTable = new SimpleIndexedTable(dataSchema, _queryContext, resultSize, trimSize, trimThreshold);
     } else {
       if (trimThreshold >= GroupByOrderByCombineOperator.MAX_TRIM_THRESHOLD) {
         // special case of trim threshold where it is set to max value.
         // there won't be any trimming during upsert in this case.
         // thus we can avoid the overhead of read-lock and write-lock
         // in the upsert method.
-        indexedTable = new UnboundedConcurrentIndexedTable(dataSchema, _queryContext, trimSize, trimThreshold);
+        indexedTable = new UnboundedConcurrentIndexedTable(dataSchema, _queryContext, resultSize);
       } else {
-        indexedTable = new ConcurrentIndexedTable(dataSchema, _queryContext, trimSize, trimThreshold);
+        indexedTable = new ConcurrentIndexedTable(dataSchema, _queryContext, resultSize, trimSize, trimThreshold);
       }
     }
 
@@ -326,7 +332,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     }
 
     int cnt = 0;
-    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+    ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     for (List<DataTable> reduceGroup : reduceGroups) {
       futures[cnt++] = reducerContext.getExecutorService().submit(new TraceRunnable() {
         @Override
@@ -338,7 +344,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
               for (int rowId = 0; rowId < numRows; rowId++) {
                 Object[] values = new Object[_numColumns];
                 for (int colId = 0; colId < _numColumns; colId++) {
-                  switch (columnDataTypes[colId]) {
+                  switch (storedColumnDataTypes[colId]) {
                     case INT:
                       values[colId] = dataTable.getInt(rowId, colId);
                       break;
@@ -394,7 +400,8 @@ public class GroupByDataTableReducer implements DataTableReducer {
   /**
    * Computes the number of reduce threads to use per query.
    * <ul>
-   *   <li> Use single thread if number of data tables to reduce is less than {@value #MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE}.</li>
+   *   <li> Use single thread if number of data tables to reduce is less than
+   *   {@value #MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE}.</li>
    *   <li> Else, use min of max allowed reduce threads per query, and number of data tables.</li>
    * </ul>
    *
@@ -584,9 +591,9 @@ public class GroupByDataTableReducer implements DataTableReducer {
   /**
    * Helper method to merge 2 intermediate result maps.
    */
-  private void mergeResultMap(Map<String, Object> mergedResultMap, Map<String, Object> ResultMapToMerge,
+  private void mergeResultMap(Map<String, Object> mergedResultMap, Map<String, Object> resultMapToMerge,
       AggregationFunction aggregationFunction) {
-    for (Map.Entry<String, Object> entry : ResultMapToMerge.entrySet()) {
+    for (Map.Entry<String, Object> entry : resultMapToMerge.entrySet()) {
       String groupKey = entry.getKey();
       Object resultToMerge = entry.getValue();
       mergedResultMap.compute(groupKey, (k, v) -> {

@@ -23,15 +23,19 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Quickstart.Color;
+import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tools.streams.AirlineDataStream;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
@@ -40,7 +44,12 @@ import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
 import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
-public class HybridQuickstart {
+public class HybridQuickstart extends QuickStartBase {
+  @Override
+  public List<String> types() {
+    return Collections.singletonList("HYBRID");
+  }
+
   private StreamDataServerStartable _kafkaStarter;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
   private File _schemaFile;
@@ -50,10 +59,10 @@ public class HybridQuickstart {
 
   public static void main(String[] args)
       throws Exception {
-    // TODO: Explicitly call below method to load dependencies from pinot-plugins libs which are excluded from pinot-tools packaging.
-    // E.g. Kafka related libs are coming from pinot-kafka-* lib, avro libs are coming from pinot-avro lib.
-    PluginManager.get().init();
-    new HybridQuickstart().execute();
+    List<String> arguments = new ArrayList<>();
+    arguments.addAll(Arrays.asList("QuickStart", "-type", "HYBRID"));
+    arguments.addAll(Arrays.asList(args));
+    PinotAdministrator.main(arguments.toArray(new String[arguments.size()]));
   }
 
   private QuickstartTableRequest prepareTableRequest(File baseDir)
@@ -91,7 +100,7 @@ public class HybridQuickstart {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
     try {
       _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME,
-          KafkaStarterUtils.getDefaultKafkaConfiguration());
+          KafkaStarterUtils.getDefaultKafkaConfiguration(_zookeeperInstance));
     } catch (Exception e) {
       throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
     }
@@ -101,13 +110,12 @@ public class HybridQuickstart {
 
   public void execute()
       throws Exception {
-    File quickstartTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
+    File quickstartTmpDir = new File(_tmpDir, String.valueOf(System.currentTimeMillis()));
     File baseDir = new File(quickstartTmpDir, "airlineStats");
     File dataDir = new File(baseDir, "data");
     Preconditions.checkState(dataDir.mkdirs());
     QuickstartTableRequest bootstrapTableRequest = prepareTableRequest(baseDir);
-    final QuickstartRunner runner =
-        new QuickstartRunner(Lists.newArrayList(bootstrapTableRequest), 1, 1, 1, dataDir);
+    final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(bootstrapTableRequest), 1, 1, 1, dataDir);
     printStatus(Color.YELLOW, "***** Starting Kafka  *****");
     startKafka();
     printStatus(Color.YELLOW, "***** Starting airline data stream and publishing to Kafka *****");
@@ -153,19 +161,24 @@ public class HybridQuickstart {
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q2 = "select AirlineID, sum(Cancelled) from airlineStats group by AirlineID order by sum(Cancelled) desc limit 5";
+    String q2 =
+        "select AirlineID, sum(Cancelled) from airlineStats group by AirlineID order by sum(Cancelled) desc limit 5";
     printStatus(Color.YELLOW, "Top 5 airlines in cancellation ");
     printStatus(Color.CYAN, "Query : " + q2);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q2)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q3 = "select AirlineID, Year, sum(Flights) from airlineStats where Year > 2010 group by AirlineID, Year order by sum(Flights) desc limit 5";
+    String q3 =
+        "select AirlineID, Year, sum(Flights) from airlineStats where Year > 2010 group by AirlineID, Year order by "
+            + "sum(Flights) desc limit 5";
     printStatus(Color.YELLOW, "Top 5 airlines in number of flights after 2010");
     printStatus(Color.CYAN, "Query : " + q3);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q3)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q4 = "select OriginCityName, max(Flights) from airlineStats group by OriginCityName order by max(Flights) desc limit 5";
+    String q4 =
+        "select OriginCityName, max(Flights) from airlineStats group by OriginCityName order by max(Flights) desc "
+            + "limit 5";
     printStatus(Color.YELLOW, "Top 5 cities for number of flights");
     printStatus(Color.CYAN, "Query : " + q4);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q4)));

@@ -20,7 +20,6 @@ package org.apache.pinot.tools.admin.command;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,13 +28,13 @@ import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
-
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
-import org.apache.http.message.BasicHeader;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.tools.AbstractBaseCommand;
@@ -50,8 +49,6 @@ import org.apache.pinot.tools.utils.PinotConfigUtils;
 public class AbstractBaseAdminCommand extends AbstractBaseCommand {
   static final String DEFAULT_CONTROLLER_PORT = "9000";
   static final String URI_TABLES_PATH = "/tables/";
-
-  static final String TMP_DIR = System.getProperty("java.io.tmpdir") + File.separator;
 
   public AbstractBaseAdminCommand(boolean addShutdownHook) {
     super(addShutdownHook);
@@ -90,10 +87,11 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
     conn.setRequestMethod(requestMethod);
     conn.setDoOutput(true);
     if (payload != null) {
-      final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(),
-          StandardCharsets.UTF_8));
-      writer.write(payload, 0, payload.length());
-      writer.flush();
+      try (final BufferedWriter writer = new BufferedWriter(
+          new OutputStreamWriter(conn.getOutputStream(), StandardCharsets.UTF_8))) {
+        writer.write(payload, 0, payload.length());
+        writer.flush();
+      }
     }
 
     try {
@@ -103,7 +101,8 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
     }
   }
 
-  private static String readInputStream(InputStream inputStream) throws IOException {
+  private static String readInputStream(InputStream inputStream)
+      throws IOException {
     final BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, "UTF-8"));
     final StringBuilder sb = new StringBuilder();
     String line;

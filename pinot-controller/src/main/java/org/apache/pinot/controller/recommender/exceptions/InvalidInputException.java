@@ -22,7 +22,7 @@ package org.apache.pinot.controller.recommender.exceptions;
  * Reflects conflicts in input, e.g. we cannot have both no-dict and index on one dimension.
  */
 public class InvalidInputException extends Exception {
-  public InvalidInputException(String pattern, Object ... arguments) {
-    super(java.text.MessageFormat.format(pattern,arguments));
+  public InvalidInputException(String pattern, Object... arguments) {
+    super(java.text.MessageFormat.format(pattern, arguments));
   }
 }

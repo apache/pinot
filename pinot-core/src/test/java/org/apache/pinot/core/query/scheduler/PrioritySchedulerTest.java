@@ -64,19 +64,19 @@ import static org.testng.Assert.assertTrue;
 
 
 public class PrioritySchedulerTest {
-  private static final ServerMetrics metrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+  private static final ServerMetrics METRICS = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
 
-  private static boolean useBarrier = false;
-  private static CyclicBarrier startupBarrier;
-  private static CyclicBarrier validationBarrier;
-  private static CountDownLatch numQueries = new CountDownLatch(1);
+  private static boolean _useBarrier = false;
+  private static CyclicBarrier _startupBarrier;
+  private static CyclicBarrier _validationBarrier;
+  private static CountDownLatch _numQueries = new CountDownLatch(1);
 
   @AfterMethod
   public void afterMethod() {
-    useBarrier = false;
-    startupBarrier = null;
-    validationBarrier = null;
-    numQueries = new CountDownLatch(1);
+    _useBarrier = false;
+    _startupBarrier = null;
+    _validationBarrier = null;
+    _numQueries = new CountDownLatch(1);
   }
 
   // Tests that there is no "hang" on stop
@@ -91,7 +91,7 @@ public class PrioritySchedulerTest {
     long queueWakeTimeMicros = ((MultiLevelPriorityQueue) scheduler.getQueue()).getWakeupTimeMicros();
     long sleepTimeMs = queueWakeTimeMicros >= 1000 ? queueWakeTimeMicros / 1000 + 10 : 10;
     Thread.sleep(sleepTimeMs);
-    assertFalse(scheduler.scheduler.isAlive());
+    assertFalse(scheduler._scheduler.isAlive());
   }
 
   @Test
@@ -104,11 +104,11 @@ public class PrioritySchedulerTest {
     conf.setProperty(ResourceLimitPolicy.TABLE_THREADS_HARD_LIMIT, 5);
     conf.setProperty(MultiLevelPriorityQueue.MAX_PENDING_PER_GROUP_KEY, 5);
     List<ListenableFuture<byte[]>> results = new ArrayList<>();
-    results.add(scheduler.submit(createServerQueryRequest("1", metrics)));
-    TestSchedulerGroup group = TestPriorityScheduler.groupFactory.groupMap.get("1");
+    results.add(scheduler.submit(createServerQueryRequest("1", METRICS)));
+    TestSchedulerGroup group = TestPriorityScheduler._groupFactory._groupMap.get("1");
     group.addReservedThreads(10);
-    group.addLast(createQueryRequest("1", metrics));
-    results.add(scheduler.submit(createServerQueryRequest("1", metrics)));
+    group.addLast(createQueryRequest("1", METRICS));
+    results.add(scheduler.submit(createServerQueryRequest("1", METRICS)));
 
     scheduler.stop();
     long queueWakeTimeMicros = ((MultiLevelPriorityQueue) scheduler.getQueue()).getWakeupTimeMicros();
@@ -130,23 +130,23 @@ public class PrioritySchedulerTest {
     properties.put(ResourceLimitPolicy.THREADS_PER_QUERY_PCT, 50);
     properties.put(ResourceLimitPolicy.TABLE_THREADS_HARD_LIMIT, 40);
     properties.put(ResourceLimitPolicy.TABLE_THREADS_SOFT_LIMIT, 20);
-    useBarrier = true;
-    startupBarrier = new CyclicBarrier(2);
-    validationBarrier = new CyclicBarrier(2);
+    _useBarrier = true;
+    _startupBarrier = new CyclicBarrier(2);
+    _validationBarrier = new CyclicBarrier(2);
 
     TestPriorityScheduler scheduler = TestPriorityScheduler.create(new PinotConfiguration(properties));
     int totalPermits = scheduler.getRunningQueriesSemaphore().availablePermits();
     scheduler.start();
-    ListenableFuture<byte[]> result = scheduler.submit(createServerQueryRequest("1", metrics));
-    startupBarrier.await();
-    TestSchedulerGroup group = TestPriorityScheduler.groupFactory.groupMap.get("1");
+    ListenableFuture<byte[]> result = scheduler.submit(createServerQueryRequest("1", METRICS));
+    _startupBarrier.await();
+    TestSchedulerGroup group = TestPriorityScheduler._groupFactory._groupMap.get("1");
     assertEquals(group.numRunning(), 1);
     assertEquals(group.getThreadsInUse(), 1);
     // The total number of threads allocated for query execution will be dependent on the underlying
     // platform (number of cores). Scheduler will assign total threads up to but not exceeding total
     // number of segments. On servers with less cores, this can assign only 1 thread (less than total segments)
     assertTrue(group.totalReservedThreads() <= 2 /* 2: numSegments in request*/);
-    validationBarrier.await();
+    _validationBarrier.await();
     byte[] resultData = result.get();
     DataTable table = DataTableFactory.getDataTable(resultData);
     assertEquals(table.getMetadata().get(MetadataKey.TABLE.getName()), "1");
@@ -178,7 +178,7 @@ public class PrioritySchedulerTest {
     final ConcurrentLinkedQueue<ListenableFuture<byte[]>> results = new ConcurrentLinkedQueue<>();
     final int numThreads = 3;
     final int queriesPerThread = 10;
-    numQueries = new CountDownLatch(numThreads * queriesPerThread);
+    _numQueries = new CountDownLatch(numThreads * queriesPerThread);
 
     for (int i = 0; i < numThreads; i++) {
       final int index = i;
@@ -186,13 +186,13 @@ public class PrioritySchedulerTest {
         @Override
         public void run() {
           for (int j = 0; j < queriesPerThread; j++) {
-            results.add(scheduler.submit(createServerQueryRequest(Integer.toString(index), metrics)));
+            results.add(scheduler.submit(createServerQueryRequest(Integer.toString(index), METRICS)));
             Uninterruptibles.sleepUninterruptibly(random.nextInt(100), TimeUnit.MILLISECONDS);
           }
         }
       }).start();
     }
-    numQueries.await();
+    _numQueries.await();
     scheduler.stop();
   }
 
@@ -208,11 +208,11 @@ public class PrioritySchedulerTest {
     TestPriorityScheduler scheduler = TestPriorityScheduler.create(new PinotConfiguration(properties));
     scheduler.start();
     List<ListenableFuture<byte[]>> results = new ArrayList<>();
-    results.add(scheduler.submit(createServerQueryRequest("1", metrics)));
-    TestSchedulerGroup group = TestPriorityScheduler.groupFactory.groupMap.get("1");
+    results.add(scheduler.submit(createServerQueryRequest("1", METRICS)));
+    TestSchedulerGroup group = TestPriorityScheduler._groupFactory._groupMap.get("1");
     group.addReservedThreads(10);
-    group.addLast(createQueryRequest("1", metrics));
-    results.add(scheduler.submit(createServerQueryRequest("1", metrics)));
+    group.addLast(createQueryRequest("1", METRICS));
+    results.add(scheduler.submit(createServerQueryRequest("1", METRICS)));
     DataTable dataTable = DataTableFactory.getDataTable(results.get(1).get());
     assertTrue(dataTable.getMetadata()
         .containsKey(DataTable.EXCEPTION_METADATA_KEY + QueryException.SERVER_OUT_OF_CAPACITY_ERROR.getErrorCode()));
@@ -223,7 +223,7 @@ public class PrioritySchedulerTest {
   public void testSubmitBeforeRunning()
       throws ExecutionException, InterruptedException, IOException {
     TestPriorityScheduler scheduler = TestPriorityScheduler.create();
-    ListenableFuture<byte[]> result = scheduler.submit(createServerQueryRequest("1", metrics));
+    ListenableFuture<byte[]> result = scheduler.submit(createServerQueryRequest("1", METRICS));
     // start is not called
     DataTable response = DataTableFactory.getDataTable(result.get());
     assertTrue(response.getExceptions().containsKey(QueryException.SERVER_SCHEDULER_DOWN_ERROR.getErrorCode()));
@@ -232,8 +232,8 @@ public class PrioritySchedulerTest {
   }
 
   static class TestPriorityScheduler extends PriorityScheduler {
-    static TestSchedulerGroupFactory groupFactory;
-    static LongAccumulator latestQueryTime;
+    static TestSchedulerGroupFactory _groupFactory;
+    static LongAccumulator _latestQueryTime;
 
     // store locally for easy access
     public TestPriorityScheduler(PinotConfiguration config, ResourceManager resourceManager,
@@ -245,11 +245,11 @@ public class PrioritySchedulerTest {
     public static TestPriorityScheduler create(PinotConfiguration config) {
       ResourceManager rm = new PolicyBasedResourceManager(config);
       QueryExecutor qe = new TestQueryExecutor();
-      groupFactory = new TestSchedulerGroupFactory();
+      _groupFactory = new TestSchedulerGroupFactory();
       MultiLevelPriorityQueue queue =
-          new MultiLevelPriorityQueue(config, rm, groupFactory, new TableBasedGroupMapper());
-      latestQueryTime = new LongAccumulator(Long::max, 0);
-      return new TestPriorityScheduler(config, rm, qe, queue, metrics, latestQueryTime);
+          new MultiLevelPriorityQueue(config, rm, _groupFactory, new TableBasedGroupMapper());
+      _latestQueryTime = new LongAccumulator(Long::max, 0);
+      return new TestPriorityScheduler(config, rm, qe, queue, METRICS, _latestQueryTime);
     }
 
     public static TestPriorityScheduler create() {
@@ -257,7 +257,7 @@ public class PrioritySchedulerTest {
     }
 
     ResourceManager getResourceManager() {
-      return this.resourceManager;
+      return _resourceManager;
     }
 
     @Override
@@ -266,19 +266,19 @@ public class PrioritySchedulerTest {
     }
 
     public Semaphore getRunningQueriesSemaphore() {
-      return runningQueriesSemaphore;
+      return _runningQueriesSemaphore;
     }
 
     Thread getSchedulerThread() {
-      return scheduler;
+      return _scheduler;
     }
 
     SchedulerPriorityQueue getQueue() {
-      return queryQueue;
+      return _queryQueue;
     }
 
     public long getLatestQueryTime() {
-      return latestQueryTime.get();
+      return _latestQueryTime.get();
     }
   }
 
@@ -299,23 +299,23 @@ public class PrioritySchedulerTest {
     @Override
     public DataTable processQuery(ServerQueryRequest queryRequest, ExecutorService executorService,
         @Nullable StreamObserver<Server.ServerResponse> responseObserver) {
-      if (useBarrier) {
+      if (_useBarrier) {
         try {
-          startupBarrier.await();
+          _startupBarrier.await();
         } catch (Exception e) {
           throw new RuntimeException(e);
         }
       }
       DataTable result = DataTableBuilder.getEmptyDataTable();
       result.getMetadata().put(MetadataKey.TABLE.getName(), queryRequest.getTableNameWithType());
-      if (useBarrier) {
+      if (_useBarrier) {
         try {
-          validationBarrier.await();
+          _validationBarrier.await();
         } catch (Exception e) {
           throw new RuntimeException(e);
         }
       }
-      numQueries.countDown();
+      _numQueries.countDown();
       return result;
     }
   }

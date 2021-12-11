@@ -19,8 +19,8 @@
 
 package org.apache.pinot.controller.recommender.rules.impl;
 
+import com.google.common.io.Files;
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -43,6 +43,8 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 
+import static org.apache.pinot.controller.recommender.realtime.provisioning.MemoryEstimator.NOT_APPLICABLE;
+
 
 /**
  * This rule gives some recommendations useful for provisioning real time tables. Specifically it provides some
@@ -50,9 +52,11 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
  * on the provided characteristics of the data.
  */
 public class RealtimeProvisioningRule extends AbstractRule {
-  public static String OPTIMAL_SEGMENT_SIZE = "Optimal Segment Size";
-  public static String CONSUMING_MEMORY_PER_HOST = "Consuming Memory per Host";
-  public static String TOTAL_MEMORY_USED_PER_HOST = "Total Memory Used per Host";
+  public static final String OPTIMAL_SEGMENT_SIZE = "Optimal Segment Size";
+  public static final String NUM_ROWS_IN_SEGMENT = "Number of Rows in Segment";
+  public static final String NUM_SEGMENTS_QUERIED_PER_HOST = "Number of Segments Queried per Host";
+  public static final String CONSUMING_MEMORY_PER_HOST = "Consuming Memory per Host";
+  public static final String TOTAL_MEMORY_USED_PER_HOST = "Total Memory Used per Host";
 
   private final RealtimeProvisioningRuleParams _params;
 
@@ -71,32 +75,33 @@ public class RealtimeProvisioningRule extends AbstractRule {
     }
 
     // prepare input to memory estimator
-    TableConfig tableConfig = createTableConfig(_output.getIndexConfig(), _input.getSchema());
+    TableConfig tableConfig =
+        createTableConfig(_output.getIndexConfig(), _input.getSchema(), _output.isAggregateMetrics());
     long maxUsableHostMemoryByte = DataSizeUtils.toBytes(_params.getMaxUsableHostMemory());
     int totalConsumingPartitions = _params.getNumPartitions() * _params.getNumReplicas();
-    int ingestionRatePerPartition = (int) _input.getNumMessagesPerSecInKafkaTopic() / _params.getNumPartitions();
+    double ingestionRatePerPartition = (double) _input.getNumMessagesPerSecInKafkaTopic() / _params.getNumPartitions();
+    int retentionHours = _params.getRealtimeTableRetentionHours();
     int[] numHosts = _params.getNumHosts();
     int[] numHours = _params.getNumHours();
 
-    // run memory estimator
+    File workingDir = Files.createTempDir();
     MemoryEstimator memoryEstimator =
-        new MemoryEstimator(tableConfig,
-            _input.getSchema(),
-            _input.getSchemaWithMetadata(),
-            (int) _input.getNumRecordsPerPush(), // TODO we may not want to use numRecordsPerPush as the numRows for the completed segment we are going to generate. A more fine-grained number is needed which we need to figure out how to capture.
-            ingestionRatePerPartition,
-            maxUsableHostMemoryByte,
-            _params.getRealtimeTableRetentionHours());
-    File statsFile = memoryEstimator.initializeStatsHistory();
-    runAndRethrowIOException(() -> memoryEstimator
-        .estimateMemoryUsed(statsFile, numHosts, numHours, totalConsumingPartitions,
-            _params.getRealtimeTableRetentionHours()));
+        new MemoryEstimator(tableConfig, _input.getSchema(), _input.getSchemaWithMetadata(),
+            _params.getNumRowsInGeneratedSegment(), ingestionRatePerPartition, maxUsableHostMemoryByte, retentionHours,
+            workingDir);
+    try {
+      // run memory estimator
+      File statsFile = memoryEstimator.initializeStatsHistory();
+      memoryEstimator.estimateMemoryUsed(statsFile, numHosts, numHours, totalConsumingPartitions, retentionHours);
 
-    // extract recommendations
-    extractResults(memoryEstimator, numHosts, numHours, _output.getRealtimeProvisioningRecommendations());
+      // extract recommendations
+      extractResults(memoryEstimator, numHosts, numHours, _output.getRealtimeProvisioningRecommendations());
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
-  private TableConfig createTableConfig(IndexConfig indexConfig, Schema schema) {
+  private TableConfig createTableConfig(IndexConfig indexConfig, Schema schema, boolean aggregateMetrics) {
     TableConfigBuilder tableConfigBuilder = new TableConfigBuilder(TableType.REALTIME);
     tableConfigBuilder.setTableName(schema.getSchemaName());
     tableConfigBuilder.setLoadMode("MMAP");
@@ -107,9 +112,11 @@ public class RealtimeProvisioningRule extends AbstractRule {
     setIfNotEmpty(indexConfig.getNoDictionaryColumns(), tableConfigBuilder::setNoDictionaryColumns);
     setIfNotEmpty(indexConfig.getInvertedIndexColumns(), tableConfigBuilder::setInvertedIndexColumns);
     setIfNotEmpty(indexConfig.getOnHeapDictionaryColumns(), tableConfigBuilder::setOnHeapDictionaryColumns);
-    setIfNotEmpty(indexConfig.getVariedLengthDictionaryColumns(), tableConfigBuilder::setVarLengthDictionaryColumns);
+    setIfNotEmpty(indexConfig.getVarLengthDictionaryColumns(), tableConfigBuilder::setVarLengthDictionaryColumns);
 
-    return tableConfigBuilder.build();
+    TableConfig tableConfig = tableConfigBuilder.build();
+    tableConfig.getIndexingConfig().setAggregateMetrics(aggregateMetrics);
+    return tableConfig;
   }
 
   private void setIfNotEmpty(String colName, Consumer<String> func) {
@@ -128,9 +135,16 @@ public class RealtimeProvisioningRule extends AbstractRule {
       Map<String, Map<String, String>> rtProvRecommendations) {
     Map<String, String> segmentSizes = makeMatrix(memoryEstimator.getOptimalSegmentSize(), numHosts, numHours);
     Map<String, String> consumingMemory = makeMatrix(memoryEstimator.getConsumingMemoryPerHost(), numHosts, numHours);
+    Map<String, String> numSegmentsQueried =
+        makeMatrix(memoryEstimator.getNumSegmentsQueriedPerHost(), numHosts, numHours);
+    Map<String, String> numRowsInSegment = makeMatrix(memoryEstimator.getNumRowsInSegment(), numHosts, numHours,
+        element -> element.equals(NOT_APPLICABLE) ? element : convertLargeNumberToHumanReadable(element));
     Map<String, String> totalMemory = makeMatrix(memoryEstimator.getActiveMemoryPerHost(), numHosts, numHours,
-        element -> element.substring(0, element.indexOf('/'))); // take the first number (eg: 48G/48G)
+        element -> element.equals(NOT_APPLICABLE) ? element
+            : element.substring(0, element.indexOf('/'))); // take the first number (eg: 48G/48G)
     rtProvRecommendations.put(OPTIMAL_SEGMENT_SIZE, segmentSizes);
+    rtProvRecommendations.put(NUM_ROWS_IN_SEGMENT, numRowsInSegment);
+    rtProvRecommendations.put(NUM_SEGMENTS_QUERIED_PER_HOST, numSegmentsQueried);
     rtProvRecommendations.put(CONSUMING_MEMORY_PER_HOST, consumingMemory);
     rtProvRecommendations.put(TOTAL_MEMORY_USED_PER_HOST, totalMemory);
   }
@@ -171,17 +185,17 @@ public class RealtimeProvisioningRule extends AbstractRule {
     return output;
   }
 
-  private void runAndRethrowIOException(Func func) {
-    try {
-      func.run();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+  private String convertLargeNumberToHumanReadable(String num) {
+    int val = Integer.parseInt(num);
+    if (val >= 10_000_000) {
+      return (val / 1_000_000) + "M";
     }
-  }
-
-  @FunctionalInterface
-  private interface Func {
-    void run()
-        throws IOException;
+    if (val >= 1_000_000) {
+      return (val / 100_000) / 10.0 + "M"; // eg: 5,432,000 -> 5.4M
+    }
+    if (val >= 10_000) {
+      return (val / 1000) + "K";
+    }
+    return num;
   }
 }

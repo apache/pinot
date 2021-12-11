@@ -24,6 +24,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -33,21 +35,29 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
+import org.apache.http.Header;
+import org.apache.http.HttpStatus;
+import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicHeader;
+import org.apache.http.message.BasicNameValuePair;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.utils.DataTable.MetadataKey;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
 import org.apache.pinot.common.utils.grpc.GrpcRequestBuilder;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
-import org.apache.pinot.segment.spi.creator.SegmentVersion;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -57,7 +67,9 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -75,6 +87,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 1;
   private static final int NUM_SEGMENTS = 12;
+  private static final long ONE_HOUR_IN_MS = TimeUnit.HOURS.toMillis(1);
+  private static final String SEGMENT_UPLOAD_TEST_TABLE = "segmentUploadTestTable";
 
   // For table config refresh test, make an expensive query to ensure the query won't finish in 5ms
   private static final String TEST_TIMEOUT_QUERY =
@@ -114,9 +128,23 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final String TEST_MISSING_COLUMNS_QUERY = "SELECT COUNT(*) FROM mytable WHERE AirlineID > 0";
   private static final String SELECT_STAR_QUERY = "SELECT * FROM mytable";
 
+  private static final String DISK_SIZE_IN_BYTES_KEY = "diskSizeInBytes";
+  private static final String NUM_SEGMENTS_KEY = "numSegments";
+  private static final String NUM_ROWS_KEY = "numRows";
+  private static final String COLUMN_LENGTH_MAP_KEY = "columnLengthMap";
+  private static final String COLUMN_CARDINALITY_MAP_KEY = "columnCardinalityMap";
+  // TODO: This might lead to flaky test, as this disk size is not deterministic
+  //       as it depends on the iteration order of a HashSet.
+  private static final int DISK_SIZE_IN_BYTES = 20796000;
+  private static final int NUM_ROWS = 115545;
+
   private final List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbacks =
       new ArrayList<>(getNumBrokers() + getNumServers());
   private String _schemaFileName = DEFAULT_SCHEMA_FILE_NAME;
+  // Cache the table size after removing an index via reloading. Once this value
+  // is set, assert that table size always gets back to this value after removing
+  // any other kind of index.
+  private long _tableSizeAfterRemovingIndex;
 
   protected int getNumBrokers() {
     return NUM_BROKERS;
@@ -129,12 +157,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Override
   protected String getSchemaFileName() {
     return _schemaFileName;
-  }
-
-  // NOTE: Only allow removing default columns for v1 segment
-  @Override
-  protected String getSegmentVersion() {
-    return SegmentVersion.v1.name();
   }
 
   @BeforeClass
@@ -185,12 +207,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   private void registerCallbackHandlers() {
     List<String> instances = _helixAdmin.getInstancesInCluster(getHelixClusterName());
-    instances.removeIf(instance -> (!instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) && !instance
-        .startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)));
+    instances.removeIf(
+        instance -> (!instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) && !instance.startsWith(
+            CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)));
     List<String> resourcesInCluster = _helixAdmin.getResourcesInCluster(getHelixClusterName());
-    resourcesInCluster.removeIf(
-        resource -> (!TableNameBuilder.isTableResource(resource) && !CommonConstants.Helix.BROKER_RESOURCE_INSTANCE
-            .equals(resource)));
+    resourcesInCluster.removeIf(resource -> (!TableNameBuilder.isTableResource(resource)
+        && !CommonConstants.Helix.BROKER_RESOURCE_INSTANCE.equals(resource)));
     for (String instance : instances) {
       List<String> resourcesToMonitor = new ArrayList<>();
       for (String resourceName : resourcesInCluster) {
@@ -202,11 +224,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
           }
         }
       }
-      _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
-          .of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager,
-                  getHelixClusterName(), instance, resourcesToMonitor, 100.0),
-              new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager,
-                  getHelixClusterName(), instance, resourcesToMonitor, 100.0))));
+      _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
+          new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, getHelixClusterName(),
+              instance, resourcesToMonitor, 100.0),
+          new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, getHelixClusterName(),
+              instance, resourcesToMonitor, 100.0))));
     }
   }
 
@@ -246,16 +268,22 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       try {
         JsonNode queryResponse = postQuery(TEST_TIMEOUT_QUERY);
         JsonNode exceptions = queryResponse.get("exceptions");
-        if (exceptions.size() != 0) {
+        if (exceptions.isEmpty()) {
+          return false;
+        }
+        int errorCode = exceptions.get(0).get("errorCode").asInt();
+        if (errorCode == QueryException.BROKER_TIMEOUT_ERROR_CODE) {
           // Timed out on broker side
-          return exceptions.get(0).get("errorCode").asInt() == QueryException.BROKER_TIMEOUT_ERROR_CODE;
-        } else {
+          return true;
+        }
+        if (errorCode == QueryException.SERVER_NOT_RESPONDING_ERROR_CODE) {
           // Timed out on server side
           int numServersQueried = queryResponse.get("numServersQueried").asInt();
           int numServersResponded = queryResponse.get("numServersResponded").asInt();
           int numDocsScanned = queryResponse.get("numDocsScanned").asInt();
           return numServersQueried == getNumServers() && numServersResponded == 0 && numDocsScanned == 0;
         }
+        return false;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -270,7 +298,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       try {
         JsonNode queryResponse = postQuery(TEST_TIMEOUT_QUERY);
         JsonNode exceptions = queryResponse.get("exceptions");
-        if (exceptions.size() != 0) {
+        if (!exceptions.isEmpty()) {
           return false;
         }
         int numServersQueried = queryResponse.get("numServersQueried").asInt();
@@ -287,7 +315,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testUploadSameSegments()
       throws Exception {
-    OfflineSegmentZKMetadata segmentZKMetadata = _helixResourceManager.getOfflineSegmentMetadata(getTableName()).get(0);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    SegmentZKMetadata segmentZKMetadata = _helixResourceManager.getSegmentsZKMetadata(offlineTableName).get(0);
     String segmentName = segmentZKMetadata.getSegmentName();
     long crc = segmentZKMetadata.getCrc();
     // Creation time is when the segment gets created
@@ -297,9 +326,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Refresh time is when the segment gets refreshed (existing segment)
     long refreshTime = segmentZKMetadata.getRefreshTime();
 
-    uploadSegments(getTableName(), _tarDir);
-    for (OfflineSegmentZKMetadata segmentZKMetadataAfterUpload : _helixResourceManager
-        .getOfflineSegmentMetadata(getTableName())) {
+    uploadSegments(offlineTableName, _tarDir);
+    for (SegmentZKMetadata segmentZKMetadataAfterUpload : _helixResourceManager.getSegmentsZKMetadata(
+        offlineTableName)) {
       // Only check one segment
       if (segmentZKMetadataAfterUpload.getSegmentName().equals(segmentName)) {
         assertEquals(segmentZKMetadataAfterUpload.getCrc(), crc);
@@ -313,25 +342,155 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
+  public void testUploadSegmentRefreshOnly()
+      throws Exception {
+    TableConfig segmentUploadTestTableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(SEGMENT_UPLOAD_TEST_TABLE).setSchemaName(getSchemaName())
+            .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
+            .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
+            .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
+            .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
+            .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
+            .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant())
+            .setIngestionConfig(getIngestionConfig()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
+    addTableConfig(segmentUploadTestTableConfig);
+    String offlineTableName = segmentUploadTestTableConfig.getTableName();
+    File[] segmentTarFiles = _tarDir.listFiles();
+    assertNotNull(segmentTarFiles);
+    int numSegments = segmentTarFiles.length;
+    assertTrue(numSegments > 0);
+    List<Header> headers = new ArrayList<>();
+    headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.REFRESH_ONLY, "true"));
+    List<NameValuePair> parameters = new ArrayList<>();
+    NameValuePair tableNameParameter = new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME,
+        TableNameBuilder.extractRawTableName(offlineTableName));
+    parameters.add(tableNameParameter);
+
+    URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentHttpURI(LOCAL_HOST, _controllerPort);
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      // Refresh non-existing segment
+      File segmentTarFile = segmentTarFiles[0];
+      try {
+        fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, headers,
+            parameters, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+        fail();
+      } catch (HttpErrorStatusException e) {
+        assertEquals(e.getStatusCode(), HttpStatus.SC_GONE);
+        assertTrue(_helixResourceManager.getSegmentsZKMetadata(SEGMENT_UPLOAD_TEST_TABLE).isEmpty());
+      }
+
+      // Upload segment
+      SimpleHttpResponse response =
+          fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, null,
+              parameters, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+      assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
+      List<SegmentZKMetadata> segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(offlineTableName);
+      assertEquals(segmentsZKMetadata.size(), 1);
+
+      // Refresh existing segment
+      response = fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile,
+          headers, parameters, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+      assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
+      segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(offlineTableName);
+      assertEquals(segmentsZKMetadata.size(), 1);
+      assertNotEquals(segmentsZKMetadata.get(0).getRefreshTime(), Long.MIN_VALUE);
+    }
+    dropOfflineTable(SEGMENT_UPLOAD_TEST_TABLE);
+  }
+
+  @Test(dependsOnMethods = "testRangeIndexTriggering")
   public void testInvertedIndexTriggering()
       throws Exception {
     long numTotalDocs = getCountStarResult();
 
-    JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
-    assertEquals(queryResponse.get("numEntriesScannedInFilter").asLong(), numTotalDocs);
+    // Without index on DivActualElapsedTime, all docs are scanned at filtering stage.
+    assertEquals(postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
 
-    // Update table config and trigger reload
+    addInvertedIndex();
+    long tableSizeWithNewIndex = getTableSize(getTableName());
+
+    // Update table config to remove the new inverted index, and
+    // reload table to clean the new inverted indices physically.
+    TableConfig tableConfig = getOfflineTableConfig();
+    tableConfig.getIndexingConfig().setInvertedIndexColumns(getInvertedIndexColumns());
+    updateTableConfig(tableConfig);
+    reloadOfflineTable(getTableName());
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+        // Total docs should not change during reload, but num entries scanned
+        // gets back to total number of documents as the index is removed.
+        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+        return queryResponse.get("numEntriesScannedInFilter").asLong() == numTotalDocs;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to cleanup obsolete index");
+    assertEquals(getTableSize(getTableName()), _tableSizeAfterRemovingIndex);
+
+    // Add the inverted index back to test index removal via force download.
+    addInvertedIndex();
+    long tableSizeAfterAddingIndexAgain = getTableSize(getTableName());
+    assertEquals(tableSizeAfterAddingIndexAgain, tableSizeWithNewIndex);
+
+    // Update table config to remove the new inverted index.
+    tableConfig = getOfflineTableConfig();
+    tableConfig.getIndexingConfig().setInvertedIndexColumns(getInvertedIndexColumns());
+    updateTableConfig(tableConfig);
+
+    // Force to download a single segment, and disk usage should drop a bit.
+    SegmentZKMetadata segmentZKMetadata =
+        _helixResourceManager.getSegmentsZKMetadata(TableNameBuilder.OFFLINE.tableNameWithType(getTableName())).get(0);
+    String segmentName = segmentZKMetadata.getSegmentName();
+    reloadOfflineSegment(getTableName(), segmentName, true);
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+        // Total docs should not change during reload
+        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+        return getTableSize(getTableName()) < tableSizeAfterAddingIndexAgain;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to clean up obsolete index in segment");
+
+    // Force to download the whole table and expect disk usage drops further.
+    reloadOfflineTable(getTableName(), true);
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+        // Total docs should not change during reload, but num entries scanned
+        // gets back to total number of documents as the index is removed.
+        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+        return queryResponse.get("numEntriesScannedInFilter").asLong() == numTotalDocs;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to cleanup obsolete index in table");
+    // With force download, the table size gets back to the initial value.
+    assertEquals(getTableSize(getTableName()), DISK_SIZE_IN_BYTES);
+  }
+
+  private void addInvertedIndex()
+      throws IOException {
+    // Update table config to add inverted index on DivActualElapsedTime column, and
+    // reload the table to get config change into effect and add the inverted index.
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setInvertedIndexColumns(UPDATED_INVERTED_INDEX_COLUMNS);
     updateTableConfig(tableConfig);
-    reloadOfflineTable(getTableName());
+    reloadOfflineTable(TableNameBuilder.OFFLINE.tableNameWithType(getTableName()));
 
+    // It takes a while to reload multiple segments, thus we retry the query for some time.
+    // After all segments are reloaded, the inverted index is added on DivActualElapsedTime.
+    // It's expected to have numEntriesScannedInFilter equal to 0, i.e. no docs is scanned
+    // at filtering stage when inverted index can answer the predicate directly.
+    long numTotalDocs = getCountStarResult();
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode queryResponse1 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+        JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
         // Total docs should not change during reload
-        assertEquals(queryResponse1.get("totalDocs").asLong(), numTotalDocs);
-        return queryResponse1.get("numEntriesScannedInFilter").asLong() == 0L;
+        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+        return queryResponse.get("numEntriesScannedInFilter").asLong() == 0L;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -341,101 +500,154 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testTimeFunc()
       throws Exception {
-    String sqlQuery = "SELECT toDateTime(now(), 'yyyy-MM-dd z') FROM mytable";
+    String sqlQuery = "SELECT toDateTime(now(), 'yyyy-MM-dd z'), toDateTime(ago('PT1H'), 'yyyy-MM-dd z') FROM mytable";
     JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
     String todayStr = response.get("resultTable").get("rows").get(0).get(0).asText();
     String expectedTodayStr =
         Instant.now().atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
     assertEquals(todayStr, expectedTodayStr);
+
+    String oneHourAgoTodayStr = response.get("resultTable").get("rows").get(0).get(1).asText();
+    String expectedOneHourAgoTodayStr = Instant.now().minus(Duration.parse("PT1H")).atZone(ZoneId.of("UTC"))
+        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
+    assertEquals(oneHourAgoTodayStr, expectedOneHourAgoTodayStr);
   }
 
   @Test
   public void testLiteralOnlyFunc()
       throws Exception {
     long currentTsMin = System.currentTimeMillis();
-    String sqlQuery = "SELECT 1, now() as currentTs, 'abc', toDateTime(now(), 'yyyy-MM-dd z') as today, now()";
+    long oneHourAgoTsMin = currentTsMin - ONE_HOUR_IN_MS;
+    String sqlQuery =
+        "SELECT 1, now() as currentTs, ago('PT1H') as oneHourAgoTs, 'abc', toDateTime(now(), 'yyyy-MM-dd z') as "
+            + "today, now(), ago('PT1H')";
     JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
     long currentTsMax = System.currentTimeMillis();
+    long oneHourAgoTsMax = currentTsMax - ONE_HOUR_IN_MS;
 
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "1");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(1).asText(), "currentTs");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(2).asText(), "abc");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(3).asText(), "today");
-    String nowColumnName = response.get("resultTable").get("dataSchema").get("columnNames").get(4).asText();
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(2).asText(), "oneHourAgoTs");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(3).asText(), "abc");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(4).asText(), "today");
+    String nowColumnName = response.get("resultTable").get("dataSchema").get("columnNames").get(5).asText();
+    String oneHourAgoColumnName = response.get("resultTable").get("dataSchema").get("columnNames").get(6).asText();
     assertTrue(Long.parseLong(nowColumnName) > currentTsMin);
     assertTrue(Long.parseLong(nowColumnName) < currentTsMax);
+    assertTrue(Long.parseLong(oneHourAgoColumnName) > oneHourAgoTsMin);
+    assertTrue(Long.parseLong(oneHourAgoColumnName) < oneHourAgoTsMax);
 
     assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "LONG");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(1).asText(), "LONG");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(2).asText(), "STRING");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(2).asText(), "LONG");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(3).asText(), "STRING");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(4).asText(), "LONG");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(4).asText(), "STRING");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(5).asText(), "LONG");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(6).asText(), "LONG");
 
     int first = response.get("resultTable").get("rows").get(0).get(0).asInt();
     long second = response.get("resultTable").get("rows").get(0).get(1).asLong();
-    String third = response.get("resultTable").get("rows").get(0).get(2).asText();
+    long third = response.get("resultTable").get("rows").get(0).get(2).asLong();
+    String fourth = response.get("resultTable").get("rows").get(0).get(3).asText();
     assertEquals(first, 1);
     assertTrue(second > currentTsMin);
     assertTrue(second < currentTsMax);
-    assertEquals(third, "abc");
-    String todayStr = response.get("resultTable").get("rows").get(0).get(3).asText();
+    assertTrue(third > oneHourAgoTsMin);
+    assertTrue(third < oneHourAgoTsMax);
+    assertEquals(fourth, "abc");
+    String todayStr = response.get("resultTable").get("rows").get(0).get(4).asText();
     String expectedTodayStr =
         Instant.now().atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
     assertEquals(todayStr, expectedTodayStr);
-    long nowValue = response.get("resultTable").get("rows").get(0).get(4).asLong();
+    long nowValue = response.get("resultTable").get("rows").get(0).get(5).asLong();
     assertEquals(nowValue, Long.parseLong(nowColumnName));
+    long oneHourAgoValue = response.get("resultTable").get("rows").get(0).get(6).asLong();
+    assertEquals(oneHourAgoValue, Long.parseLong(oneHourAgoColumnName));
   }
 
-  @Test
+  @Test(dependsOnMethods = "testBloomFilterTriggering")
   public void testRangeIndexTriggering()
       throws Exception {
     long numTotalDocs = getCountStarResult();
-
-    JsonNode queryResponse = postQuery(TEST_UPDATED_RANGE_INDEX_QUERY);
-    assertEquals(queryResponse.get("numEntriesScannedInFilter").asLong(), numTotalDocs);
+    assertEquals(postQuery(TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
 
     // Update table config and trigger reload
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setRangeIndexColumns(UPDATED_RANGE_INDEX_COLUMNS);
     updateTableConfig(tableConfig);
     reloadOfflineTable(getTableName());
-
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode queryResponse1 = postQuery(TEST_UPDATED_RANGE_INDEX_QUERY);
+        JsonNode queryResponse = postQuery(TEST_UPDATED_RANGE_INDEX_QUERY);
         // Total docs should not change during reload
-        assertEquals(queryResponse1.get("totalDocs").asLong(), numTotalDocs);
-        return queryResponse1.get("numEntriesScannedInFilter").asLong() < numTotalDocs;
+        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+        return queryResponse.get("numEntriesScannedInFilter").asLong() < numTotalDocs;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to generate range index");
+
+    // Update table config to remove the new range index, and
+    // reload table to clean the new range index physically.
+    tableConfig = getOfflineTableConfig();
+    tableConfig.getIndexingConfig().setRangeIndexColumns(getRangeIndexColumns());
+    updateTableConfig(tableConfig);
+    reloadOfflineTable(getTableName());
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse = postQuery(TEST_UPDATED_RANGE_INDEX_QUERY);
+        // Total docs should not change during reload, but num entries scanned
+        // gets back to total number of documents as the index is removed.
+        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+        return queryResponse.get("numEntriesScannedInFilter").asLong() == numTotalDocs;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to cleanup obsolete index");
+
+    assertEquals(getTableSize(getTableName()), _tableSizeAfterRemovingIndex);
   }
 
-  @Test
+  @Test(dependsOnMethods = "testDefaultColumns")
   public void testBloomFilterTriggering()
       throws Exception {
     long numTotalDocs = getCountStarResult();
-
-    JsonNode queryResponse = postQuery(TEST_UPDATED_BLOOM_FILTER_QUERY);
-    assertEquals(queryResponse.get("numSegmentsProcessed").asLong(), NUM_SEGMENTS);
+    assertEquals(postQuery(TEST_UPDATED_BLOOM_FILTER_QUERY).get("numSegmentsProcessed").asLong(), NUM_SEGMENTS);
 
     // Update table config and trigger reload
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setBloomFilterColumns(UPDATED_BLOOM_FILTER_COLUMNS);
     updateTableConfig(tableConfig);
     reloadOfflineTable(getTableName());
-
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode queryResponse1 = postQuery(TEST_UPDATED_BLOOM_FILTER_QUERY);
+        JsonNode queryResponse = postQuery(TEST_UPDATED_BLOOM_FILTER_QUERY);
         // Total docs should not change during reload
-        assertEquals(queryResponse1.get("totalDocs").asLong(), numTotalDocs);
-        return queryResponse1.get("numSegmentsProcessed").asLong() == 0L;
+        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+        return queryResponse.get("numSegmentsProcessed").asLong() == 0L;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to generate bloom filter");
+
+    // Update table config to remove the new bloom filter, and
+    // reload table to clean the new bloom filter physically.
+    tableConfig = getOfflineTableConfig();
+    tableConfig.getIndexingConfig().setBloomFilterColumns(getBloomFilterColumns());
+    updateTableConfig(tableConfig);
+    reloadOfflineTable(getTableName());
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse = postQuery(TEST_UPDATED_BLOOM_FILTER_QUERY);
+        // Total docs should not change during reload, but num entries scanned
+        // gets back to total number of documents as bloom filter is removed.
+        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+        return queryResponse.get("numSegmentsProcessed").asLong() == NUM_SEGMENTS;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to cleanup obsolete index");
+    assertEquals(getTableSize(getTableName()), _tableSizeAfterRemovingIndex);
   }
 
   /** Check if server returns error response quickly without timing out Broker. */
@@ -449,9 +661,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     updateTableConfig(tableConfig);
 
     long startTime = System.currentTimeMillis();
-    // The query below will fail execution due to use of double quotes around value in IN clause.
-    JsonNode queryResponse = postSqlQuery("SELECT count(*) FROM mytable WHERE Dest IN (\"DFW\")");
-    String result = queryResponse.toPrettyString();
+    // The query below will fail execution due to JSON_MATCH on column without json index
+    JsonNode queryResponse = postSqlQuery("SELECT count(*) FROM mytable WHERE JSON_MATCH(Dest, '$=123')");
 
     assertTrue(System.currentTimeMillis() - startTime < queryTimeout);
     assertTrue(queryResponse.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
@@ -465,6 +676,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testStarTreeTriggering()
       throws Exception {
     long numTotalDocs = getCountStarResult();
+    long tableSizeWithDefaultIndex = getTableSize(getTableName());
 
     // Test the first query
     JsonNode firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1);
@@ -493,7 +705,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
-    }, 600_000L, "Failed to star-tree index");
+    }, 600_000L, "Failed to add first star-tree index");
 
     // Reload again should have no effect
     reloadOfflineTable(getTableName());
@@ -532,7 +744,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
-    }, 600_000L, "Failed to star-tree index");
+    }, 600_000L, "Failed to change to second star-tree index");
 
     // First query should not be able to use the star-tree
     firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1);
@@ -572,7 +784,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
-    }, 600_000L, "Failed to star-tree index");
+    }, 600_000L, "Failed to remove star-tree index");
+    assertEquals(getTableSize(getTableName()), tableSizeWithDefaultIndex);
 
     // First query should not be able to use the star-tree
     firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1);
@@ -607,9 +820,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
    *   <li>"NewAddedMVStringDimension", DIMENSION, STRING, multi-value, ""</li>
    *   <li>"NewAddedDerivedHoursSinceEpoch", DIMENSION, INT, single-value, default (Integer.MIN_VALUE)</li>
    *   <li>"NewAddedDerivedSecondsSinceEpoch", DIMENSION, LONG, single-value, default (LONG.MIN_VALUE)</li>
+   *   <li>"NewAddedDerivedMVStringDimension", DIMENSION, STRING, multi-value</li>
    * </ul>
    */
-  @Test
+  @Test(dependsOnMethods = "testAggregateMetadataAPI")
   public void testDefaultColumns()
       throws Exception {
     long numTotalDocs = getCountStarResult();
@@ -617,7 +831,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     reloadWithExtraColumns();
     JsonNode queryResponse = postQuery(SELECT_STAR_QUERY);
     assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-    assertEquals(queryResponse.get("selectionResults").get("columns").size(), 91);
+    assertEquals(queryResponse.get("selectionResults").get("columns").size(), 92);
 
     testNewAddedColumns();
 
@@ -630,6 +844,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     queryResponse = postQuery(SELECT_STAR_QUERY);
     assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
     assertEquals(queryResponse.get("selectionResults").get("columns").size(), 79);
+
+    _tableSizeAfterRemovingIndex = getTableSize(getTableName());
   }
 
   private void reloadWithExtraColumns()
@@ -640,9 +856,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     _schemaFileName = SCHEMA_FILE_NAME_WITH_EXTRA_COLUMNS;
     addSchema(createSchema());
     TableConfig tableConfig = getOfflineTableConfig();
-    tableConfig.setIngestionConfig(new IngestionConfig(null, null, null, Arrays
-        .asList(new TransformConfig("NewAddedDerivedHoursSinceEpoch", "times(DaysSinceEpoch, 24)"),
-            new TransformConfig("NewAddedDerivedSecondsSinceEpoch", "times(times(DaysSinceEpoch, 24), 3600)"))));
+    tableConfig.setIngestionConfig(new IngestionConfig(null, null, null,
+        Arrays.asList(new TransformConfig("NewAddedDerivedHoursSinceEpoch", "times(DaysSinceEpoch, 24)"),
+            new TransformConfig("NewAddedDerivedSecondsSinceEpoch", "times(times(DaysSinceEpoch, 24), 3600)"),
+            new TransformConfig("NewAddedDerivedMVStringDimension", "split(DestCityName, ', ')")), null));
     updateTableConfig(tableConfig);
 
     // Trigger reload
@@ -669,6 +886,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.setIngestionConfig(null);
     updateTableConfig(tableConfig);
+
+    // Need to first delete then add the schema because removing columns is backward-incompatible change
+    deleteSchema(getSchemaName());
     _schemaFileName = SCHEMA_FILE_NAME_WITH_MISSING_COLUMNS;
     addSchema(createSchema());
 
@@ -756,6 +976,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedSecondsSinceEpoch = 1411862400";
     sqlQuery = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16341";
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedMVStringDimension = 'CA'";
+    sqlQuery = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
 
     // Test queries with new added metric column in aggregation function
     pqlQuery = "SELECT SUM(NewAddedIntMetric) FROM mytable WHERE DaysSinceEpoch <= 16312";
@@ -829,6 +1052,27 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
+  public void testInBuiltVirtualColumns()
+      throws Exception {
+    String query = "SELECT $docId, $HOSTNAME, $segmentname FROM mytable";
+    JsonNode response = postSqlQuery(query);
+    JsonNode resultTable = response.get("resultTable");
+    JsonNode dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnNames").toString(), "[\"$docId\",\"$hostName\",\"$segmentName\"]");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"INT\",\"STRING\",\"STRING\"]");
+    JsonNode rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+    String expectedHostName = NetUtils.getHostnameOrAddress();
+    String expectedSegmentNamePrefix = "mytable_";
+    for (int i = 0; i < 10; i++) {
+      JsonNode row = rows.get(i);
+      assertEquals(row.get(0).asInt(), i);
+      assertEquals(row.get(1).asText(), expectedHostName);
+      assertTrue(row.get(2).asText().startsWith(expectedSegmentNamePrefix));
+    }
+  }
+
+  @Test
   public void testGroupByUDF()
       throws Exception {
     String pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY timeConvert(DaysSinceEpoch,'DAYS','SECONDS')";
@@ -839,8 +1083,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(groupByEntry.get("group").get(0).asInt(), 16138 * 24 * 3600);
     assertEquals(groupByResult.get("groupByColumns").get(0).asText(), "timeconvert(DaysSinceEpoch,'DAYS','SECONDS')");
 
-    pqlQuery =
-        "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')";
+    pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH',"
+        + "'1:HOURS')";
     response = postQuery(pqlQuery);
     groupByResult = response.get("aggregationResults").get(0);
     groupByEntry = groupByResult.get("groupByResult").get(0);
@@ -948,7 +1192,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode response = postQuery(pqlQuery);
     ArrayNode selectionResults = (ArrayNode) response.get("selectionResults").get("results");
     assertNotNull(selectionResults);
-    assertTrue(selectionResults.size() > 0);
+    assertFalse(selectionResults.isEmpty());
     for (int i = 0; i < selectionResults.size(); i++) {
       long daysSinceEpoch = selectionResults.get(i).get(0).asLong();
       long secondsSinceEpoch = selectionResults.get(i).get(1).asLong();
@@ -956,11 +1200,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
 
     pqlQuery =
-        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch limit 10000";
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch "
+            + "limit 10000";
     response = postQuery(pqlQuery);
     selectionResults = (ArrayNode) response.get("selectionResults").get("results");
     assertNotNull(selectionResults);
-    assertTrue(selectionResults.size() > 0);
+    assertFalse(selectionResults.isEmpty());
     long prevValue = -1;
     for (int i = 0; i < selectionResults.size(); i++) {
       long daysSinceEpoch = selectionResults.get(i).get(0).asLong();
@@ -970,12 +1215,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       prevValue = daysSinceEpoch;
     }
 
-    pqlQuery =
-        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000";
+    pqlQuery = "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert"
+        + "(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000";
     response = postQuery(pqlQuery);
     selectionResults = (ArrayNode) response.get("selectionResults").get("results");
     assertNotNull(selectionResults);
-    assertTrue(selectionResults.size() > 0);
+    assertFalse(selectionResults.isEmpty());
     prevValue = Long.MAX_VALUE;
     for (int i = 0; i < selectionResults.size(); i++) {
       long daysSinceEpoch = selectionResults.get(i).get(0).asLong();
@@ -1011,23 +1256,23 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "SELECT count(*) FROM mytable WHERE DIV(timeConvert(DaysSinceEpoch,'DAYS','SECONDS'),1) = " + secondsSinceEpoch;
     assertEquals(postQuery(pqlQuery).get("aggregationResults").get(0).get("value").asLong(), expectedResult);
 
-    pqlQuery = String
-        .format("SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') IN (%d, %d)",
+    pqlQuery =
+        String.format("SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') IN (%d, %d)",
             secondsSinceEpoch - 100, secondsSinceEpoch);
     assertEquals(postQuery(pqlQuery).get("aggregationResults").get(0).get("value").asLong(), expectedResult);
 
-    pqlQuery = String
-        .format("SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') BETWEEN %d AND %d",
-            secondsSinceEpoch - 100, secondsSinceEpoch);
+    pqlQuery = String.format(
+        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') BETWEEN %d AND %d",
+        secondsSinceEpoch - 100, secondsSinceEpoch);
     assertEquals(postQuery(pqlQuery).get("aggregationResults").get(0).get("value").asLong(), expectedResult);
   }
 
   @Test
   public void testCaseStatementInSelection()
       throws Exception {
-    List<String> origins = Arrays
-        .asList("ATL", "ORD", "DFW", "DEN", "LAX", "IAH", "SFO", "PHX", "LAS", "EWR", "MCO", "BOS", "SLC", "SEA", "MSP",
-            "CLT", "LGA", "DTW", "JFK", "BWI");
+    List<String> origins =
+        Arrays.asList("ATL", "ORD", "DFW", "DEN", "LAX", "IAH", "SFO", "PHX", "LAS", "EWR", "MCO", "BOS", "SLC", "SEA",
+            "MSP", "CLT", "LGA", "DTW", "JFK", "BWI");
     StringBuilder caseStatementBuilder = new StringBuilder("CASE ");
     for (int i = 0; i < origins.size(); i++) {
       // WHEN origin = 'ATL' THEN 1
@@ -1056,7 +1301,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testCaseStatementInSelectionWithTransformFunctionInThen()
       throws Exception {
     String sqlQuery =
-        "SELECT ArrDelay, CASE WHEN ArrDelay > 0 THEN ArrDelay WHEN ArrDelay < 0 THEN ArrDelay * -1 ELSE 0 END AS ArrTimeDiff FROM mytable LIMIT 1000";
+        "SELECT ArrDelay, CASE WHEN ArrDelay > 0 THEN ArrDelay WHEN ArrDelay < 0 THEN ArrDelay * -1 ELSE 0 END AS "
+            + "ArrTimeDiff FROM mytable LIMIT 1000";
     JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
     JsonNode rows = response.get("resultTable").get("rows");
     assertEquals(response.get("exceptions").size(), 0);
@@ -1127,8 +1373,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     int daysSinceEpoch = 16138;
     long secondsSinceEpoch = 16138 * 24 * 60 * 60;
 
-    String[] origins =
-        new String[]{"ATL", "ORD", "DFW", "DEN", "LAX", "IAH", "SFO", "PHX", "LAS", "EWR", "MCO", "BOS", "SLC", "SEA", "MSP", "CLT", "LGA", "DTW", "JFK", "BWI"};
+    String[] origins = new String[]{
+        "ATL", "ORD", "DFW", "DEN", "LAX", "IAH", "SFO", "PHX", "LAS", "EWR", "MCO", "BOS", "SLC", "SEA", "MSP", "CLT",
+        "LGA", "DTW", "JFK", "BWI"
+    };
     String pqlQuery;
     for (String origin : origins) {
       pqlQuery =
@@ -1160,11 +1408,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "SELECT count(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'"));
 
     //test repeated columns in agg group by query
-    query =
-        "SELECT ArrTime, ArrTime, count(*), count(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' group by ArrTime, ArrTime";
+    query = "SELECT ArrTime, ArrTime, count(*), count(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' "
+        + "group by ArrTime, ArrTime";
     testQuery(query, Arrays.asList(
-        "SELECT ArrTime, ArrTime, count(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' group by ArrTime, ArrTime",
-        "SELECT ArrTime, ArrTime, count(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' group by ArrTime, ArrTime"));
+        "SELECT ArrTime, ArrTime, count(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' group by "
+            + "ArrTime, ArrTime",
+        "SELECT ArrTime, ArrTime, count(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' group by "
+            + "ArrTime, ArrTime"));
   }
 
   @Test
@@ -1184,22 +1434,59 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testQueryWithSameAlias()
+  public void testQueryWithAlias()
       throws Exception {
-    //test repeated columns in selection query
-    String query =
-        "SELECT ArrTime AS ArrTime, Carrier AS Carrier, DaysSinceEpoch AS DaysSinceEpoch FROM mytable ORDER BY DaysSinceEpoch DESC";
-    testQuery(query, Collections.singletonList(query));
+    {
+      //test same alias name with column name
+      String query =
+          "SELECT ArrTime AS ArrTime, Carrier AS Carrier, DaysSinceEpoch AS DaysSinceEpoch FROM mytable ORDER BY "
+              + "DaysSinceEpoch DESC";
+      testSqlQuery(query, Collections.singletonList(query));
 
-    //test repeated columns in selection query
-    query =
-        "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY Carrier DESC";
-    testQuery(query, Collections.singletonList(query));
+      query = "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY "
+          + "Carrier DESC";
+      testSqlQuery(query, Collections.singletonList(query));
 
-    //test repeated columns in selection query
-    query =
-        "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY Carrier DESC, ArrTime DESC";
-    testQuery(query, Collections.singletonList(query));
+      query = "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY "
+          + "Carrier DESC, ArrTime DESC";
+      testSqlQuery(query, Collections.singletonList(query));
+    }
+    {
+      //test single alias
+      String query = "SELECT ArrTime, Carrier AS CarrierName, DaysSinceEpoch FROM mytable ORDER BY DaysSinceEpoch DESC";
+      testSqlQuery(query, Collections.singletonList(query));
+
+      query = "SELECT count(*) AS cnt, max(ArrTime) as maxArrTime FROM mytable";
+      testSqlQuery(query, Collections.singletonList(query));
+
+      query = "SELECT count(*) AS cnt, Carrier AS CarrierName FROM mytable GROUP BY CarrierName ORDER BY cnt";
+      testSqlQuery(query, Collections.singletonList(query));
+    }
+    {
+      //test multiple alias
+      String query =
+          "SELECT ArrTime, Carrier, Carrier AS CarrierName1, Carrier AS CarrierName2, DaysSinceEpoch FROM mytable "
+              + "ORDER BY DaysSinceEpoch DESC";
+      testSqlQuery(query, Collections.singletonList(query));
+
+      query = "SELECT count(*) AS cnt, max(ArrTime) as maxArrTime1, max(ArrTime) as maxArrTime2 FROM mytable";
+      testSqlQuery(query, Collections.singletonList(query));
+
+      query = "SELECT count(*), count(*) AS cnt1, count(*) AS cnt2, Carrier AS CarrierName FROM mytable GROUP BY "
+          + "CarrierName ORDER BY cnt2";
+      testSqlQuery(query, Collections.singletonList(query));
+    }
+    {
+      //test alias with distinct
+      String query =
+          "SELECT distinct ArrTime, Carrier, Carrier AS CarrierName1, Carrier AS CarrierName2, DaysSinceEpoch FROM "
+              + "mytable ORDER BY DaysSinceEpoch DESC";
+      testSqlQuery(query, Collections.singletonList(query));
+
+      query = "SELECT ArrTime, Carrier, Carrier AS CarrierName1, Carrier AS CarrierName2, DaysSinceEpoch FROM mytable "
+          + "GROUP BY ArrTime, Carrier, DaysSinceEpoch ORDER BY DaysSinceEpoch DESC";
+      testSqlQuery(query, Collections.singletonList(query));
+    }
   }
 
   @AfterClass
@@ -1341,13 +1628,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     sql = "SELECT Carrier, DestAirportID FROM mytable GROUP BY Carrier, DestAirportID";
     testSqlQuery(pql, Collections.singletonList(sql));
 
-    pql =
-        "SELECT Carrier, DestAirportID, DestStateName FROM mytable GROUP BY Carrier, DestAirportID, DestStateName LIMIT 1000000";
+    pql = "SELECT Carrier, DestAirportID, DestStateName FROM mytable GROUP BY Carrier, DestAirportID, DestStateName "
+        + "LIMIT 1000000";
     sql = "SELECT Carrier, DestAirportID, DestStateName FROM mytable GROUP BY Carrier, DestAirportID, DestStateName";
     testSqlQuery(pql, Collections.singletonList(sql));
 
-    pql =
-        "SELECT Carrier, DestAirportID, DestCityName FROM mytable GROUP BY Carrier, DestAirportID, DestCityName LIMIT 1000000";
+    pql = "SELECT Carrier, DestAirportID, DestCityName FROM mytable GROUP BY Carrier, DestAirportID, DestCityName LIMIT"
+        + " 1000000";
     sql = "SELECT Carrier, DestAirportID, DestCityName FROM mytable GROUP BY Carrier, DestAirportID, DestCityName";
     testSqlQuery(pql, Collections.singletonList(sql));
 
@@ -1367,20 +1654,24 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testCaseInsensitivity() {
     int daysSinceEpoch = 16138;
-    long secondsSinceEpoch = 16138 * 24 * 60 * 60;
+    int hoursSinceEpoch = 16138 * 24;
+    int secondsSinceEpoch = 16138 * 24 * 60 * 60;
     List<String> baseQueries = Arrays.asList("SELECT * FROM mytable",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable",
-        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch limit 10000",
-        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000",
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch "
+            + "limit 10000",
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert"
+            + "(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000",
         "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch,
+        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','HOURS') = " + hoursSinceEpoch,
         "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch,
-        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + daysSinceEpoch,
         "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable",
-        "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
+        "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH',"
+            + "'1:HOURS')");
     List<String> queries = new ArrayList<>();
     baseQueries.forEach(q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
-    baseQueries
-        .forEach(q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
+    baseQueries.forEach(
+        q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
 
     for (String query : queries) {
       try {
@@ -1399,16 +1690,20 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testColumnNameContainsTableName() {
     int daysSinceEpoch = 16138;
-    long secondsSinceEpoch = 16138 * 24 * 60 * 60;
+    int hoursSinceEpoch = 16138 * 24;
+    int secondsSinceEpoch = 16138 * 24 * 60 * 60;
     List<String> baseQueries = Arrays.asList("SELECT * FROM mytable",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable",
-        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch limit 10000",
-        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000",
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch "
+            + "limit 10000",
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert"
+            + "(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000",
         "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch,
+        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','HOURS') = " + hoursSinceEpoch,
         "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch,
-        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + daysSinceEpoch,
         "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable",
-        "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
+        "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH',"
+            + "'1:HOURS')");
     List<String> queries = new ArrayList<>();
     baseQueries.forEach(q -> queries.add(q.replace("DaysSinceEpoch", "mytable.DAYSSinceEpOch")));
     baseQueries.forEach(q -> queries.add(q.replace("DaysSinceEpoch", "mytable.DAYSSinceEpOch")));
@@ -1430,19 +1725,23 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testCaseInsensitivityWithColumnNameContainsTableName() {
     int daysSinceEpoch = 16138;
-    long secondsSinceEpoch = 16138 * 24 * 60 * 60;
+    int hoursSinceEpoch = 16138 * 24;
+    int secondsSinceEpoch = 16138 * 24 * 60 * 60;
     List<String> baseQueries = Arrays.asList("SELECT * FROM mytable",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable",
-        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch limit 10000",
-        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000",
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch "
+            + "limit 10000",
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert"
+            + "(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000",
         "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch,
+        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','HOURS') = " + hoursSinceEpoch,
         "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch,
-        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + daysSinceEpoch,
         "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable",
-        "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
+        "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH',"
+            + "'1:HOURS')");
     List<String> queries = new ArrayList<>();
-    baseQueries
-        .forEach(q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
+    baseQueries.forEach(
+        q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
     baseQueries.forEach(
         q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
 
@@ -1482,8 +1781,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(postSqlQuery(query, _brokerBaseApiUrl).get("resultTable").get("rows").get(0).get(0).asLong(), 6538);
 
     // Expected distinctCountHll with different log2m value from 2 to 19. The Accurate value is 6538.
-    long[] expectedResults =
-        new long[]{3504, 6347, 8877, 9729, 9046, 7672, 7538, 6993, 6649, 6651, 6553, 6525, 6459, 6523, 6532, 6544, 6538, 6539};
+    long[] expectedResults = new long[]{
+        3504, 6347, 8877, 9729, 9046, 7672, 7538, 6993, 6649, 6651, 6553, 6525, 6459, 6523, 6532, 6544, 6538, 6539
+    };
 
     for (int i = 2; i < 20; i++) {
       query = String.format("SELECT distinctCountHLL(FlightNum, %d) FROM mytable ", i);
@@ -1516,6 +1816,24 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
+  public void testExplainPlanQuery()
+      throws Exception {
+    String query = "EXPLAIN PLAN FOR SELECT count(*) AS count, Carrier AS name FROM mytable GROUP BY name ORDER BY 1";
+    String response = postSqlQuery(query, _brokerBaseApiUrl).get("resultTable").toString();
+
+    // Replace string "docs:[0-9]+" with "docs:*" so that test doesn't fail when number of documents change. This is
+    // needed because both OfflineClusterIntegrationTest and MultiNodesOfflineClusterIntegrationTest run this test
+    // case with different number of documents in the segment.
+    response = response.replaceAll("docs:[0-9]+", "docs:*");
+
+    assertEquals(response, "{\"dataSchema\":{\"columnNames\":[\"Operator\",\"Operator_Id\",\"Parent_Id\"],"
+        + "\"columnDataTypes\":[\"STRING\",\"INT\",\"INT\"]},\"rows\":[[\"BROKER_REDUCE(sort:[count(*) ASC],limit:10)"
+        + "\",0,-1],[\"COMBINE_GROUPBY_ORDERBY\",1,0],[\"AGGREGATE_GROUPBY_ORDERBY(groupKeys:Carrier, "
+        + "aggregations:count(*))\",2,1],[\"TRANSFORM_PASSTHROUGH(Carrier)\",3,2],[\"PROJECT(Carrier)\",4,3],"
+        + "[\"FILTER_MATCH_ENTIRE_SEGMENT(docs:*)\",5,4]]}");
+  }
+
+  @Test
   public void testGrpcQueryServer()
       throws Exception {
     GrpcQueryClient queryClient = new GrpcQueryClient("localhost", CommonConstants.Server.DEFAULT_GRPC_PORT);
@@ -1543,7 +1861,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertNotNull(dataTable.getDataSchema());
     assertEquals(dataTable.getNumberOfRows(), expectedNumDocs);
     Map<String, String> metadata = dataTable.getMetadata();
-    assertEquals(metadata.get(DataTable.NUM_DOCS_SCANNED_METADATA_KEY), Integer.toString(expectedNumDocs));
+    assertEquals(metadata.get(MetadataKey.NUM_DOCS_SCANNED.getName()), Integer.toString(expectedNumDocs));
   }
 
   private void testStreamingRequest(Iterator<Server.ServerResponse> streamingResponses)
@@ -1556,9 +1874,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       String responseType =
           streamingResponse.getMetadataMap().get(CommonConstants.Query.Response.MetadataKeys.RESPONSE_TYPE);
       if (responseType.equals(CommonConstants.Query.Response.ResponseType.DATA)) {
-        // verify the returned data table metadata only contains "threadCpuTimeNs".
+        // verify the returned data table metadata only contains "responseSerializationCpuTimeNs".
         Map<String, String> metadata = dataTable.getMetadata();
-        assertTrue(metadata.size() == 1 && metadata.containsKey(DataTable.MetadataKey.THREAD_CPU_TIME_NS.getName()));
+        assertTrue(metadata.size() == 1 && metadata.containsKey(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName()));
         assertNotNull(dataTable.getDataSchema());
         numTotalDocs += dataTable.getNumberOfRows();
       } else {
@@ -1568,7 +1886,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         assertNull(dataTable.getDataSchema());
         assertEquals(dataTable.getNumberOfRows(), 0);
         Map<String, String> metadata = dataTable.getMetadata();
-        assertEquals(metadata.get(DataTable.NUM_DOCS_SCANNED_METADATA_KEY), Integer.toString(expectedNumDocs));
+        assertEquals(metadata.get(MetadataKey.NUM_DOCS_SCANNED.getName()), Integer.toString(expectedNumDocs));
       }
     }
   }
@@ -1578,5 +1896,49 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testHardcodedServerPartitionedSqlQueries()
       throws Exception {
     super.testHardcodedServerPartitionedSqlQueries();
+  }
+
+  @Test
+  public void testAggregateMetadataAPI()
+      throws IOException {
+    JsonNode oneColumnResponse = JsonUtils.stringToJsonNode(
+        sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=DestCityMarketID"));
+    assertEquals(oneColumnResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
+    assertEquals(oneColumnResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
+    assertEquals(oneColumnResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
+    assertEquals(oneColumnResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 1);
+    assertEquals(oneColumnResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 1);
+
+    JsonNode threeColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl
+        + "/tables/mytable/metadata?columns=DivActualElapsedTime&columns=CRSElapsedTime&columns=OriginStateName"));
+    assertEquals(threeColumnsResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
+    assertEquals(threeColumnsResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
+    assertEquals(threeColumnsResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
+    assertEquals(threeColumnsResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 3);
+    assertEquals(threeColumnsResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 3);
+
+    JsonNode zeroColumnResponse =
+        JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata"));
+    assertEquals(zeroColumnResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
+    assertEquals(zeroColumnResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
+    assertEquals(zeroColumnResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
+    assertEquals(zeroColumnResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 0);
+    assertEquals(zeroColumnResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 0);
+
+    JsonNode allColumnResponse =
+        JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=*"));
+    assertEquals(allColumnResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
+    assertEquals(allColumnResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
+    assertEquals(allColumnResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
+    assertEquals(allColumnResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 82);
+    assertEquals(allColumnResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 82);
+
+    allColumnResponse = JsonUtils.stringToJsonNode(sendGetRequest(
+        _controllerBaseApiUrl + "/tables/mytable/metadata?columns=CRSElapsedTime&columns=*&columns=OriginStateName"));
+    assertEquals(allColumnResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
+    assertEquals(allColumnResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
+    assertEquals(allColumnResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
+    assertEquals(allColumnResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 82);
+    assertEquals(allColumnResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 82);
   }
 }

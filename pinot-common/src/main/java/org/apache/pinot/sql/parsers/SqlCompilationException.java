@@ -30,4 +30,8 @@ public class SqlCompilationException extends RuntimeException {
   public SqlCompilationException(Throwable throwable) {
     super(throwable);
   }
+
+  public SqlCompilationException(String msg, Throwable throwable) {
+    super(msg, throwable);
+  }
 }

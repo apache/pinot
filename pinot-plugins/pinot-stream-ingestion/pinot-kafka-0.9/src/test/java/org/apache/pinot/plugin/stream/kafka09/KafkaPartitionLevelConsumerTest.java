@@ -56,45 +56,45 @@ import scala.collection.immutable.List;
 public class KafkaPartitionLevelConsumerTest {
   public class MockKafkaSimpleConsumerFactory implements KafkaSimpleConsumerFactory {
 
-    private String[] hosts;
-    private int[] ports;
-    private int[] partitionLeaderIndices;
-    private int brokerCount;
-    private int partitionCount;
-    private String topicName;
-    private BrokerEndPoint[] brokerArray;
+    private String[] _hosts;
+    private int[] _ports;
+    private int[] _partitionLeaderIndices;
+    private int _brokerCount;
+    private int _partitionCount;
+    private String _topicName;
+    private BrokerEndPoint[] _brokerArray;
 
     public MockKafkaSimpleConsumerFactory(String[] hosts, int[] ports, long[] partitionStartOffsets,
         long[] partitionEndOffsets, int[] partitionLeaderIndices, String topicName) {
       Preconditions.checkArgument(hosts.length == ports.length);
-      this.hosts = hosts;
-      this.ports = ports;
-      brokerCount = hosts.length;
+      _hosts = hosts;
+      _ports = ports;
+      _brokerCount = hosts.length;
 
-      brokerArray = new BrokerEndPoint[brokerCount];
-      for (int i = 0; i < brokerCount; i++) {
-        brokerArray[i] = new BrokerEndPoint(i, hosts[i], ports[i]);
+      _brokerArray = new BrokerEndPoint[_brokerCount];
+      for (int i = 0; i < _brokerCount; i++) {
+        _brokerArray[i] = new BrokerEndPoint(i, hosts[i], ports[i]);
       }
 
       Preconditions.checkArgument(partitionStartOffsets.length == partitionEndOffsets.length);
       Preconditions.checkArgument(partitionStartOffsets.length == partitionLeaderIndices.length);
-      this.partitionLeaderIndices = partitionLeaderIndices;
-      partitionCount = partitionStartOffsets.length;
+      _partitionLeaderIndices = partitionLeaderIndices;
+      _partitionCount = partitionStartOffsets.length;
 
-      this.topicName = topicName;
+      _topicName = topicName;
     }
 
     private class MockFetchResponse extends FetchResponse {
-      java.util.Map<TopicAndPartition, Short> errorMap;
+      java.util.Map<TopicAndPartition, Short> _errorMap;
 
       public MockFetchResponse(java.util.Map<TopicAndPartition, Short> errorMap) {
         super(null);
-        this.errorMap = errorMap;
+        _errorMap = errorMap;
       }
 
       @Override
       public ByteBufferMessageSet messageSet(String topic, int partition) {
-        if (errorMap.containsKey(new TopicAndPartition(topic, partition))) {
+        if (_errorMap.containsKey(new TopicAndPartition(topic, partition))) {
           throw new IllegalArgumentException();
         } else {
           // TODO Maybe generate dummy messages here?
@@ -105,8 +105,8 @@ public class KafkaPartitionLevelConsumerTest {
       @Override
       public short errorCode(String topic, int partition) {
         TopicAndPartition key = new TopicAndPartition(topic, partition);
-        if (errorMap.containsKey(key)) {
-          return errorMap.get(key);
+        if (_errorMap.containsKey(key)) {
+          return _errorMap.get(key);
         } else {
           return Errors.NONE.code();
         }
@@ -118,16 +118,16 @@ public class KafkaPartitionLevelConsumerTest {
       }
 
       public boolean hasError() {
-        return !errorMap.isEmpty();
+        return !_errorMap.isEmpty();
       }
     }
 
     private class MockSimpleConsumer extends SimpleConsumer {
-      private int index;
+      private int _index;
 
       public MockSimpleConsumer(String host, int port, int soTimeout, int bufferSize, String clientId, int index) {
         super(host, port, soTimeout, bufferSize, clientId);
-        this.index = index;
+        _index = index;
       }
 
       @Override
@@ -143,11 +143,11 @@ public class KafkaPartitionLevelConsumerTest {
           TopicAndPartition topicAndPartition = t2._1();
           PartitionFetchInfo partitionFetchInfo = t2._2();
 
-          if (!topicAndPartition.topic().equals(topicName)) {
+          if (!topicAndPartition.topic().equals(_topicName)) {
             errorMap.put(topicAndPartition, Errors.UNKNOWN_TOPIC_OR_PARTITION.code());
-          } else if (partitionLeaderIndices.length < topicAndPartition.partition()) {
+          } else if (_partitionLeaderIndices.length < topicAndPartition.partition()) {
             errorMap.put(topicAndPartition, Errors.UNKNOWN_TOPIC_OR_PARTITION.code());
-          } else if (partitionLeaderIndices[topicAndPartition.partition()] != index) {
+          } else if (_partitionLeaderIndices[topicAndPartition.partition()] != _index) {
             errorMap.put(topicAndPartition, Errors.NOT_LEADER_FOR_PARTITION.code());
           } else {
             // Do nothing, we'll generate a fake message
@@ -176,15 +176,15 @@ public class KafkaPartitionLevelConsumerTest {
 
         for (int i = 0; i < topicMetadataArray.length; i++) {
           String topic = topics.get(i);
-          if (!topic.equals(topicName)) {
+          if (!topic.equals(_topicName)) {
             topicMetadataArray[i] = new TopicMetadata(topic, null, Errors.UNKNOWN_TOPIC_OR_PARTITION.code());
           } else {
-            PartitionMetadata[] partitionMetadataArray = new PartitionMetadata[partitionCount];
-            for (int j = 0; j < partitionCount; j++) {
+            PartitionMetadata[] partitionMetadataArray = new PartitionMetadata[_partitionCount];
+            for (int j = 0; j < _partitionCount; j++) {
               java.util.List<BrokerEndPoint> emptyJavaList = Collections.emptyList();
               List<BrokerEndPoint> emptyScalaList = JavaConversions.asScalaBuffer(emptyJavaList).toList();
               partitionMetadataArray[j] =
-                  new PartitionMetadata(j, Some.apply(brokerArray[partitionLeaderIndices[j]]), emptyScalaList,
+                  new PartitionMetadata(j, Some.apply(_brokerArray[_partitionLeaderIndices[j]]), emptyScalaList,
                       emptyScalaList, Errors.NONE.code());
             }
 
@@ -193,7 +193,7 @@ public class KafkaPartitionLevelConsumerTest {
           }
         }
 
-        Seq<BrokerEndPoint> brokers = List.fromArray(brokerArray);
+        Seq<BrokerEndPoint> brokers = List.fromArray(_brokerArray);
         Seq<TopicMetadata> topicsMetadata = List.fromArray(topicMetadataArray);
 
         return new TopicMetadataResponse(new kafka.api.TopicMetadataResponse(brokers, topicsMetadata, -1));
@@ -202,8 +202,8 @@ public class KafkaPartitionLevelConsumerTest {
 
     @Override
     public SimpleConsumer buildSimpleConsumer(String host, int port, int soTimeout, int bufferSize, String clientId) {
-      for (int i = 0; i < brokerCount; i++) {
-        if (hosts[i].equalsIgnoreCase(host) && ports[i] == port) {
+      for (int i = 0; i < _brokerCount; i++) {
+        if (_hosts[i].equalsIgnoreCase(host) && _ports[i] == port) {
           return new MockSimpleConsumer(host, port, soTimeout, bufferSize, clientId, i);
         }
       }

@@ -28,38 +28,41 @@ import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.kohsuke.args4j.Option;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
+@CommandLine.Command
 public class UpdateSegmentState extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpdateSegmentState.class);
-  private static final String CmdName = "UpdateSegmentState";
-  private static final String fromState = "OFFLINE";
-  private static final String toState = "ONLINE";
+  private static final String CMD_NAME = "UpdateSegmentState";
+  private static final String FROM_STATE = "OFFLINE";
+  private static final String TO_STATE = "ONLINE";
   static final String DEFAULT_ZK_ADDRESS = "localhost:2181";
   static final String DEFAULT_CLUSTER_NAME = "PinotCluster";
 
-  @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "Http address of Zookeeper.")
+  @CommandLine.Option(names = {"-zkAddress"}, required = false, description = "Http address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
 
-  @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
+  @CommandLine.Option(names = {"-clusterName"}, required = false, description = "Pinot cluster name.")
   private String _clusterName = DEFAULT_CLUSTER_NAME;
 
-  @Option(name = "-tenantName", required = false, metaVar = "<string>", usage = "Name of tenant.")
+  @CommandLine.Option(names = {"-tenantName"}, required = false, description = "Name of tenant.")
   private String _tenantName;
 
-  @Option(name = "-tableName", required = false, metaVar = "<string>", usage = "Name of the table (e.g. foo_table_OFFLINE).")
+  @CommandLine.Option(names = {"-tableName"}, required = false, 
+      description = "Name of the table (e.g. foo_table_OFFLINE).")
   private String _tableName;
 
-  @Option(name = "-fix", required = false, metaVar = "<boolean>", usage = "Update IDEALSTATE values (OFFLINE->ONLINE).")
+  @CommandLine.Option(names = {"-fix"}, required = false, description = "Update IDEALSTATE values (OFFLINE->ONLINE).")
   private boolean _fix = false;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help = false;
 
   public UpdateSegmentState() {
@@ -73,12 +76,12 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
 
   @Override
   public String getName() {
-    return CmdName;
+    return CMD_NAME;
   }
 
   @Override
   public String toString() {
-    String retString = CmdName + " -zkAddress " + _zkAddress + " -clusterName " + _clusterName;
+    String retString = CMD_NAME + " -zkAddress " + _zkAddress + " -clusterName " + _clusterName;
     if (_tableName != null) {
       retString += " -tableName " + _tableName;
     } else {
@@ -92,7 +95,8 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
 
   @Override
   public String description() {
-    return "Audit the IDEALSTATE for the segments of a table (or all tables of a tenant). Optionally update segment state from OFFLINE to ONLINE";
+    return "Audit the IDEALSTATE for the segments of a table (or all tables of a tenant). Optionally update segment "
+        + "state from OFFLINE to ONLINE";
   }
 
   public UpdateSegmentState setZkAddress(String zkAddress) {
@@ -134,8 +138,9 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
   public List<String> getAllTenantTables()
       throws Exception {
     String tableConfigPath = "/CONFIGS/TABLE";
-    List<ZNRecord> tableConfigs = _propertyStore.getChildren(tableConfigPath, null, 0,
-        CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
+    List<ZNRecord> tableConfigs = _propertyStore
+        .getChildren(tableConfigPath, null, 0, CommonConstants.Helix.ZkClient.RETRY_COUNT,
+            CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
     List<String> tables = new ArrayList<>(128);
     for (ZNRecord znRecord : tableConfigs) {
       TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);
@@ -160,24 +165,24 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
 
       for (String server : mapIS.keySet()) {
         String state = mapIS.get(server);
-        if (state.equals(fromState)) {
+        if (state.equals(FROM_STATE)) {
           if (_fix) {
-            mapIS.put(server, toState);
+            mapIS.put(server, TO_STATE);
           } else {
-            LOGGER.info("Table:" + tableName + ",Segment:" + segment + ",Server:" + server + ":" + fromState);
+            LOGGER.info("Table:" + tableName + ",Segment:" + segment + ",Server:" + server + ":" + FROM_STATE);
           }
           nChanges++;
         }
       }
     }
     if (nChanges == 0) {
-      LOGGER.info("No segments detected in " + fromState + " state for table " + tableName);
+      LOGGER.info("No segments detected in " + FROM_STATE + " state for table " + tableName);
     } else {
       if (_fix) {
         LOGGER.info("Replacing IDEALSTATE for table " + tableName + " with " + nChanges + " changes");
         _helixAdmin.setResourceIdealState(_clusterName, tableName, idealState);
       } else {
-        LOGGER.info("Detected " + nChanges + " instances in " + fromState + " in table " + tableName);
+        LOGGER.info("Detected " + nChanges + " instances in " + FROM_STATE + " in table " + tableName);
       }
     }
   }
@@ -200,7 +205,7 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
       LOGGER.info("Working on all tables for tenant " + _tenantName);
       List<String> tableNames = getAllTenantTables();
       LOGGER.info("Found " + tableNames.size() + " tables for tenant " + _tenantName);
-      if (tableNames.size() > 0) {
+      if (!tableNames.isEmpty()) {
         for (String tableName : tableNames) {
           fixTableIdealState(tableName);
         }

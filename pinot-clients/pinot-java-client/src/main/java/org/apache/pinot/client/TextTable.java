@@ -26,36 +26,35 @@ import java.util.List;
  * Utility class to format tabular data. Useful to display on console for debugging
  */
 public class TextTable {
-
-  private List<String[]> rows = new LinkedList<>();
-  private String[] headerColumnNames;
   private final static char PAD_CHAR = ' ';
 
-  public TextTable() {
+  private final List<String[]> _rows = new LinkedList<>();
+  private String[] _headerColumnNames;
 
+  public TextTable() {
   }
 
   public void addHeader(String... headerColumnNames) {
-    this.headerColumnNames = headerColumnNames;
+    _headerColumnNames = headerColumnNames;
   }
 
   public void addRow(String... columnValues) {
-    rows.add(columnValues);
+    _rows.add(columnValues);
   }
 
   private int[] colWidths() {
     int cols = 0;
-    if (headerColumnNames != null) {
-      cols = headerColumnNames.length;
+    if (_headerColumnNames != null) {
+      cols = _headerColumnNames.length;
     }
-    for (String[] row : rows) {
+    for (String[] row : _rows) {
       cols = Math.max(cols, row.length);
     }
     int[] widths = new int[cols];
-    if (headerColumnNames != null) {
-      updateWidths(widths, headerColumnNames);
+    if (_headerColumnNames != null) {
+      updateWidths(widths, _headerColumnNames);
     }
-    for (String[] row : rows) {
+    for (String[] row : _rows) {
       updateWidths(widths, row);
     }
     return widths;
@@ -76,8 +75,8 @@ public class TextTable {
     StringBuilder buf = new StringBuilder();
 
     int[] colWidths = colWidths();
-    if (headerColumnNames != null) {
-      append(buf, colWidths, headerColumnNames);
+    if (_headerColumnNames != null) {
+      append(buf, colWidths, _headerColumnNames);
       int totalWidth = 0;
       for (int width : colWidths) {
         totalWidth += width;
@@ -85,7 +84,7 @@ public class TextTable {
       buf.append(rightPad("", totalWidth, '='));
       buf.append('\n');
     }
-    for (String[] row : rows) {
+    for (String[] row : _rows) {
       append(buf, colWidths, row);
     }
 

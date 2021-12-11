@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.periodictask;
 
+import java.util.Properties;
 import javax.annotation.concurrent.ThreadSafe;
 
 
@@ -27,6 +28,10 @@ import javax.annotation.concurrent.ThreadSafe;
  */
 @ThreadSafe
 public interface PeriodicTask extends Runnable {
+
+  // PeriodicTask objects may take a {@link Properties} object. Define all the keys property keys here.
+  String PROPERTY_KEY_REQUEST_ID = "requestId";
+  String PROPERTY_KEY_TABLE_NAME = "tableNameWithType";
 
   /**
    * Returns the periodic task name.
@@ -58,6 +63,12 @@ public interface PeriodicTask extends Runnable {
    */
   @Override
   void run();
+
+  /**
+   * Execute the task with specified {@link Properties}.
+   * @param periodicTaskProperties Properties used by {@link PeriodicTask} during execution.
+   */
+  void run(Properties periodicTaskProperties);
 
   /**
    * Stops the periodic task and performs necessary cleanups. Should be called after removing the periodic task from the

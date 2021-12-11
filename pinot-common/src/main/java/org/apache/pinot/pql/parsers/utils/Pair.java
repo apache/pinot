@@ -22,28 +22,28 @@ import java.io.Serializable;
 
 
 public class Pair<FIRST extends Serializable, SECOND extends Serializable> implements Serializable {
-  private FIRST first;
-  private SECOND second;
+  private FIRST _first;
+  private SECOND _second;
 
   public FIRST getFirst() {
-    return first;
+    return _first;
   }
 
   public void setFirst(FIRST first) {
-    this.first = first;
+    _first = first;
   }
 
   public SECOND getSecond() {
-    return second;
+    return _second;
   }
 
   public void setSecond(SECOND second) {
-    this.second = second;
+    _second = second;
   }
 
   public Pair(FIRST first, SECOND second) {
     super();
-    this.first = first;
-    this.second = second;
+    _first = first;
+    _second = second;
   }
 }

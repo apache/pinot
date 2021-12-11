@@ -5,7 +5,8 @@
   },
   "segmentsConfig": {
     "segmentPushType": "REFRESH",
-    "replication": "1"
+    "replication": "1",
+    "timeColumnName": "created_at_timestamp"
   },
   "tableIndexConfig": {
     "loadMode": "MMAP",
@@ -18,6 +19,14 @@
       "actor",
       "repo",
       "payload"
+    ]
+  },
+  "ingestionConfig": {
+    "transformConfigs": [
+      {
+        "columnName": "created_at_timestamp",
+        "transformFunction": "fromDateTime(created_at, 'yyyy-MM-dd''T''HH:mm:ss''Z''')"
+      }
     ]
   },
   "metadata": {

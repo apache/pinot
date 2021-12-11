@@ -21,6 +21,7 @@ package org.apache.pinot.common.function.scalar;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
+
 /**
  * Inbuilt Hash Transformation Functions
  * The functions can be used as UDFs in Query when added in the FunctionRegistry.

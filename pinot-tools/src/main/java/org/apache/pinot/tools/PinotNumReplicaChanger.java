@@ -35,11 +35,11 @@ import org.slf4j.LoggerFactory;
 public class PinotNumReplicaChanger extends PinotZKChanger {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotNumReplicaChanger.class);
 
-  private boolean dryRun;
+  private boolean _dryRun;
 
   public PinotNumReplicaChanger(String zkAddress, String clusterName, boolean dryRun) {
     super(zkAddress, clusterName);
-    this.dryRun = dryRun;
+    _dryRun = dryRun;
   }
 
   private static void usage() {
@@ -52,11 +52,11 @@ public class PinotNumReplicaChanger extends PinotZKChanger {
       throws Exception {
     // Get the number of replicas in the tableconfig.
     final String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-    final TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(propertyStore, offlineTableName);
+    final TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, offlineTableName);
     final int newNumReplicas = Integer.parseInt(offlineTableConfig.getValidationConfig().getReplication());
 
     // Now get the idealstate, and get the number of replicas in it.
-    IdealState currentIdealState = helixAdmin.getResourceIdealState(clusterName, offlineTableName);
+    IdealState currentIdealState = _helixAdmin.getResourceIdealState(_clusterName, offlineTableName);
     int currentNumReplicas = Integer.parseInt(currentIdealState.getReplicas());
 
     if (newNumReplicas > currentNumReplicas) {
@@ -65,12 +65,12 @@ public class PinotNumReplicaChanger extends PinotZKChanger {
       LOGGER.info("Number of replicas ({}) match in table definition and Idealstate. Nothing to do for {}",
           newNumReplicas, offlineTableName);
     } else if (newNumReplicas < currentNumReplicas) {
-      if (dryRun) {
+      if (_dryRun) {
         IdealState newIdealState = updateIdealState(currentIdealState, newNumReplicas);
         LOGGER.info("Final segment Assignment:");
         printSegmentAssignment(newIdealState.getRecord().getMapFields());
       } else {
-        HelixHelper.updateIdealState(helixManager, offlineTableName, new Function<IdealState, IdealState>() {
+        HelixHelper.updateIdealState(_helixManager, offlineTableName, new Function<IdealState, IdealState>() {
           @Nullable
           @Override
           public IdealState apply(IdealState idealState) {

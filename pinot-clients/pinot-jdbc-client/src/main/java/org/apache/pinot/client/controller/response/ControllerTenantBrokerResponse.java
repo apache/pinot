@@ -21,11 +21,10 @@ package org.apache.pinot.client.controller.response;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
-import com.google.common.collect.Lists;
 import com.ning.http.client.Response;
-
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -57,7 +56,7 @@ public class ControllerTenantBrokerResponse {
       String hostName = broker.get("host").textValue();
       Integer port = broker.get("port").intValue();
       String brokerIP = hostName;
-      if(hostName.contains("_")) {
+      if (hostName.contains("_")) {
         String[] hostNamePart = hostName.split("_");
         brokerIP = hostNamePart[hostNamePart.length - 1];
       }
@@ -68,8 +67,9 @@ public class ControllerTenantBrokerResponse {
     return brokerList;
   }
 
-  public static class ControllerTenantBrokerResponseFuture extends ControllerResponseFuture<ControllerTenantBrokerResponse> {
-    private final ObjectReader OBJECT_READER = new ObjectMapper().reader();
+  public static class ControllerTenantBrokerResponseFuture
+      extends ControllerResponseFuture<ControllerTenantBrokerResponse> {
+    private static final ObjectReader OBJECT_READER = new ObjectMapper().reader();
 
     public ControllerTenantBrokerResponseFuture(Future<Response> response, String url) {
       super(response, url);

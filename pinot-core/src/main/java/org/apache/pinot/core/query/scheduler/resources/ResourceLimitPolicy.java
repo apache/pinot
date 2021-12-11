@@ -38,25 +38,25 @@ public class ResourceLimitPolicy {
   public static final int DEFAULT_TABLE_THREADS_SOFT_LIMIT = 30;
   public static final int DEFAULT_TABLE_THREADS_HARD_LIMIT = 45;
 
-  private final int maxThreadsPerQuery;
-  private final int tableThreadsSoftLimit;
-  private final int tableThreadsHardLimit;
+  private final int _maxThreadsPerQuery;
+  private final int _tableThreadsSoftLimit;
+  private final int _tableThreadsHardLimit;
 
   ResourceLimitPolicy(PinotConfiguration config, int numWorkerThreads) {
     int softLimit = checkGetOrDefaultPct(config, TABLE_THREADS_SOFT_LIMIT, DEFAULT_TABLE_THREADS_SOFT_LIMIT);
-    tableThreadsSoftLimit = Math.min(numWorkerThreads, Math.max(1, numWorkerThreads * softLimit / 100));
+    _tableThreadsSoftLimit = Math.min(numWorkerThreads, Math.max(1, numWorkerThreads * softLimit / 100));
     int hardLimit = checkGetOrDefaultPct(config, TABLE_THREADS_HARD_LIMIT, DEFAULT_TABLE_THREADS_HARD_LIMIT);
     // hardLimit <= tableThreadsHardLimit < numWorkerThreads
-    tableThreadsHardLimit =
-        Math.min(numWorkerThreads, Math.max(tableThreadsSoftLimit, numWorkerThreads * hardLimit / 100));
+    _tableThreadsHardLimit =
+        Math.min(numWorkerThreads, Math.max(_tableThreadsSoftLimit, numWorkerThreads * hardLimit / 100));
 
     int tpqPct = checkGetOrDefaultPct(config, THREADS_PER_QUERY_PCT, DEFAULT_THREADS_PER_QUERY_PCT);
     // 1 <= maxThreadsPerQuery <= tableThreadsHardLimit
-    maxThreadsPerQuery =
-        Math.min(tableThreadsHardLimit, Math.min(MAX_THREAD_LIMIT, Math.max(1, numWorkerThreads * tpqPct / 100)));
+    _maxThreadsPerQuery =
+        Math.min(_tableThreadsHardLimit, Math.min(MAX_THREAD_LIMIT, Math.max(1, numWorkerThreads * tpqPct / 100)));
 
-    LOGGER.info("MaxThreadsPerQuery: {}, tableThreadsSoftLimit: {}, tableThreadsHardLimit: {}", maxThreadsPerQuery,
-        tableThreadsSoftLimit, tableThreadsHardLimit);
+    LOGGER.info("MaxThreadsPerQuery: {}, tableThreadsSoftLimit: {}, tableThreadsHardLimit: {}", _maxThreadsPerQuery,
+        _tableThreadsSoftLimit, _tableThreadsHardLimit);
   }
 
   private int checkGetOrDefaultPct(PinotConfiguration schedulerConfig, String key, int defaultValue) {
@@ -69,14 +69,14 @@ public class ResourceLimitPolicy {
   }
 
   int getMaxThreadsPerQuery() {
-    return maxThreadsPerQuery;
+    return _maxThreadsPerQuery;
   }
 
   int getTableThreadsSoftLimit() {
-    return tableThreadsSoftLimit;
+    return _tableThreadsSoftLimit;
   }
 
   int getTableThreadsHardLimit() {
-    return tableThreadsHardLimit;
+    return _tableThreadsHardLimit;
   }
 }

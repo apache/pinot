@@ -32,8 +32,9 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.core.util.TableConfigUtils;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -47,7 +48,7 @@ public class PinotTableIndexingConfigs {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableIndexingConfigs.class);
 
   @Inject
-  PinotHelixResourceManager pinotHelixResourceManager;
+  PinotHelixResourceManager _pinotHelixResourceManager;
 
   @Deprecated
   @PUT
@@ -55,21 +56,25 @@ public class PinotTableIndexingConfigs {
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update table indexing configuration")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Table not found"), @ApiResponse(code = 500, message = "Server error updating configuration")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Server error updating configuration")
+  })
   public SuccessResponse updateIndexingConfig(
       @ApiParam(value = "Table name (without type)", required = true) @PathParam("tableName") String tableName,
       String tableConfigString) {
     TableConfig tableConfig;
     try {
       tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
-      Schema schema = pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
+      Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
       String msg = String.format("Invalid table config: %s", tableName);
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
     try {
-      pinotHelixResourceManager.updateIndexingConfigFor(tableConfig.getTableName(), tableConfig.getTableType(),
+      _pinotHelixResourceManager.updateIndexingConfigFor(tableConfig.getTableName(), tableConfig.getTableType(),
           tableConfig.getIndexingConfig());
       return new SuccessResponse("Updated indexing config for table " + tableName);
     } catch (Exception e) {

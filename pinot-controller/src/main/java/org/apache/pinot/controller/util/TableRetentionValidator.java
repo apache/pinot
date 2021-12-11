@@ -30,7 +30,7 @@ import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -91,32 +91,32 @@ public class TableRetentionValidator {
     // Get all resources in cluster
     List<String> resourcesInCluster = _helixAdmin.getResourcesInCluster(_clusterName);
 
-    for (String tableName : resourcesInCluster) {
+    for (String tableNameWithType : resourcesInCluster) {
       // Skip non-table resources
-      if (!TableNameBuilder.isTableResource(tableName)) {
+      if (!TableNameBuilder.isTableResource(tableNameWithType)) {
         continue;
       }
 
       // Skip tables that do not match the defined name pattern
-      if (_tableNamePattern != null && !tableName.matches(_tableNamePattern)) {
+      if (_tableNamePattern != null && !tableNameWithType.matches(_tableNamePattern)) {
         continue;
       }
 
       // Get the retention config
-      TableConfig tableConfig = getTableConfig(tableName);
+      TableConfig tableConfig = getTableConfig(tableNameWithType);
       SegmentsValidationAndRetentionConfig retentionConfig = tableConfig.getValidationConfig();
       if (retentionConfig == null) {
-        LOGGER.error("Table: {}, \"segmentsConfig\" field is missing in table config", tableName);
+        LOGGER.error("Table: {}, \"segmentsConfig\" field is missing in table config", tableNameWithType);
         continue;
       }
       String segmentPushType = IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig);
       if (segmentPushType == null) {
-        LOGGER.error("Table: {}, null push type", tableName);
+        LOGGER.error("Table: {}, null push type", tableNameWithType);
         continue;
       } else if (segmentPushType.equalsIgnoreCase("REFRESH")) {
         continue;
       } else if (!segmentPushType.equalsIgnoreCase("APPEND")) {
-        LOGGER.error("Table: {}, invalid push type: {}", tableName, segmentPushType);
+        LOGGER.error("Table: {}, invalid push type: {}", tableNameWithType, segmentPushType);
         continue;
       }
 
@@ -128,7 +128,7 @@ public class TableRetentionValidator {
       try {
         timeUnit = TimeUnit.valueOf(timeUnitString.toUpperCase());
       } catch (Exception e) {
-        LOGGER.error("Table: {}, invalid time unit: {}", tableName, timeUnitString);
+        LOGGER.error("Table: {}, invalid time unit: {}", tableNameWithType, timeUnitString);
         continue;
       }
 
@@ -136,46 +136,47 @@ public class TableRetentionValidator {
       String timeValueString = retentionConfig.getRetentionTimeValue();
       long durationInDays;
       try {
-        durationInDays = timeUnit.toDays(Long.valueOf(timeValueString));
+        durationInDays = timeUnit.toDays(Long.parseLong(timeValueString));
       } catch (Exception e) {
-        LOGGER.error("Table: {}, invalid time value: {}", tableName, timeValueString);
+        LOGGER.error("Table: {}, invalid time value: {}", tableNameWithType, timeValueString);
         continue;
       }
       if (durationInDays <= 0) {
-        LOGGER.error("Table: {}, invalid retention duration in days: {}", tableName, durationInDays);
+        LOGGER.error("Table: {}, invalid retention duration in days: {}", tableNameWithType, durationInDays);
         continue;
       }
       if (durationInDays > _durationInDaysThreshold) {
-        LOGGER.warn("Table: {}, retention duration in days is too large: {}", tableName, durationInDays);
+        LOGGER.warn("Table: {}, retention duration in days is too large: {}", tableNameWithType, durationInDays);
       }
 
       // Skip segments metadata check for realtime tables
-      if (tableName.endsWith("REALTIME")) {
+      if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
         continue;
       }
 
       // Check segments metadata (only for offline tables)
-      List<String> segmentNames = getSegmentNames(tableName);
+      List<String> segmentNames = getSegmentNames(tableNameWithType);
       if (segmentNames == null || segmentNames.isEmpty()) {
-        LOGGER.warn("Table: {}, no segment metadata in property store", tableName);
+        LOGGER.warn("Table: {}, no segment metadata in property store", tableNameWithType);
         continue;
       }
 
       List<String> errorMessages = new ArrayList<>();
       for (String segmentName : segmentNames) {
-        OfflineSegmentZKMetadata offlineSegmentMetadata = getOfflineSegmentMetadata(tableName, segmentName);
-        long startTimeMs = offlineSegmentMetadata.getStartTimeMs();
+        SegmentZKMetadata segmentMetadata =
+            ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, tableNameWithType, segmentName);
+        long startTimeMs = segmentMetadata.getStartTimeMs();
         if (!TimeUtils.timeValueInValidRange(startTimeMs)) {
           errorMessages.add("Segment: " + segmentName + " has invalid start time in millis: " + startTimeMs);
         }
-        long endTimeMs = offlineSegmentMetadata.getEndTimeMs();
+        long endTimeMs = segmentMetadata.getEndTimeMs();
         if (!TimeUtils.timeValueInValidRange(endTimeMs)) {
           errorMessages.add("Segment: " + segmentName + " has invalid end time in millis: " + endTimeMs);
         }
       }
 
       if (!errorMessages.isEmpty()) {
-        LOGGER.error("Table: {}, invalid segments: {}", tableName, errorMessages);
+        LOGGER.error("Table: {}, invalid segments: {}", tableNameWithType, errorMessages);
       }
     }
   }
@@ -188,10 +189,5 @@ public class TableRetentionValidator {
 
   private List<String> getSegmentNames(String tableName) {
     return _propertyStore.getChildNames(ZKMetadataProvider.constructPropertyStorePathForResource(tableName), 0);
-  }
-
-  private OfflineSegmentZKMetadata getOfflineSegmentMetadata(String tableName, String segmentName) {
-    return new OfflineSegmentZKMetadata(
-        _propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForSegment(tableName, segmentName), null, 0));
   }
 }

@@ -31,19 +31,17 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
-import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
-import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
-import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
-import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
-import org.apache.pinot.core.realtime.converter.RealtimeSegmentConverter;
-import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.core.util.IngestionUtils;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
+import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
+import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -57,6 +55,8 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
+import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -104,16 +104,16 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   // An instance of this class exists only for the duration of the realtime segment that is currently being consumed.
   // Once the segment is committed, the segment is handled by OfflineSegmentDataManager
-  public HLRealtimeSegmentDataManager(final RealtimeSegmentZKMetadata realtimeSegmentZKMetadata,
-      final TableConfig tableConfig, InstanceZKMetadata instanceMetadata,
-      final RealtimeTableDataManager realtimeTableDataManager, final String resourceDataDir,
-      final IndexLoadingConfig indexLoadingConfig, final Schema schema, final ServerMetrics serverMetrics)
+  public HLRealtimeSegmentDataManager(final SegmentZKMetadata segmentZKMetadata, final TableConfig tableConfig,
+      InstanceZKMetadata instanceMetadata, final RealtimeTableDataManager realtimeTableDataManager,
+      final String resourceDataDir, final IndexLoadingConfig indexLoadingConfig, final Schema schema,
+      final ServerMetrics serverMetrics)
       throws Exception {
     super();
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     _recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
     _serverMetrics = serverMetrics;
-    _segmentName = realtimeSegmentZKMetadata.getSegmentName();
+    _segmentName = segmentZKMetadata.getSegmentName();
     _tableNameWithType = tableConfig.getTableName();
     _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     Preconditions
@@ -192,7 +192,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setCapacity(capacity).setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
             .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
             .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
-            .setInvertedIndexColumns(invertedIndexColumns).setRealtimeSegmentZKMetadata(realtimeSegmentZKMetadata)
+            .setInvertedIndexColumns(invertedIndexColumns).setSegmentZKMetadata(segmentZKMetadata)
             .setOffHeap(indexLoadingConfig.isRealtimeOffHeapAllocation()).setMemoryManager(
             getMemoryManager(realtimeTableDataManager.getConsumerDir(), _segmentName,
                 indexLoadingConfig.isRealtimeOffHeapAllocation(),
@@ -286,9 +286,10 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + System.currentTimeMillis());
 
           // lets convert the segment now
+
           RealtimeSegmentConverter converter =
               new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
-                  _tableNameWithType, tableConfig, realtimeSegmentZKMetadata.getSegmentName(), _sortedColumn,
+                  _tableNameWithType, tableConfig, segmentZKMetadata.getSegmentName(), _sortedColumn,
                   _invertedIndexColumns, Collections.emptyList(), Collections.emptyList(), _noDictionaryColumns,
                   _varLengthDictionaryColumns, indexingConfig.isNullHandlingEnabled());
 
@@ -298,7 +299,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           final long buildEndTime = System.nanoTime();
           _segmentLogger.info("Built segment in {} ms",
               TimeUnit.MILLISECONDS.convert((buildEndTime - buildStartTime), TimeUnit.NANOSECONDS));
-          File destDir = new File(resourceDataDir, realtimeSegmentZKMetadata.getSegmentName());
+          File destDir = new File(resourceDataDir, segmentZKMetadata.getSegmentName());
           FileUtils.deleteQuietly(destDir);
           FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], destDir);
 
@@ -375,10 +376,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
           try {
             _segmentLogger.info("Marking current segment as completed in Helix");
-            RealtimeSegmentZKMetadata metadataToOverwrite = new RealtimeSegmentZKMetadata();
-            metadataToOverwrite.setTableName(_tableNameWithType);
-            metadataToOverwrite.setSegmentName(realtimeSegmentZKMetadata.getSegmentName());
-            metadataToOverwrite.setSegmentType(SegmentType.OFFLINE);
+            SegmentZKMetadata metadataToOverwrite = new SegmentZKMetadata(segmentZKMetadata.getSegmentName());
             metadataToOverwrite.setStatus(Status.DONE);
             metadataToOverwrite.setStartTime(segStartTime);
             metadataToOverwrite.setEndTime(segEndTime);
@@ -390,12 +388,13 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           } catch (Exception e) {
             if (commitSuccessful) {
               _segmentLogger.error(
-                  "Offsets were committed to Kafka but we were unable to mark this segment as completed in Helix. Manually mark the segment as completed in Helix; restarting this instance will result in data loss.",
-                  e);
+                  "Offsets were committed to Kafka but we were unable to mark this segment as completed in Helix. "
+                      + "Manually mark the segment as completed in Helix; restarting this instance will result in "
+                      + "data loss.", e);
             } else {
               _segmentLogger.warn(
-                  "Caught exception while marking segment as completed in Helix. Offsets were not written, restarting the instance should be safe.",
-                  e);
+                  "Caught exception while marking segment as completed in Helix. Offsets were not written, restarting"
+                      + " the instance should be safe.", e);
             }
           }
         } catch (Exception e) {
@@ -408,7 +407,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
     _segmentLogger.debug("scheduling keepIndexing timer check");
     // start a schedule timer to keep track of the segment
-    TimerService.timer.schedule(_segmentStatusTask, ONE_MINUTE_IN_MILLSEC, ONE_MINUTE_IN_MILLSEC);
+    TimerService.TIMER.schedule(_segmentStatusTask, ONE_MINUTE_IN_MILLSEC, ONE_MINUTE_IN_MILLSEC);
     _segmentLogger.info("finished scheduling keepIndexing timer check");
   }
 

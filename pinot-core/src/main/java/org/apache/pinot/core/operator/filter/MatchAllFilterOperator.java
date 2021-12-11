@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import java.util.Collections;
+import java.util.List;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 
 
 public class MatchAllFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "MatchEntireSegmentOperator";
-
+  private static final String EXPLAIN_NAME = "FILTER_MATCH_ENTIRE_SEGMENT";
   private final int _numDocs;
 
   public MatchAllFilterOperator(int numDocs) {
@@ -44,5 +47,15 @@ public class MatchAllFilterOperator extends BaseFilterOperator {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Collections.emptyList();
+  }
+
+  @Override
+  public String toExplainString() {
+    return new StringBuilder(EXPLAIN_NAME).append("(docs:").append(_numDocs).append(')').toString();
   }
 }

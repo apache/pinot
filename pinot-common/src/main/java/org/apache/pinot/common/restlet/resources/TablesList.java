@@ -23,7 +23,7 @@ import java.util.List;
 
 
 public class TablesList {
-  private List<String> _tables;
+  private final List<String> _tables;
 
   public TablesList(@JsonProperty("tables") List<String> tables) {
     _tables = tables;

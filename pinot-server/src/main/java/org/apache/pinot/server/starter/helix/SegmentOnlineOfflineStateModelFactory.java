@@ -30,13 +30,14 @@ import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -52,13 +53,10 @@ import org.slf4j.LoggerFactory;
 public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
   private final String _instanceId;
   private final InstanceDataManager _instanceDataManager;
-  private final SegmentFetcherAndLoader _fetcherAndLoader;
 
-  public SegmentOnlineOfflineStateModelFactory(String instanceId, InstanceDataManager instanceDataManager,
-      SegmentFetcherAndLoader fetcherAndLoader) {
+  public SegmentOnlineOfflineStateModelFactory(String instanceId, InstanceDataManager instanceDataManager) {
     _instanceId = instanceId;
     _instanceDataManager = instanceDataManager;
-    _fetcherAndLoader = fetcherAndLoader;
   }
 
   public static String getStateModelName() {
@@ -112,12 +110,14 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
           return;
         }
         LLRealtimeSegmentDataManager segmentDataManager = (LLRealtimeSegmentDataManager) acquiredSegment;
-        RealtimeSegmentZKMetadata metadata = ZKMetadataProvider
-            .getRealtimeSegmentZKMetadata(_instanceDataManager.getPropertyStore(), segmentName.getTableName(),
-                segmentNameStr);
-        segmentDataManager.goOnlineFromConsuming(metadata);
+        SegmentZKMetadata segmentZKMetadata = ZKMetadataProvider
+            .getSegmentZKMetadata(_instanceDataManager.getPropertyStore(), realtimeTableName, segmentNameStr);
+        segmentDataManager.goOnlineFromConsuming(segmentZKMetadata);
       } catch (InterruptedException e) {
-        _logger.warn("State transition interrupted", e);
+        String errorMessage = String.format("State transition interrupted for segment %s.", segmentNameStr);
+        _logger.warn(errorMessage, e);
+        tableDataManager
+            .addSegmentError(segmentNameStr, new SegmentErrorInfo(System.currentTimeMillis(), errorMessage, e));
         throw new RuntimeException(e);
       } finally {
         tableDataManager.releaseSegment(acquiredSegment);
@@ -159,13 +159,20 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         TableType tableType = TableNameBuilder.getTableTypeFromTableName(message.getResourceName());
         Preconditions.checkNotNull(tableType);
         if (tableType == TableType.OFFLINE) {
-          _fetcherAndLoader.addOrReplaceOfflineSegment(tableNameWithType, segmentName);
+          _instanceDataManager.addOrReplaceSegment(tableNameWithType, segmentName);
         } else {
           _instanceDataManager.addRealtimeSegment(tableNameWithType, segmentName);
         }
       } catch (Exception e) {
-        _logger.error("Caught exception in state transition from OFFLINE -> ONLINE for resource: {}, partition: {}",
-            tableNameWithType, segmentName, e);
+        String errorMessage = String
+            .format("Caught exception in state transition from OFFLINE -> ONLINE for resource: %s, partition: %s",
+                tableNameWithType, segmentName);
+        _logger.error(errorMessage, e);
+        TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
+        if (tableDataManager != null) {
+          tableDataManager
+              .addSegmentError(segmentName, new SegmentErrorInfo(System.currentTimeMillis(), errorMessage, e));
+        }
         Utils.rethrowException(e);
       }
     }
@@ -198,7 +205,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       try {
         segmentLock.lock();
 
-        final File segmentDir = new File(_fetcherAndLoader.getSegmentLocalDirectory(tableNameWithType, segmentName));
+        File segmentDir = _instanceDataManager.getSegmentDataDirectory(tableNameWithType, segmentName);
         if (segmentDir.exists()) {
           FileUtils.deleteQuietly(segmentDir);
           _logger.info("Deleted segment directory {}", segmentDir);

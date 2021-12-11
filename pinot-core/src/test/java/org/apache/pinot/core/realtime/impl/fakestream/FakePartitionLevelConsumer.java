@@ -37,11 +37,10 @@ import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
-import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils.*;
+import static org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils.unpackAvroTarFile;
 
 
 /**
@@ -52,8 +51,8 @@ public class FakePartitionLevelConsumer implements PartitionLevelConsumer {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FakePartitionLevelConsumer.class.getName());
 
-  private List<Integer> messageOffsets = new ArrayList<>();
-  private List<byte[]> messageBytes = new ArrayList<>();
+  private List<Integer> _messageOffsets = new ArrayList<>();
+  private List<byte[]> _messageBytes = new ArrayList<>();
 
   FakePartitionLevelConsumer(int partition, StreamConfig streamConfig) {
 
@@ -84,8 +83,8 @@ public class FakePartitionLevelConsumer implements PartitionLevelConsumer {
 
           byte[] bytes = outputStream.toByteArray();
           // contiguous offsets
-          messageOffsets.add(offset++);
-          messageBytes.add(bytes);
+          _messageOffsets.add(offset++);
+          _messageBytes.add(bytes);
         }
       }
     } catch (Exception e) {
@@ -95,13 +94,15 @@ public class FakePartitionLevelConsumer implements PartitionLevelConsumer {
     }
   }
 
-  public MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis) throws TimeoutException {
+  public MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis)
+      throws TimeoutException {
     throw new UnsupportedOperationException("This method is deprecated");
   }
 
   @Override
   public MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset,
-      int timeoutMillis) throws TimeoutException {
+      int timeoutMillis)
+      throws TimeoutException {
     if (startOffset.compareTo(FakeStreamConfigUtils.getLargestOffset()) >= 0) {
       return new FakeStreamMessageBatch(Collections.emptyList(), Collections.emptyList());
     }
@@ -111,14 +112,15 @@ public class FakePartitionLevelConsumer implements PartitionLevelConsumer {
     if (endOffset == null || endOffset.compareTo(FakeStreamConfigUtils.getLargestOffset()) > 0) {
       endOffset = FakeStreamConfigUtils.getLargestOffset();
     }
-    int startOffsetInt = (int) ((LongMsgOffset)startOffset).getOffset();
-    int endOffsetInt = (int) ((LongMsgOffset)endOffset).getOffset();
-    return new FakeStreamMessageBatch(messageOffsets.subList(startOffsetInt, endOffsetInt),
-        messageBytes.subList(startOffsetInt, endOffsetInt));
+    int startOffsetInt = (int) ((LongMsgOffset) startOffset).getOffset();
+    int endOffsetInt = (int) ((LongMsgOffset) endOffset).getOffset();
+    return new FakeStreamMessageBatch(_messageOffsets.subList(startOffsetInt, endOffsetInt),
+        _messageBytes.subList(startOffsetInt, endOffsetInt));
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
   }
 
   /**

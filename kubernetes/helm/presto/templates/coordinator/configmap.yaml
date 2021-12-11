@@ -22,14 +22,10 @@ kind: ConfigMap
 metadata:
   name: presto-catalog
 data:
-  pinot.properties: |-
-    connector.name={{ .Values.pinot.connectorName }}
-    pinot.controller-urls={{ .Values.pinot.controllerUrls }}
-    pinot.controller-rest-service={{ .Values.pinot.controllerRestService }}
-    pinot.allow-multiple-aggregations={{ .Values.pinot.allowMultipleAggregations }}
-    pinot.use-date-trunc={{ .Values.pinot.useDateTrunc }}
-    pinot.infer-date-type-in-schema={{ .Values.pinot.inferDateTypeInSchema }}
-    pinot.infer-timestamp-type-in-schema={{ .Values.pinot.inferTimestampTypeInSchema }}
+{{- range $name, $catalog := .Values.catalogs }}
+  {{ $name }}: |
+{{- tpl $catalog $ | nindent 4 -}}
+{{- end }}
 ---
 apiVersion: v1
 kind: ConfigMap

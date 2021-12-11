@@ -29,21 +29,21 @@ import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.FileFormat;
-import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
-import org.apache.pinot.segment.spi.ImmutableSegment;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 
 
@@ -55,8 +55,10 @@ public class StringDictionaryPerfTest {
   private static final boolean USE_FIXED_SIZE_STRING = true;
   private static final String TMP_DIR = System.getProperty("java.io.tmpdir");
   private static final String COLUMN_NAME = "test";
-  private static final String[] STATS_HEADERS =
-      new String[]{"DictSize", "TimeTaken(ms)", "SegmentSize", "NumLookups", "Min", "Max", "Mean", "StdDev", "Median", "Skewness", "Kurtosis", "Variance", "BufferSize"};
+  private static final String[] STATS_HEADERS = new String[]{
+      "DictSize", "TimeTaken(ms)", "SegmentSize", "NumLookups", "Min", "Max", "Mean", "StdDev", "Median", "Skewness",
+      "Kurtosis", "Variance", "BufferSize"
+  };
   private static final Joiner COMMA_JOINER = Joiner.on(",");
 
   private final DescriptiveStatistics _statistics = new DescriptiveStatistics();
@@ -172,12 +174,13 @@ public class StringDictionaryPerfTest {
 
     System.out.println("Total time for " + numGetValues + " lookups: " + time + "ms");
     System.out.println("Memory usage: " + (newMemory - oldMemory));
-    return new String[]{String.valueOf(_statistics.getN()), String.valueOf(time), String.valueOf(
-        segmentSize), String.valueOf(numGetValues), String.valueOf(_statistics.getMin()), String.valueOf(
-        _statistics.getMax()), String.valueOf(_statistics.getMean()), String.valueOf(
-        _statistics.getStandardDeviation()), String.valueOf(_statistics.getPercentile(50.0D)), String.valueOf(
-        _statistics.getSkewness()), String.valueOf(_statistics.getKurtosis()), String.valueOf(
-        _statistics.getVariance())};
+    return new String[]{
+        String.valueOf(_statistics.getN()), String.valueOf(time), String.valueOf(segmentSize),
+        String.valueOf(numGetValues), String.valueOf(_statistics.getMin()), String.valueOf(_statistics.getMax()),
+        String.valueOf(_statistics.getMean()), String.valueOf(_statistics.getStandardDeviation()),
+        String.valueOf(_statistics.getPercentile(50.0D)), String.valueOf(_statistics.getSkewness()),
+        String.valueOf(_statistics.getKurtosis()), String.valueOf(_statistics.getVariance())
+    };
   }
 
   public static void main(String[] args)

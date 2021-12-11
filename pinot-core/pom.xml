@@ -25,7 +25,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.7.0-SNAPSHOT</version>
+    <version>0.10.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-core</artifactId>
@@ -34,6 +34,7 @@
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
   </properties>
+
   <build>
     <plugins>
       <plugin>
@@ -58,10 +59,6 @@
       <artifactId>h3</artifactId>
     </dependency>
     <dependency>
-      <groupId>me.lemire.integercompression</groupId>
-      <artifactId>JavaFastPFOR</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.roaringbitmap</groupId>
       <artifactId>RoaringBitmap</artifactId>
     </dependency>
@@ -72,6 +69,10 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-segment-spi</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-segment-local</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -121,6 +122,11 @@
         </exclusion>
       </exclusions>
     </dependency>-->
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-tcnative-boringssl-static</artifactId>
+      <version>${netty-tcnative.version}</version>
+    </dependency>
     <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty</artifactId>
@@ -178,6 +184,13 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-segment-local</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
@@ -277,6 +290,12 @@
           </plugin>
         </plugins>
       </build>
+    </profile>
+    <profile>
+      <id>presto-driver</id>
+      <properties>
+        <jdk.version>8</jdk.version>
+      </properties>
     </profile>
   </profiles>
 </project>

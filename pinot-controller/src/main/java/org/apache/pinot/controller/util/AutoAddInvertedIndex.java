@@ -46,7 +46,6 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -225,7 +224,7 @@ public class AutoAddInvertedIndex {
 
       // Skip tables without dimensions
       List<String> dimensionNames = tableSchema.getDimensionNames();
-      if (dimensionNames.size() == 0) {
+      if (dimensionNames.isEmpty()) {
         LOGGER.info("Table: {}, skip adding inverted index because it does not have any dimension column",
             tableNameWithType);
         continue;
@@ -235,8 +234,8 @@ public class AutoAddInvertedIndex {
       String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
       if (timeColumnName == null) {
         LOGGER.info(
-            "Table: {}, skip adding inverted index because it does not have a time column specified in the table config",
-            tableNameWithType);
+            "Table: {}, skip adding inverted index because it does not have a time column specified in the table "
+                + "config", tableNameWithType);
         continue;
       }
       DateTimeFieldSpec dateTimeSpec = tableSchema.getSpecForTimeColumn(timeColumnName);

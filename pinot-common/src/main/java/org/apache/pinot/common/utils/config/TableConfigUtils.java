@@ -22,13 +22,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
@@ -42,6 +42,9 @@ import org.apache.pinot.spi.config.table.TunerConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -140,15 +143,16 @@ public class TableConfigUtils {
       });
     }
 
-    TunerConfig tunerConfig = null;
-    String tunerConfigString = simpleFields.get(TableConfig.TUNER_CONFIG);
-    if (tunerConfigString != null) {
-      tunerConfig = JsonUtils.stringToObject(tunerConfigString, TunerConfig.class);
+    List<TunerConfig> tunerConfigList = null;
+    String tunerConfigListString = simpleFields.get(TableConfig.TUNER_CONFIG_LIST_KEY);
+    if (tunerConfigListString != null) {
+      tunerConfigList = JsonUtils.stringToObject(tunerConfigListString, new TypeReference<List<TunerConfig>>() {
+      });
     }
 
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig,
-        ingestionConfig, tierConfigList, isDimTable, tunerConfig);
+        ingestionConfig, tierConfigList, isDimTable, tunerConfigList);
   }
 
   public static ZNRecord toZNRecord(TableConfig tableConfig)
@@ -203,13 +207,87 @@ public class TableConfigUtils {
     if (tierConfigList != null) {
       simpleFields.put(TableConfig.TIER_CONFIGS_LIST_KEY, JsonUtils.objectToString(tierConfigList));
     }
-    TunerConfig tunerConfig = tableConfig.getTunerConfig();
-    if (tunerConfig != null) {
-      simpleFields.put(TableConfig.TUNER_CONFIG, JsonUtils.objectToString(tunerConfig));
+    List<TunerConfig> tunerConfigList = tableConfig.getTunerConfigsList();
+    if (tunerConfigList != null) {
+      simpleFields.put(TableConfig.TUNER_CONFIG_LIST_KEY, JsonUtils.objectToString(tunerConfigList));
     }
 
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());
     znRecord.setSimpleFields(simpleFields);
     return znRecord;
+  }
+
+  /**
+   * Helper method to convert from legacy/deprecated configs into current version
+   * of TableConfig.
+   * <ul>
+   *   <li>Moves deprecated ingestion related configs into Ingestion Config.</li>
+   *   <li>The conversion happens in-place, the specified tableConfig is mutated in-place.</li>
+   * </ul>
+   *
+   * @param tableConfig Input table config.
+   */
+  public static void convertFromLegacyTableConfig(TableConfig tableConfig) {
+    // It is possible that indexing as well as ingestion configs exist, in which case we always honor ingestion config.
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    BatchIngestionConfig batchIngestionConfig =
+        (ingestionConfig != null) ? ingestionConfig.getBatchIngestionConfig() : null;
+
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    String segmentPushType = validationConfig.getSegmentPushType();
+    String segmentPushFrequency = validationConfig.getSegmentPushFrequency();
+
+    if (batchIngestionConfig == null) {
+      // Only create the config if any of the deprecated config is not null.
+      if (segmentPushType != null || segmentPushFrequency != null) {
+        batchIngestionConfig = new BatchIngestionConfig(null, segmentPushType, segmentPushFrequency);
+      }
+    } else {
+      // This should not happen typically, but since we are in repair mode, might as well cover this corner case.
+      if (batchIngestionConfig.getSegmentIngestionType() == null) {
+        batchIngestionConfig.setSegmentIngestionType(segmentPushType);
+      }
+
+      if (batchIngestionConfig.getSegmentIngestionFrequency() == null) {
+        batchIngestionConfig.setSegmentIngestionFrequency(segmentPushFrequency);
+      }
+    }
+
+    StreamIngestionConfig streamIngestionConfig =
+        (ingestionConfig != null) ? ingestionConfig.getStreamIngestionConfig() : null;
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+
+    if (streamIngestionConfig == null) {
+      Map<String, String> streamConfigs = indexingConfig.getStreamConfigs();
+
+      // Only set the new config if the deprecated one is set.
+      if (streamConfigs != null && !streamConfigs.isEmpty()) {
+        streamIngestionConfig = new StreamIngestionConfig(Collections.singletonList(streamConfigs));
+      }
+    }
+
+    if (ingestionConfig == null) {
+      if (batchIngestionConfig != null || streamIngestionConfig != null) {
+        ingestionConfig = new IngestionConfig(batchIngestionConfig, streamIngestionConfig, null, null, null);
+      }
+    } else {
+      if (batchIngestionConfig != null) {
+        ingestionConfig.setBatchIngestionConfig(batchIngestionConfig);
+      }
+
+      if (streamIngestionConfig != null) {
+        ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
+      }
+    }
+
+    // Set the new config fields.
+    if (ingestionConfig != null) {
+      tableConfig.setIngestionConfig(ingestionConfig);
+    }
+
+    // Clear the deprecated ones.
+    indexingConfig.setStreamConfigs(null);
+    validationConfig.setSegmentPushFrequency(null);
+    validationConfig.setSegmentPushType(null);
   }
 }

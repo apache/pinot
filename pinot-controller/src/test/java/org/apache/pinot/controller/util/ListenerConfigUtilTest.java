@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.util;
 
 import java.util.List;
-
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
@@ -28,11 +27,13 @@ import org.testng.annotations.Test;
 
 
 /**
- * Asserts that {@link ListenerConfigUtil} will generated expected {@link ListenerConfig} based on the properties provided in {@link ControllerConf}
+ * Asserts that {@link ListenerConfigUtil} will generated expected {@link ListenerConfig} based on the properties
+ * provided in {@link ControllerConf}
  */
 public class ListenerConfigUtilTest {
   /**
-   * Asserts that the protocol listeners properties are Opt-In and not initialized when nothing but controler.port is used.
+   * Asserts that the protocol listeners properties are Opt-In and not initialized when nothing but controler.port is
+   * used.
    */
   @Test
   public void assertControllerPortConfig() {
@@ -49,7 +50,8 @@ public class ListenerConfigUtilTest {
   }
 
   /**
-   * Asserts that enabling https generates the existing legacy listener as well as the another one configured with TLS settings. 
+   * Asserts that enabling https generates the existing legacy listener as well as the another one configured with
+   * TLS settings.
    */
   @Test
   public void assertLegacyAndHttps() {

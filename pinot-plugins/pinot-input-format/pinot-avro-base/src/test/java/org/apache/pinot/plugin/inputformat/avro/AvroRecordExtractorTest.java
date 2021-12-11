@@ -112,7 +112,8 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     String jsonString = genericRecord.toString();
     Map<String, Object> jsonMap = DEFAULT_MAPPER.readValue(jsonString, new TypeReference<Map<String, Object>>() {
     });
-    // The data type got changed to Integer, which will then have to trigger the convert method in DataTypeTransformer class.
+    // The data type got changed to Integer, which will then have to trigger the convert method in
+    // DataTypeTransformer class.
     Assert.assertEquals("Integer", jsonMap.get(testColumnName).getClass().getSimpleName());
   }
 }

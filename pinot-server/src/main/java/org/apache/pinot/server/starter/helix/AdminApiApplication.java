@@ -28,11 +28,13 @@ import java.util.List;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
-import org.apache.pinot.server.api.access.AccessControlFactory;
+import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -41,25 +43,34 @@ import org.glassfish.jersey.server.ResourceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_SWAGGER_SERVER_ENABLED;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_SWAGGER_SERVER_ENABLED;
+
 
 public class AdminApiApplication extends ResourceConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(AdminApiApplication.class);
-
-  private final ServerInstance serverInstance;
-  private final AccessControlFactory accessControlFactory;
-  private boolean started = false;
-  private HttpServer httpServer;
+  public static final String PINOT_CONFIGURATION = "pinotConfiguration";
   public static final String RESOURCE_PACKAGE = "org.apache.pinot.server.api.resources";
+  public static final String SERVER_INSTANCE_ID = "serverInstanceId";
 
-  public AdminApiApplication(ServerInstance instance, AccessControlFactory accessControlFactory) {
-    this.serverInstance = instance;
-    this.accessControlFactory = accessControlFactory;
+  private final ServerInstance _serverInstance;
+  private final AccessControlFactory _accessControlFactory;
+  private boolean _started = false;
+  private HttpServer _httpServer;
+
+  public AdminApiApplication(ServerInstance instance, AccessControlFactory accessControlFactory,
+      PinotConfiguration serverConf) {
+    _serverInstance = instance;
+    _accessControlFactory = accessControlFactory;
     packages(RESOURCE_PACKAGE);
+    property(PINOT_CONFIGURATION, serverConf);
+
     register(new AbstractBinder() {
       @Override
       protected void configure() {
-        bind(serverInstance).to(ServerInstance.class);
+        bind(_serverInstance).to(ServerInstance.class);
         bind(accessControlFactory).to(AccessControlFactory.class);
+        bind(serverConf.getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID)).named(SERVER_INSTANCE_ID);
       }
     });
 
@@ -78,16 +89,25 @@ public class AdminApiApplication extends ResourceConfig {
   }
 
   public boolean start(List<ListenerConfig> listenerConfigs) {
-    httpServer = ListenerConfigUtil.buildHttpServer(this, listenerConfigs);
+    _httpServer = ListenerConfigUtil.buildHttpServer(this, listenerConfigs);
 
     try {
-      httpServer.start();
+      _httpServer.start();
     } catch (IOException e) {
       throw new RuntimeException("Failed to start http server", e);
     }
 
-    setupSwagger(httpServer);
-    started = true;
+    PinotConfiguration pinotConfiguration = (PinotConfiguration) getProperties().get(PINOT_CONFIGURATION);
+    // Allow optional start of the swagger as the Reflection lib has multi-thread access bug (issues/7271). It is not
+    // always possible to pin the Reflection lib on 0.9.9. So this optional setting will disable the swagger because it
+    // is NOT an essential part of Pinot servers.
+    if (pinotConfiguration.getProperty(CONFIG_OF_SWAGGER_SERVER_ENABLED, DEFAULT_SWAGGER_SERVER_ENABLED)) {
+      LOGGER.info("Starting swagger for the Pinot server.");
+      synchronized (PinotReflectionUtils.getReflectionLock()) {
+        setupSwagger(_httpServer);
+      }
+    }
+    _started = true;
     return true;
   }
 
@@ -120,9 +140,9 @@ public class AdminApiApplication extends ResourceConfig {
   }
 
   public void stop() {
-    if (!started) {
+    if (!_started) {
       return;
     }
-    httpServer.shutdownNow();
+    _httpServer.shutdownNow();
   }
 }

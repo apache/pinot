@@ -90,7 +90,7 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
     batchConfigMap.put(BatchConfigProperties.OVERWRITE_OUTPUT, "false");
     batchConfigMap.put(BatchConfigProperties.PUSH_CONTROLLER_URI, _controllerBaseApiUrl);
     return new IngestionConfig(new BatchIngestionConfig(Lists.newArrayList(batchConfigMap), "APPEND", "HOURLY"), null,
-        null, null);
+        null, null, null);
   }
 
   /**

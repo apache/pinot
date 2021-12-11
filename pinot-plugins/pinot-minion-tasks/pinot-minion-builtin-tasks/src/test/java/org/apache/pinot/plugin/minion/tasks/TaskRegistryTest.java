@@ -21,14 +21,15 @@ package org.apache.pinot.plugin.minion.tasks;
 import java.util.Set;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorRegistry;
 import org.apache.pinot.minion.executor.TaskExecutorFactoryRegistry;
-import org.apache.pinot.plugin.minion.tasks.convert_to_raw_index.ConvertToRawIndexTaskExecutorFactory;
-import org.apache.pinot.plugin.minion.tasks.convert_to_raw_index.ConvertToRawIndexTaskGenerator;
-import org.apache.pinot.plugin.minion.tasks.merge_rollup.MergeRollupTaskExecutorFactory;
+import org.apache.pinot.plugin.minion.tasks.converttorawindex.ConvertToRawIndexTaskExecutorFactory;
+import org.apache.pinot.plugin.minion.tasks.converttorawindex.ConvertToRawIndexTaskGenerator;
+import org.apache.pinot.plugin.minion.tasks.mergerollup.MergeRollupTaskExecutorFactory;
+import org.apache.pinot.plugin.minion.tasks.mergerollup.MergeRollupTaskGenerator;
 import org.apache.pinot.plugin.minion.tasks.purge.PurgeTaskExecutorFactory;
-import org.apache.pinot.plugin.minion.tasks.realtime_to_offline_segments.RealtimeToOfflineSegmentsTaskExecutorFactory;
-import org.apache.pinot.plugin.minion.tasks.realtime_to_offline_segments.RealtimeToOfflineSegmentsTaskGenerator;
-import org.apache.pinot.plugin.minion.tasks.segment_generation_and_push.SegmentGenerationAndPushTaskExecutorFactory;
-import org.apache.pinot.plugin.minion.tasks.segment_generation_and_push.SegmentGenerationAndPushTaskGenerator;
+import org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments.RealtimeToOfflineSegmentsTaskExecutorFactory;
+import org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments.RealtimeToOfflineSegmentsTaskGenerator;
+import org.apache.pinot.plugin.minion.tasks.segmentgenerationandpush.SegmentGenerationAndPushTaskExecutorFactory;
+import org.apache.pinot.plugin.minion.tasks.segmentgenerationandpush.SegmentGenerationAndPushTaskGenerator;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -37,8 +38,9 @@ public class TaskRegistryTest {
   @Test
   public void testTaskGeneratorRegistry() {
     Set<Class<?>> classes = TaskGeneratorRegistry.getTaskGeneratorClasses();
-    Assert.assertTrue(classes.size() >= 3);
+    Assert.assertTrue(classes.size() >= 4);
     Assert.assertTrue(classes.contains(ConvertToRawIndexTaskGenerator.class));
+    Assert.assertTrue(classes.contains(MergeRollupTaskGenerator.class));
     Assert.assertTrue(classes.contains(SegmentGenerationAndPushTaskGenerator.class));
     Assert.assertTrue(classes.contains(RealtimeToOfflineSegmentsTaskGenerator.class));
   }

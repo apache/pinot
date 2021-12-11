@@ -27,7 +27,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -109,7 +108,7 @@ public abstract class PinotFS implements Closeable, Serializable {
       // ensures the parent path of dst exists.
       try {
         Path parentPath = Paths.get(dstUri.getPath()).getParent();
-        URI parentUri = new URI(dstUri.getScheme(), dstUri.getHost(), parentPath.toString(), null);
+        URI parentUri = new URI(dstUri.getScheme(), dstUri.getAuthority(), parentPath.toString(), null, null);
         mkdir(parentUri);
       } catch (URISyntaxException e) {
         throw new IOException(e);

@@ -49,10 +49,9 @@
         <exclude>**/*.releaseBackup</exclude>
         <exclude>release.properties</exclude>
 
-        <!-- Do not include docker, kubernetes, website related files -->
+        <!-- Do not include docker, kubernetes related files -->
         <exclude>kubernetes/**</exclude>
         <exclude>docker/**</exclude>
-        <exclude>website/**</exclude>
         <exclude>contrib/**</exclude>
         <exclude>thirdeye/**</exclude>
       </excludes>

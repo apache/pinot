@@ -25,7 +25,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -45,7 +45,7 @@ public class TransformBlockValSet implements BlockValSet {
   }
 
   @Override
-  public FieldSpec.DataType getValueType() {
+  public DataType getValueType() {
     return _transformFunction.getResultMetadata().getDataType();
   }
 
@@ -139,7 +139,7 @@ public class TransformBlockValSet implements BlockValSet {
       }
       return _numMVEntries;
     } else {
-      switch (resultMetadata.getDataType()) {
+      switch (resultMetadata.getDataType().getStoredType()) {
         case INT:
           int[][] intValues = getIntValuesMV();
           for (int i = 0; i < numDocs; i++) {

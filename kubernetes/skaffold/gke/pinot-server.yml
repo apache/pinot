@@ -53,7 +53,7 @@ items:
         spec:
           terminationGracePeriodSeconds: 30
           containers:
-          - image: apachepinot/pinot:0.3.0-SNAPSHOT
+          - image: apachepinot/pinot:release-0.7.1
             imagePullPolicy: Always
             name: pinot-server
             args: [

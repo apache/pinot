@@ -18,23 +18,35 @@
  */
 package org.apache.pinot.common.restlet.resources;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import java.util.ArrayList;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TableSizeInfo {
-  public String tableName;
-  public long diskSizeInBytes = -1;
-  public List<SegmentSizeInfo> segments = new ArrayList<>();
+  private final String _tableName;
+  private final long _diskSizeInBytes;
+  private final List<SegmentSizeInfo> _segments;
 
-  public TableSizeInfo() {
-
+  @JsonCreator
+  public TableSizeInfo(@JsonProperty("tableName") String tableName, @JsonProperty("diskSizeInBytes") long sizeInBytes,
+      @JsonProperty("segments") List<SegmentSizeInfo> segments) {
+    _tableName = tableName;
+    _diskSizeInBytes = sizeInBytes;
+    _segments = segments;
   }
 
-  public TableSizeInfo(String tableName, long sizeInBytes) {
-    this.tableName = tableName;
-    this.diskSizeInBytes = sizeInBytes;
+  public String getTableName() {
+    return _tableName;
+  }
+
+  public long getDiskSizeInBytes() {
+    return _diskSizeInBytes;
+  }
+
+  public List<SegmentSizeInfo> getSegments() {
+    return _segments;
   }
 }

@@ -39,7 +39,8 @@ public interface StreamMessageDecoder<T> {
    * Initializes the decoder.
    *
    * @param props Decoder properties extracted from the {@link StreamConfig}
-   * @param fieldsToRead The fields to read from the source stream. If blank, reads all fields (only for AVRO/JSON currently)
+   * @param fieldsToRead The fields to read from the source stream. If blank, reads all fields (only for AVRO/JSON
+   *                     currently)
    * @param topicName Topic name of the stream
    * @throws Exception If an error occurs
    */

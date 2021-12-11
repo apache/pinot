@@ -31,7 +31,7 @@ import static org.testng.Assert.fail;
 
 
 public class LocalPinotFSTest {
-  private File testFile;
+  private File _testFile;
   private File _absoluteTmpDirPath;
   private File _newTmpDir;
   private File _nonExistentTmpFolder;
@@ -43,8 +43,8 @@ public class LocalPinotFSTest {
     FileUtils.deleteQuietly(_absoluteTmpDirPath);
     Assert.assertTrue(_absoluteTmpDirPath.mkdir(), "Could not make directory " + _absoluteTmpDirPath.getPath());
     try {
-      testFile = new File(_absoluteTmpDirPath, "testFile");
-      Assert.assertTrue(testFile.createNewFile(), "Could not create file " + testFile.getPath());
+      _testFile = new File(_absoluteTmpDirPath, "testFile");
+      Assert.assertTrue(_testFile.createNewFile(), "Could not create file " + _testFile.getPath());
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -71,7 +71,7 @@ public class LocalPinotFSTest {
   public void testFS()
       throws Exception {
     LocalPinotFS localPinotFS = new LocalPinotFS();
-    URI testFileUri = testFile.toURI();
+    URI testFileUri = _testFile.toURI();
     // Check whether a directory exists
     Assert.assertTrue(localPinotFS.exists(_absoluteTmpDirPath.toURI()));
     Assert.assertTrue(localPinotFS.lastModified(_absoluteTmpDirPath.toURI()) > 0L);

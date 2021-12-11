@@ -201,7 +201,8 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     // Query containing predicate on multiple metrics and dimensions
     starQuery =
-        "SELECT SUM(DepDelayMinutes) FROM myStarTable WHERE DepDelay > 0 AND ArrDelay > 0 AND OriginStateName = 'Massachusetts'";
+        "SELECT SUM(DepDelayMinutes) FROM myStarTable WHERE DepDelay > 0 AND ArrDelay > 0 AND OriginStateName = "
+            + "'Massachusetts'";
     testStarQuery(starQuery);
   }
 

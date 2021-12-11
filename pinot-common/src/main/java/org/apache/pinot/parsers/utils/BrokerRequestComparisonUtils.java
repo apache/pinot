@@ -31,6 +31,8 @@ import org.slf4j.LoggerFactory;
 
 
 public class BrokerRequestComparisonUtils {
+  private BrokerRequestComparisonUtils() {
+  }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRequestComparisonUtils.class);
 
@@ -188,7 +190,7 @@ public class BrokerRequestComparisonUtils {
       }
     }
     return true;
-}
+  }
 
   private static boolean validateGroupBy(GroupBy groupBy1, GroupBy groupBy2) {
     if (groupBy1.getTopN() != groupBy2.getTopN()) {

@@ -18,7 +18,25 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import org.apache.pinot.common.request.context.predicate.Predicate;
+
+
 public abstract class BasePredicateEvaluator implements PredicateEvaluator {
+  protected final Predicate _predicate;
+
+  protected BasePredicateEvaluator(Predicate predicate) {
+    _predicate = predicate;
+  }
+
+  @Override
+  public Predicate getPredicate() {
+    return _predicate;
+  }
+
+  @Override
+  public Predicate.Type getPredicateType() {
+    return getPredicate().getType();
+  }
 
   @Override
   public final boolean isExclusive() {

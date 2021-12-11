@@ -18,10 +18,6 @@
  */
 package org.apache.pinot.integration.tests;
 
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
-
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,14 +25,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
-import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
@@ -46,12 +40,17 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -109,15 +108,23 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
 
     Map<String, Object> properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
-    properties.put(ControllerPeriodicTasksConf.STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS, PERIODIC_TASK_INITIAL_DELAY_SECONDS);
-    properties.put(ControllerPeriodicTasksConf.STATUS_CHECKER_FREQUENCY_IN_SECONDS, PERIODIC_TASK_FREQUENCY_SECONDS);
-    properties.put(ControllerPeriodicTasksConf.DEPRECATED_REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS, PERIODIC_TASK_INITIAL_DELAY_SECONDS);
-    properties.put(ControllerPeriodicTasksConf.DEPRECATED_REALTIME_SEGMENT_RELOCATOR_FREQUENCY, PERIODIC_TASK_FREQUENCY);
-    properties.put(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_INITIAL_DELAY_IN_SECONDS, PERIODIC_TASK_INITIAL_DELAY_SECONDS);
-    properties.put(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS, PERIODIC_TASK_FREQUENCY_SECONDS);
-    properties.put(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_IN_SECONDS, PERIODIC_TASK_INITIAL_DELAY_SECONDS);
-    properties.put(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS, PERIODIC_TASK_FREQUENCY_SECONDS);
-    
+    properties
+        .put(ControllerPeriodicTasksConf.STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS, PERIODIC_TASK_INITIAL_DELAY_SECONDS);
+    properties.put(ControllerPeriodicTasksConf.DEPRECATED_STATUS_CHECKER_FREQUENCY_IN_SECONDS,
+        PERIODIC_TASK_FREQUENCY_SECONDS);
+    properties.put(ControllerPeriodicTasksConf.DEPRECATED_REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS,
+        PERIODIC_TASK_INITIAL_DELAY_SECONDS);
+    properties
+        .put(ControllerPeriodicTasksConf.DEPRECATED_REALTIME_SEGMENT_RELOCATOR_FREQUENCY, PERIODIC_TASK_FREQUENCY);
+    properties.put(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_INITIAL_DELAY_IN_SECONDS,
+        PERIODIC_TASK_INITIAL_DELAY_SECONDS);
+    properties.put(ControllerPeriodicTasksConf.DEPRECATED_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS,
+        PERIODIC_TASK_FREQUENCY_SECONDS);
+    properties.put(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_IN_SECONDS,
+        PERIODIC_TASK_INITIAL_DELAY_SECONDS);
+    properties.put(ControllerPeriodicTasksConf.DEPRECATED_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS,
+        PERIODIC_TASK_FREQUENCY_SECONDS);
+
     startController(properties);
     startBrokers(NUM_BROKERS);
     startServers(NUM_OFFLINE_SERVERS + NUM_REALTIME_SERVERS);

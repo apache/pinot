@@ -42,6 +42,15 @@ public class IngestionJobLauncherTest {
   }
 
   @Test
+  public void testIngestionJobLauncherWithUnicodeCharForMultivalueFieldDelimiter()
+      throws IOException, ClassNotFoundException {
+    SegmentGenerationJobSpec spec = IngestionJobLauncher.getSegmentGenerationJobSpec(
+        GroovyTemplateUtils.class.getClassLoader().getResource("ingestion_job_spec_unicode.yaml").getFile(), null,
+        null);
+    Assert.assertEquals("\ufff0", spec.getRecordReaderSpec().getConfigs().get("multiValueDelimiter"));
+  }
+
+  @Test
   public void testIngestionJobLauncherWithTemplateAndPropertyFile()
       throws IOException, ClassNotFoundException {
     SegmentGenerationJobSpec spec = IngestionJobLauncher.getSegmentGenerationJobSpec(

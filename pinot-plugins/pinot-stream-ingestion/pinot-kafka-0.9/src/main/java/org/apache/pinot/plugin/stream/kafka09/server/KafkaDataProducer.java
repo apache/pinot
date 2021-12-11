@@ -26,12 +26,12 @@ import org.apache.pinot.spi.stream.StreamDataProducer;
 
 
 public class KafkaDataProducer implements StreamDataProducer {
-  Producer<byte[], byte[]> producer;
+  private Producer<byte[], byte[]> _producer;
 
   @Override
   public void init(Properties props) {
     ProducerConfig producerConfig = new ProducerConfig(props);
-    this.producer = new Producer(producerConfig);
+    _producer = new Producer(producerConfig);
   }
 
   @Override
@@ -47,11 +47,11 @@ public class KafkaDataProducer implements StreamDataProducer {
   }
 
   public void produce(KeyedMessage message) {
-    producer.send(message);
+    _producer.send(message);
   }
 
   @Override
   public void close() {
-    producer.close();
+    _producer.close();
   }
 }

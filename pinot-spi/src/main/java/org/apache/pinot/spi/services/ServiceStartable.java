@@ -27,6 +27,9 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  *
  */
 public interface ServiceStartable {
+  void init(PinotConfiguration conf)
+      throws Exception;
+
   ServiceRole getServiceRole();
 
   String getInstanceId();

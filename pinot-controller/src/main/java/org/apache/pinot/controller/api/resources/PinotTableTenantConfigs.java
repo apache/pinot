@@ -33,6 +33,7 @@ import javax.ws.rs.core.Response;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.slf4j.Logger;
@@ -40,7 +41,10 @@ import org.slf4j.LoggerFactory;
 
 
 @Path("/")
-@Api(tags = {Constants.TABLE_TAG, Constants.TENANT_TAG})
+@Api(tags = {
+    Constants.TABLE_TAG,
+    Constants.TENANT_TAG
+})
 public class PinotTableTenantConfigs {
 
   @Inject
@@ -53,7 +57,11 @@ public class PinotTableTenantConfigs {
   @Authenticate(AccessType.UPDATE)
   @Path("/tables/{tableName}/rebuildBrokerResourceFromHelixTags")
   @ApiOperation(value = "Rebuild broker resource for table", notes = "when new brokers are added")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 400, message = "Bad request: table name has to be with table type"), @ApiResponse(code = 500, message = "Internal error rebuilding broker resource or serializing response")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 400, message = "Bad request: table name has to be with table type"),
+      @ApiResponse(code = 500, message = "Internal error rebuilding broker resource or serializing response")
+  })
   public SuccessResponse rebuildBrokerResource(
       @ApiParam(value = "Table name (with type)", required = true) @PathParam("tableName") String tableNameWithType) {
     try {

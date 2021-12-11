@@ -65,6 +65,7 @@ const InstaceTable = ({ name, instances, clusterName }: Props) => {
       inAccordionFormat={true}
       addLinks
       baseURL="/instance/"
+      isPagination
     />
   );
 };

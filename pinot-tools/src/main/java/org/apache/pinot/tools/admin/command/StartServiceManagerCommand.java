@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import static org.apache.pinot.common.utils.CommonConstants.Helix.PINOT_SERVICE_ROLE;
-
 import java.io.File;
 import java.net.SocketException;
 import java.net.UnknownHostException;
@@ -32,17 +30,17 @@ import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.services.ServiceRole;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.service.PinotServiceManager;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
-import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
+
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.PINOT_SERVICE_ROLE;
 
 
 /**
@@ -54,24 +52,35 @@ import org.slf4j.LoggerFactory;
  * <li>All remaining bootstrap services in parallel</li>
  * </ol>
  */
+@CommandLine.Command(name = "StartServiceManager")
 public class StartServiceManagerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartServiceManagerCommand.class);
-  private static final long startTick = System.nanoTime();
+  private static final long START_TICK = System.nanoTime();
   private static final String[] BOOTSTRAP_SERVICES = new String[]{"CONTROLLER", "BROKER", "SERVER"};
   // multiple instances allowed per role for testing many minions
   private final List<Entry<ServiceRole, Map<String, Object>>> _bootstrapConfigurations = new ArrayList<>();
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help;
-  @Option(name = "-zkAddress", required = true, metaVar = "<http>", usage = "Http address of Zookeeper.")
+  @CommandLine.Option(names = {"-zkAddress"}, required = false, description = "Http address of Zookeeper.")
+  // TODO: support forbids = {"-bootstrapConfigPaths", "-bootstrapServices"})
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
-  @Option(name = "-clusterName", required = true, metaVar = "<String>", usage = "Pinot cluster name.")
+  @CommandLine.Option(names = {"-clusterName"}, required = false, description = "Pinot cluster name.")
+      // TODO: support forbids = {"-bootstrapConfigPaths", "-bootstrapServices"})
   private String _clusterName = DEFAULT_CLUSTER_NAME;
-  @Option(name = "-port", required = true, metaVar = "<int>", usage = "Pinot service manager admin port, -1 means disable, 0 means a random available port.")
-  private int _port;
-  @Option(name = "-bootstrapConfigPaths", handler = StringArrayOptionHandler.class, required = false, usage = "A list of Pinot service config file paths. Each config file requires an extra config: 'pinot.service.role' to indicate which service to start.", forbids = {"-bootstrapServices"})
+  @CommandLine.Option(names = {"-port"}, required = false,
+      description = "Pinot service manager admin port, -1 means disable, 0 means a random available port.")
+      // TODO: support forbids = {"-bootstrapConfigPaths", "-bootstrapServices"})
+  private int _port = -1;
+  @CommandLine.Option(names = {"-bootstrapConfigPaths"}, required = false, arity = "1..*",
+      description = "A list of Pinot service config file paths. Each config file requires an extra config:"
+          + " 'pinot.service.role' to indicate which service to start.")
+      // TODO: support forbids = {"-zkAddress", "-clusterName", "-port", "-bootstrapServices"})
   private String[] _bootstrapConfigPaths;
-  @Option(name = "-bootstrapServices", handler = StringArrayOptionHandler.class, required = false, usage = "A list of Pinot service roles to start with default config. E.g. CONTROLLER/BROKER/SERVER", forbids = {"-bootstrapConfigPaths"})
+  @CommandLine.Option(names = {"-bootstrapServices"}, required = false, arity = "1..*",
+      description = "A list of Pinot service roles to start with default config. E.g. CONTROLLER/BROKER/SERVER")
+      // TODO: support forbids = {"-zkAddress", "-clusterName", "-port", "-bootstrapConfigPaths"})
   private String[] _bootstrapServices = BOOTSTRAP_SERVICES;
 
   private PinotServiceManager _pinotServiceManager;
@@ -150,6 +159,9 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
 
   @Override
   public void cleanup() {
+    if (_pinotServiceManager != null) {
+      _pinotServiceManager.stopAll();
+    }
   }
 
   @Override
@@ -183,7 +195,6 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
       if (!startBootstrapServices()) {
         return false;
       }
-
       String pidFile = ".pinotAdminService-" + System.currentTimeMillis() + ".pid";
       savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
       return true;
@@ -207,10 +218,12 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
         return PinotConfigUtils.generateControllerConf(_zkAddress, _clusterName, null, DEFAULT_CONTROLLER_PORT, null,
             ControllerConf.ControllerMode.DUAL, true);
       case BROKER:
-        return PinotConfigUtils.generateBrokerConf(CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT);
+        return PinotConfigUtils
+            .generateBrokerConf(_clusterName, _zkAddress, null, CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT);
       case SERVER:
-        return PinotConfigUtils.generateServerConf(null, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT,
-            CommonConstants.Server.DEFAULT_ADMIN_API_PORT, null, null);
+        return PinotConfigUtils
+            .generateServerConf(_clusterName, _zkAddress, null, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT,
+                CommonConstants.Server.DEFAULT_ADMIN_API_PORT, null, null);
       default:
         throw new RuntimeException("No default config found for service role: " + serviceRole);
     }
@@ -220,7 +233,9 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
    * Starts a controller synchronously unless the cluster already exists. Other services start in parallel.
    */
   private boolean startBootstrapServices() {
-    if (_bootstrapConfigurations.isEmpty()) return true;
+    if (_bootstrapConfigurations.isEmpty()) {
+      return true;
+    }
 
     List<Entry<ServiceRole, Map<String, Object>>> parallelConfigs = new ArrayList<>();
 
@@ -242,11 +257,11 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
     return startBootstrapServicesInParallel(_pinotServiceManager, parallelConfigs);
   }
 
-  static boolean startBootstrapServicesInParallel(
-      PinotServiceManager pinotServiceManager,
-      List<Entry<ServiceRole, Map<String, Object>>> parallelConfigs
-  ) {
-    if (parallelConfigs.isEmpty()) return true;
+  static boolean startBootstrapServicesInParallel(PinotServiceManager pinotServiceManager,
+      List<Entry<ServiceRole, Map<String, Object>>> parallelConfigs) {
+    if (parallelConfigs.isEmpty()) {
+      return true;
+    }
 
     // True is when everything succeeded
     AtomicBoolean failed = new AtomicBoolean(false);
@@ -256,7 +271,8 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
       ServiceRole role = roleToConfig.getKey();
       Map<String, Object> config = roleToConfig.getValue();
       Thread thread = new Thread("Start a Pinot [" + role + "]") {
-        @Override public void run() {
+        @Override
+        public void run() {
           if (!startPinotService(role, () -> pinotServiceManager.startRole(role, config))) {
             failed.set(true);
           }
@@ -294,11 +310,13 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
 
   /** Creates millis precision unit of seconds. ex 1.002 */
   private static float startOffsetSeconds() {
-    return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTick) / 1000f;
+    return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - START_TICK) / 1000f;
   }
 
   public StartServiceManagerCommand addBootstrapService(ServiceRole role, Map<String, Object> config) {
-    if (role == null) throw new NullPointerException("role == null");
+    if (role == null) {
+      throw new NullPointerException("role == null");
+    }
     config.put(PINOT_SERVICE_ROLE, role.toString()); // Ensure config has role key
     _bootstrapConfigurations.add(new SimpleImmutableEntry<>(role, config));
     return this;

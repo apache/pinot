@@ -21,6 +21,7 @@ package org.apache.pinot.spi.env;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -29,7 +30,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -58,6 +58,21 @@ public abstract class CommonsConfigurationUtils {
 
       return propertiesConfiguration;
     } catch (ConfigurationException | FileNotFoundException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from an inputstream.
+   * @param inputStream containing properties
+   * @return a {@link PropertiesConfiguration} instance.
+   */
+  public static PropertiesConfiguration fromInputStream(InputStream inputStream) {
+    try {
+      PropertiesConfiguration propertiesConfiguration = new PropertiesConfiguration();
+      propertiesConfiguration.load(inputStream);
+      return propertiesConfiguration;
+    } catch (ConfigurationException e) {
       throw new RuntimeException(e);
     }
   }
@@ -92,8 +107,8 @@ public abstract class CommonsConfigurationUtils {
   }
 
   private static Object mapValue(String key, Configuration configuration) {
-    return Optional.of(configuration.getStringArray(key)).filter(values -> values.length > 1)
-        .<Object> map(values -> Arrays.stream(values).collect(Collectors.joining(",")))
+    return Optional.of(configuration.getStringArray(key)).filter(values -> values.length > 1).<Object>map(
+        values -> Arrays.stream(values).collect(Collectors.joining(",")))
         .orElseGet(() -> configuration.getProperty(key));
   }
 }

@@ -18,33 +18,25 @@
  */
 package org.apache.pinot.server.realtime;
 
-import static org.apache.pinot.common.utils.CommonConstants.Server.SegmentCompletionProtocol.CONFIG_OF_CONTROLLER_HTTPS_ENABLED;
-import static org.apache.pinot.common.utils.CommonConstants.Server.SegmentCompletionProtocol.CONFIG_OF_CONTROLLER_HTTPS_PORT;
-import static org.apache.pinot.common.utils.CommonConstants.Server.SegmentCompletionProtocol.CONFIG_OF_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS;
-import static org.apache.pinot.common.utils.CommonConstants.Server.SegmentCompletionProtocol.DEFAULT_OTHER_REQUESTS_TIMEOUT;
-import static org.apache.pinot.common.utils.CommonConstants.Server.SegmentCompletionProtocol.DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS;
-
 import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Map;
-
 import javax.net.ssl.SSLContext;
-
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.core.data.manager.realtime.Server2ControllerSegmentUploader;
 import org.apache.pinot.core.util.SegmentCompletionProtocolUtils;
 import org.apache.pinot.pql.parsers.utils.Pair;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.utils.CommonConstants.Server.SegmentCompletionProtocol.*;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.SegmentCompletionProtocol.*;
 
 
 /**
@@ -53,7 +45,7 @@ import static org.apache.pinot.common.utils.CommonConstants.Server.SegmentComple
  */
 // TODO: Use exception based code to handle different types of exceptions.
 public class ServerSegmentCompletionProtocolHandler {
-  private static Logger LOGGER = LoggerFactory.getLogger(ServerSegmentCompletionProtocolHandler.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ServerSegmentCompletionProtocolHandler.class);
   private static final String HTTPS_PROTOCOL = CommonConstants.HTTPS_PROTOCOL;
   private static final String HTTP_PROTOCOL = CommonConstants.HTTP_PROTOCOL;
 
@@ -61,6 +53,7 @@ public class ServerSegmentCompletionProtocolHandler {
   private static Integer _controllerHttpsPort;
   private static int _segmentUploadRequestTimeoutMs;
   private static String _authToken;
+  private static String _protocol = HTTP_PROTOCOL;
 
   private final FileUploadDownloadClient _fileUploadDownloadClient;
   private final ServerMetrics _serverMetrics;
@@ -68,10 +61,15 @@ public class ServerSegmentCompletionProtocolHandler {
 
   public static void init(PinotConfiguration uploaderConfig) {
     PinotConfiguration httpsConfig = uploaderConfig.subset(HTTPS_PROTOCOL);
+
+    // NOTE: legacy https config for segment upload is deprecated. If you're relying on these settings, please consider
+    // moving to server-wide TLS configs instead. Legacy support will be removed eventually.
     if (httpsConfig.getProperty(CONFIG_OF_CONTROLLER_HTTPS_ENABLED, false)) {
       _sslContext = new ClientSSLContextGenerator(httpsConfig.subset(CommonConstants.PREFIX_OF_SSL_SUBSET)).generate();
       _controllerHttpsPort = httpsConfig.getProperty(CONFIG_OF_CONTROLLER_HTTPS_PORT, Integer.class);
     }
+
+    _protocol = uploaderConfig.getProperty(CONFIG_OF_PROTOCOL, HTTP_PROTOCOL);
     _segmentUploadRequestTimeoutMs = uploaderConfig
         .getProperty(CONFIG_OF_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS, DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS);
     _authToken = uploaderConfig.getProperty(CONFIG_OF_SEGMENT_UPLOADER_AUTH_TOKEN);
@@ -200,7 +198,7 @@ public class ServerSegmentCompletionProtocolHandler {
       LOGGER.warn("No leader found while trying to send {}", request.toString());
       return null;
     }
-    String protocol = HTTP_PROTOCOL;
+    String protocol = _protocol;
     if (_controllerHttpsPort != null) {
       leaderHostPort.setSecond(_controllerHttpsPort);
       protocol = HTTPS_PROTOCOL;
@@ -224,7 +222,8 @@ public class ServerSegmentCompletionProtocolHandler {
       // Catch all exceptions, we want the protocol to handle the case assuming the request was never sent.
       response = SegmentCompletionProtocol.RESP_NOT_SENT;
       LOGGER.error("Could not send request {}", url, e);
-      // Invalidate controller leader cache, as exception could be because of leader being down (deployment/failure) and hence unable to send {@link SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER}
+      // Invalidate controller leader cache, as exception could be because of leader being down (deployment/failure)
+      // and hence unable to send {@link SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER}
       // If cache is not invalidated, we will not recover from exceptions until the controller comes back up
       ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();
     }
@@ -248,7 +247,8 @@ public class ServerSegmentCompletionProtocolHandler {
       // Catch all exceptions, we want the protocol to handle the case assuming the request was never sent.
       response = SegmentCompletionProtocol.RESP_NOT_SENT;
       LOGGER.error("Could not send request {}", url, e);
-      // Invalidate controller leader cache, as exception could be because of leader being down (deployment/failure) and hence unable to send {@link SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER}
+      // Invalidate controller leader cache, as exception could be because of leader being down (deployment/failure)
+      // and hence unable to send {@link SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER}
       // If cache is not invalidated, we will not recover from exceptions until the controller comes back up
       ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();
     }

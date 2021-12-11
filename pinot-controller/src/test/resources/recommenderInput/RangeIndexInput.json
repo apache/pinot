@@ -1,0 +1,140 @@
+{
+  "schema":{
+    "schemaName": "tableSchema",
+    "dimensionFieldSpecs": [
+      {
+        "name": "a",
+        "dataType": "INT",
+        "cardinality":1000001,
+        "numValuesPerEntry":1
+      },
+      {
+        "name": "b",
+        "dataType": "DOUBLE",
+        "cardinality":6,
+        "singleValueField": false,
+        "numValuesPerEntry":1.5
+      },
+      {
+        "name": "c",
+        "dataType": "FLOAT",
+        "cardinality":7,
+        "numValuesPerEntry":1
+      },
+      {
+        "name": "d",
+        "dataType": "STRING",
+        "cardinality":41,
+        "singleValueField": false,
+        "numValuesPerEntry":2,
+        "averageLength" : 27
+      },
+      {
+        "name": "e",
+        "dataType": "LONG",
+        "cardinality":18,
+        "singleValueField": false,
+        "numValuesPerEntry":4
+      },
+      {
+        "name": "f",
+        "dataType": "DOUBLE",
+        "cardinality":13,
+        "singleValueField": false,
+        "numValuesPerEntry":3
+      },
+      {
+        "name": "g",
+        "dataType": "STRING",
+        "cardinality":6,
+        "singleValueField": false,
+        "numValuesPerEntry":2,
+        "averageLength" : 100
+      },
+      {
+        "name": "h",
+        "dataType": "BYTES",
+        "cardinality":12,
+        "numValuesPerEntry":1,
+        "averageLength" : 10
+      },
+      {
+        "name": "i",
+        "dataType": "STRING",
+        "cardinality":7,
+        "numValuesPerEntry":1,
+        "averageLength" : 25
+      },
+      {
+        "name": "j",
+        "dataType": "DOUBLE",
+        "cardinality":4,
+        "numValuesPerEntry":1
+      }
+    ],
+    "metricFieldSpecs": [
+      {
+        "name": "k",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":1,
+        "averageLength" : 100
+      },
+      {
+        "name": "l",
+        "dataType": "STRING",
+        "cardinality":10000,
+        "numValuesPerEntry":1,
+        "averageLength" : 10
+      },
+      {
+        "name": "m",
+        "dataType": "BYTES",
+        "cardinality":10000,
+        "numValuesPerEntry":1,
+        "averageLength" : 25
+      },
+      {
+        "name": "n",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":1
+      },
+      {
+        "name": "o",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":1,
+        "averageLength" : 25
+      },
+      {
+        "name": "p",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":1
+      }
+    ],
+    "timeFieldSpec": {
+      "incomingGranularitySpec": {
+        "dataType": "INT",
+        "name": "t",
+        "timeType": "DAYS",
+        "cardinality":10000,
+        "numValuesPerEntry":1
+      }
+    }
+  },
+  "queriesWithWeights":{
+    "SELECT f from tableName WHERE i > 'aaa' AND j >= 300 OR (j BETWEEN 30 AND 1000)": 3,
+    "SELECT f from tableName WHERE ((i BETWEEN 'A' and 'B') OR j = 30) AND k IN (10, 20, 30, 40) OR i >= 'A' OR t <= 500": 1,
+    "SELECT f from tableName WHERE (((p BETWEEN 1 and 1000) OR (o > 100)) OR (t < 10)) AND (o=100 AND (m>40 OR n>300))": 2,
+    "SELECT f from tableName where i >= 'C' AND TEXT_MATCH(l, 'xxx') OR (t>=500 AND j>10)": 2,
+    "SELECT f from tableName WHERE i <= 'D' OR j < 1000 AND (t IN (100, 200, 300, 400, 500) OR j >=20 OR m=40)": 1,
+    "SELECT AVG(i), AVG(j) from tableName where j > 10 OR (k < 10 AND t>=100) AND t<=500 GROUP BY p": 2
+  },
+  "qps": 250,
+  "numMessagesPerSecInKafkaTopic":1000,
+  "numRecordsPerPush":1000000000,
+  "tableType": "HYBRID",
+  "latencySLA": 500
+}

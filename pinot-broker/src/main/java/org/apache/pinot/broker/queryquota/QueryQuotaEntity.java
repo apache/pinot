@@ -40,6 +40,10 @@ public class QueryQuotaEntity {
     _tableConfigStatVersion = tableConfigStatVersion;
   }
 
+  public void setRateLimiter(RateLimiter rateLimiter) {
+    _rateLimiter = rateLimiter;
+  }
+
   public RateLimiter getRateLimiter() {
     return _rateLimiter;
   }

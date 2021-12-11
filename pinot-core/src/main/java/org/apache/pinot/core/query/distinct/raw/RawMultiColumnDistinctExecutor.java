@@ -20,15 +20,16 @@ package org.apache.pinot.core.query.distinct.raw;
 
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctTable;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -45,10 +46,10 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
 
     int numExpressions = expressions.size();
     String[] columnNames = new String[numExpressions];
-    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
+    ColumnDataType[] columnDataTypes = new ColumnDataType[numExpressions];
     for (int i = 0; i < numExpressions; i++) {
       columnNames[i] = expressions.get(i).toString();
-      columnDataTypes[i] = DataSchema.ColumnDataType.fromDataTypeSV(dataTypes.get(i));
+      columnDataTypes[i] = ColumnDataType.fromDataTypeSV(dataTypes.get(i));
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
     _distinctTable = new DistinctTable(dataSchema, orderByExpressions, limit);

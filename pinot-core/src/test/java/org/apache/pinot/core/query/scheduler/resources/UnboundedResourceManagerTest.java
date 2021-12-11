@@ -18,18 +18,17 @@
  */
 package org.apache.pinot.core.query.scheduler.resources;
 
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.testng.annotations.Test;
+
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
-
-import java.util.HashMap;
-import java.util.Map;
-
-import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.testng.annotations.Test;
 
 
 public class UnboundedResourceManagerTest {

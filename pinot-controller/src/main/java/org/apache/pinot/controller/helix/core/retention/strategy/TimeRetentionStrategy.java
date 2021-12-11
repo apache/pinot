@@ -43,8 +43,8 @@ public class TimeRetentionStrategy implements RetentionStrategy {
 
     // Check that the end time is between 1971 and 2071
     if (!TimeUtils.timeValueInValidRange(endTimeMs)) {
-      LOGGER.warn("{} segment: {} of table: {} has invalid end time in millis: {}", segmentZKMetadata.getSegmentType(),
-          segmentZKMetadata.getSegmentName(), tableNameWithType, endTimeMs);
+      LOGGER.warn("Segment: {} of table: {} has invalid end time in millis: {}", segmentZKMetadata.getSegmentName(),
+          tableNameWithType, endTimeMs);
       return false;
     }
 

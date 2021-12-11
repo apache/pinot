@@ -24,8 +24,8 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.ProjectionOperator;
-import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.plan.PlanNode;
+import org.apache.pinot.core.startree.CompositePredicateEvaluator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
@@ -35,7 +35,7 @@ public class StarTreeProjectionPlanNode implements PlanNode {
   private final StarTreeDocIdSetPlanNode _starTreeDocIdSetPlanNode;
 
   public StarTreeProjectionPlanNode(StarTreeV2 starTreeV2, Set<String> projectionColumns,
-      Map<String, List<PredicateEvaluator>> predicateEvaluatorsMap, @Nullable Set<String> groupByColumns,
+      Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap, @Nullable Set<String> groupByColumns,
       @Nullable Map<String, String> debugOptions) {
     _dataSourceMap = new HashMap<>();
     for (String projectionColumn : projectionColumns) {

@@ -52,7 +52,7 @@ public class GitHubEventsQuickstart {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
     try {
       _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME,
-          KafkaStarterUtils.getDefaultKafkaConfiguration());
+          KafkaStarterUtils.getDefaultKafkaConfiguration(_zookeeperInstance));
     } catch (Exception e) {
       throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
     }
@@ -62,7 +62,8 @@ public class GitHubEventsQuickstart {
 
   public void execute(String personalAccessToken)
       throws Exception {
-    final File quickStartDataDir = new File(new File("githubEvents-" + System.currentTimeMillis()), "pullRequestMergedEvents");
+    final File quickStartDataDir =
+        new File(new File("githubEvents-" + System.currentTimeMillis()), "pullRequestMergedEvents");
 
     if (!quickStartDataDir.exists()) {
       Preconditions.checkState(quickStartDataDir.mkdirs());

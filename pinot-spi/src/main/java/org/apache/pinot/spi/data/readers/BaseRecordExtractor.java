@@ -96,7 +96,7 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
    * {@code null}.
    *
    * This implementation converts the Collection to an Object array. Any elements of the Collection that are
-   * {@code null} or an empty string will be excluded from the returned multi-value object.
+   * {@code null} will be excluded from the returned multi-value object.
    *
    * Override this method if the data format requires a different conversion for its multi-value objects.
    *
@@ -118,7 +118,7 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
       if (element != null) {
         convertedValue = convert(element);
       }
-      if (convertedValue != null && !convertedValue.toString().equals("")) {
+      if (convertedValue != null) {
         array[index++] = convertedValue;
       }
     }

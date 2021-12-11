@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.SortedDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -34,6 +35,7 @@ import org.apache.pinot.spi.utils.Pairs.IntPair;
 
 public class SortedIndexBasedFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "SortedIndexBasedFilterOperator";
+  private static final String EXPLAIN_NAME = "FILTER_SORTED_INDEX";
 
   private final PredicateEvaluator _predicateEvaluator;
   private final SortedIndexReader<?> _sortedIndexReader;
@@ -133,5 +135,18 @@ public class SortedIndexBasedFilterOperator extends BaseFilterOperator {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Collections.emptyList();
+  }
+
+  @Override
+  public String toExplainString() {
+    StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(indexLookUp:sorted_index");
+    stringBuilder.append(",operator:").append(_predicateEvaluator.getPredicateType());
+    stringBuilder.append(",predicate:").append(_predicateEvaluator.getPredicate().toString());
+    return stringBuilder.append(')').toString();
   }
 }

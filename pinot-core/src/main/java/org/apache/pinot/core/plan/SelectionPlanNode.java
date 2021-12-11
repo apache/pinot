@@ -20,18 +20,18 @@ package org.apache.pinot.core.plan;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.common.utils.CommonConstants.Segment.BuiltInVirtualColumn;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.EmptySelectionOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 
 
 /**
@@ -40,26 +40,31 @@ import org.apache.pinot.segment.spi.IndexSegment;
 public class SelectionPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;
-  private final List<ExpressionContext> _expressions;
-  private final TransformPlanNode _transformPlanNode;
 
   public SelectionPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
     _indexSegment = indexSegment;
     _queryContext = queryContext;
-    _expressions = SelectionOperatorUtils.extractExpressions(queryContext, indexSegment);
-    int limit = queryContext.getLimit();
+  }
+
+  @Override
+  public Operator<IntermediateResultsBlock> run() {
+    List<ExpressionContext> expressions = SelectionOperatorUtils.extractExpressions(_queryContext, _indexSegment);
+    int limit = _queryContext.getLimit();
+
     if (limit > 0) {
       List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
       if (orderByExpressions == null) {
         // Selection only
-        _transformPlanNode = new TransformPlanNode(_indexSegment, queryContext, _expressions,
-            Math.min(limit, DocIdSetPlanNode.MAX_DOC_PER_CALL));
+        TransformOperator transformOperator = new TransformPlanNode(_indexSegment, _queryContext, expressions,
+            Math.min(limit, DocIdSetPlanNode.MAX_DOC_PER_CALL)).run();
+        return new SelectionOnlyOperator(_indexSegment, _queryContext, expressions, transformOperator);
       } else {
         // Selection order-by
-        if (orderByExpressions.size() == _expressions.size()) {
+        if (orderByExpressions.size() == expressions.size()) {
           // All output expressions are ordered
-          _transformPlanNode =
-              new TransformPlanNode(_indexSegment, queryContext, _expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL);
+          TransformOperator transformOperator =
+              new TransformPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
+          return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, transformOperator);
         } else {
           // Not all output expressions are ordered, only fetch the order-by expressions and docId to avoid the
           // unnecessary data fetch
@@ -68,27 +73,16 @@ public class SelectionPlanNode implements PlanNode {
             expressionsToTransform.add(orderByExpression.getExpression());
           }
           expressionsToTransform.add(ExpressionContext.forIdentifier(BuiltInVirtualColumn.DOCID));
-          _transformPlanNode = new TransformPlanNode(_indexSegment, queryContext, expressionsToTransform,
-              DocIdSetPlanNode.MAX_DOC_PER_CALL);
+          TransformOperator transformOperator =
+              new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform,
+                  DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
+          return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, transformOperator);
         }
       }
     } else {
       // Empty selection (LIMIT 0)
-      _transformPlanNode = new TransformPlanNode(_indexSegment, queryContext, _expressions, 0);
-    }
-  }
-
-  @Override
-  public Operator<IntermediateResultsBlock> run() {
-    TransformOperator transformOperator = _transformPlanNode.run();
-    if (_queryContext.getLimit() > 0) {
-      if (_queryContext.getOrderByExpressions() == null) {
-        return new SelectionOnlyOperator(_indexSegment, _queryContext, _expressions, transformOperator);
-      } else {
-        return new SelectionOrderByOperator(_indexSegment, _queryContext, _expressions, transformOperator);
-      }
-    } else {
-      return new EmptySelectionOperator(_indexSegment, _expressions, transformOperator);
+      TransformOperator transformOperator = new TransformPlanNode(_indexSegment, _queryContext, expressions, 0).run();
+      return new EmptySelectionOperator(_indexSegment, expressions, transformOperator);
     }
   }
 }

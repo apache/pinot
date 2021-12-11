@@ -19,8 +19,8 @@
 package org.apache.pinot.core.startree.v2;
 
 import java.util.Random;
-import org.apache.pinot.core.data.aggregator.DistinctCountBitmapValueAggregator;
-import org.apache.pinot.core.data.aggregator.ValueAggregator;
+import org.apache.pinot.segment.local.aggregator.DistinctCountBitmapValueAggregator;
+import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
 

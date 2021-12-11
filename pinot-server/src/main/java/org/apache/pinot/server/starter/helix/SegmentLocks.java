@@ -23,6 +23,9 @@ import java.util.concurrent.locks.ReentrantLock;
 
 
 public class SegmentLocks {
+  private SegmentLocks() {
+  }
+
   private static final int NUM_LOCKS = 10000;
   private static final Lock[] LOCKS = new Lock[NUM_LOCKS];
 

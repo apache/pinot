@@ -23,40 +23,53 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
-
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.services.ServiceRole;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
  * Class to implement StartController command.
  *
  */
+@CommandLine.Command(name = "StartController")
 public class StartControllerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartControllerCommand.class);
-  @Option(name = "-controllerMode", required = false, metaVar = "<String>", usage = "Pinot controller mode.")
+
+  @CommandLine.Option(names = {"-controllerMode"}, description = "Pinot controller mode.")
   private ControllerConf.ControllerMode _controllerMode = ControllerConf.ControllerMode.DUAL;
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, description = "Print this message.")
   private boolean _help = false;
-  @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
+
+  @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "host name for controller.")
   private String _controllerHost;
-  @Option(name = "-controllerPort", required = false, metaVar = "<int>", usage = "Port number to start the controller at.")
+
+  @CommandLine.Option(names = {"-controllerPort"}, required = false, 
+      description = "Port number to start the controller at.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
-  @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Path to directory containging data.")
-  private String _dataDir = TMP_DIR + "PinotController";
-  @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "Http address of Zookeeper.")
+
+  @CommandLine.Option(names = {"-dataDir"}, required = false, description = "Path to directory containging data.")
+  private String _dataDir = PinotConfigUtils.TMP_DIR + "data/PinotController";
+
+  @CommandLine.Option(names = {"-zkAddress"}, required = false, description = "Http address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
-  @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
+
+  @CommandLine.Option(names = {"-clusterName"}, required = false, description = "Pinot cluster name.")
   private String _clusterName = DEFAULT_CLUSTER_NAME;
-  @Option(name = "-configFileName", required = false, metaVar = "<FilePathName>", usage = "Controller Starter config file", forbids = {"-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName", "-controllerMode"})
+
+  @CommandLine.Option(names = {"-configFileName", "-config", "-configFile", "-controllerConfig", "-controllerConf"},
+      required = false, description = "Controller Starter config file")
+      // TODO support:
+      // forbids = {"-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName", "-controllerMode"})
   private String _configFileName;
+
   // This can be set via the set method, or via config file input.
   private boolean _tenantIsolation = true;
 
@@ -65,6 +78,42 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
   @Override
   public boolean getHelp() {
     return _help;
+  }
+
+  public ControllerConf.ControllerMode getControllerMode() {
+    return _controllerMode;
+  }
+
+  public String getControllerHost() {
+    return _controllerHost;
+  }
+
+  public String getControllerPort() {
+    return _controllerPort;
+  }
+
+  public String getDataDir() {
+    return _dataDir;
+  }
+
+  public String getZkAddress() {
+    return _zkAddress;
+  }
+
+  public String getClusterName() {
+    return _clusterName;
+  }
+
+  public String getConfigFileName() {
+    return _configFileName;
+  }
+
+  public boolean isTenantIsolation() {
+    return _tenantIsolation;
+  }
+
+  public Map<String, Object> getConfigOverrides() {
+    return _configOverrides;
   }
 
   public StartControllerCommand setControllerPort(String controllerPort) {
@@ -132,9 +181,10 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
       throws Exception {
     try {
       LOGGER.info("Executing command: " + toString());
+      Map<String, Object> controllerConf = getControllerConf();
       StartServiceManagerCommand startServiceManagerCommand =
           new StartServiceManagerCommand().setZkAddress(_zkAddress).setClusterName(_clusterName).setPort(-1)
-              .setBootstrapServices(new String[0]).addBootstrapService(ServiceRole.CONTROLLER, getControllerConf());
+              .setBootstrapServices(new String[0]).addBootstrapService(ServiceRole.CONTROLLER, controllerConf);
       startServiceManagerCommand.execute();
       String pidFile = ".pinotAdminController-" + System.currentTimeMillis() + ".pid";
       savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
@@ -146,14 +196,19 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
     }
   }
 
-  private Map<String, Object> getControllerConf()
+  protected Map<String, Object> getControllerConf()
       throws ConfigurationException, SocketException, UnknownHostException {
     Map<String, Object> properties = new HashMap<>();
     if (_configFileName != null) {
       properties.putAll(PinotConfigUtils.generateControllerConf(_configFileName));
+      // Override the zkAddress and clusterName to ensure ServiceManager is connecting to the right Zookeeper and
+      // Cluster.
+      // Configs existence is already verified.
+      _zkAddress = properties.get(ControllerConf.ZK_STR).toString();
+      _clusterName = properties.get(ControllerConf.HELIX_CLUSTER_NAME).toString();
     } else {
       if (_controllerHost == null) {
-        _controllerHost = NetUtil.getHostAddress();
+        _controllerHost = NetUtils.getHostAddress();
       }
       properties.putAll(PinotConfigUtils
           .generateControllerConf(_zkAddress, _clusterName, _controllerHost, _controllerPort, _dataDir, _controllerMode,

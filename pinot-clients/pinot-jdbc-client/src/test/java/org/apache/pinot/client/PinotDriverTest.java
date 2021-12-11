@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.client;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -34,14 +32,16 @@ public class PinotDriverTest {
   static final String DB_URL = "jdbc:pinot://localhost:8000?controller=localhost:9000";
 
   @Test(enabled = false)
-  public void testDriver() throws Exception {
+  public void testDriver()
+      throws Exception {
     Connection conn = DriverManager.getConnection(DB_URL);
     Statement statement = conn.createStatement();
     Integer limitResults = 10;
-    ResultSet rs = statement.executeQuery(String.format("SELECT UPPER(playerName) AS name FROM baseballStats LIMIT %d", limitResults));
+    ResultSet rs = statement
+        .executeQuery(String.format("SELECT UPPER(playerName) AS name FROM baseballStats LIMIT %d", limitResults));
     Set<String> results = new HashSet<>();
     Integer resultCount = 0;
-    while(rs.next()){
+    while (rs.next()) {
       String playerName = rs.getString("name");
       results.add(playerName);
       resultCount++;
@@ -55,7 +55,8 @@ public class PinotDriverTest {
     Assert.assertEquals(results, expectedResults);
 
     rs.close();
-    statement.close();;
+    statement.close();
+    ;
     conn.close();
   }
 }

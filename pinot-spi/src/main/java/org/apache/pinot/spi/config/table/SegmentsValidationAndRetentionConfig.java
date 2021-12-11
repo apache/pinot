@@ -20,7 +20,6 @@ package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.pinot.spi.config.BaseJsonConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
@@ -39,14 +38,15 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _schemaName;
   private String _timeColumnName;
   private TimeUnit _timeType;
+  // Flag to indicate if null value in time column is allowed.
+  private boolean _allowNullTimeValue;
   private String _segmentAssignmentStrategy;
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
   private String _crypterClassName;
   // Possible values can be http or https. If this field is set, a Pinot server can download segments from peer servers
   // using the specified download scheme. Both realtime tables and offline tables can set this field.
-  // For more usage of this field, please refer to this design doc:
-  // https://cwiki.apache.org/confluence/display/PINOT/By-passing+deep-store+requirement+for+Realtime+segment+completion#By-passingdeep-storerequirementforRealtimesegmentcompletion-EnablebesteffortsegmentuploadinSplitSegmentCommiteranddownloadsegmentfrompeerservers.
+  // For more usage of this field, please refer to this design doc: https://tinyurl.com/f63ru4sb
   private String _peerSegmentDownloadScheme;
 
   // Number of replicas per partition of low-level consumers. This config is used for realtime tables only.
@@ -78,6 +78,14 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _timeType = TimeUtils.timeUnitFromString(timeType);
   }
 
+  public boolean isAllowNullTimeValue() {
+    return _allowNullTimeValue;
+  }
+
+  public void setAllowNullTimeValue(boolean allowNullTimeValue) {
+    _allowNullTimeValue = allowNullTimeValue;
+  }
+
   public String getRetentionTimeUnit() {
     return _retentionTimeUnit;
   }
@@ -95,7 +103,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   }
 
   /**
-   * @deprecated Use {@code segmentPushFrequency} from {@link IngestionConfig#getBatchIngestionConfig()}
+   * @deprecated Use {@code segmentIngestionFrequency} from {@link IngestionConfig#getBatchIngestionConfig()}
    */
   public String getSegmentPushFrequency() {
     return _segmentPushFrequency;
@@ -106,7 +114,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   }
 
   /**
-   * @deprecated Use {@code segmentPushType} from {@link IngestionConfig#getBatchIngestionConfig()}
+   * @deprecated Use {@code segmentIngestionType} from {@link IngestionConfig#getBatchIngestionConfig()}
    */
   public String getSegmentPushType() {
     return _segmentPushType;

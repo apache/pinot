@@ -30,9 +30,9 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.AggregationInfo;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.parsers.CompilerConstants;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
@@ -173,15 +173,5 @@ public class AggregationFunctionUtils {
     ExpressionContext expression = ExpressionContext.forIdentifier(aggregationFunctionColumnPair.getColumn());
     BlockValSet blockValSet = transformBlock.getBlockValueSet(aggregationFunctionColumnPair.toColumnName());
     return Collections.singletonMap(expression, blockValSet);
-  }
-
-  public static boolean isFitForDictionaryBasedComputation(String functionName) {
-    //@formatter:off
-    return functionName.equalsIgnoreCase(AggregationFunctionType.MIN.name())
-        || functionName.equalsIgnoreCase(AggregationFunctionType.MAX.name())
-        || functionName.equalsIgnoreCase(AggregationFunctionType.MINMAXRANGE.name())
-        || functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())
-        || functionName.equalsIgnoreCase(AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT.name());
-    //@formatter:on
   }
 }

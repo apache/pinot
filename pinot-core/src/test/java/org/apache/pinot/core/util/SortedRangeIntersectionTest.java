@@ -144,7 +144,7 @@ public class SortedRangeIntersectionTest {
 
   @Test
   public void testRandom() {
-    int totalDocs = 1000000;// 1 million docs
+    int totalDocs = 1_000_000;
     int maxRange = 10000;
     int minRange = 1000;
     long randomSeed = System.currentTimeMillis();

@@ -34,19 +34,18 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByResult;
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
-import org.apache.pinot.segment.spi.ImmutableSegment;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -55,6 +54,7 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -271,7 +271,8 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
 
   protected String getAggregationQuery(int percentile) {
     return String.format(
-        "SELECT PERCENTILE%1$d(%2$s), PERCENTILETDIGEST%1$d(%2$s), PERCENTILETDIGEST%1$d(%3$s), PERCENTILE(%2$s, %1$d), "
+        "SELECT PERCENTILE%1$d(%2$s), PERCENTILETDIGEST%1$d(%2$s), PERCENTILETDIGEST%1$d(%3$s), PERCENTILE(%2$s, "
+            + "%1$d), "
             + "PERCENTILETDIGEST(%2$s, %1$d), PERCENTILETDIGEST(%3$s, %1$d) FROM %4$s", percentile, DOUBLE_COLUMN,
         TDIGEST_COLUMN, TABLE_NAME);
   }

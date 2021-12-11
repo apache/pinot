@@ -18,19 +18,22 @@
  */
 package org.apache.pinot.core.geospatial.transform.function;
 
-import org.apache.pinot.core.geospatial.GeometryUtils;
-import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
+import org.apache.pinot.segment.local.utils.GeometrySerializer;
+import org.apache.pinot.segment.local.utils.GeometryUtils;
+import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
-import org.locationtech.jts.io.WKTWriter;
+import org.locationtech.jts.io.ParseException;
 
 
 /**
  * Geospatial scalar functions that can be used in transformation.
  */
 public class ScalarFunctions {
+  private ScalarFunctions() {
+  }
 
   /**
    * Creates a point.
@@ -41,8 +44,7 @@ public class ScalarFunctions {
    */
   @ScalarFunction
   public static byte[] stPoint(double x, double y) {
-    return GeometrySerializer
-        .serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(x, y)));
+    return GeometrySerializer.serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(x, y)));
   }
 
   /**
@@ -54,12 +56,48 @@ public class ScalarFunctions {
    * @return the created point
    */
   @ScalarFunction
-  public static byte[] stPoint(double x, double y, int isGeography) {
+  public static byte[] stPoint(double x, double y, boolean isGeography) {
     Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(x, y));
-    if (isGeography > 0) {
+    if (isGeography) {
       GeometryUtils.setGeography(point);
     }
     return GeometrySerializer.serialize(point);
+  }
+
+  /**
+   * Reads a geometry object from the WKT format.
+   */
+  @ScalarFunction
+  public static byte[] stGeomFromText(String wkt)
+      throws ParseException {
+    return GeometrySerializer.serialize(GeometryUtils.GEOMETRY_WKT_READER.read(wkt));
+  }
+
+  /**
+   * Reads a geography object from the WKT format.
+   */
+  @ScalarFunction
+  public static byte[] stGeogFromText(String wkt)
+      throws ParseException {
+    return GeometrySerializer.serialize(GeometryUtils.GEOGRAPHY_WKT_READER.read(wkt));
+  }
+
+  /**
+   * Reads a geometry object from the WKB format.
+   */
+  @ScalarFunction
+  public static byte[] stGeomFromWKB(byte[] wkb)
+      throws ParseException {
+    return GeometrySerializer.serialize(GeometryUtils.GEOMETRY_WKB_READER.read(wkb));
+  }
+
+  /**
+   * Reads a geography object from the WKB format.
+   */
+  @ScalarFunction
+  public static byte[] stGeogFromWKB(byte[] wkb)
+      throws ParseException {
+    return GeometrySerializer.serialize(GeometryUtils.GEOGRAPHY_WKB_READER.read(wkb));
   }
 
   /**
@@ -70,8 +108,18 @@ public class ScalarFunctions {
    */
   @ScalarFunction
   public static String stAsText(byte[] bytes) {
-    WKTWriter writer = new WKTWriter();
-    return writer.write(GeometrySerializer.deserialize(bytes));
+    return GeometryUtils.WKT_WRITER.write(GeometrySerializer.deserialize(bytes));
+  }
+
+  /**
+   * Saves the geometry object as WKB format.
+   *
+   * @param bytes the serialized geometry object
+   * @return the geometry in WKB
+   */
+  @ScalarFunction
+  public static byte[] stAsBinary(byte[] bytes) {
+    return GeometryUtils.WKB_WRITER.write(GeometrySerializer.deserialize(bytes));
   }
 
   /**
@@ -98,5 +146,17 @@ public class ScalarFunctions {
     Geometry geometry = GeometrySerializer.deserialize(bytes);
     GeometryUtils.setGeometry(geometry);
     return GeometrySerializer.serialize(geometry);
+  }
+
+  /**
+   * Gets the H3 hexagon address from the location
+   * @param latitude latitude of the location
+   * @param longitude longitude of the location
+   * @param resolution H3 index resolution
+   * @return the H3 index address
+   */
+  @ScalarFunction
+  public static long geoToH3(double longitude, double latitude, int resolution) {
+    return H3Utils.H3_CORE.geoToH3(latitude, longitude, resolution);
   }
 }

@@ -25,11 +25,14 @@ import java.io.FileReader;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.io.IOUtils;
-import org.apache.pinot.core.io.writer.impl.FixedBitMVForwardIndexWriter;
+import org.apache.pinot.segment.local.io.writer.impl.FixedBitMVForwardIndexWriter;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class ForwardIndexWriterBenchmark {
+  private ForwardIndexWriterBenchmark() {
+  }
+
   public static void convertRawToForwardIndex(File rawFile)
       throws Exception {
     List<String> lines = IOUtils.readLines(new FileReader(rawFile));
@@ -37,7 +40,7 @@ public class ForwardIndexWriterBenchmark {
     int max = Integer.MIN_VALUE;
     int maxNumberOfMultiValues = Integer.MIN_VALUE;
     int totalNumValues = 0;
-    int data[][] = new int[totalDocs][];
+    int[][] data = new int[totalDocs][];
     for (int i = 0; i < lines.size(); i++) {
       String line = lines.get(i);
       String[] split = line.split(",");

@@ -18,37 +18,26 @@
  */
 package org.apache.pinot.core.util;
 
-import org.apache.pinot.core.query.request.context.QueryContext;
-
-
 public final class GroupByUtils {
   private GroupByUtils() {
   }
 
-  private static final int NUM_RESULTS_LOWER_LIMIT = 5000;
+  public static final int DEFAULT_MIN_NUM_GROUPS = 5000;
 
   /**
-   * (For PQL semantic) Returns the capacity of the table required by the given query.
-   * NOTE: It returns {@code max(limit * 5, 5000)} to ensure the result accuracy because the results are always ordered
-   *       in PQL semantic.
+   * Returns the capacity of the table required by the given query.
+   * NOTE: It returns {@code max(limit * 5, 5000)} to ensure the result accuracy.
    */
   public static int getTableCapacity(int limit) {
-    return Math.max(limit * 5, NUM_RESULTS_LOWER_LIMIT);
+    return Math.max(limit * 5, DEFAULT_MIN_NUM_GROUPS);
   }
 
   /**
-   * (For SQL semantic) Returns the capacity of the table required by the given query.
-   * <ul>
-   *   <li>For GROUP-BY with ORDER-BY or HAVING, returns {@code max(limit * 5, 5000)} to ensure the result accuracy</li>
-   *   <li>For GROUP-BY without ORDER-BY or HAVING, returns the limit</li>
-   * </ul>
+   * Returns the capacity of the table required by the given query.
+   * NOTE: It returns {@code max(limit * 5, minNumGroups)} where minNumGroups is configurable to tune the table size and
+   *       result accuracy.
    */
-  public static int getTableCapacity(QueryContext queryContext) {
-    int limit = queryContext.getLimit();
-    if (queryContext.getOrderByExpressions() != null || queryContext.getHavingFilter() != null) {
-      return Math.max(limit * 5, NUM_RESULTS_LOWER_LIMIT);
-    } else {
-      return limit;
-    }
+  public static int getTableCapacity(int limit, int minNumGroups) {
+    return Math.max(limit * 5, minNumGroups);
   }
 }

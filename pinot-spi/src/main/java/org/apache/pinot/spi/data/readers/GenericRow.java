@@ -22,7 +22,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
 import java.io.Serializable;
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -55,13 +56,16 @@ public class GenericRow implements Serializable {
 
   /**
    * This key is used by a Decoder/RecordReader to handle 1 record to many records flattening.
-   * If a Decoder/RecordReader produces multiple GenericRows from the given record, they must be put into the destination GenericRow as a List<GenericRow> with this key
-   * The segment generation drivers handle this key as a special case and process the multiple records
+   * If a Decoder/RecordReader produces multiple GenericRows from the given record, they must be put into the
+   * destination GenericRow as a List<GenericRow> with this key.
+   * The segment generation drivers handle this key as a special case and process the multiple records.
    */
   public static final String MULTIPLE_RECORDS_KEY = "$MULTIPLE_RECORDS_KEY$";
   /**
    * This key is used by the FilterTransformer to skip records during ingestion
-   * The FilterTransformer puts this key into the GenericRow with value true, if the record matches the filtering criteria, based on FilterConfig
+   * The FilterTransformer puts this key into the GenericRow with value true, if the record matches the filtering
+   * criteria, based on
+   * FilterConfig
    */
   public static final String SKIP_RECORD_KEY = "$SKIP_RECORD_KEY$";
 
@@ -104,6 +108,10 @@ public class GenericRow implements Serializable {
     return _fieldToValueMap.get(fieldName);
   }
 
+  public Object removeValue(String fieldName) {
+    return _fieldToValueMap.remove(fieldName);
+  }
+
   /**
    * Returns whether the value is {@code null} for the given field.
    * <p>The {@code nullField} will be set when setting the {@code nullDefaultValue} for field by calling
@@ -118,6 +126,49 @@ public class GenericRow implements Serializable {
    */
   public boolean hasNullValues() {
     return !_nullValueFields.isEmpty();
+  }
+
+  /**
+   * @return a deep copy of the generic row
+   */
+  public GenericRow copy() {
+    GenericRow copy = new GenericRow();
+    copy.init(this);
+    for (Map.Entry<String, Object> entry : copy._fieldToValueMap.entrySet()) {
+      entry.setValue(copy(entry.getValue()));
+    }
+    return copy;
+  }
+
+  /**
+   * @return a deep copy of the object.
+   */
+  private Object copy(Object value) {
+    if (value == null) {
+      return null;
+    } else if (value instanceof Map) {
+      Map<String, Object> map = new HashMap<>((Map<String, Object>) value);
+      for (Map.Entry<String, Object> entry : map.entrySet()) {
+        entry.setValue(copy(entry.getValue()));
+      }
+      return map;
+    } else if (value instanceof Collection) {
+      List list = new ArrayList(((Collection) value).size());
+      for (Object object : (Collection) value) {
+        list.add(copy(object));
+      }
+      return list;
+    } else if (value.getClass().isArray()) {
+      Object[] array = new Object[((Object[]) value).length];
+      int idx = 0;
+      for (Object object : (Object[]) value) {
+        array[idx++] = copy(object);
+      }
+      return array;
+    } else {
+      // other values are of primitive type
+      return value;
+    }
   }
 
   /**
@@ -149,6 +200,20 @@ public class GenericRow implements Serializable {
   }
 
   /**
+   * Marks a field as {@code null}.
+   */
+  public void addNullValueField(String fieldName) {
+    _nullValueFields.add(fieldName);
+  }
+
+  /**
+   * Marks a field as {@code non-null} and returns whether the field was marked as {@code null}.
+   */
+  public boolean removeNullValueField(String fieldName) {
+    return _nullValueFields.remove(fieldName);
+  }
+
+  /**
    * Removes all the fields from the row.
    */
   public void clear() {
@@ -168,63 +233,10 @@ public class GenericRow implements Serializable {
     }
     if (obj instanceof GenericRow) {
       GenericRow that = (GenericRow) obj;
-      if (!_nullValueFields.containsAll(that._nullValueFields) || !that._nullValueFields
-          .containsAll(_nullValueFields)) {
-        return false;
-      }
-      return compareMap(_fieldToValueMap, that._fieldToValueMap);
+      return _nullValueFields.equals(that._nullValueFields) && EqualityUtils
+          .isEqual(_fieldToValueMap, that._fieldToValueMap);
     }
     return false;
-  }
-
-  private boolean compareMap(Map<String, Object> thisMap, Map<String, Object> thatMap) {
-    if (thisMap.size() == thatMap.size()) {
-      for (String key : thisMap.keySet()) {
-        Object fieldValue = thisMap.get(key);
-        Object thatFieldValue = thatMap.get(key);
-        if (fieldValue == null) {
-          if (thatFieldValue != null) {
-            return false;
-          }
-        } else if (!fieldValue.equals(thatFieldValue)) {
-          if (fieldValue instanceof Map && thatFieldValue instanceof Map) {
-            return compareMap((Map<String, Object>) fieldValue, (Map<String, Object>) thatFieldValue);
-          }
-          if ((fieldValue instanceof byte[]) && (thatFieldValue instanceof byte[])) {
-            return Arrays.equals((byte[]) fieldValue, (byte[]) thatFieldValue);
-          }
-          if (fieldValue.getClass().isArray() && thatFieldValue.getClass().isArray()) {
-            return compareArray((Object[]) fieldValue, (Object[]) thatFieldValue);
-          }
-          return false;
-        }
-      }
-    }
-    return true;
-  }
-
-  private boolean compareArray(Object[] fieldValue, Object[] thatFieldValue) {
-    for (int i = 0; i < fieldValue.length; i++) {
-      if (fieldValue[i] instanceof Map) {
-        if (!(thatFieldValue[i] instanceof Map)) {
-          return false;
-        }
-        if (!compareMap((Map<String, Object>) fieldValue[i], (Map<String, Object>) thatFieldValue[i])) {
-          return false;
-        }
-        continue;
-      }
-      if (fieldValue[i].getClass().isArray()) {
-        if (!compareArray((Object[]) fieldValue[i], (Object[]) thatFieldValue[i])) {
-          return false;
-        }
-        continue;
-      }
-      if (!fieldValue[i].equals(thatFieldValue[i])) {
-        return false;
-      }
-    }
-    return true;
   }
 
   @Override

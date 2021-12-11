@@ -18,12 +18,13 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
-import org.apache.pinot.core.query.request.context.predicate.EqPredicate;
-import org.apache.pinot.core.query.request.context.predicate.Predicate;
+import java.util.Arrays;
+import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.TimestampUtils;
 
 
 /**
@@ -38,11 +39,12 @@ public class EqualsPredicateEvaluatorFactory {
    *
    * @param eqPredicate EQ predicate to evaluate
    * @param dictionary Dictionary for the column
+   * @param dataType Data type for the column
    * @return Dictionary based EQ predicate evaluator
    */
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(EqPredicate eqPredicate,
-      Dictionary dictionary) {
-    return new DictionaryBasedEqPredicateEvaluator(eqPredicate, dictionary);
+      Dictionary dictionary, DataType dataType) {
+    return new DictionaryBasedEqPredicateEvaluator(eqPredicate, dictionary, dataType);
   }
 
   /**
@@ -54,21 +56,26 @@ public class EqualsPredicateEvaluatorFactory {
    */
   public static BaseRawValueBasedPredicateEvaluator newRawValueBasedEvaluator(EqPredicate eqPredicate,
       DataType dataType) {
+    String value = eqPredicate.getValue();
     switch (dataType) {
       case INT:
-        return new IntRawValueBasedEqPredicateEvaluator(eqPredicate);
+        return new IntRawValueBasedEqPredicateEvaluator(eqPredicate, Integer.parseInt(value));
       case LONG:
-        return new LongRawValueBasedEqPredicateEvaluator(eqPredicate);
+        return new LongRawValueBasedEqPredicateEvaluator(eqPredicate, Long.parseLong(value));
       case FLOAT:
-        return new FloatRawValueBasedEqPredicateEvaluator(eqPredicate);
+        return new FloatRawValueBasedEqPredicateEvaluator(eqPredicate, Float.parseFloat(value));
       case DOUBLE:
-        return new DoubleRawValueBasedEqPredicateEvaluator(eqPredicate);
+        return new DoubleRawValueBasedEqPredicateEvaluator(eqPredicate, Double.parseDouble(value));
+      case BOOLEAN:
+        return new IntRawValueBasedEqPredicateEvaluator(eqPredicate, BooleanUtils.toInt(value));
+      case TIMESTAMP:
+        return new LongRawValueBasedEqPredicateEvaluator(eqPredicate, TimestampUtils.toMillisSinceEpoch(value));
       case STRING:
-        return new StringRawValueBasedEqPredicateEvaluator(eqPredicate);
+        return new StringRawValueBasedEqPredicateEvaluator(eqPredicate, value);
       case BYTES:
-        return new BytesRawValueBasedEqPredicateEvaluator(eqPredicate);
+        return new BytesRawValueBasedEqPredicateEvaluator(eqPredicate, BytesUtils.toBytes(value));
       default:
-        throw new UnsupportedOperationException("Unsupported data type: " + dataType);
+        throw new IllegalStateException("Unsupported data type: " + dataType);
     }
   }
 
@@ -76,8 +83,10 @@ public class EqualsPredicateEvaluatorFactory {
     final int _matchingDictId;
     final int[] _matchingDictIds;
 
-    DictionaryBasedEqPredicateEvaluator(EqPredicate eqPredicate, Dictionary dictionary) {
-      _matchingDictId = dictionary.indexOf(eqPredicate.getValue());
+    DictionaryBasedEqPredicateEvaluator(EqPredicate eqPredicate, Dictionary dictionary, DataType dataType) {
+      super(eqPredicate);
+      String predicateValue = PredicateUtils.getStoredValue(eqPredicate.getValue(), dataType);
+      _matchingDictId = dictionary.indexOf(predicateValue);
       if (_matchingDictId >= 0) {
         _matchingDictIds = new int[]{_matchingDictId};
         if (dictionary.length() == 1) {
@@ -87,11 +96,6 @@ public class EqualsPredicateEvaluatorFactory {
         _matchingDictIds = new int[0];
         _alwaysFalse = true;
       }
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.EQ;
     }
 
     @Override
@@ -108,13 +112,9 @@ public class EqualsPredicateEvaluatorFactory {
   private static final class IntRawValueBasedEqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final int _matchingValue;
 
-    IntRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
-      _matchingValue = Integer.parseInt(eqPredicate.getValue());
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.EQ;
+    IntRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate, int matchingValue) {
+      super(eqPredicate);
+      _matchingValue = matchingValue;
     }
 
     @Override
@@ -131,13 +131,9 @@ public class EqualsPredicateEvaluatorFactory {
   private static final class LongRawValueBasedEqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final long _matchingValue;
 
-    LongRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
-      _matchingValue = Long.parseLong(eqPredicate.getValue());
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.EQ;
+    LongRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate, long matchingValue) {
+      super(eqPredicate);
+      _matchingValue = matchingValue;
     }
 
     @Override
@@ -154,13 +150,9 @@ public class EqualsPredicateEvaluatorFactory {
   private static final class FloatRawValueBasedEqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final float _matchingValue;
 
-    FloatRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
-      _matchingValue = Float.parseFloat(eqPredicate.getValue());
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.EQ;
+    FloatRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate, float matchingValue) {
+      super(eqPredicate);
+      _matchingValue = matchingValue;
     }
 
     @Override
@@ -177,13 +169,9 @@ public class EqualsPredicateEvaluatorFactory {
   private static final class DoubleRawValueBasedEqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final double _matchingValue;
 
-    DoubleRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
-      _matchingValue = Double.parseDouble(eqPredicate.getValue());
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.EQ;
+    DoubleRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate, double matchingValue) {
+      super(eqPredicate);
+      _matchingValue = matchingValue;
     }
 
     @Override
@@ -200,13 +188,9 @@ public class EqualsPredicateEvaluatorFactory {
   private static final class StringRawValueBasedEqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final String _matchingValue;
 
-    StringRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
-      _matchingValue = eqPredicate.getValue();
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.EQ;
+    StringRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate, String matchingValue) {
+      super(eqPredicate);
+      _matchingValue = matchingValue;
     }
 
     @Override
@@ -223,13 +207,9 @@ public class EqualsPredicateEvaluatorFactory {
   private static final class BytesRawValueBasedEqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final byte[] _matchingValue;
 
-    BytesRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
-      _matchingValue = BytesUtils.toBytes(eqPredicate.getValue());
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.EQ;
+    BytesRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate, byte[] matchingValue) {
+      super(eqPredicate);
+      _matchingValue = matchingValue;
     }
 
     @Override
@@ -239,7 +219,7 @@ public class EqualsPredicateEvaluatorFactory {
 
     @Override
     public boolean applySV(byte[] value) {
-      return ByteArray.compare(_matchingValue, value) == 0;
+      return Arrays.equals(_matchingValue, value);
     }
   }
 }

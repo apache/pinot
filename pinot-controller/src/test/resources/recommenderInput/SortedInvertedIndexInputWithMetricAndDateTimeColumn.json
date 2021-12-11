@@ -1,0 +1,64 @@
+{
+  "schema":{
+    "schemaName": "tableSchema",
+    "dimensionFieldSpecs": [
+      {
+        "name": "b",
+        "dataType": "DOUBLE",
+        "cardinality":6,
+        "singleValueField": false,
+        "numValuesPerEntry":1.5
+      },
+      {
+        "name": "c",
+        "dataType": "FLOAT",
+        "cardinality":7,
+        "numValuesPerEntry":1
+      },
+      {
+        "name": "d",
+        "dataType": "STRING",
+        "cardinality":41,
+        "singleValueField": false,
+        "numValuesPerEntry":2,
+        "averageLength" : 27
+      }
+    ],
+    "metricFieldSpecs": [
+      {
+        "name": "p",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":1
+      }
+    ],
+    "dateTimeFieldSpecs": [
+      {
+        "name": "x",
+        "dataType": "INT",
+        "format": "1:DAYS:EPOCH",
+        "granularity": "1:DAYS",
+        "cardinality": 3
+      }
+    ],
+    "timeFieldSpec": {
+      "incomingGranularitySpec": {
+        "dataType": "INT",
+        "name": "t",
+        "timeType": "DAYS",
+        "cardinality":10000,
+        "numValuesPerEntry":1
+      }
+    }
+  },
+  "queriesWithWeights":{
+    "select i from tableName where p in (2,4) and (c = 7) and t in ('#VALUES', 500)": 1,
+    "select j from tableName where (x=3)": 2,
+    "select f from tableName where (p=1) and t<3": 4,
+    "select f from tableName where (x=0 and b=1) or c=7 or (t = 7)": 2,
+    "select f from tableName where t between 1 and 1000": 2
+  },
+  "invertedSortedIndexJointRuleParams": {
+    "THRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION" : 0.06
+  }
+}

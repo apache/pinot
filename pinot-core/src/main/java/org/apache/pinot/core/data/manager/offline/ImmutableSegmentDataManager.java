@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
-import org.apache.pinot.core.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 
 

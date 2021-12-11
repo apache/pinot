@@ -21,7 +21,6 @@ package org.apache.pinot.spi.data.readers;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -32,7 +31,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.avro.generic.GenericData;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.data.Schema;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -112,8 +110,7 @@ public abstract class AbstractRecordExtractorTest {
 
   private void checkValue(Object expectedValue, Object actualValue) {
     if (expectedValue instanceof Collection) {
-      List actualArray =
-          actualValue instanceof List ? (ArrayList) actualValue : Arrays.asList((Object[]) actualValue);
+      List actualArray = actualValue instanceof List ? (ArrayList) actualValue : Arrays.asList((Object[]) actualValue);
       List expectedArray = (List) expectedValue;
       for (int j = 0; j < actualArray.size(); j++) {
         checkValue(expectedArray.get(j), actualArray.get(j));

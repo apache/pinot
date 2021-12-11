@@ -42,7 +42,8 @@ public class MaxHitRateTrackerTest {
     latestTimeStamp = latestTimeStamp + 2000L;
     Assert.assertEquals(5, hitCounter.getMaxCountPerBucket(latestTimeStamp));
 
-    // This time it should return 0 as the internal lastAccessTimestamp has already been updated and there is no more hits between the gap.
+    // This time it should return 0 as the internal lastAccessTimestamp has already been updated and there is no more
+    // hits between the gap.
     latestTimeStamp = latestTimeStamp + 2000L;
     Assert.assertEquals(0, hitCounter.getMaxCountPerBucket(latestTimeStamp));
 

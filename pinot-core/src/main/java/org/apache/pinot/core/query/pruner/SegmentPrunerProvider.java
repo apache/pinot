@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.pruner;
 
 import java.util.HashMap;
 import java.util.Map;
-
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 

@@ -23,14 +23,11 @@ executionFrameworkSpec:
   # name: execution framework name
   name: 'hadoop'
 
-  # segmentGenerationJobRunnerClassName: class name implements org.apache.pinot.spi.batch.ingestion.runner.SegmentGenerationJobRunner interface.
+  # Class to use for segment generation and different push types.
   segmentGenerationJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.hadoop.HadoopSegmentGenerationJobRunner'
-
-  # segmentTarPushJobRunnerClassName: class name implements org.apache.pinot.spi.batch.ingestion.runner.SegmentTarPushJobRunner interface.
   segmentTarPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.hadoop.HadoopSegmentTarPushJobRunner'
-
-  # segmentUriPushJobRunnerClassName: class name implements org.apache.pinot.spi.batch.ingestion.runner.SegmentUriPushJobRunner interface.
   segmentUriPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.hadoop.HadoopSegmentUriPushJobRunner'
+  segmentMetadataPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.hadoop.HadoopSegmentMetadataPushJobRunner'
 
   # extraConfigs: extra configs for execution framework.
   extraConfigs:
@@ -39,12 +36,14 @@ executionFrameworkSpec:
     stagingDir: examples/batch/airlineStats/staging
 
 # jobType: Pinot ingestion job type.
-# Supported job types are:
+# Supported job types are defined in PinotIngestionJobType class.
 #   'SegmentCreation'
 #   'SegmentTarPush'
 #   'SegmentUriPush'
+#   'SegmentMetadataPush'
 #   'SegmentCreationAndTarPush'
 #   'SegmentCreationAndUriPush'
+#   'SegmentCreationAndMetadataPush'
 jobType: SegmentCreationAndTarPush
 
 # inputDirURI: Root directory of input data, expected to have scheme configured in PinotFS.
@@ -93,6 +92,7 @@ recordReaderSpec:
   #   org.apache.pinot.plugin.inputformat.avro.AvroRecordReader
   #   org.apache.pinot.plugin.inputformat.csv.CSVRecordReader
   #   org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReader
+  #   org.apache.pinot.plugin.inputformat.parquet.ParquetNativeRecordReader
   #   org.apache.pinot.plugin.inputformat.json.JSONRecordReader
   #   org.apache.pinot.plugin.inputformat.orc.ORCRecordReader
   #   org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReader

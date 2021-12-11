@@ -24,10 +24,10 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
-import org.apache.pinot.common.utils.CommonConstants.Query.Request;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
+import org.apache.pinot.spi.utils.CommonConstants.Query.Request;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.protocol.TCompactProtocol;
@@ -48,6 +48,7 @@ public class ServerQueryRequest {
   private final boolean _enableStreaming;
   private final List<String> _segmentsToQuery;
   private final QueryContext _queryContext;
+  private final boolean _explain;
 
   // Timing information for different phases of query execution
   private final TimerContext _timerContext;
@@ -58,7 +59,10 @@ public class ServerQueryRequest {
     _enableTrace = instanceRequest.isEnableTrace();
     _enableStreaming = false;
     _segmentsToQuery = instanceRequest.getSearchSegments();
-    _queryContext = BrokerRequestToQueryContextConverter.convert(instanceRequest.getQuery());
+    BrokerRequest brokerRequest = instanceRequest.getQuery();
+    _queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
+    _explain = brokerRequest != null && brokerRequest.getPinotQuery() != null
+        ? brokerRequest.getPinotQuery().isExplain() : false;
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
   }
 
@@ -87,6 +91,7 @@ public class ServerQueryRequest {
     }
     _queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
+    _explain = Boolean.parseBoolean(metadata.get(Request.MetadataKeys.EXPLAIN));
   }
 
   public long getRequestId() {
@@ -119,5 +124,9 @@ public class ServerQueryRequest {
 
   public TimerContext getTimerContext() {
     return _timerContext;
+  }
+
+  public boolean isExplain() {
+    return _explain;
   }
 }

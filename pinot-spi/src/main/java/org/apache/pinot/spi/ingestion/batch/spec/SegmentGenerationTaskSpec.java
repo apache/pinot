@@ -146,6 +146,13 @@ public class SegmentGenerationTaskSpec implements Serializable {
     _customProperties.put(key, value);
   }
 
+  public String getCustomProperty(String key) {
+    if (!key.startsWith(CUSTOM_PREFIX)) {
+      key = CUSTOM_PREFIX + key;
+    }
+    return _customProperties.get(key);
+  }
+
   public void setCustomProperties(Map<String, String> customProperties) {
     for (String key : customProperties.keySet()) {
       setCustomProperty(key, customProperties.get(key));

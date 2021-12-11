@@ -21,13 +21,13 @@ package org.apache.pinot.core.geospatial.transform.function;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.core.geospatial.GeometryUtils;
-import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.segment.local.utils.GeometrySerializer;
+import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.locationtech.jts.geom.Geometry;
@@ -126,7 +126,7 @@ public class StAreaFunction extends BaseTransformFunction {
     private static final double THREE_PI = 3 * Math.PI;
 
     private double _sphericalExcess;
-    private double courseDelta;
+    private double _courseDelta;
 
     private boolean _firstPoint;
     private double _firstInitialBearing;
@@ -188,10 +188,10 @@ public class StAreaFunction extends BaseTransformFunction {
         _firstInitialBearing = initialBearing;
         _firstPoint = false;
       } else {
-        courseDelta += (initialBearing - _previousFinalBearing + THREE_PI) % TWO_PI - PI;
+        _courseDelta += (initialBearing - _previousFinalBearing + THREE_PI) % TWO_PI - PI;
       }
 
-      courseDelta += (finalBearing - initialBearing + THREE_PI) % TWO_PI - PI;
+      _courseDelta += (finalBearing - initialBearing + THREE_PI) % TWO_PI - PI;
 
       _previousFinalBearing = finalBearing;
       _previousCos = cos;
@@ -204,11 +204,11 @@ public class StAreaFunction extends BaseTransformFunction {
     public double computeSphericalExcess() {
       if (!_done) {
         // Now that we have our last final bearing, we can calculate the remaining course delta
-        courseDelta += (_firstInitialBearing - _previousFinalBearing + THREE_PI) % TWO_PI - PI;
+        _courseDelta += (_firstInitialBearing - _previousFinalBearing + THREE_PI) % TWO_PI - PI;
 
         // The courseDelta should be 2Pi or - 2Pi, unless a pole is enclosed (and then it should be ~ 0)
         // In which case we need to correct the spherical excess by 2Pi
-        if (Math.abs(courseDelta) < PI / 4) {
+        if (Math.abs(_courseDelta) < PI / 4) {
           _sphericalExcess = Math.abs(_sphericalExcess) - TWO_PI;
         }
         _done = true;

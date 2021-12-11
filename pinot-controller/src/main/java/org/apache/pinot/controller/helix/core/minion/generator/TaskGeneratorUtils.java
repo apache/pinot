@@ -32,6 +32,9 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 
 
 public class TaskGeneratorUtils {
+  private TaskGeneratorUtils() {
+  }
+
   private static final long ONE_DAY_IN_MILLIS = 24 * 60 * 60 * 1000L;
 
   /**

@@ -27,16 +27,17 @@ import java.util.TreeMap;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class OfflineNonReplicaGroupSegmentAssignmentTest {
@@ -63,7 +64,8 @@ public class OfflineNonReplicaGroupSegmentAssignmentTest {
     _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(null, tableConfig);
 
     // {
-    //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7, instance_8, instance_9]
+    //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7,
+    //   instance_8, instance_9]
     // }
     InstancePartitions instancePartitions = new InstancePartitions(INSTANCE_PARTITIONS_NAME);
     instancePartitions.setInstances(0, 0, INSTANCES);

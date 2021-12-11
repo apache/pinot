@@ -23,17 +23,16 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.commons.collections.ListUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.slf4j.Logger;
@@ -45,6 +44,9 @@ import org.slf4j.LoggerFactory;
  * of a Pinot table. It performs retries during the discovery to minimize the chance of Helix state propagation delay.
  */
 public class PeerServerSegmentFinder {
+  private PeerServerSegmentFinder() {
+  }
+
   private static final Logger _logger = LoggerFactory.getLogger(PeerServerSegmentFinder.class);
   private static final int MAX_NUM_ATTEMPTS = 5;
   private static final int INITIAL_DELAY_MS = 500;
@@ -71,11 +73,12 @@ public class PeerServerSegmentFinder {
     }
     final List<URI> onlineServerURIs = new ArrayList<>();
     try {
-      RetryPolicies.exponentialBackoffRetryPolicy(MAX_NUM_ATTEMPTS, INITIAL_DELAY_MS, DELAY_SCALE_FACTOR).attempt(() -> {
-        getOnlineServersFromExternalView(segmentName, downloadScheme, tableNameWithType, helixAdmin, clusterName,
-            onlineServerURIs);
-        return onlineServerURIs.size() > 0;
-      });
+      RetryPolicies.exponentialBackoffRetryPolicy(MAX_NUM_ATTEMPTS, INITIAL_DELAY_MS, DELAY_SCALE_FACTOR)
+          .attempt(() -> {
+            getOnlineServersFromExternalView(segmentName, downloadScheme, tableNameWithType, helixAdmin, clusterName,
+                onlineServerURIs);
+            return !onlineServerURIs.isEmpty();
+          });
     } catch (Exception e) {
       _logger.error("Failure in getting online servers for segment {}", segmentName, e);
     }

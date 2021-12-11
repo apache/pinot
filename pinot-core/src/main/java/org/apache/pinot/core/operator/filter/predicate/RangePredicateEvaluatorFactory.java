@@ -19,12 +19,13 @@
 package org.apache.pinot.core.operator.filter.predicate;
 
 import it.unimi.dsi.fastutil.ints.IntSet;
-import org.apache.pinot.core.query.request.context.predicate.Predicate;
-import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
+import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.TimestampUtils;
 
 
 /**
@@ -45,7 +46,7 @@ public class RangePredicateEvaluatorFactory {
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(RangePredicate rangePredicate,
       Dictionary dictionary, DataType dataType) {
     if (dictionary.isSorted()) {
-      return new SortedDictionaryBasedRangePredicateEvaluator(rangePredicate, dictionary);
+      return new SortedDictionaryBasedRangePredicateEvaluator(rangePredicate, dictionary, dataType);
     } else {
       return new UnsortedDictionaryBasedRangePredicateEvaluator(rangePredicate, dictionary, dataType);
     }
@@ -60,21 +61,48 @@ public class RangePredicateEvaluatorFactory {
    */
   public static BaseRawValueBasedPredicateEvaluator newRawValueBasedEvaluator(RangePredicate rangePredicate,
       DataType dataType) {
+    String lowerBound = rangePredicate.getLowerBound();
+    String upperBound = rangePredicate.getUpperBound();
+    // NOTE: Handle unbounded as inclusive min/max value of the data type
+    boolean lowerUnbounded = lowerBound.equals(RangePredicate.UNBOUNDED);
+    boolean upperUnbounded = upperBound.equals(RangePredicate.UNBOUNDED);
+    boolean lowerInclusive = lowerUnbounded || rangePredicate.isLowerInclusive();
+    boolean upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
     switch (dataType) {
       case INT:
-        return new IntRawValueBasedRangePredicateEvaluator(rangePredicate);
+        return new IntRawValueBasedRangePredicateEvaluator(rangePredicate,
+            lowerUnbounded ? Integer.MIN_VALUE : Integer.parseInt(lowerBound),
+            upperUnbounded ? Integer.MAX_VALUE : Integer.parseInt(upperBound), lowerInclusive, upperInclusive);
       case LONG:
-        return new LongRawValueBasedRangePredicateEvaluator(rangePredicate);
+        return new LongRawValueBasedRangePredicateEvaluator(rangePredicate,
+            lowerUnbounded ? Long.MIN_VALUE : Long.parseLong(lowerBound),
+            upperUnbounded ? Long.MAX_VALUE : Long.parseLong(upperBound), lowerInclusive, upperInclusive);
       case FLOAT:
-        return new FloatRawValueBasedRangePredicateEvaluator(rangePredicate);
+        return new FloatRawValueBasedRangePredicateEvaluator(rangePredicate,
+            lowerUnbounded ? Float.NEGATIVE_INFINITY : Float.parseFloat(lowerBound),
+            upperUnbounded ? Float.POSITIVE_INFINITY : Float.parseFloat(upperBound), lowerInclusive, upperInclusive);
       case DOUBLE:
-        return new DoubleRawValueBasedRangePredicateEvaluator(rangePredicate);
+        return new DoubleRawValueBasedRangePredicateEvaluator(rangePredicate,
+            lowerUnbounded ? Double.NEGATIVE_INFINITY : Double.parseDouble(lowerBound),
+            upperUnbounded ? Double.POSITIVE_INFINITY : Double.parseDouble(upperBound), lowerInclusive, upperInclusive);
+      case BOOLEAN:
+        return new IntRawValueBasedRangePredicateEvaluator(rangePredicate,
+            lowerUnbounded ? Integer.MIN_VALUE : BooleanUtils.toInt(lowerBound),
+            upperUnbounded ? Integer.MAX_VALUE : BooleanUtils.toInt(upperBound), lowerInclusive, upperInclusive);
+      case TIMESTAMP:
+        return new LongRawValueBasedRangePredicateEvaluator(rangePredicate,
+            lowerUnbounded ? Long.MIN_VALUE : TimestampUtils.toMillisSinceEpoch(lowerBound),
+            upperUnbounded ? Long.MAX_VALUE : TimestampUtils.toMillisSinceEpoch(upperBound), lowerInclusive,
+            upperInclusive);
       case STRING:
-        return new StringRawValueBasedRangePredicateEvaluator(rangePredicate);
+        return new StringRawValueBasedRangePredicateEvaluator(rangePredicate, lowerUnbounded ? null : lowerBound,
+            upperUnbounded ? null : upperBound, lowerInclusive, upperInclusive);
       case BYTES:
-        return new BytesRawValueBasedRangePredicateEvaluator(rangePredicate);
+        return new BytesRawValueBasedRangePredicateEvaluator(rangePredicate,
+            lowerUnbounded ? null : BytesUtils.toBytes(lowerBound),
+            upperUnbounded ? null : BytesUtils.toBytes(upperBound), lowerInclusive, upperInclusive);
       default:
-        throw new UnsupportedOperationException("Unsupported data type: " + dataType);
+        throw new IllegalStateException("Unsupported data type: " + dataType);
     }
   }
 
@@ -85,7 +113,9 @@ public class RangePredicateEvaluatorFactory {
     final int _numMatchingDictIds;
     int[] _matchingDictIds;
 
-    SortedDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, Dictionary dictionary) {
+    SortedDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, Dictionary dictionary,
+        DataType dataType) {
+      super(rangePredicate);
       String lowerBound = rangePredicate.getLowerBound();
       String upperBound = rangePredicate.getUpperBound();
       boolean lowerInclusive = rangePredicate.isLowerInclusive();
@@ -94,7 +124,7 @@ public class RangePredicateEvaluatorFactory {
       if (lowerBound.equals(RangePredicate.UNBOUNDED)) {
         _startDictId = 0;
       } else {
-        int insertionIndex = dictionary.insertionIndexOf(lowerBound);
+        int insertionIndex = dictionary.insertionIndexOf(PredicateUtils.getStoredValue(lowerBound, dataType));
         if (insertionIndex < 0) {
           _startDictId = -(insertionIndex + 1);
         } else {
@@ -108,7 +138,7 @@ public class RangePredicateEvaluatorFactory {
       if (upperBound.equals(RangePredicate.UNBOUNDED)) {
         _endDictId = dictionary.length();
       } else {
-        int insertionIndex = dictionary.insertionIndexOf(upperBound);
+        int insertionIndex = dictionary.insertionIndexOf(PredicateUtils.getStoredValue(upperBound, dataType));
         if (insertionIndex < 0) {
           _endDictId = -(insertionIndex + 1);
         } else {
@@ -137,11 +167,6 @@ public class RangePredicateEvaluatorFactory {
     }
 
     @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.RANGE;
-    }
-
-    @Override
     public boolean applySV(int dictId) {
       return _startDictId <= dictId && _endDictId > dictId;
     }
@@ -167,29 +192,36 @@ public class RangePredicateEvaluatorFactory {
     }
   }
 
-  private static final class UnsortedDictionaryBasedRangePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
+  private static final class UnsortedDictionaryBasedRangePredicateEvaluator
+      extends BaseDictionaryBasedPredicateEvaluator {
     // When the cardinality of the column is lower than this threshold, pre-calculate the matching dictionary ids;
     // otherwise, fetch the value when evaluating each dictionary id.
     // TODO: Tune this threshold
     private static final int DICT_ID_SET_BASED_CARDINALITY_THRESHOLD = 1000;
 
     final Dictionary _dictionary;
-    final DataType _dataType;
     final boolean _dictIdSetBased;
     final IntSet _matchingDictIdSet;
     final BaseRawValueBasedPredicateEvaluator _rawValueBasedEvaluator;
 
     UnsortedDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, Dictionary dictionary,
         DataType dataType) {
+      super(rangePredicate);
       _dictionary = dictionary;
-      _dataType = dataType;
       int cardinality = dictionary.length();
       if (cardinality < DICT_ID_SET_BASED_CARDINALITY_THRESHOLD) {
         _dictIdSetBased = true;
         _rawValueBasedEvaluator = null;
-        _matchingDictIdSet = dictionary
-            .getDictIdsInRange(rangePredicate.getLowerBound(), rangePredicate.getUpperBound(),
-                rangePredicate.isLowerInclusive(), rangePredicate.isUpperInclusive());
+        String lowerBound = rangePredicate.getLowerBound();
+        if (!lowerBound.equals(RangePredicate.UNBOUNDED)) {
+          lowerBound = PredicateUtils.getStoredValue(lowerBound, dataType);
+        }
+        String upperBound = rangePredicate.getUpperBound();
+        if (!upperBound.equals(RangePredicate.UNBOUNDED)) {
+          upperBound = PredicateUtils.getStoredValue(upperBound, dataType);
+        }
+        _matchingDictIdSet = dictionary.getDictIdsInRange(lowerBound, upperBound, rangePredicate.isLowerInclusive(),
+            rangePredicate.isUpperInclusive());
         int numMatchingDictIds = _matchingDictIdSet.size();
         if (numMatchingDictIds == 0) {
           _alwaysFalse = true;
@@ -199,34 +231,8 @@ public class RangePredicateEvaluatorFactory {
       } else {
         _dictIdSetBased = false;
         _matchingDictIdSet = null;
-        switch (dataType) {
-          case INT:
-            _rawValueBasedEvaluator = new IntRawValueBasedRangePredicateEvaluator(rangePredicate);
-            break;
-          case LONG:
-            _rawValueBasedEvaluator = new LongRawValueBasedRangePredicateEvaluator(rangePredicate);
-            break;
-          case FLOAT:
-            _rawValueBasedEvaluator = new FloatRawValueBasedRangePredicateEvaluator(rangePredicate);
-            break;
-          case DOUBLE:
-            _rawValueBasedEvaluator = new DoubleRawValueBasedRangePredicateEvaluator(rangePredicate);
-            break;
-          case STRING:
-            _rawValueBasedEvaluator = new StringRawValueBasedRangePredicateEvaluator(rangePredicate);
-            break;
-          case BYTES:
-            _rawValueBasedEvaluator = new BytesRawValueBasedRangePredicateEvaluator(rangePredicate);
-            break;
-          default:
-            throw new IllegalStateException();
-        }
+        _rawValueBasedEvaluator = newRawValueBasedEvaluator(rangePredicate, dataType);
       }
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.RANGE;
     }
 
     @Override
@@ -234,7 +240,7 @@ public class RangePredicateEvaluatorFactory {
       if (_dictIdSetBased) {
         return _matchingDictIdSet.contains(dictId);
       } else {
-        switch (_dataType) {
+        switch (_dictionary.getValueType()) {
           case INT:
             return _rawValueBasedEvaluator.applySV(_dictionary.getIntValue(dictId));
           case LONG:
@@ -265,16 +271,13 @@ public class RangePredicateEvaluatorFactory {
     final boolean _lowerInclusive;
     final boolean _upperInclusive;
 
-    IntRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate) {
-      String lowerBound = rangePredicate.getLowerBound();
-      String upperBound = rangePredicate.getUpperBound();
-      // NOTE: Handle unbounded as inclusive min/max value of the data type
-      boolean lowerUnbounded = lowerBound.equals(RangePredicate.UNBOUNDED);
-      boolean upperUnbounded = upperBound.equals(RangePredicate.UNBOUNDED);
-      _lowerBound = lowerUnbounded ? Integer.MIN_VALUE : Integer.parseInt(lowerBound);
-      _upperBound = upperUnbounded ? Integer.MAX_VALUE : Integer.parseInt(upperBound);
-      _lowerInclusive = lowerUnbounded || rangePredicate.isLowerInclusive();
-      _upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
+    IntRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate, int lowerBound, int upperBound,
+        boolean lowerInclusive, boolean upperInclusive) {
+      super(rangePredicate);
+      _lowerBound = lowerBound;
+      _upperBound = upperBound;
+      _lowerInclusive = lowerInclusive;
+      _upperInclusive = upperInclusive;
     }
 
     public int geLowerBound() {
@@ -283,11 +286,6 @@ public class RangePredicateEvaluatorFactory {
 
     public int getUpperBound() {
       return _upperBound;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.RANGE;
     }
 
     @Override
@@ -318,16 +316,13 @@ public class RangePredicateEvaluatorFactory {
     final boolean _lowerInclusive;
     final boolean _upperInclusive;
 
-    LongRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate) {
-      String lowerBound = rangePredicate.getLowerBound();
-      String upperBound = rangePredicate.getUpperBound();
-      // NOTE: Handle unbounded as inclusive min/max value of the data type
-      boolean lowerUnbounded = lowerBound.equals(RangePredicate.UNBOUNDED);
-      boolean upperUnbounded = upperBound.equals(RangePredicate.UNBOUNDED);
-      _lowerBound = lowerUnbounded ? Long.MIN_VALUE : Long.parseLong(lowerBound);
-      _upperBound = upperUnbounded ? Long.MAX_VALUE : Long.parseLong(upperBound);
-      _lowerInclusive = lowerUnbounded || rangePredicate.isLowerInclusive();
-      _upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
+    LongRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate, long lowerBound, long upperBound,
+        boolean lowerInclusive, boolean upperInclusive) {
+      super(rangePredicate);
+      _lowerBound = lowerBound;
+      _upperBound = upperBound;
+      _lowerInclusive = lowerInclusive;
+      _upperInclusive = upperInclusive;
     }
 
     public long geLowerBound() {
@@ -336,11 +331,6 @@ public class RangePredicateEvaluatorFactory {
 
     public long getUpperBound() {
       return _upperBound;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.RANGE;
     }
 
     @Override
@@ -371,16 +361,13 @@ public class RangePredicateEvaluatorFactory {
     final boolean _lowerInclusive;
     final boolean _upperInclusive;
 
-    FloatRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate) {
-      String lowerBound = rangePredicate.getLowerBound();
-      String upperBound = rangePredicate.getUpperBound();
-      // NOTE: Handle unbounded as inclusive min/max value of the data type
-      boolean lowerUnbounded = lowerBound.equals(RangePredicate.UNBOUNDED);
-      boolean upperUnbounded = upperBound.equals(RangePredicate.UNBOUNDED);
-      _lowerBound = lowerUnbounded ? Float.NEGATIVE_INFINITY : Float.parseFloat(lowerBound);
-      _upperBound = upperUnbounded ? Float.POSITIVE_INFINITY : Float.parseFloat(upperBound);
-      _lowerInclusive = lowerUnbounded || rangePredicate.isLowerInclusive();
-      _upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
+    FloatRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate, float lowerBound, float upperBound,
+        boolean lowerInclusive, boolean upperInclusive) {
+      super(rangePredicate);
+      _lowerBound = lowerBound;
+      _upperBound = upperBound;
+      _lowerInclusive = lowerInclusive;
+      _upperInclusive = upperInclusive;
     }
 
     public float geLowerBound() {
@@ -389,11 +376,6 @@ public class RangePredicateEvaluatorFactory {
 
     public float getUpperBound() {
       return _upperBound;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.RANGE;
     }
 
     @Override
@@ -424,16 +406,13 @@ public class RangePredicateEvaluatorFactory {
     final boolean _lowerInclusive;
     final boolean _upperInclusive;
 
-    DoubleRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate) {
-      String lowerBound = rangePredicate.getLowerBound();
-      String upperBound = rangePredicate.getUpperBound();
-      // NOTE: Handle unbounded as inclusive min/max value of the data type
-      boolean lowerUnbounded = lowerBound.equals(RangePredicate.UNBOUNDED);
-      boolean upperUnbounded = upperBound.equals(RangePredicate.UNBOUNDED);
-      _lowerBound = lowerUnbounded ? Double.NEGATIVE_INFINITY : Double.parseDouble(lowerBound);
-      _upperBound = upperUnbounded ? Double.POSITIVE_INFINITY : Double.parseDouble(upperBound);
-      _lowerInclusive = lowerUnbounded || rangePredicate.isLowerInclusive();
-      _upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
+    DoubleRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate, double lowerBound, double upperBound,
+        boolean lowerInclusive, boolean upperInclusive) {
+      super(rangePredicate);
+      _lowerBound = lowerBound;
+      _upperBound = upperBound;
+      _lowerInclusive = lowerInclusive;
+      _upperInclusive = upperInclusive;
     }
 
     public double geLowerBound() {
@@ -442,11 +421,6 @@ public class RangePredicateEvaluatorFactory {
 
     public double getUpperBound() {
       return _upperBound;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.RANGE;
     }
 
     @Override
@@ -477,18 +451,13 @@ public class RangePredicateEvaluatorFactory {
     final boolean _lowerInclusive;
     final boolean _upperInclusive;
 
-    StringRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate) {
-      String lowerBound = rangePredicate.getLowerBound();
-      String upperBound = rangePredicate.getUpperBound();
-      _lowerBound = lowerBound.equals(RangePredicate.UNBOUNDED) ? null : lowerBound;
-      _upperBound = upperBound.equals(RangePredicate.UNBOUNDED) ? null : upperBound;
-      _lowerInclusive = rangePredicate.isLowerInclusive();
-      _upperInclusive = rangePredicate.isUpperInclusive();
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.RANGE;
+    StringRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate, String lowerBound, String upperBound,
+        boolean lowerInclusive, boolean upperInclusive) {
+      super(rangePredicate);
+      _lowerBound = lowerBound;
+      _upperBound = upperBound;
+      _lowerInclusive = lowerInclusive;
+      _upperInclusive = upperInclusive;
     }
 
     @Override
@@ -523,18 +492,13 @@ public class RangePredicateEvaluatorFactory {
     final boolean _lowerInclusive;
     final boolean _upperInclusive;
 
-    BytesRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate) {
-      String lowerBound = rangePredicate.getLowerBound();
-      String upperBound = rangePredicate.getUpperBound();
-      _lowerBound = lowerBound.equals(RangePredicate.UNBOUNDED) ? null : BytesUtils.toBytes(lowerBound);
-      _upperBound = upperBound.equals(RangePredicate.UNBOUNDED) ? null : BytesUtils.toBytes(upperBound);
-      _lowerInclusive = rangePredicate.isLowerInclusive();
-      _upperInclusive = rangePredicate.isUpperInclusive();
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.RANGE;
+    BytesRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate, byte[] lowerBound, byte[] upperBound,
+        boolean lowerInclusive, boolean upperInclusive) {
+      super(rangePredicate);
+      _lowerBound = lowerBound;
+      _upperBound = upperBound;
+      _lowerInclusive = lowerInclusive;
+      _upperInclusive = upperInclusive;
     }
 
     @Override

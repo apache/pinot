@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.scheduler;
 
 import java.util.List;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 
@@ -36,7 +35,7 @@ public interface SchedulerPriorityQueue {
    */
   // TODO: throw OutOfCapacity or drop from the front of the queue ?
   // It may be more beneficial to drop oldest queries to move forward
-  void put(@Nonnull SchedulerQueryContext query)
+  void put(SchedulerQueryContext query)
       throws OutOfCapacityException;
 
   /**
@@ -52,6 +51,5 @@ public interface SchedulerPriorityQueue {
    * @return Non-null list of all the pending queries in the queue
    *         List is empty if there are no pending queries
    */
-  @Nonnull
   List<SchedulerQueryContext> drain();
 }

@@ -21,8 +21,6 @@ package org.apache.pinot.spi.config.table.ingestion;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
-import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
@@ -38,7 +36,8 @@ public class TransformConfig extends BaseJsonConfig {
   private final String _transformFunction;
 
   @JsonCreator
-  public TransformConfig(@JsonProperty("columnName") String columnName, @JsonProperty("transformFunction") String transformFunction) {
+  public TransformConfig(@JsonProperty("columnName") String columnName,
+      @JsonProperty("transformFunction") String transformFunction) {
     _columnName = columnName;
     _transformFunction = transformFunction;
   }

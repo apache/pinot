@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
@@ -43,6 +42,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.AssertJUnit.fail;
 
 
 /**
@@ -102,7 +102,7 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
   @Override
   protected List<FieldConfig> getFieldConfigs() {
     return Collections.singletonList(
-        new FieldConfig(TEXT_COLUMN_NAME, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null));
+        new FieldConfig(TEXT_COLUMN_NAME, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null, null));
   }
 
   @BeforeClass
@@ -198,15 +198,15 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
       Thread.sleep(100);
     }
 
-    // TODO: Fix Lucene index on consuming segments to update the latest records, then uncomment the following part
-//    TestUtils.waitForCondition(aVoid -> {
-//      try {
-//        return getTextColumnQueryResult() == NUM_MATCHING_RECORDS;
-//      } catch (Exception e) {
-//        fail("Caught exception while getting text column query result");
-//        return false;
-//      }
-//    }, 10_000L, "Failed to reach expected number of matching records");
+    //Lucene index on consuming segments to update the latest records
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        return getTextColumnQueryResult() == NUM_MATCHING_RECORDS;
+      } catch (Exception e) {
+        fail("Caught exception while getting text column query result");
+        return false;
+      }
+    }, 10_000L, "Failed to reach expected number of matching records");
   }
 
   private long getTextColumnQueryResult()

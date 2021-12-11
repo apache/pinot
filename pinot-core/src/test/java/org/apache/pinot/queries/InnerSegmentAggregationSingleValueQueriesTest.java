@@ -21,6 +21,7 @@ package org.apache.pinot.queries;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
@@ -165,7 +166,8 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
         .testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 6129L, 84134L, 55161L,
             30000L);
     QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
-        "1361199163\000178133991\000296467636\000788414092\0001719301234\0P\0MaztCmmxxgguBUxPti\0001284373442\000752388855",
+        "1361199163\000178133991\000296467636\000788414092\0001719301234\0P\0MaztCmmxxgguBUxPti\0001284373442"
+            + "\000752388855",
         1L, 1361199163L, 178133991, 296467636, 788414092L, 1L);
   }
 
@@ -178,7 +180,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   @Test
   public void testSingleColumnDistinct() {
     String query = "SELECT DISTINCT(column1) FROM testTable LIMIT 1000000";
-    DistinctOperator distinctOperator = getOperatorForPqlQuery(query);
+    BaseOperator<IntermediateResultsBlock> distinctOperator = getOperatorForPqlQuery(query);
     IntermediateResultsBlock resultsBlock = distinctOperator.nextBlock();
     List<Object> operatorResult = resultsBlock.getAggregationResult();
 

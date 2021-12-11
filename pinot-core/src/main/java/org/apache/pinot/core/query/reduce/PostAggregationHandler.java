@@ -22,12 +22,13 @@ import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.postaggregation.PostAggregationFunction;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.FunctionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.util.GapfillUtils;
 
 
 /**
@@ -50,7 +51,7 @@ public class PostAggregationHandler {
       _numGroupByExpressions = groupByExpressions.size();
       _groupByExpressionIndexMap = new HashMap<>();
       for (int i = 0; i < _numGroupByExpressions; i++) {
-        _groupByExpressionIndexMap.put(groupByExpressions.get(i), i);
+        _groupByExpressionIndexMap.put(GapfillUtils.stripGapfill(groupByExpressions.get(i)), i);
       }
     } else {
       _numGroupByExpressions = 0;
@@ -98,6 +99,7 @@ public class PostAggregationHandler {
    * Returns a ValueExtractor based on the given expression.
    */
   public ValueExtractor getValueExtractor(ExpressionContext expression) {
+    expression = GapfillUtils.stripGapfill(expression);
     if (expression.getType() == ExpressionContext.Type.LITERAL) {
       // Literal
       return new LiteralValueExtractor(expression.getLiteral());

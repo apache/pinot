@@ -23,10 +23,9 @@
 <img src="https://imgur.com/GNevDZ0.png" align="center" alt="Apache Pinot"/>
 
 ---------------------------------------
-
-[![Build Status](https://api.travis-ci.org/apache/incubator-pinot.svg?branch=master)](https://travis-ci.org/apache/incubator-pinot)
-[![Release](https://img.shields.io/github/release/apache/incubator-pinot/all.svg)](https://pinot.apache.org/download/)
-[![codecov.io](https://codecov.io/github/apache/incubator-pinot/branch/master/graph/badge.svg)](https://codecov.io/github/apache/incubator-pinot)
+[![Build Status](https://github.com/apache/pinot/actions/workflows/pinot_tests.yml/badge.svg?event=push)](https://github.com/apache/pinot/actions/workflows/pinot_tests.yml)
+[![Release](https://img.shields.io/github/release/apache/pinot/all.svg)](https://pinot.apache.org/download/)
+[![codecov.io](https://codecov.io/github/apache/pinot/branch/master/graph/badge.svg)](https://codecov.io/github/apache/pinot)
 [![Join the chat at https://communityinviter.com/apps/apache-pinot/apache-pinot](https://img.shields.io/badge/slack-apache--pinot-brightgreen?logo=slack)](https://communityinviter.com/apps/apache-pinot/apache-pinot)
 [![Twitter Follow](https://img.shields.io/twitter/follow/apachepinot.svg?label=Follow&style=social)](https://twitter.com/intent/follow?screen_name=apachepinot)
 [![License](https://img.shields.io/github/license/apache/pinot.svg)](LICENSE)
@@ -44,7 +43,7 @@
 
 # What is Apache Pinot?
 
-[Apache Pinot](https://pinot.apache.org) (incubating) is a real-time distributed OLAP datastore, built to deliver scalable real-time analytics with low latency. It can ingest from batch data sources (such as Hadoop HDFS, Amazon S3, Azure ADLS, Google Cloud Storage) as well as stream data sources (such as Apache Kafka).
+[Apache Pinot](https://pinot.apache.org) is a real-time distributed OLAP datastore, built to deliver scalable real-time analytics with low latency. It can ingest from batch data sources (such as Hadoop HDFS, Amazon S3, Azure ADLS, Google Cloud Storage) as well as stream data sources (such as Apache Kafka).
 
 Pinot was built by engineers at LinkedIn and Uber and is designed to scale up and out with no upper bound. Performance always remains constant based on the size of your cluster and an expected query per second (QPS) threshold.
 
@@ -88,28 +87,28 @@ SELECT sum(clicks), sum(impressions) FROM AdAnalyticsTable
        daysSinceEpoch TOP 100
 ```
 
-Pinot is not a replacement for database i.e it cannot be used as source of truth store, cannot mutate data. While Pinot [supports text search](https://docs.pinot.apache.org/basics/features/text-search-support), it's not a replacement for a search engine. Also, Pinot queries cannot span across multiple tables by default. You can use the [Presto-Pinot connector](https://prestodb.io/docs/current/connector/pinot.html) to achieve table joins and other features.
+Pinot is not a replacement for database i.e it cannot be used as source of truth store, cannot mutate data. While Pinot [supports text search](https://docs.pinot.apache.org/basics/features/text-search-support), it's not a replacement for a search engine. Also, Pinot queries cannot span across multiple tables by default. You can use the [Trino-Pinot Connector](https://trino.io/docs/current/connector/pinot.html) or [Presto-Pinot Connector](https://prestodb.io/docs/current/connector/pinot.html) to achieve table joins and other features.
 
 ## Building Pinot
 More detailed instructions can be found at [Quick Demo](https://docs.pinot.apache.org/getting-started) section in the documentation.
 ```
 # Clone a repo
-$ git clone https://github.com/apache/incubator-pinot.git
-$ cd incubator-pinot
+$ git clone https://github.com/apache/pinot.git
+$ cd pinot
 
 # Build Pinot
 $ mvn clean install -DskipTests -Pbin-dist
 
 # Run the Quick Demo
-$ cd pinot-distribution/target/apache-pinot-incubating-<version>-SNAPSHOT-bin/apache-pinot-incubating-<version>-SNAPSHOT-bin
+$ cd pinot-distribution/target/apache-pinot-<version>-SNAPSHOT-bin/apache-pinot-<version>-SNAPSHOT-bin
 $ bin/quick-start-batch.sh
 ```
 
 ## Deploying Pinot to Kubernetes
-Please refer to [Running Pinot on Kubernetes](https://docs.pinot.apache.org/basics/getting-started/kubernetes-quickstart) in our project documentation. Pinot also provides Kubernetes integrations with the interactive query engine, [Presto](kubernetes/helm/presto-coordinator.yaml), and the data visualization tool, [Apache Superset](kubernetes/helm/superset.yaml).
+Please refer to [Running Pinot on Kubernetes](https://docs.pinot.apache.org/basics/getting-started/kubernetes-quickstart) in our project documentation. Pinot also provides Kubernetes integrations with the interactive query engine, [Trino](https://docs.pinot.apache.org/integrations/trino) [Presto](https://docs.pinot.apache.org/integrations/presto), and the data visualization tool, [Apache Superset](kubernetes/helm/superset.yaml).
 
 ## Join the Community
- - Ask questions on [Apache Pinot Slack](https://communityinviter.com/apps/apache-pinot/apache-pinot)
+ - Ask questions on [Apache Pinot Slack](https://join.slack.com/t/apache-pinot/shared_invite/zt-5z7pav2f-yYtjZdVA~EDmrGkho87Vzw)
  - Please join Apache Pinot mailing lists  
    dev-subscribe@pinot.apache.org (subscribe to pinot-dev mailing list)  
    dev@pinot.apache.org (posting to pinot-dev mailing list)  

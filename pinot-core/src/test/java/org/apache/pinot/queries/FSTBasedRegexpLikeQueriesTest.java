@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -33,17 +34,18 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
-import org.apache.pinot.segment.spi.ImmutableSegment;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -69,8 +71,6 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
   private static final Integer INT_BASE_VALUE = 1000;
   private static final Integer NUM_ROWS = 1024;
 
-  private final List<GenericRow> _rows = new ArrayList<>();
-
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
 
@@ -94,19 +94,25 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
       throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
-    buildSegment();
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    Set<String> fstIndexCols = new HashSet<>();
-    fstIndexCols.add(DOMAIN_NAMES_COL);
-    indexLoadingConfig.setFSTIndexColumns(fstIndexCols);
+    List<IndexSegment> segments = new ArrayList<>();
+    for (FSTType fstType : Arrays.asList(FSTType.LUCENE, FSTType.NATIVE)) {
+      buildSegment(fstType);
 
-    Set<String> invertedIndexCols = new HashSet<>();
-    invertedIndexCols.add(DOMAIN_NAMES_COL);
-    indexLoadingConfig.setInvertedIndexColumns(invertedIndexCols);
-    ImmutableSegment immutableSegment =
-        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
-    _indexSegment = immutableSegment;
-    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+      IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
+      Set<String> fstIndexCols = new HashSet<>();
+      fstIndexCols.add(DOMAIN_NAMES_COL);
+      indexLoadingConfig.setFSTIndexColumns(fstIndexCols);
+      indexLoadingConfig.setFSTIndexType(fstType);
+      Set<String> invertedIndexCols = new HashSet<>();
+      invertedIndexCols.add(DOMAIN_NAMES_COL);
+      indexLoadingConfig.setInvertedIndexColumns(invertedIndexCols);
+      ImmutableSegment segment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
+
+      segments.add(segment);
+    }
+
+    _indexSegment = segments.get(ThreadLocalRandom.current().nextInt(2));
+    _indexSegments = segments;
   }
 
   @AfterClass
@@ -151,13 +157,14 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     return rows;
   }
 
-  private void buildSegment()
+  private void buildSegment(FSTType fstType)
       throws Exception {
     List<GenericRow> rows = createTestData(NUM_ROWS);
     List<FieldConfig> fieldConfigs = new ArrayList<>();
+    fieldConfigs.add(
+        new FieldConfig(DOMAIN_NAMES_COL, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null));
     fieldConfigs
-        .add(new FieldConfig(DOMAIN_NAMES_COL, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null));
-    fieldConfigs.add(new FieldConfig(URL_COL, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null));
+        .add(new FieldConfig(URL_COL, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null));
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(Arrays.asList(DOMAIN_NAMES_COL)).setFieldConfigList(fieldConfigs).build();
@@ -170,6 +177,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
+    config.setFSTIndexType(fstType);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
@@ -220,7 +228,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
 
   private void testSelectionResults(String query, int expectedResultSize, List<Serializable[]> expectedResults)
       throws Exception {
-    Operator<IntermediateResultsBlock> operator = getOperatorForPqlQuery(query);
+    Operator<IntermediateResultsBlock> operator = getOperatorForSqlQuery(query);
     IntermediateResultsBlock operatorResult = operator.nextBlock();
     List<Object[]> resultset = (List<Object[]>) operatorResult.getSelectionResult();
     Assert.assertNotNull(resultset);
@@ -345,39 +353,69 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
   }
 
   @Test
+  public void testLikeOperator()
+      throws Exception {
+
+    String query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE 'www.dom_in1.com' LIMIT 50000";
+    testSelectionResults(query, 64, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE 'www.do_ai%' LIMIT 50000";
+    testSelectionResults(query, 512, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE 'www.domain1%' LIMIT 50000";
+    testSelectionResults(query, 256, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE 'www.sd.domain1%' LIMIT 50000";
+    testSelectionResults(query, 256, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE '%domain1%' LIMIT 50000";
+    testSelectionResults(query, 512, null);
+
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE '%com' LIMIT 50000";
+    testSelectionResults(query, 256, null);
+  }
+
+  @Test
   public void testFSTBasedRegexpLikeWithOtherFilters()
       throws Exception {
     String query;
 
     // Select queries on columns with combination of FST Index , (FST + Inverted Index), No index and other constraints.
     query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
+        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, "
+            + "'test1') LIMIT 50000";
     testSelectionResults(query, 52, null);
 
     query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
+        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, "
+            + "'test1') LIMIT 50000";
     testSelectionResults(query, 51, null);
 
     query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') AND REGEXP_LIKE(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
+        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') AND REGEXP_LIKE"
+            + "(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
     testSelectionResults(query, 13, null);
 
     query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.co\\..*') AND REGEXP_LIKE(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
+        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.co\\..*') AND REGEXP_LIKE"
+            + "(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
     testSelectionResults(query, 0, null);
 
     query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.co\\..*') AND REGEXP_LIKE(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
+        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.co\\..*') AND REGEXP_LIKE"
+            + "(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
     testSelectionResults(query, 12, null);
 
     query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, 'test1') and INT_COL=1000 LIMIT 50000";
+        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, "
+            + "'test1') and INT_COL=1000 LIMIT 50000";
     List<Serializable[]> expected = new ArrayList<>();
     expected.add(new Serializable[]{1000, "www.domain1.com/a"});
     testSelectionResults(query, 1, expected);
 
     query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') AND REGEXP_LIKE(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, 'test2') and INT_COL=1001 LIMIT 50000";
+        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') AND REGEXP_LIKE"
+            + "(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, 'test2') and INT_COL=1001 LIMIT 50000";
     expected = new ArrayList<>();
     expected.add(new Serializable[]{1001, "www.domain1.co.ab/b"});
     testSelectionResults(query, 1, expected);
@@ -388,7 +426,8 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
       throws Exception {
     String query;
     query =
-        "SELECT DOMAIN_NAMES, count(*) FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') group by DOMAIN_NAMES LIMIT 50000";
+        "SELECT DOMAIN_NAMES, count(*) FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') group by "
+            + "DOMAIN_NAMES LIMIT 50000";
     AggregationGroupByResult result = getGroupByResults(query);
     matchGroupResult(result, "www.domain1.com", 64);
     matchGroupResult(result, "www.domain1.co.ab", 64);
@@ -396,7 +435,8 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     matchGroupResult(result, "www.domain1.co.cd", 64);
 
     query =
-        "SELECT URL_COL, count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, 'test1') group by URL_COL LIMIT 5000";
+        "SELECT URL_COL, count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, "
+            + "'test1') group by URL_COL LIMIT 5000";
     result = getGroupByResults(query);
     matchGroupResult(result, "www.domain1.com/a", 13);
     matchGroupResult(result, "www.sd.domain1.com/a", 13);
@@ -404,7 +444,8 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     matchGroupResult(result, "www.sd.domain2.com/a", 13);
 
     query =
-        "SELECT URL_COL, count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, 'test1') group by URL_COL LIMIT 5000";
+        "SELECT URL_COL, count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, "
+            + "'test1') group by URL_COL LIMIT 5000";
     result = getGroupByResults(query);
     matchGroupResult(result, "www.domain1.co.ab/b", 12);
     matchGroupResult(result, "www.sd.domain1.co.ab/b", 13);
@@ -412,7 +453,8 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     matchGroupResult(result, "www.sd.domain2.co.ab/b", 13);
 
     query =
-        "SELECT URL_COL, count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, 'test1') AND INT_COL > 1005 group by URL_COL LIMIT 5000";
+        "SELECT URL_COL, count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, "
+            + "'test1') AND INT_COL > 1005 group by URL_COL LIMIT 5000";
     result = getGroupByResults(query);
     matchGroupResult(result, "www.domain1.co.ab/b", 12);
     matchGroupResult(result, "www.sd.domain1.co.ab/b", 12);
@@ -420,7 +462,8 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     matchGroupResult(result, "www.sd.domain2.co.ab/b", 13);
 
     query =
-        "SELECT URL_COL, count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, 'www.domain1.*/a') group by URL_COL LIMIT 50000";
+        "SELECT URL_COL, count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, 'www.domain1.*/a') group by URL_COL LIMIT "
+            + "50000";
     result = getGroupByResults(query);
     matchGroupResult(result, "www.domain1.com/a", 64);
   }
@@ -428,7 +471,8 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
   @Test
   public void testInterSegment() {
     String query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') AND REGEXP_LIKE(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, 'test2') and INT_COL=1001 LIMIT 50000";
+        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') AND REGEXP_LIKE"
+            + "(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, 'test2') and INT_COL=1001 LIMIT 50000";
     List<Serializable[]> expected = new ArrayList<>();
     expected.add(new Serializable[]{1001, "www.domain1.co.ab/b"});
     expected.add(new Serializable[]{1001, "www.domain1.co.ab/b"});
@@ -437,7 +481,8 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     testInterSegmentSelectionQueryHelper(query, 4, expected);
 
     query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, 'test1') and INT_COL=1000 LIMIT 50000";
+        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, "
+            + "'test1') and INT_COL=1000 LIMIT 50000";
     expected = new ArrayList<>();
     expected.add(new Serializable[]{1000, "www.domain1.com/a"});
     expected.add(new Serializable[]{1000, "www.domain1.com/a"});
@@ -446,22 +491,26 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     testInterSegmentSelectionQueryHelper(query, 4, expected);
 
     query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.co\\..*') AND REGEXP_LIKE(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, 'test1') ORDER  BY INT_COL LIMIT 5000";
+        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.co\\..*') AND REGEXP_LIKE"
+            + "(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, 'test1') ORDER  BY INT_COL LIMIT 5000";
     testInterSegmentSelectionQueryHelper(query, 48, null);
 
     query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.co\\..*') AND REGEXP_LIKE(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
+        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.co\\..*') AND REGEXP_LIKE"
+            + "(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
     testInterSegmentSelectionQueryHelper(query, 0, null);
 
     query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') AND REGEXP_LIKE(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
+        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') AND REGEXP_LIKE"
+            + "(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
     testInterSegmentSelectionQueryHelper(query, 52, null);
 
     query = "SELECT count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, 'www.domain1.*/a')";
     testInterSegmentAggregationQueryHelper(query, 256);
 
     query =
-        "SELECT count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, 'test1') AND INT_COL > 1005 ";
+        "SELECT count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, 'test1') AND "
+            + "INT_COL > 1005 ";
     testInterSegmentAggregationQueryHelper(query, 200);
 
     query = "SELECT count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, 'test1')";

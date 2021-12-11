@@ -24,14 +24,14 @@ import java.net.URI;
 import java.util.Collections;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.message.BasicNameValuePair;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
@@ -39,36 +39,38 @@ import org.slf4j.LoggerFactory;
  *
  *
  */
+@CommandLine.Command(name = "UploadSegment")
 public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(UploadSegmentCommand.class);
   private static final String SEGMENT_UPLOADER = "segmentUploader";
 
-  @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
+  @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "host name for controller.")
   private String _controllerHost;
 
-  @Option(name = "-controllerPort", required = false, metaVar = "<int>", usage = "Port number for controller.")
+  @CommandLine.Option(names = {"-controllerPort"}, required = false, description = "Port number for controller.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
-  @Option(name = "-controllerProtocol", required = false, metaVar = "<String>", usage = "protocol for controller.")
+  @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "protocol for controller.")
   private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
 
-  @Option(name = "-user", required = false, metaVar = "<String>", usage = "Username for basic auth.")
+  @CommandLine.Option(names = {"-user"}, required = false, description = "Username for basic auth.")
   private String _user;
 
-  @Option(name = "-password", required = false, metaVar = "<String>", usage = "Password for basic auth.")
+  @CommandLine.Option(names = {"-password"}, required = false, description = "Password for basic auth.")
   private String _password;
 
-  @Option(name = "-authToken", required = false, metaVar = "<String>", usage = "Http auth token.")
+  @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
   private String _authToken;
 
-  @Option(name = "-segmentDir", required = true, metaVar = "<string>", usage = "Path to segment directory.")
+  @CommandLine.Option(names = {"-segmentDir"}, required = true, description = "Path to segment directory.")
   private String _segmentDir = null;
 
   // TODO: make this as a required field once we deprecate the table name from segment metadata
-  @Option(name = "-tableName", required = false, metaVar = "<string>", usage = "Table name to upload.")
+  @CommandLine.Option(names = {"-tableName"}, required = false, description = "Table name to upload.")
   private String _tableName = null;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -136,7 +138,7 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
   public boolean execute()
       throws Exception {
     if (_controllerHost == null) {
-      _controllerHost = NetUtil.getHostAddress();
+      _controllerHost = NetUtils.getHostAddress();
     }
 
     // Create a temporary working directory.
@@ -150,8 +152,8 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
     Preconditions.checkNotNull(segmentFiles);
 
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      URI uploadSegmentHttpURI =
-          FileUploadDownloadClient.getUploadSegmentURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort));
+      URI uploadSegmentHttpURI = FileUploadDownloadClient
+          .getUploadSegmentURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort));
       for (File segmentFile : segmentFiles) {
         File segmentTarFile;
         if (segmentFile.isDirectory()) {
@@ -165,11 +167,10 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
         }
 
         LOGGER.info("Uploading segment tar file: {}", segmentTarFile);
-        fileUploadDownloadClient
-            .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile,
-                makeAuthHeader(makeAuthToken(_authToken, _user, _password)), Collections.singletonList(new BasicNameValuePair(
-                    FileUploadDownloadClient.QueryParameters.TABLE_NAME, _tableName)),
-                FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+        fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile,
+            makeAuthHeader(makeAuthToken(_authToken, _user, _password)), Collections
+                .singletonList(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, _tableName)),
+            FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
       }
     } finally {
       // Delete the temporary working directory.

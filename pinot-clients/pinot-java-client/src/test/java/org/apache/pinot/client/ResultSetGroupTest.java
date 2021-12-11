@@ -20,10 +20,10 @@ package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
+import java.util.Collections;
+import java.util.Properties;
 import java.util.concurrent.Future;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
@@ -33,7 +33,6 @@ import org.testng.annotations.Test;
  */
 public class ResultSetGroupTest {
   private final DummyJsonTransport _dummyJsonTransport = new DummyJsonTransport();
-  private PinotClientTransportFactory _previousTransportFactory = null;
 
   @Test
   public void testDeserializeSelectionResultSet() {
@@ -118,21 +117,29 @@ public class ResultSetGroupTest {
     }
   }
 
+  @Test
+  public void testDeserializeExceptionResultSetSkipFail() {
+    try {
+      final ResultSetGroup resultSet = getResultSetSkipError("exception.json");
+      Assert.assertTrue(resultSet.getExceptions().size() > 0);
+    } catch (PinotClientException e) {
+      Assert.fail("Execute should have thrown an exception");
+    }
+  }
+
   private ResultSetGroup getResultSet(String resourceName) {
     _dummyJsonTransport._resource = resourceName;
-    Connection connection = ConnectionFactory.fromHostList("dummy");
+    Connection connection = ConnectionFactory.fromHostList(Collections.singletonList("dummy"), _dummyJsonTransport);
     return connection.execute("dummy");
   }
 
-  @BeforeClass
-  public void overridePinotClientTransport() {
-    _previousTransportFactory = ConnectionFactory._transportFactory;
-    ConnectionFactory._transportFactory = new DummyJsonTransportFactory();
-  }
-
-  @AfterClass
-  public void resetPinotClientTransport() {
-    ConnectionFactory._transportFactory = _previousTransportFactory;
+  private ResultSetGroup getResultSetSkipError(String resourceName) {
+    _dummyJsonTransport._resource = resourceName;
+    Properties props = new Properties();
+    props.setProperty("failOnExceptions", "false");
+    Connection connection =
+        ConnectionFactory.fromHostList(props, Collections.singletonList("dummy"), _dummyJsonTransport);
+    return connection.execute("dummy");
   }
 
   static class DummyJsonTransport implements PinotClientTransport {

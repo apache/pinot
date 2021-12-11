@@ -31,11 +31,11 @@ import java.util.TreeMap;
 import org.apache.commons.collections.comparators.ComparableComparator;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.function.MinAggregationFunction;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GroupByUtils;
 
@@ -82,7 +82,8 @@ public class AggregationGroupByTrimmingService {
       Sorter[] sorters = new Sorter[numAggregationFunctions];
       for (int i = 0; i < numAggregationFunctions; i++) {
         AggregationFunction aggregationFunction = _aggregationFunctions[i];
-        sorters[i] = getSorter(_trimSize, aggregationFunction, aggregationFunction.isIntermediateResultComparable());
+        // Assume the intermediate result may not be comparable.
+        sorters[i] = getSorter(_trimSize, aggregationFunction, false);
       }
 
       // Add results into sorters

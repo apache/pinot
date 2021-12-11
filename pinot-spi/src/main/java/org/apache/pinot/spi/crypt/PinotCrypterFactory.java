@@ -21,7 +21,6 @@ package org.apache.pinot.spi.crypt;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
@@ -59,7 +58,7 @@ public class PinotCrypterFactory {
     }
     for (String scheme : schemes) {
       String className = schemesConfig.getProperty(scheme);
-      
+
       LOGGER.info("Got crypter class name {}, full crypter path {}, starting to initialize", scheme, className);
 
       try {

@@ -55,11 +55,12 @@ public interface PartitionLevelConsumer extends Closeable, PartitionGroupConsume
    * @return An iterable containing messages fetched from the stream partition and their offsets, as well as the
    * high watermark for this partition.
    */
-  default MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset, int timeoutMillis)
+  default MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset,
+      int timeoutMillis)
       throws java.util.concurrent.TimeoutException {
-   // TODO Issue 5359 remove this default implementation once all kafka consumers have migrated to use this API
-    long startOffsetLong = ((LongMsgOffset)startOffset).getOffset();
-    long endOffsetLong = endOffset == null ? Long.MAX_VALUE : ((LongMsgOffset)endOffset).getOffset();
+    // TODO Issue 5359 remove this default implementation once all kafka consumers have migrated to use this API
+    long startOffsetLong = ((LongMsgOffset) startOffset).getOffset();
+    long endOffsetLong = endOffset == null ? Long.MAX_VALUE : ((LongMsgOffset) endOffset).getOffset();
     return fetchMessages(startOffsetLong, endOffsetLong, timeoutMillis);
   }
 }

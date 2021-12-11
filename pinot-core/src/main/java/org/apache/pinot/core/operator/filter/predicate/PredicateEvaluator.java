@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
-import org.apache.pinot.core.query.request.context.predicate.Predicate;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -27,6 +27,11 @@ public interface PredicateEvaluator {
   /**
    * APIs for both dictionary based and raw value based predicate evaluator
    */
+
+  /**
+   * Get the predicate.
+   */
+  Predicate getPredicate();
 
   /**
    * Get the predicate type.

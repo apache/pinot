@@ -43,7 +43,8 @@ import org.slf4j.LoggerFactory;
  * Common code for metrics implementations.
  *
  */
-public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M extends AbstractMetrics.Meter, G extends AbstractMetrics.Gauge, T extends AbstractMetrics.Timer> {
+public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M extends AbstractMetrics.Meter,
+    G extends AbstractMetrics.Gauge, T extends AbstractMetrics.Timer> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractMetrics.class);
 
@@ -151,11 +152,12 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   private void addValueToTimer(String fullTimerName, final long duration, final TimeUnit timeUnit) {
     final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullTimerName);
-    PinotTimer timer = PinotMetricUtils.makePinotTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
+    PinotTimer timer =
+        PinotMetricUtils.makePinotTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
     if (timer != null) {
       timer.update(duration, timeUnit);
-    }  
-   }
+    }
+  }
 
   /**
    * Logs a value to a meter.
@@ -462,16 +464,49 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param valueCallback The callback function used to retrieve the value of the gauge
    */
   public void addCallbackGauge(final String metricName, final Callable<Long> valueCallback) {
-    PinotMetricUtils.makeGauge(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
-        PinotMetricUtils.makePinotGauge(avoid -> {
-          try {
-            return valueCallback.call();
-          } catch (Exception e) {
-            LOGGER.error("Caught exception", e);
-            Utils.rethrowException(e);
-            throw new AssertionError("Should not reach this");
-          }
-        }));
+    PinotMetricUtils
+        .makeGauge(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
+            PinotMetricUtils.makePinotGauge(avoid -> {
+              try {
+                return valueCallback.call();
+              } catch (Exception e) {
+                LOGGER.error("Caught exception", e);
+                Utils.rethrowException(e);
+                throw new AssertionError("Should not reach this");
+              }
+            }));
+  }
+
+  /**
+   * Removes a table gauge given the table name and the gauge.
+   * The add/remove is expected to work correctly in case of being invoked across multiple threads.
+   * @param tableName table name
+   * @param gauge the gauge to be removed
+   */
+  public void removeTableGauge(final String tableName, final G gauge) {
+    final String fullGaugeName;
+    String gaugeName = gauge.getGaugeName();
+    fullGaugeName = gaugeName + "." + getTableName(tableName);
+    removeGauge(fullGaugeName);
+  }
+
+  /**
+   * Remove gauge from Pinot metrics.
+   * @param gaugeName gauge name
+   */
+  public void removeGauge(final String gaugeName) {
+    if (_gaugeValues.remove(gaugeName) != null) {
+      removeCallbackGauge(gaugeName);
+    }
+  }
+
+  /**
+   * Remove callback gauge.
+   * @param metricName metric name
+   */
+  private void removeCallbackGauge(String metricName) {
+    PinotMetricUtils
+        .removeMetric(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName));
   }
 
   protected abstract QP[] getQueryPhases();
@@ -482,5 +517,15 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   protected String getTableName(String tableName) {
     return _isTableLevelMetricsEnabled || _allowedTables.contains(tableName) ? tableName : "allTables";
+  }
+
+  /**
+   * Check if the metric name appears in the gauge value map.
+   * @param metricName metric name
+   * @return True if the metric name appears on the gauge value map. False otherwise.
+   */
+  @VisibleForTesting
+  public boolean containsGauge(String metricName) {
+    return _gaugeValues.containsKey(metricName);
   }
 }

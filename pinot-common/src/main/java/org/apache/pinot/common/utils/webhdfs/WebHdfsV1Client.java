@@ -25,7 +25,7 @@ import org.apache.commons.httpclient.HttpMethod;
 import org.apache.commons.httpclient.methods.FileRequestEntity;
 import org.apache.commons.httpclient.methods.PutMethod;
 import org.apache.commons.httpclient.methods.RequestEntity;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,7 +108,8 @@ public class WebHdfsV1Client {
       return true;
     } catch (IOException e) {
       LOGGER.error(String
-              .format("Failed to execute the redirected request to upload segment to webhdfs: %s.", redirectedReqString),
+              .format("Failed to execute the redirected request to upload segment to webhdfs: %s.",
+                  redirectedReqString),
           e);
       return false;
     } finally {

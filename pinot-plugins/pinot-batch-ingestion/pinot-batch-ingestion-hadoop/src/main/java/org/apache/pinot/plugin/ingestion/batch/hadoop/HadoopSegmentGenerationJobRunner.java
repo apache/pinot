@@ -48,7 +48,6 @@ import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationJobUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -63,6 +62,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_INCLUDE_PROPERTY_NAME;
 
 
@@ -330,7 +330,7 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
     // hdfs:// portion of the path. Call getFileURI() to fix this up.
     File localFile = File.createTempFile("pinot-filepath-", ".txt");
     try (DataOutputStream dataOutputStream = new DataOutputStream(new FileOutputStream(localFile))) {
-      dataOutputStream.write(StringUtil.encodeUtf8(inputFileURI + " " + seqId));
+      dataOutputStream.write((inputFileURI + " " + seqId).getBytes(UTF_8));
       dataOutputStream.flush();
       outputDirFS.copyFromLocalFile(localFile, new Path(stagingInputDir, Integer.toString(seqId)).toUri());
     }

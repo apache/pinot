@@ -29,12 +29,14 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.query.exception.EarlyTerminationException;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
+import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.util.trace.TraceRunnable;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,28 +55,23 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
   protected final int _numOperators;
   protected final QueryContext _queryContext;
   protected final ExecutorService _executorService;
-  protected final long _endTimeMs;
-  protected final int _numThreads;
+  protected final int _numTasks;
   protected final Future[] _futures;
   // Use a _blockingQueue to store the intermediate results blocks
   protected final BlockingQueue<IntermediateResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
-  protected final AtomicLong totalWorkerThreadCpuTimeNs = new AtomicLong(0);
+  protected final AtomicLong _totalWorkerThreadCpuTimeNs = new AtomicLong(0);
 
-  protected BaseCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
-      long endTimeMs, int numThreads) {
+  protected BaseCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
     _operators = operators;
     _numOperators = _operators.size();
     _queryContext = queryContext;
     _executorService = executorService;
-    _endTimeMs = endTimeMs;
-    _numThreads = numThreads;
-    _futures = new Future[_numThreads];
-  }
 
-  protected BaseCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
-      long endTimeMs) {
-    this(operators, queryContext, executorService, endTimeMs,
-        CombineOperatorUtils.getNumThreadsForQuery(operators.size()));
+    // NOTE: We split the query execution into multiple tasks, where each task handles the query execution on multiple
+    //       (>=1) segments. These tasks are assigned to multiple execution threads so that they can run in parallel.
+    //       The parallelism is bounded by the task count.
+    _numTasks = CombineOperatorUtils.getNumTasksForQuery(operators.size(), queryContext.getMaxExecutionThreads());
+    _futures = new Future[_numTasks];
   }
 
   @Override
@@ -85,28 +82,34 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
     // behavior (even JVM crash) when processing queries against it.
     Phaser phaser = new Phaser(1);
 
-    for (int i = 0; i < _numThreads; i++) {
-      int threadIndex = i;
+    for (int i = 0; i < _numTasks; i++) {
+      int taskIndex = i;
       _futures[i] = _executorService.submit(new TraceRunnable() {
         @Override
         public void runJob() {
           ThreadTimer executionThreadTimer = new ThreadTimer();
-          executionThreadTimer.start();
 
-          // Register the thread to the phaser
-          // NOTE: If the phaser is terminated (returning negative value) when trying to register the thread, that
-          //       means the query execution has finished, and the main thread has deregistered itself and returned
-          //       the result. Directly return as no execution result will be taken.
+          // Register the task to the phaser
+          // NOTE: If the phaser is terminated (returning negative value) when trying to register the task, that means
+          //       the query execution has finished, and the main thread has deregistered itself and returned the
+          //       result. Directly return as no execution result will be taken.
           if (phaser.register() < 0) {
             return;
           }
           try {
-            processSegments(threadIndex);
+            processSegments(taskIndex);
+          } catch (EarlyTerminationException e) {
+            // Early-terminated by interruption (canceled by the main thread)
+          } catch (Exception e) {
+            // Caught exception, skip processing the remaining segments
+            LOGGER.error("Caught exception while processing query: {}", _queryContext, e);
+            onException(e);
           } finally {
+            onFinish();
             phaser.arriveAndDeregister();
           }
 
-          totalWorkerThreadCpuTimeNs.getAndAdd(executionThreadTimer.stopAndGetThreadTimeNs());
+          _totalWorkerThreadCpuTimeNs.getAndAdd(executionThreadTimer.getThreadTimeNs());
         }
       });
     }
@@ -127,35 +130,57 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
       // Deregister the main thread and wait for all threads done
       phaser.awaitAdvance(phaser.arriveAndDeregister());
     }
-    CombineOperatorUtils.setExecutionStatistics(mergedBlock, _operators, totalWorkerThreadCpuTimeNs.get());
+    /*
+     * _numTasks are number of async tasks submitted to the _executorService, but it does not mean Pinot server
+     * use those number of threads to concurrently process segments. Instead, if _executorService thread pool has
+     * less number of threads than _numTasks, the number of threads that used to concurrently process segments equals
+     * to the pool size.
+     * TODO: Get the actual number of query worker threads instead of using the default value.
+     */
+    int numServerThreads = Math.min(_numTasks, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
+    CombineOperatorUtils.setExecutionStatistics(mergedBlock, _operators, _totalWorkerThreadCpuTimeNs.get(),
+        numServerThreads);
     return mergedBlock;
   }
 
   /**
    * Executes query on one or more segments in a worker thread.
    */
-  protected void processSegments(int threadIndex) {
-    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numThreads) {
+  protected void processSegments(int taskIndex) {
+    for (int operatorIndex = taskIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
+      Operator operator = _operators.get(operatorIndex);
+      IntermediateResultsBlock resultsBlock;
       try {
-        IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) _operators.get(operatorIndex).nextBlock();
-        if (isQuerySatisfied(resultsBlock)) {
-          // Query is satisfied, skip processing the remaining segments
-          _blockingQueue.offer(resultsBlock);
-          return;
-        } else {
-          _blockingQueue.offer(resultsBlock);
+        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+          ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
-      } catch (EarlyTerminationException e) {
-        // Early-terminated by interruption (canceled by the main thread)
+        resultsBlock = (IntermediateResultsBlock) operator.nextBlock();
+      } finally {
+        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+          ((AcquireReleaseColumnsSegmentOperator) operator).release();
+        }
+      }
+      if (isQuerySatisfied(resultsBlock)) {
+        // Query is satisfied, skip processing the remaining segments
+        _blockingQueue.offer(resultsBlock);
         return;
-      } catch (Exception e) {
-        // Caught exception, skip processing the remaining operators
-        LOGGER.error("Caught exception while executing operator of index: {} (query: {})", operatorIndex, _queryContext,
-            e);
-        _blockingQueue.offer(new IntermediateResultsBlock(e));
-        return;
+      } else {
+        _blockingQueue.offer(resultsBlock);
       }
     }
+  }
+
+  /**
+   * Invoked when {@link #processSegments(int)} throws exception.
+   */
+  protected void onException(Exception e) {
+    _blockingQueue.offer(new IntermediateResultsBlock(e));
+  }
+
+  /**
+   * Invoked when {@link #processSegments(int)} is finished (called in the finally block).
+   */
+  protected void onFinish() {
   }
 
   /**
@@ -165,9 +190,10 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
       throws Exception {
     IntermediateResultsBlock mergedBlock = null;
     int numBlocksMerged = 0;
+    long endTimeMs = _queryContext.getEndTimeMs();
     while (numBlocksMerged < _numOperators) {
       IntermediateResultsBlock blockToMerge =
-          _blockingQueue.poll(_endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+          _blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
       if (blockToMerge == null) {
         // Query times out, skip merging the remaining results blocks
         LOGGER.error("Timed out while polling results block, numBlocksMerged: {} (query: {})", numBlocksMerged,
@@ -208,4 +234,9 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
    */
   protected abstract void mergeResultsBlocks(IntermediateResultsBlock mergedBlock,
       IntermediateResultsBlock blockToMerge);
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return _operators;
+  }
 }

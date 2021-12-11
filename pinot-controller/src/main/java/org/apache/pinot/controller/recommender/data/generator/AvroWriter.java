@@ -28,9 +28,9 @@ import java.util.Map;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
+import org.apache.pinot.plugin.inputformat.avro.AvroSchemaUtil;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.plugin.inputformat.avro.AvroSchemaUtil;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 

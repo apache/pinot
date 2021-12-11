@@ -249,14 +249,16 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
     assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
-    // multiple dictionary based aggregation functions, dictionary columns: answered by DictionaryBasedAggregationOperator
+    // multiple dictionary based aggregation functions, dictionary columns: answered by
+    // DictionaryBasedAggregationOperator
     pqlQuery = "SELECT MAX(ArrTime),MIN(ArrTime) FROM " + tableName;
     response = postQuery(pqlQuery);
     assertEquals(response.get("numEntriesScannedPostFilter").asLong(), 0);
     assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
     assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
-    // multiple aggregation functions, mix of dictionary based and non dictionary based: not answered by DictionaryBasedAggregationOperator
+    // multiple aggregation functions, mix of dictionary based and non dictionary based: not answered by
+    // DictionaryBasedAggregationOperator
     pqlQuery = "SELECT MAX(ArrTime),COUNT(ArrTime) FROM " + tableName;
     response = postQuery(pqlQuery);
     assertEquals(response.get("numEntriesScannedPostFilter").asLong(), response.get("numDocsScanned").asLong());

@@ -20,9 +20,6 @@ package org.apache.pinot.tools.service;
 
 import org.apache.pinot.common.utils.ServiceStatus;
 
-import static org.apache.pinot.common.utils.ServiceStatus.STATUS_DESCRIPTION_INIT;
-import static org.apache.pinot.common.utils.ServiceStatus.STATUS_DESCRIPTION_STARTED;
-
 
 public class PinotServiceManagerStatusCallback implements ServiceStatus.ServiceStatusCallback {
   private final PinotServiceManager _pinotServiceManager;
@@ -33,19 +30,23 @@ public class PinotServiceManagerStatusCallback implements ServiceStatus.ServiceS
 
   @Override
   public ServiceStatus.Status getServiceStatus() {
+    if (_pinotServiceManager.isShuttingDown()) {
+      return ServiceStatus.Status.SHUTTING_DOWN;
+    }
     if (_pinotServiceManager.isStarted()) {
       return ServiceStatus.Status.GOOD;
-    } else {
-      return ServiceStatus.Status.STARTING;
     }
+    return ServiceStatus.Status.STARTING;
   }
 
   @Override
   public String getStatusDescription() {
-    if (_pinotServiceManager.isStarted()) {
-      return STATUS_DESCRIPTION_STARTED;
-    } else {
-      return STATUS_DESCRIPTION_INIT;
+    if (_pinotServiceManager.isShuttingDown()) {
+      return ServiceStatus.STATUS_DESCRIPTION_SHUTTING_DOWN;
     }
+    if (_pinotServiceManager.isStarted()) {
+      return ServiceStatus.STATUS_DESCRIPTION_STARTED;
+    }
+    return ServiceStatus.STATUS_DESCRIPTION_INIT;
   }
 }

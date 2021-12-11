@@ -59,7 +59,8 @@ public class ValidationManagerStatelessTest extends ControllerTest {
   @Test
   public void testRebuildBrokerResourceWhenBrokerAdded()
       throws Exception {
-    // Check that the first table we added doesn't need to be rebuilt(case where ideal state brokers and brokers in broker resource are the same.
+    // Check that the first table we added doesn't need to be rebuilt(case where ideal state brokers and brokers in
+    // broker resource are the same.
     String partitionName = _offlineTableConfig.getTableName();
     HelixAdmin helixAdmin = _helixManager.getClusterManagmentTool();
 
@@ -74,7 +75,8 @@ public class ValidationManagerStatelessTest extends ControllerTest {
     _helixResourceManager.addTable(offlineTableConfigTwo);
     String partitionNameTwo = offlineTableConfigTwo.getTableName();
 
-    // Add a new broker manually such that the ideal state is not updated and ensure that rebuild broker resource is called
+    // Add a new broker manually such that the ideal state is not updated and ensure that rebuild broker resource is
+    // called
     final String brokerId = "Broker_localhost_2";
     InstanceConfig instanceConfig = new InstanceConfig(brokerId);
     instanceConfig.setInstanceEnabled(true);

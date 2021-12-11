@@ -26,10 +26,12 @@ import java.util.List;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AuthenticationFilter;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -42,14 +44,17 @@ import org.slf4j.LoggerFactory;
 
 public class ControllerAdminApiApplication extends ResourceConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerAdminApiApplication.class);
+  public static final String PINOT_CONFIGURATION = "pinotConfiguration";
 
+  private final String _controllerResourcePackages;
   private HttpServer _httpServer;
-  private static final String RESOURCE_PACKAGE = "org.apache.pinot.controller.api.resources";
 
-  public ControllerAdminApiApplication() {
+  public ControllerAdminApiApplication(ControllerConf conf) {
     super();
+    property(PINOT_CONFIGURATION, conf);
 
-    packages(RESOURCE_PACKAGE);
+    _controllerResourcePackages = conf.getControllerResourcePackages();
+    packages(_controllerResourcePackages);
     // TODO See ControllerResponseFilter
 //    register(new LoggingFeature());
     register(JacksonFeature.class);
@@ -74,8 +79,9 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     } catch (IOException e) {
       throw new RuntimeException("Failed to start http server", e);
     }
-
-    setupSwagger(_httpServer);
+    synchronized (PinotReflectionUtils.getReflectionLock()) {
+      setupSwagger(_httpServer);
+    }
 
     ClassLoader classLoader = ControllerAdminApiApplication.class.getClassLoader();
 
@@ -85,7 +91,10 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     // So, we setup specific handlers for static resource directory. index.html is served directly
     // by a jersey handler
 
-    _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/"), "/index.html");
+    _httpServer.getServerConfiguration()
+        .addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/"), "/index.html");
+    _httpServer.getServerConfiguration()
+        .addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/images/"), "/images/");
     _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/js/"), "/js/");
   }
 
@@ -97,7 +106,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     beanConfig.setVersion("1.0");
     beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
     beanConfig.setBasePath("/");
-    beanConfig.setResourcePackage(RESOURCE_PACKAGE);
+    beanConfig.setResourcePackage(_controllerResourcePackages);
     beanConfig.setScan(true);
 
     ClassLoader loader = this.getClass().getClassLoader();

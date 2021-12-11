@@ -37,6 +37,8 @@ import org.apache.helix.model.StateModelDefinition.StateModelDefinitionProperty;
  *
  */
 public class PinotHelixBrokerResourceOnlineOfflineStateModelGenerator {
+  private PinotHelixBrokerResourceOnlineOfflineStateModelGenerator() {
+  }
 
   public static final String PINOT_BROKER_RESOURCE_ONLINE_OFFLINE_STATE_MODEL = "BrokerResourceOnlineOfflineStateModel";
 

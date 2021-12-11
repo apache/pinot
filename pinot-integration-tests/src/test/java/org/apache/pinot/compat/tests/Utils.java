@@ -27,6 +27,8 @@ import java.util.stream.Stream;
 
 
 public class Utils {
+  private Utils() {
+  }
 
   /**
    * Replace all occurrence of a string in originalDataFile and write the replaced content to replacedDataFile.

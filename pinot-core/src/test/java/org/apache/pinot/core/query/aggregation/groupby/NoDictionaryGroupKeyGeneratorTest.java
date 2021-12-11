@@ -30,18 +30,17 @@ import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.plan.TransformPlanNode;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -50,6 +49,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -147,8 +147,8 @@ public class NoDictionaryGroupKeyGeneratorTest {
 
     // Create transform operator and block
     // NOTE: put all columns into group-by so that transform operator has expressions for all columns
-    String query = "SELECT COUNT(*) FROM table GROUP BY " + StringUtils.join(COLUMNS, ", ");
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(query);
+    String query = "SELECT COUNT(*) FROM testTable GROUP BY " + StringUtils.join(COLUMNS, ", ");
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
     List<ExpressionContext> expressions = new ArrayList<>();
     for (String column : COLUMNS) {
       expressions.add(ExpressionContext.forIdentifier(column));

@@ -27,24 +27,28 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
-import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
-import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.plan.maker.PlanMaker;
+import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
+import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 
 
@@ -55,6 +59,8 @@ public abstract class BaseQueriesTest {
   protected static final Pql2Compiler PQL_COMPILER = new Pql2Compiler();
   protected static final CalciteSqlCompiler SQL_COMPILER = new CalciteSqlCompiler();
   protected static final PlanMaker PLAN_MAKER = new InstancePlanMakerImplV2();
+  protected static final QueryOptimizer OPTIMIZER = new QueryOptimizer();
+
   protected static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(2);
 
   protected abstract String getFilter();
@@ -184,7 +190,7 @@ public abstract class BaseQueriesTest {
   @SuppressWarnings("SameParameterValue")
   protected BrokerResponseNative getBrokerResponseForSqlQuery(String sqlQuery, PlanMaker planMaker) {
     BrokerRequest brokerRequest = SQL_COMPILER.compileToBrokerRequest(sqlQuery);
-    Map<String, String> queryOptions = brokerRequest.getQueryOptions();
+    Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
     if (queryOptions == null) {
       queryOptions = new HashMap<>();
       brokerRequest.getPinotQuery().setQueryOptions(queryOptions);
@@ -202,9 +208,13 @@ public abstract class BaseQueriesTest {
    */
   private BrokerResponseNative getBrokerResponse(QueryContext queryContext, PlanMaker planMaker) {
     // Server side.
-    Plan plan = planMaker.makeInstancePlan(getIndexSegments(), queryContext, EXECUTOR_SERVICE,
-        System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
-    DataTable instanceResponse = plan.execute();
+    queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    Plan plan = planMaker.makeInstancePlan(getIndexSegments(), queryContext, EXECUTOR_SERVICE);
+
+    BrokerRequest brokerRequest = queryContext.getBrokerRequest();
+    DataTable instanceResponse =
+        brokerRequest != null && brokerRequest.getPinotQuery() != null && brokerRequest.getPinotQuery().isExplain()
+            ? ServerQueryExecutorV1Impl.processExplainPlanQueries(plan) : plan.execute();
 
     // Broker side.
     Map<String, Object> properties = new HashMap<>();
@@ -224,10 +234,44 @@ public abstract class BaseQueriesTest {
       Utils.rethrowException(e);
     }
 
-    BrokerResponseNative brokerResponse = brokerReduceService
-        .reduceOnDataTable(queryContext.getBrokerRequest(), dataTableMap,
+    BrokerResponseNative brokerResponse =
+        brokerReduceService.reduceOnDataTable(queryContext.getBrokerRequest(), dataTableMap,
             CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS, null);
     brokerReduceService.shutDown();
     return brokerResponse;
+  }
+
+  /**
+   * Run optimized SQL query on multiple index segments.
+   * <p>Use this to test the whole flow from server to broker.
+   * <p>The result should be equivalent to querying 4 identical index segments.
+   */
+  protected BrokerResponseNative getBrokerResponseForOptimizedSqlQuery(String sqlQuery, @Nullable Schema schema) {
+    return getBrokerResponseForOptimizedSqlQuery(sqlQuery, null, schema, PLAN_MAKER);
+  }
+
+  protected BrokerResponseNative getBrokerResponseForOptimizedSqlQuery(String sqlQuery, @Nullable TableConfig config,
+      @Nullable Schema schema) {
+    return getBrokerResponseForOptimizedSqlQuery(sqlQuery, config, schema, PLAN_MAKER);
+  }
+
+  /**
+   * Run optimized SQL query on multiple index segments with custom plan maker.
+   * <p>Use this to test the whole flow from server to broker.
+   * <p>The result should be equivalent to querying 4 identical index segments.
+   */
+  protected BrokerResponseNative getBrokerResponseForOptimizedSqlQuery(String sqlQuery, @Nullable TableConfig config,
+      @Nullable Schema schema, PlanMaker planMaker) {
+    BrokerRequest brokerRequest = SQL_COMPILER.compileToBrokerRequest(sqlQuery);
+    OPTIMIZER.optimize(brokerRequest.getPinotQuery(), config, schema);
+    Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
+    if (queryOptions == null) {
+      queryOptions = new HashMap<>();
+      brokerRequest.getPinotQuery().setQueryOptions(queryOptions);
+    }
+    queryOptions.put(Request.QueryOptionKey.GROUP_BY_MODE, Request.SQL);
+    queryOptions.put(Request.QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
+    QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
+    return getBrokerResponse(queryContext, planMaker);
   }
 }

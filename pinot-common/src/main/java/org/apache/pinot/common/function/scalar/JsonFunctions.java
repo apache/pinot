@@ -19,17 +19,18 @@
 package org.apache.pinot.common.function.scalar;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.annotations.VisibleForTesting;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
-import com.jayway.jsonpath.Option;
+import com.jayway.jsonpath.ParseContext;
+import com.jayway.jsonpath.Predicate;
+import com.jayway.jsonpath.spi.cache.CacheProvider;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
-import com.jayway.jsonpath.spi.json.JsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
-import com.jayway.jsonpath.spi.mapper.MappingProvider;
-import java.util.EnumSet;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -46,29 +47,17 @@ import org.apache.pinot.spi.utils.JsonUtils;
  *   </code>
  */
 public class JsonFunctions {
-  static {
-    Configuration.setDefaults(new Configuration.Defaults() {
-      private final JsonProvider jsonProvider = new JacksonJsonProvider();
-      private final MappingProvider mappingProvider = new JacksonMappingProvider();
-
-      @Override
-      public JsonProvider jsonProvider() {
-        return jsonProvider;
-      }
-
-      @Override
-      public MappingProvider mappingProvider() {
-        return mappingProvider;
-      }
-
-      @Override
-      public Set<Option> options() {
-        return EnumSet.noneOf(Option.class);
-      }
-    });
+  private JsonFunctions() {
   }
 
-  private JsonFunctions() {
+  private static final Predicate[] NO_PREDICATES = new Predicate[0];
+  private static final ParseContext PARSE_CONTEXT = JsonPath.using(
+      new Configuration.ConfigurationBuilder().jsonProvider(new ArrayAwareJacksonJsonProvider())
+          .mappingProvider(new JacksonMappingProvider()).build());
+
+  static {
+    // Set the JsonPath cache before the cache is accessed
+    CacheProvider.setCache(new JsonPathCache());
   }
 
   /**
@@ -95,9 +84,9 @@ public class JsonFunctions {
   @ScalarFunction
   public static Object jsonPath(Object object, String jsonPath) {
     if (object instanceof String) {
-      return JsonPath.read((String) object, jsonPath);
+      return PARSE_CONTEXT.parse((String) object).read(jsonPath, NO_PREDICATES);
     }
-    return JsonPath.read(object, jsonPath);
+    return PARSE_CONTEXT.parse(object).read(jsonPath, NO_PREDICATES);
   }
 
   /**
@@ -107,12 +96,18 @@ public class JsonFunctions {
   public static Object[] jsonPathArray(Object object, String jsonPath)
       throws JsonProcessingException {
     if (object instanceof String) {
-      return convertObjectToArray(JsonPath.read((String) object, jsonPath));
+      return convertObjectToArray(PARSE_CONTEXT.parse((String) object).read(jsonPath, NO_PREDICATES));
     }
-    if (object instanceof Object[]) {
-      return convertObjectToArray(JsonPath.read(JsonUtils.objectToString(object), jsonPath));
+    return convertObjectToArray(PARSE_CONTEXT.parse(object).read(jsonPath, NO_PREDICATES));
+  }
+
+  @ScalarFunction
+  public static Object[] jsonPathArrayDefaultEmpty(Object object, String jsonPath) {
+    try {
+      return jsonPathArray(object, jsonPath);
+    } catch (Exception e) {
+      return new Object[0];
     }
-    return convertObjectToArray(JsonPath.read(object, jsonPath));
   }
 
   private static Object[] convertObjectToArray(Object arrayObject) {
@@ -197,6 +192,38 @@ public class JsonFunctions {
       return jsonPathDouble(object, jsonPath);
     } catch (Exception e) {
       return defaultValue;
+    }
+  }
+
+  @VisibleForTesting
+  static class ArrayAwareJacksonJsonProvider extends JacksonJsonProvider {
+    @Override
+    public boolean isArray(Object obj) {
+      return (obj instanceof List) || (obj instanceof Object[]);
+    }
+
+    @Override
+    public Object getArrayIndex(Object obj, int idx) {
+      if (obj instanceof Object[]) {
+        return ((Object[]) obj)[idx];
+      }
+      return super.getArrayIndex(obj, idx);
+    }
+
+    @Override
+    public int length(Object obj) {
+      if (obj instanceof Object[]) {
+        return ((Object[]) obj).length;
+      }
+      return super.length(obj);
+    }
+
+    @Override
+    public Iterable<?> toIterable(Object obj) {
+      if (obj instanceof Object[]) {
+        return Arrays.asList((Object[]) obj);
+      }
+      return super.toIterable(obj);
     }
   }
 }

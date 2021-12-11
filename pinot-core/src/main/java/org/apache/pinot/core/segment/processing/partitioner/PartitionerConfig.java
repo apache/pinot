@@ -42,8 +42,7 @@ public class PartitionerConfig {
   @JsonCreator
   private PartitionerConfig(
       @JsonProperty(value = "partitionerType", required = true) PartitionerFactory.PartitionerType partitionerType,
-      @JsonProperty(value = "numPartitions") int numPartitions,
-      @JsonProperty(value = "columnName") String columnName,
+      @JsonProperty(value = "numPartitions") int numPartitions, @JsonProperty(value = "columnName") String columnName,
       @JsonProperty(value = "transformFunction") String transformFunction,
       @JsonProperty(value = "columnPartitionConfig") ColumnPartitionConfig columnPartitionConfig) {
     _partitionerType = partitionerType;

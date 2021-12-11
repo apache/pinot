@@ -31,14 +31,19 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.CommonConstants.Segment;
+import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.Identifier;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
+import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
+import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
+import org.apache.pinot.spi.utils.CommonConstants.Segment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,7 +71,7 @@ public class PartitionSegmentPruner implements SegmentPruner {
   }
 
   @Override
-  public void init(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
+  public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
     // Bulk load partition info for all online segments
     int numSegments = onlineSegments.size();
     List<String> segments = new ArrayList<>(numSegments);
@@ -75,7 +80,7 @@ public class PartitionSegmentPruner implements SegmentPruner {
       segments.add(segment);
       segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
     }
-    List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT);
+    List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
     for (int i = 0; i < numSegments; i++) {
       String segment = segments.get(i);
       PartitionInfo partitionInfo = extractPartitionInfoFromSegmentZKMetadataZNRecord(segment, znRecords.get(i));
@@ -120,13 +125,12 @@ public class PartitionSegmentPruner implements SegmentPruner {
       return INVALID_PARTITION_INFO;
     }
 
-    return new PartitionInfo(PartitionFunctionFactory
-        .getPartitionFunction(columnPartitionMetadata.getFunctionName(), columnPartitionMetadata.getNumPartitions()),
-        columnPartitionMetadata.getPartitions());
+    return new PartitionInfo(PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata.getFunctionName(),
+        columnPartitionMetadata.getNumPartitions()), columnPartitionMetadata.getPartitions());
   }
 
   @Override
-  public synchronized void onExternalViewChange(ExternalView externalView, IdealState idealState,
+  public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments) {
     // NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
     //       ones. The refreshed segment ZK metadata change won't be picked up.
@@ -150,21 +154,90 @@ public class PartitionSegmentPruner implements SegmentPruner {
 
   @Override
   public Set<String> prune(BrokerRequest brokerRequest, Set<String> segments) {
-    FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
-    if (filterQueryTree == null) {
-      return segments;
-    }
-    Set<String> selectedSegments = new HashSet<>();
-    for (String segment : segments) {
-      PartitionInfo partitionInfo = _partitionInfoMap.get(segment);
-      if (partitionInfo == null || partitionInfo == INVALID_PARTITION_INFO || isPartitionMatch(filterQueryTree,
-          partitionInfo)) {
-        selectedSegments.add(segment);
+    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
+    if (pinotQuery != null) {
+      // SQL
+
+      Expression filterExpression = pinotQuery.getFilterExpression();
+      if (filterExpression == null) {
+        return segments;
       }
+      Set<String> selectedSegments = new HashSet<>();
+      for (String segment : segments) {
+        PartitionInfo partitionInfo = _partitionInfoMap.get(segment);
+        if (partitionInfo == null || partitionInfo == INVALID_PARTITION_INFO || isPartitionMatch(filterExpression,
+            partitionInfo)) {
+          selectedSegments.add(segment);
+        }
+      }
+      return selectedSegments;
+    } else {
+      // PQL
+      FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
+      if (filterQueryTree == null) {
+        return segments;
+      }
+      Set<String> selectedSegments = new HashSet<>();
+      for (String segment : segments) {
+        PartitionInfo partitionInfo = _partitionInfoMap.get(segment);
+        if (partitionInfo == null || partitionInfo == INVALID_PARTITION_INFO || isPartitionMatch(filterQueryTree,
+            partitionInfo)) {
+          selectedSegments.add(segment);
+        }
+      }
+      return selectedSegments;
     }
-    return selectedSegments;
   }
 
+  private boolean isPartitionMatch(Expression filterExpression, PartitionInfo partitionInfo) {
+    Function function = filterExpression.getFunctionCall();
+    FilterKind filterKind = FilterKind.valueOf(function.getOperator());
+    List<Expression> operands = function.getOperands();
+    switch (filterKind) {
+      case AND:
+        for (Expression child : operands) {
+          if (!isPartitionMatch(child, partitionInfo)) {
+            return false;
+          }
+        }
+        return true;
+      case OR:
+        for (Expression child : operands) {
+          if (isPartitionMatch(child, partitionInfo)) {
+            return true;
+          }
+        }
+        return false;
+      case EQUALS: {
+        Identifier identifier = operands.get(0).getIdentifier();
+        if (identifier != null && identifier.getName().equals(_partitionColumn)) {
+          return partitionInfo._partitions.contains(
+              partitionInfo._partitionFunction.getPartition(operands.get(1).getLiteral().getFieldValue().toString()));
+        } else {
+          return true;
+        }
+      }
+      case IN: {
+        Identifier identifier = operands.get(0).getIdentifier();
+        if (identifier != null && identifier.getName().equals(_partitionColumn)) {
+          int numOperands = operands.size();
+          for (int i = 1; i < numOperands; i++) {
+            if (partitionInfo._partitions.contains(partitionInfo._partitionFunction.getPartition(
+                operands.get(i).getLiteral().getFieldValue().toString()))) {
+              return true;
+            }
+          }
+          return false;
+        } else {
+          return true;
+        }
+      }
+      default:
+        return true;
+    }
+  }
+
+  @Deprecated
   private boolean isPartitionMatch(FilterQueryTree filterQueryTree, PartitionInfo partitionInfo) {
     switch (filterQueryTree.getOperator()) {
       case AND:
@@ -191,6 +264,7 @@ public class PartitionSegmentPruner implements SegmentPruner {
           }
           return false;
         }
+        return true;
       default:
         return true;
     }

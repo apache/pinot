@@ -25,6 +25,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.handler.ssl.SslHandshakeCompletionEvent;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -35,9 +36,11 @@ import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
+import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
@@ -59,10 +62,24 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   private final TDeserializer _deserializer = new TDeserializer(new TCompactProtocol.Factory());
   private final QueryScheduler _queryScheduler;
   private final ServerMetrics _serverMetrics;
+  private final AccessControl _accessControl;
 
-  public InstanceRequestHandler(QueryScheduler queryScheduler, ServerMetrics serverMetrics) {
+  public InstanceRequestHandler(QueryScheduler queryScheduler, ServerMetrics serverMetrics,
+      AccessControl accessControl) {
     _queryScheduler = queryScheduler;
     _serverMetrics = serverMetrics;
+    _accessControl = accessControl;
+  }
+
+  @Override
+  public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+    super.userEventTriggered(ctx, evt);
+    if (evt instanceof SslHandshakeCompletionEvent) {
+      if (!_accessControl.isAuthorizedChannel(ctx)) {
+        ctx.disconnect();
+        LOGGER.error("Exception while processing instance request: Unauthorized access to pinot-server");
+      }
+    }
   }
 
   /**
@@ -74,6 +91,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     long queryArrivalTimeMs = 0;
     InstanceRequest instanceRequest = null;
     byte[] requestBytes = null;
+    String tableNameWithType = null;
 
     try {
       // Put all code inside try block to catch all exceptions.
@@ -93,10 +111,12 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics, queryArrivalTimeMs);
       queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
           .stopAndRecord();
+      tableNameWithType = queryRequest.getTableNameWithType();
 
       // Submit query for execution and register callback for execution results.
       Futures.addCallback(_queryScheduler.submit(queryRequest),
-          createCallback(ctx, queryArrivalTimeMs, instanceRequest, queryRequest), MoreExecutors.directExecutor());
+          createCallback(ctx, tableNameWithType, queryArrivalTimeMs, instanceRequest, queryRequest),
+          MoreExecutors.directExecutor());
     } catch (Exception e) {
       if (e instanceof TException) {
         // Deserialization exception
@@ -107,22 +127,22 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       String hexString = requestBytes != null ? BytesUtils.toHexString(requestBytes) : "";
       long reqestId = instanceRequest != null ? instanceRequest.getRequestId() : 0;
       LOGGER.error("Exception while processing instance request: {}", hexString, e);
-      sendErrorResponse(ctx, reqestId, queryArrivalTimeMs, DataTableBuilder.getEmptyDataTable(), e);
+      sendErrorResponse(ctx, reqestId, tableNameWithType, queryArrivalTimeMs, DataTableBuilder.getEmptyDataTable(), e);
     }
   }
 
-  private FutureCallback<byte[]> createCallback(ChannelHandlerContext ctx, long queryArrivalTimeMs,
-      InstanceRequest instanceRequest, ServerQueryRequest queryRequest) {
+  private FutureCallback<byte[]> createCallback(ChannelHandlerContext ctx, String tableNameWithType,
+      long queryArrivalTimeMs, InstanceRequest instanceRequest, ServerQueryRequest queryRequest) {
     return new FutureCallback<byte[]>() {
       @Override
       public void onSuccess(@Nullable byte[] responseBytes) {
         if (responseBytes != null) {
           // responseBytes contains either query results or exception.
-          sendResponse(ctx, queryArrivalTimeMs, responseBytes);
+          sendResponse(ctx, queryRequest.getTableNameWithType(), queryArrivalTimeMs, responseBytes);
         } else {
           // Send exception response.
-          sendErrorResponse(ctx, queryRequest.getRequestId(), queryArrivalTimeMs, DataTableBuilder.getEmptyDataTable(),
-              new Exception("Null query response."));
+          sendErrorResponse(ctx, queryRequest.getRequestId(), tableNameWithType, queryArrivalTimeMs,
+              DataTableBuilder.getEmptyDataTable(), new Exception("Null query response."));
         }
       }
 
@@ -130,8 +150,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       public void onFailure(Throwable t) {
         // Send exception response.
         LOGGER.error("Exception while processing instance request", t);
-        sendErrorResponse(ctx, instanceRequest.getRequestId(), queryArrivalTimeMs, DataTableBuilder.getEmptyDataTable(),
-            new Exception(t));
+        sendErrorResponse(ctx, instanceRequest.getRequestId(), tableNameWithType, queryArrivalTimeMs,
+            DataTableBuilder.getEmptyDataTable(), new Exception(t));
       }
     };
   }
@@ -142,21 +162,21 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     // will only be called if for some remote reason we are unable to handle exceptions in channelRead0.
     String message = "Unhandled Exception in " + getClass().getCanonicalName();
     LOGGER.error(message, cause);
-    sendErrorResponse(ctx, 0, System.currentTimeMillis(), DataTableBuilder.getEmptyDataTable(),
+    sendErrorResponse(ctx, 0, null, System.currentTimeMillis(), DataTableBuilder.getEmptyDataTable(),
         new Exception(message, cause));
   }
 
   /**
    * Send an exception back to broker as response to the query request.
    */
-  private void sendErrorResponse(ChannelHandlerContext ctx, long requestId, long queryArrivalTimeMs,
-      DataTable dataTable, Exception e) {
+  private void sendErrorResponse(ChannelHandlerContext ctx, long requestId, String tableNameWithType,
+      long queryArrivalTimeMs, DataTable dataTable, Exception e) {
     try {
       Map<String, String> dataTableMetadata = dataTable.getMetadata();
-      dataTableMetadata.put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(requestId));
+      dataTableMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
       dataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
       byte[] serializedDataTable = dataTable.toBytes();
-      sendResponse(ctx, queryArrivalTimeMs, serializedDataTable);
+      sendResponse(ctx, tableNameWithType, queryArrivalTimeMs, serializedDataTable);
     } catch (Exception exception) {
       LOGGER.error("Exception while sending query processing error to Broker.", exception);
     } finally {
@@ -169,7 +189,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   /**
    * Send a response (either query results or exception) back to broker as response to the query request.
    */
-  private void sendResponse(ChannelHandlerContext ctx, long queryArrivalTimeMs, byte[] serializedDataTable) {
+  private void sendResponse(ChannelHandlerContext ctx, String tableNameWithType, long queryArrivalTimeMs,
+      byte[] serializedDataTable) {
     long sendResponseStartTimeMs = System.currentTimeMillis();
     int queryProcessingTimeMs = (int) (sendResponseStartTimeMs - queryArrivalTimeMs);
     ctx.writeAndFlush(Unpooled.wrappedBuffer(serializedDataTable)).addListener(f -> {
@@ -177,14 +198,13 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       int sendResponseLatencyMs = (int) (sendResponseEndTimeMs - sendResponseStartTimeMs);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_RESPONSES_SENT, 1);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_BYTES_SENT, serializedDataTable.length);
-      _serverMetrics.addTimedValue(ServerTimer.NETTY_CONNECTION_SEND_RESPONSE_LATENCY, sendResponseLatencyMs,
-          TimeUnit.MILLISECONDS);
+      _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.NETTY_CONNECTION_SEND_RESPONSE_LATENCY,
+          sendResponseLatencyMs, TimeUnit.MILLISECONDS);
 
       int totalQueryTimeMs = (int) (sendResponseEndTimeMs - queryArrivalTimeMs);
       if (totalQueryTimeMs > SLOW_QUERY_LATENCY_THRESHOLD_MS) {
-        LOGGER.info(
-            "Slow query: request handler processing time: {}, send response latency: {}, total time to handle request: {}",
-            queryProcessingTimeMs, sendResponseLatencyMs, totalQueryTimeMs);
+        LOGGER.info("Slow query: request handler processing time: {}, send response latency: {}, total time to handle "
+            + "request: {}", queryProcessingTimeMs, sendResponseLatencyMs, totalQueryTimeMs);
       }
     });
   }

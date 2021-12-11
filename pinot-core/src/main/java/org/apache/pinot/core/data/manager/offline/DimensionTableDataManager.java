@@ -30,9 +30,9 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -52,7 +52,7 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 @ThreadSafe
 public class DimensionTableDataManager extends OfflineTableDataManager {
   // Storing singletons per table in a HashMap
-  private static final Map<String, DimensionTableDataManager> _instances = new ConcurrentHashMap<>();
+  private static final Map<String, DimensionTableDataManager> INSTANCES = new ConcurrentHashMap<>();
 
   private DimensionTableDataManager() {
   }
@@ -62,16 +62,17 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
    * instance should be properly initialized via {@link #init} method before using.
    */
   public static DimensionTableDataManager createInstanceByTableName(String tableNameWithType) {
-    return _instances.computeIfAbsent(tableNameWithType, k -> new DimensionTableDataManager());
+    return INSTANCES.computeIfAbsent(tableNameWithType, k -> new DimensionTableDataManager());
   }
 
   @VisibleForTesting
-  public static DimensionTableDataManager registerDimensionTable(String tableNameWithType, DimensionTableDataManager instance) {
-    return _instances.computeIfAbsent(tableNameWithType, k -> instance);
+  public static DimensionTableDataManager registerDimensionTable(String tableNameWithType,
+      DimensionTableDataManager instance) {
+    return INSTANCES.computeIfAbsent(tableNameWithType, k -> instance);
   }
 
   public static DimensionTableDataManager getInstanceByTableName(String tableNameWithType) {
-    return _instances.get(tableNameWithType);
+    return INSTANCES.get(tableNameWithType);
   }
 
   /**
@@ -116,8 +117,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
       _logger.info("Successfully removed segment {} and reloaded lookup table: {}", segmentName, getTableName());
     } catch (Exception e) {
       throw new RuntimeException(String
-          .format("Error reloading lookup table after segment remove ({}) for table: {}", segmentName, getTableName()),
-          e);
+          .format("Error reloading lookup table after segment remove '%s' for table: '%s'", segmentName,
+              getTableName()), e);
     }
   }
 
@@ -130,7 +131,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     try {
       _lookupTable.clear();
       List<SegmentDataManager> segmentManagers = acquireAllSegments();
-      if (segmentManagers.size() == 0) {
+      if (segmentManagers.isEmpty()) {
         return;
       }
 

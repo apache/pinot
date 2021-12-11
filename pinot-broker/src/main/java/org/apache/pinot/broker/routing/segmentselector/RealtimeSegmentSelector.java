@@ -30,10 +30,11 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentName;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 
 
 /**
@@ -57,12 +58,12 @@ public class RealtimeSegmentSelector implements SegmentSelector {
   private volatile Set<String> _llcSegments;
 
   @Override
-  public void init(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
-    onExternalViewChange(externalView, idealState, onlineSegments);
+  public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
+    onAssignmentChange(idealState, externalView, onlineSegments);
   }
 
   @Override
-  public void onExternalViewChange(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
+  public void onAssignmentChange(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
     // Group HLC segments by their group id
     // NOTE: Use TreeMap so that group ids are sorted and the result is deterministic
     Map<String, Set<String>> groupIdToHLCSegmentsMap = new TreeMap<>();
@@ -95,17 +96,18 @@ public class RealtimeSegmentSelector implements SegmentSelector {
         if (instanceStateMap.containsValue(SegmentStateModel.CONSUMING)) {
           // Keep the first CONSUMING segment for each partition
           LLCSegmentName llcSegmentName = new LLCSegmentName(segment);
-          partitionIdToFirstConsumingLLCSegmentMap.compute(llcSegmentName.getPartitionGroupId(), (k, consumingSegment) -> {
-            if (consumingSegment == null) {
-              return llcSegmentName;
-            } else {
-              if (llcSegmentName.getSequenceNumber() < consumingSegment.getSequenceNumber()) {
-                return llcSegmentName;
-              } else {
-                return consumingSegment;
-              }
-            }
-          });
+          partitionIdToFirstConsumingLLCSegmentMap
+              .compute(llcSegmentName.getPartitionGroupId(), (k, consumingSegment) -> {
+                if (consumingSegment == null) {
+                  return llcSegmentName;
+                } else {
+                  if (llcSegmentName.getSequenceNumber() < consumingSegment.getSequenceNumber()) {
+                    return llcSegmentName;
+                  } else {
+                    return consumingSegment;
+                  }
+                }
+              });
         } else {
           completedLLCSegments.add(segment);
         }
@@ -149,7 +151,9 @@ public class RealtimeSegmentSelector implements SegmentSelector {
     }
 
     // Handle HLC and LLC coexisting scenario, select HLC segments only if it is forced in the routing options
-    Map<String, String> debugOptions = brokerRequest.getDebugOptions();
+    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
+    Map<String, String> debugOptions =
+        pinotQuery != null ? pinotQuery.getDebugOptions() : brokerRequest.getDebugOptions();
     if (debugOptions != null) {
       String routingOptions = debugOptions.get(ROUTING_OPTIONS_KEY);
       if (routingOptions != null && routingOptions.toUpperCase().contains(FORCE_HLC)) {

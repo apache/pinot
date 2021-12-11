@@ -24,12 +24,12 @@ import java.util.Map;
 import java.util.TreeMap;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -76,7 +76,8 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
     _instancePartitionsMap = new TreeMap<>();
     // CONSUMING instances:
     // {
-    //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7, instance_8]
+    //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7,
+    //   instance_8]
     // }
     //        p0r0        p0r1        p0r2        p1r0        p1r1        p1r2        p2r0        p2r1        p2r2
     //        p3r0        p3r1        p3r2
@@ -86,7 +87,8 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
 
     // COMPLETED instances:
     // {
-    //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7, instance_8, instance_9]
+    //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7,
+    //   instance_8, instance_9]
     // }
     InstancePartitions completedInstancePartitions = new InstancePartitions(COMPLETED_INSTANCE_PARTITIONS_NAME);
     completedInstancePartitions.setInstances(0, 0, COMPLETED_INSTANCES);

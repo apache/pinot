@@ -24,6 +24,7 @@
         "name": "d",
         "dataType": "STRING",
         "cardinality":41,
+        "singleValueField": false,
         "numValuesPerEntry":2,
         "averageLength" : 27
       },
@@ -31,6 +32,7 @@
         "name": "e",
         "dataType": "LONG",
         "cardinality":18,
+        "singleValueField": false,
         "numValuesPerEntry":4
       }
     ],
@@ -39,7 +41,7 @@
         "name": "k",
         "dataType": "DOUBLE",
         "cardinality":10000,
-        "numValuesPerEntry":2,
+        "numValuesPerEntry":1,
         "averageLength" : 100
       },
       {

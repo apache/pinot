@@ -22,11 +22,11 @@ import java.io.File;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.io.writer.impl.FixedBitSVForwardIndexWriter;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReader;
-import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.segment.local.io.writer.impl.FixedBitSVForwardIndexWriter;
+import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -64,7 +64,10 @@ public class BenchmarkFixedBitSVForwardIndexReader {
   private final int[] _sparseDocIds = new int[NUM_DOC_IDS];
   private final int[] _dictIdBuffer = new int[NUM_DOC_IDS];
 
-  @Param({"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31"})
+  @Param({
+      "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
+      "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31"
+  })
   public int _numBits;
 
   @Setup

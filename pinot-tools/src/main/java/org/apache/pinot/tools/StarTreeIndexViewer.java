@@ -36,14 +36,14 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.startree.StarTree;
 import org.apache.pinot.segment.spi.index.startree.StarTreeNode;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.slf4j.Logger;
@@ -200,20 +200,20 @@ public class StarTreeIndexViewer {
   private static class StarTreeResource extends ResourceConfig {
     StarTreeResource(String json) {
       StarTreeViewRestResource resource = new StarTreeViewRestResource();
-      StarTreeViewRestResource.json = json;
+      StarTreeViewRestResource._json = json;
       register(resource.getClass());
     }
   }
 
   @Path("/")
   public static final class StarTreeViewRestResource {
-    public static String json;
+    public static String _json;
 
     @GET
     @Path("/data")
     @Produces(MediaType.TEXT_PLAIN)
     public String getStarTree() {
-      return json;
+      return _json;
     }
 
     @GET

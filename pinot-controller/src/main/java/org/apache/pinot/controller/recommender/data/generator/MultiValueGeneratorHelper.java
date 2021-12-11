@@ -29,6 +29,8 @@ import java.util.function.Supplier;
  * A helper class for generating multi value entries
  */
 public class MultiValueGeneratorHelper {
+  private MultiValueGeneratorHelper() {
+  }
 
   /**
    * Generate MV entries

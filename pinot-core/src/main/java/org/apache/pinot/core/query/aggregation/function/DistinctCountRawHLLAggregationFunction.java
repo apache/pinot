@@ -21,16 +21,17 @@ package org.apache.pinot.core.query.aggregation.function;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.function.customobject.SerializedHLL;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.segment.local.customobject.SerializedHLL;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-public class DistinctCountRawHLLAggregationFunction extends BaseSingleInputAggregationFunction<HyperLogLog, SerializedHLL> {
+public class DistinctCountRawHLLAggregationFunction
+    extends BaseSingleInputAggregationFunction<HyperLogLog, SerializedHLL> {
   private final DistinctCountHLLAggregationFunction _distinctCountHLLAggregationFunction;
 
   public DistinctCountRawHLLAggregationFunction(List<ExpressionContext> arguments) {
@@ -90,11 +91,6 @@ public class DistinctCountRawHLLAggregationFunction extends BaseSingleInputAggre
   @Override
   public HyperLogLog merge(HyperLogLog intermediateResult1, HyperLogLog intermediateResult2) {
     return _distinctCountHLLAggregationFunction.merge(intermediateResult1, intermediateResult2);
-  }
-
-  @Override
-  public boolean isIntermediateResultComparable() {
-    return _distinctCountHLLAggregationFunction.isIntermediateResultComparable();
   }
 
   @Override
