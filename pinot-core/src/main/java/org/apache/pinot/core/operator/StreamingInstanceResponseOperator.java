@@ -25,7 +25,6 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
-import org.apache.pinot.core.common.datatable.DataTableUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingResponseUtils;
@@ -47,9 +46,11 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
   protected InstanceResponseBlock getNextBlock() {
     InstanceResponseBlock nextBlock = super.getNextBlock();
     DataTable instanceResponseDataTable = nextBlock.getInstanceResponseDataTable();
-    DataTable metadataOnlyDataTable = DataTableUtils.buildMetadataOnlyDataTable(instanceResponseDataTable);
+    DataTable metadataOnlyDataTable;
     try {
-      _streamObserver.onNext(StreamingResponseUtils.getDataResponse(instanceResponseDataTable));
+      metadataOnlyDataTable = instanceResponseDataTable.extractMetadataOnlyDataTable();
+      _streamObserver.onNext(StreamingResponseUtils.getDataResponse(
+          instanceResponseDataTable.toDataOnlyMetadataTable()));
     } catch (IOException e) {
       // when exception occurs in streaming, we return an error-only metadata block.
       metadataOnlyDataTable = DataTableBuilder.getEmptyDataTable();

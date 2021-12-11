@@ -39,12 +39,7 @@ public interface DataTable {
 
   Map<Integer, String> getExceptions();
 
-  default byte[] toBytes()
-      throws IOException {
-    return toBytes(false);
-  }
-
-  byte[] toBytes(boolean isStrippingMetadata)
+  byte[] toBytes()
       throws IOException;
 
   Map<String, String> getMetadata();
@@ -76,6 +71,10 @@ public interface DataTable {
   double[] getDoubleArray(int rowId, int colId);
 
   String[] getStringArray(int rowId, int colId);
+
+  DataTable extractMetadataOnlyDataTable();
+
+  DataTable toDataOnlyMetadataTable();
 
   enum MetadataValueType {
     INT, LONG, STRING

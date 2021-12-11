@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataTable;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -172,7 +173,7 @@ public class DataTableImplV2 extends BaseDataTable {
   }
 
   @Override
-  public byte[] toBytes(boolean isStrippingMetadata)
+  public byte[] toBytes()
       throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
@@ -193,15 +194,10 @@ public class DataTableImplV2 extends BaseDataTable {
     }
 
     // Write metadata.
-    byte[] metadataBytes = null;
-    if (!isStrippingMetadata) {
-      dataOutputStream.writeInt(dataOffset);
-      metadataBytes = serializeMetadata();
-      dataOutputStream.writeInt(metadataBytes.length);
-      dataOffset += metadataBytes.length;
-    } else {
-      dataOutputStream.writeInt(0);
-    }
+    dataOutputStream.writeInt(dataOffset);
+    byte[] metadataBytes = serializeMetadata();
+    dataOutputStream.writeInt(metadataBytes.length);
+    dataOffset += metadataBytes.length;
 
     // Write data schema.
     dataOutputStream.writeInt(dataOffset);
@@ -235,9 +231,7 @@ public class DataTableImplV2 extends BaseDataTable {
     if (dictionaryMapBytes != null) {
       dataOutputStream.write(dictionaryMapBytes);
     }
-    if (metadataBytes != null) {
-      dataOutputStream.write(metadataBytes);
-    }
+    dataOutputStream.write(metadataBytes);
     if (dataSchemaBytes != null) {
       dataOutputStream.write(dataSchemaBytes);
     }
@@ -249,6 +243,12 @@ public class DataTableImplV2 extends BaseDataTable {
     }
 
     return byteArrayOutputStream.toByteArray();
+  }
+
+  @Override
+  public DataTable toDataOnlyMetadataTable() {
+    return new DataTableImplV2(
+        _numRows, _dataSchema, _dictionaryMap, _fixedSizeDataBytes, _variableSizeDataBytes);
   }
 
   private byte[] serializeMetadata()

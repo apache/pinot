@@ -250,6 +250,35 @@ public abstract class BaseDataTable implements DataTable {
     return strings;
   }
 
+  @Override
+  public DataTable extractMetadataOnlyDataTable() {
+    DataTable destDataTable = DataTableBuilder.getEmptyDataTable();
+    destDataTable.getMetadata().put(DataTable.MetadataKey.NUM_DOCS_SCANNED.getName(),
+        this.getMetadata().get(DataTable.MetadataKey.NUM_DOCS_SCANNED.getName()));
+    destDataTable.getMetadata().put(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName(),
+        this.getMetadata().get(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName()));
+    destDataTable.getMetadata().put(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(),
+        this.getMetadata().get(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName()));
+    destDataTable.getMetadata().put(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED.getName(),
+        this.getMetadata().get(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED.getName()));
+    destDataTable.getMetadata().put(DataTable.MetadataKey.NUM_SEGMENTS_MATCHED.getName(),
+        this.getMetadata().get(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED.getName()));
+    destDataTable.getMetadata().put(DataTable.MetadataKey.NUM_RESIZES.getName(),
+        this.getMetadata().get(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED.getName()));
+    destDataTable.getMetadata().put(DataTable.MetadataKey.RESIZE_TIME_MS.getName(),
+        this.getMetadata().get(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED.getName()));
+    destDataTable.getMetadata().put(DataTable.MetadataKey.TOTAL_DOCS.getName(),
+        this.getMetadata().get(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED.getName()));
+    destDataTable.getMetadata().put(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(),
+        this.getMetadata().get(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED.getName()));
+    if (!this.getExceptions().isEmpty()) {
+      for (Map.Entry<Integer, String> e : this.getExceptions().entrySet()) {
+        destDataTable.addException(e.getKey(), e.getValue());
+      }
+    }
+    return destDataTable;
+  }
+
   private int positionCursorInVariableBuffer(int rowId, int colId) {
     _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
     _variableSizeData.position(_fixedSizeData.getInt());

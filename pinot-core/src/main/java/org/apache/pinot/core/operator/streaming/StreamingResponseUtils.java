@@ -46,8 +46,7 @@ public class StreamingResponseUtils {
 
   private static Server.ServerResponse getResponse(DataTable dataTable, String responseType)
       throws IOException {
-    boolean isStrippingMetadata = Response.ResponseType.DATA.equals(responseType);
     return Server.ServerResponse.newBuilder().putMetadata(Response.MetadataKeys.RESPONSE_TYPE, responseType)
-        .setPayload(ByteString.copyFrom(dataTable.toBytes(isStrippingMetadata))).build();
+        .setPayload(ByteString.copyFrom(dataTable.toBytes())).build();
   }
 }

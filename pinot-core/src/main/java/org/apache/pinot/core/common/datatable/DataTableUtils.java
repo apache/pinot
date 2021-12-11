@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -106,34 +105,6 @@ public class DataTableUtils {
       assert QueryContextUtils.isDistinctQuery(queryContext);
       return buildEmptyDataTableForDistinctQuery(queryContext);
     }
-  }
-
-  public static DataTable buildMetadataOnlyDataTable(DataTable origDataTable) {
-    DataTable destDataTable = DataTableBuilder.getEmptyDataTable();
-    destDataTable.getMetadata().put(DataTable.MetadataKey.NUM_DOCS_SCANNED.getName(),
-        origDataTable.getMetadata().get(DataTable.MetadataKey.NUM_DOCS_SCANNED.getName()));
-    destDataTable.getMetadata().put(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName(),
-        origDataTable.getMetadata().get(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName()));
-    destDataTable.getMetadata().put(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(),
-        origDataTable.getMetadata().get(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName()));
-    destDataTable.getMetadata().put(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED.getName(),
-        origDataTable.getMetadata().get(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED.getName()));
-    destDataTable.getMetadata().put(DataTable.MetadataKey.NUM_SEGMENTS_MATCHED.getName(),
-        origDataTable.getMetadata().get(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED.getName()));
-    destDataTable.getMetadata().put(DataTable.MetadataKey.NUM_RESIZES.getName(),
-        origDataTable.getMetadata().get(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED.getName()));
-    destDataTable.getMetadata().put(DataTable.MetadataKey.RESIZE_TIME_MS.getName(),
-        origDataTable.getMetadata().get(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED.getName()));
-    destDataTable.getMetadata().put(DataTable.MetadataKey.TOTAL_DOCS.getName(),
-        origDataTable.getMetadata().get(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED.getName()));
-    destDataTable.getMetadata().put(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(),
-        origDataTable.getMetadata().get(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED.getName()));
-    if (!origDataTable.getExceptions().isEmpty()) {
-      for (Map.Entry<Integer, String> e : origDataTable.getExceptions().entrySet()) {
-        destDataTable.addException(e.getKey(), e.getValue());
-      }
-    }
-    return destDataTable;
   }
 
   /**

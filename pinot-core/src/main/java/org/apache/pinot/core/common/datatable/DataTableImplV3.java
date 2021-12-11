@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -190,7 +191,7 @@ public class DataTableImplV3 extends BaseDataTable {
   }
 
   @Override
-  public byte[] toBytes(boolean isStrippingMetadata)
+  public byte[] toBytes()
       throws IOException {
     ThreadTimer threadTimer = new ThreadTimer();
 
@@ -207,15 +208,17 @@ public class DataTableImplV3 extends BaseDataTable {
     // Write metadata: length followed by actual metadata bytes.
     // NOTE: We ignore metadata serialization time in "responseSerializationCpuTimeNs" as it's negligible while
     // considering it will bring a lot code complexity.
-    if (!isStrippingMetadata) {
-      byte[] metadataBytes = serializeMetadata();
-      dataOutputStream.writeInt(metadataBytes.length);
-      dataOutputStream.write(metadataBytes);
-    } else {
-      dataOutputStream.writeInt(0);
-    }
+    byte[] metadataBytes = serializeMetadata();
+    dataOutputStream.writeInt(metadataBytes.length);
+    dataOutputStream.write(metadataBytes);
 
     return byteArrayOutputStream.toByteArray();
+  }
+
+  @Override
+  public DataTable toDataOnlyMetadataTable() {
+    return new DataTableImplV3(
+        _numRows, _dataSchema, _dictionaryMap, _fixedSizeDataBytes, _variableSizeDataBytes);
   }
 
   private void writeLeadingSections(DataOutputStream dataOutputStream)
