@@ -95,6 +95,8 @@ public class CalciteSqlParser {
   //   `OPTION (<k1> = <v1>) OPTION (<k2> = <v2>) OPTION (<k3> = <v3>)`
   private static final Pattern OPTIONS_REGEX_PATTEN =
       Pattern.compile("option\\s*\\(([^\\)]+)\\)", Pattern.CASE_INSENSITIVE);
+  private static final Pattern COMMENTED_QUERY_PATTERN =
+      Pattern.compile("-{2,}", Pattern.CASE_INSENSITIVE);
 
   /**
    * Checks for the presence of semicolon in the sql query and modifies the query accordingly
@@ -406,11 +408,23 @@ public class CalciteSqlParser {
 
   private static List<String> extractOptionsFromSql(String sql) {
     List<String> results = new ArrayList<>();
-    Matcher matcher = OPTIONS_REGEX_PATTEN.matcher(sql);
+    Matcher matcher = COMMENTED_QUERY_PATTERN.matcher(sql);
+    if (matcher.find()) {
+      sql = removeCommentFromSql(sql);
+    }
+    matcher = OPTIONS_REGEX_PATTEN.matcher(sql);
     while (matcher.find()) {
       results.add(matcher.group(1));
     }
     return results;
+  }
+
+  private static String removeCommentFromSql(String sql) {
+    Matcher matcher = COMMENTED_QUERY_PATTERN.matcher(sql);
+    while (matcher.find()) {
+      return sql.substring(0, matcher.start());
+    }
+    return sql;
   }
 
   private static String removeOptionsFromSql(String sql) {

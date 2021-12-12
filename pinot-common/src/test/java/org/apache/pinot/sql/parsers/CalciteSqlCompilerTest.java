@@ -654,6 +654,36 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(pinotQuery.getQueryOptions().get("delicious"), "yes");
     Assert.assertEquals(pinotQuery.getQueryOptions().get("foo"), "1234");
     Assert.assertEquals(pinotQuery.getQueryOptions().get("bar"), "'potato'");
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(
+        "select * from vegetables\n" + "-- select * from vegetables OPTION (delicious=yes) option"
+            + "(bar='potato')");
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 0);
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(
+        "select * from vegetables OPTION (delicious=yes, foo=1234, bar='potato') --"
+            + " select * from vegetables OPTION (delicious=no) option"
+            + "(bar='tomato')");
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 3);
+    Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("delicious"));
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("delicious"), "yes");
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("foo"), "1234");
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("bar"), "'potato'");
+
+    pinotQuery =
+        CalciteSqlParser.compileToPinotQuery("SELECT SUM('foo'), MAX(bar) FROM myTable GROUP BY 'foo', bar"
+            + "-- select * from vegetables OPTION (delicious=yes)");
+    List<Expression> selectFunctionList = pinotQuery.getSelectList();
+    Assert.assertEquals(selectFunctionList.size(), 2);
+    Assert.assertEquals(selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getLiteral().getStringValue(),
+        "foo");
+    Assert.assertEquals(selectFunctionList.get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "bar");
+    List<Expression> groupbyList = pinotQuery.getGroupByList();
+    Assert.assertEquals(groupbyList.size(), 2);
+    Assert.assertEquals(groupbyList.get(0).getLiteral().getStringValue(), "foo");
+    Assert.assertEquals(groupbyList.get(1).getIdentifier().getName(), "bar");
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 0);
   }
 
   @Test

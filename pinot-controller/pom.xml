@@ -241,9 +241,8 @@
               <goal>install-node-and-npm</goal>
             </goals>
             <configuration>
-              <nodeVersion>v17.2.0</nodeVersion>
-              <npmVersion>8.1.4</npmVersion>
-              <nodeDownloadRoot>http://nodejs.org/dist/</nodeDownloadRoot>
+              <nodeVersion>v10.16.1</nodeVersion>
+              <npmVersion>6.10.0</npmVersion>
             </configuration>
           </execution>
           <execution>
