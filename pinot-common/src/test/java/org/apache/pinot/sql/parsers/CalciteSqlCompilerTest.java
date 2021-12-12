@@ -683,6 +683,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(groupbyList.size(), 2);
     Assert.assertEquals(groupbyList.get(0).getLiteral().getStringValue(), "foo");
     Assert.assertEquals(groupbyList.get(1).getIdentifier().getName(), "bar");
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 0);
   }
 
   @Test

@@ -96,7 +96,7 @@ public class CalciteSqlParser {
   private static final Pattern OPTIONS_REGEX_PATTEN =
       Pattern.compile("option\\s*\\(([^\\)]+)\\)", Pattern.CASE_INSENSITIVE);
   private static final Pattern COMMENTED_QUERY_PATTERN =
-      Pattern.compile("-{2,}.*option\\s*\\(([^\\)]+)\\)", Pattern.CASE_INSENSITIVE);
+      Pattern.compile("-{2,}", Pattern.CASE_INSENSITIVE);
 
   /**
    * Checks for the presence of semicolon in the sql query and modifies the query accordingly
@@ -123,8 +123,6 @@ public class CalciteSqlParser {
     sql = removeTerminatingSemicolon(sql);
 
     // Extract OPTION statements from sql as Calcite Parser doesn't parse it.
-    LOGGER.error(" ----------- ORIGINAL QUERY: {}", sql);
-
     List<String> options = extractOptionsFromSql(sql);
     if (!options.isEmpty()) {
       sql = removeOptionsFromSql(sql);
@@ -134,7 +132,6 @@ public class CalciteSqlParser {
 
     // Set Option statements to PinotQuery.
     setOptions(pinotQuery, options);
-    LOGGER.error(" ----------- QUERY: {}", pinotQuery);
     return pinotQuery;
   }
 
@@ -413,13 +410,21 @@ public class CalciteSqlParser {
     List<String> results = new ArrayList<>();
     Matcher matcher = COMMENTED_QUERY_PATTERN.matcher(sql);
     if (matcher.find()) {
-      return results;
+      sql = removeCommentFromSql(sql);
     }
     matcher = OPTIONS_REGEX_PATTEN.matcher(sql);
     while (matcher.find()) {
       results.add(matcher.group(1));
     }
     return results;
+  }
+
+  private static String removeCommentFromSql(String sql) {
+    Matcher matcher = COMMENTED_QUERY_PATTERN.matcher(sql);
+    while (matcher.find()) {
+      return sql.substring(0, matcher.start());
+    }
+    return sql;
   }
 
   private static String removeOptionsFromSql(String sql) {
