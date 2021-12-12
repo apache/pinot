@@ -532,7 +532,7 @@ public class PinotSegmentRestletResource {
   public SuccessResponse reloadAllSegmentsDeprecated1(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @DefaultValue("1") int parallelism) {
+      @QueryParam("parallelism") @DefaultValue("1") int parallelism) {
     List<String> tableNamesWithType = ResourceUtils
         .getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, Constants.validateTableType(tableTypeStr),
             LOGGER);
@@ -553,7 +553,7 @@ public class PinotSegmentRestletResource {
   public SuccessResponse reloadAllSegmentsDeprecated2(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @DefaultValue("1") int parallelism) {
+      @QueryParam("parallelism") @DefaultValue("1") int parallelism) {
     return reloadAllSegmentsDeprecated1(tableName, tableTypeStr, parallelism);
   }
 
