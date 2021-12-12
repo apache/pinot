@@ -38,8 +38,15 @@ public class PostAggregationFunction {
   public PostAggregationFunction(String functionName, ColumnDataType[] argumentTypes) {
     int numArguments = argumentTypes.length;
     FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
-    Preconditions
-        .checkArgument(functionInfo != null, "Unsupported function: %s with %s parameters", functionName, numArguments);
+    if (functionInfo == null) {
+      if (FunctionRegistry.containsFunction(functionName)) {
+        throw new IllegalArgumentException(
+          String.format("Unsupported function: %s with %d parameters", functionName, numArguments));
+      } else {
+        throw new IllegalArgumentException(
+          String.format("Unsupported function: %s not found", functionName));
+      }
+    }
     _functionInvoker = new FunctionInvoker(functionInfo);
     Class<?>[] parameterClasses = _functionInvoker.getParameterClasses();
     PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
