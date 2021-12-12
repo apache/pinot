@@ -501,7 +501,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Whether to force server to download segment") @QueryParam("forceDownload")
-      @DefaultValue("false") boolean forceDownload, @DefaultValue("1") int parallelism) {
+      @DefaultValue("false") boolean forceDownload, @QueryParam("parallelism") @DefaultValue("1") int parallelism) {
     TableType tableTypeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
     TableType tableTypeFromRequest = Constants.validateTableType(tableTypeStr);
     // When rawTableName is provided but w/o table type, Pinot tries to reload both OFFLINE
