@@ -81,7 +81,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     switch (msgSubType) {
       case SegmentRefreshMessage.REFRESH_SEGMENT_MSG_SUB_TYPE:
         return new SegmentRefreshMessageHandler(new SegmentRefreshMessage(message), _metrics, context);
-      case SegmentReloadMessage.RELOAD_PARALLELISM:
+      case SegmentReloadMessage.RELOAD_SEGMENT_MSG_SUB_TYPE:
         return new SegmentReloadMessageHandler(new SegmentReloadMessage(message), _metrics, context);
       default:
         LOGGER.warn("Unsupported user defined message sub type: {} for segment: {}", msgSubType,
