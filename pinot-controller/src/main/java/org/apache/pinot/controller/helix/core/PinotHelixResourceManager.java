@@ -1895,7 +1895,8 @@ public class PinotHelixResourceManager {
   }
 
   public int reloadAllSegments(String tableNameWithType, boolean forceDownload, int parallelism) {
-    LOGGER.info("Sending reload message for table: {} with forceDownload: {}, parallelism: {}", tableNameWithType, forceDownload, parallelism);
+    LOGGER.info("Sending reload message for table: {} with forceDownload: {}, parallelism: {}", tableNameWithType,
+        forceDownload, parallelism);
 
     if (forceDownload) {
       TableType tt = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
