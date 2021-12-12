@@ -229,9 +229,10 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
     List<SegmentMetadata> segmentsMetadata = getAllSegmentsMetadata(tableNameWithType);
 
-    ExecutorService threadPool = Executors.newFixedThreadPool(parallelism);
+    ExecutorService workers = Executors.newFixedThreadPool(parallelism);
 
     final AtomicReference<Exception> sampleException = new AtomicReference<>();
+
     CountDownLatch latch = new CountDownLatch(parallelism);
 
     for (SegmentMetadata segmentMetadata : segmentsMetadata) {
@@ -246,7 +247,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         } finally {
           latch.countDown();
         }
-      }, threadPool);
+      }, workers);
     }
 
     try {

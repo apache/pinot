@@ -69,7 +69,7 @@ public class SegmentReloadMessage extends Message {
   }
 
   public int getReloadParallelism() {
-    //reload parallelism defaults to 1 if not set
+    //reload segments sequentially by default
     return getRecord().getIntField(RELOAD_PARALLELISM, 1);
   }
 }
