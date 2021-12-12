@@ -81,7 +81,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     switch (msgSubType) {
       case SegmentRefreshMessage.REFRESH_SEGMENT_MSG_SUB_TYPE:
         return new SegmentRefreshMessageHandler(new SegmentRefreshMessage(message), _metrics, context);
-      case SegmentReloadMessage.RELOAD_SEGMENT_MSG_SUB_TYPE:
+      case SegmentReloadMessage.RELOAD_PARALLELISM:
         return new SegmentReloadMessageHandler(new SegmentReloadMessage(message), _metrics, context);
       default:
         LOGGER.warn("Unsupported user defined message sub type: {} for segment: {}", msgSubType,
@@ -129,11 +129,13 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
 
   private class SegmentReloadMessageHandler extends DefaultMessageHandler {
     private final boolean _forceDownload;
+    private final int _reloadParallelism;
 
     SegmentReloadMessageHandler(SegmentReloadMessage segmentReloadMessage, ServerMetrics metrics,
         NotificationContext context) {
       super(segmentReloadMessage, metrics, context);
       _forceDownload = segmentReloadMessage.shouldForceDownload();
+      _reloadParallelism = segmentReloadMessage.getReloadParallelism();
     }
 
     @Override
@@ -146,7 +148,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
           acquireSema("ALL", _logger);
           // NOTE: the method aborts if any segment reload encounters an unhandled exception,
           // and can lead to inconsistent state across segments
-          _instanceDataManager.reloadAllSegments(_tableNameWithType, _forceDownload);
+          _instanceDataManager.reloadAllSegments(_tableNameWithType, _forceDownload, _reloadParallelism);
         } else {
           // Reload one segment
           acquireSema(_segmentName, _logger);

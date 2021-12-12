@@ -93,9 +93,10 @@ public interface InstanceDataManager {
       throws Exception;
 
   /**
-   * Reloads all segments in a table.
+   * Reloads all segments of a table.
+   * @param parallelism number of segments to reload in parallel
    */
-  void reloadAllSegments(String tableNameWithType, boolean forceDownload)
+  void reloadAllSegments(String tableNameWithType, boolean forceDownload, int parallelism)
       throws Exception;
 
   /**
