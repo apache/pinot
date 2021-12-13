@@ -137,7 +137,9 @@ public class ServiceStatus {
 
     private Supplier<Boolean> _isStartingCallable;
     private Supplier<Boolean> _isShuttingDownCallable;
-    public LifecycleServiceStatusCallback(Supplier<Boolean> isStartingCallable, Supplier<Boolean> isShuttingDownCallable) {
+
+    public LifecycleServiceStatusCallback(Supplier<Boolean> isStartingCallable,
+        Supplier<Boolean> isShuttingDownCallable) {
       _isStartingCallable = isStartingCallable;
       _isShuttingDownCallable = isShuttingDownCallable;
     }
