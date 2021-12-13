@@ -222,6 +222,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     LOGGER.info("Reloading all segments in table: {}", tableNameWithType);
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkNotNull(tableConfig);
+    Preconditions.checkArgument(parallelism > 0, "Invalid reload parallelism: %s, must be at least 1", parallelism);
 
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
 
@@ -230,6 +231,12 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     List<SegmentMetadata> segmentsMetadata = getAllSegmentsMetadata(tableNameWithType);
 
     int nosWorkers = Math.min(segmentsMetadata.size(), parallelism);
+
+    if (nosWorkers < parallelism) {
+      LOGGER.info(
+          "No. of segments: {} in table: {} less than passed reload parallelism, loading all segments in parallel",
+          nosWorkers, tableNameWithType);
+    }
 
     ExecutorService workers = Executors.newFixedThreadPool(nosWorkers);
 
