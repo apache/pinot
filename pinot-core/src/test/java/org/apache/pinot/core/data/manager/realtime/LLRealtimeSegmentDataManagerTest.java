@@ -901,9 +901,8 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected boolean buildSegmentAndReplace() {
+    protected void buildSegmentAndReplace() throws Exception {
       _buildAndReplaceCalled = true;
-      return true;
     }
 
     @Override

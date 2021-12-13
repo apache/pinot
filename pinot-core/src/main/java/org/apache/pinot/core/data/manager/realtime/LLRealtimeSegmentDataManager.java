@@ -624,14 +624,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                   _state = State.DISCARDED;
                   break;
                 case DEFAULT:
-                  success = buildSegmentAndReplace();
-                  if (success) {
+                  try {
+                    buildSegmentAndReplace();
                     _state = State.RETAINED;
-                  } else {
+                  } catch (Exception e) {
                     // Could not build segment for some reason. We can only download it.
-                    _state = State.ERROR;
                     _realtimeTableDataManager.addSegmentError(_segmentNameStr,
-                        new SegmentErrorInfo(System.currentTimeMillis(), "Could not build segment", null));
+                        new SegmentErrorInfo(System.currentTimeMillis(), "Could not build segment!", e));
+                    _state = State.ERROR;
                   }
                   break;
                 default:
@@ -645,8 +645,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               if (_segmentBuildDescriptor == null) {
                 // We could not build the segment. Go into error state.
                 _state = State.ERROR;
-                _realtimeTableDataManager.addSegmentError(_segmentNameStr,
-                    new SegmentErrorInfo(System.currentTimeMillis(), "Could not build segment", null));
               } else {
                 success = commitSegment(response.getControllerVipUrl(),
                     response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit());
@@ -744,6 +742,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       }
       _leaseExtender.addSegment(_segmentNameStr, buildTimeLeaseMs, _currentOffset);
       _segmentBuildDescriptor = buildSegmentInternal(true);
+    } catch (Exception e) {
+      _realtimeTableDataManager.addSegmentError(_segmentNameStr,
+          new SegmentErrorInfo(System.currentTimeMillis(), "Could not build segment!", e));
     } finally {
       _leaseExtender.removeSegment(_segmentNameStr);
     }
@@ -789,7 +790,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return _acquiredConsumerSemaphore;
   }
 
-  protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
+  protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit)
+      throws Exception {
     closeStreamConsumers();
     try {
       final long startTimeMillis = now();
@@ -816,7 +818,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       } catch (Exception e) {
         _segmentLogger.error("Could not build segment", e);
         FileUtils.deleteQuietly(tempSegmentFolder);
-        return null;
+        throw new RuntimeException("Could not build segment", e);
       }
       final long buildTimeMillis = now() - lockAcquireTimeMillis;
       final long waitTimeMillis = lockAcquireTimeMillis - startTimeMillis;
@@ -838,7 +840,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         _segmentLogger.error(errorMessage, e);
         _realtimeTableDataManager
             .addSegmentError(_segmentNameStr, new SegmentErrorInfo(System.currentTimeMillis(), errorMessage, e));
-        return null;
+        FileUtils.deleteQuietly(tempSegmentFolder);
+        throw new IOException("Interrupted while waiting for semaphore", e);
       } finally {
         FileUtils.deleteQuietly(tempSegmentFolder);
       }
@@ -854,26 +857,27 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         try {
           TarGzCompressionUtils.createTarGzFile(indexDir, segmentTarFile);
         } catch (IOException e) {
-          String errorMessage =
+          String errMsg =
               String.format("Caught exception while taring index directory from: %s to: %s", indexDir, segmentTarFile);
-          _segmentLogger.error(errorMessage, e);
+          _segmentLogger.error(errMsg, e);
           _realtimeTableDataManager
-              .addSegmentError(_segmentNameStr, new SegmentErrorInfo(System.currentTimeMillis(), errorMessage, e));
-          return null;
+              .addSegmentError(_segmentNameStr, new SegmentErrorInfo(System.currentTimeMillis(), errMsg, e));
+          throw new IOException(errMsg, e);
         }
 
         File metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
         if (metadataFile == null) {
-          _segmentLogger
-              .error("Failed to find file: {} under index directory: {}", V1Constants.MetadataKeys.METADATA_FILE_NAME,
-                  indexDir);
-          return null;
+          String errMsg = String.format("Failed to find file: %s under index directory: %s",
+              V1Constants.MetadataKeys.METADATA_FILE_NAME, indexDir);
+          _segmentLogger.error(errMsg);
+          throw new IllegalStateException(errMsg);
         }
         File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
         if (creationMetaFile == null) {
-          _segmentLogger
-              .error("Failed to find file: {} under index directory: {}", V1Constants.SEGMENT_CREATION_META, indexDir);
-          return null;
+          String errMsg = String.format("Failed to find file: %s under index directory: %s",
+              V1Constants.SEGMENT_CREATION_META, indexDir);
+          _segmentLogger.error(errMsg);
+          throw new IllegalStateException(errMsg);
         }
         Map<String, File> metadataFiles = new HashMap<>();
         metadataFiles.put(V1Constants.MetadataKeys.METADATA_FILE_NAME, metadataFile);
@@ -886,8 +890,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             segmentSizeBytes);
       }
     } catch (InterruptedException e) {
-      _segmentLogger.error("Interrupted while waiting for semaphore");
-      return null;
+      _segmentLogger.error("Interrupted while waiting for semaphore", e);
+      throw new RuntimeException("Interrupted while waiting for semaphore", e);
     } finally {
       if (_segBuildSemaphore != null) {
         _segBuildSemaphore.release();
@@ -935,14 +939,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return segmentCommitter.commit(_segmentBuildDescriptor);
   }
 
-  protected boolean buildSegmentAndReplace() {
+  protected void buildSegmentAndReplace() throws Exception {
     SegmentBuildDescriptor descriptor = buildSegmentInternal(false);
-    if (descriptor == null) {
-      return false;
-    }
-
     _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
-    return true;
   }
 
   private void closeStreamConsumers() {
