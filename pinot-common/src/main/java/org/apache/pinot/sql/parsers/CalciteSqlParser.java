@@ -95,9 +95,7 @@ public class CalciteSqlParser {
   //   `OPTION (<k1> = <v1>) OPTION (<k2> = <v2>) OPTION (<k3> = <v3>)`
   private static final Pattern OPTIONS_REGEX_PATTEN =
       Pattern.compile("option\\s*\\(([^\\)]+)\\)", Pattern.CASE_INSENSITIVE);
-  private static final Pattern COMMENTED_QUERY_PATTERN =
-      Pattern.compile("-{2,}", Pattern.CASE_INSENSITIVE);
-
+  private static final Pattern COMMENTED_QUERY_PATTERN = Pattern.compile("-{2,}");
   /**
    * Checks for the presence of semicolon in the sql query and modifies the query accordingly
    *
@@ -124,6 +122,7 @@ public class CalciteSqlParser {
 
     // Extract OPTION statements from sql as Calcite Parser doesn't parse it.
     List<String> options = extractOptionsFromSql(sql);
+    sql = removeCommentedOptionsFromSql(sql);
     if (!options.isEmpty()) {
       sql = removeOptionsFromSql(sql);
     }
@@ -410,7 +409,7 @@ public class CalciteSqlParser {
     List<String> results = new ArrayList<>();
     Matcher matcher = COMMENTED_QUERY_PATTERN.matcher(sql);
     if (matcher.find()) {
-      sql = removeCommentFromSql(sql);
+      sql = removeCommentedOptionsFromSql(sql);
     }
     matcher = OPTIONS_REGEX_PATTEN.matcher(sql);
     while (matcher.find()) {
@@ -419,10 +418,16 @@ public class CalciteSqlParser {
     return results;
   }
 
-  private static String removeCommentFromSql(String sql) {
+  // for query options present in commented out query
+  // such as `SELECT * FROM tablex -- SELECT * FROM tabley OPTION(k=v)`
+  // use `-{2,0}` pattern as sign post to detect and remove query options in commented out query
+  // NOTE: THIS FAILS WHEN the `-{2,0}` pattern is found in string literals, identifiers
+  // Query `SELECT * FROM tablex WHERE cola LIKE '%---%' OPTION (a=b)` will be parsed as
+  // `SELECT * FROM tablex WHERE cola LIKE '%---%'`
+  private static String removeCommentedOptionsFromSql(String sql) {
     Matcher matcher = COMMENTED_QUERY_PATTERN.matcher(sql);
     while (matcher.find()) {
-      return sql.substring(0, matcher.start());
+      return sql.substring(0, matcher.start()) + removeOptionsFromSql(sql.substring(matcher.start()));
     }
     return sql;
   }

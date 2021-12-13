@@ -684,6 +684,34 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(groupbyList.get(0).getLiteral().getStringValue(), "foo");
     Assert.assertEquals(groupbyList.get(1).getIdentifier().getName(), "bar");
     Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 0);
+
+    // ensure that using `--` as signpost to remove commented out query options does not impact
+    // usage of `--` in identifiers and string literals
+    pinotQuery =
+        CalciteSqlParser.compileToPinotQuery("SELECT * FROM myTable where foo LIKE '%--%' and \"b--a----r\" = 'he---ll-o' option(a=b)"
+            + "-- select * from vegetables OPTION (delicious=yes)");
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 0);
+    Assert.assertEquals(pinotQuery, CalciteSqlParser.compileToPinotQuery(
+        "SELECT * FROM myTable where foo LIKE '%--%' and \"b--a----r\" = 'he---ll-o'"
+        + "-- select * from vegetables"));
+
+    // ensure that using `--` as signpost to remove commented out query options does not impact query
+    pinotQuery =
+        CalciteSqlParser.compileToPinotQuery("SELECT * FROM myTable where foo = '----' "
+            + "-- select * from vegetables OPTION (delicious=yes)");
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 0);
+    Assert.assertEquals(pinotQuery, CalciteSqlParser.compileToPinotQuery("SELECT * FROM myTable where foo = '----' "
+        + "-- select * from vegetables"));
+
+    // ensure that `option` used in identifiers does not get removed by the query options regex
+    pinotQuery =
+        CalciteSqlParser.compileToPinotQuery("SELECT ktoptionsx, option(), \"option()\" FROM myTable option (a=b) "
+            + "-- select * from vegetables OPTION (delicious=yes)");
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
+    Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("a"));
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("a"), "b");
+    Assert.assertEquals(pinotQuery, CalciteSqlParser.compileToPinotQuery("SELECT ktoptionsx, option(), \"option()\" FROM myTable option (a=b) "
+        + "-- select * from vegetables"));
   }
 
   @Test
