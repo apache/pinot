@@ -56,6 +56,34 @@ public class ColumnMinMaxValueGenerator {
     _columnMinMaxValueGeneratorMode = columnMinMaxValueGeneratorMode;
   }
 
+  public boolean needAddColumnMinMaxValue() {
+    Schema schema = _segmentMetadata.getSchema();
+    Set<String> columnsToAddMinMaxValue = new HashSet<>(schema.getPhysicalColumnNames());
+    switch (_columnMinMaxValueGeneratorMode) {
+      case TIME:
+        columnsToAddMinMaxValue.removeAll(schema.getDimensionNames());
+        columnsToAddMinMaxValue.removeAll(schema.getMetricNames());
+        break;
+      case NON_METRIC:
+        columnsToAddMinMaxValue.removeAll(schema.getMetricNames());
+        break;
+      default:
+        break;
+    }
+    for (String column : columnsToAddMinMaxValue) {
+      if (needAddColumnMinMaxValueForColumn(column)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean needAddColumnMinMaxValueForColumn(String columnName) {
+    ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(columnName);
+    return columnMetadata.hasDictionary() && columnMetadata.getMinValue() == null
+        && columnMetadata.getMaxValue() == null;
+  }
+
   public void addColumnMinMaxValue()
       throws Exception {
     Preconditions.checkState(_columnMinMaxValueGeneratorMode != ColumnMinMaxValueGeneratorMode.NONE);

@@ -120,6 +120,68 @@ public class SegmentPreProcessor implements AutoCloseable {
     }
   }
 
+  public boolean needProcess()
+      throws Exception {
+    if (_segmentMetadata.getTotalDocs() == 0) {
+      return false;
+    }
+    try (SegmentDirectory.Reader segmentReader = _segmentDirectory.createReader()) {
+      // Check if there is need to update default columns according to the schema.
+      if (_schema != null) {
+        DefaultColumnHandler defaultColumnHandler = DefaultColumnHandlerFactory
+            .getDefaultColumnHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, _schema, null);
+        if (defaultColumnHandler.needUpdateDefaultColumns()) {
+          return true;
+        }
+      }
+      // Check if there is need to update single-column indices, like inverted index, json index etc.
+      for (ColumnIndexType type : ColumnIndexType.values()) {
+        if (IndexHandlerFactory.getIndexHandler(type, _segmentMetadata, _indexLoadingConfig, segmentReader)
+            .needUpdateIndices()) {
+          return true;
+        }
+      }
+      // Check if there is need to create/modify/remove star-trees.
+      if (needProcessStarTrees()) {
+        return true;
+      }
+      // Check if there is need to update column min max value.
+      if (needUpdateColumnMinMaxValue()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean needUpdateColumnMinMaxValue() {
+    ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode =
+        _indexLoadingConfig.getColumnMinMaxValueGeneratorMode();
+    if (columnMinMaxValueGeneratorMode == ColumnMinMaxValueGeneratorMode.NONE) {
+      return false;
+    }
+    ColumnMinMaxValueGenerator columnMinMaxValueGenerator =
+        new ColumnMinMaxValueGenerator(_segmentMetadata, null, columnMinMaxValueGeneratorMode);
+    return columnMinMaxValueGenerator.needAddColumnMinMaxValue();
+  }
+
+  private boolean needProcessStarTrees() {
+    // Check if there is need to create/modify/remove star-trees.
+    if (!_indexLoadingConfig.isEnableDynamicStarTreeCreation()) {
+      return false;
+    }
+    List<StarTreeV2BuilderConfig> starTreeBuilderConfigs = StarTreeBuilderUtils
+        .generateBuilderConfigs(_indexLoadingConfig.getStarTreeIndexConfigs(),
+            _indexLoadingConfig.isEnableDefaultStarTree(), _segmentMetadata);
+    List<StarTreeV2Metadata> starTreeMetadataList = _segmentMetadata.getStarTreeV2MetadataList();
+    // There are existing star-trees, but if they match the builder configs exactly,
+    // then there is no need to generate the star-trees
+    if (starTreeMetadataList != null && !StarTreeBuilderUtils
+        .shouldRemoveExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList)) {
+      return false;
+    }
+    return !starTreeBuilderConfigs.isEmpty();
+  }
+
   private void processStarTrees()
       throws Exception {
     // Create/modify/remove star-trees if required

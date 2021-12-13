@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -49,6 +50,7 @@ import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -783,16 +785,7 @@ public class SegmentPreProcessorTest {
     constructV1Segment();
 
     // Remove min/max value from the metadata
-    PropertiesConfiguration configuration = SegmentMetadataImpl.getPropertiesConfiguration(_indexDir);
-    Iterator<String> keys = configuration.getKeys();
-    while (keys.hasNext()) {
-      String key = keys.next();
-      if (key.endsWith(V1Constants.MetadataKeys.Column.MIN_VALUE) || key.endsWith(
-          V1Constants.MetadataKeys.Column.MAX_VALUE)) {
-        configuration.clearProperty(key);
-      }
-    }
-    configuration.save();
+    removeMinMaxValuesFromMetadataFile(_indexDir);
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
     indexLoadingConfig.setColumnMinMaxValueGeneratorMode(ColumnMinMaxValueGeneratorMode.NONE);
@@ -1079,5 +1072,130 @@ public class SegmentPreProcessorTest {
       processor.process();
     }
     assertEquals(singleFileIndex.length(), initFileSize);
+  }
+
+  @Test
+  public void testV1IfNeedProcess()
+      throws Exception {
+    constructV1Segment();
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
+    assertEquals(segmentMetadata.getVersion(), SegmentVersion.v1);
+
+    testIfNeedProcess();
+  }
+
+  @Test
+  public void testV3IfNeedProcess()
+      throws Exception {
+    constructV3Segment();
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
+    assertEquals(segmentMetadata.getVersion(), SegmentVersion.v3);
+
+    testIfNeedProcess();
+  }
+
+  private void testIfNeedProcess()
+      throws Exception {
+    // There are a few indices initially. Require to remove them with an empty IndexLoadingConfig.
+    try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
+        .load(_indexDir.toURI(), new SegmentDirectoryLoaderContext(null, null, null, _configuration));
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, new IndexLoadingConfig(), null)) {
+      assertTrue(processor.needProcess());
+      processor.process();
+      assertFalse(processor.needProcess());
+    }
+
+    // Require to add some default columns with new schema.
+    try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
+        .load(_indexDir.toURI(), new SegmentDirectoryLoaderContext(null, null, null, _configuration));
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, new IndexLoadingConfig(),
+            _newColumnsSchemaWithH3Json)) {
+      assertTrue(processor.needProcess());
+      processor.process();
+      assertFalse(processor.needProcess());
+    }
+
+    // Require to add different types of indices. Add one new index a time
+    // to test the index handlers separately.
+    IndexLoadingConfig config = new IndexLoadingConfig();
+    for (Runnable prepFunc : createConfigPrepFunctions(config)) {
+      prepFunc.run();
+      try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
+          .load(_indexDir.toURI(), new SegmentDirectoryLoaderContext(null, null, null, _configuration));
+          SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, config,
+              _newColumnsSchemaWithH3Json)) {
+        assertTrue(processor.needProcess());
+        processor.process();
+        assertFalse(processor.needProcess());
+      }
+    }
+
+    // Require to add startree index.
+    IndexingConfig indexingConfig = new IndexingConfig();
+    indexingConfig.setEnableDynamicStarTreeCreation(true);
+    indexingConfig.setEnableDefaultStarTree(true);
+    _tableConfig.setIndexingConfig(indexingConfig);
+    IndexLoadingConfig configWithStarTreeIndex = new IndexLoadingConfig(null, _tableConfig);
+    createConfigPrepFunctions(configWithStarTreeIndex).forEach(Runnable::run);
+    try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
+        .load(_indexDir.toURI(), new SegmentDirectoryLoaderContext(null, null, null, _configuration));
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, configWithStarTreeIndex,
+            _newColumnsSchemaWithH3Json)) {
+      assertTrue(processor.needProcess());
+      processor.process();
+      assertFalse(processor.needProcess());
+    }
+
+    // Require to update min and max values.
+    removeMinMaxValuesFromMetadataFile(_indexDir);
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
+    segmentMetadata.getColumnMetadataMap().forEach((k, v) -> {
+      assertNull(v.getMinValue(), "checking column: " + k);
+      assertNull(v.getMaxValue(), "checking column: " + k);
+    });
+    try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
+        .load(_indexDir.toURI(), new SegmentDirectoryLoaderContext(null, null, null, _configuration));
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, configWithStarTreeIndex,
+            _newColumnsSchemaWithH3Json)) {
+      assertTrue(processor.needProcess());
+      processor.process();
+    }
+    segmentMetadata = new SegmentMetadataImpl(_indexDir);
+    segmentMetadata.getColumnMetadataMap().forEach((k, v) -> {
+      if (v.hasDictionary()) {
+        assertNotNull(v.getMinValue(), "checking column: " + k);
+        assertNotNull(v.getMaxValue(), "checking column: " + k);
+      } else {
+        assertNull(v.getMinValue(), "checking column: " + k);
+        assertNull(v.getMaxValue(), "checking column: " + k);
+      }
+    });
+  }
+
+  private static void removeMinMaxValuesFromMetadataFile(File indexDir)
+      throws Exception {
+    PropertiesConfiguration configuration = SegmentMetadataImpl.getPropertiesConfiguration(indexDir);
+    Iterator<String> keys = configuration.getKeys();
+    while (keys.hasNext()) {
+      String key = keys.next();
+      if (key.endsWith(V1Constants.MetadataKeys.Column.MIN_VALUE) || key.endsWith(
+          V1Constants.MetadataKeys.Column.MAX_VALUE)) {
+        configuration.clearProperty(key);
+      }
+    }
+    configuration.save();
+  }
+
+  private static List<Runnable> createConfigPrepFunctions(IndexLoadingConfig config) {
+    return Arrays.asList(
+        () -> config.setInvertedIndexColumns(new HashSet<>(Collections.singletonList("column3"))),
+        () -> config.setRangeIndexColumns(new HashSet<>(Collections.singletonList("column3"))),
+        () -> config.setTextIndexColumns(new HashSet<>(Collections.singletonList("column3"))),
+        () -> config.setFSTIndexColumns(new HashSet<>(Collections.singletonList("column3"))),
+        () -> config.setBloomFilterConfigs(ImmutableMap.of("column3", new BloomFilterConfig(0.1, 1024, true))),
+        () -> config
+            .setH3IndexConfigs(ImmutableMap.of("newH3Col", new H3IndexConfig(ImmutableMap.of("resolutions", "5")))),
+        () -> config.setJsonIndexColumns(new HashSet<>(Collections.singletonList("newJsonCol")))
+    );
   }
 }

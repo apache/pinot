@@ -51,15 +51,39 @@ public class H3IndexHandler implements IndexHandler {
 
   private final File _indexDir;
   private final SegmentMetadataImpl _segmentMetadata;
+  private final SegmentDirectory.Reader _segmentReader;
   private final SegmentDirectory.Writer _segmentWriter;
   private final Map<String, H3IndexConfig> _h3Configs;
 
   public H3IndexHandler(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
       SegmentDirectory.Writer segmentWriter) {
+    this(indexDir, segmentMetadata, indexLoadingConfig, null, segmentWriter);
+  }
+
+  public H3IndexHandler(SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
+      SegmentDirectory.Reader segmentReader) {
+    this(null, segmentMetadata, indexLoadingConfig, segmentReader, null);
+  }
+
+  private H3IndexHandler(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
+      SegmentDirectory.Reader segmentReader, SegmentDirectory.Writer segmentWriter) {
     _indexDir = indexDir;
     _segmentMetadata = segmentMetadata;
+    _segmentReader = segmentReader;
     _segmentWriter = segmentWriter;
     _h3Configs = indexLoadingConfig.getH3IndexConfigs();
+  }
+
+  @Override
+  public boolean needUpdateIndices() {
+    Set<String> columnsToAddIdx = new HashSet<>(_h3Configs.keySet());
+    Set<String> existingColumns = _segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.H3_INDEX);
+    for (String column : existingColumns) {
+      if (!columnsToAddIdx.remove(column)) {
+        return true;
+      }
+    }
+    return !columnsToAddIdx.isEmpty();
   }
 
   @Override

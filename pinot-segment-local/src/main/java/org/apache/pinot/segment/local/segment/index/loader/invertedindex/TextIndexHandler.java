@@ -83,15 +83,38 @@ public class TextIndexHandler implements IndexHandler {
 
   private final File _indexDir;
   private final SegmentMetadata _segmentMetadata;
+  private final SegmentDirectory.Reader _segmentReader;
   private final SegmentDirectory.Writer _segmentWriter;
   private final Set<String> _columnsToAddIdx;
 
   public TextIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
       SegmentDirectory.Writer segmentWriter) {
+    this(indexDir, segmentMetadata, indexLoadingConfig, null, segmentWriter);
+  }
+
+  public TextIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
+      SegmentDirectory.Reader segmentReader) {
+    this(null, segmentMetadata, indexLoadingConfig, segmentReader, null);
+  }
+
+  private TextIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
+      SegmentDirectory.Reader segmentReader, SegmentDirectory.Writer segmentWriter) {
     _indexDir = indexDir;
     _segmentMetadata = segmentMetadata;
+    _segmentReader = segmentReader;
     _segmentWriter = segmentWriter;
     _columnsToAddIdx = new HashSet<>(indexLoadingConfig.getTextIndexColumns());
+  }
+
+  @Override
+  public boolean needUpdateIndices() {
+    Set<String> existingColumns = _segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.TEXT_INDEX);
+    for (String column : existingColumns) {
+      if (!_columnsToAddIdx.remove(column)) {
+        return true;
+      }
+    }
+    return !_columnsToAddIdx.isEmpty();
   }
 
   @Override
