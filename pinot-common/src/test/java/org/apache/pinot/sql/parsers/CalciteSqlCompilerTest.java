@@ -688,7 +688,8 @@ public class CalciteSqlCompilerTest {
     // ensure that using `--` as signpost to remove commented out query options does not impact
     // usage of `--` in identifiers and string literals
     pinotQuery =
-        CalciteSqlParser.compileToPinotQuery("SELECT * FROM myTable where foo LIKE '%--%' and \"b--a----r\" = 'he---ll-o' option(a=b)"
+        CalciteSqlParser.compileToPinotQuery(
+            "SELECT * FROM myTable where foo LIKE '%--%' and \"b--a----r\" = 'he---ll-o' option(a=b)"
             + "-- select * from vegetables OPTION (delicious=yes)");
     Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 0);
     Assert.assertEquals(pinotQuery, CalciteSqlParser.compileToPinotQuery(
@@ -710,7 +711,8 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
     Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("a"));
     Assert.assertEquals(pinotQuery.getQueryOptions().get("a"), "b");
-    Assert.assertEquals(pinotQuery, CalciteSqlParser.compileToPinotQuery("SELECT ktoptionsx, option(), \"option()\" FROM myTable option (a=b) "
+    Assert.assertEquals(pinotQuery, CalciteSqlParser.compileToPinotQuery(
+        "SELECT ktoptionsx, option(), \"option()\" FROM myTable option (a=b) "
         + "-- select * from vegetables"));
   }
 

@@ -420,8 +420,8 @@ public class CalciteSqlParser {
 
   // for query options present in commented out query
   // such as `SELECT * FROM tablex -- SELECT * FROM tabley OPTION(k=v)`
-  // use `-{2,0}` pattern as sign post to detect and remove query options in commented out query
-  // NOTE: THIS FAILS WHEN the `-{2,0}` pattern is found in string literals, identifiers
+  // use `-{2,}` pattern as signpost to detect and remove query options in commented out query
+  // NOTE: THIS FAILS WHEN the `-{2,}` pattern is found in string literals, identifiers
   // Query `SELECT * FROM tablex WHERE cola LIKE '%---%' OPTION (a=b)` will be parsed as
   // `SELECT * FROM tablex WHERE cola LIKE '%---%'`
   private static String removeCommentedOptionsFromSql(String sql) {
