@@ -40,9 +40,9 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
-import org.apache.pinot.segment.spi.creator.IndexCreatorProviders;
 import org.apache.pinot.segment.spi.creator.SegmentCreator;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.IndexingOverrides;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.GeoSpatialIndexCreator;
@@ -83,7 +83,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   private SegmentGeneratorConfig _config;
   private Map<String, ColumnIndexCreationInfo> _indexCreationInfoMap;
-  private final IndexCreatorProvider _indexCreatorProvider = IndexCreatorProviders.getIndexCreatorProvider();
+  private final IndexCreatorProvider _indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
   private final Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
   private final Map<String, ForwardIndexCreator> _forwardIndexCreatorMap = new HashMap<>();
   private final Map<String, DictionaryBasedInvertedIndexCreator> _invertedIndexCreatorMap = new HashMap<>();

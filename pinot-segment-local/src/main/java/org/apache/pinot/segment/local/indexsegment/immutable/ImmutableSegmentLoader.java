@@ -37,6 +37,7 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.IndexingOverrides;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
@@ -141,7 +142,8 @@ public class ImmutableSegmentLoader {
     for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
       // FIXME: text-index only works with local SegmentDirectory
       indexContainerMap.put(entry.getKey(),
-          new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig, indexDir));
+          new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig, indexDir,
+              IndexingOverrides.getIndexReaderProvider()));
     }
 
     // Instantiate virtual columns
