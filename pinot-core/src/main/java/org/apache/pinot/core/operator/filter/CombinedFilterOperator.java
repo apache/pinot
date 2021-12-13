@@ -10,25 +10,23 @@ import javax.annotation.Nullable;
 
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.VisitableOperator;
 import org.apache.pinot.core.operator.blocks.CombinedFilterBlock;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 
 
-public class CombinedFilterOperator extends BaseFilterOperator {
+public class CombinedFilterOperator extends BaseFilterOperator implements VisitableOperator {
   private static final String OPERATOR_NAME = "CombinedFilterOperator";
 
   protected Map<ExpressionContext, BaseFilterOperator> _filterOperators;
-  protected Map<ExpressionContext, FilterBlock> _filterBlockMap;
-  protected FilterBlock _mainFilterBlock;
   protected BaseFilterOperator _mainFilterOperator;
+  protected CombinedFilterBlock _resultBlock;
 
   public CombinedFilterOperator(Map<ExpressionContext, BaseFilterOperator> filterOperators,
       BaseFilterOperator mainFilterOperator) {
     _filterOperators = filterOperators;
     _mainFilterOperator = mainFilterOperator;
-
-    _filterBlockMap = new HashMap<>();
   }
 
   @Override
@@ -49,19 +47,39 @@ public class CombinedFilterOperator extends BaseFilterOperator {
 
   @Override
   protected FilterBlock getNextBlock() {
-    _mainFilterBlock = _mainFilterOperator.nextBlock();
+    if (_resultBlock != null) {
+      return _resultBlock;
+    }
 
+    FilterBlock mainFilterBlock = _mainFilterOperator.nextBlock();
+
+    Map<ExpressionContext, FilterBlock> filterBlockMap = new HashMap<>();
     Iterator<Map.Entry<ExpressionContext, BaseFilterOperator>> iterator = _filterOperators.entrySet().iterator();
 
     while (iterator.hasNext()) {
       Map.Entry<ExpressionContext, BaseFilterOperator> entry = iterator.next();
       FilterBlock subFilterBlock = entry.getValue().nextBlock();
 
-      _filterBlockMap.put(entry.getKey(),
+      filterBlockMap.put(entry.getKey(),
           new FilterBlock(new AndDocIdSet(Arrays.asList(subFilterBlock.getBlockDocIdSet(),
-          _mainFilterBlock.getBlockDocIdSet()))));
+          mainFilterBlock.getBlockDocIdSet()))));
     }
 
-    return new CombinedFilterBlock(_filterBlockMap, _mainFilterBlock);
+    _resultBlock = new CombinedFilterBlock(filterBlockMap, mainFilterBlock);
+
+    return _resultBlock;
+  }
+
+  @Override
+  public <T> void accept(T v) {
+    if (v instanceof BaseFilterOperator) {
+      assert _mainFilterOperator == null;
+
+      _mainFilterOperator = (BaseFilterOperator) v;
+    } else if (v instanceof Map) {
+      assert _filterOperators == null;
+
+      _filterOperators = (Map<ExpressionContext, BaseFilterOperator>) v;
+    }
   }
 }

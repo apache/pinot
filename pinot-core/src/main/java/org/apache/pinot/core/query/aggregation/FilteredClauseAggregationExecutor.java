@@ -20,10 +20,13 @@ package org.apache.pinot.core.query.aggregation;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.blocks.CombinedTransformBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.aggregation.function.FilterableAggregationFunction;
 
 
 public class FilteredClauseAggregationExecutor implements AggregationExecutor {
@@ -47,15 +50,18 @@ public class FilteredClauseAggregationExecutor implements AggregationExecutor {
     }
 
     CombinedTransformBlock combinedTransformBlock = (CombinedTransformBlock) transformBlock;
-    List<TransformBlock> transformBlockList = combinedTransformBlock.getTransformBlockList();
+    Map<ExpressionContext, TransformBlock> transformBlockMap = combinedTransformBlock.getTransformBlockMap();
     int numAggregations = _aggregationFunctions.length;
     int transformListOffset = 0;
 
     for (int i = 0; i < numAggregations; i++) {
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
 
-      if (aggregationFunction.isFilteredAggregation()) {
-        TransformBlock innerTransformBlock = transformBlockList.get(transformListOffset++);
+      if (aggregationFunction instanceof FilterableAggregationFunction) {
+        FilterableAggregationFunction filterableAggregationFunction =
+            (FilterableAggregationFunction) aggregationFunction;
+        TransformBlock innerTransformBlock = transformBlockMap
+            .get(filterableAggregationFunction.getAssociatedExpressionContext());
 
         if (innerTransformBlock != null) {
           int length = innerTransformBlock.getNumDocs();

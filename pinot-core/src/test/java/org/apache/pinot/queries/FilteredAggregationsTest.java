@@ -57,7 +57,7 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
   private static final String INT_COL_NAME = "INT_COL";
   private static final String NO_INDEX_INT_COL_NAME = "NO_INDEX_COL";
   private static final Integer INT_BASE_VALUE = 0;
-  private static final Integer NUM_ROWS = 30000;
+  private static final Integer NUM_ROWS = 5;
 
 
   private IndexSegment _indexSegment;
@@ -172,7 +172,7 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
   @Test
   public void testInterSegment() {
 
-   String query =
+  String query =
         "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 9999)"
             + "FROM MyTable WHERE INT_COL < 1000000";
 
@@ -301,6 +301,53 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     nonFilterQuery =
         "SELECT MIN(NO_INDEX_COL), MAX(INT_COL) FROM MyTable "
             + "WHERE INT_COL > 29990";
+
+    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
+  }
+
+  @Test
+  public void testFoo() {
+    String query = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 3),"
+        + "SUM(INT_COL) FILTER(WHERE INT_COL < 4),"
+        + "MAX(INT_COL) FILTER(WHERE INT_COL < 3)"
+        + "FROM MyTable WHERE INT_COL > 2";
+
+    String nonFilterQuery = "SELECT SUM("
+        + "CASE "
+        + "WHEN (INT_COL > 3) THEN INT_COL "
+        + "ELSE 0 "
+        + "END) AS total_sum,"
+        + "SUM("
+        + "CASE "
+        + "WHEN (INT_COL < 4) THEN INT_COL "
+        + "ELSE 0 "
+        + "END) AS total_sum2,"
+        + "MAX("
+        + "CASE "
+        + "WHEN (INT_COL < 3) THEN INT_COL "
+        + "ELSE 0 "
+        + "END) AS total_max "
+        + "FROM MyTable WHERE INT_COL > 2";
+
+    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
+
+    System.out.println("DOING");
+
+    query = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 12345),"
+        + "SUM(INT_COL) FILTER(WHERE INT_COL < 59999) "
+        + "FROM MyTable WHERE INT_COL > 1000";
+
+    nonFilterQuery = "SELECT SUM("
+        + "CASE "
+        + "WHEN (INT_COL > 12345) THEN INT_COL "
+        + "ELSE 0 "
+        + "END) AS total_sum,"
+        + "SUM("
+        + "CASE "
+        + "WHEN (INT_COL < 59999) THEN INT_COL "
+        + "ELSE 0 "
+        + "END) AS total_max "
+        + "FROM MyTable WHERE INT_COL > 1000";
 
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
   }

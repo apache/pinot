@@ -29,6 +29,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -39,6 +40,7 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.FilterableAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.testng.annotations.Test;
@@ -575,28 +577,6 @@ public class BrokerRequestToQueryContextConverterTest {
         QueryContextConverterUtils.getQueryContextFromPQL(pqlQuery), QueryContextConverterUtils.getQueryContextFromSQL(
         sqlQuery)
     };
-  }
-
-  @Test
-  public void testFilteredAggregations() {
-    String query = "SELECT COUNT(*) FILTER(WHERE foo > 5),"
-        + "COUNT(*) FILTER(WHERE foo < 6) FROM testTable WHERE bar > 0";
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
-    Map<ExpressionContext, FilterContext> filteredAggregationContexts =
-        queryContext.getFilteredAggregationContexts();
-    assertNotNull(filteredAggregationContexts);
-    assertEquals(filteredAggregationContexts.size(), 2);
-
-    Iterator<Map.Entry<ExpressionContext, FilterContext>> iterator =
-        filteredAggregationContexts.entrySet().iterator();
-    Set<String> containedValues = new HashSet<>();
-
-    while (iterator.hasNext()) {
-      containedValues.add(iterator.next().getValue().toString());
-    }
-
-    assertTrue(containedValues.contains("foo > '5'"));
-    assertTrue(containedValues.contains("foo < '6'"));
   }
 
   @Test

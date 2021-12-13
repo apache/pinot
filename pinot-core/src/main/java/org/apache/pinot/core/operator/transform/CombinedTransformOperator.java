@@ -20,7 +20,10 @@ package org.apache.pinot.core.operator.transform;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.blocks.CombinedTransformBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
@@ -38,46 +41,43 @@ import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 public class CombinedTransformOperator extends TransformOperator {
   private static final String OPERATOR_NAME = "CombinedTransformOperator";
 
-  protected final List<TransformOperator> _transformOperatorList;
+  protected final Map<ExpressionContext, TransformOperator> _transformOperatorMap;
   protected final TransformOperator _mainPredicateTransformOperator;
   protected final BaseFilterOperator _mainPredicateFilterOperator;
 
   /**
    * Constructor for the class
    */
-  public CombinedTransformOperator(List<TransformOperator> transformOperatorList,
+  public CombinedTransformOperator(Map<ExpressionContext, TransformOperator> transformOperatorMap,
       TransformOperator mainPredicateTransformOperator, BaseFilterOperator filterOperator,
       Collection<ExpressionContext> expressions) {
-    super(null, transformOperatorList.get(0)._projectionOperator, expressions);
+    super(null, transformOperatorMap.entrySet().iterator().next().getValue()._projectionOperator,
+        expressions);
 
     _mainPredicateTransformOperator = mainPredicateTransformOperator;
     _mainPredicateFilterOperator = filterOperator;
-    _transformOperatorList = transformOperatorList;
+    _transformOperatorMap = transformOperatorMap;
   }
 
   @Override
   protected TransformBlock getNextBlock() {
-    List<TransformBlock> transformBlockList = new ArrayList<>();
+    Map<ExpressionContext, TransformBlock> expressionContextTransformBlockMap = new HashMap<>();
     boolean hasTransformBlock = false;
     boolean isMatchAll = _mainPredicateFilterOperator instanceof MatchAllFilterOperator;
     TransformBlock nonFilteredAggTransformBlock = _mainPredicateTransformOperator.getNextBlock();
 
+    Iterator<Map.Entry<ExpressionContext, TransformOperator>> iterator = _transformOperatorMap.entrySet().iterator();
     // Get next block from all underlying transform operators
-    for (TransformOperator transformOperator : _transformOperatorList) {
+    while(iterator.hasNext()) {
+      Map.Entry<ExpressionContext, TransformOperator> entry = iterator.next();
 
-      // If it is a match all from main predicate, don't bother broadcasting
-      // the block to filter clause predicates
-      if (nonFilteredAggTransformBlock != null && !isMatchAll) {
-        transformOperator.accept(nonFilteredAggTransformBlock);
-      }
-
-      TransformBlock transformBlock = transformOperator.getNextBlock();
+      TransformBlock transformBlock = entry.getValue().getNextBlock();
 
       if (transformBlock != null) {
         hasTransformBlock = true;
       }
 
-      transformBlockList.add(transformBlock);
+      expressionContextTransformBlockMap.put(entry.getKey(), transformBlock);
     }
 
 
@@ -85,7 +85,7 @@ public class CombinedTransformOperator extends TransformOperator {
       return null;
     }
 
-    return new CombinedTransformBlock(transformBlockList,
+    return new CombinedTransformBlock(expressionContextTransformBlockMap,
         nonFilteredAggTransformBlock);
   }
 

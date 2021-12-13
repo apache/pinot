@@ -10,6 +10,8 @@ public class CombinedFilterBlock extends FilterBlock {
 
   public CombinedFilterBlock(Map<ExpressionContext, FilterBlock> filterBlockMap,
       FilterBlock mainFilterBlock) {
+    // Initialize with main predicate's filter block to allow main predicate
+    // chain to operate normally
     super(mainFilterBlock.getBlockDocIdSet());
 
     _filterBlockMap = filterBlockMap;

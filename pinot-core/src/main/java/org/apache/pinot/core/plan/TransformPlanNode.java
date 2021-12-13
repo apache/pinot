@@ -40,19 +40,29 @@ public class TransformPlanNode implements PlanNode {
   private final Collection<ExpressionContext> _expressions;
   private final int _maxDocsPerCall;
   private final BaseFilterOperator _filterOperator;
+  private final boolean _isSwimlane;
+  private final ExpressionContext _associatedExpContext;
 
   public TransformPlanNode(IndexSegment indexSegment, QueryContext queryContext,
       Collection<ExpressionContext> expressions, int maxDocsPerCall) {
-    this(indexSegment, queryContext, expressions, maxDocsPerCall, null);
+    this(indexSegment, queryContext, expressions, maxDocsPerCall, null, false, null);
   }
 
   public TransformPlanNode(IndexSegment indexSegment, QueryContext queryContext,
       Collection<ExpressionContext> expressions, int maxDocsPerCall, @Nullable BaseFilterOperator filterOperator) {
+    this(indexSegment, queryContext, expressions, maxDocsPerCall, filterOperator, false, null);
+  }
+
+  public TransformPlanNode(IndexSegment indexSegment, QueryContext queryContext,
+      Collection<ExpressionContext> expressions, int maxDocsPerCall, @Nullable BaseFilterOperator filterOperator,
+      boolean isSwimlane, @Nullable ExpressionContext associatedExpContext) {
     _indexSegment = indexSegment;
     _queryContext = queryContext;
     _expressions = expressions;
     _maxDocsPerCall = maxDocsPerCall;
     _filterOperator = filterOperator;
+    _isSwimlane = isSwimlane;
+    _associatedExpContext = associatedExpContext;
   }
 
   @Override
@@ -66,7 +76,8 @@ public class TransformPlanNode implements PlanNode {
       }
     }
     ProjectionOperator projectionOperator =
-        new ProjectionPlanNode(_indexSegment, _queryContext, projectionColumns, _maxDocsPerCall, _filterOperator).run();
+        new ProjectionPlanNode(_indexSegment, _queryContext, projectionColumns, _maxDocsPerCall, _filterOperator,
+            _isSwimlane, _associatedExpContext).run();
     if (hasNonIdentifierExpression) {
       return new TransformOperator(_queryContext, projectionOperator, _expressions);
     } else {

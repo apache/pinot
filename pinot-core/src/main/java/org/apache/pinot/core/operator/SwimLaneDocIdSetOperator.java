@@ -16,7 +16,7 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.Constants;
 
 
-public class SwimLaneDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
+public class SwimLaneDocIdSetOperator extends DocIdSetOperator {
   private static final String OPERATOR_NAME = "SwimLaneDocIdSetOperator";
 
   private final CombinedFilterOperator _filterOperator;
@@ -29,6 +29,8 @@ public class SwimLaneDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
 
   public SwimLaneDocIdSetOperator(CombinedFilterOperator filterOperator, ExpressionContext expressionContext,
       int maxSizeOfDocIdSet) {
+    super(filterOperator, maxSizeOfDocIdSet);
+
     Preconditions.checkArgument(maxSizeOfDocIdSet > 0 && maxSizeOfDocIdSet <= DocIdSetPlanNode.MAX_DOC_PER_CALL);
     _filterOperator = filterOperator;
     _expressionContext = expressionContext;

@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.operator.blocks;
 
-import java.util.List;
+import java.util.Iterator;
+import java.util.Map;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.BlockDocIdValueSet;
 import org.apache.pinot.core.common.BlockMetadata;
@@ -28,22 +30,27 @@ import org.apache.pinot.core.common.BlockValSet;
  * Represents a combination of multiple TransformBlock instances
  */
 public class CombinedTransformBlock extends TransformBlock {
-  protected List<TransformBlock> _transformBlockList;
+  protected Map<ExpressionContext, TransformBlock> _transformBlockMap;
   protected TransformBlock _nonFilteredAggBlock;
 
-  public CombinedTransformBlock(List<TransformBlock> transformBlockList,
+  public CombinedTransformBlock(Map<ExpressionContext, TransformBlock> transformBlockMap,
       TransformBlock nonFilteredAggBlock) {
     super(nonFilteredAggBlock == null ? null : nonFilteredAggBlock._projectionBlock,
         nonFilteredAggBlock == null ? null : nonFilteredAggBlock._transformFunctionMap);
 
-    _transformBlockList = transformBlockList;
+    _transformBlockMap = transformBlockMap;
     _nonFilteredAggBlock = nonFilteredAggBlock;
   }
 
   public int getNumDocs() {
     int numDocs = 0;
 
-    for (TransformBlock transformBlock : _transformBlockList) {
+    Iterator<Map.Entry<ExpressionContext, TransformBlock>> iterator = _transformBlockMap.entrySet().iterator();
+
+    while (iterator.hasNext()) {
+      Map.Entry<ExpressionContext, TransformBlock> entry = iterator.next();
+      TransformBlock transformBlock = entry.getValue();
+
       if (transformBlock != null) {
         numDocs = numDocs + transformBlock._projectionBlock.getNumDocs();
       }
@@ -56,8 +63,8 @@ public class CombinedTransformBlock extends TransformBlock {
     return numDocs;
   }
 
-  public List<TransformBlock> getTransformBlockList() {
-    return _transformBlockList;
+  public Map<ExpressionContext, TransformBlock> getTransformBlockMap() {
+    return _transformBlockMap;
   }
 
   public TransformBlock getNonFilteredAggBlock() {
