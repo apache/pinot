@@ -229,11 +229,13 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
     List<SegmentMetadata> segmentsMetadata = getAllSegmentsMetadata(tableNameWithType);
 
-    ExecutorService workers = Executors.newFixedThreadPool(parallelism);
+    int nosWorkers = Math.min(segmentsMetadata.size(), parallelism);
+
+    ExecutorService workers = Executors.newFixedThreadPool(nosWorkers);
 
     final AtomicReference<Exception> sampleException = new AtomicReference<>();
 
-    CountDownLatch latch = new CountDownLatch(parallelism);
+    CountDownLatch latch = new CountDownLatch(nosWorkers);
 
     for (SegmentMetadata segmentMetadata : segmentsMetadata) {
       CompletableFuture.runAsync(() -> {
