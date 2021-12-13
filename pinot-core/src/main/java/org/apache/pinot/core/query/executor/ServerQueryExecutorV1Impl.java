@@ -278,8 +278,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     LOGGER.debug("Matched {} segments after pruning", numSelectedSegments);
     if (numSelectedSegments == 0) {
       // Only return metadata for streaming query
-      DataTable dataTable =
-          enableStreaming ? DataTableBuilder.getEmptyDataTable() : DataTableUtils.buildEmptyDataTable(queryContext);
+      DataTable dataTable = DataTableUtils.buildEmptyDataTable(queryContext);
       Map<String, String> metadata = dataTable.getMetadata();
       metadata.put(MetadataKey.TOTAL_DOCS.getName(), String.valueOf(numTotalDocs));
       metadata.put(MetadataKey.NUM_DOCS_SCANNED.getName(), "0");

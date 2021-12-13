@@ -18,26 +18,27 @@
  */
 package org.apache.pinot.core.plan;
 
+import io.grpc.stub.StreamObserver;
 import java.util.List;
+import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.core.operator.InstanceResponseOperator;
+import org.apache.pinot.core.operator.StreamingInstanceResponseOperator;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
-public class InstanceResponsePlanNode implements PlanNode {
-  protected final CombinePlanNode _combinePlanNode;
-  protected final List<IndexSegment> _indexSegments;
-  protected final List<FetchContext> _fetchContexts;
+public class StreamingInstanceResponsePlanNode extends InstanceResponsePlanNode {
+  private final StreamObserver<Server.ServerResponse> _streamObserver;
 
-  public InstanceResponsePlanNode(CombinePlanNode combinePlanNode, List<IndexSegment> indexSegments,
-      List<FetchContext> fetchContexts) {
-    _combinePlanNode = combinePlanNode;
-    _indexSegments = indexSegments;
-    _fetchContexts = fetchContexts;
+  public StreamingInstanceResponsePlanNode(CombinePlanNode combinePlanNode, List<IndexSegment> indexSegments,
+      List<FetchContext> fetchContexts, StreamObserver<Server.ServerResponse> streamObserver) {
+    super(combinePlanNode, indexSegments, fetchContexts);
+    _streamObserver = streamObserver;
   }
 
   @Override
   public InstanceResponseOperator run() {
-    return new InstanceResponseOperator(_combinePlanNode.run(), _indexSegments, _fetchContexts);
+    return new StreamingInstanceResponseOperator(_combinePlanNode.run(), _indexSegments, _fetchContexts,
+        _streamObserver);
   }
 }

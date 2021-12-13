@@ -43,13 +43,6 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     startServers(NUM_SERVERS);
   }
 
-  // Disabled because gRPC query server is not enabled
-  @Test(enabled = false)
-  @Override
-  public void testGrpcQueryServer() {
-    // Ignored
-  }
-
   @Test(enabled = false)
   @Override
   public void testHardcodedServerPartitionedSqlQueries() {

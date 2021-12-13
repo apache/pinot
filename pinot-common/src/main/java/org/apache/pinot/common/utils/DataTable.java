@@ -35,6 +35,8 @@ public interface DataTable {
 
   void addException(ProcessingException processingException);
 
+  void addException(int exceptionCode, String exceptionMsg);
+
   Map<Integer, String> getExceptions();
 
   byte[] toBytes()
@@ -69,6 +71,10 @@ public interface DataTable {
   double[] getDoubleArray(int rowId, int colId);
 
   String[] getStringArray(int rowId, int colId);
+
+  DataTable toMetadataOnlyDataTable();
+
+  DataTable toDataOnlyDataTable();
 
   enum MetadataValueType {
     INT, LONG, STRING

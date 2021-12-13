@@ -32,9 +32,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
@@ -46,17 +44,9 @@ import org.apache.http.message.BasicNameValuePair;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.proto.Server;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
-import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
-import org.apache.pinot.common.utils.grpc.GrpcRequestBuilder;
-import org.apache.pinot.core.common.datatable.DataTableFactory;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -201,7 +191,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   protected void startServers() {
     // Enable gRPC server
     PinotConfiguration serverConfig = getDefaultServerConfiguration();
-    serverConfig.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_GRPC_SERVER, true);
     startServer(serverConfig);
   }
 
@@ -1831,64 +1820,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "\",0,-1],[\"COMBINE_GROUPBY_ORDERBY\",1,0],[\"AGGREGATE_GROUPBY_ORDERBY(groupKeys:Carrier, "
         + "aggregations:count(*))\",2,1],[\"TRANSFORM_PASSTHROUGH(Carrier)\",3,2],[\"PROJECT(Carrier)\",4,3],"
         + "[\"FILTER_MATCH_ENTIRE_SEGMENT(docs:*)\",5,4]]}");
-  }
-
-  @Test
-  public void testGrpcQueryServer()
-      throws Exception {
-    GrpcQueryClient queryClient = new GrpcQueryClient("localhost", CommonConstants.Server.DEFAULT_GRPC_PORT);
-    String sql = "SELECT * FROM mytable_OFFLINE LIMIT 1000000";
-    BrokerRequest brokerRequest = new Pql2Compiler().compileToBrokerRequest(sql);
-    List<String> segments = _helixResourceManager.getSegmentsFor("mytable_OFFLINE");
-
-    GrpcRequestBuilder requestBuilder = new GrpcRequestBuilder().setSegments(segments);
-    testNonStreamingRequest(queryClient.submit(requestBuilder.setSql(sql).build()));
-    testNonStreamingRequest(queryClient.submit(requestBuilder.setBrokerRequest(brokerRequest).build()));
-
-    requestBuilder.setEnableStreaming(true);
-    testStreamingRequest(queryClient.submit(requestBuilder.setSql(sql).build()));
-    testStreamingRequest(queryClient.submit(requestBuilder.setBrokerRequest(brokerRequest).build()));
-  }
-
-  private void testNonStreamingRequest(Iterator<Server.ServerResponse> nonStreamingResponses)
-      throws Exception {
-    int expectedNumDocs = (int) getCountStarResult();
-    assertTrue(nonStreamingResponses.hasNext());
-    Server.ServerResponse nonStreamingResponse = nonStreamingResponses.next();
-    assertEquals(nonStreamingResponse.getMetadataMap().get(CommonConstants.Query.Response.MetadataKeys.RESPONSE_TYPE),
-        CommonConstants.Query.Response.ResponseType.NON_STREAMING);
-    DataTable dataTable = DataTableFactory.getDataTable(nonStreamingResponse.getPayload().asReadOnlyByteBuffer());
-    assertNotNull(dataTable.getDataSchema());
-    assertEquals(dataTable.getNumberOfRows(), expectedNumDocs);
-    Map<String, String> metadata = dataTable.getMetadata();
-    assertEquals(metadata.get(MetadataKey.NUM_DOCS_SCANNED.getName()), Integer.toString(expectedNumDocs));
-  }
-
-  private void testStreamingRequest(Iterator<Server.ServerResponse> streamingResponses)
-      throws Exception {
-    int expectedNumDocs = (int) getCountStarResult();
-    int numTotalDocs = 0;
-    while (streamingResponses.hasNext()) {
-      Server.ServerResponse streamingResponse = streamingResponses.next();
-      DataTable dataTable = DataTableFactory.getDataTable(streamingResponse.getPayload().asReadOnlyByteBuffer());
-      String responseType =
-          streamingResponse.getMetadataMap().get(CommonConstants.Query.Response.MetadataKeys.RESPONSE_TYPE);
-      if (responseType.equals(CommonConstants.Query.Response.ResponseType.DATA)) {
-        // verify the returned data table metadata only contains "responseSerializationCpuTimeNs".
-        Map<String, String> metadata = dataTable.getMetadata();
-        assertTrue(metadata.size() == 1 && metadata.containsKey(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName()));
-        assertNotNull(dataTable.getDataSchema());
-        numTotalDocs += dataTable.getNumberOfRows();
-      } else {
-        assertEquals(responseType, CommonConstants.Query.Response.ResponseType.METADATA);
-        assertFalse(streamingResponses.hasNext());
-        assertEquals(numTotalDocs, expectedNumDocs);
-        assertNull(dataTable.getDataSchema());
-        assertEquals(dataTable.getNumberOfRows(), 0);
-        Map<String, String> metadata = dataTable.getMetadata();
-        assertEquals(metadata.get(MetadataKey.NUM_DOCS_SCANNED.getName()), Integer.toString(expectedNumDocs));
-      }
-    }
   }
 
   @Test
