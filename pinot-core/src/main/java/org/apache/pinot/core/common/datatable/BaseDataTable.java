@@ -250,18 +250,6 @@ public abstract class BaseDataTable implements DataTable {
     return strings;
   }
 
-  @Override
-  public DataTable toMetadataOnlyDataTable() {
-    DataTable destDataTable = DataTableBuilder.getEmptyDataTable();
-    destDataTable.getMetadata().putAll(this.getMetadata());
-    if (!this.getExceptions().isEmpty()) {
-      for (Map.Entry<Integer, String> e : this.getExceptions().entrySet()) {
-        destDataTable.addException(e.getKey(), e.getValue());
-      }
-    }
-    return destDataTable;
-  }
-
   private int positionCursorInVariableBuffer(int rowId, int colId) {
     _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
     _variableSizeData.position(_fixedSizeData.getInt());

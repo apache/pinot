@@ -246,6 +246,13 @@ public class DataTableImplV2 extends BaseDataTable {
   }
 
   @Override
+  public DataTable toMetadataOnlyDataTable() {
+    DataTable destDataTable = DataTableBuilder.getEmptyDataTable();
+    destDataTable.getMetadata().putAll(this.getMetadata());
+    return destDataTable;
+  }
+
+  @Override
   public DataTable toDataOnlyDataTable() {
     return new DataTableImplV2(
         _numRows, _dataSchema, _dictionaryMap, _fixedSizeDataBytes, _variableSizeDataBytes);

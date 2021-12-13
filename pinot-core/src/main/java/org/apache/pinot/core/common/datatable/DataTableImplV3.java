@@ -216,6 +216,19 @@ public class DataTableImplV3 extends BaseDataTable {
   }
 
   @Override
+  public DataTable toMetadataOnlyDataTable() {
+    DataTable destDataTable = DataTableBuilder.getEmptyDataTable();
+    destDataTable.getMetadata().putAll(this.getMetadata());
+    // in V3 exceptions are stored in separate map. need to add them individually.
+    if (!this.getExceptions().isEmpty()) {
+      for (Map.Entry<Integer, String> e : this.getExceptions().entrySet()) {
+        destDataTable.addException(e.getKey(), e.getValue());
+      }
+    }
+    return destDataTable;
+  }
+
+  @Override
   public DataTable toDataOnlyDataTable() {
     return new DataTableImplV3(
         _numRows, _dataSchema, _dictionaryMap, _fixedSizeDataBytes, _variableSizeDataBytes);
