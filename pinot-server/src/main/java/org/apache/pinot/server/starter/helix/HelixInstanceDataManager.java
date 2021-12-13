@@ -32,6 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
@@ -242,35 +243,23 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
     final AtomicReference<Exception> sampleException = new AtomicReference<>();
 
-    CountDownLatch latch = new CountDownLatch(nosWorkers);
-
-    for (SegmentMetadata segmentMetadata : segmentsMetadata) {
-      CompletableFuture.runAsync(() -> {
-        try {
-          reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
-        } catch (Exception e) {
-          String segmentName = segmentMetadata.getName();
-          LOGGER.error("Caught exception while reloading segment: {} in table: {}", segmentName, tableNameWithType, e);
-          failedSegments.add(segmentName);
-          sampleException.set(e);
-        } finally {
-          latch.countDown();
-        }
-      }, workers);
-    }
-
-    try {
-      latch.await();
-      if (sampleException.get() != null) {
-        throw new RuntimeException(
-            String.format("Failed to reload %d/%d segments: %s in table: %s", failedSegments.size(),
-                segmentsMetadata.size(), failedSegments, tableNameWithType), sampleException.get());
+    CompletableFuture.allOf(segmentsMetadata.stream().map(segmentMetadata -> CompletableFuture.runAsync(() -> {
+      try {
+        reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
+      } catch (Exception e) {
+        String segmentName = segmentMetadata.getName();
+        LOGGER.error("Caught exception while reloading segment: {} in table: {}", segmentName, tableNameWithType, e);
+        failedSegments.add(segmentName);
+        sampleException.set(e);
       }
-      LOGGER.info("Reloaded all segments in table: {}", tableNameWithType);
-    } catch (InterruptedException e) {
-      LOGGER.info("Calling thread interrupted while waiting to reload segments in table: {}", tableNameWithType);
-      throw e;
+    }, workers)).toArray(CompletableFuture[]::new)).get();
+
+    if (sampleException.get() != null) {
+      throw new RuntimeException(
+          String.format("Failed to reload %d/%d segments: %s in table: %s", failedSegments.size(),
+              segmentsMetadata.size(), failedSegments, tableNameWithType), sampleException.get());
     }
+    LOGGER.info("Reloaded all segments in table: {}", tableNameWithType);
   }
 
   private void reloadSegment(String tableNameWithType, SegmentMetadata segmentMetadata, TableConfig tableConfig,
