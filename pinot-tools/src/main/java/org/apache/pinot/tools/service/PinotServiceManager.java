@@ -199,7 +199,6 @@ public class PinotServiceManager {
       ServiceRole role = instance.getServiceRole();
       String instanceId = instance.getInstanceId();
       LOGGER.info("Trying to stop Pinot [{}] Instance [{}] ...", role, instanceId);
-      ServiceStatus.setServiceStatusCallback(instanceId, new ServiceStatus.ShuttingDownServiceStatusCallback());
       instance.stop();
       LOGGER.info("Pinot [{}] Instance [{}] is Stopped...", role, instanceId);
       _runningInstanceMap.remove(instanceId);

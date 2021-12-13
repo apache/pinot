@@ -85,6 +85,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected String _hostname;
   protected int _port;
   protected String _instanceId;
+  private boolean _isStarting = false;
+  private boolean _isShuttingDown = false;
   protected final List<ClusterChangeHandler> _idealStateChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _externalViewChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _instanceConfigChangeHandlers = new ArrayList<>();
@@ -198,6 +200,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   public void start()
       throws Exception {
     LOGGER.info("Starting Pinot broker");
+    _isStarting = true;
     Utils.logVersions();
 
     LOGGER.info("Connecting spectator Helix manager");
@@ -316,6 +319,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // Register the service status handler
     registerServiceStatusHandler();
 
+    _isStarting = false;
     LOGGER.info("Finish starting Pinot broker");
   }
 
@@ -360,12 +364,15 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         ImmutableList.of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_participantHelixManager,
                 _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup),
             new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_participantHelixManager,
-                _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup))));
+                _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup),
+            new ServiceStatus.LifecycleServiceStatusCallback(this::isStarting, this::isShuttingDown)
+        )));
   }
 
   @Override
   public void stop() {
     LOGGER.info("Shutting down Pinot broker");
+    _isShuttingDown = true;
 
     LOGGER.info("Disconnecting participant Helix manager");
     _participantHelixManager.disconnect();
@@ -397,6 +404,14 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     LOGGER.info("Shutdown Broker Metrics Registry");
     _metricsRegistry.shutdown();
     LOGGER.info("Finish shutting down Pinot broker for {}", _instanceId);
+  }
+
+  public boolean isStarting() {
+    return _isStarting;
+  }
+
+  public boolean isShuttingDown() {
+    return _isShuttingDown;
   }
 
   public HelixManager getSpectatorHelixManager() {
