@@ -37,7 +37,15 @@ public class IndexHandlerFactory {
   private IndexHandlerFactory() {
   }
 
-  private static final IndexHandler NO_OP_HANDLER = () -> {
+  private static final IndexHandler NO_OP_HANDLER = new IndexHandler() {
+    @Override
+    public void updateIndices() {
+    }
+
+    @Override
+    public boolean needUpdateIndices() {
+      return false;
+    }
   };
 
   public static IndexHandler getIndexHandler(ColumnIndexType type, File indexDir, SegmentMetadataImpl segmentMetadata,
@@ -62,6 +70,29 @@ public class IndexHandlerFactory {
       case BLOOM_FILTER:
         return new BloomFilterHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter,
             indexCreatorProvider);
+      default:
+        return NO_OP_HANDLER;
+    }
+  }
+
+  public static IndexHandler getIndexHandler(ColumnIndexType type, SegmentMetadataImpl segmentMetadata,
+      IndexLoadingConfig indexLoadingConfig, SegmentDirectory.Reader segmentReader) {
+    switch (type) {
+      case INVERTED_INDEX:
+        return new InvertedIndexHandler(segmentMetadata, indexLoadingConfig, segmentReader);
+      case RANGE_INDEX:
+        return new RangeIndexHandler(segmentMetadata, indexLoadingConfig, segmentReader);
+      case TEXT_INDEX:
+        return new TextIndexHandler(segmentMetadata, indexLoadingConfig, segmentReader);
+      case FST_INDEX:
+        return new FSTIndexHandler(segmentMetadata, indexLoadingConfig, segmentReader,
+            indexLoadingConfig.getFSTIndexType());
+      case JSON_INDEX:
+        return new JsonIndexHandler(segmentMetadata, indexLoadingConfig, segmentReader);
+      case H3_INDEX:
+        return new H3IndexHandler(segmentMetadata, indexLoadingConfig, segmentReader);
+      case BLOOM_FILTER:
+        return new BloomFilterHandler(segmentMetadata, indexLoadingConfig, segmentReader);
       default:
         return NO_OP_HANDLER;
     }

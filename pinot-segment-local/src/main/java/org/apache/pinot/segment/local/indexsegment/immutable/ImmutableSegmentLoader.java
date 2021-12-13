@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.indexsegment.immutable;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.HashMap;
@@ -173,6 +174,34 @@ public class ImmutableSegmentLoader {
         new ImmutableSegmentImpl(actualSegmentDirectory, segmentMetadata, indexContainerMap, starTreeIndexContainer);
     LOGGER.info("Successfully loaded segment {} with config: {}", segmentName, segmentDirectoryConfigs);
     return segment;
+  }
+
+  /**
+   * Check segment directory against the table config and schema to see if any preprocessing is needed,
+   * like changing segment format, adding new indices or updating default columns.
+   */
+  public static boolean needPreprocess(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
+      @Nullable Schema schema)
+      throws Exception {
+    if (needConvertSegmentFormat(indexLoadingConfig, segmentDirectory.getSegmentMetadata())) {
+      return true;
+    }
+    SegmentPreProcessor preProcessor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema);
+    return preProcessor.needProcess();
+  }
+
+  @VisibleForTesting
+  static boolean needConvertSegmentFormat(IndexLoadingConfig indexLoadingConfig,
+      SegmentMetadataImpl segmentMetadata) {
+    SegmentVersion segmentVersionToLoad = indexLoadingConfig.getSegmentVersion();
+    if (segmentVersionToLoad == null) {
+      return false;
+    }
+    File indexDir = segmentMetadata.getIndexDir();
+    if (indexDir != null && SegmentDirectoryPaths.segmentDirectoryFor(indexDir, segmentVersionToLoad).isDirectory()) {
+      return false;
+    }
+    return segmentVersionToLoad != segmentMetadata.getVersion();
   }
 
   private static void convertSegmentFormat(File indexDir, IndexLoadingConfig indexLoadingConfig,

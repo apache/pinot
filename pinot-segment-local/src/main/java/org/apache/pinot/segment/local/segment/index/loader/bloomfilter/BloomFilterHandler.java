@@ -56,17 +56,45 @@ public class BloomFilterHandler implements IndexHandler {
 
   private final File _indexDir;
   private final SegmentMetadataImpl _segmentMetadata;
+  private final SegmentDirectory.Reader _segmentReader;
   private final SegmentDirectory.Writer _segmentWriter;
   private final Map<String, BloomFilterConfig> _bloomFilterConfigs;
   private final BloomFilterCreatorProvider _indexCreatorProvider;
 
   public BloomFilterHandler(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
+<<<<<<< HEAD
       SegmentDirectory.Writer segmentWriter, BloomFilterCreatorProvider indexCreatorProvider) {
+=======
+      SegmentDirectory.Writer segmentWriter) {
+    this(indexDir, segmentMetadata, indexLoadingConfig, null, segmentWriter);
+  }
+
+  public BloomFilterHandler(SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
+      SegmentDirectory.Reader segmentReader) {
+    this(null, segmentMetadata, indexLoadingConfig, segmentReader, null);
+  }
+
+  private BloomFilterHandler(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
+      SegmentDirectory.Reader segmentReader, SegmentDirectory.Writer segmentWriter) {
+>>>>>>> add checker to just check if segment needs reprocessing based on new table config and schema
     _indexDir = indexDir;
+    _segmentReader = segmentReader;
     _segmentWriter = segmentWriter;
     _segmentMetadata = segmentMetadata;
     _bloomFilterConfigs = indexLoadingConfig.getBloomFilterConfigs();
     _indexCreatorProvider = indexCreatorProvider;
+  }
+
+  @Override
+  public boolean needUpdateIndices() {
+    Set<String> columnsToAddBF = new HashSet<>(_bloomFilterConfigs.keySet());
+    Set<String> existingColumns = _segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.BLOOM_FILTER);
+    for (String column : existingColumns) {
+      if (!columnsToAddBF.remove(column)) {
+        return true;
+      }
+    }
+    return !columnsToAddBF.isEmpty();
   }
 
   @Override

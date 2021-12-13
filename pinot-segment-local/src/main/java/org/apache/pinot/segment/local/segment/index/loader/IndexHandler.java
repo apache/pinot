@@ -28,4 +28,10 @@ public interface IndexHandler {
    */
   void updateIndices()
       throws Exception;
+
+  /**
+   * Check if there is a need to add new indices or removes obsolete indices.
+   * @return true if there is a need to update.
+   */
+  boolean needUpdateIndices();
 }

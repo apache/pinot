@@ -68,19 +68,46 @@ public class FSTIndexHandler implements IndexHandler {
 
   private final File _indexDir;
   private final SegmentMetadata _segmentMetadata;
+  private final SegmentDirectory.Reader _segmentReader;
   private final SegmentDirectory.Writer _segmentWriter;
   private final Set<String> _columnsToAddIdx;
   private final FSTType _fstType;
   private final TextIndexCreatorProvider _indexCreatorProvider;
 
   public FSTIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
+<<<<<<< HEAD
       SegmentDirectory.Writer segmentWriter, FSTType fstType, TextIndexCreatorProvider indexCreatorProvider) {
+=======
+      SegmentDirectory.Writer segmentWriter, FSTType fstType) {
+    this(indexDir, segmentMetadata, indexLoadingConfig, null, segmentWriter, fstType);
+  }
+
+  public FSTIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
+      SegmentDirectory.Reader segmentReader, FSTType fstType) {
+    this(null, segmentMetadata, indexLoadingConfig, segmentReader, null, fstType);
+  }
+
+  private FSTIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
+      SegmentDirectory.Reader segmentReader, SegmentDirectory.Writer segmentWriter, FSTType fstType) {
+>>>>>>> add checker to just check if segment needs reprocessing based on new table config and schema
     _indexDir = indexDir;
     _segmentMetadata = segmentMetadata;
+    _segmentReader = segmentReader;
     _segmentWriter = segmentWriter;
     _columnsToAddIdx = new HashSet<>(indexLoadingConfig.getFSTIndexColumns());
     _fstType = fstType;
     _indexCreatorProvider = indexCreatorProvider;
+  }
+
+  @Override
+  public boolean needUpdateIndices() {
+    Set<String> existingColumns = _segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.FST_INDEX);
+    for (String column : existingColumns) {
+      if (!_columnsToAddIdx.remove(column)) {
+        return true;
+      }
+    }
+    return !_columnsToAddIdx.isEmpty();
   }
 
   @Override

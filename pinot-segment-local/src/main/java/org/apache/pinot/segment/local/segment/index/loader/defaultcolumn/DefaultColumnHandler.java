@@ -28,4 +28,10 @@ public interface DefaultColumnHandler {
    */
   void updateDefaultColumns()
       throws Exception;
+
+  /**
+   * Check if there is a need to update the auto-generated default columns.
+   * @return true if there is a need to update.
+   */
+  boolean needUpdateDefaultColumns();
 }
