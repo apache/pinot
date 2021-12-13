@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -246,16 +245,15 @@ public class DataTableImplV2 extends BaseDataTable {
   }
 
   @Override
-  public DataTable toMetadataOnlyDataTable() {
-    DataTable destDataTable = DataTableBuilder.getEmptyDataTable();
-    destDataTable.getMetadata().putAll(this.getMetadata());
-    return destDataTable;
+  public DataTableImplV2 toMetadataOnlyDataTable() {
+    DataTableImplV2 metadataOnlyDataTable = new DataTableImplV2();
+    metadataOnlyDataTable._metadata.putAll(_metadata);
+    return metadataOnlyDataTable;
   }
 
   @Override
-  public DataTable toDataOnlyDataTable() {
-    return new DataTableImplV2(
-        _numRows, _dataSchema, _dictionaryMap, _fixedSizeDataBytes, _variableSizeDataBytes);
+  public DataTableImplV2 toDataOnlyDataTable() {
+    return new DataTableImplV2(_numRows, _dataSchema, _dictionaryMap, _fixedSizeDataBytes, _variableSizeDataBytes);
   }
 
   private byte[] serializeMetadata()

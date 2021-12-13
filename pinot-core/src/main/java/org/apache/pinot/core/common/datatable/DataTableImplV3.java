@@ -31,7 +31,6 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -216,22 +215,16 @@ public class DataTableImplV3 extends BaseDataTable {
   }
 
   @Override
-  public DataTable toMetadataOnlyDataTable() {
-    DataTable destDataTable = DataTableBuilder.getEmptyDataTable();
-    destDataTable.getMetadata().putAll(this.getMetadata());
-    // in V3 exceptions are stored in separate map. need to add them individually.
-    if (!this.getExceptions().isEmpty()) {
-      for (Map.Entry<Integer, String> e : this.getExceptions().entrySet()) {
-        destDataTable.addException(e.getKey(), e.getValue());
-      }
-    }
-    return destDataTable;
+  public DataTableImplV3 toMetadataOnlyDataTable() {
+    DataTableImplV3 metadataOnlyDataTable = new DataTableImplV3();
+    metadataOnlyDataTable._metadata.putAll(_metadata);
+    metadataOnlyDataTable._errCodeToExceptionMap.putAll(_errCodeToExceptionMap);
+    return metadataOnlyDataTable;
   }
 
   @Override
-  public DataTable toDataOnlyDataTable() {
-    return new DataTableImplV3(
-        _numRows, _dataSchema, _dictionaryMap, _fixedSizeDataBytes, _variableSizeDataBytes);
+  public DataTableImplV3 toDataOnlyDataTable() {
+    return new DataTableImplV3(_numRows, _dataSchema, _dictionaryMap, _fixedSizeDataBytes, _variableSizeDataBytes);
   }
 
   private void writeLeadingSections(DataOutputStream dataOutputStream)
