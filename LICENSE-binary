@@ -392,7 +392,7 @@ org.quartz-scheduler:quartz:2.3.2
 org.roaringbitmap:RoaringBitmap:0.9.23
 org.roaringbitmap:shims:0.9.23
 org.typelevel:macro-compat_2.12:1.1.1
-org.webjars:swagger-ui:3.18.2
+org.webjars:swagger-ui:3.23.11
 org.wildfly.openssl:wildfly-openssl:1.0.7.Final
 org.xerial.larray:larray-buffer:0.4.1
 org.xerial.larray:larray-mmap:0.4.1
