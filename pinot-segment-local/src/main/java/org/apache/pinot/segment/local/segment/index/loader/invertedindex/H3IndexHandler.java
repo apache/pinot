@@ -55,11 +55,19 @@ public class H3IndexHandler implements IndexHandler {
   private final SegmentDirectory.Writer _segmentWriter;
   private final Map<String, H3IndexConfig> _h3Configs;
 
+  /**
+   * This method creates a handler to update H3 indices, requiring a segment writer.
+   * The segment writer is managed by caller, like to opens and closes it.
+   */
   public H3IndexHandler(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
       SegmentDirectory.Writer segmentWriter) {
     this(indexDir, segmentMetadata, indexLoadingConfig, null, segmentWriter);
   }
 
+  /**
+   * This method creates a handler to check H3 indices. A segment reader is required,
+   * as only read-only operations are allowed during checks.
+   */
   public H3IndexHandler(SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
       SegmentDirectory.Reader segmentReader) {
     this(null, segmentMetadata, indexLoadingConfig, segmentReader, null);

@@ -49,11 +49,19 @@ public class InvertedIndexHandler implements IndexHandler {
   private final SegmentDirectory.Writer _segmentWriter;
   private final HashSet<String> _columnsToAddIdx;
 
+  /**
+   * This method creates a handler to update inverted indices, requiring a segment writer.
+   * The segment writer is managed by caller, like to opens and closes it.
+   */
   public InvertedIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
       SegmentDirectory.Writer segmentWriter) {
     this(indexDir, segmentMetadata, indexLoadingConfig, null, segmentWriter);
   }
 
+  /**
+   * This method creates a handler to check inverted indices. A segment reader is required,
+   * as only read-only operations are allowed during checks.
+   */
   public InvertedIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
       SegmentDirectory.Reader segmentReader) {
     this(null, segmentMetadata, indexLoadingConfig, segmentReader, null);

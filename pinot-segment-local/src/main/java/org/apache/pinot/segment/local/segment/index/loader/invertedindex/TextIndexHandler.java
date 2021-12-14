@@ -87,11 +87,19 @@ public class TextIndexHandler implements IndexHandler {
   private final SegmentDirectory.Writer _segmentWriter;
   private final Set<String> _columnsToAddIdx;
 
+  /**
+   * This method creates a handler to update text indices, requiring a segment writer.
+   * The segment writer is managed by caller, like to opens and closes it.
+   */
   public TextIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
       SegmentDirectory.Writer segmentWriter) {
     this(indexDir, segmentMetadata, indexLoadingConfig, null, segmentWriter);
   }
 
+  /**
+   * This method creates a handler to check text indices. A segment reader is required,
+   * as only read-only operations are allowed during checks.
+   */
   public TextIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
       SegmentDirectory.Reader segmentReader) {
     this(null, segmentMetadata, indexLoadingConfig, segmentReader, null);

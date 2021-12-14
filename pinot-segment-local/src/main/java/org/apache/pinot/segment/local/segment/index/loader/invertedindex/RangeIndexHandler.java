@@ -53,11 +53,19 @@ public class RangeIndexHandler implements IndexHandler {
   private final Set<String> _columnsToAddIdx;
   private final int _rangeIndexVersion;
 
+  /**
+   * This method creates a handler to update range indices, requiring a segment writer.
+   * The segment writer is managed by caller, like to opens and closes it.
+   */
   public RangeIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
       SegmentDirectory.Writer segmentWriter) {
     this(indexDir, segmentMetadata, indexLoadingConfig, null, segmentWriter);
   }
 
+  /**
+   * This method creates a handler to check range indices. A segment reader is required,
+   * as only read-only operations are allowed during checks.
+   */
   public RangeIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
       SegmentDirectory.Reader segmentReader) {
     this(null, segmentMetadata, indexLoadingConfig, segmentReader, null);

@@ -46,6 +46,10 @@ public class IndexHandlerFactory {
     }
   };
 
+  /**
+   * This method creates handlers to update different types of indices, requiring a segment writer.
+   * The segment writer is managed by caller, like to opens and closes it.
+   */
   public static IndexHandler getIndexHandler(ColumnIndexType type, File indexDir, SegmentMetadataImpl segmentMetadata,
       IndexLoadingConfig indexLoadingConfig, SegmentDirectory.Writer segmentWriter) {
     switch (type) {
@@ -69,6 +73,10 @@ public class IndexHandlerFactory {
     }
   }
 
+  /**
+   * This method creates handlers to check different types of indices. A segment reader is required,
+   * as only read-only operations are allowed during checks.
+   */
   public static IndexHandler getIndexHandler(ColumnIndexType type, SegmentMetadataImpl segmentMetadata,
       IndexLoadingConfig indexLoadingConfig, SegmentDirectory.Reader segmentReader) {
     switch (type) {

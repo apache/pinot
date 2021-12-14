@@ -59,11 +59,19 @@ public class BloomFilterHandler implements IndexHandler {
   private final SegmentDirectory.Writer _segmentWriter;
   private final Map<String, BloomFilterConfig> _bloomFilterConfigs;
 
+  /**
+   * This method creates a handler to update bloom filters, requiring a segment writer.
+   * The segment writer is managed by caller, like to opens and closes it.
+   */
   public BloomFilterHandler(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
       SegmentDirectory.Writer segmentWriter) {
     this(indexDir, segmentMetadata, indexLoadingConfig, null, segmentWriter);
   }
 
+  /**
+   * This method creates a handler to check bloom filters. A segment reader is required,
+   * as only read-only operations are allowed during checks.
+   */
   public BloomFilterHandler(SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
       SegmentDirectory.Reader segmentReader) {
     this(null, segmentMetadata, indexLoadingConfig, segmentReader, null);

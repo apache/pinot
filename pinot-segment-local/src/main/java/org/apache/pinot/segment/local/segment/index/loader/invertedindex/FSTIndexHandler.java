@@ -73,11 +73,19 @@ public class FSTIndexHandler implements IndexHandler {
   private final Set<String> _columnsToAddIdx;
   private final FSTType _fstType;
 
+  /**
+   * This method creates a handler to update FST indices, requiring a segment writer.
+   * The segment writer is managed by caller, like to opens and closes it.
+   */
   public FSTIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
       SegmentDirectory.Writer segmentWriter, FSTType fstType) {
     this(indexDir, segmentMetadata, indexLoadingConfig, null, segmentWriter, fstType);
   }
 
+  /**
+   * This method creates a handler to check FST indices. A segment reader is required,
+   * as only read-only operations are allowed during checks.
+   */
   public FSTIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
       SegmentDirectory.Reader segmentReader, FSTType fstType) {
     this(null, segmentMetadata, indexLoadingConfig, segmentReader, null, fstType);
