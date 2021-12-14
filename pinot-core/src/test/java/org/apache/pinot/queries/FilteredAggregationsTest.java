@@ -57,7 +57,7 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
   private static final String INT_COL_NAME = "INT_COL";
   private static final String NO_INDEX_INT_COL_NAME = "NO_INDEX_COL";
   private static final Integer INT_BASE_VALUE = 0;
-  private static final Integer NUM_ROWS = 5;
+  private static final Integer NUM_ROWS = 30000;
 
 
   private IndexSegment _indexSegment;
@@ -308,8 +308,7 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
   @Test
   public void testFoo() {
     String query = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 3),"
-        + "SUM(INT_COL) FILTER(WHERE INT_COL < 4),"
-        + "MAX(INT_COL) FILTER(WHERE INT_COL < 3)"
+        + "SUM(INT_COL) FILTER(WHERE INT_COL < 4)"
         + "FROM MyTable WHERE INT_COL > 2";
 
     String nonFilterQuery = "SELECT SUM("
@@ -321,17 +320,10 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
         + "CASE "
         + "WHEN (INT_COL < 4) THEN INT_COL "
         + "ELSE 0 "
-        + "END) AS total_sum2,"
-        + "MAX("
-        + "CASE "
-        + "WHEN (INT_COL < 3) THEN INT_COL "
-        + "ELSE 0 "
-        + "END) AS total_max "
+        + "END) AS total_sum2 "
         + "FROM MyTable WHERE INT_COL > 2";
 
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
-
-    System.out.println("DOING");
 
     query = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 12345),"
         + "SUM(INT_COL) FILTER(WHERE INT_COL < 59999) "
@@ -348,6 +340,20 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
         + "ELSE 0 "
         + "END) AS total_max "
         + "FROM MyTable WHERE INT_COL > 1000";
+
+    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
+  }
+
+  @Test
+  public void testBar() {
+    String query =
+        "SELECT MIN(NO_INDEX_COL) FILTER(WHERE INT_COL > 2),"
+            + "MAX(INT_COL) FILTER(WHERE INT_COL > 2)"
+            + "FROM MyTable";
+
+    String nonFilterQuery =
+        "SELECT MIN(NO_INDEX_COL), MAX(INT_COL) FROM MyTable "
+            + "WHERE INT_COL > 2";
 
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
   }
