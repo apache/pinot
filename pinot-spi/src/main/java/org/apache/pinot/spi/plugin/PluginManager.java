@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.plugin;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
@@ -110,7 +111,7 @@ public class PluginManager {
       };
 
   private Map<Plugin, PluginClassLoader> _registry = new HashMap<>();
-  private String _pluginsRootDir;
+  private String _pluginsDirectories;
   private String _pluginsInclude;
   private boolean _initialized = false;
 
@@ -124,10 +125,10 @@ public class PluginManager {
       return;
     }
     try {
-      _pluginsRootDir = System.getProperty(PLUGINS_DIR_PROPERTY_NAME);
+      _pluginsDirectories = System.getProperty(PLUGINS_DIR_PROPERTY_NAME);
     } catch (Exception e) {
       LOGGER.error("Failed to load env variable {}", PLUGINS_DIR_PROPERTY_NAME, e);
-      _pluginsRootDir = null;
+      _pluginsDirectories = null;
     }
     try {
       _pluginsInclude = System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME);
@@ -135,47 +136,93 @@ public class PluginManager {
       LOGGER.error("Failed to load env variable {}", PLUGINS_INCLUDE_PROPERTY_NAME, e);
       _pluginsInclude = null;
     }
-    init(_pluginsRootDir, _pluginsInclude);
+    init(_pluginsDirectories, _pluginsInclude);
     _initialized = true;
   }
 
-  private void init(String pluginsRootDir, String pluginsInclude) {
-    if (StringUtils.isEmpty(pluginsRootDir)) {
+  private void init(String pluginsDirectories, String pluginsInclude) {
+    if (StringUtils.isEmpty(pluginsDirectories)) {
       LOGGER.info("Env variable '{}' is not specified. Set this env variable to load additional plugins.",
           PLUGINS_DIR_PROPERTY_NAME);
       return;
     } else {
-      if (!new File(pluginsRootDir).exists()) {
-        LOGGER.warn("Plugins root dir [{}] doesn't exist.", pluginsRootDir);
-        return;
+      try {
+        HashMap<String, File> plugins = getPluginsToLoad(pluginsDirectories, pluginsInclude);
+        LOGGER.info("#getPluginsToLoad has produced {} plugins to load", plugins.size());
+
+        for (Map.Entry<String, File> entry : plugins.entrySet()) {
+          String pluginName = entry.getKey();
+          File pluginDir = entry.getValue();
+
+          try {
+            load(pluginName, pluginDir);
+            LOGGER.info("Successfully Loaded plugin [{}] from dir [{}]", pluginName, pluginDir);
+          } catch (Exception e) {
+            LOGGER.error("Failed to load plugin [{}] from dir [{}]", pluginName, pluginDir, e);
+          }
+        }
+
+        initRecordReaderClassMap();
+      } catch (IllegalArgumentException e) {
+        LOGGER.warn(e.getMessage());
       }
-      LOGGER.info("Plugins root dir is [{}]", pluginsRootDir);
     }
-    Collection<File> jarFiles = FileUtils.listFiles(new File(pluginsRootDir), new String[]{JAR_FILE_EXTENSION}, true);
-    List<String> pluginsToLoad = null;
-    if (!StringUtils.isEmpty(pluginsInclude)) {
-      pluginsToLoad = Arrays.asList(pluginsInclude.split(","));
-      LOGGER.info("Trying to load plugins: [{}]", Arrays.toString(pluginsToLoad.toArray()));
-    } else {
-      LOGGER.info("Please use env variable '{}' to customize plugins to load. Loading all plugins: {}",
-          PLUGINS_INCLUDE_PROPERTY_NAME, Arrays.toString(jarFiles.toArray()));
-    }
-    for (File jarFile : jarFiles) {
-      File pluginDir = jarFile.getParentFile();
-      String pluginName = pluginDir.getName();
-      if (pluginsToLoad != null) {
-        if (!pluginsToLoad.contains(pluginName)) {
-          continue;
+  }
+
+  /**
+   * This method will take a semi-colon delimited string of directories and a semi-colon delimited string of plugin
+   * names. It will traverse the directories in order and produce a <String, File> map of plugins to be loaded.
+   * If a plugin is found in multiple directories, only the first copy of it will be picked up.
+   * @param pluginsDirectories
+   * @param pluginsInclude
+   * @return A hash map with key = plugin name, value = file object
+   */
+  @VisibleForTesting
+  public HashMap<String, File> getPluginsToLoad(String pluginsDirectories, String pluginsInclude) throws
+      IllegalArgumentException {
+    String[] directories = pluginsDirectories.split(";");
+    LOGGER.info("Plugin directories env: {}, parsed directories to load: '{}'", pluginsDirectories, directories);
+
+    HashMap<String, File> finalPluginsToLoad = new HashMap<>();
+
+    for (String pluginsDirectory : directories) {
+      if (!new File(pluginsDirectory).exists()) {
+        throw new IllegalArgumentException(String.format("Plugins dir [{}] doesn't exist.", pluginsDirectory));
+      }
+
+      Collection<File> jarFiles = FileUtils.listFiles(
+          new File(pluginsDirectory),
+          new String[]{JAR_FILE_EXTENSION},
+          true
+      );
+      List<String> pluginsToLoad = null;
+      if (!StringUtils.isEmpty(pluginsInclude)) {
+        pluginsToLoad = Arrays.asList(pluginsInclude.split(";"));
+        LOGGER.info("Potential plugins to load: [{}]", Arrays.toString(pluginsToLoad.toArray()));
+      } else {
+        LOGGER.info("Please use env variable '{}' to customize plugins to load. Loading all plugins: {}",
+            PLUGINS_INCLUDE_PROPERTY_NAME, Arrays.toString(jarFiles.toArray()));
+      }
+
+      for (File jarFile : jarFiles) {
+        File pluginDir = jarFile.getParentFile();
+        String pluginName = pluginDir.getName();
+        LOGGER.info("Found plugin, pluginDir: {}, pluginName: {}", pluginDir, pluginName);
+        if (pluginsToLoad != null) {
+          if (!pluginsToLoad.contains(pluginName)) {
+            LOGGER.info("Skipping plugin: {} is not inside pluginsToLoad {}", pluginName, pluginsToLoad);
+            continue;
+          }
+        }
+
+        if (!finalPluginsToLoad.containsKey(pluginName)) {
+          finalPluginsToLoad.put(pluginName, pluginDir);
+          LOGGER.info("Added [{}] from dir [{}] to final list of plugins to load", pluginName, pluginDir);
         }
       }
-      try {
-        load(pluginName, pluginDir);
-        LOGGER.info("Successfully Loaded plugin [{}] from dir [{}]", pluginName, pluginDir);
-      } catch (Exception e) {
-        LOGGER.error("Failed to load plugin [{}] from dir [{}]", pluginName, pluginDir, e);
-      }
     }
-    initRecordReaderClassMap();
+
+    return finalPluginsToLoad;
   }
 
   private void initRecordReaderClassMap() {
@@ -312,8 +359,11 @@ public class PluginManager {
     return (T) instance;
   }
 
-  public String getPluginsRootDir() {
-    return _pluginsRootDir;
+  public String[] getPluginsDirectories() {
+    if (_pluginsDirectories != null) {
+      return _pluginsDirectories.split(";");
+    }
+    return null;
   }
 
   public static PluginManager get() {
