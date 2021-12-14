@@ -835,7 +835,7 @@ public class LLRealtimeSegmentDataManagerTest {
       return consumer;
     }
 
-    public SegmentBuildDescriptor invokeBuildForCommit(long leaseTime) {
+    public SegmentBuildDescriptor invokeBuildForCommit(long leaseTime) throws Exception {
       super.buildSegmentForCommit(leaseTime);
       return getSegmentBuildDescriptor();
     }
@@ -902,13 +902,13 @@ public class LLRealtimeSegmentDataManagerTest {
 
     @Override
     protected void buildSegmentAndReplace()
-        throws Exception {
+        throws SegmentGenerationException {
       _buildAndReplaceCalled = true;
     }
 
     @Override
     protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit)
-        throws Exception {
+        throws SegmentGenerationException {
       _buildSegmentCalled = true;
       if (_failSegmentBuild) {
         return null;

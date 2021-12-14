@@ -641,22 +641,24 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             case COMMIT:
               _state = State.COMMITTING;
               long buildTimeSeconds = response.getBuildTimeSeconds();
-              buildSegmentForCommit(buildTimeSeconds * 1000L);
-              if (_segmentBuildDescriptor == null) {
+              try {
+                buildSegmentForCommit(buildTimeSeconds * 1000L);
+              } catch (SegmentGenerationException e) {
                 // We could not build the segment. Go into error state.
                 _state = State.ERROR;
+                _realtimeTableDataManager.addSegmentError(
+                    _segmentNameStr, new SegmentErrorInfo(System.currentTimeMillis(), e.getMessage(), e));
+              }
+              success = commitSegment(response.getControllerVipUrl(),
+                  response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit());
+              if (success) {
+                _state = State.COMMITTED;
               } else {
-                success = commitSegment(response.getControllerVipUrl(),
-                    response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit());
-                if (success) {
-                  _state = State.COMMITTED;
-                } else {
-                  // If for any reason commit failed, we don't want to be in COMMITTING state when we hold.
-                  // Change the state to HOLDING before looping around.
-                  _state = State.HOLDING;
-                  _segmentLogger.info("Could not commit segment. Retrying after hold");
-                  hold();
-                }
+                // If for any reason commit failed, we don't want to be in COMMITTING state when we hold.
+                // Change the state to HOLDING before looping around.
+                _state = State.HOLDING;
+                _segmentLogger.info("Could not commit segment. Retrying after hold");
+                hold();
               }
               break;
             default:
@@ -670,8 +672,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         _segmentLogger.error(errorMessage, e);
         postStopConsumedMsg(e.getClass().getName());
         _state = State.ERROR;
-        _realtimeTableDataManager
-            .addSegmentError(_segmentNameStr, new SegmentErrorInfo(System.currentTimeMillis(), errorMessage, e));
+        _realtimeTableDataManager.addSegmentError(
+            _segmentNameStr, new SegmentErrorInfo(System.currentTimeMillis(), errorMessage, e));
         _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
         return;
       }
@@ -720,7 +722,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   // Side effect: Modifies _segmentBuildDescriptor if we do not have a valid built segment file and we
   // built the segment successfully.
-  protected void buildSegmentForCommit(long buildTimeLeaseMs) {
+  protected void buildSegmentForCommit(long buildTimeLeaseMs)
+      throws SegmentGenerationException {
     try {
       if (_segmentBuildDescriptor != null && _segmentBuildDescriptor.getOffset().compareTo(_currentOffset) == 0) {
         // Double-check that we have the file, just in case.
@@ -743,8 +746,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _leaseExtender.addSegment(_segmentNameStr, buildTimeLeaseMs, _currentOffset);
       _segmentBuildDescriptor = buildSegmentInternal(true);
     } catch (Exception e) {
-      _realtimeTableDataManager.addSegmentError(_segmentNameStr,
-          new SegmentErrorInfo(System.currentTimeMillis(), "Could not build segment!", e));
+      // rethrow exception so that
+      throw new SegmentGenerationException("Could not build segment!", e);
     } finally {
       _leaseExtender.removeSegment(_segmentNameStr);
     }
@@ -791,7 +794,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit)
-      throws Exception {
+      throws SegmentGenerationException {
     closeStreamConsumers();
     try {
       final long startTimeMillis = now();
@@ -817,7 +820,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         converter.build(_segmentVersion, _serverMetrics);
       } catch (Exception e) {
         FileUtils.deleteQuietly(tempSegmentFolder);
-        throw new RuntimeException("Could not build segment", e);
+        throw new SegmentGenerationException("Could not build segment", e);
       }
       final long buildTimeMillis = now() - lockAcquireTimeMillis;
       final long waitTimeMillis = lockAcquireTimeMillis - startTimeMillis;
@@ -834,8 +837,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       try {
         FileUtils.moveDirectory(tempIndexDir, indexDir);
       } catch (IOException e) {
-        throw new IOException(String.format("Interrupted while waiting for semaphore, caught exception while moving "
-            + "index directory from: %s to: %s", tempIndexDir, indexDir), e);
+        throw new SegmentGenerationException(String.format("Interrupted while waiting for semaphore, "
+            + "caught exception while moving index directory from: %s to: %s", tempIndexDir, indexDir), e);
       } finally {
         FileUtils.deleteQuietly(tempSegmentFolder);
       }
@@ -851,8 +854,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         try {
           TarGzCompressionUtils.createTarGzFile(indexDir, segmentTarFile);
         } catch (IOException e) {
-          throw new IOException(String.format("Caught exception while taring index directory from: %s to: %s",
-              indexDir, segmentTarFile), e);
+          throw new SegmentGenerationException(String.format("Caught exception while taring index directory from: "
+                  + "%s to: %s", indexDir, segmentTarFile), e);
         }
 
         File metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
@@ -876,7 +879,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             segmentSizeBytes);
       }
     } catch (InterruptedException e) {
-      throw new RuntimeException("Interrupted while waiting for semaphore", e);
+      throw new SegmentGenerationException("Interrupted while waiting for semaphore", e);
     } finally {
       if (_segBuildSemaphore != null) {
         _segBuildSemaphore.release();
@@ -925,7 +928,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   protected void buildSegmentAndReplace()
-      throws Exception {
+      throws SegmentGenerationException {
     SegmentBuildDescriptor descriptor = buildSegmentInternal(false);
     _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
   }
@@ -1055,20 +1058,27 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                     .warn("Current offset {} ahead of the offset in zk {}. Downloading to replace", _currentOffset,
                         endOffset);
                 downloadSegmentAndReplace(segmentZKMetadata);
-              } else if (_currentOffset.compareTo(endOffset) == 0) {
-                _segmentLogger
-                    .info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset, endOffset);
-                buildSegmentAndReplace();
               } else {
-                _segmentLogger.info("Attempting to catch up from offset {} to {} ", _currentOffset, endOffset);
-                boolean success = catchupToFinalOffset(endOffset,
-                    TimeUnit.MILLISECONDS.convert(MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS, TimeUnit.SECONDS));
-                if (success) {
-                  _segmentLogger.info("Caught up to offset {}", _currentOffset);
-                  buildSegmentAndReplace();
-                } else {
-                  _segmentLogger
-                      .info("Could not catch up to offset (current = {}). Downloading to replace", _currentOffset);
+                try {
+                  if (_currentOffset.compareTo(endOffset) == 0) {
+                    _segmentLogger.info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset,
+                        endOffset);
+                    buildSegmentAndReplace();
+                  } else {
+                    _segmentLogger.info("Attempting to catch up from offset {} to {} ", _currentOffset, endOffset);
+                    boolean success = catchupToFinalOffset(endOffset, TimeUnit.MILLISECONDS.convert(
+                        MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS, TimeUnit.SECONDS));
+                    if (success) {
+                      _segmentLogger.info("Caught up to offset {}", _currentOffset);
+                      buildSegmentAndReplace();
+                    } else {
+                      _segmentLogger.info("Could not catch up to offset (current = {}). Downloading to replace",
+                          _currentOffset);
+                      downloadSegmentAndReplace(segmentZKMetadata);
+                    }
+                  }
+                } catch (SegmentGenerationException e) {
+                  _segmentLogger.error("Could not build segment and replace.", e);
                   downloadSegmentAndReplace(segmentZKMetadata);
                 }
               }
