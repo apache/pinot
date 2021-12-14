@@ -901,12 +901,14 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected void buildSegmentAndReplace() throws Exception {
+    protected void buildSegmentAndReplace()
+        throws Exception {
       _buildAndReplaceCalled = true;
     }
 
     @Override
-    protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
+    protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit)
+        throws Exception {
       _buildSegmentCalled = true;
       if (_failSegmentBuild) {
         return null;
