@@ -26,6 +26,7 @@ import {
   makeStyles,
   useTheme,
 } from '@material-ui/core/styles';
+import Dialog from '@material-ui/core/Dialog';
 import Table from '@material-ui/core/Table';
 import TableBody from '@material-ui/core/TableBody';
 import TableCell from '@material-ui/core/TableCell';
@@ -152,7 +153,7 @@ const useStyles = makeStyles((theme) => ({
   spacer: {
     flex: '0 1 auto',
   },
-  cellSatusGood: {
+  cellStatusGood: {
     color: '#4CAF50',
     border: '1px solid #4CAF50',
   },
@@ -332,7 +333,7 @@ export default function CustomizedTables({
       return (
         <StyledChip
           label={str}
-          className={classes.cellSatusGood}
+          className={classes.cellStatusGood}
           variant="outlined"
         />
       );
@@ -375,6 +376,56 @@ export default function CustomizedTables({
     }
     return (<span>{str.toString()}</span>);
   };
+
+  const [isModalOpen, setModalOpen] = React.useState(false);
+  const handleModalOpen = () => setModalOpen(true);
+  const handleModalClose = () => setModalOpen(false);
+
+  const makeCell = (cellData) => {
+    if (Object.prototype.toString.call(cellData) === '[object Object]') {
+      if (_.has(cellData, 'component')) {
+        let cell = (styleCell(cellData.value))
+        let statusModal = (
+            <Dialog
+                maxWidth="xl"
+                onClose={handleModalClose}
+                open={isModalOpen}
+                scroll="paper"
+            >
+              {cellData.component}
+            </Dialog>
+        )
+        cell = (
+            React.cloneElement(
+                cell,
+                {onClick: handleModalOpen},
+            )
+        );
+        if (_.has(cellData, 'tooltip')) {
+          cell = (
+              <Tooltip title={cellData.tooltip} placement="top" arrow>
+                {cell}
+              </Tooltip>
+          )
+        };
+        return (
+            <>
+              {cell}
+              {statusModal}
+            </>
+        );
+      } else if (_.has(cellData, 'tooltip')) {
+        return (
+            <Tooltip title={cellData.tooltip} placement="top" arrow>
+              {styleCell(cellData.value)}
+            </Tooltip>
+        );
+      } else {
+        return styleCell(cellData.value);
+      }
+    }
+    return styleCell(cellData.toString());
+  }
 
   const renderTableComponent = () => {
     return (
@@ -460,10 +511,7 @@ export default function CustomizedTables({
                             className={isCellClickable ? classes.isCellClickable : (isSticky ? classes.isSticky : '')}
                             onClick={() => {cellClickCallback && cellClickCallback(cell);}}
                           >
-                            {Object.prototype.toString.call(cell) === '[object Object]' ?
-                              <Tooltip title={cell?.tooltip || ''} placement="top" arrow>{styleCell(cell.value.toString())}</Tooltip>
-                            : styleCell(cell.toString())
-                            }
+                            {makeCell(cell)}
                           </StyledTableCell>
                         );
                       })}

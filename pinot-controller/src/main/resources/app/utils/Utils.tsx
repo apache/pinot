@@ -18,6 +18,8 @@
  * under the License.
  */
 
+import React from 'react';
+import ReactDiffViewer, {DiffMethod} from 'react-diff-viewer';
 import _ from 'lodash';
 
 const sortArray = function (sortingArr, keyName, ascendingFlag) {
@@ -66,14 +68,29 @@ const getSegmentStatus = (idealStateObj, externalViewObj) => {
   const externalSegmentCount = externalSegmentKeys.length;
 
   if (idealSegmentCount !== externalSegmentCount) {
-    return 'Bad';
+    return {value: 'Bad', tooltip: `Ideal Segment Count: ${idealSegmentCount} does not match external Segment Count: ${externalSegmentCount}`};
   }
 
-  let segmentStatus = 'Good';
+  let segmentStatus = {value: 'Good', tooltip: null, component: null};
   idealSegmentKeys.map((segmentKey) => {
-    if (segmentStatus === 'Good') {
+    if (segmentStatus.value === 'Good') {
       if (!_.isEqual(idealStateObj[segmentKey], externalViewObj[segmentKey])) {
-        segmentStatus = 'Bad';
+        let segmentStatusComponent = (
+            <ReactDiffViewer
+                oldValue={JSON.stringify(idealStateObj[segmentKey])}
+                newValue={JSON.stringify(externalViewObj[segmentKey])}
+                splitView={true}
+                hideLineNumbers
+                leftTitle={"Ideal State"}
+                rightTitle={"External View"}
+                compareMethod={DiffMethod.WORDS}
+            />
+        )
+        segmentStatus = {
+          value: 'Bad',
+          tooltip: "Ideal Status does not match external status",
+          component: segmentStatusComponent
+        };
       }
     }
   });
