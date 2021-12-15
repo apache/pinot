@@ -105,15 +105,6 @@ public class FilterableAggregationFunction implements
   }
 
   @Override
-  public void setFilteredAggregation(boolean isFilteredAggregation) {
-  }
-
-  @Override
-  public boolean isFilteredAggregation() {
-    return false;
-  }
-
-  @Override
   public String toExplainString() {
     return null;
   }

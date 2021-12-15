@@ -159,16 +159,6 @@ public class CountAggregationFunction
   }
 
   @Override
-  public void setFilteredAggregation(boolean isFilteredAggregation) {
-    _isFilteredAggregation = isFilteredAggregation;
-  }
-
-  @Override
-  public boolean isFilteredAggregation() {
-    return _isFilteredAggregation;
-  }
-
-  @Override
   public String toExplainString() {
     StringBuilder stringBuilder = new StringBuilder(getType().getName()).append('(');
     int numArguments = getInputExpressions().size();

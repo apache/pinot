@@ -152,9 +152,4 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
   public ExecutionStatistics getExecutionStatistics() {
     return _projectionOperator.getExecutionStatistics();
   }
-
-  @Override
-  public <T> void accept(T v) {
-    _projectionOperator.accept(v);
-  }
 }

@@ -67,14 +67,4 @@ public abstract class BaseSingleInputAggregationFunction<I, F extends Comparable
     }
     return stringBuilder.append(')').toString();
   }
-
-  @Override
-  public void setFilteredAggregation(boolean isFilteredAggregation) {
-    _isFilteredAggregation = isFilteredAggregation;
-  }
-
-  @Override
-  public boolean isFilteredAggregation() {
-    return _isFilteredAggregation;
-  }
 }
