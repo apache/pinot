@@ -115,6 +115,12 @@ fi
 if [ -z "$PLUGINS_CLASSPATH" ] ; then
   if [ -z "$PLUGINS_DIR" ] ; then
     PLUGINS_DIR="$BASEDIR"/plugins
+  else
+    if [[ "$PLUGINS_DIR" = *,* ]]
+    then
+        echo "\$PLUGINS_DIR should use ; as the delimiter"
+        exit 1
+    fi
   fi
 
   export IFS=';'
@@ -122,6 +128,11 @@ if [ -z "$PLUGINS_CLASSPATH" ] ; then
     if [ -d "$DIR" ] ; then
       unset IFS
       if [ -n "$PLUGINS_INCLUDE" ] ; then
+        if [[ "$PLUGINS_INCLUDE" = *,* ]]
+        then
+            echo "\$PLUGINS_INCLUDE should use ; as the delimiter"
+            exit 1
+        fi
         export IFS=';'
         for PLUGIN_JAR in $PLUGINS_INCLUDE; do
             PLUGIN_JAR_PATH=$(find "$DIR" -path \*/"$PLUGIN_JAR"/"$PLUGIN_JAR"-\*.jar)
