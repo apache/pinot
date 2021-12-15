@@ -70,7 +70,7 @@ public class UpsertConfig extends BaseJsonConfig {
 
     if (mode == Mode.PARTIAL) {
       _partialUpsertStrategies = partialUpsertStrategies != null ? partialUpsertStrategies : new HashMap<>();
-      _globalUpsertStrategy = globalUpsertStrategy;
+      _globalUpsertStrategy = globalUpsertStrategy != null ? globalUpsertStrategy : Strategy.OVERWRITE;
     } else {
       _partialUpsertStrategies = null;
       _globalUpsertStrategy = Strategy.OVERWRITE;
