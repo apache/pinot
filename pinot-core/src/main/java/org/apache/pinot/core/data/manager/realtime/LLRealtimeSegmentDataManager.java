@@ -1148,7 +1148,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     cleanupMetrics();
   }
 
-  protected void start() {
+  protected void startConsumerThread() {
     _consumerThread = new Thread(new PartitionConsumer(), _segmentNameStr);
     _segmentLogger.info("Created new consumer thread {} for {}", _consumerThread, this.toString());
     _consumerThread.start();
@@ -1310,10 +1310,75 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _segmentLogger.error(errorMsg);
       throw new RuntimeException(errorMsg + " for segment: " + _segmentNameStr);
     }
-    makeStreamConsumer("Starting");
-    makeStreamMetadataProvider("Starting");
 
-    SegmentPartitionConfig segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
+    try {
+      makeStreamConsumer("Starting");
+      makeStreamMetadataProvider("Starting");
+      setPartitionParameters(realtimeSegmentConfigBuilder, indexingConfig.getSegmentPartitionConfig());
+      _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), serverMetrics);
+      _startOffset = _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset());
+      _currentOffset = _streamPartitionMsgOffsetFactory.create(_startOffset);
+      _resourceTmpDir = new File(resourceDataDir, "_tmp");
+      if (!_resourceTmpDir.exists()) {
+        _resourceTmpDir.mkdirs();
+      }
+      _state = State.INITIAL_CONSUMING;
+      fetchLatestStreamOffset();
+      _consumeStartTime = now();
+      setConsumeEndTime(segmentZKMetadata, _consumeStartTime);
+      _segmentCommitterFactory =
+          new SegmentCommitterFactory(_segmentLogger, _protocolHandler, tableConfig, indexLoadingConfig, serverMetrics);
+      _segmentLogger
+          .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", _llcSegmentName,
+              _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC).toString());
+      startConsumerThread();
+    } catch (Exception e) {
+      // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
+      // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.
+      // Hence releasing the semaphore here to unblock reset operation via Helix Admin.
+      _partitionGroupConsumerSemaphore.release();
+      throw e;
+    }
+  }
+
+  private void setConsumeEndTime(SegmentZKMetadata segmentZKMetadata, long now) {
+    long maxConsumeTimeMillis = _partitionLevelStreamConfig.getFlushThresholdTimeMillis();
+    _consumeEndTime = segmentZKMetadata.getCreationTime() + maxConsumeTimeMillis;
+
+    // When we restart a server, the consuming segments retain their creationTime (derived from segment
+    // metadata), but a couple of corner cases can happen:
+    // (1) The server was down for a very long time, and the consuming segment is not yet completed.
+    // (2) The consuming segment was just about to be completed, but the server went down.
+    // In either of these two cases, if a different replica could not complete the segment, it is possible
+    // that we get a value for _consumeEndTime that is in the very near future, or even in the past. In such
+    // cases, we let some minimum consumption happen before we attempt to complete the segment (unless, of course
+    // the max consumption time has been configured to be less than the minimum time we use in this class).
+    long minConsumeTimeMillis =
+        Math.min(maxConsumeTimeMillis, TimeUnit.MILLISECONDS.convert(MINIMUM_CONSUME_TIME_MINUTES, TimeUnit.MINUTES));
+    if (_consumeEndTime - now < minConsumeTimeMillis) {
+      _consumeEndTime = now + minConsumeTimeMillis;
+    }
+  }
+
+  private void fetchLatestStreamOffset() {
+    try (StreamMetadataProvider metadataProvider = _streamConsumerFactory
+        .createPartitionMetadataProvider(_clientId, _partitionGroupId)) {
+      _latestStreamOffsetAtStartupTime =
+          metadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, /*maxWaitTimeMs*/5000);
+    } catch (Exception e) {
+      _segmentLogger.warn("Cannot fetch latest stream offset for clientId {} and partitionGroupId {}", _clientId,
+          _partitionGroupId);
+    }
+  }
+
+  /*
+   * set the following partition parameters in RT segment config builder:
+   *  - partition column
+   *  - partition function
+   *  - partition group id
+   */
+  private void setPartitionParameters(RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder,
+      SegmentPartitionConfig segmentPartitionConfig) {
     if (segmentPartitionConfig != null) {
       Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
       if (columnPartitionMap.size() == 1) {
@@ -1324,9 +1389,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
         // NOTE: Here we compare the number of partitions from the config and the stream, and log a warning and emit a
         //       metric when they don't match, but use the one from the stream. The mismatch could happen when the
-        //       stream partitions are changed, but the table config has not been updated to reflect the change. In such
-        //       case, picking the number of partitions from the stream can keep the segment properly partitioned as
-        //       long as the partition function is not changed.
+        //       stream partitions are changed, but the table config has not been updated to reflect the change.
+        //       In such case, picking the number of partitions from the stream can keep the segment properly
+        //       partitioned as long as the partition function is not changed.
         int numPartitions = columnPartitionConfig.getNumPartitions();
         try {
           // TODO: currentPartitionGroupConsumptionStatus should be fetched from idealState + segmentZkMetadata,
@@ -1346,66 +1411,19 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             numPartitions = numPartitionGroups;
           }
         } catch (Exception e) {
-          _segmentLogger.warn(
-              "Failed to get number of stream partitions in 5s, using number of partitions in the partition config: {}",
-              numPartitions, e);
+          _segmentLogger.warn("Failed to get number of stream partitions in 5s, "
+              + "using number of partitions in the partition config: {}", numPartitions, e);
           makeStreamMetadataProvider("Timeout getting number of stream partitions");
         }
 
         realtimeSegmentConfigBuilder.setPartitionColumn(partitionColumn);
-        realtimeSegmentConfigBuilder
-            .setPartitionFunction(PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions));
+        realtimeSegmentConfigBuilder.setPartitionFunction(
+            PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions));
         realtimeSegmentConfigBuilder.setPartitionId(_partitionGroupId);
       } else {
         _segmentLogger.warn("Cannot partition on multiple columns: {}", columnPartitionMap.keySet());
       }
     }
-
-    _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), serverMetrics);
-    _startOffset = _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset());
-    _currentOffset = _streamPartitionMsgOffsetFactory.create(_startOffset);
-    _resourceTmpDir = new File(resourceDataDir, "_tmp");
-    if (!_resourceTmpDir.exists()) {
-      _resourceTmpDir.mkdirs();
-    }
-    _state = State.INITIAL_CONSUMING;
-
-    // fetch latest stream offset
-    try (StreamMetadataProvider metadataProvider = _streamConsumerFactory
-        .createPartitionMetadataProvider(_clientId, _partitionGroupId)) {
-      _latestStreamOffsetAtStartupTime = metadataProvider
-          .fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, /*maxWaitTimeMs*/5000);
-    } catch (Exception e) {
-      _segmentLogger.warn("Cannot fetch latest stream offset for clientId {} and partitionGroupId {}", _clientId,
-          _partitionGroupId);
-    }
-
-    long now = now();
-    _consumeStartTime = now;
-    long maxConsumeTimeMillis = _partitionLevelStreamConfig.getFlushThresholdTimeMillis();
-    _consumeEndTime = segmentZKMetadata.getCreationTime() + maxConsumeTimeMillis;
-
-    // When we restart a server, the consuming segments retain their creationTime (derived from segment
-    // metadata), but a couple of corner cases can happen:
-    // (1) The server was down for a very long time, and the consuming segment is not yet completed.
-    // (2) The consuming segment was just about to be completed, but the server went down.
-    // In either of these two cases, if a different replica could not complete the segment, it is possible
-    // that we get a value for _consumeEndTime that is in the very near future, or even in the past. In such
-    // cases, we let some minimum consumption happen before we attempt to complete the segment (unless, of course
-    // the max consumption time has been configured to be less than the minimum time we use in this class).
-    long minConsumeTimeMillis =
-        Math.min(maxConsumeTimeMillis, TimeUnit.MILLISECONDS.convert(MINIMUM_CONSUME_TIME_MINUTES, TimeUnit.MINUTES));
-    if (_consumeEndTime - now < minConsumeTimeMillis) {
-      _consumeEndTime = now + minConsumeTimeMillis;
-    }
-
-    _segmentCommitterFactory =
-        new SegmentCommitterFactory(_segmentLogger, _protocolHandler, tableConfig, indexLoadingConfig, serverMetrics);
-
-    _segmentLogger
-        .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", _llcSegmentName,
-            _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC).toString());
-    start();
   }
 
   /**
