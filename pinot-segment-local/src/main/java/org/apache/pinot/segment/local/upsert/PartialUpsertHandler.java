@@ -29,6 +29,7 @@ import org.apache.helix.model.LiveInstance;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMerger;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMergerFactory;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.slf4j.Logger;
@@ -48,12 +49,26 @@ public class PartialUpsertHandler {
   private final String _tableNameWithType;
   private boolean _allSegmentsLoaded;
 
-  public PartialUpsertHandler(HelixManager helixManager, String tableNameWithType,
-      Map<String, UpsertConfig.Strategy> partialUpsertStrategies) {
+  public PartialUpsertHandler(HelixManager helixManager, String tableNameWithType, Schema schema,
+      Map<String, UpsertConfig.Strategy> partialUpsertStrategies, UpsertConfig.Strategy globalUpsertStrategy) {
     _helixManager = helixManager;
     _tableNameWithType = tableNameWithType;
     for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
       _column2Mergers.put(entry.getKey(), PartialUpsertMergerFactory.getMerger(entry.getValue()));
+    }
+
+    if (schema != null) {
+      for (String dimensionName : schema.getDimensionNames()) {
+        if (!schema.getPrimaryKeyColumns().contains(dimensionName) && !_column2Mergers.containsKey(dimensionName)) {
+          _column2Mergers.put(dimensionName, PartialUpsertMergerFactory.getMerger(globalUpsertStrategy));
+        }
+      }
+
+      for (String metricName : schema.getMetricNames()) {
+        if (!schema.getPrimaryKeyColumns().contains(metricName) && !_column2Mergers.containsKey(metricName)) {
+          _column2Mergers.put(metricName, PartialUpsertMergerFactory.getMerger(globalUpsertStrategy));
+        }
+      }
     }
   }
 

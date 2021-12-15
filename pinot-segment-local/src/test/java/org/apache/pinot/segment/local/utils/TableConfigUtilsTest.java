@@ -1046,7 +1046,7 @@ public class TableConfigUtilsTest {
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
             .build();
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null)).build();
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, UpsertConfig.Strategy.OVERWRITE, null, null)).build();
     try {
       TableConfigUtils.validateUpsertConfig(tableConfig, schema);
       Assert.fail();
@@ -1055,7 +1055,7 @@ public class TableConfigUtilsTest {
     }
 
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null)).build();
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, UpsertConfig.Strategy.OVERWRITE, null, null)).build();
     try {
       TableConfigUtils.validateUpsertConfig(tableConfig, schema);
       Assert.fail();
@@ -1076,7 +1076,7 @@ public class TableConfigUtilsTest {
 
     Map<String, String> streamConfigs = getStreamConfigs();
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null)).setStreamConfigs(streamConfigs)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, UpsertConfig.Strategy.OVERWRITE, null, null)).setStreamConfigs(streamConfigs)
         .build();
     try {
       TableConfigUtils.validateUpsertConfig(tableConfig, schema);
@@ -1087,7 +1087,7 @@ public class TableConfigUtilsTest {
 
     streamConfigs.put("stream.kafka.consumer.type", "simple");
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null)).setStreamConfigs(streamConfigs)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, UpsertConfig.Strategy.OVERWRITE, null, null)).setStreamConfigs(streamConfigs)
         .build();
     try {
       TableConfigUtils.validateUpsertConfig(tableConfig, schema);
@@ -1098,7 +1098,7 @@ public class TableConfigUtilsTest {
     }
 
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null))
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, UpsertConfig.Strategy.OVERWRITE, null, null))
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
         .setStreamConfigs(streamConfigs).build();
     TableConfigUtils.validateUpsertConfig(tableConfig, schema);
@@ -1107,7 +1107,7 @@ public class TableConfigUtilsTest {
         Collections.singletonList(
             new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, "myCol").toColumnName()), 10);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null))
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, UpsertConfig.Strategy.OVERWRITE, null, null))
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
         .setStarTreeIndexConfigs(Lists.newArrayList(starTreeIndexConfig)).setStreamConfigs(streamConfigs).build();
     try {
@@ -1132,7 +1132,7 @@ public class TableConfigUtilsTest {
     partialUpsertStratgies.put("myCol1", UpsertConfig.Strategy.INCREMENT);
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.PARTIAL, partialUpsertStratgies, null, null))
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.PARTIAL, partialUpsertStratgies, UpsertConfig.Strategy.OVERWRITE, null, null))
         .setNullHandlingEnabled(false)
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
         .setStreamConfigs(streamConfigs).build();
@@ -1191,10 +1191,7 @@ public class TableConfigUtilsTest {
   @Test
   public void testTaskConfig() {
     Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-            .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-            .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
-            .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
             .build();
     Map<String, String> realtimeToOfflineTaskConfig =
         ImmutableMap.of("schedule", "0 */10 * ? * * *", "bucketTimePeriod", "6h", "bufferTimePeriod", "5d", "mergeType",
@@ -1223,7 +1220,7 @@ public class TableConfigUtilsTest {
     // invalid Upsert config with RealtimeToOfflineTask
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setTimeColumnName(TIME_COLUMN)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null)).setTaskConfig(new TableTaskConfig(
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, UpsertConfig.Strategy.OVERWRITE, null, null)).setTaskConfig(new TableTaskConfig(
             ImmutableMap.of("RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig,
                 "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig))).build();
     try {
