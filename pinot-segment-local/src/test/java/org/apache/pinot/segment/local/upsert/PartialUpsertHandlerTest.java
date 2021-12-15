@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.helix.HelixManager;
@@ -92,8 +93,10 @@ public class PartialUpsertHandlerTest {
   public void testMergeWithGlobalStrategy() {
     HelixManager helixManager = Mockito.mock(HelixManager.class);
 
-    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("field1", FieldSpec.DataType.LONG)
-        .addMetric("field2", FieldSpec.DataType.LONG).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("field1", FieldSpec.DataType.LONG)
+        .addMetric("field2", FieldSpec.DataType.LONG)
+        .setPrimaryKeyColumns(Arrays.asList("pk")).build();
 
     String realtimeTableName = "testTable_REALTIME";
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
