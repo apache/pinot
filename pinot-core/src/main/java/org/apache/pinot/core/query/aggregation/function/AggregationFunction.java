@@ -129,12 +129,6 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
    */
   FinalResult extractFinalResult(IntermediateResult intermediateResult);
 
-  /** Set if this aggregation is filtered */
-  void setFilteredAggregation(boolean isFilteredAggregation);
-
-  /** @return If the aggregation is filtered */
-  boolean isFilteredAggregation();
-
   /** @return Description of this operator for Explain Plan */
   String toExplainString();
 }

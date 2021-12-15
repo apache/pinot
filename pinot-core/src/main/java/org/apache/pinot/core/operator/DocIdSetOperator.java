@@ -35,8 +35,7 @@ import org.apache.pinot.segment.spi.Constants;
  * <p>Should call {@link #nextBlock()} multiple times until it returns <code>null</code> (already exhausts all the
  * matched documents) or already gathered enough documents (for selection queries).
  */
-public class DocIdSetOperator extends BaseOperator<DocIdSetBlock>
-    implements VisitableOperator {
+public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
   private static final String OPERATOR_NAME = "DocIdSetOperator";
   private static final String EXPLAIN_NAME = null;
 
@@ -104,10 +103,5 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock>
     long numEntriesScannedInFilter =
         _filterBlockDocIdSet != null ? _filterBlockDocIdSet.getNumEntriesScannedInFilter() : 0;
     return new ExecutionStatistics(0, numEntriesScannedInFilter, 0, 0);
-  }
-
-  @Override
-  public <T> void accept(T v) {
-    _filterOperator.accept(v);
   }
 }

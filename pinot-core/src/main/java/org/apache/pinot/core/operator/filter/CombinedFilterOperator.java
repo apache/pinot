@@ -10,13 +10,12 @@ import javax.annotation.Nullable;
 
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.VisitableOperator;
 import org.apache.pinot.core.operator.blocks.CombinedFilterBlock;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 
 
-public class CombinedFilterOperator extends BaseFilterOperator implements VisitableOperator {
+public class CombinedFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "CombinedFilterOperator";
 
   protected Map<ExpressionContext, BaseFilterOperator> _filterOperators;
@@ -68,18 +67,5 @@ public class CombinedFilterOperator extends BaseFilterOperator implements Visita
     _resultBlock = new CombinedFilterBlock(filterBlockMap, mainFilterBlock);
 
     return _resultBlock;
-  }
-
-  @Override
-  public <T> void accept(T v) {
-    if (v instanceof BaseFilterOperator) {
-      assert _mainFilterOperator == null;
-
-      _mainFilterOperator = (BaseFilterOperator) v;
-    } else if (v instanceof Map) {
-      assert _filterOperators == null;
-
-      _filterOperators = (Map<ExpressionContext, BaseFilterOperator>) v;
-    }
   }
 }
