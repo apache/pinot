@@ -68,7 +68,22 @@ const getSegmentStatus = (idealStateObj, externalViewObj) => {
   const externalSegmentCount = externalSegmentKeys.length;
 
   if (idealSegmentCount !== externalSegmentCount) {
-    return {value: 'Bad', tooltip: `Ideal Segment Count: ${idealSegmentCount} does not match external Segment Count: ${externalSegmentCount}`};
+    let segmentStatusComponent = (
+        <ReactDiffViewer
+            oldValue={JSON.stringify(idealStateObj)}
+            newValue={JSON.stringify(externalViewObj)}
+            splitView={true}
+            hideLineNumbers
+            leftTitle={"Ideal State"}
+            rightTitle={"External View"}
+            compareMethod={DiffMethod.WORDS}
+        />
+    )
+    return {
+      value: 'Bad',
+      tooltip: `Ideal Segment Count: ${idealSegmentCount} does not match external Segment Count: ${externalSegmentCount}`,
+      component: segmentStatusComponent,
+    };
   }
 
   let segmentStatus = {value: 'Good', tooltip: null, component: null};
@@ -77,8 +92,8 @@ const getSegmentStatus = (idealStateObj, externalViewObj) => {
       if (!_.isEqual(idealStateObj[segmentKey], externalViewObj[segmentKey])) {
         let segmentStatusComponent = (
             <ReactDiffViewer
-                oldValue={JSON.stringify(idealStateObj[segmentKey])}
-                newValue={JSON.stringify(externalViewObj[segmentKey])}
+                oldValue={JSON.stringify(idealStateObj)}
+                newValue={JSON.stringify(externalViewObj)}
                 splitView={true}
                 hideLineNumbers
                 leftTitle={"Ideal State"}

@@ -383,7 +383,7 @@ export default function CustomizedTables({
 
   const makeCell = (cellData) => {
     if (Object.prototype.toString.call(cellData) === '[object Object]') {
-      if (_.has(cellData, 'component')) {
+      if (_.has(cellData, 'component') && cellData.component) {
         let cell = (styleCell(cellData.value))
         let statusModal = (
             <Dialog
@@ -401,7 +401,7 @@ export default function CustomizedTables({
                 {onClick: handleModalOpen},
             )
         );
-        if (_.has(cellData, 'tooltip')) {
+        if (_.has(cellData, 'tooltip') && cellData.tooltip) {
           cell = (
               <Tooltip title={cellData.tooltip} placement="top" arrow>
                 {cell}
@@ -414,7 +414,7 @@ export default function CustomizedTables({
               {statusModal}
             </>
         );
-      } else if (_.has(cellData, 'tooltip')) {
+      } else if (_.has(cellData, 'tooltip') && cellData.tooltip) {
         return (
             <Tooltip title={cellData.tooltip} placement="top" arrow>
               {styleCell(cellData.value)}
