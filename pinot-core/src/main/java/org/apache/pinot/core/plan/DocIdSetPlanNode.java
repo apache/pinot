@@ -62,7 +62,7 @@ public class DocIdSetPlanNode implements PlanNode {
     if (_isSwimlanePredicate) {
       BaseFilterOperator filterOperator = _filterOperator;
 
-      if(filterOperator == null) {
+      if (filterOperator == null) {
         filterOperator = new FilterPlanNode(_indexSegment, _queryContext, null).run();
       }
 

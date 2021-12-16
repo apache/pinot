@@ -179,8 +179,8 @@ public class AggregationPlanNode implements PlanNode {
     // For each transform operator, associate it with the underlying expression. This allows
     // fetching the relevant TransformOperator when resolving blocks during aggregation
     // execution
-    for (Pair<ExpressionContext, Pair<FilterPlanNode, BaseFilterOperator>> pair :
-        filterPredicatesAndMetadata) {
+    for (Pair<ExpressionContext, Pair<FilterPlanNode, BaseFilterOperator>> pair
+        : gifilterPredicatesAndMetadata) {
       Pair<TransformOperator,
           BaseOperator<IntermediateResultsBlock>> innerPair =
           buildOperators(combinedFilterOperator, pair.getRight().getLeft(),

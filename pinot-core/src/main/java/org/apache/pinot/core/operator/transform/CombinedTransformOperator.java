@@ -60,7 +60,7 @@ public class CombinedTransformOperator extends TransformOperator {
 
     Iterator<Map.Entry<ExpressionContext, TransformOperator>> iterator = _transformOperatorMap.entrySet().iterator();
     // Get next block from all underlying transform operators
-    while(iterator.hasNext()) {
+    while (iterator.hasNext()) {
       Map.Entry<ExpressionContext, TransformOperator> entry = iterator.next();
 
       TransformBlock transformBlock = entry.getValue().getNextBlock();

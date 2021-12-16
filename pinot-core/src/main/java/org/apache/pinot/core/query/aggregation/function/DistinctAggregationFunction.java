@@ -36,7 +36,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  * TODO: Use a separate way to represent DISTINCT instead of aggregation.
  */
 @SuppressWarnings("rawtypes")
-public class DistinctAggregationFunction  implements AggregationFunction<Object, Comparable> {
+public class DistinctAggregationFunction implements AggregationFunction<Object, Comparable> {
   private final List<ExpressionContext> _expressions;
   private final String[] _columns;
   private final List<OrderByExpressionContext> _orderByExpressions;

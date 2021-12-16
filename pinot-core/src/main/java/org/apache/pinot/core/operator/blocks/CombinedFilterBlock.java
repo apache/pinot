@@ -26,7 +26,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
  * Contains a mapping between expressions and filter blocks
  */
 public class CombinedFilterBlock extends FilterBlock {
-  private final Map<ExpressionContext,  FilterBlock> _filterBlockMap;
+  private final Map<ExpressionContext, FilterBlock> _filterBlockMap;
 
   public CombinedFilterBlock(Map<ExpressionContext, FilterBlock> filterBlockMap,
       FilterBlock mainFilterBlock) {
