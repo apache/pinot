@@ -121,8 +121,8 @@ public class CalciteSqlParser {
     sql = removeTerminatingSemicolon(sql);
 
     // Extract OPTION statements from sql as Calcite Parser doesn't parse it.
-    List<String> options = extractOptionsFromSql(sql);
     sql = removeCommentedOptionsFromSql(sql);
+    List<String> options = extractOptionsFromSql(sql);
     if (!options.isEmpty()) {
       sql = removeOptionsFromSql(sql);
     }
@@ -407,11 +407,7 @@ public class CalciteSqlParser {
 
   private static List<String> extractOptionsFromSql(String sql) {
     List<String> results = new ArrayList<>();
-    Matcher matcher = COMMENTED_QUERY_PATTERN.matcher(sql);
-    if (matcher.find()) {
-      sql = removeCommentedOptionsFromSql(sql);
-    }
-    matcher = OPTIONS_REGEX_PATTEN.matcher(sql);
+    Matcher matcher = OPTIONS_REGEX_PATTEN.matcher(sql);
     while (matcher.find()) {
       results.add(matcher.group(1));
     }
@@ -424,6 +420,9 @@ public class CalciteSqlParser {
   // NOTE: THIS FAILS WHEN the `-{2,}` pattern is found in string literals, identifiers
   // Query `SELECT * FROM tablex WHERE cola LIKE '%---%' OPTION (a=b)` will be parsed as
   // `SELECT * FROM tablex WHERE cola LIKE '%---%'`
+  // NOTE: We are removing commented options from the query, and not the commented part itself
+  // so as to not distort the query. For ex, we want to avoid the following conversion:
+  // `SELECT * FROM tableA where colA LIKE '%--%'` to `SELECT * FROM tableA where colA LIKE '%%'`
   private static String removeCommentedOptionsFromSql(String sql) {
     Matcher matcher = COMMENTED_QUERY_PATTERN.matcher(sql);
     while (matcher.find()) {
