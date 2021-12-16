@@ -33,7 +33,6 @@ import org.apache.pinot.core.query.optimizer.filter.MergeEqInFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.MergeRangeFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.NumericalFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.TimePredicateFilterOptimizer;
-import org.apache.pinot.core.query.optimizer.statement.JsonStatementOptimizer;
 import org.apache.pinot.core.query.optimizer.statement.StatementOptimizer;
 import org.apache.pinot.core.query.optimizer.statement.StringPredicateFilterOptimizer;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -51,7 +50,7 @@ public class QueryOptimizer {
           new TimePredicateFilterOptimizer(), new MergeRangeFilterOptimizer());
 
   private static final List<StatementOptimizer> STATEMENT_OPTIMIZERS =
-      Arrays.asList(new JsonStatementOptimizer(), new StringPredicateFilterOptimizer());
+      Arrays.asList(new StringPredicateFilterOptimizer());
 
   /**
    * Optimizes the given PQL query.
