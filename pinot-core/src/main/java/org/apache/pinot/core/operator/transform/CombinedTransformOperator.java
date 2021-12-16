@@ -56,29 +56,16 @@ public class CombinedTransformOperator extends TransformOperator {
   @Override
   protected TransformBlock getNextBlock() {
     Map<ExpressionContext, TransformBlock> expressionContextTransformBlockMap = new HashMap<>();
-    boolean hasBlock = false;
-
-    Iterator<Map.Entry<ExpressionContext, TransformOperator>> iterator = _transformOperatorMap.entrySet().iterator();
+    
     // Get next block from all underlying transform operators
-    while (iterator.hasNext()) {
-      Map.Entry<ExpressionContext, TransformOperator> entry = iterator.next();
-
+    for (Map.Entry<ExpressionContext, TransformOperator> entry: _transformOperatorMap.entrySet()) {
       TransformBlock transformBlock = entry.getValue().getNextBlock();
-
       if (transformBlock != null) {
-        hasBlock = true;
+        expressionContextTransformBlockMap.put(entry.getKey(), transformBlock);
       }
-
-      expressionContextTransformBlockMap.put(entry.getKey(), transformBlock);
     }
 
-    if (!hasBlock) {
-      return null;
-    }
-
-    return new
-        CombinedTransformBlock(expressionContextTransformBlockMap,
-        _mainPredicateExpression);
+    return expressionContextTransformBlockMap.isEmpty() ? null : new CombinedTransformBlock(expressionContextTransformBlockMap, _mainPredicateExpression);
   }
 
   @Override
