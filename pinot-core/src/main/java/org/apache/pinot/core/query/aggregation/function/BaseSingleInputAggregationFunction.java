@@ -26,10 +26,8 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 /**
  * Base implementation of {@link AggregationFunction} with single input expression.
  */
-public abstract class BaseSingleInputAggregationFunction<I, F extends Comparable>
-    implements AggregationFunction<I, F> {
+public abstract class BaseSingleInputAggregationFunction<I, F extends Comparable> implements AggregationFunction<I, F> {
   protected final ExpressionContext _expression;
-  private boolean _isFilteredAggregation;
 
   /**
    * Constructor for the class.

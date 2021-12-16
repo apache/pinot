@@ -23,8 +23,7 @@ import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.BlockDocIdValueSet;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.apache.pinot.core.operator.docidsets.ArrayBasedDocIdSet;
 
 
 public class DocIdSetBlock implements Block {
@@ -57,7 +56,7 @@ public class DocIdSetBlock implements Block {
 
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
-    return new BitmapDocIdSet(ImmutableRoaringBitmap.bitmapOf(_docIdArray), _searchableLength);
+    return new ArrayBasedDocIdSet(_docIdArray, _searchableLength);
   }
 
   @Override

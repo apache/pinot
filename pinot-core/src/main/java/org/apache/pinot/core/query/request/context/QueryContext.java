@@ -488,6 +488,7 @@ public class QueryContext {
         AggregationFunction aggregationFunction =
             AggregationFunctionFactory.getAggregationFunction(function, queryContext);
 
+        // Hack: If the left pair is not null, implies a filtered aggregation
         if (pair.getLeft() != null) {
           if (_groupByExpressions != null) {
             throw new IllegalStateException("GROUP BY with FILTER clauses is not supported");
@@ -553,6 +554,8 @@ public class QueryContext {
 
     /**
      * Helper method to extract AGGREGATION FunctionContexts from the given expression.
+     *
+     * NOTE: The left pair of aggregations should be set only for filtered aggregations
      */
     private static void getAggregations(ExpressionContext expression,
         List<Pair<Pair<FilterContext, ExpressionContext>, FunctionContext>> aggregations) {

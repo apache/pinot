@@ -90,7 +90,6 @@ public class AggregationPlanNode implements PlanNode {
 
       assert pair != null && aggregationOperator != null;
 
-      //TODO: For non star tree, non filtered aggregation, share the main filter transform operator
       TransformOperator filteredTransformOperator = buildOperatorForFilteredAggregations(pair.getLeft(),
           filterOperatorPair.getRight(), expressionsToTransform, aggregationFunctions);
       return new AggregationOperator(aggregationFunctions, filteredTransformOperator, numTotalDocs,

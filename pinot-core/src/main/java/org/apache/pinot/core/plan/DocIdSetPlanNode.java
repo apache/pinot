@@ -60,10 +60,6 @@ public class DocIdSetPlanNode implements PlanNode {
   @Override
   public DocIdSetOperator run() {
     if (_isSwimlanePredicate) {
-      if (!(_filterOperator instanceof CombinedFilterOperator)) {
-        throw new IllegalStateException("Filter operator is not instance of CombinedFilterOperator");
-      }
-
       BaseFilterOperator filterOperator = _filterOperator;
 
       if(filterOperator == null) {

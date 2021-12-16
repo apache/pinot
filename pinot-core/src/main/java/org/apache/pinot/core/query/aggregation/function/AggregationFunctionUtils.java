@@ -140,29 +140,6 @@ public class AggregationFunctionUtils {
   }
 
   /**
-   * Collects all transform expressions required for aggregation/group-by queries and maps them per agg function
-   * <p>NOTE: We don't need to consider order-by columns here as the ordering is only allowed for aggregation functions
-   *          or group-by expressions.
-   */
-  public static Map<AggregationFunction, Set<ExpressionContext>> collectExpressionsToTransformPerAggFunc(
-      AggregationFunction[] aggregationFunctions, @Nullable ExpressionContext[] groupByExpressions) {
-    Map<AggregationFunction, Set<ExpressionContext>> resultMap = new HashMap<>();
-
-    for (AggregationFunction aggregationFunction : aggregationFunctions) {
-      Set<ExpressionContext> expressions = new HashSet<>();
-      expressions.addAll(aggregationFunction.getInputExpressions());
-
-      if (groupByExpressions != null) {
-        expressions.addAll(Arrays.asList(groupByExpressions));
-      }
-
-      resultMap.put(aggregationFunction, expressions);
-    }
-
-    return resultMap;
-  }
-
-  /**
    * Creates a map from expression required by the {@link AggregationFunction} to {@link BlockValSet} fetched from the
    * {@link TransformBlock}.
    */
