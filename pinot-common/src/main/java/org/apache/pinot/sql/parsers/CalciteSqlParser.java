@@ -95,7 +95,7 @@ public class CalciteSqlParser {
   //   `OPTION (<k1> = <v1>) OPTION (<k2> = <v2>) OPTION (<k3> = <v3>)`
   private static final Pattern OPTIONS_REGEX_PATTEN =
       Pattern.compile("option\\s*\\(([^\\)]+)\\)", Pattern.CASE_INSENSITIVE);
-  private static final Pattern COMMENTED_QUERY_PATTERN = Pattern.compile("-{2,}");
+  private static final String COMMENTED_QUERY_PATTERN = "--";
   /**
    * Checks for the presence of semicolon in the sql query and modifies the query accordingly
    *
@@ -416,17 +416,18 @@ public class CalciteSqlParser {
 
   // for query options present in commented out query
   // such as `SELECT * FROM tablex -- SELECT * FROM tabley OPTION(k=v)`
-  // use `-{2,}` pattern as signpost to detect and remove query options in commented out query
-  // NOTE: THIS FAILS WHEN the `-{2,}` pattern is found in string literals, identifiers
+  // use `--` pattern as signpost to detect and remove query options in commented out query
+  // NOTE: THIS FAILS WHEN the `--` pattern is found in string literals, identifiers
   // Query `SELECT * FROM tablex WHERE cola LIKE '%---%' OPTION (a=b)` will be parsed as
   // `SELECT * FROM tablex WHERE cola LIKE '%---%'`
   // NOTE: We are removing commented options from the query, and not the commented part itself
   // so as to not distort the query. For ex, we want to avoid the following conversion:
   // `SELECT * FROM tableA where colA LIKE '%--%'` to `SELECT * FROM tableA where colA LIKE '%%'`
   private static String removeCommentedOptionsFromSql(String sql) {
-    Matcher matcher = COMMENTED_QUERY_PATTERN.matcher(sql);
-    while (matcher.find()) {
-      return sql.substring(0, matcher.start()) + removeOptionsFromSql(sql.substring(matcher.start()));
+    boolean match = sql.contains(COMMENTED_QUERY_PATTERN);
+    if (match) {
+      int indexOfMatch = sql.indexOf(COMMENTED_QUERY_PATTERN);
+      return sql.substring(0, indexOfMatch) + removeOptionsFromSql(sql.substring(indexOfMatch));
     }
     return sql;
   }
