@@ -96,6 +96,7 @@ public class CalciteSqlParser {
   private static final Pattern OPTIONS_REGEX_PATTEN =
       Pattern.compile("option\\s*\\(([^\\)]+)\\)", Pattern.CASE_INSENSITIVE);
   private static final String COMMENTED_QUERY_PATTERN = "--";
+
   /**
    * Checks for the presence of semicolon in the sql query and modifies the query accordingly
    *
