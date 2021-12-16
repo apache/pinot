@@ -48,6 +48,7 @@ import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
+import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
@@ -71,8 +72,11 @@ public class BenchmarkFilteredAggregations extends BaseQueriesTest {
   private static final String SECOND_SEGMENT_NAME = "secondTestSegment";
   private static final String INT_COL_NAME = "INT_COL";
   private static final String NO_INDEX_INT_COL_NAME = "NO_INDEX_INT_COL";
-  private static final Integer INT_BASE_VALUE = 0;
-  private static final Integer NUM_ROWS = 1500000;
+
+  @Param("1500000")
+  private int _numRows;
+  @Param("0")
+  int _intBaseValue;
   
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
@@ -130,8 +134,8 @@ public class BenchmarkFilteredAggregations extends BaseQueriesTest {
 
     for (int i = 0; i < numRows; i++) {
       GenericRow row = new GenericRow();
-      row.putField(INT_COL_NAME, INT_BASE_VALUE + i);
-      row.putField(NO_INDEX_INT_COL_NAME, INT_BASE_VALUE + i);
+      row.putField(INT_COL_NAME, _intBaseValue + i);
+      row.putField(NO_INDEX_INT_COL_NAME, _intBaseValue + i);
 
       rows.add(row);
     }
@@ -140,7 +144,7 @@ public class BenchmarkFilteredAggregations extends BaseQueriesTest {
 
   private void buildSegment(String segmentName)
       throws Exception {
-    List<GenericRow> rows = createTestData(NUM_ROWS);
+    List<GenericRow> rows = createTestData(_numRows);
     List<FieldConfig> fieldConfigs = new ArrayList<>();
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)

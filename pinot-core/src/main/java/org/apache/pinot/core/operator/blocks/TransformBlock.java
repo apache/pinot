@@ -43,6 +43,11 @@ public class TransformBlock implements Block {
     _transformFunctionMap = transformFunctionMap;
   }
 
+  protected TransformBlock(TransformBlock transformBlock) {
+    this(transformBlock == null ? null : transformBlock._projectionBlock,
+        transformBlock == null ? null : transformBlock._transformFunctionMap);
+  }
+
   public int getNumDocs() {
     return _projectionBlock.getNumDocs();
   }

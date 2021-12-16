@@ -21,15 +21,16 @@ package org.apache.pinot.core.operator.filter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.CombinedFilterBlock;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
+
 
 /**
  * A filter operator consisting of one main predicate block and multiple
@@ -39,11 +40,11 @@ import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 public class CombinedFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "CombinedFilterOperator";
 
-  protected Map<ExpressionContext, BaseFilterOperator> _filterOperators;
+  protected List<Pair<ExpressionContext, BaseFilterOperator>> _filterOperators;
   protected BaseFilterOperator _mainFilterOperator;
   protected CombinedFilterBlock _resultBlock;
 
-  public CombinedFilterOperator(Map<ExpressionContext, BaseFilterOperator> filterOperators,
+  public CombinedFilterOperator(List<Pair<ExpressionContext, BaseFilterOperator>> filterOperators,
       BaseFilterOperator mainFilterOperator) {
     _filterOperators = filterOperators;
     _mainFilterOperator = mainFilterOperator;
@@ -56,7 +57,13 @@ public class CombinedFilterOperator extends BaseFilterOperator {
 
   @Override
   public List<Operator> getChildOperators() {
-    return new ArrayList<>(_filterOperators.values());
+    List<Operator> operators = new ArrayList<>();
+
+    for (Pair<ExpressionContext, BaseFilterOperator> pair : _filterOperators) {
+      operators.add(pair.getRight());
+    }
+
+    return operators;
   }
 
   @Nullable
@@ -74,9 +81,9 @@ public class CombinedFilterOperator extends BaseFilterOperator {
     FilterBlock mainFilterBlock = _mainFilterOperator.nextBlock();
 
     Map<ExpressionContext, FilterBlock> filterBlockMap = new HashMap<>();
-    for (Map.Entry<ExpressionContext, BaseFilterOperator> entry : _filterOperators.entrySet()) {
-      FilterBlock subFilterBlock = entry.getValue().nextBlock();
-      filterBlockMap.put(entry.getKey(),
+    for (Pair<ExpressionContext, BaseFilterOperator> pair : _filterOperators) {
+      FilterBlock subFilterBlock = pair.getValue().nextBlock();
+      filterBlockMap.put(pair.getKey(),
           new FilterBlock(new AndDocIdSet(Arrays.asList(subFilterBlock.getBlockDocIdSet(),
               mainFilterBlock.getBlockDocIdSet()))));
     }

@@ -152,8 +152,8 @@ public class AggregationPlanNode implements PlanNode {
       Set<ExpressionContext> expressionsToTransform,
       AggregationFunction[] aggregationFunctions) {
     Map<ExpressionContext, TransformOperator> transformOperatorMap = new HashMap<>();
-    Map<ExpressionContext, BaseFilterOperator> baseFilterOperatorMap =
-        new HashMap<>();
+    List<Pair<ExpressionContext, BaseFilterOperator>> baseFilterOperatorList =
+        new ArrayList<>();
     List<Pair<ExpressionContext, Pair<FilterPlanNode, BaseFilterOperator>>> filterPredicatesAndMetadata =
         new ArrayList<>();
 
@@ -166,14 +166,14 @@ public class AggregationPlanNode implements PlanNode {
         Pair<FilterPlanNode, BaseFilterOperator> pair =
             buildFilterOperator(filterableAggregationFunction.getFilterContext());
 
-        baseFilterOperatorMap.put(filterableAggregationFunction.getAssociatedExpressionContext(),
-            pair.getRight());
+        baseFilterOperatorList.add(Pair.of(filterableAggregationFunction.getAssociatedExpressionContext(),
+            pair.getRight()));
         filterPredicatesAndMetadata.add(Pair.of(filterableAggregationFunction.getAssociatedExpressionContext(),
             pair));
       }
     }
 
-    CombinedFilterOperator combinedFilterOperator = new CombinedFilterOperator(baseFilterOperatorMap,
+    CombinedFilterOperator combinedFilterOperator = new CombinedFilterOperator(baseFilterOperatorList,
         mainPredicateFilterOperator);
 
     // For each transform operator, associate it with the underlying expression. This allows

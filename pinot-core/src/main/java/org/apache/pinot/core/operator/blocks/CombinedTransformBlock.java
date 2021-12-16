@@ -34,10 +34,7 @@ public class CombinedTransformBlock extends TransformBlock {
 
   public CombinedTransformBlock(Map<ExpressionContext, TransformBlock> transformBlockMap,
       ExpressionContext mainPredicateExpressionContext) {
-    super(transformBlockMap.get(mainPredicateExpressionContext) == null ? null
-            : transformBlockMap.get(mainPredicateExpressionContext)._projectionBlock,
-        transformBlockMap.get(mainPredicateExpressionContext) == null ? null
-            : transformBlockMap.get(mainPredicateExpressionContext)._transformFunctionMap);
+    super(transformBlockMap.get(mainPredicateExpressionContext));
 
     _transformBlockMap = transformBlockMap;
     _mainPredicateExpressionContext = mainPredicateExpressionContext;
