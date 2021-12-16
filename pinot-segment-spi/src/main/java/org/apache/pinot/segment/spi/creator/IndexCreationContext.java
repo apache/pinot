@@ -426,6 +426,9 @@ public interface IndexCreationContext {
     private final FSTType _fstType;
     private final String[] _sortedUniqueElementsArray;
 
+    /**
+     * For text indexes
+     */
     public Text(IndexCreationContext wrapped, boolean commitOnClose) {
       super(wrapped);
       _commitOnClose = commitOnClose;
@@ -434,6 +437,9 @@ public interface IndexCreationContext {
       _isFst = false;
     }
 
+    /**
+     * For FST indexes
+     */
     public Text(IndexCreationContext wrapped, FSTType fstType, String[] sortedUniqueElementsArray) {
       super(wrapped);
       _commitOnClose = true;
