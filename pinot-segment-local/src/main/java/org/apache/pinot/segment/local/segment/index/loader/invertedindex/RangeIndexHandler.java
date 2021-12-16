@@ -220,6 +220,6 @@ public class RangeIndexHandler implements IndexHandler {
       throws IOException {
     return _indexCreatorProvider.newRangeIndexCreator(
         IndexCreationContext.builder().withIndexDir(_indexDir).withColumnMetadata(columnMetadata).build()
-            .forRangeIndex(columnMetadata, _rangeIndexVersion));
+            .forRangeIndex(_rangeIndexVersion, columnMetadata.getMinValue(), columnMetadata.getMaxValue()));
   }
 }

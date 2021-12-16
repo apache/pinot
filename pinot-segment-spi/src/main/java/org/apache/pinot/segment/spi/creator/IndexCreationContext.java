@@ -254,8 +254,8 @@ public interface IndexCreationContext {
       return new Json(this);
     }
 
-    public Range forRangeIndex(ColumnMetadata columnMetadata, int rangeIndexVersion) {
-      return new Range(this, columnMetadata, rangeIndexVersion);
+    public Range forRangeIndex(int rangeIndexVersion, Comparable<?> min, Comparable<?> max) {
+      return new Range(this, rangeIndexVersion, min, max);
     }
 
     public Text forTextIndex(boolean commitOnClose) {
@@ -395,17 +395,24 @@ public interface IndexCreationContext {
 
   class Range extends Wrapper {
 
-    private final ColumnMetadata _columnMetadata;
+    private final Comparable<?> _min;
+    private final Comparable<?> _max;
     private final int _rangeIndexVersion;
 
-    Range(IndexCreationContext delegate, ColumnMetadata columnMetadata, int rangeIndexVersion) {
+
+    Range(IndexCreationContext delegate, int rangeIndexVersion, Comparable<?> min, Comparable<?> max) {
       super(delegate);
-      _columnMetadata = columnMetadata;
       _rangeIndexVersion = rangeIndexVersion;
+      _min = min;
+      _max = max;
     }
 
-    public ColumnMetadata getColumnMetadata() {
-      return _columnMetadata;
+    public Comparable<?> getMin() {
+      return _min;
+    }
+
+    public Comparable<?> getMax() {
+      return _max;
     }
 
     public int getRangeIndexVersion() {

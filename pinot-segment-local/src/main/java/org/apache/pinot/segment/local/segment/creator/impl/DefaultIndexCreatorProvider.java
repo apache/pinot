@@ -260,11 +260,15 @@ public final class DefaultIndexCreatorProvider implements IndexCreatorProvider {
       throws IOException {
     if (context.getRangeIndexVersion() == BitSlicedRangeIndexCreator.VERSION && context.getFieldSpec()
         .isSingleValueField()) {
-      return new BitSlicedRangeIndexCreator(context.getIndexDir(), context.getColumnMetadata());
+      if (context.hasDictionary()) {
+        return new BitSlicedRangeIndexCreator(context.getIndexDir(), context.getFieldSpec(), context.getCardinality());
+      }
+      return new BitSlicedRangeIndexCreator(context.getIndexDir(), context.getFieldSpec(), context.getMin(),
+          context.getMax());
     }
     // default to RangeIndexCreator for the time being
     return new RangeIndexCreator(context.getIndexDir(), context.getFieldSpec(),
-        context.getColumnMetadata().hasDictionary() ? FieldSpec.DataType.INT : context.getFieldSpec().getDataType(), -1,
+        context.hasDictionary() ? FieldSpec.DataType.INT : context.getFieldSpec().getDataType(), -1,
         -1, context.getTotalDocs(), context.getTotalNumberOfEntries());
   }
 }

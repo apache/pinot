@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.inv;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.segment.local.utils.FPOrdering;
-import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.creator.CombinedInvertedIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RangeBitmap;
@@ -41,13 +41,33 @@ public class BitSlicedRangeIndexCreator implements CombinedInvertedIndexCreator 
   private final File _rangeIndexFile;
   private final long _minValue;
 
-  public BitSlicedRangeIndexCreator(File indexDir, ColumnMetadata metadata) {
-    if (!metadata.isSingleValue()) {
-      throw new IllegalArgumentException("MV columns not supported");
-    }
-    _appender = RangeBitmap.appender(maxValue(metadata));
-    _rangeIndexFile = new File(indexDir, metadata.getColumnName() + BITMAP_RANGE_INDEX_FILE_EXTENSION);
-    _minValue = minValue(metadata);
+  private BitSlicedRangeIndexCreator(File indexDir, FieldSpec fieldSpec, long minValue, long maxValue) {
+    Preconditions.checkArgument(fieldSpec.isSingleValueField(), "MV columns not supported");
+    _rangeIndexFile = new File(indexDir, fieldSpec.getName() + BITMAP_RANGE_INDEX_FILE_EXTENSION);
+    _appender = RangeBitmap.appender(maxValue);
+    _minValue = minValue;
+  }
+
+  /**
+   * For dictionarized columns
+   * @param indexDir the directory for the index
+   * @param fieldSpec the specification of the field
+   * @param cardinality the cardinality of the dictionary
+   */
+  public BitSlicedRangeIndexCreator(File indexDir, FieldSpec fieldSpec, int cardinality) {
+    this(indexDir, fieldSpec, 0, cardinality - 1);
+  }
+
+  /**
+   * For raw columns
+   * @param indexDir the directory for the index
+   * @param fieldSpec the specification of the field
+   * @param minValue the minimum value
+   * @param maxValue the maximum value
+   */
+  public BitSlicedRangeIndexCreator(File indexDir, FieldSpec fieldSpec, Comparable<?> minValue,
+      Comparable<?> maxValue) {
+    this(indexDir, fieldSpec, minValue(fieldSpec, minValue), maxValue(fieldSpec, minValue, maxValue));
   }
 
   @Override
@@ -110,13 +130,8 @@ public class BitSlicedRangeIndexCreator implements CombinedInvertedIndexCreator 
       throws IOException {
   }
 
-  private static long maxValue(ColumnMetadata metadata) {
-    if (metadata.hasDictionary()) {
-      return metadata.getCardinality() - 1;
-    }
-    FieldSpec.DataType storedType = metadata.getDataType().getStoredType();
-    Comparable<?> minValue = metadata.getMinValue();
-    Comparable<?> maxValue = metadata.getMaxValue();
+  private static long maxValue(FieldSpec fieldSpec, Comparable<?> minValue, Comparable<?> maxValue) {
+    FieldSpec.DataType storedType = fieldSpec.getDataType().getStoredType();
     if (storedType == INT || storedType == LONG) {
       return ((Number) maxValue).longValue() - ((Number) minValue).longValue();
     }
@@ -126,15 +141,11 @@ public class BitSlicedRangeIndexCreator implements CombinedInvertedIndexCreator 
     if (storedType == DOUBLE) {
       return 0xFFFFFFFFFFFFFFFFL;
     }
-    throw new IllegalArgumentException("Unsupported data type: " + metadata.getDataType());
+    throw new IllegalArgumentException("Unsupported data type: " + fieldSpec.getDataType());
   }
 
-  private static long minValue(ColumnMetadata metadata) {
-    if (metadata.hasDictionary()) {
-      return 0;
-    }
-    FieldSpec.DataType storedType = metadata.getDataType().getStoredType();
-    Comparable<?> minValue = metadata.getMinValue();
+  private static long minValue(FieldSpec fieldSpec, Comparable<?> minValue) {
+    FieldSpec.DataType storedType = fieldSpec.getDataType().getStoredType();
     if (storedType == INT || storedType == LONG) {
       return ((Number) minValue).longValue();
     }
