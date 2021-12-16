@@ -32,6 +32,6 @@ public interface TextIndexCreatorProvider {
    * @return a {@see ForwardIndexCreator}
    * @throws IOException whenever something goes wrong matching or constructing the creator
    */
-  TextIndexCreator newFSTIndexCreator(IndexCreationContext.Text context)
+  TextIndexCreator newTextIndexCreator(IndexCreationContext.Text context)
       throws IOException;
 }

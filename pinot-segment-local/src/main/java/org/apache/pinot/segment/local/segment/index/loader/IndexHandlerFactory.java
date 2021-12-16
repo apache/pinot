@@ -51,7 +51,7 @@ public class IndexHandlerFactory {
         return new RangeIndexHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter,
             indexCreatorProvider);
       case TEXT_INDEX:
-        return new TextIndexHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter);
+        return new TextIndexHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter, indexCreatorProvider);
       case FST_INDEX:
         return new FSTIndexHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter,
             indexLoadingConfig.getFSTIndexType(), indexCreatorProvider);

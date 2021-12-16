@@ -43,7 +43,7 @@ public final class IndexCreatorProviders {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(IndexCreatorProviders.class);
 
-  static final IndexCreatorProvider DEFAULT = defaultProvider();
+  private static final IndexCreatorProvider DEFAULT = defaultProvider();
   private static final AtomicReference<IndexCreatorProvider> REGISTRATION = new AtomicReference<>(DEFAULT);
 
   private IndexCreatorProviders() {
@@ -80,10 +80,11 @@ public final class IndexCreatorProviders {
       Class<?> clazz = Class.forName(className, false, IndexCreatorProviders.class.getClassLoader());
       return (IndexCreatorProvider) MethodHandles.publicLookup()
           .findConstructor(clazz, MethodType.methodType(void.class)).invoke();
-    } catch (Throwable implausible) {
-      LOGGER.error("could not construct MethodHandle for {}", className,
-          implausible);
-      throw new IllegalStateException(implausible);
+    } catch (Throwable missing) {
+      LOGGER.error("could not construct MethodHandle for {}", className, missing);
+      // this means pinot-segment-local isn't on the classpath, but this means
+      // no indexes will be created, so it's ok to return null
+      return null;
     }
   }
 
@@ -95,43 +96,64 @@ public final class IndexCreatorProviders {
     @Override
     public BloomFilterCreator newBloomFilterCreator(IndexCreationContext.BloomFilter context)
         throws IOException {
+      if (DEFAULT == null) {
+        throw new UnsupportedOperationException("default implementation not present on classpath");
+      }
       return DEFAULT.newBloomFilterCreator(context);
     }
 
     @Override
     public ForwardIndexCreator newForwardIndexCreator(IndexCreationContext.Forward context)
         throws Exception {
+      if (DEFAULT == null) {
+        throw new UnsupportedOperationException("default implementation not present on classpath");
+      }
       return DEFAULT.newForwardIndexCreator(context);
     }
 
     @Override
     public GeoSpatialIndexCreator newGeoSpatialIndexCreator(IndexCreationContext.Geospatial context)
         throws IOException {
+      if (DEFAULT == null) {
+        throw new UnsupportedOperationException("default implementation not present on classpath");
+      }
       return DEFAULT.newGeoSpatialIndexCreator(context);
     }
 
     @Override
     public DictionaryBasedInvertedIndexCreator newInvertedIndexCreator(IndexCreationContext.Inverted context)
         throws IOException {
+      if (DEFAULT == null) {
+        throw new UnsupportedOperationException("default implementation not present on classpath");
+      }
       return DEFAULT.newInvertedIndexCreator(context);
     }
 
     @Override
     public JsonIndexCreator newJsonIndexCreator(IndexCreationContext.Json context)
         throws IOException {
+      if (DEFAULT == null) {
+        throw new UnsupportedOperationException("default implementation not present on classpath");
+      }
       return DEFAULT.newJsonIndexCreator(context);
     }
 
     @Override
     public CombinedInvertedIndexCreator newRangeIndexCreator(IndexCreationContext.Range context)
         throws IOException {
+      if (DEFAULT == null) {
+        throw new UnsupportedOperationException("default implementation not present on classpath");
+      }
       return DEFAULT.newRangeIndexCreator(context);
     }
 
     @Override
-    public TextIndexCreator newFSTIndexCreator(IndexCreationContext.Text context)
+    public TextIndexCreator newTextIndexCreator(IndexCreationContext.Text context)
         throws IOException {
-      return DEFAULT.newFSTIndexCreator(context);
+      if (DEFAULT == null) {
+        throw new UnsupportedOperationException("default implementation not present on classpath");
+      }
+      return DEFAULT.newTextIndexCreator(context);
     }
   }
 }

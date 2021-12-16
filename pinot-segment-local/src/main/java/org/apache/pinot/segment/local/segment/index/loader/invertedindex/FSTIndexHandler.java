@@ -138,9 +138,9 @@ public class FSTIndexHandler implements IndexHandler {
     LOGGER.info("Creating new FST index for column: {} in segment: {}, cardinality: {}", column, segmentName,
         columnMetadata.getCardinality());
 
-    TextIndexCreator fstIndexCreator = _indexCreatorProvider.newFSTIndexCreator(
+    TextIndexCreator fstIndexCreator = _indexCreatorProvider.newTextIndexCreator(
         IndexCreationContext.builder().withIndexDir(_indexDir).withColumnMetadata(columnMetadata)
-            .build().forTextIndex(_fstType, null));
+            .build().forFSTIndex(_fstType, null));
 
     try (Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata)) {
       for (int dictId = 0; dictId < dictionary.length(); dictId++) {

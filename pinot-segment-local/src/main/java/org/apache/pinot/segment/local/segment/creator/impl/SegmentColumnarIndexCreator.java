@@ -34,7 +34,6 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -171,7 +170,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Preconditions.checkState(dictEnabledColumn || !invertedIndexColumns.contains(columnName),
           "Cannot create inverted index for raw index column: %s", columnName);
 
-      IndexCreationContext context = IndexCreationContext.builder()
+      IndexCreationContext.Common context = IndexCreationContext.builder()
           .withIndexDir(_indexDir)
           .withCardinality(columnIndexCreationInfo.getDistinctValueCount())
           .withDictionary(dictEnabledColumn)
@@ -212,16 +211,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
 
       if (textIndexColumns.contains(columnName)) {
-        // Initialize text index creator
-        Preconditions.checkState(fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING,
-            "Text index is currently only supported on STRING type columns");
-        _textIndexCreatorMap.put(columnName,
-            new LuceneTextIndexCreator(columnName, _indexDir, true /* commitOnClose */));
+        _textIndexCreatorMap.put(columnName, _indexCreatorProvider.newTextIndexCreator(context.forTextIndex(true)));
       }
 
       if (fstIndexColumns.contains(columnName)) {
-        _fstIndexCreatorMap.put(columnName, _indexCreatorProvider.newFSTIndexCreator(
-            context.forTextIndex(_config.getFSTIndexType(),
+        _fstIndexCreatorMap.put(columnName, _indexCreatorProvider.newTextIndexCreator(
+            context.forFSTIndex(_config.getFSTIndexType(),
                 (String[]) columnIndexCreationInfo.getSortedUniqueElementsArray())));
       }
 

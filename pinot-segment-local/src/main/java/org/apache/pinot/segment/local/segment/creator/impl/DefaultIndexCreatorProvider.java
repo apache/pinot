@@ -41,6 +41,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial.OnHeap
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OffHeapJsonIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OnHeapJsonIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.text.LuceneFSTIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexCreator;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -124,19 +125,26 @@ public final class DefaultIndexCreatorProvider implements IndexCreatorProvider {
   }
 
   @Override
-  public TextIndexCreator newFSTIndexCreator(IndexCreationContext.Text context)
+  public TextIndexCreator newTextIndexCreator(IndexCreationContext.Text context)
       throws IOException {
-    Preconditions.checkState(context.getFieldSpec().isSingleValueField(),
-        "FST index is currently only supported on single-value columns");
-    Preconditions.checkState(context.getFieldSpec().getDataType().getStoredType() == FieldSpec.DataType.STRING,
-        "FST index is currently only supported on STRING type columns");
-    Preconditions.checkState(context.hasDictionary(),
-        "FST index is currently only supported on dictionary-encoded columns");
-    String[] sortedValues = (String[]) context.getSortedUniqueElementsArray();
-    if (context.getFstType() == FSTType.NATIVE) {
-      return new NativeFSTIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(), sortedValues);
+    if (context.isFst()) {
+      Preconditions.checkState(context.getFieldSpec().isSingleValueField(),
+          "FST index is currently only supported on single-value columns");
+      Preconditions.checkState(context.getFieldSpec().getDataType().getStoredType() == FieldSpec.DataType.STRING,
+          "FST index is currently only supported on STRING type columns");
+      Preconditions.checkState(context.hasDictionary(),
+          "FST index is currently only supported on dictionary-encoded columns");
+      String[] sortedValues = context.getSortedUniqueElementsArray();
+      if (context.getFstType() == FSTType.NATIVE) {
+        return new NativeFSTIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(), sortedValues);
+      } else {
+        return new LuceneFSTIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(), sortedValues);
+      }
     } else {
-      return new LuceneFSTIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(), sortedValues);
+      Preconditions.checkState(context.getFieldSpec().getDataType().getStoredType() == FieldSpec.DataType.STRING,
+          "Text index is currently only supported on STRING type columns");
+      return new LuceneTextIndexCreator(context.getFieldSpec().getName(), context.getIndexDir(),
+          context.isCommitOnClose());
     }
   }
 

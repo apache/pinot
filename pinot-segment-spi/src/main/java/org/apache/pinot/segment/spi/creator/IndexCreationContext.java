@@ -59,21 +59,6 @@ public interface IndexCreationContext {
 
   boolean hasDictionary();
 
-  BloomFilter forBloomFilter(BloomFilterConfig bloomFilterConfig);
-
-  Forward forForwardIndex(ChunkCompressionType chunkCompressionType,
-      @Nullable Map<String, Map<String, String>> columnProperties);
-
-  Geospatial forGeospatialIndex(H3IndexConfig h3IndexConfig);
-
-  Inverted forInvertedIndex();
-
-  Json forJsonIndex();
-
-  Range forRangeIndex(ColumnMetadata columnMetadata, int rangeIndexVersion);
-
-  Text forTextIndex(FSTType fstType, String[] sortedUniqueElementsArray);
-
   final class Builder {
     private File _indexDir;
     private int _lengthOfLongestEntry;
@@ -253,6 +238,10 @@ public interface IndexCreationContext {
       return new Forward(this, chunkCompressionType, columnProperties);
     }
 
+    public Text forFSTIndex(FSTType fstType, String[] sortedUniqueElementsArray) {
+      return new Text(this, fstType, sortedUniqueElementsArray);
+    }
+
     public Geospatial forGeospatialIndex(H3IndexConfig h3IndexConfig) {
       return new Geospatial(this, h3IndexConfig);
     }
@@ -269,8 +258,8 @@ public interface IndexCreationContext {
       return new Range(this, columnMetadata, rangeIndexVersion);
     }
 
-    public Text forTextIndex(FSTType fstType, String[] sortedUniqueElementsArray) {
-      return new Text(this, fstType, sortedUniqueElementsArray);
+    public Text forTextIndex(boolean commitOnClose) {
+      return new Text(this, commitOnClose);
     }
   }
 
@@ -335,42 +324,6 @@ public interface IndexCreationContext {
     @Override
     public boolean hasDictionary() {
       return _delegate.hasDictionary();
-    }
-
-    @Override
-    public BloomFilter forBloomFilter(BloomFilterConfig bloomFilterConfig) {
-      return _delegate.forBloomFilter(bloomFilterConfig);
-    }
-
-    @Override
-    public Forward forForwardIndex(ChunkCompressionType chunkCompressionType,
-        @Nullable Map<String, Map<String, String>> columnProperties) {
-      return _delegate.forForwardIndex(chunkCompressionType, columnProperties);
-    }
-
-    @Override
-    public Geospatial forGeospatialIndex(H3IndexConfig h3IndexConfig) {
-      return _delegate.forGeospatialIndex(h3IndexConfig);
-    }
-
-    @Override
-    public Inverted forInvertedIndex() {
-      return _delegate.forInvertedIndex();
-    }
-
-    @Override
-    public Json forJsonIndex() {
-      return _delegate.forJsonIndex();
-    }
-
-    @Override
-    public Range forRangeIndex(ColumnMetadata columnMetadata, int rangeIndexVersion) {
-      return _delegate.forRangeIndex(columnMetadata, rangeIndexVersion);
-    }
-
-    @Override
-    public Text forTextIndex(FSTType fstType, String[] sortedUniqueElementsArray) {
-      return _delegate.forTextIndex(fstType, sortedUniqueElementsArray);
     }
   }
 
@@ -461,17 +414,37 @@ public interface IndexCreationContext {
   }
 
   class Text extends Wrapper {
+    private final boolean _commitOnClose;
+    private final boolean _isFst;
     private final FSTType _fstType;
     private final String[] _sortedUniqueElementsArray;
 
+    public Text(IndexCreationContext wrapped, boolean commitOnClose) {
+      super(wrapped);
+      _commitOnClose = commitOnClose;
+      _fstType = null;
+      _sortedUniqueElementsArray = null;
+      _isFst = false;
+    }
+
     public Text(IndexCreationContext wrapped, FSTType fstType, String[] sortedUniqueElementsArray) {
       super(wrapped);
+      _commitOnClose = true;
       _fstType = fstType;
       _sortedUniqueElementsArray = sortedUniqueElementsArray;
+      _isFst = true;
+    }
+
+    public boolean isCommitOnClose() {
+      return _commitOnClose;
     }
 
     public FSTType getFstType() {
       return _fstType;
+    }
+
+    public boolean isFst() {
+      return _isFst;
     }
 
     public String[] getSortedUniqueElementsArray() {
