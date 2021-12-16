@@ -7,14 +7,17 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.CombinedFilterBlock;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 
-
+/**
+ * A filter operator consisting of one main predicate block and multiple
+ * sub blocks. The main predicate block and sub blocks are ANDed before
+ * returning.
+ */
 public class CombinedFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "CombinedFilterOperator";
 

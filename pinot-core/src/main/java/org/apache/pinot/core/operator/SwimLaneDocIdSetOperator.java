@@ -15,7 +15,9 @@ import org.apache.pinot.core.operator.filter.CombinedFilterOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.Constants;
 
-
+/**
+ * DocIdSetOperator for a swimlane query plan.
+ */
 public class SwimLaneDocIdSetOperator extends DocIdSetOperator {
   private static final String OPERATOR_NAME = "SwimLaneDocIdSetOperator";
 

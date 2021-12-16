@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -490,6 +489,10 @@ public class QueryContext {
             AggregationFunctionFactory.getAggregationFunction(function, queryContext);
 
         if (pair.getLeft() != null) {
+          if (_groupByExpressions != null) {
+            throw new IllegalStateException("GROUP BY with FILTER clauses is not supported");
+          }
+
           FilterableAggregationFunction filterableAggregationFunction =
               new FilterableAggregationFunction(aggregationFunction, pair.getLeft().getRight(),
                   pair.getLeft().getLeft());
