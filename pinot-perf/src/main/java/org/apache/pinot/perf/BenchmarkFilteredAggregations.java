@@ -77,14 +77,20 @@ public class BenchmarkFilteredAggregations extends BaseQueriesTest {
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
 
-  public String _filteredQuery = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 12345 AND INT_COL < 599999)"
+  public String _filteredQuery = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 123 AND INT_COL < 599999),"
+      + "MAX(INT_COL) FILTER(WHERE INT_COL > 123 AND INT_COL < 599999) "
       + "FROM MyTable WHERE NO_INDEX_INT_COL > 5 AND NO_INDEX_INT_COL < 1499999";
 
   public String _nonFilteredQuery = "SELECT SUM("
       + "CASE "
       + "WHEN (INT_COL > 123 AND INT_COL < 599999) THEN INT_COL "
       + "ELSE 0 "
-      + "END) AS total_sum "
+      + "END) AS total_sum,"
+      + "MAX("
+      + "CASE "
+      + "WHEN (INT_COL > 123 AND INT_COL < 599999) THEN INT_COL "
+      + "ELSE 0 "
+      + "END) AS total_avg "
       + "FROM MyTable WHERE NO_INDEX_INT_COL > 5 AND NO_INDEX_INT_COL < 1499999";
 
   @Setup

@@ -457,6 +457,24 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
         + "FROM MyTable WHERE INT_COL < 28000 AND NO_INDEX_COL > 3000";
 
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
+
+    query = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 123 AND INT_COL < 25000),"
+        + "MAX(INT_COL) FILTER(WHERE INT_COL > 123 AND INT_COL < 25000) "
+        + "FROM MyTable WHERE NO_INDEX_COL > 5 AND NO_INDEX_COL < 29999";
+
+    nonFilterQuery = "SELECT SUM("
+        + "CASE "
+        + "WHEN (INT_COL > 123 AND INT_COL < 25000) THEN INT_COL "
+        + "ELSE 0 "
+        + "END) AS total_sum,"
+        + "MAX("
+        + "CASE "
+        + "WHEN (INT_COL > 123 AND INT_COL < 25000) THEN INT_COL "
+        + "ELSE 0 "
+        + "END) AS total_avg "
+        + "FROM MyTable WHERE NO_INDEX_COL > 5 AND NO_INDEX_COL < 29999";
+
+    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
   }
 
   @Test(expectedExceptions = IllegalStateException.class)
