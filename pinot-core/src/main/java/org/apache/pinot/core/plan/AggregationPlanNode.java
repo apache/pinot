@@ -180,7 +180,7 @@ public class AggregationPlanNode implements PlanNode {
     // fetching the relevant TransformOperator when resolving blocks during aggregation
     // execution
     for (Pair<ExpressionContext, Pair<FilterPlanNode, BaseFilterOperator>> pair
-        : gifilterPredicatesAndMetadata) {
+        : gfilterPredicatesAndMetadata) {
       Pair<TransformOperator,
           BaseOperator<IntermediateResultsBlock>> innerPair =
           buildOperators(combinedFilterOperator, pair.getRight().getLeft(),
