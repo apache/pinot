@@ -65,14 +65,12 @@ public class BitSlicedIndexCreatorTest {
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testFailToCreateRawString() {
-    new BitSlicedRangeIndexCreator(INDEX_DIR, new ColumnMetadataImpl.Builder()
-        .setFieldSpec(new DimensionFieldSpec("foo", STRING, true)).build());
+    new BitSlicedRangeIndexCreator(INDEX_DIR, new DimensionFieldSpec("foo", STRING, true), null, null);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testFailToCreateMV() {
-    new BitSlicedRangeIndexCreator(INDEX_DIR, new ColumnMetadataImpl.Builder()
-        .setFieldSpec(new DimensionFieldSpec("foo", INT, false)).build());
+    new BitSlicedRangeIndexCreator(INDEX_DIR, new DimensionFieldSpec("foo", INT, false), 0, 10);
   }
 
   @Test
@@ -153,7 +151,7 @@ public class BitSlicedIndexCreatorTest {
   private void testInt(Dataset<int[]> dataset)
       throws IOException {
     ColumnMetadata metadata = dataset.toColumnMetadata();
-    try (BitSlicedRangeIndexCreator creator = new BitSlicedRangeIndexCreator(INDEX_DIR, metadata)) {
+    try (BitSlicedRangeIndexCreator creator = newBitslicedIndexCreator(metadata)) {
       for (int value : dataset.values()) {
         creator.add(value);
       }
@@ -181,7 +179,7 @@ public class BitSlicedIndexCreatorTest {
   private void testLong(Dataset<long[]> dataset)
       throws IOException {
     ColumnMetadata metadata = dataset.toColumnMetadata();
-    try (BitSlicedRangeIndexCreator creator = new BitSlicedRangeIndexCreator(INDEX_DIR, metadata)) {
+    try (BitSlicedRangeIndexCreator creator = newBitslicedIndexCreator(metadata)) {
       for (long value : dataset.values()) {
         creator.add(value);
       }
@@ -209,7 +207,7 @@ public class BitSlicedIndexCreatorTest {
   private void testFloat(Dataset<float[]> dataset)
       throws IOException {
     ColumnMetadata metadata = dataset.toColumnMetadata();
-    try (BitSlicedRangeIndexCreator creator = new BitSlicedRangeIndexCreator(INDEX_DIR, metadata)) {
+    try (BitSlicedRangeIndexCreator creator = newBitslicedIndexCreator(metadata)) {
       for (float value : dataset.values()) {
         creator.add(value);
       }
@@ -237,7 +235,7 @@ public class BitSlicedIndexCreatorTest {
   private void testDouble(Dataset<double[]> dataset)
       throws IOException {
     ColumnMetadata metadata = dataset.toColumnMetadata();
-    try (BitSlicedRangeIndexCreator creator = new BitSlicedRangeIndexCreator(INDEX_DIR, metadata)) {
+    try (BitSlicedRangeIndexCreator creator = newBitslicedIndexCreator(metadata)) {
       for (double value : dataset.values()) {
         creator.add(value);
       }
@@ -260,6 +258,12 @@ public class BitSlicedIndexCreatorTest {
     } finally {
       FileUtils.forceDelete(rangeIndexFile);
     }
+  }
+
+  private static BitSlicedRangeIndexCreator newBitslicedIndexCreator(ColumnMetadata metadata) {
+    return metadata.hasDictionary() ? new BitSlicedRangeIndexCreator(INDEX_DIR,
+        metadata.getFieldSpec(), metadata.getCardinality()) : new BitSlicedRangeIndexCreator(INDEX_DIR,
+        metadata.getFieldSpec(), metadata.getMinValue(), metadata.getMaxValue());
   }
 
   enum Distribution {

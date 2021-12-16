@@ -191,14 +191,7 @@ public class BenchmarkRangeIndex {
     public void setup()
         throws IOException {
       super.setup();
-      ColumnMetadata metadata = new ColumnMetadataImpl.Builder()
-          .setFieldSpec(_fieldSpec)
-          .setTotalDocs(_numDocs)
-          .setHasDictionary(false)
-          .setMaxValue(max())
-          .setMinValue(min())
-          .build();
-      _creator = new BitSlicedRangeIndexCreator(_indexDir, metadata);
+      _creator = new BitSlicedRangeIndexCreator(_indexDir, _fieldSpec, min(), max());
     }
   }
 
@@ -328,7 +321,7 @@ public class BenchmarkRangeIndex {
 
     @Override
     protected RawValueBasedInvertedIndexCreator newCreator() {
-      return new BitSlicedRangeIndexCreator(_indexDir, metadata());
+      return new BitSlicedRangeIndexCreator(_indexDir, _fieldSpec, min(), max());
     }
   }
 

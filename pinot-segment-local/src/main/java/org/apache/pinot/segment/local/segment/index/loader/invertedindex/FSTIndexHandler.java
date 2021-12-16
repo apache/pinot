@@ -24,15 +24,15 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.creator.impl.inv.text.LuceneFSTIndexCreator;
 import org.apache.pinot.segment.local.segment.index.loader.IndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
-import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexCreator;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.creator.TextIndexCreatorProvider;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
@@ -71,14 +71,16 @@ public class FSTIndexHandler implements IndexHandler {
   private final SegmentDirectory.Writer _segmentWriter;
   private final Set<String> _columnsToAddIdx;
   private final FSTType _fstType;
+  private final TextIndexCreatorProvider _indexCreatorProvider;
 
   public FSTIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Writer segmentWriter, FSTType fstType) {
+      SegmentDirectory.Writer segmentWriter, FSTType fstType, TextIndexCreatorProvider indexCreatorProvider) {
     _indexDir = indexDir;
     _segmentMetadata = segmentMetadata;
     _segmentWriter = segmentWriter;
     _columnsToAddIdx = new HashSet<>(indexLoadingConfig.getFSTIndexColumns());
     _fstType = fstType;
+    _indexCreatorProvider = indexCreatorProvider;
   }
 
   @Override
@@ -136,12 +138,9 @@ public class FSTIndexHandler implements IndexHandler {
     LOGGER.info("Creating new FST index for column: {} in segment: {}, cardinality: {}", column, segmentName,
         columnMetadata.getCardinality());
 
-    TextIndexCreator fstIndexCreator;
-    if (_fstType == FSTType.LUCENE) {
-      fstIndexCreator = new LuceneFSTIndexCreator(_indexDir, column, null);
-    } else {
-      fstIndexCreator = new NativeFSTIndexCreator(_indexDir, column, null);
-    }
+    TextIndexCreator fstIndexCreator = _indexCreatorProvider.newTextIndexCreator(
+        IndexCreationContext.builder().withIndexDir(_indexDir).withColumnMetadata(columnMetadata)
+            .build().forFSTIndex(_fstType, null));
 
     try (Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata)) {
       for (int dictId = 0; dictId < dictionary.length(); dictId++) {
