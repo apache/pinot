@@ -56,7 +56,7 @@ public class CombinedTransformOperator extends TransformOperator {
   @Override
   protected TransformBlock getNextBlock() {
     Map<ExpressionContext, TransformBlock> expressionContextTransformBlockMap = new HashMap<>();
-    
+
     // Get next block from all underlying transform operators
     for (Map.Entry<ExpressionContext, TransformOperator> entry: _transformOperatorMap.entrySet()) {
       TransformBlock transformBlock = entry.getValue().getNextBlock();

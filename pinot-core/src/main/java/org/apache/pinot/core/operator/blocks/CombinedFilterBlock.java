@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.blocks;
 
 import java.util.Map;
+import java.util.Objects;
 import org.apache.pinot.common.request.context.ExpressionContext;
 
 
@@ -38,10 +39,6 @@ public class CombinedFilterBlock extends FilterBlock {
   }
 
   public FilterBlock getFilterBlock(ExpressionContext expressionContext) {
-    if (expressionContext == null) {
-      throw new IllegalStateException("ExpressionContext is null");
-    }
-
-    return _filterBlockMap.get(expressionContext);
+    return _filterBlockMap.get(Objects.requireNonNull(expressionContext, "ExpressionContext is null"));
   }
 }

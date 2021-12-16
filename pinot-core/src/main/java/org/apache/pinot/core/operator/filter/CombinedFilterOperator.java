@@ -74,17 +74,12 @@ public class CombinedFilterOperator extends BaseFilterOperator {
     FilterBlock mainFilterBlock = _mainFilterOperator.nextBlock();
 
     Map<ExpressionContext, FilterBlock> filterBlockMap = new HashMap<>();
-    Iterator<Map.Entry<ExpressionContext, BaseFilterOperator>> iterator = _filterOperators.entrySet().iterator();
-
-    while (iterator.hasNext()) {
-      Map.Entry<ExpressionContext, BaseFilterOperator> entry = iterator.next();
+    for (Map.Entry<ExpressionContext, BaseFilterOperator> entry : _filterOperators.entrySet()) {
       FilterBlock subFilterBlock = entry.getValue().nextBlock();
-
       filterBlockMap.put(entry.getKey(),
           new FilterBlock(new AndDocIdSet(Arrays.asList(subFilterBlock.getBlockDocIdSet(),
-          mainFilterBlock.getBlockDocIdSet()))));
+              mainFilterBlock.getBlockDocIdSet()))));
     }
-
     _resultBlock = new CombinedFilterBlock(filterBlockMap, mainFilterBlock);
 
     return _resultBlock;
