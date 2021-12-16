@@ -325,7 +325,7 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testFoo() {
+  public void testCaseVsFilter() {
     String query = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 3),"
         + "SUM(INT_COL) FILTER(WHERE INT_COL < 4)"
         + "FROM MyTable WHERE INT_COL > 2";
@@ -464,11 +464,11 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     String query =
         "SELECT MIN(NO_INDEX_COL) FILTER(WHERE INT_COL > 2),"
             + "MAX(INT_COL) FILTER(WHERE INT_COL > 2)"
-            + "FROM MyTable";
+            + "FROM MyTable WHERE INT_COL < 1000";
 
     String nonFilterQuery =
         "SELECT MIN(NO_INDEX_COL), MAX(INT_COL) FROM MyTable "
-            + "WHERE INT_COL > 2";
+            + "WHERE INT_COL < 1000";
 
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
   }

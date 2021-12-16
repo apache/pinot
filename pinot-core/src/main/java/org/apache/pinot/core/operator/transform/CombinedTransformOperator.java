@@ -42,29 +42,25 @@ public class CombinedTransformOperator extends TransformOperator {
   private static final String OPERATOR_NAME = "CombinedTransformOperator";
 
   protected final Map<ExpressionContext, TransformOperator> _transformOperatorMap;
-  protected final TransformOperator _mainPredicateTransformOperator;
-  protected final BaseFilterOperator _mainPredicateFilterOperator;
+  protected final ExpressionContext _mainPredicateExpression;
 
   /**
    * Constructor for the class
    */
   public CombinedTransformOperator(Map<ExpressionContext, TransformOperator> transformOperatorMap,
-      TransformOperator mainPredicateTransformOperator, BaseFilterOperator filterOperator,
+      ExpressionContext mainPredicateExpression,
       Collection<ExpressionContext> expressions) {
     super(null, transformOperatorMap.entrySet().iterator().next().getValue()._projectionOperator,
         expressions);
 
-    _mainPredicateTransformOperator = mainPredicateTransformOperator;
-    _mainPredicateFilterOperator = filterOperator;
+    _mainPredicateExpression = mainPredicateExpression;
     _transformOperatorMap = transformOperatorMap;
   }
 
   @Override
   protected TransformBlock getNextBlock() {
     Map<ExpressionContext, TransformBlock> expressionContextTransformBlockMap = new HashMap<>();
-    boolean hasTransformBlock = false;
-    boolean isMatchAll = _mainPredicateFilterOperator instanceof MatchAllFilterOperator;
-    TransformBlock nonFilteredAggTransformBlock = _mainPredicateTransformOperator.getNextBlock();
+    boolean hasBlock = false;
 
     Iterator<Map.Entry<ExpressionContext, TransformOperator>> iterator = _transformOperatorMap.entrySet().iterator();
     // Get next block from all underlying transform operators
@@ -74,19 +70,19 @@ public class CombinedTransformOperator extends TransformOperator {
       TransformBlock transformBlock = entry.getValue().getNextBlock();
 
       if (transformBlock != null) {
-        hasTransformBlock = true;
+        hasBlock = true;
       }
 
       expressionContextTransformBlockMap.put(entry.getKey(), transformBlock);
     }
 
-
-    if (!hasTransformBlock && nonFilteredAggTransformBlock == null) {
+    if (!hasBlock) {
       return null;
     }
 
-    return new CombinedTransformBlock(expressionContextTransformBlockMap,
-        nonFilteredAggTransformBlock);
+    return new
+        CombinedTransformBlock(expressionContextTransformBlockMap,
+        _mainPredicateExpression);
   }
 
   @Override

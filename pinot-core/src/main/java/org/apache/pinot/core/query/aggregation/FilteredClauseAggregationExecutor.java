@@ -52,7 +52,6 @@ public class FilteredClauseAggregationExecutor implements AggregationExecutor {
     CombinedTransformBlock combinedTransformBlock = (CombinedTransformBlock) transformBlock;
     Map<ExpressionContext, TransformBlock> transformBlockMap = combinedTransformBlock.getTransformBlockMap();
     int numAggregations = _aggregationFunctions.length;
-    int transformListOffset = 0;
 
     for (int i = 0; i < numAggregations; i++) {
       AggregationFunction aggregationFunction = _aggregationFunctions[i];

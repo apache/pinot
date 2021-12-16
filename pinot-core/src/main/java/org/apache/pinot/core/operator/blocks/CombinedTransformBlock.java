@@ -31,15 +31,17 @@ import org.apache.pinot.core.common.BlockValSet;
  */
 public class CombinedTransformBlock extends TransformBlock {
   protected Map<ExpressionContext, TransformBlock> _transformBlockMap;
-  protected TransformBlock _nonFilteredAggBlock;
+  protected ExpressionContext _mainPredicateExpressionContext;
 
   public CombinedTransformBlock(Map<ExpressionContext, TransformBlock> transformBlockMap,
-      TransformBlock nonFilteredAggBlock) {
-    super(nonFilteredAggBlock == null ? null : nonFilteredAggBlock._projectionBlock,
-        nonFilteredAggBlock == null ? null : nonFilteredAggBlock._transformFunctionMap);
+      ExpressionContext mainPredicateExpressionContext) {
+    super(transformBlockMap.get(mainPredicateExpressionContext) == null ? null
+            : transformBlockMap.get(mainPredicateExpressionContext)._projectionBlock,
+        transformBlockMap.get(mainPredicateExpressionContext) == null ? null
+            : transformBlockMap.get(mainPredicateExpressionContext)._transformFunctionMap);
 
     _transformBlockMap = transformBlockMap;
-    _nonFilteredAggBlock = nonFilteredAggBlock;
+    _mainPredicateExpressionContext = mainPredicateExpressionContext;
   }
 
   public int getNumDocs() {
@@ -56,10 +58,6 @@ public class CombinedTransformBlock extends TransformBlock {
       }
     }
 
-    if (_nonFilteredAggBlock != null) {
-      numDocs = numDocs + _nonFilteredAggBlock.getNumDocs();
-    }
-
     return numDocs;
   }
 
@@ -68,7 +66,7 @@ public class CombinedTransformBlock extends TransformBlock {
   }
 
   public TransformBlock getNonFilteredAggBlock() {
-    return _nonFilteredAggBlock;
+    return _transformBlockMap.get(_mainPredicateExpressionContext);
   }
 
   @Override

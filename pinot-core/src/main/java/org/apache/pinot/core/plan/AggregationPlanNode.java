@@ -144,7 +144,7 @@ public class AggregationPlanNode implements PlanNode {
       BaseFilterOperator filterOperator,
       Set<ExpressionContext> expressionsToTransform,
       AggregationFunction[] aggregationFunctions) {
-    Map<ExpressionContext, TransformOperator> transformOperatorList = new HashMap<>();
+    Map<ExpressionContext, TransformOperator> transformOperatorMap = new HashMap<>();
     Map<ExpressionContext, BaseFilterOperator> baseFilterOperatorMap =
         new HashMap<>();
     List<Pair<ExpressionContext, Pair<FilterPlanNode, BaseFilterOperator>>> filterPredicatesAndMetadata =
@@ -174,11 +174,13 @@ public class AggregationPlanNode implements PlanNode {
           buildOperators(combinedFilterOperator, pair.getRight().getLeft(),
               true, pair.getLeft());
 
-      transformOperatorList.put(pair.getLeft(), innerPair.getLeft());
+      transformOperatorMap.put(pair.getLeft(), innerPair.getLeft());
     }
 
-    return new CombinedTransformOperator(transformOperatorList, nonFilteredTransformOperator,
-        filterOperator, expressionsToTransform);
+    transformOperatorMap.put(_queryContext.getFilterExpression(), nonFilteredTransformOperator);
+
+    return new CombinedTransformOperator(transformOperatorMap, _queryContext.getFilterExpression(),
+        expressionsToTransform);
   }
 
   private Pair<FilterPlanNode, BaseFilterOperator> buildFilterOperator(FilterContext filterContext) {

@@ -6,7 +6,6 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 
 public class CombinedFilterBlock extends FilterBlock {
   private final Map<ExpressionContext,  FilterBlock> _filterBlockMap;
-  private final FilterBlock _mainFilterBlock;
 
   public CombinedFilterBlock(Map<ExpressionContext, FilterBlock> filterBlockMap,
       FilterBlock mainFilterBlock) {
@@ -15,7 +14,6 @@ public class CombinedFilterBlock extends FilterBlock {
     super(mainFilterBlock.getBlockDocIdSet());
 
     _filterBlockMap = filterBlockMap;
-    _mainFilterBlock = mainFilterBlock;
   }
 
   public FilterBlock getFilterBlock(ExpressionContext expressionContext) {
@@ -24,9 +22,5 @@ public class CombinedFilterBlock extends FilterBlock {
     }
 
     return _filterBlockMap.get(expressionContext);
-  }
-
-  public FilterBlock getMainFilterBlock() {
-    return _mainFilterBlock;
   }
 }

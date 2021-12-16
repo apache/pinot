@@ -102,9 +102,11 @@ public class BrokerRequestToQueryContextConverter {
 
     // WHERE
     FilterContext filter = null;
+    ExpressionContext filterExpressionContext = null;
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
       filter = RequestContextUtils.getFilter(pinotQuery.getFilterExpression());
+      filterExpressionContext = RequestContextUtils.getExpression(filterExpression);
     }
 
     // GROUP BY
@@ -144,6 +146,7 @@ public class BrokerRequestToQueryContextConverter {
 
     return new QueryContext.Builder().setTableName(pinotQuery.getDataSource().getTableName())
         .setSelectExpressions(selectExpressions).setAliasList(aliasList).setFilter(filter)
+        .setFilterExpression(filterExpressionContext)
         .setGroupByExpressions(groupByExpressions).setOrderByExpressions(orderByExpressions)
         .setHavingFilter(havingFilter).setLimit(pinotQuery.getLimit()).setOffset(pinotQuery.getOffset())
         .setQueryOptions(pinotQuery.getQueryOptions()).setDebugOptions(pinotQuery.getDebugOptions())
