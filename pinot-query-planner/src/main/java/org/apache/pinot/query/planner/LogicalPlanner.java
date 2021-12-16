@@ -1,4 +1,4 @@
-package org.apache.pinot.query.logical;
+package org.apache.pinot.query.planner;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -9,11 +9,11 @@ import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgram;
 
 
-public class QueryPlanner extends HepPlanner {
+public class LogicalPlanner extends HepPlanner {
 
   private List<RelTraitDef> traitDefs;
 
-  public QueryPlanner(HepProgram program, Context context) {
+  public LogicalPlanner(HepProgram program, Context context) {
     super(program, context);
     this.traitDefs = new ArrayList();
   }

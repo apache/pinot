@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.query.parser;
 
-import org.apache.pinot.query.planner.QueryContext;
+import org.apache.pinot.query.context.PlannerContext;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -45,7 +45,7 @@ public class CalciteSqlParser {
   /**
    * entrypoint for Sql Parser.
    */
-  public static SqlNode compile(String sql, QueryContext plannerContext)
+  public static SqlNode compile(String sql, PlannerContext plannerContext)
       throws SqlCompilationException {
     // Extract OPTION statements from sql as Calcite Parser doesn't parse it.
     // TODO: use parser syntax extension instead.

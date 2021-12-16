@@ -1,16 +1,15 @@
 package org.apache.pinot.query;
 
-import com.google.common.collect.ImmutableList;
 import java.util.Collection;
 import java.util.Collections;
-import org.apache.calcite.adapter.enumerable.EnumerableConvention;
+import java.util.List;
+import java.util.Map;
 import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.plan.Contexts;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptUtil;
-import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.prepare.PlannerImpl;
@@ -28,11 +27,10 @@ import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.pinot.query.context.PlannerContext;
-import org.apache.pinot.query.logical.QueryPlanner;
+import org.apache.pinot.query.planner.LogicalPlanner;
 import org.apache.pinot.query.parser.CalciteSqlParser;
-import org.apache.pinot.query.physical.StagePlanner;
-import org.apache.pinot.query.planner.QueryContext;
-import org.apache.pinot.query.planner.QueryPlan;
+import org.apache.pinot.query.planner.StagePlanner;
+import org.apache.pinot.query.planner.nodes.StageNode;
 import org.apache.pinot.query.rules.PinotQueryRuleSets;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.Validator;
@@ -71,17 +69,17 @@ public class QueryEnvironment {
     for (RelOptRule relOptRule : _logicalRuleSet) {
       hepProgramBuilder.addRuleInstance(relOptRule);
     }
-    _relOptPlanner = new QueryPlanner(hepProgramBuilder.build(), Contexts.EMPTY_CONTEXT);
+    _relOptPlanner = new LogicalPlanner(hepProgramBuilder.build(), Contexts.EMPTY_CONTEXT);
   }
 
-  public QueryPlan sqlQuery(String sqlQuery) {
-    QueryContext queryContext = new PlannerContext();
+  public Map<String, StageNode> sqlQuery(String sqlQuery) {
+    PlannerContext PlannerContext = new PlannerContext();
     try {
-      SqlNode parsed = this.parse(sqlQuery, queryContext);
+      SqlNode parsed = this.parse(sqlQuery, PlannerContext);
       SqlNode validated = this.validate(parsed);
-      RelRoot relation = this.toRelation(validated, queryContext);
-      RelNode optimized = this.optimize(relation, queryContext);
-      return this.toQuery(optimized, queryContext);
+      RelRoot relation = this.toRelation(validated, PlannerContext);
+      RelNode optimized = this.optimize(relation, PlannerContext);
+      return this.toQuery(optimized, PlannerContext);
     } catch (Exception e) {
       throw new RuntimeException("Error composing query plan", e);
     }
@@ -91,9 +89,9 @@ public class QueryEnvironment {
   // steps
   // --------------------------------------------------------------------------
 
-  protected SqlNode parse(String query, QueryContext queryContext) throws Exception {
+  protected SqlNode parse(String query, PlannerContext PlannerContext) throws Exception {
     // 1. invoke CalciteSqlParser to parse out SqlNode;
-    SqlNode compiled = CalciteSqlParser.compile(query, queryContext);
+    SqlNode compiled = CalciteSqlParser.compile(query, PlannerContext);
     // 2. TODO: add query rewrite logic
     return compiled;
   }
@@ -108,7 +106,7 @@ public class QueryEnvironment {
     return validated;
   }
 
-  protected RelRoot toRelation(SqlNode parsed, QueryContext queryContext) {
+  protected RelRoot toRelation(SqlNode parsed, PlannerContext PlannerContext) {
     RexBuilder rexBuilder = createRexBuilder();
     RelOptCluster cluster = createRelOptCluster(_relOptPlanner, rexBuilder);
     SqlToRelConverter sqlToRelConverter =
@@ -117,7 +115,7 @@ public class QueryEnvironment {
     return sqlToRelConverter.convertQuery(parsed, false, true);
   }
 
-  protected RelNode optimize(RelRoot relRoot, QueryContext queryContext) {
+  protected RelNode optimize(RelRoot relRoot, PlannerContext PlannerContext) {
 //    RelTraitSet traitSet = relRoot.rel.getCluster().traitSet().replace(EnumerableConvention.INSTANCE).simplify();
     try {
       _relOptPlanner.setRoot(relRoot.rel);
@@ -127,8 +125,8 @@ public class QueryEnvironment {
     }
   }
 
-  protected QueryPlan toQuery(RelNode relRoot, QueryContext queryContext) {
-    StagePlanner queryStagePlanner = new StagePlanner(queryContext);
+  protected Map<String, StageNode> toQuery(RelNode relRoot, PlannerContext PlannerContext) {
+    StagePlanner queryStagePlanner = new StagePlanner(PlannerContext);
     return queryStagePlanner.makePlan(relRoot);
   }
 
