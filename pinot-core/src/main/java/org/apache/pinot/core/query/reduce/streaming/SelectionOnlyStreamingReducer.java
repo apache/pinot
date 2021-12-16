@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce;
+package org.apache.pinot.core.query.reduce.streaming;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -27,6 +27,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.query.reduce.DataTableReducerContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
@@ -35,8 +36,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class StreamingSelectionOnlyReducer implements StreamingReducer {
-  private static final Logger LOGGER = LoggerFactory.getLogger(StreamingSelectionOnlyReducer.class);
+public class SelectionOnlyStreamingReducer implements StreamingReducer {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SelectionOnlyStreamingReducer.class);
 
   private final QueryContext _queryContext;
   private final boolean _preserveType;
@@ -46,7 +47,7 @@ public class StreamingSelectionOnlyReducer implements StreamingReducer {
   private DataTableReducerContext _dataTableReducerContext;
   private List<Object[]> _rows;
 
-  public StreamingSelectionOnlyReducer(QueryContext queryContext) {
+  public SelectionOnlyStreamingReducer(QueryContext queryContext) {
     _queryContext = queryContext;
     _limit = _queryContext.getLimit();
     Map<String, String> queryOptions = queryContext.getQueryOptions();

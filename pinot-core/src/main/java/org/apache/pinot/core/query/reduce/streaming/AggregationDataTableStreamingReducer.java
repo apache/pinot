@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce;
+package org.apache.pinot.core.query.reduce.streaming;
 
 import com.google.common.base.Preconditions;
 import java.io.Serializable;
@@ -32,6 +32,8 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.reduce.DataTableReducerContext;
+import org.apache.pinot.core.query.reduce.PostAggregationHandler;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.QueryOptionsUtils;
@@ -41,7 +43,7 @@ import org.apache.pinot.core.util.QueryOptionsUtils;
  * Helper class to reduce and set Aggregation results into the BrokerResponseNative
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class StreamingAggregationDataTableReducer implements StreamingReducer {
+public class AggregationDataTableStreamingReducer implements StreamingReducer {
   private final QueryContext _queryContext;
   private final AggregationFunction[] _aggregationFunctions;
   private final boolean _preserveType;
@@ -51,7 +53,7 @@ public class StreamingAggregationDataTableReducer implements StreamingReducer {
   private DataSchema _dataSchema;
   private DataTableReducerContext _dataTableReducerContext;
 
-  StreamingAggregationDataTableReducer(QueryContext queryContext) {
+  public AggregationDataTableStreamingReducer(QueryContext queryContext) {
     _queryContext = queryContext;
     _aggregationFunctions = queryContext.getAggregationFunctions();
     Map<String, String> queryOptions = queryContext.getQueryOptions();
@@ -74,7 +76,7 @@ public class StreamingAggregationDataTableReducer implements StreamingReducer {
    * 2. AggregationResults by default
    */
   @Override
-  public void reduce(ServerRoutingInstance key, DataTable dataTable) {
+  public synchronized void reduce(ServerRoutingInstance key, DataTable dataTable) {
     _dataSchema = _dataSchema == null ? dataTable.getDataSchema() : _dataSchema;
     // Merge results from all data tables
 

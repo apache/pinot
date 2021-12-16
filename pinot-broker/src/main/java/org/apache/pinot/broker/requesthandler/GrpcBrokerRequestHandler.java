@@ -36,7 +36,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
 import org.apache.pinot.common.utils.grpc.GrpcRequestBuilder;
 import org.apache.pinot.common.utils.helix.TableCache;
-import org.apache.pinot.core.query.reduce.StreamingReduceService;
+import org.apache.pinot.core.query.reduce.streaming.StreamingReduceService;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.transport.TlsConfig;

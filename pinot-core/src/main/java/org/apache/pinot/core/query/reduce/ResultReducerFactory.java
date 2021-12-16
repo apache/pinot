@@ -21,6 +21,11 @@ package org.apache.pinot.core.query.reduce;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
+import org.apache.pinot.core.query.reduce.streaming.SelectionOnlyStreamingReducer;
+import org.apache.pinot.core.query.reduce.streaming.AggregationDataTableStreamingReducer;
+import org.apache.pinot.core.query.reduce.streaming.DistinctDataTableStreamingReducer;
+import org.apache.pinot.core.query.reduce.streaming.GroupByDataTableStreamingReducer;
+import org.apache.pinot.core.query.reduce.streaming.StreamingReducer;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -73,23 +78,23 @@ public final class ResultReducerFactory {
         throw new UnsupportedOperationException("Only selection queries are supported");
       }
       // Simple election query
-      return new StreamingSelectionOnlyReducer(queryContext);
+      return new SelectionOnlyStreamingReducer(queryContext);
     } else {
       // Aggregation query
       if (queryContext.getGroupByExpressions() == null) {
         // Aggregation only query
         if (aggregationFunctions.length == 1 && aggregationFunctions[0].getType() == AggregationFunctionType.DISTINCT) {
           // Distinct query
-          return new StreamingDistinctDataTableReducer(queryContext,
+          return new DistinctDataTableStreamingReducer(queryContext,
               (DistinctAggregationFunction) aggregationFunctions[0]);
         } else {
-          return new StreamingAggregationDataTableReducer(queryContext);
+          return new AggregationDataTableStreamingReducer(queryContext);
         }
       } else if (GapfillUtils.isPostAggregateGapfill(queryContext)) {
         throw new UnsupportedOperationException("unsupported!");
       } else {
         // Aggregation group-by query
-        return new StreamingGroupByDataTableReducer(queryContext);
+        return new GroupByDataTableStreamingReducer(queryContext);
       }
     }
   }

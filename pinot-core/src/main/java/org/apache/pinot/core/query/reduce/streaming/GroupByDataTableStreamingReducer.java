@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce;
+package org.apache.pinot.core.query.reduce.streaming;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -34,6 +34,9 @@ import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.reduce.DataTableReducerContext;
+import org.apache.pinot.core.query.reduce.HavingFilterHandler;
+import org.apache.pinot.core.query.reduce.PostAggregationHandler;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
@@ -44,7 +47,7 @@ import org.apache.pinot.core.util.QueryOptionsUtils;
  * Helper class to reduce data tables and set group by results into the BrokerResponseNative
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class StreamingGroupByDataTableReducer implements StreamingReducer {
+public class GroupByDataTableStreamingReducer implements StreamingReducer {
   private static final int MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE = 2; // TBD, find a better value.
 
   private final QueryContext _queryContext;
@@ -60,7 +63,7 @@ public class StreamingGroupByDataTableReducer implements StreamingReducer {
   private DataTableReducerContext _reducerContext;
   private IndexedTable _indexedTable;
 
-  StreamingGroupByDataTableReducer(QueryContext queryContext) {
+  public GroupByDataTableStreamingReducer(QueryContext queryContext) {
     _queryContext = queryContext;
     _aggregationFunctions = queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
@@ -84,7 +87,7 @@ public class StreamingGroupByDataTableReducer implements StreamingReducer {
    * By default, sets group by results into GroupByResults
    */
   @Override
-  public void reduce(ServerRoutingInstance key, DataTable dataTable) {
+  public synchronized void reduce(ServerRoutingInstance key, DataTable dataTable) {
     _dataSchema = _dataSchema == null ? dataTable.getDataSchema() : _dataSchema;
     try {
       appendIndexedTable(_dataSchema, dataTable, _reducerContext);

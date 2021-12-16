@@ -144,11 +144,11 @@ public abstract class BaseReduceService {
     private long _realtimeTotalCpuTimeNs = 0L;
     private boolean _numGroupsLimitReached = false;
 
-    protected ExecutionStatsAggregator(boolean enableTrace) {
+    public ExecutionStatsAggregator(boolean enableTrace) {
       _enableTrace = enableTrace;
     }
 
-    protected synchronized void aggregate(ServerRoutingInstance routingInstance, DataTable dataTable) {
+    public synchronized void aggregate(ServerRoutingInstance routingInstance, DataTable dataTable) {
       Map<String, String> metadata = dataTable.getMetadata();
       // Reduce on trace info.
       if (_enableTrace) {
@@ -237,7 +237,7 @@ public abstract class BaseReduceService {
       _numGroupsLimitReached |= Boolean.parseBoolean(metadata.get(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName()));
     }
 
-    protected void setStats(String rawTableName, BrokerResponseNative brokerResponseNative,
+    public void setStats(String rawTableName, BrokerResponseNative brokerResponseNative,
         BrokerMetrics brokerMetrics) {
       // set exception
       List<QueryProcessingException> processingExceptions = brokerResponseNative.getProcessingExceptions();

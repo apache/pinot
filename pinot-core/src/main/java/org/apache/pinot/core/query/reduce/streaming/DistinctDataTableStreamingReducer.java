@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce;
+package org.apache.pinot.core.query.reduce.streaming;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -29,6 +29,7 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
+import org.apache.pinot.core.query.reduce.DataTableReducerContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 
@@ -36,13 +37,13 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 /**
  * Helper class to reduce data tables and set results of distinct query into the BrokerResponseNative
  */
-public class StreamingDistinctDataTableReducer implements StreamingReducer {
+public class DistinctDataTableStreamingReducer implements StreamingReducer {
   private final DistinctAggregationFunction _distinctAggregationFunction;
 
   private DistinctTable _mainDistinctTable;
 
     // TODO: queryOptions.isPreserveType() is ignored for DISTINCT queries.
-  StreamingDistinctDataTableReducer(QueryContext queryContext,
+  public DistinctDataTableStreamingReducer(QueryContext queryContext,
       DistinctAggregationFunction distinctAggregationFunction) {
     _distinctAggregationFunction = distinctAggregationFunction;
   }
@@ -58,7 +59,7 @@ public class StreamingDistinctDataTableReducer implements StreamingReducer {
    * 2. SelectionResults by default
    */
   @Override
-  public void reduce(ServerRoutingInstance key, DataTable dataTable) {
+  public synchronized void reduce(ServerRoutingInstance key, DataTable dataTable) {
     // DISTINCT is implemented as an aggregation function in the execution engine. Just like
     // other aggregation functions, DISTINCT returns its result as a single object
     // (of type DistinctTable) serialized by the server into the DataTable and deserialized
