@@ -172,6 +172,7 @@ abstract class BaseStarTreeV2Test<R, A> {
       throws IOException {
     AggregationFunctionType aggregationType = _valueAggregator.getAggregationType();
     String aggregation;
+    String filteredAggregation = null;
     if (aggregationType == AggregationFunctionType.COUNT) {
       aggregation = "COUNT(*)";
     } else if (aggregationType == AggregationFunctionType.PERCENTILEEST
@@ -182,18 +183,23 @@ abstract class BaseStarTreeV2Test<R, A> {
       aggregation = String.format("%s(%s)", aggregationType.getName(), METRIC);
     }
 
+    String baseQuery = String.format("SELECT %s FROM %s", aggregation, TABLE_NAME);
+    String filteredQuery;
+
     if (runFilteredAggregate) {
-      aggregation = aggregation + FILTER_AGG_CLAUSE;
+      filteredAggregation = aggregation + FILTER_AGG_CLAUSE;
+      filteredQuery = String.format("SELECT %s FROM %s", filteredAggregation, TABLE_NAME);
+    } else {
+      filteredQuery = baseQuery;
     }
 
-    String baseQuery = String.format("SELECT %s FROM %s", aggregation, TABLE_NAME);
-    testQuery(baseQuery);
-    testQuery(baseQuery + QUERY_FILTER_AND);
-    testQuery(baseQuery + QUERY_FILTER_OR);
-    testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS);
-    testQuery(baseQuery + QUERY_FILTER_COMPLEX_AND_MULTIPLE_DIMENSIONS_THREE_PREDICATES);
-    testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS_THREE_PREDICATES);
-    testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR_SINGLE_DIMENSION);
+    testQuery(filteredQuery);
+    testQuery(filteredQuery + QUERY_FILTER_AND);
+    testQuery(filteredQuery + QUERY_FILTER_OR);
+    testQuery(filteredQuery + QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS);
+    testQuery(filteredQuery + QUERY_FILTER_COMPLEX_AND_MULTIPLE_DIMENSIONS_THREE_PREDICATES);
+    testQuery(filteredQuery + QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS_THREE_PREDICATES);
+    testQuery(filteredQuery + QUERY_FILTER_COMPLEX_OR_SINGLE_DIMENSION);
     testQuery(baseQuery + QUERY_GROUP_BY);
     testQuery(baseQuery + QUERY_FILTER_AND + QUERY_GROUP_BY);
     testQuery(baseQuery + QUERY_FILTER_OR + QUERY_GROUP_BY);

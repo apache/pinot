@@ -47,17 +47,10 @@ public class CombinedTransformBlock extends TransformBlock {
   public int getNumDocs() {
     int numDocs = 0;
 
-    Iterator<Map.Entry<ExpressionContext, TransformBlock>> iterator = _transformBlockMap.entrySet().iterator();
-
-    while (iterator.hasNext()) {
-      Map.Entry<ExpressionContext, TransformBlock> entry = iterator.next();
-      TransformBlock transformBlock = entry.getValue();
-
-      if (transformBlock != null) {
-        numDocs = numDocs + transformBlock._projectionBlock.getNumDocs();
-      }
+    for (TransformBlock transformBlock : _transformBlockMap.values()) {
+      // null check can be avoided by not putting null values in the map
+      numDocs += transformBlock._projectionBlock.getNumDocs();
     }
-
     return numDocs;
   }
 
