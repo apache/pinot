@@ -64,7 +64,8 @@ public class CombinedTransformOperator extends TransformOperator {
       }
     }
 
-    return expressionContextTransformBlockMap.isEmpty() ? null : new CombinedTransformBlock(expressionContextTransformBlockMap, _mainPredicateExpression);
+    return expressionContextTransformBlockMap.isEmpty() ? null :
+        new CombinedTransformBlock(expressionContextTransformBlockMap, _mainPredicateExpression);
   }
 
   @Override
