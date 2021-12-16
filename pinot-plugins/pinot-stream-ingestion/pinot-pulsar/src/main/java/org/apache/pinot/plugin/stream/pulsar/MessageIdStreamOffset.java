@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pulsar.client.api.MessageId;
+import org.apache.pulsar.client.impl.BatchMessageIdImpl;
+import org.apache.pulsar.client.impl.MessageIdImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,11 +44,21 @@ public class MessageIdStreamOffset implements StreamPartitionMsgOffset {
    * throws {@link IOException} if message if format is invalid.
    * @param messageId
    */
-  public MessageIdStreamOffset(String messageId) {
-    try {
-      _messageId = MessageId.fromByteArray(messageId.getBytes(StandardCharsets.UTF_8));
-    } catch (IOException e) {
-      LOGGER.warn("Cannot parse message id " + messageId, e);
+  public MessageIdStreamOffset(String messageIdStringRepresentation) {
+    String messageParts = messageIdStringRepresentation.split(":");
+    if (messageParts.length == 3) {
+      Long ledgerId = Long.parseLong(messageIdParts[0];
+      Long entryId = Long.parseLong(messageIdParts[1];
+      int partitionId = Integer.parseInt(messageIdParts[2]);
+      _messageId = new MessageIdImpl(ledgerId, entryId, partitionId);
+    } else if (messageParts.length == 4) {
+      Long ledgerId = Long.parseLong(messageIdParts[0];
+      Long entryId = Long.parseLong(messageIdParts[1];
+      int partitionId = Integer.parseInt(messageIdParts[2]);
+      int batchId = Integer.parseInt(messageIdParts[3]);
+      _messageId = new BatchMessageIdImpl(ledgerId, entryId, partitionId, batchId);
+    } else {
+      LOOGER.error("Illegal Pulsar MessageId={}", messageIdStringRepresentation);
     }
   }
 
