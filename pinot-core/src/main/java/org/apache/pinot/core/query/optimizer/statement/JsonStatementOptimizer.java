@@ -48,6 +48,9 @@ import org.apache.pinot.spi.utils.Pair;
 
 
 /**
+ * NOTE: This class is not in an active code path, but exists to allow us to experiment and gain better understanding
+ * of identifier dot notation usage in SQL.
+ *
  * This class will rewrite a query that has json path expressions into a query that uses JSON_EXTRACT_SCALAR and
  * JSON_MATCH functions.
  *

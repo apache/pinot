@@ -96,7 +96,8 @@ public class JsonExtractScalarTest extends BaseJsonQueryTest {
         + ", '$.name', 'STRING'), '$.last', 'STRING') FROM testTable LIMIT 3", expecteds1);
   }
 
-  @Test(dataProvider = "nativeJsonColumns")
+  /* NOTE: This test cases is inactive since {@link JsonStatementOptimizer} is currently disabled. */
+  @Test(dataProvider = "nativeJsonColumns", enabled = false)
   public void testJsonSelect(String column) {
     // SELECT using a simple json path expression.
     Object[][] expecteds1 = {{"duck"}, {"mouse"}, {"duck"}};
@@ -107,8 +108,9 @@ public class JsonExtractScalarTest extends BaseJsonQueryTest {
     checkResult("SELECT " + column + ".data[0].e[2].z[0].i1 FROM testTable", expecteds2);
   }
 
+  /* NOTE: This test cases is inactive since {@link JsonStatementOptimizer} is currently disabled. */
   /** Test that a json path expression in GROUP BY clause is properly converted into a JSON_EXTRACT_SCALAR function. */
-  @Test(dataProvider = "nativeJsonColumns")
+  @Test(dataProvider = "nativeJsonColumns", enabled = false)
   public void testJsonGroupBy(String column) {
     Object[][] expecteds1 =
         {
@@ -118,8 +120,9 @@ public class JsonExtractScalarTest extends BaseJsonQueryTest {
     checkResult("SELECT " + column + ".id, count(*) FROM testTable GROUP BY " + column + ".id", expecteds1);
   }
 
+  /* NOTE: This test cases is inactive since {@link JsonStatementOptimizer} is currently disabled. */
   /** Test that a json path expression in HAVING clause is properly converted into a JSON_EXTRACT_SCALAR function. */
-  @Test(dataProvider = "nativeJsonColumns")
+  @Test(dataProvider = "nativeJsonColumns", enabled = false)
   public void testJsonGroupByHaving(String column) {
     Object[][] expecteds1 = {{"mouse", 8L}};
     checkResult(
@@ -128,8 +131,9 @@ public class JsonExtractScalarTest extends BaseJsonQueryTest {
             + ".last = 'mouse'", expecteds1);
   }
 
+  /* NOTE: This test cases is inactive since {@link JsonStatementOptimizer} is currently disabled. */
   /** Test a complex SQL statement with json path expression in SELECT, WHERE, and GROUP BY clauses. */
-  @Test(dataProvider = "nativeJsonColumns")
+  @Test(dataProvider = "nativeJsonColumns", enabled = false)
   public void testJsonSelectFilterGroupBy(String column) {
     Object[][] expecteds1 = {{"duck", 4L}};
     checkResult(
@@ -138,8 +142,9 @@ public class JsonExtractScalarTest extends BaseJsonQueryTest {
         expecteds1);
   }
 
+  /* NOTE: This test cases is inactive since {@link JsonStatementOptimizer} is currently disabled. */
   /** Test a numerical function over json path expression in SELECT clause. */
-  @Test(dataProvider = "nativeJsonColumns")
+  @Test(dataProvider = "nativeJsonColumns", enabled = false)
   public void testNumericalFunctionOverJsonPathSelectExpression(String column) {
 
     // Test without user-specified alias.

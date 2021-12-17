@@ -30,9 +30,12 @@ import org.testng.annotations.Test;
 
 
 /**
+ * NOTE: These test cases are inactive since {@link JsonStatementOptimizer} is currently disabled.
+ *
  * Test cases to verify that {@link JsonStatementOptimizer} is properly rewriting queries that use JSON path expressions
  * into equivalent queries that use JSON_MATCH and JSON_EXTRACT_SCALAR functions.
  */
+@Test(enabled = false)
 public class JsonStatementOptimizerTest {
   private static final QueryOptimizer OPTIMIZER = new QueryOptimizer();
   private static final CalciteSqlCompiler SQL_COMPILER = new CalciteSqlCompiler();
@@ -48,7 +51,7 @@ public class JsonStatementOptimizerTest {
 
   /** Test that a json path expression in SELECT list is properly converted to a JSON_EXTRACT_SCALAR function within
    * an AS function. */
-  @Test
+  @Test(enabled = false)
   public void testJsonSelect() {
     // SELECT using json column.
     TestHelper.assertEqualsQuery("SELECT jsonColumn FROM testTable", "SELECT jsonColumn FROM testTable",
@@ -72,7 +75,7 @@ public class JsonStatementOptimizerTest {
 
   /** Test that a predicate comparing a json path expression with literal is properly converted into a JSON_MATCH
    * function. */
-  @Test
+  @Test(enabled = false)
   public void testJsonFilter() {
     // Comparing json path expression with a string value.
     TestHelper.assertEqualsQuery("SELECT * FROM testTable WHERE jsonColumn.name.first = 'daffy'",
@@ -103,7 +106,7 @@ public class JsonStatementOptimizerTest {
   }
 
   /** Test that a json path expression in GROUP BY clause is properly converted into a JSON_EXTRACT_SCALAR function. */
-  @Test
+  @Test(enabled = false)
   public void testJsonGroupBy() {
     TestHelper.assertEqualsQuery("SELECT jsonColumn.id, count(*) FROM testTable GROUP BY jsonColumn.id",
         "SELECT JSON_EXTRACT_SCALAR(jsonColumn, '$.id', 'STRING', 'null') AS \"jsonColumn.id\", count(*) FROM "
@@ -117,7 +120,7 @@ public class JsonStatementOptimizerTest {
   }
 
   /** Test that a json path expression in HAVING clause is properly converted into a JSON_EXTRACT_SCALAR function. */
-  @Test
+  @Test(enabled = false)
   public void testJsonGroupByHaving() {
     TestHelper.assertEqualsQuery(
         "SELECT jsonColumn.name.last, count(*) FROM testTable GROUP BY jsonColumn.name.last HAVING jsonColumn.name"
@@ -137,7 +140,7 @@ public class JsonStatementOptimizerTest {
   }
 
   /** Test a complex SQL statement with json path expression in SELECT, WHERE, and GROUP BY clauses. */
-  @Test
+  @Test(enabled = false)
   public void testJsonSelectFilterGroupBy() {
     TestHelper.assertEqualsQuery(
         "SELECT jsonColumn.name.last, count(*) FROM testTable WHERE jsonColumn.id = 101 GROUP BY jsonColumn.name.last",
@@ -154,7 +157,7 @@ public class JsonStatementOptimizerTest {
   }
 
   /** Test an aggregation function over json path expression in SELECT clause. */
-  @Test
+  @Test(enabled = false)
   public void testTransformFunctionOverJsonPathSelectExpression() {
     // Apply string transform function on json path expression.
     TestHelper.assertEqualsQuery("SELECT UPPER(jsonColumn.name.first) FROM testTable",
@@ -182,7 +185,7 @@ public class JsonStatementOptimizerTest {
   }
 
   /** Test a numerical function over json path expression in SELECT clause. */
-  @Test
+  @Test(enabled = false)
   public void testNumericalFunctionOverJsonPathSelectExpression() {
 
     // Test without user-specified alias.
@@ -201,7 +204,7 @@ public class JsonStatementOptimizerTest {
             + "') - 5) AS \"max(minus(jsonColumn.id,'5'))\" FROM testTable", TABLE_CONFIG_WITH_INDEX, SCHEMA);
   }
 
-  @Test
+  @Test(enabled = false)
   public void testTopLevelArrayPathExpressions() {
     // SELECT using json path expression with top-level array addressing.
     TestHelper.assertEqualsQuery("SELECT jsonColumn[0] FROM testTable",
