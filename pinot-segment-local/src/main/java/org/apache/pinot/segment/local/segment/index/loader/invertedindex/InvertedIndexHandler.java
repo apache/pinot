@@ -47,39 +47,21 @@ public class InvertedIndexHandler implements IndexHandler {
 
   private final File _indexDir;
   private final SegmentMetadata _segmentMetadata;
-  private final SegmentDirectory.Reader _segmentReader;
-  private final SegmentDirectory.Writer _segmentWriter;
   private final HashSet<String> _columnsToAddIdx;
   private final InvertedIndexCreatorProvider _indexCreatorProvider;
 
   public InvertedIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-<<<<<<< HEAD
-      SegmentDirectory.Writer segmentWriter, InvertedIndexCreatorProvider indexCreatorProvider) {
-=======
-      SegmentDirectory.Writer segmentWriter) {
-    this(indexDir, segmentMetadata, indexLoadingConfig, null, segmentWriter);
-  }
-
-  public InvertedIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Reader segmentReader) {
-    this(null, segmentMetadata, indexLoadingConfig, segmentReader, null);
-  }
-
-  private InvertedIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Reader segmentReader, SegmentDirectory.Writer segmentWriter) {
->>>>>>> add checker to just check if segment needs reprocessing based on new table config and schema
+      InvertedIndexCreatorProvider indexCreatorProvider) {
     _indexDir = indexDir;
     _segmentMetadata = segmentMetadata;
-    _segmentReader = segmentReader;
-    _segmentWriter = segmentWriter;
     _columnsToAddIdx = new HashSet<>(indexLoadingConfig.getInvertedIndexColumns());
     _indexCreatorProvider = indexCreatorProvider;
   }
 
   @Override
-  public boolean needUpdateIndices() {
+  public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
     Set<String> existingColumns =
-        _segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.INVERTED_INDEX);
+        segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.INVERTED_INDEX);
     for (String column : existingColumns) {
       if (!_columnsToAddIdx.remove(column)) {
         return true;
@@ -89,16 +71,16 @@ public class InvertedIndexHandler implements IndexHandler {
   }
 
   @Override
-  public void updateIndices()
+  public void updateIndices(SegmentDirectory.Writer segmentWriter)
       throws IOException {
     // Remove indices not set in table config any more.
     String segmentName = _segmentMetadata.getName();
     Set<String> existingColumns =
-        _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.INVERTED_INDEX);
+        segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.INVERTED_INDEX);
     for (String column : existingColumns) {
       if (!_columnsToAddIdx.remove(column)) {
         LOGGER.info("Removing existing inverted index from segment: {}, column: {}", segmentName, column);
-        _segmentWriter.removeIndex(column, ColumnIndexType.INVERTED_INDEX);
+        segmentWriter.removeIndex(column, ColumnIndexType.INVERTED_INDEX);
         LOGGER.info("Removed existing inverted index from segment: {}, column: {}", segmentName, column);
       }
     }
@@ -106,12 +88,12 @@ public class InvertedIndexHandler implements IndexHandler {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       // Only create inverted index on dictionary-encoded unsorted columns.
       if (columnMetadata != null && !columnMetadata.isSorted() && columnMetadata.hasDictionary()) {
-        createInvertedIndexForColumn(columnMetadata);
+        createInvertedIndexForColumn(segmentWriter, columnMetadata);
       }
     }
   }
 
-  private void createInvertedIndexForColumn(ColumnMetadata columnMetadata)
+  private void createInvertedIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
       throws IOException {
     String segmentName = _segmentMetadata.getName();
     String column = columnMetadata.getColumnName();
@@ -135,7 +117,7 @@ public class InvertedIndexHandler implements IndexHandler {
     try (DictionaryBasedInvertedIndexCreator creator = _indexCreatorProvider.newInvertedIndexCreator(
         IndexCreationContext.builder().withIndexDir(_indexDir).withColumnMetadata(columnMetadata).build()
             .forInvertedIndex())) {
-      try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
+      try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
           ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
         if (columnMetadata.isSingleValue()) {
           // Single-value column.
@@ -156,7 +138,7 @@ public class InvertedIndexHandler implements IndexHandler {
 
     // For v3, write the generated inverted index file into the single file and remove it.
     if (_segmentMetadata.getVersion() == SegmentVersion.v3) {
-      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, invertedIndexFile, ColumnIndexType.INVERTED_INDEX);
+      LoaderUtils.writeIndexToV3Format(segmentWriter, column, invertedIndexFile, ColumnIndexType.INVERTED_INDEX);
     }
 
     // Delete the marker file.

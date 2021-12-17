@@ -54,39 +54,21 @@ public class H3IndexHandler implements IndexHandler {
 
   private final File _indexDir;
   private final SegmentMetadataImpl _segmentMetadata;
-  private final SegmentDirectory.Reader _segmentReader;
-  private final SegmentDirectory.Writer _segmentWriter;
   private final Map<String, H3IndexConfig> _h3Configs;
   private final IndexCreatorProvider _indexCreatorProvider;
 
   public H3IndexHandler(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-<<<<<<< HEAD
-      SegmentDirectory.Writer segmentWriter, IndexCreatorProvider indexCreatorProvider) {
-=======
-      SegmentDirectory.Writer segmentWriter) {
-    this(indexDir, segmentMetadata, indexLoadingConfig, null, segmentWriter);
-  }
-
-  public H3IndexHandler(SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Reader segmentReader) {
-    this(null, segmentMetadata, indexLoadingConfig, segmentReader, null);
-  }
-
-  private H3IndexHandler(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Reader segmentReader, SegmentDirectory.Writer segmentWriter) {
->>>>>>> add checker to just check if segment needs reprocessing based on new table config and schema
+      IndexCreatorProvider indexCreatorProvider) {
     _indexDir = indexDir;
     _segmentMetadata = segmentMetadata;
-    _segmentReader = segmentReader;
-    _segmentWriter = segmentWriter;
     _h3Configs = indexLoadingConfig.getH3IndexConfigs();
     _indexCreatorProvider = indexCreatorProvider;
   }
 
   @Override
-  public boolean needUpdateIndices() {
+  public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
     Set<String> columnsToAddIdx = new HashSet<>(_h3Configs.keySet());
-    Set<String> existingColumns = _segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.H3_INDEX);
+    Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.H3_INDEX);
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
         return true;
@@ -96,28 +78,28 @@ public class H3IndexHandler implements IndexHandler {
   }
 
   @Override
-  public void updateIndices()
+  public void updateIndices(SegmentDirectory.Writer segmentWriter)
       throws Exception {
     Set<String> columnsToAddIdx = new HashSet<>(_h3Configs.keySet());
     // Remove indices not set in table config any more
     String segmentName = _segmentMetadata.getName();
-    Set<String> existingColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.H3_INDEX);
+    Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.H3_INDEX);
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Removing existing H3 index from segment: {}, column: {}", segmentName, column);
-        _segmentWriter.removeIndex(column, ColumnIndexType.H3_INDEX);
+        segmentWriter.removeIndex(column, ColumnIndexType.H3_INDEX);
         LOGGER.info("Removed existing H3 index from segment: {}, column: {}", segmentName, column);
       }
     }
     for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       if (columnMetadata != null) {
-        createH3IndexForColumn(columnMetadata);
+        createH3IndexForColumn(segmentWriter, columnMetadata);
       }
     }
   }
 
-  private void createH3IndexForColumn(ColumnMetadata columnMetadata)
+  private void createH3IndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
       throws Exception {
     String segmentName = _segmentMetadata.getName();
     String column = columnMetadata.getColumnName();
@@ -140,14 +122,14 @@ public class H3IndexHandler implements IndexHandler {
     Preconditions
         .checkState(columnMetadata.getDataType() == DataType.BYTES, "H3 index can only be applied to BYTES columns");
     if (columnMetadata.hasDictionary()) {
-      handleDictionaryBasedColumn(columnMetadata);
+      handleDictionaryBasedColumn(segmentWriter, columnMetadata);
     } else {
-      handleNonDictionaryBasedColumn(columnMetadata);
+      handleNonDictionaryBasedColumn(segmentWriter, columnMetadata);
     }
 
     // For v3, write the generated H3 index file into the single file and remove it.
     if (_segmentMetadata.getVersion() == SegmentVersion.v3) {
-      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, h3IndexFile, ColumnIndexType.H3_INDEX);
+      LoaderUtils.writeIndexToV3Format(segmentWriter, column, h3IndexFile, ColumnIndexType.H3_INDEX);
     }
 
     // Delete the marker file.
@@ -156,12 +138,12 @@ public class H3IndexHandler implements IndexHandler {
     LOGGER.info("Created H3 index for segment: {}, column: {}", segmentName, column);
   }
 
-  private void handleDictionaryBasedColumn(ColumnMetadata columnMetadata)
+  private void handleDictionaryBasedColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
       throws IOException {
     String columnName = columnMetadata.getColumnName();
-    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
+    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata);
+        Dictionary dictionary = LoaderUtils.getDictionary(segmentWriter, columnMetadata);
         GeoSpatialIndexCreator h3IndexCreator = _indexCreatorProvider.newGeoSpatialIndexCreator(
             IndexCreationContext.builder().withIndexDir(_indexDir).withColumnMetadata(columnMetadata)
                 .build().forGeospatialIndex(_h3Configs.get(columnName)))) {
@@ -174,10 +156,10 @@ public class H3IndexHandler implements IndexHandler {
     }
   }
 
-  private void handleNonDictionaryBasedColumn(ColumnMetadata columnMetadata)
+  private void handleNonDictionaryBasedColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
       throws Exception {
     String columnName = columnMetadata.getColumnName();
-    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
+    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         OffHeapH3IndexCreator h3IndexCreator = new OffHeapH3IndexCreator(_indexDir, columnName,
             _h3Configs.get(columnName).getResolution())) {

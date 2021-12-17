@@ -97,8 +97,8 @@ public class SegmentPreProcessor implements AutoCloseable {
 
       // Update single-column indices, like inverted index, json index etc.
       for (ColumnIndexType type : ColumnIndexType.values()) {
-        IndexHandlerFactory.getIndexHandler(type, _indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter)
-            .updateIndices();
+        IndexHandlerFactory.getIndexHandler(type, _indexDir, _segmentMetadata, _indexLoadingConfig)
+            .updateIndices(segmentWriter);
       }
 
       // Create/modify/remove star-trees if required.
@@ -120,6 +120,11 @@ public class SegmentPreProcessor implements AutoCloseable {
     }
   }
 
+  /**
+   * This method checks if there is any discrepancy between the segment and current table config and schema.
+   * If so, it returns true indicating the segment needs to be reprocessed. Right now, the default columns,
+   * all types of indices and column min/max values are checked against what's set in table config and schema.
+   */
   public boolean needProcess()
       throws Exception {
     if (_segmentMetadata.getTotalDocs() == 0) {
@@ -136,8 +141,8 @@ public class SegmentPreProcessor implements AutoCloseable {
       }
       // Check if there is need to update single-column indices, like inverted index, json index etc.
       for (ColumnIndexType type : ColumnIndexType.values()) {
-        if (IndexHandlerFactory.getIndexHandler(type, _segmentMetadata, _indexLoadingConfig, segmentReader)
-            .needUpdateIndices()) {
+        if (IndexHandlerFactory.getIndexHandler(type, null, _segmentMetadata, _indexLoadingConfig)
+            .needUpdateIndices(segmentReader)) {
           return true;
         }
       }

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.indexsegment.immutable;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.HashMap;
@@ -190,18 +189,10 @@ public class ImmutableSegmentLoader {
     return preProcessor.needProcess();
   }
 
-  @VisibleForTesting
-  static boolean needConvertSegmentFormat(IndexLoadingConfig indexLoadingConfig,
+  private static boolean needConvertSegmentFormat(IndexLoadingConfig indexLoadingConfig,
       SegmentMetadataImpl segmentMetadata) {
     SegmentVersion segmentVersionToLoad = indexLoadingConfig.getSegmentVersion();
-    if (segmentVersionToLoad == null) {
-      return false;
-    }
-    File indexDir = segmentMetadata.getIndexDir();
-    if (indexDir != null && SegmentDirectoryPaths.segmentDirectoryFor(indexDir, segmentVersionToLoad).isDirectory()) {
-      return false;
-    }
-    return segmentVersionToLoad != segmentMetadata.getVersion();
+    return segmentVersionToLoad != null && segmentVersionToLoad != segmentMetadata.getVersion();
   }
 
   private static void convertSegmentFormat(File indexDir, IndexLoadingConfig indexLoadingConfig,

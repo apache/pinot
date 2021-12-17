@@ -56,39 +56,21 @@ public class BloomFilterHandler implements IndexHandler {
 
   private final File _indexDir;
   private final SegmentMetadataImpl _segmentMetadata;
-  private final SegmentDirectory.Reader _segmentReader;
-  private final SegmentDirectory.Writer _segmentWriter;
   private final Map<String, BloomFilterConfig> _bloomFilterConfigs;
   private final BloomFilterCreatorProvider _indexCreatorProvider;
 
   public BloomFilterHandler(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-<<<<<<< HEAD
-      SegmentDirectory.Writer segmentWriter, BloomFilterCreatorProvider indexCreatorProvider) {
-=======
-      SegmentDirectory.Writer segmentWriter) {
-    this(indexDir, segmentMetadata, indexLoadingConfig, null, segmentWriter);
-  }
-
-  public BloomFilterHandler(SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Reader segmentReader) {
-    this(null, segmentMetadata, indexLoadingConfig, segmentReader, null);
-  }
-
-  private BloomFilterHandler(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Reader segmentReader, SegmentDirectory.Writer segmentWriter) {
->>>>>>> add checker to just check if segment needs reprocessing based on new table config and schema
+      BloomFilterCreatorProvider indexCreatorProvider) {
     _indexDir = indexDir;
-    _segmentReader = segmentReader;
-    _segmentWriter = segmentWriter;
     _segmentMetadata = segmentMetadata;
     _bloomFilterConfigs = indexLoadingConfig.getBloomFilterConfigs();
     _indexCreatorProvider = indexCreatorProvider;
   }
 
   @Override
-  public boolean needUpdateIndices() {
+  public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
     Set<String> columnsToAddBF = new HashSet<>(_bloomFilterConfigs.keySet());
-    Set<String> existingColumns = _segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.BLOOM_FILTER);
+    Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.BLOOM_FILTER);
     for (String column : existingColumns) {
       if (!columnsToAddBF.remove(column)) {
         return true;
@@ -98,16 +80,16 @@ public class BloomFilterHandler implements IndexHandler {
   }
 
   @Override
-  public void updateIndices()
+  public void updateIndices(SegmentDirectory.Writer segmentWriter)
       throws Exception {
     Set<String> columnsToAddBF = new HashSet<>(_bloomFilterConfigs.keySet());
     // Remove indices not set in table config any more.
     String segmentName = _segmentMetadata.getName();
-    Set<String> existingColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.BLOOM_FILTER);
+    Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.BLOOM_FILTER);
     for (String column : existingColumns) {
       if (!columnsToAddBF.remove(column)) {
         LOGGER.info("Removing existing bloom filter from segment: {}, column: {}", segmentName, column);
-        _segmentWriter.removeIndex(column, ColumnIndexType.BLOOM_FILTER);
+        segmentWriter.removeIndex(column, ColumnIndexType.BLOOM_FILTER);
         LOGGER.info("Removed existing bloom filter from segment: {}, column: {}", segmentName, column);
       }
     }
@@ -115,14 +97,14 @@ public class BloomFilterHandler implements IndexHandler {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       if (columnMetadata != null) {
         if (columnMetadata.hasDictionary()) {
-          createBloomFilterForColumn(columnMetadata);
+          createBloomFilterForColumn(segmentWriter, columnMetadata);
         }
         // TODO: Support raw index
       }
     }
   }
 
-  private void createBloomFilterForColumn(ColumnMetadata columnMetadata)
+  private void createBloomFilterForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
       throws Exception {
     String segmentName = _segmentMetadata.getName();
     String columnName = columnMetadata.getColumnName();
@@ -146,7 +128,7 @@ public class BloomFilterHandler implements IndexHandler {
     try (BloomFilterCreator bloomFilterCreator = _indexCreatorProvider.newBloomFilterCreator(
         IndexCreationContext.builder().withIndexDir(_indexDir).withColumnMetadata(columnMetadata)
             .build().forBloomFilter(bloomFilterConfig));
-        Dictionary dictionary = getDictionaryReader(columnMetadata, _segmentWriter)) {
+        Dictionary dictionary = getDictionaryReader(columnMetadata, segmentWriter)) {
       int length = dictionary.length();
       for (int i = 0; i < length; i++) {
         bloomFilterCreator.add(dictionary.getStringValue(i));
@@ -156,7 +138,7 @@ public class BloomFilterHandler implements IndexHandler {
 
     // For v3, write the generated bloom filter file into the single file and remove it.
     if (_segmentMetadata.getVersion() == SegmentVersion.v3) {
-      LoaderUtils.writeIndexToV3Format(_segmentWriter, columnName, bloomFilterFile, ColumnIndexType.BLOOM_FILTER);
+      LoaderUtils.writeIndexToV3Format(segmentWriter, columnName, bloomFilterFile, ColumnIndexType.BLOOM_FILTER);
     }
 
     // Delete the marker file.

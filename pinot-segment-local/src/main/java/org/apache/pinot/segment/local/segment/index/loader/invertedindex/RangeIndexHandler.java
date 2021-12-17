@@ -47,40 +47,22 @@ public class RangeIndexHandler implements IndexHandler {
 
   private final File _indexDir;
   private final SegmentMetadata _segmentMetadata;
-  private final SegmentDirectory.Reader _segmentReader;
-  private final SegmentDirectory.Writer _segmentWriter;
   private final Set<String> _columnsToAddIdx;
   private final int _rangeIndexVersion;
   private final RangeIndexCreatorProvider _indexCreatorProvider;
 
   public RangeIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-<<<<<<< HEAD
-      SegmentDirectory.Writer segmentWriter, RangeIndexCreatorProvider indexCreatorProvider) {
-=======
-      SegmentDirectory.Writer segmentWriter) {
-    this(indexDir, segmentMetadata, indexLoadingConfig, null, segmentWriter);
-  }
-
-  public RangeIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Reader segmentReader) {
-    this(null, segmentMetadata, indexLoadingConfig, segmentReader, null);
-  }
-
-  private RangeIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Reader segmentReader, SegmentDirectory.Writer segmentWriter) {
->>>>>>> add checker to just check if segment needs reprocessing based on new table config and schema
+      RangeIndexCreatorProvider indexCreatorProvider) {
     _indexDir = indexDir;
     _segmentMetadata = segmentMetadata;
-    _segmentReader = segmentReader;
-    _segmentWriter = segmentWriter;
     _columnsToAddIdx = new HashSet<>(indexLoadingConfig.getRangeIndexColumns());
     _rangeIndexVersion = indexLoadingConfig.getRangeIndexVersion();
     _indexCreatorProvider = indexCreatorProvider;
   }
 
   @Override
-  public boolean needUpdateIndices() {
-    Set<String> existingColumns = _segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.RANGE_INDEX);
+  public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
+    Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.RANGE_INDEX);
     for (String column : existingColumns) {
       if (!_columnsToAddIdx.remove(column)) {
         return true;
@@ -90,15 +72,15 @@ public class RangeIndexHandler implements IndexHandler {
   }
 
   @Override
-  public void updateIndices()
+  public void updateIndices(SegmentDirectory.Writer segmentWriter)
       throws IOException {
     // Remove indices not set in table config any more
     String segmentName = _segmentMetadata.getName();
-    Set<String> existingColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.RANGE_INDEX);
+    Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.RANGE_INDEX);
     for (String column : existingColumns) {
       if (!_columnsToAddIdx.remove(column)) {
         LOGGER.info("Removing existing range index from segment: {}, column: {}", segmentName, column);
-        _segmentWriter.removeIndex(column, ColumnIndexType.RANGE_INDEX);
+        segmentWriter.removeIndex(column, ColumnIndexType.RANGE_INDEX);
         LOGGER.info("Removed existing range index from segment: {}, column: {}", segmentName, column);
       }
     }
@@ -106,12 +88,12 @@ public class RangeIndexHandler implements IndexHandler {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       // Only create range index on dictionary-encoded unsorted columns
       if (columnMetadata != null && !columnMetadata.isSorted()) {
-        createRangeIndexForColumn(columnMetadata);
+        createRangeIndexForColumn(segmentWriter, columnMetadata);
       }
     }
   }
 
-  private void createRangeIndexForColumn(ColumnMetadata columnMetadata)
+  private void createRangeIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
       throws IOException {
     String segmentName = _segmentMetadata.getName();
     String column = columnMetadata.getColumnName();
@@ -132,14 +114,14 @@ public class RangeIndexHandler implements IndexHandler {
     // Create new range index for the column.
     LOGGER.info("Creating new range index for segment: {}, column: {}", segmentName, column);
     if (columnMetadata.hasDictionary()) {
-      handleDictionaryBasedColumn(columnMetadata);
+      handleDictionaryBasedColumn(segmentWriter, columnMetadata);
     } else {
-      handleNonDictionaryBasedColumn(columnMetadata);
+      handleNonDictionaryBasedColumn(segmentWriter, columnMetadata);
     }
 
     // For v3, write the generated range index file into the single file and remove it.
     if (_segmentMetadata.getVersion() == SegmentVersion.v3) {
-      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, rangeIndexFile, ColumnIndexType.RANGE_INDEX);
+      LoaderUtils.writeIndexToV3Format(segmentWriter, column, rangeIndexFile, ColumnIndexType.RANGE_INDEX);
     }
 
     // Delete the marker file.
@@ -148,10 +130,10 @@ public class RangeIndexHandler implements IndexHandler {
     LOGGER.info("Created range index for segment: {}, column: {}", segmentName, column);
   }
 
-  private void handleDictionaryBasedColumn(ColumnMetadata columnMetadata)
+  private void handleDictionaryBasedColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
       throws IOException {
     int numDocs = columnMetadata.getTotalDocs();
-    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
+    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata)) {
       if (columnMetadata.isSingleValue()) {
@@ -171,10 +153,10 @@ public class RangeIndexHandler implements IndexHandler {
     }
   }
 
-  private void handleNonDictionaryBasedColumn(ColumnMetadata columnMetadata)
+  private void handleNonDictionaryBasedColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
       throws IOException {
     int numDocs = columnMetadata.getTotalDocs();
-    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
+    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata)) {
       if (columnMetadata.isSingleValue()) {

@@ -68,40 +68,22 @@ public class FSTIndexHandler implements IndexHandler {
 
   private final File _indexDir;
   private final SegmentMetadata _segmentMetadata;
-  private final SegmentDirectory.Reader _segmentReader;
-  private final SegmentDirectory.Writer _segmentWriter;
   private final Set<String> _columnsToAddIdx;
   private final FSTType _fstType;
   private final TextIndexCreatorProvider _indexCreatorProvider;
 
   public FSTIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-<<<<<<< HEAD
-      SegmentDirectory.Writer segmentWriter, FSTType fstType, TextIndexCreatorProvider indexCreatorProvider) {
-=======
-      SegmentDirectory.Writer segmentWriter, FSTType fstType) {
-    this(indexDir, segmentMetadata, indexLoadingConfig, null, segmentWriter, fstType);
-  }
-
-  public FSTIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Reader segmentReader, FSTType fstType) {
-    this(null, segmentMetadata, indexLoadingConfig, segmentReader, null, fstType);
-  }
-
-  private FSTIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Reader segmentReader, SegmentDirectory.Writer segmentWriter, FSTType fstType) {
->>>>>>> add checker to just check if segment needs reprocessing based on new table config and schema
+      FSTType fstType, TextIndexCreatorProvider indexCreatorProvider) {
     _indexDir = indexDir;
     _segmentMetadata = segmentMetadata;
-    _segmentReader = segmentReader;
-    _segmentWriter = segmentWriter;
     _columnsToAddIdx = new HashSet<>(indexLoadingConfig.getFSTIndexColumns());
     _fstType = fstType;
     _indexCreatorProvider = indexCreatorProvider;
   }
 
   @Override
-  public boolean needUpdateIndices() {
-    Set<String> existingColumns = _segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.FST_INDEX);
+  public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
+    Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.FST_INDEX);
     for (String column : existingColumns) {
       if (!_columnsToAddIdx.remove(column)) {
         return true;
@@ -111,15 +93,15 @@ public class FSTIndexHandler implements IndexHandler {
   }
 
   @Override
-  public void updateIndices()
+  public void updateIndices(SegmentDirectory.Writer segmentWriter)
       throws Exception {
     // Remove indices not set in table config any more
     String segmentName = _segmentMetadata.getName();
-    Set<String> existingColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.FST_INDEX);
+    Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.FST_INDEX);
     for (String column : existingColumns) {
       if (!_columnsToAddIdx.remove(column)) {
         LOGGER.info("Removing existing FST index from segment: {}, column: {}", segmentName, column);
-        _segmentWriter.removeIndex(column, ColumnIndexType.FST_INDEX);
+        segmentWriter.removeIndex(column, ColumnIndexType.FST_INDEX);
         LOGGER.info("Removed existing FST index from segment: {}, column: {}", segmentName, column);
       }
     }
@@ -127,7 +109,7 @@ public class FSTIndexHandler implements IndexHandler {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       if (columnMetadata != null) {
         checkUnsupportedOperationsForFSTIndex(columnMetadata);
-        createFSTIndexForColumn(columnMetadata);
+        createFSTIndexForColumn(segmentWriter, columnMetadata);
       }
     }
   }
@@ -148,7 +130,7 @@ public class FSTIndexHandler implements IndexHandler {
     }
   }
 
-  private void createFSTIndexForColumn(ColumnMetadata columnMetadata)
+  private void createFSTIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
       throws IOException {
     String segmentName = _segmentMetadata.getName();
     String column = columnMetadata.getColumnName();
@@ -169,7 +151,7 @@ public class FSTIndexHandler implements IndexHandler {
         IndexCreationContext.builder().withIndexDir(_indexDir).withColumnMetadata(columnMetadata)
             .build().forFSTIndex(_fstType, null));
 
-    try (Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata)) {
+    try (Dictionary dictionary = LoaderUtils.getDictionary(segmentWriter, columnMetadata)) {
       for (int dictId = 0; dictId < dictionary.length(); dictId++) {
         fstIndexCreator.add(dictionary.getStringValue(dictId));
       }
@@ -178,7 +160,7 @@ public class FSTIndexHandler implements IndexHandler {
 
     // For v3, write the generated range index file into the single file and remove it.
     if (_segmentMetadata.getVersion() == SegmentVersion.v3) {
-      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, fstIndexFile, ColumnIndexType.FST_INDEX);
+      LoaderUtils.writeIndexToV3Format(segmentWriter, column, fstIndexFile, ColumnIndexType.FST_INDEX);
     }
 
     // Delete the marker file.

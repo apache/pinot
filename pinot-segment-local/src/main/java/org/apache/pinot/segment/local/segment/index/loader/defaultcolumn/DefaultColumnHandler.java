@@ -30,7 +30,8 @@ public interface DefaultColumnHandler {
       throws Exception;
 
   /**
-   * Check if there is a need to update the auto-generated default columns.
+   * Check if there is a need to add/remove/update the auto-generated default columns
+   * for the segment, according to the current table schema.
    * @return true if there is a need to update.
    */
   boolean needUpdateDefaultColumns();
