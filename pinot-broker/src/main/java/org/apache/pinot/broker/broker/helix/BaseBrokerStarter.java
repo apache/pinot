@@ -85,8 +85,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected String _hostname;
   protected int _port;
   protected String _instanceId;
-  private boolean _isStarting = false;
-  private boolean _isShuttingDown = false;
+  private volatile boolean _isStarting = false;
+  private volatile boolean _isShuttingDown = false;
   protected final List<ClusterChangeHandler> _idealStateChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _externalViewChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _instanceConfigChangeHandlers = new ArrayList<>();
