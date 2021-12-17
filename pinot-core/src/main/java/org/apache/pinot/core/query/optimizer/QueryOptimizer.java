@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.optimizer;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -50,7 +51,7 @@ public class QueryOptimizer {
           new TimePredicateFilterOptimizer(), new MergeRangeFilterOptimizer());
 
   private static final List<StatementOptimizer> STATEMENT_OPTIMIZERS =
-      Arrays.asList(new StringPredicateFilterOptimizer());
+      Collections.singletonList(new StringPredicateFilterOptimizer());
 
   /**
    * Optimizes the given PQL query.
