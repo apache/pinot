@@ -27,7 +27,7 @@ import org.apache.pinot.segment.local.segment.index.loader.invertedindex.JsonInd
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.RangeIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.TextIndexHandler;
 import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
-import org.apache.pinot.segment.spi.creator.IndexCreatorProviders;
+import org.apache.pinot.segment.spi.index.IndexingOverrides;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -42,7 +42,7 @@ public class IndexHandlerFactory {
 
   public static IndexHandler getIndexHandler(ColumnIndexType type, File indexDir, SegmentMetadataImpl segmentMetadata,
       IndexLoadingConfig indexLoadingConfig, SegmentDirectory.Writer segmentWriter) {
-    IndexCreatorProvider indexCreatorProvider = IndexCreatorProviders.getIndexCreatorProvider();
+    IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
     switch (type) {
       case INVERTED_INDEX:
         return new InvertedIndexHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter,

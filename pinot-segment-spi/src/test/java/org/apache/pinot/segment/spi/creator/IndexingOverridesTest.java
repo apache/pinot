@@ -19,7 +19,10 @@
 package org.apache.pinot.segment.spi.creator;
 
 import java.io.IOException;
+import org.apache.pinot.segment.spi.index.IndexingOverrides;
 import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
+import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -27,27 +30,42 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-public class IndexCreatorProvidersTest {
+public class IndexingOverridesTest {
 
   @Test
-  public void indexCreatorProvidersLoadableWithoutDefaultImplementation()
+  public void indexingOverridesLoadableWithoutDefaultImplementation()
       throws IOException {
     BloomFilterCreator mockBloomFilterCreator = mock(BloomFilterCreator.class);
-    assertTrue(IndexCreatorProviders.registerProvider(new IndexCreatorProviders.Default() {
+    BloomFilterReader mockBloomFilterReader = mock(BloomFilterReader.class);
+    assertTrue(IndexingOverrides.registerProvider(new IndexingOverrides.Default() {
       @Override
       public BloomFilterCreator newBloomFilterCreator(IndexCreationContext.BloomFilter context) {
         return mockBloomFilterCreator;
       }
+
+      @Override
+      public BloomFilterReader newBloomFilterReader(PinotDataBuffer dataBuffer, boolean onHeap) {
+        return mockBloomFilterReader;
+      }
     }));
     // it's ok to load external overrides without an internal implementation present, e.g. for testing
-    assertEquals(mockBloomFilterCreator, IndexCreatorProviders.getIndexCreatorProvider()
+    assertEquals(mockBloomFilterCreator, IndexingOverrides.getIndexCreatorProvider()
         .newBloomFilterCreator(mock(IndexCreationContext.BloomFilter.class)));
+    assertEquals(mockBloomFilterReader, IndexingOverrides.getIndexReaderProvider()
+        .newBloomFilterReader(mock(PinotDataBuffer.class), false));
   }
 
   @Test(expectedExceptions = UnsupportedOperationException.class)
-  public void whenDefaultImplementationMissingThrowUnsupportedOperationException()
+  public void whenDefaultImplementationMissingThrowUnsupportedOperationExceptionCreator()
       throws IOException {
     // the implementation is missing so no indexes will be created anyway...
-    new IndexCreatorProviders.Default().newBloomFilterCreator(mock(IndexCreationContext.BloomFilter.class));
+    new IndexingOverrides.Default().newBloomFilterCreator(mock(IndexCreationContext.BloomFilter.class));
+  }
+
+  @Test(expectedExceptions = UnsupportedOperationException.class)
+  public void whenDefaultImplementationMissingThrowUnsupportedOperationExceptionReader()
+      throws IOException {
+    // the implementation is missing so no indexes will be created anyway...
+    new IndexingOverrides.Default().newBloomFilterReader(mock(PinotDataBuffer.class), true);
   }
 }
