@@ -40,8 +40,8 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
   }
 
   @Override
-  public MessageBatch<byte[]> fetchMessages(StreamPartitionMsgOffset startMsgOffset, StreamPartitionMsgOffset endMsgOffset,
-      int timeoutMillis) {
+  public MessageBatch<byte[]> fetchMessages(StreamPartitionMsgOffset startMsgOffset,
+      StreamPartitionMsgOffset endMsgOffset, int timeoutMillis) {
     final long startOffset = ((LongMsgOffset) startMsgOffset).getOffset();
     final long endOffset = endMsgOffset == null ? Long.MAX_VALUE : ((LongMsgOffset) endMsgOffset).getOffset();
     return fetchMessages(startOffset, endOffset, timeoutMillis);
