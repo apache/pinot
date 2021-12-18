@@ -35,7 +35,9 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
@@ -230,6 +232,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final MutableSegmentImpl _realtimeSegment;
   private volatile StreamPartitionMsgOffset _currentOffset;
   private volatile State _state;
+  private static final AtomicIntegerFieldUpdater<LLRealtimeSegmentDataManager> NUM_ROWS_CONSUMED_UPDATER =
+      AtomicIntegerFieldUpdater.newUpdater(LLRealtimeSegmentDataManager.class, "_numRowsConsumed");
   private volatile int _numRowsConsumed = 0;
   private volatile int _numRowsIndexed = 0; // Can be different from _numRowsConsumed when metrics update is enabled.
   private volatile int _numRowsErrored = 0;
@@ -243,6 +247,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final StreamPartitionMsgOffsetFactory _streamPartitionMsgOffsetFactory;
 
   // Segment end criteria
+  private static final AtomicLongFieldUpdater<LLRealtimeSegmentDataManager> CONSUME_END_TIME_UPDATER =
+      AtomicLongFieldUpdater.newUpdater(LLRealtimeSegmentDataManager.class, "_consumeEndTime");
   private volatile long _consumeEndTime = 0;
   private volatile boolean _endOfPartitionGroup = false;
   private StreamPartitionMsgOffset _finalOffset; // Used when we want to catch up to this one
@@ -294,15 +300,17 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private boolean endCriteriaReached() {
     Preconditions.checkState(_state.shouldConsume(), "Incorrect state %s", _state);
     long now = now();
+    long consumeEndTime = _consumeEndTime;
     switch (_state) {
       case INITIAL_CONSUMING:
         // The segment has been created, and we have not posted a segmentConsumed() message on the controller yet.
         // We need to consume as much data as available, until we have either reached the max number of rows or
         // the max time we are allowed to consume.
-        if (now >= _consumeEndTime) {
+        if (now >= consumeEndTime) {
           if (_realtimeSegment.getNumDocsIndexed() == 0) {
             _segmentLogger.info("No events came in, extending time by {} hours", TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS);
-            _consumeEndTime += TimeUnit.HOURS.toMillis(TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS);
+            CONSUME_END_TIME_UPDATER.compareAndSet(this, consumeEndTime, consumeEndTime
+                + TimeUnit.HOURS.toMillis(TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS));
             return false;
           }
           _segmentLogger
@@ -347,7 +355,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         if (_currentOffset.compareTo(_finalOffset) == 0) {
           _segmentLogger.info("Caught up to offset={}, state={}", _finalOffset, _state.toString());
           return true;
-        } else if (now >= _consumeEndTime) {
+        } else if (now >= consumeEndTime) {
           _segmentLogger.info("Past max time budget: offset={}, state={}", _currentOffset, _state.toString());
           return true;
         }
@@ -401,16 +409,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .fetchMessages(_currentOffset, null, _partitionLevelStreamConfig.getFetchTimeoutMillis());
         _endOfPartitionGroup = messageBatch.isEndOfPartitionGroup();
         _consecutiveErrorCount = 0;
-      } catch (TimeoutException e) {
-        handleTransientStreamErrors(e);
-        continue;
-      } catch (TransientConsumerException e) {
-        handleTransientStreamErrors(e);
-        continue;
       } catch (PermanentConsumerException e) {
         _segmentLogger.warn("Permanent exception from stream when fetching messages, stopping consumption", e);
         throw e;
       } catch (Exception e) {
+        // all exceptions but PermanentConsumerException are handled the same way
+        // can be a TimeoutException or TransientConsumerException routinely
         // Unknown exception from stream. Treat as a transient exception.
         // One such exception seen so far is java.net.SocketTimeoutException
         handleTransientStreamErrors(e);
@@ -423,11 +427,16 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         consecutiveIdleCount = 0;
         // We consumed something. Update the highest stream offset as well as partition-consuming metric.
         // TODO Issue 5359 Need to find a way to bump metrics without getting actual offset value.
-//        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_KAFKA_OFFSET_CONSUMED,
-//        _currentOffset.getOffset());
-//        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED,
-//        _currentOffset.getOffset());
+        //_serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_KAFKA_OFFSET_CONSUMED,
+        //_currentOffset.getOffset());
+        //_serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED,
+        //_currentOffset.getOffset());
         _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 1);
+        lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(_currentOffset);
+      } else if (messageBatch.getUnfilteredMessageCount() > 0) {
+        // we consumed something from the stream but filtered all the content out,
+        // so we need to advance the offsets to avoid getting stuck
+        _currentOffset = messageBatch.getLastOffset();
         lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(_currentOffset);
       } else {
         // We did not consume any rows. Update the partition-consuming metric only if we have been idling for a long
@@ -552,14 +561,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
       _currentOffset = messagesAndOffsets.getNextStreamParitionMsgOffsetAtIndex(index);
       _numRowsIndexed = _realtimeSegment.getNumDocsIndexed();
-      _numRowsConsumed++;
       streamMessageCount++;
+      NUM_ROWS_CONSUMED_UPDATER.incrementAndGet(this);
     }
     updateCurrentDocumentCountMetrics();
     if (streamMessageCount != 0) {
       _segmentLogger.debug("Indexed {} messages ({} messages read from stream) current offset {}", indexedMessageCount,
           streamMessageCount, _currentOffset);
-    } else {
+    } else if (messagesAndOffsets.getUnfilteredMessageCount() == 0) {
       // If there were no messages to be fetched from stream, wait for a little bit as to avoid hammering the stream
       Uninterruptibles.sleepUninterruptibly(idlePipeSleepTimeMillis, TimeUnit.MILLISECONDS);
     }
