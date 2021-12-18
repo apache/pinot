@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce;
+package org.apache.pinot.core.query.reduce.datatable;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -51,6 +51,9 @@ import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.combine.GroupByOrderByCombineOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.reduce.DataTableReducerContext;
+import org.apache.pinot.core.query.reduce.HavingFilterHandler;
+import org.apache.pinot.core.query.reduce.PostAggregationHandler;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GapfillUtils;
@@ -84,7 +87,7 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
   private final boolean [] _isGroupBySelections;
   private int _timeBucketIndex = -1;
 
-  GapFillGroupByDataTableReducer(QueryContext queryContext) {
+  public GapFillGroupByDataTableReducer(QueryContext queryContext) {
     Preconditions.checkArgument(
         queryContext.getBrokerRequest().getPinotQuery() != null, "GapFill can only be applied to sql query");
     _queryContext = queryContext;

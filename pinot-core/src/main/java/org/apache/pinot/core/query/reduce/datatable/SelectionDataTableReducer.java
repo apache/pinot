@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce;
+package org.apache.pinot.core.query.reduce.datatable;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,6 +32,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.query.reduce.DataTableReducerContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorService;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
@@ -52,7 +53,7 @@ public class SelectionDataTableReducer implements DataTableReducer {
   private final boolean _preserveType;
   private final boolean _responseFormatSql;
 
-  SelectionDataTableReducer(QueryContext queryContext) {
+  public SelectionDataTableReducer(QueryContext queryContext) {
     _queryContext = queryContext;
     Map<String, String> queryOptions = queryContext.getQueryOptions();
     _preserveType = QueryOptionsUtils.isPreserveType(queryOptions);

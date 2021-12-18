@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce;
+package org.apache.pinot.core.query.reduce.datatable;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -28,6 +28,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.query.reduce.DataTableReducerContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
@@ -41,7 +42,7 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
 
   private final QueryContext _queryContext;
 
-  ExplainPlanDataTableReducer(QueryContext queryContext) {
+  public ExplainPlanDataTableReducer(QueryContext queryContext) {
     _queryContext = queryContext;
   }
 

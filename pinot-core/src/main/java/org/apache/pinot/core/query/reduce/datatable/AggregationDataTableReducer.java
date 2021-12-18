@@ -16,16 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce.streaming;
+package org.apache.pinot.core.query.reduce.datatable;
 
 import java.io.Serializable;
+import java.util.Collections;
 import java.util.Map;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.reduce.AggregationReducerBase;
 import org.apache.pinot.core.query.reduce.DataTableReducerContext;
+import org.apache.pinot.core.query.reduce.PostAggregationHandler;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.QueryOptionsUtils;
@@ -35,24 +39,13 @@ import org.apache.pinot.core.util.QueryOptionsUtils;
  * Helper class to reduce and set Aggregation results into the BrokerResponseNative
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class AggregationDataTableStreamingReducer extends AggregationReducerBase implements StreamingReducer {
+public class AggregationDataTableReducer extends AggregationReducerBase implements DataTableReducer {
 
-  private DataSchema _dataSchema;
-  private DataTableReducerContext _dataTableReducerContext;
-
-  private Object[] _intermediateResults;
-
-  public AggregationDataTableStreamingReducer(QueryContext queryContext) {
+  public AggregationDataTableReducer(QueryContext queryContext) {
     super(queryContext, queryContext.getAggregationFunctions());
     Map<String, String> queryOptions = queryContext.getQueryOptions();
     _preserveType = QueryOptionsUtils.isPreserveType(queryOptions);
-    _intermediateResults = new Object[_aggregationFunctions.length];
-    _dataSchema = null;
-  }
-
-  @Override
-  public void init(DataTableReducerContext dataTableReducerContext) {
-    _dataTableReducerContext = dataTableReducerContext;
+    _responseFormatSql = QueryOptionsUtils.isResponseFormatSQL(queryOptions);
   }
 
   /**
@@ -61,24 +54,35 @@ public class AggregationDataTableStreamingReducer extends AggregationReducerBase
    * 2. AggregationResults by default
    */
   @Override
-  public synchronized void reduce(ServerRoutingInstance key, DataTable dataTable) {
-    _dataSchema = _dataSchema == null ? dataTable.getDataSchema() : _dataSchema;
-    // Merge results from all data tables
-    mergedResults(_intermediateResults, _dataSchema, dataTable);
-  }
-
-  @Override
-  public BrokerResponseNative seal() {
-
-    Serializable[] finalResults = new Serializable[_aggregationFunctions.length];
-    for (int i = 0; i < _aggregationFunctions.length; i++) {
-      AggregationFunction aggregationFunction = _aggregationFunctions[i];
-      finalResults[i] = aggregationFunction.getFinalResultColumnType()
-          .convert(aggregationFunction.extractFinalResult(_intermediateResults[i]));
+  public void reduceAndSetResults(String tableName, DataSchema dataSchema,
+      Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
+      DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics) {
+    if (dataTableMap.isEmpty()) {
+      if (_responseFormatSql) {
+        DataSchema resultTableSchema =
+            new PostAggregationHandler(_queryContext, getPrePostAggregationDataSchema()).getResultDataSchema();
+        brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, Collections.emptyList()));
+      }
+      return;
     }
 
-    BrokerResponseNative brokerResponseNative = new BrokerResponseNative();
-    brokerResponseNative.setResultTable(reduceToResultTable(finalResults));
-    return brokerResponseNative;
+    // Merge results from all data tables
+    int numAggregationFunctions = _aggregationFunctions.length;
+    Object[] intermediateResults = new Object[numAggregationFunctions];
+    for (DataTable dataTable : dataTableMap.values()) {
+      mergedResults(intermediateResults, dataSchema, dataTable);
+    }
+    Serializable[] finalResults = new Serializable[numAggregationFunctions];
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      AggregationFunction aggregationFunction = _aggregationFunctions[i];
+      finalResults[i] = aggregationFunction.getFinalResultColumnType()
+          .convert(aggregationFunction.extractFinalResult(intermediateResults[i]));
+    }
+
+    if (_responseFormatSql) {
+      brokerResponseNative.setResultTable(reduceToResultTable(finalResults));
+    } else {
+      brokerResponseNative.setAggregationResults(reduceToAggregationResults(finalResults, dataSchema.getColumnNames()));
+    }
   }
 }

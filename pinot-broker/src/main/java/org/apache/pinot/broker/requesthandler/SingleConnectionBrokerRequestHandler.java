@@ -39,7 +39,7 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.helix.TableCache;
-import org.apache.pinot.core.query.reduce.BrokerReduceService;
+import org.apache.pinot.core.query.reduce.datatable.BrokerReduceService;
 import org.apache.pinot.core.transport.AsyncQueryResponse;
 import org.apache.pinot.core.transport.QueryRouter;
 import org.apache.pinot.core.transport.ServerInstance;

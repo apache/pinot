@@ -29,7 +29,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -38,7 +37,6 @@ import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByResult;
-import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -53,7 +51,6 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
@@ -63,21 +60,21 @@ import org.apache.pinot.core.util.trace.TraceRunnable;
  * Helper class to reduce data tables and set group by results into the BrokerResponseNative
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class GroupByDataTableReducer implements DataTableReducer {
+public class GroupByReducerBase {
   private static final int MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE = 2; // TBD, find a better value.
 
-  private final QueryContext _queryContext;
-  private final AggregationFunction[] _aggregationFunctions;
-  private final int _numAggregationFunctions;
-  private final List<ExpressionContext> _groupByExpressions;
-  private final int _numGroupByExpressions;
-  private final int _numColumns;
-  private final boolean _preserveType;
-  private final boolean _groupByModeSql;
-  private final boolean _responseFormatSql;
-  private final boolean _sqlQuery;
+  protected final QueryContext _queryContext;
+  protected final AggregationFunction[] _aggregationFunctions;
+  protected final int _numAggregationFunctions;
+  protected final List<ExpressionContext> _groupByExpressions;
+  protected final int _numGroupByExpressions;
+  protected final int _numColumns;
+  protected final boolean _preserveType;
+  protected final boolean _groupByModeSql;
+  protected final boolean _responseFormatSql;
+  protected final boolean _sqlQuery;
 
-  GroupByDataTableReducer(QueryContext queryContext) {
+  public GroupByReducerBase(QueryContext queryContext) {
     _queryContext = queryContext;
     _aggregationFunctions = queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
@@ -94,91 +91,6 @@ public class GroupByDataTableReducer implements DataTableReducer {
   }
 
   /**
-   * Reduces and sets group by results into ResultTable, if responseFormat = sql
-   * By default, sets group by results into GroupByResults
-   */
-  @Override
-  public void reduceAndSetResults(String tableName, DataSchema dataSchema,
-      Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
-      DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics) {
-    assert dataSchema != null;
-    int resultSize = 0;
-    Collection<DataTable> dataTables = dataTableMap.values();
-
-    // For group by, PQL behavior is different than the SQL behavior. In the PQL way,
-    // a result is generated for each aggregation in the query,
-    // and the group by keys are not the same across the aggregations
-    // This PQL style of execution makes it impossible to support order by on group by.
-    //
-    // We could not simply change the group by execution behavior,
-    // as that would not be backward compatible for existing users of group by.
-    // As a result, we have 2 modes of group by execution - pql and sql - which can be controlled via query options
-    //
-    // Long term, we may completely move to sql, and keep only full sql mode alive
-    // Until then, we need to support responseFormat = sql for both the modes of execution.
-    // The 4 variants are as described below:
-
-    if (_groupByModeSql) {
-
-      if (_responseFormatSql) {
-        // 1. groupByMode = sql, responseFormat = sql
-        // This is the primary SQL compliant group by
-
-        try {
-          setSQLGroupByInResultTable(brokerResponseNative, dataSchema, dataTables, reducerContext, tableName,
-              brokerMetrics);
-        } catch (TimeoutException e) {
-          brokerResponseNative.getProcessingExceptions()
-              .add(new QueryProcessingException(QueryException.BROKER_TIMEOUT_ERROR_CODE, e.getMessage()));
-        }
-        resultSize = brokerResponseNative.getResultTable().getRows().size();
-      } else {
-        // 2. groupByMode = sql, responseFormat = pql
-        // This mode will invoke SQL style group by execution, but present results in PQL way
-        // This mode is useful for users who want to avail of SQL compliant group by behavior,
-        // w/o having to forcefully move to a new result type
-
-        try {
-          setSQLGroupByInAggregationResults(brokerResponseNative, dataSchema, dataTables, reducerContext);
-        } catch (TimeoutException e) {
-          brokerResponseNative.getProcessingExceptions()
-              .add(new QueryProcessingException(QueryException.BROKER_TIMEOUT_ERROR_CODE, e.getMessage()));
-        }
-
-        if (!brokerResponseNative.getAggregationResults().isEmpty()) {
-          resultSize = brokerResponseNative.getAggregationResults().get(0).getGroupByResult().size();
-        }
-      }
-    } else {
-
-      // 3. groupByMode = pql, responseFormat = sql
-      // This mode is for users who want response presented in SQL style, but want PQL style group by behavior
-      // Multiple aggregations in PQL violates the tabular nature of results
-      // As a result, in this mode, only single aggregations are supported
-
-      // 4. groupByMode = pql, responseFormat = pql
-      // This is the primary PQL compliant group by
-
-      setGroupByResults(brokerResponseNative, dataTables);
-
-      if (_responseFormatSql) {
-        resultSize = brokerResponseNative.getResultTable().getRows().size();
-      } else {
-        // We emit the group by size when the result isn't empty. All the sizes among group-by results should be the
-        // same.
-        // Thus, we can just emit the one from the 1st result.
-        if (!brokerResponseNative.getAggregationResults().isEmpty()) {
-          resultSize = brokerResponseNative.getAggregationResults().get(0).getGroupByResult().size();
-        }
-      }
-    }
-
-    if (brokerMetrics != null && resultSize > 0) {
-      brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.GROUP_BY_SIZE, resultSize);
-    }
-  }
-
-  /**
    * Extract group by order by results and set into {@link ResultTable}
    * @param brokerResponseNative broker response
    * @param dataSchema data schema
@@ -188,7 +100,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
    * @param brokerMetrics broker metrics (meters)
    * @throws TimeoutException If unable complete within timeout.
    */
-  private void setSQLGroupByInResultTable(BrokerResponseNative brokerResponseNative, DataSchema dataSchema,
+  protected void setSQLGroupByInResultTable(BrokerResponseNative brokerResponseNative, DataSchema dataSchema,
       Collection<DataTable> dataTables, DataTableReducerContext reducerContext, String rawTableName,
       BrokerMetrics brokerMetrics)
       throws TimeoutException {
@@ -265,7 +177,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
   /**
    * Helper method to extract the final aggregation results for the given row (in-place).
    */
-  private void extractFinalAggregationResults(Object[] row) {
+  protected void extractFinalAggregationResults(Object[] row) {
     for (int i = 0; i < _numAggregationFunctions; i++) {
       int valueIndex = i + _numGroupByExpressions;
       row[valueIndex] = _aggregationFunctions[i].extractFinalResult(row[valueIndex]);
@@ -275,7 +187,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
   /**
    * Constructs the DataSchema for the rows before the post-aggregation (SQL mode).
    */
-  private DataSchema getPrePostAggregationDataSchema(DataSchema dataSchema) {
+  protected DataSchema getPrePostAggregationDataSchema(DataSchema dataSchema) {
     String[] columnNames = dataSchema.getColumnNames();
     ColumnDataType[] columnDataTypes = new ColumnDataType[_numColumns];
     System.arraycopy(dataSchema.getColumnDataTypes(), 0, columnDataTypes, 0, _numGroupByExpressions);
@@ -285,7 +197,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     return new DataSchema(columnNames, columnDataTypes);
   }
 
-  private IndexedTable getIndexedTable(DataSchema dataSchema, Collection<DataTable> dataTablesToReduce,
+  protected IndexedTable getIndexedTable(DataSchema dataSchema, Collection<DataTable> dataTablesToReduce,
       DataTableReducerContext reducerContext)
       throws TimeoutException {
     long start = System.currentTimeMillis();
@@ -427,7 +339,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
    * @param reducerContext DataTableReducer context
    * @throws TimeoutException If unable to complete within the timeout.
    */
-  private void setSQLGroupByInAggregationResults(BrokerResponseNative brokerResponseNative, DataSchema dataSchema,
+  protected void setSQLGroupByInAggregationResults(BrokerResponseNative brokerResponseNative, DataSchema dataSchema,
       Collection<DataTable> dataTables, DataTableReducerContext reducerContext)
       throws TimeoutException {
 
@@ -490,7 +402,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     brokerResponseNative.setAggregationResults(aggregationResults);
   }
 
-  private Serializable getSerializableValue(Object value) {
+  protected Serializable getSerializableValue(Object value) {
     if (value instanceof Number) {
       return (Number) value;
     } else {
@@ -501,7 +413,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
   /**
    * Constructs the final result table schema for PQL execution mode
    */
-  private DataSchema getPQLResultTableSchema(AggregationFunction aggregationFunction) {
+  protected DataSchema getPQLResultTableSchema(AggregationFunction aggregationFunction) {
     String[] columnNames = new String[_numColumns];
     ColumnDataType[] columnDataTypes = new ColumnDataType[_numColumns];
     for (int i = 0; i < _numGroupByExpressions; i++) {
@@ -519,7 +431,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
    * @param brokerResponseNative broker response.
    * @param dataTables Collection of data tables
    */
-  private void setGroupByResults(BrokerResponseNative brokerResponseNative, Collection<DataTable> dataTables) {
+  protected void setGroupByResults(BrokerResponseNative brokerResponseNative, Collection<DataTable> dataTables) {
 
     // Merge results from all data tables.
     String[] columnNames = new String[_numAggregationFunctions];
@@ -591,7 +503,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
   /**
    * Helper method to merge 2 intermediate result maps.
    */
-  private void mergeResultMap(Map<String, Object> mergedResultMap, Map<String, Object> resultMapToMerge,
+  protected void mergeResultMap(Map<String, Object> mergedResultMap, Map<String, Object> resultMapToMerge,
       AggregationFunction aggregationFunction) {
     for (Map.Entry<String, Object> entry : resultMapToMerge.entrySet()) {
       String groupKey = entry.getKey();

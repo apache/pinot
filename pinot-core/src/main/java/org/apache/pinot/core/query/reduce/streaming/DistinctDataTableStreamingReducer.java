@@ -18,18 +18,12 @@
  */
 package org.apache.pinot.core.query.reduce.streaming;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.reduce.DataTableReducerContext;
+import org.apache.pinot.core.query.reduce.DistinctReducerBase;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 
@@ -37,15 +31,14 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 /**
  * Helper class to reduce data tables and set results of distinct query into the BrokerResponseNative
  */
-public class DistinctDataTableStreamingReducer implements StreamingReducer {
-  private final DistinctAggregationFunction _distinctAggregationFunction;
+public class DistinctDataTableStreamingReducer extends DistinctReducerBase implements StreamingReducer {
 
   private DistinctTable _mainDistinctTable;
 
     // TODO: queryOptions.isPreserveType() is ignored for DISTINCT queries.
   public DistinctDataTableStreamingReducer(QueryContext queryContext,
       DistinctAggregationFunction distinctAggregationFunction) {
-    _distinctAggregationFunction = distinctAggregationFunction;
+    super(queryContext, distinctAggregationFunction);
   }
 
   @Override
@@ -89,22 +82,5 @@ public class DistinctDataTableStreamingReducer implements StreamingReducer {
     // for that reason, response from broker should be a selection query result.
     brokerResponseNative.setResultTable(reduceToResultTable(_mainDistinctTable));
     return brokerResponseNative;
-  }
-
-  private ResultTable reduceToResultTable(DistinctTable distinctTable) {
-    List<Object[]> rows = new ArrayList<>(distinctTable.size());
-    DataSchema dataSchema = distinctTable.getDataSchema();
-    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
-    int numColumns = columnDataTypes.length;
-    Iterator<Record> iterator = distinctTable.getFinalResult();
-    while (iterator.hasNext()) {
-      Object[] values = iterator.next().getValues();
-      Object[] row = new Object[numColumns];
-      for (int i = 0; i < numColumns; i++) {
-        row[i] = columnDataTypes[i].convertAndFormat(values[i]);
-      }
-      rows.add(row);
-    }
-    return new ResultTable(dataSchema, rows);
   }
 }
