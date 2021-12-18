@@ -317,7 +317,8 @@ public class ClusterIntegrationTestUtils {
    * @throws Exception
    */
   public static void pushAvroIntoKafka(List<File> avroFiles, String kafkaBroker, String kafkaTopic,
-      int maxNumKafkaMessagesPerBatch, @Nullable byte[] header, @Nullable String partitionColumn)
+      int maxNumKafkaMessagesPerBatch, @Nullable byte[] header, @Nullable String partitionColumn,
+      boolean injectTombstones)
       throws Exception {
     Properties properties = new Properties();
     properties.put("metadata.broker.list", kafkaBroker);
@@ -329,6 +330,13 @@ public class ClusterIntegrationTestUtils {
         StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
 
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536)) {
+      if (injectTombstones) {
+        // publish lots of tombstones to livelock the consumer if it can't handle this properly
+        for (int i = 0; i < 1000; i++) {
+          // publish a tombstone first
+          producer.produce(kafkaTopic, Longs.toByteArray(System.currentTimeMillis()), null);
+        }
+      }
       for (File avroFile : avroFiles) {
         try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
           BinaryEncoder binaryEncoder = new EncoderFactory().directBinaryEncoder(outputStream, null);
