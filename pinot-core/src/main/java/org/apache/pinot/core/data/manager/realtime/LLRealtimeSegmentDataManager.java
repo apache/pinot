@@ -434,7 +434,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       } else if (messageBatch.getUnfilteredMessageCount() > 0) {
         // we consumed something from the stream but filtered all the content out,
         // so we need to advance the offsets to avoid getting stuck
-        _currentOffset = messageBatch.getLastOffset();
+        _currentOffset = messageBatch.getOffsetOfNextBatch();
         lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(_currentOffset);
       } else {
         // We did not consume any rows. Update the partition-consuming metric only if we have been idling for a long

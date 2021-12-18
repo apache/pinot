@@ -91,7 +91,7 @@ public interface MessageBatch<T> {
   /**
    * @return last offset in the batch
    */
-  default StreamPartitionMsgOffset getLastOffset() {
+  default StreamPartitionMsgOffset getOffsetOfNextBatch() {
     return getNextStreamParitionMsgOffsetAtIndex(getMessageCount() - 1);
   }
 
