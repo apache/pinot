@@ -58,29 +58,38 @@ public class BenchmarkFixedByteSVForwardIndexReader {
   private long[] _longBuffer;
   private FixedByteChunkSVForwardIndexReader _compressedReader;
   private FixedBytePower2ChunkSVForwardIndexReader _compressedPow2Reader;
+  private FixedByteChunkSVForwardIndexReader _uncompressedReader;
 
   @Setup(Level.Trial)
   public void setup()
       throws IOException {
     FileUtils.forceMkdir(INDEX_DIR);
+    File uncompressedIndexFile = new File(INDEX_DIR, UUID.randomUUID().toString());
     File compressedIndexFile = new File(INDEX_DIR, UUID.randomUUID().toString());
     File pow2CompressedIndexFile = new File(INDEX_DIR, UUID.randomUUID().toString());
     _doubleBuffer = new double[_blockSize];
     _longBuffer = new long[_blockSize];
     try (FixedByteChunkSVForwardIndexWriter writer = new FixedByteChunkSVForwardIndexWriter(compressedIndexFile,
         ChunkCompressionType.LZ4, _numBlocks * _blockSize, 1000, Long.BYTES, 3);
+        FixedByteChunkSVForwardIndexWriter passthroughWriter = new FixedByteChunkSVForwardIndexWriter(
+            uncompressedIndexFile,
+            ChunkCompressionType.PASS_THROUGH, _numBlocks * _blockSize, 1000, Long.BYTES, 3);
         FixedByteChunkSVForwardIndexWriter pow2Writer = new FixedByteChunkSVForwardIndexWriter(pow2CompressedIndexFile,
             ChunkCompressionType.LZ4, _numBlocks * _blockSize, 1000, Long.BYTES, 4)) {
       for (int i = 0; i < _numBlocks * _blockSize; i++) {
         long next = ThreadLocalRandom.current().nextLong();
         writer.putLong(next);
         pow2Writer.putLong(next);
+        passthroughWriter.putLong(next);
       }
     }
     _compressedReader = new FixedByteChunkSVForwardIndexReader(PinotDataBuffer.loadBigEndianFile(compressedIndexFile),
         FieldSpec.DataType.LONG);
     _compressedPow2Reader =
         new FixedBytePower2ChunkSVForwardIndexReader(PinotDataBuffer.loadBigEndianFile(pow2CompressedIndexFile),
+            FieldSpec.DataType.LONG);
+    _uncompressedReader =
+        new FixedByteChunkSVForwardIndexReader(PinotDataBuffer.loadBigEndianFile(uncompressedIndexFile),
             FieldSpec.DataType.LONG);
     _docIds = new int[_blockSize];
   }
@@ -141,6 +150,66 @@ public class BenchmarkFixedByteSVForwardIndexReader {
           _doubleBuffer[i] = reader.getDouble(_docIds[i], context);
         }
         bh.consume(_doubleBuffer);
+      }
+    }
+  }
+
+  @Benchmark
+  public void readDoublesBatch(Blackhole bh)
+      throws IOException {
+    try (ChunkReaderContext context = _uncompressedReader.createContext()) {
+      for (int block = 0; block < _numBlocks; block++) {
+        for (int i = 0; i < _docIds.length; i++) {
+          _docIds[i] = block * _blockSize + i;
+        }
+        _uncompressedReader.readValuesSV(_docIds, _docIds.length, _doubleBuffer, context);
+        bh.consume(_doubleBuffer);
+      }
+    }
+  }
+
+  @Benchmark
+  public void readDoubles(Blackhole bh)
+      throws IOException {
+    try (ChunkReaderContext context = _uncompressedReader.createContext()) {
+      for (int block = 0; block < _numBlocks; block++) {
+        for (int i = 0; i < _docIds.length; i++) {
+          _docIds[i] = block * _blockSize + i;
+        }
+        for (int i = 0; i < _docIds.length; i++) {
+          _doubleBuffer[i] = _uncompressedReader.getLong(_docIds[i], context);
+        }
+        bh.consume(_doubleBuffer);
+      }
+    }
+  }
+
+  @Benchmark
+  public void readLongsBatch(Blackhole bh)
+      throws IOException {
+    try (ChunkReaderContext context = _uncompressedReader.createContext()) {
+      for (int block = 0; block < _numBlocks; block++) {
+        for (int i = 0; i < _docIds.length; i++) {
+          _docIds[i] = block * _blockSize + i;
+        }
+        _uncompressedReader.readValuesSV(_docIds, _docIds.length, _longBuffer, context);
+        bh.consume(_longBuffer);
+      }
+    }
+  }
+
+  @Benchmark
+  public void readLongs(Blackhole bh)
+      throws IOException {
+    try (ChunkReaderContext context = _uncompressedReader.createContext()) {
+      for (int block = 0; block < _numBlocks; block++) {
+        for (int i = 0; i < _docIds.length; i++) {
+          _docIds[i] = block * _blockSize + i;
+        }
+        for (int i = 0; i < _docIds.length; i++) {
+          _longBuffer[i] = _uncompressedReader.getLong(_docIds[i], context);
+        }
+        bh.consume(_longBuffer);
       }
     }
   }

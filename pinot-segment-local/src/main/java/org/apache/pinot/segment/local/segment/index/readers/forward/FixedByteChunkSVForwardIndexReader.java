@@ -65,7 +65,7 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForward
         case LONG: {
           int minOffset = docIds[0] * Long.BYTES;
           LongBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Long.BYTES).asLongBuffer();
-          for (int i = 0; i < length; i++) {
+          for (int i = 0; i < buffer.limit(); i++) {
             values[i] = (int) buffer.get(i);
           }
         }
@@ -73,7 +73,7 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForward
         case FLOAT: {
           int minOffset = docIds[0] * Float.BYTES;
           FloatBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Float.BYTES).asFloatBuffer();
-          for (int i = 0; i < length; i++) {
+          for (int i = 0; i < buffer.limit(); i++) {
             values[i] = (int) buffer.get(i);
           }
         }
@@ -81,7 +81,7 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForward
         case DOUBLE: {
           int minOffset = docIds[0] * Double.BYTES;
           DoubleBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Double.BYTES).asDoubleBuffer();
-          for (int i = 0; i < length; i++) {
+          for (int i = 0; i < buffer.limit(); i++) {
             values[i] = (int) buffer.get(i);
           }
         }
@@ -101,7 +101,7 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForward
         case INT: {
           int minOffset = docIds[0] * Integer.BYTES;
           IntBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Integer.BYTES).asIntBuffer();
-          for (int i = 0; i < length; i++) {
+          for (int i = 0; i < buffer.limit(); i++) {
             values[i] = buffer.get(i);
           }
         }
@@ -115,7 +115,7 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForward
         case FLOAT: {
           int minOffset = docIds[0] * Float.BYTES;
           FloatBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Float.BYTES).asFloatBuffer();
-          for (int i = 0; i < length; i++) {
+          for (int i = 0; i < buffer.limit(); i++) {
             values[i] = (long) buffer.get(i);
           }
         }
@@ -123,7 +123,7 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForward
         case DOUBLE: {
           int minOffset = docIds[0] * Double.BYTES;
           DoubleBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Double.BYTES).asDoubleBuffer();
-          for (int i = 0; i < length; i++) {
+          for (int i = 0; i < buffer.limit(); i++) {
             values[i] = (long) buffer.get(i);
           }
         }
@@ -143,7 +143,7 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForward
         case INT: {
           int minOffset = docIds[0] * Integer.BYTES;
           IntBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Integer.BYTES).asIntBuffer();
-          for (int i = 0; i < length; i++) {
+          for (int i = 0; i < buffer.limit(); i++) {
             values[i] = buffer.get(i);
           }
         }
@@ -151,7 +151,7 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForward
         case LONG: {
           int minOffset = docIds[0] * Long.BYTES;
           LongBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Long.BYTES).asLongBuffer();
-          for (int i = 0; i < length; i++) {
+          for (int i = 0; i < buffer.limit(); i++) {
             values[i] = buffer.get(i);
           }
         }
@@ -165,7 +165,7 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForward
         case DOUBLE: {
           int minOffset = docIds[0] * Double.BYTES;
           DoubleBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Double.BYTES).asDoubleBuffer();
-          for (int i = 0; i < length; i++) {
+          for (int i = 0; i < buffer.limit(); i++) {
             values[i] = (float) buffer.get(i);
           }
         }
@@ -185,7 +185,7 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForward
         case INT: {
           int minOffset = docIds[0] * Integer.BYTES;
           IntBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Integer.BYTES).asIntBuffer();
-          for (int i = 0; i < length; i++) {
+          for (int i = 0; i < buffer.limit(); i++) {
             values[i] = buffer.get(i);
           }
         }
@@ -194,7 +194,7 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForward
           int minOffset = docIds[0] * Long.BYTES;
           getLong(0, context);
           LongBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Long.BYTES).asLongBuffer();
-          for (int i = 0; i < length; i++) {
+          for (int i = 0; i < buffer.limit(); i++) {
             values[i] = buffer.get(i);
           }
         }
@@ -202,7 +202,7 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForward
         case FLOAT: {
           int minOffset = docIds[0] * Float.BYTES;
           FloatBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Float.BYTES).asFloatBuffer();
-          for (int i = 0; i < length; i++) {
+          for (int i = 0; i < buffer.limit(); i++) {
             values[i] = buffer.get(i);
           }
         }
