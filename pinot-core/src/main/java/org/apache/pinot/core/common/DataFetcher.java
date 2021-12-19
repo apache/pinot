@@ -427,7 +427,7 @@ public class DataFetcher {
         _dictionary.readIntValues(dictIdBuffer, length, valueBuffer);
       } else {
         if (_reader.getValueType().isFixedWidth()) {
-          _reader.fillValues(docIds, length, valueBuffer, readerContext);
+          _reader.readValuesSV(docIds, length, valueBuffer, readerContext);
         } else if (_reader.getValueType() == FieldSpec.DataType.STRING) {
           for (int i = 0; i < length; i++) {
             valueBuffer[i] = Integer.parseInt(_reader.getString(docIds[i], readerContext));
@@ -451,7 +451,7 @@ public class DataFetcher {
         _dictionary.readLongValues(dictIdBuffer, length, valueBuffer);
       } else {
         if (_reader.getValueType().isFixedWidth()) {
-          _reader.fillValues(docIds, length, valueBuffer, readerContext);
+          _reader.readValuesSV(docIds, length, valueBuffer, readerContext);
         } else if (_reader.getValueType() == FieldSpec.DataType.STRING) {
           for (int i = 0; i < length; i++) {
             valueBuffer[i] = Long.parseLong(_reader.getString(docIds[i], readerContext));
@@ -475,7 +475,7 @@ public class DataFetcher {
         _dictionary.readFloatValues(dictIdBuffer, length, valueBuffer);
       } else {
         if (_reader.getValueType().isFixedWidth()) {
-          _reader.fillValues(docIds, length, valueBuffer, readerContext);
+          _reader.readValuesSV(docIds, length, valueBuffer, readerContext);
         } else if (_reader.getValueType() == FieldSpec.DataType.STRING) {
           for (int i = 0; i < length; i++) {
             valueBuffer[i] = Float.parseFloat(_reader.getString(docIds[i], readerContext));
@@ -499,7 +499,7 @@ public class DataFetcher {
         _dictionary.readDoubleValues(dictIdBuffer, length, valueBuffer);
       } else {
         if (_reader.getValueType().isFixedWidth()) {
-          _reader.fillValues(docIds, length, valueBuffer, readerContext);
+          _reader.readValuesSV(docIds, length, valueBuffer, readerContext);
         } else if (_reader.getValueType() == FieldSpec.DataType.STRING) {
           for (int i = 0; i < length; i++) {
             valueBuffer[i] = Double.parseDouble(_reader.getString(docIds[i], readerContext));

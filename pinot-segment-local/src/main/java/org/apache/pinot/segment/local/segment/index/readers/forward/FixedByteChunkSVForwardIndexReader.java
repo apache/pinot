@@ -53,9 +53,8 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForward
   }
 
   @Override
-  public void fillValues(int[] docIds, int length, int[] values, ChunkReaderContext context) {
-    int range = docIds[length - 1] - docIds[0];
-    if (!_isCompressed && range == length - 1) {
+  public void readValuesSV(int[] docIds, int length, int[] values, ChunkReaderContext context) {
+    if (!_isCompressed && isContiguousRange(docIds, length)) {
       switch (getValueType().getStoredType()) {
         case INT: {
           int minOffset = docIds[0] * Integer.BYTES;
@@ -91,14 +90,13 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForward
           throw new IllegalArgumentException();
       }
     } else {
-      super.fillValues(docIds, length, values, context);
+      super.readValuesSV(docIds, length, values, context);
     }
   }
 
   @Override
-  public void fillValues(int[] docIds, int length, long[] values, ChunkReaderContext context) {
-    int range = docIds[length - 1] - docIds[0];
-    if (!_isCompressed && range == length - 1) {
+  public void readValuesSV(int[] docIds, int length, long[] values, ChunkReaderContext context) {
+    if (!_isCompressed && isContiguousRange(docIds, length)) {
       switch (getValueType().getStoredType()) {
         case INT: {
           int minOffset = docIds[0] * Integer.BYTES;
@@ -134,14 +132,13 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForward
           throw new IllegalArgumentException();
       }
     } else {
-      super.fillValues(docIds, length, values, context);
+      super.readValuesSV(docIds, length, values, context);
     }
   }
 
   @Override
-  public void fillValues(int[] docIds, int length, float[] values, ChunkReaderContext context) {
-    int range = docIds[length - 1] - docIds[0];
-    if (!_isCompressed && range == length - 1) {
+  public void readValuesSV(int[] docIds, int length, float[] values, ChunkReaderContext context) {
+    if (!_isCompressed && isContiguousRange(docIds, length)) {
       switch (getValueType().getStoredType()) {
         case INT: {
           int minOffset = docIds[0] * Integer.BYTES;
@@ -177,14 +174,13 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForward
           throw new IllegalArgumentException();
       }
     } else {
-      super.fillValues(docIds, length, values, context);
+      super.readValuesSV(docIds, length, values, context);
     }
   }
 
   @Override
-  public void fillValues(int[] docIds, int length, double[] values, ChunkReaderContext context) {
-    int range = docIds[length - 1] - docIds[0];
-    if (!_isCompressed && range == length - 1) {
+  public void readValuesSV(int[] docIds, int length, double[] values, ChunkReaderContext context) {
+    if (!_isCompressed && isContiguousRange(docIds, length)) {
       switch (getValueType().getStoredType()) {
         case INT: {
           int minOffset = docIds[0] * Integer.BYTES;
@@ -221,7 +217,7 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForward
           throw new IllegalArgumentException();
       }
     } else {
-      super.fillValues(docIds, length, values, context);
+      super.readValuesSV(docIds, length, values, context);
     }
   }
 
@@ -267,5 +263,9 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForward
     } else {
       return _rawData.getDouble(docId * Double.BYTES);
     }
+  }
+
+  private boolean isContiguousRange(int[] docIds, int length) {
+    return docIds[length - 1] - docIds[0] == length - 1;
   }
 }

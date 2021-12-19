@@ -109,7 +109,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * @param values Values to fill
    * @param context Reader context
    */
-  default void fillValues(int[] docIds, int length, int[] values, T context) {
+  default void readValuesSV(int[] docIds, int length, int[] values, T context) {
     switch (getValueType().getStoredType()) {
       case INT:
         for (int i = 0; i < length; i++) {
@@ -143,7 +143,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * @param values Values to fill
    * @param context Reader context
    */
-  default void fillValues(int[] docIds, int length, long[] values, T context) {
+  default void readValuesSV(int[] docIds, int length, long[] values, T context) {
     switch (getValueType().getStoredType()) {
       case INT:
         for (int i = 0; i < length; i++) {
@@ -177,7 +177,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * @param values Values to fill
    * @param context Reader context
    */
-  default void fillValues(int[] docIds, int length, float[] values, T context) {
+  default void readValuesSV(int[] docIds, int length, float[] values, T context) {
     switch (getValueType().getStoredType()) {
       case INT:
         for (int i = 0; i < length; i++) {
@@ -211,7 +211,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * @param values Values to fill
    * @param context Reader context
    */
-  default void fillValues(int[] docIds, int length, double[] values, T context) {
+  default void readValuesSV(int[] docIds, int length, double[] values, T context) {
     switch (getValueType().getStoredType()) {
       case INT:
         for (int i = 0; i < length; i++) {
