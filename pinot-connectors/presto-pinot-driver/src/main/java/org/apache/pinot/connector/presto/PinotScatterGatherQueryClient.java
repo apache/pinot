@@ -34,12 +34,12 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.transport.AsyncQueryResponse;
-import org.apache.pinot.core.transport.QueryRouter;
-import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.core.transport.ServerResponse;
-import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.core.transport.TlsConfig;
+import org.apache.pinot.connector.presto.transport.AsyncQueryResponse;
+import org.apache.pinot.connector.presto.transport.QueryRouter;
+import org.apache.pinot.connector.presto.transport.ServerInstance;
+import org.apache.pinot.connector.presto.transport.ServerResponse;
+import org.apache.pinot.connector.presto.transport.ServerRoutingInstance;
+import org.apache.pinot.connector.presto.transport.TlsConfig;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.TableType;
@@ -256,8 +256,8 @@ public class PinotScatterGatherQueryClient {
           String.format("Parsing error with on %s, Error = %s", serverHost, e.getMessage()), e);
     }
 
-    Map<org.apache.pinot.core.transport.ServerInstance, List<String>> routingTable = new HashMap<>();
-    routingTable.put(new org.apache.pinot.core.transport.ServerInstance(new InstanceConfig(serverHost)),
+    Map<ServerInstance, List<String>> routingTable = new HashMap<>();
+    routingTable.put(new ServerInstance(new InstanceConfig(serverHost)),
         new ArrayList<>(segments));
 
     // Unfortunately the retries will all hit the same server because the routing decision has already been made by
@@ -309,7 +309,7 @@ public class PinotScatterGatherQueryClient {
   }
 
   private Map<ServerInstance, DataTable> gatherServerResponses(boolean ignoreEmptyResponses,
-      Map<org.apache.pinot.core.transport.ServerInstance, List<String>> routingTable,
+      Map<ServerInstance, List<String>> routingTable,
       AsyncQueryResponse asyncQueryResponse, String tableNameWithType) {
     try {
       Map<ServerRoutingInstance, ServerResponse> queryResponses = asyncQueryResponse.getResponse();
