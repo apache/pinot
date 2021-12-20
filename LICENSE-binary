@@ -345,10 +345,10 @@ org.apache.httpcomponents:httpmime:4.5.3
 org.apache.kafka:kafka-clients:2.0.0
 org.apache.kafka:kafka_2.10:0.9.0.1
 org.apache.kafka:kafka_2.11:2.0.0
-org.apache.logging.log4j:log4j-1.2-api:2.16.0
-org.apache.logging.log4j:log4j-api:2.16.0
-org.apache.logging.log4j:log4j-core:2.16.0
-org.apache.logging.log4j:log4j-slf4j-impl:2.16.0
+org.apache.logging.log4j:log4j-1.2-api:2.17.0
+org.apache.logging.log4j:log4j-api:2.17.0
+org.apache.logging.log4j:log4j-core:2.17.0
+org.apache.logging.log4j:log4j-slf4j-impl:2.17.0
 org.apache.lucene:lucene-analyzers-common:8.2.0
 org.apache.lucene:lucene-core:8.2.0
 org.apache.lucene:lucene-queries:8.2.0
