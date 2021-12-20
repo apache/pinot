@@ -34,9 +34,7 @@ import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
@@ -230,8 +228,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final MutableSegmentImpl _realtimeSegment;
   private volatile StreamPartitionMsgOffset _currentOffset;
   private volatile State _state;
-  private static final AtomicIntegerFieldUpdater<LLRealtimeSegmentDataManager> NUM_ROWS_CONSUMED_UPDATER =
-      AtomicIntegerFieldUpdater.newUpdater(LLRealtimeSegmentDataManager.class, "_numRowsConsumed");
   private volatile int _numRowsConsumed = 0;
   private volatile int _numRowsIndexed = 0; // Can be different from _numRowsConsumed when metrics update is enabled.
   private volatile int _numRowsErrored = 0;
@@ -245,8 +241,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final StreamPartitionMsgOffsetFactory _streamPartitionMsgOffsetFactory;
 
   // Segment end criteria
-  private static final AtomicLongFieldUpdater<LLRealtimeSegmentDataManager> CONSUME_END_TIME_UPDATER =
-      AtomicLongFieldUpdater.newUpdater(LLRealtimeSegmentDataManager.class, "_consumeEndTime");
   private volatile long _consumeEndTime = 0;
   private volatile boolean _endOfPartitionGroup = false;
   private StreamPartitionMsgOffset _finalOffset; // Used when we want to catch up to this one
@@ -298,17 +292,15 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private boolean endCriteriaReached() {
     Preconditions.checkState(_state.shouldConsume(), "Incorrect state %s", _state);
     long now = now();
-    long consumeEndTime = _consumeEndTime;
     switch (_state) {
       case INITIAL_CONSUMING:
         // The segment has been created, and we have not posted a segmentConsumed() message on the controller yet.
         // We need to consume as much data as available, until we have either reached the max number of rows or
         // the max time we are allowed to consume.
-        if (now >= consumeEndTime) {
+        if (now >= _consumeEndTime) {
           if (_realtimeSegment.getNumDocsIndexed() == 0) {
             _segmentLogger.info("No events came in, extending time by {} hours", TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS);
-            CONSUME_END_TIME_UPDATER.compareAndSet(this, consumeEndTime, consumeEndTime
-                + TimeUnit.HOURS.toMillis(TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS));
+            _consumeEndTime += TimeUnit.HOURS.toMillis(TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS);
             return false;
           }
           _segmentLogger
@@ -353,7 +345,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         if (_currentOffset.compareTo(_finalOffset) == 0) {
           _segmentLogger.info("Caught up to offset={}, state={}", _finalOffset, _state.toString());
           return true;
-        } else if (now >= consumeEndTime) {
+        } else if (now >= _consumeEndTime) {
           _segmentLogger.info("Past max time budget: offset={}, state={}", _currentOffset, _state.toString());
           return true;
         }
@@ -559,8 +551,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
       _currentOffset = messagesAndOffsets.getNextStreamParitionMsgOffsetAtIndex(index);
       _numRowsIndexed = _realtimeSegment.getNumDocsIndexed();
+      _numRowsConsumed++;
       streamMessageCount++;
-      NUM_ROWS_CONSUMED_UPDATER.incrementAndGet(this);
     }
     updateCurrentDocumentCountMetrics();
     if (streamMessageCount != 0) {
