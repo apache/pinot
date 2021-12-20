@@ -76,7 +76,8 @@ public abstract class BaseChunkSVForwardIndexWriter implements Closeable {
     _headerEntryChunkOffsetSize = getHeaderEntryChunkOffsetSize(version);
     _dataOffset = writeHeader(compressionType, totalDocs, numDocsPerChunk, sizeOfEntry, version);
     _chunkBuffer = ByteBuffer.allocateDirect(chunkSize);
-    _compressedBuffer = ByteBuffer.allocateDirect(chunkSize * 2);
+    int maxCompressedChunkSize = _chunkCompressor.maxCompressedSize(_chunkSize); // may exceed original chunk size
+    _compressedBuffer = ByteBuffer.allocateDirect(maxCompressedChunkSize);
     _dataFile = new RandomAccessFile(file, "rw").getChannel();
   }
 
