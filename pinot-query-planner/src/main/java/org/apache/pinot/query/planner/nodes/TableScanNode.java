@@ -22,4 +22,8 @@ public class TableScanNode extends AbstractStageNode {
   public void addInput(StageNode queryStageRoot) {
     throw new UnsupportedOperationException("table scan cannot add input");
   }
+
+  public List<String> getTableName() {
+    return _tableName;
+  }
 }
