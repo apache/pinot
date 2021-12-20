@@ -36,6 +36,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -153,7 +154,10 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
   @ApiOperation(value = "Adds a table", notes = "Adds a table")
-  public SuccessResponse addTable(String tableConfigStr, @Context HttpHeaders httpHeaders, @Context Request request) {
+  public SuccessResponse addTable(
+      String tableConfigStr,
+      @ApiParam(value = "comma separated list of validation skip") @QueryParam("skipValidate") String skipValidate,
+      @Context HttpHeaders httpHeaders, @Context Request request) {
     // TODO introduce a table config ctor with json string.
     TableConfig tableConfig;
     String tableName;
@@ -171,7 +175,7 @@ public class PinotTableRestletResource {
       TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema, Collections.emptyMap());
 
       // TableConfigUtils.validate(...) is used across table create/update.
-      TableConfigUtils.validate(tableConfig, schema);
+      TableConfigUtils.validate(tableConfig, toSkippedTypes(skipValidate), schema);
       // TableConfigUtils.validateTableName(...) checks table name rules.
       // So it won't effect already created tables.
       TableConfigUtils.validateTableName(tableConfig);
@@ -435,13 +439,14 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Updates table config for a table", notes = "Updates table config for a table")
   public SuccessResponse updateTableConfig(
       @ApiParam(value = "Name of the table to update", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "comma separated list of validation skip") @QueryParam("skipValidate") String skipValidate,
       String tableConfigString)
       throws Exception {
     TableConfig tableConfig;
     try {
       tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
-      TableConfigUtils.validate(tableConfig, schema);
+      TableConfigUtils.validate(tableConfig, toSkippedTypes(skipValidate), schema);
     } catch (Exception e) {
       String msg = String.format("Invalid table config: %s with error: %s", tableName, e.getMessage());
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
@@ -487,7 +492,9 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Validate table config for a table",
       notes = "This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
           + " This allows us to validate table config before apply.")
-  public String checkTableConfig(String tableConfigStr) {
+  public String checkTableConfig(
+      String tableConfigStr,
+      @ApiParam(value = "comma separated list of validation skip") @QueryParam("skipValidate") String skipValidate) {
     TableConfig tableConfig;
     try {
       tableConfig = JsonUtils.stringToObject(tableConfigStr, TableConfig.class);
@@ -495,7 +502,7 @@ public class PinotTableRestletResource {
       String msg = String.format("Invalid table config json string: %s", tableConfigStr);
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
-    return validateConfig(tableConfig, _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig));
+    return validateConfig(tableConfig, skipValidate, _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig));
   }
 
   @Deprecated
@@ -508,22 +515,28 @@ public class PinotTableRestletResource {
           + "Validate given table config and schema. If specified schema is null, attempt to retrieve schema using the "
           + "table name. This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
           + " This allows us to validate table config before apply.")
-  public String validateTableAndSchema(TableAndSchemaConfig tableSchemaConfig) {
+  public String validateTableAndSchema(
+      TableAndSchemaConfig tableSchemaConfig,
+      @ApiParam(value = "comma separated list of validation skip") @QueryParam("skipValidate") String skipValidate) {
     TableConfig tableConfig = tableSchemaConfig.getTableConfig();
     Schema schema = tableSchemaConfig.getSchema();
     if (schema == null) {
       schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
     }
-    return validateConfig(tableSchemaConfig.getTableConfig(), schema);
+    return validateConfig(tableSchemaConfig.getTableConfig(), skipValidate, schema);
   }
 
-  private String validateConfig(TableConfig tableConfig, Schema schema) {
+  private List<TableConfigUtils.ValidationType> toSkippedTypes(String skipValidate) {
+    return java.util.Arrays.stream(skipValidate.split(","))
+        .map(TableConfigUtils.ValidationType::valueOf).collect(Collectors.toList());
+  }
+
+  private String validateConfig(TableConfig tableConfig, String skipValidate, Schema schema) {
     try {
       if (schema == null) {
         throw new SchemaNotFoundException("Got empty schema");
       }
-
-      TableConfigUtils.validate(tableConfig, schema);
+      TableConfigUtils.validate(tableConfig, toSkippedTypes(skipValidate), schema);
       ObjectNode tableConfigValidateStr = JsonUtils.newObjectNode();
       if (tableConfig.getTableType() == TableType.OFFLINE) {
         tableConfigValidateStr.set(TableType.OFFLINE.name(), tableConfig.toJsonNode());
