@@ -270,6 +270,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         if (!_flags[outGroupIds[i]]) {
           _numKeys++;
           _flags[outGroupIds[i]] = true;
+          if (_numKeys == _globalGroupIdUpperBound) {
+            return;
+          }
         }
       }
     }
