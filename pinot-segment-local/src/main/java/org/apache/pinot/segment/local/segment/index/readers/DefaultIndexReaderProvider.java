@@ -30,6 +30,7 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVFo
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBytePower2ChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReaderV4;
@@ -89,10 +90,12 @@ public class DefaultIndexReaderProvider implements IndexReaderProvider {
     } else {
       FieldSpec.DataType storedType = columnMetadata.getDataType().getStoredType();
       if (columnMetadata.isSingleValue()) {
-        if (storedType.isFixedWidth()) {
-          return new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
-        }
         int version = dataBuffer.getInt(0);
+        if (storedType.isFixedWidth()) {
+          return version >= FixedBytePower2ChunkSVForwardIndexReader.VERSION
+              ? new FixedBytePower2ChunkSVForwardIndexReader(dataBuffer, storedType)
+              : new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
+        }
         if (version >= VarByteChunkSVForwardIndexWriterV4.VERSION) {
           return new VarByteChunkSVForwardIndexReaderV4(dataBuffer, storedType);
         }
