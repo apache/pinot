@@ -149,7 +149,12 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
               _refreshThreadSemaphore);
         } else {
           // Reload one segment
-          _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName, _forceDownload, _refreshThreadSemaphore);
+          try {
+            acquireSema(_segmentName, _logger);
+            _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName, _forceDownload);
+          } finally {
+            _refreshThreadSemaphore.release();
+          }
         }
         helixTaskResult.setSuccess(true);
       } catch (Throwable e) {

@@ -197,11 +197,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload,
-      Semaphore refreshThreadsSemaphore)
+  public void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload)
       throws Exception {
-    try {
-      acquireSema(segmentName, refreshThreadsSemaphore);
       LOGGER.info("Reloading single segment: {} in table: {}", segmentName, tableNameWithType);
       SegmentMetadata segmentMetadata = getSegmentMetadata(tableNameWithType, segmentName);
       if (segmentMetadata == null) {
@@ -218,9 +215,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
 
       LOGGER.info("Reloaded single segment: {} in table: {}", segmentName, tableNameWithType);
-    } finally {
-      refreshThreadsSemaphore.release();
-    }
   }
 
   @Override
@@ -234,7 +228,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     List<SegmentMetadata> segmentsMetadata = getAllSegmentsMetadata(tableNameWithType);
     ExecutorService workers = Executors.newCachedThreadPool();
     final AtomicReference<Exception> sampleException = new AtomicReference<>();
-
+    //calling thread hasn't acquired any permit so we don't reload any segments using it.
     CompletableFuture.allOf(segmentsMetadata.stream().map(segmentMetadata -> CompletableFuture.runAsync(() -> {
       try {
         acquireSema("ALL", refreshThreadSemaphore);

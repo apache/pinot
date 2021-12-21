@@ -90,15 +90,14 @@ public interface InstanceDataManager {
    * one before loading. Download happens when local segment's CRC mismatches the one of
    * the remote segment; but can also be forced to do regardless of CRC.
    */
-  void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload,
-      Semaphore refreshThreadsSemaphore)
+  void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload)
       throws Exception;
 
   /**
    * Reloads all segments of a table.
    * @param refreshThreadSemaphore the semaphore to control the number of reloads in parallel.
    */
-  void reloadAllSegments(String tableNameWithType, boolean forceDownload, Semaphore refreshThreadSemaphore)
+  void reloadAllSegments(String tableNameWithType, boolean forceDownload, @Nullable Semaphore refreshThreadSemaphore)
       throws Exception;
 
   /**
