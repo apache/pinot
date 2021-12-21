@@ -47,6 +47,7 @@ import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
 import org.apache.pinot.segment.spi.creator.TextIndexCreatorProvider;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -82,32 +83,22 @@ import org.slf4j.LoggerFactory;
 public class TextIndexHandler implements IndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(TextIndexHandler.class);
 
-  private final File _indexDir;
   private final SegmentMetadata _segmentMetadata;
   private final Set<String> _columnsToAddIdx;
-  private final TextIndexCreatorProvider _textIndexCreatorProvider;
 
-  public TextIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      TextIndexCreatorProvider textIndexCreatorProvider) {
-    _indexDir = indexDir;
+  public TextIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
     _segmentMetadata = segmentMetadata;
     _columnsToAddIdx = new HashSet<>(indexLoadingConfig.getTextIndexColumns());
-    _textIndexCreatorProvider = textIndexCreatorProvider;
   }
 
   @Override
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.TEXT_INDEX);
-    for (String column : existingColumns) {
-      if (!_columnsToAddIdx.remove(column)) {
-        return true;
-      }
-    }
-    return !_columnsToAddIdx.isEmpty();
+    return !existingColumns.equals(_columnsToAddIdx);
   }
 
   @Override
-  public void updateIndices(SegmentDirectory.Writer segmentWriter)
+  public void updateIndices(SegmentDirectory.Writer segmentWriter, IndexCreatorProvider indexCreatorProvider)
       throws Exception {
     // Remove indices not set in table config any more
     String segmentName = _segmentMetadata.getName();
@@ -123,7 +114,7 @@ public class TextIndexHandler implements IndexHandler {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       if (columnMetadata != null) {
         checkUnsupportedOperationsForTextIndex(columnMetadata);
-        createTextIndexForColumn(segmentWriter, columnMetadata);
+        createTextIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
       }
     }
   }
@@ -140,15 +131,17 @@ public class TextIndexHandler implements IndexHandler {
     }
   }
 
-  private void createTextIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
+  private void createTextIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
+      TextIndexCreatorProvider indexCreatorProvider)
       throws Exception {
+    File indexDir = _segmentMetadata.getIndexDir();
     String segmentName = _segmentMetadata.getName();
-    String column = columnMetadata.getColumnName();
+    String columnName = columnMetadata.getColumnName();
     int numDocs = columnMetadata.getTotalDocs();
     boolean hasDictionary = columnMetadata.hasDictionary();
-    LOGGER.info("Creating new text index for column: {} in segment: {}, hasDictionary: {}", column, segmentName,
+    LOGGER.info("Creating new text index for column: {} in segment: {}, hasDictionary: {}", columnName, segmentName,
         hasDictionary);
-    File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, _segmentMetadata.getVersion());
+    File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(indexDir, _segmentMetadata.getVersion());
     // The handlers are always invoked by the preprocessor. Before this ImmutableSegmentLoader would have already
     // up-converted the segment from v1/v2 -> v3 (if needed). So based on the segmentVersion, whatever segment
     // segmentDirectory is indicated to us by SegmentDirectoryPaths, we create lucene index there. There is no
@@ -156,7 +149,7 @@ public class TextIndexHandler implements IndexHandler {
     // based on segmentVersion.
     try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        TextIndexCreator textIndexCreator = _textIndexCreatorProvider.newTextIndexCreator(IndexCreationContext.builder()
+        TextIndexCreator textIndexCreator = indexCreatorProvider.newTextIndexCreator(IndexCreationContext.builder()
             .withColumnMetadata(columnMetadata).withIndexDir(segmentDirectory).build().forTextIndex(true))) {
       if (columnMetadata.isSingleValue()) {
         processSVField(segmentWriter, hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
@@ -168,7 +161,7 @@ public class TextIndexHandler implements IndexHandler {
       textIndexCreator.seal();
     }
 
-    LOGGER.info("Created text index for column: {} in segment: {}", column, segmentName);
+    LOGGER.info("Created text index for column: {} in segment: {}", columnName, segmentName);
   }
 
   private void processSVField(SegmentDirectory.Writer segmentWriter, boolean hasDictionary,

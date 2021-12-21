@@ -35,12 +35,13 @@ import org.apache.pinot.segment.local.segment.index.readers.IntDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.LongDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.BloomFilterCreatorProvider;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
-import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
@@ -54,33 +55,23 @@ import org.slf4j.LoggerFactory;
 public class BloomFilterHandler implements IndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BloomFilterHandler.class);
 
-  private final File _indexDir;
-  private final SegmentMetadataImpl _segmentMetadata;
+  private final SegmentMetadata _segmentMetadata;
   private final Map<String, BloomFilterConfig> _bloomFilterConfigs;
-  private final BloomFilterCreatorProvider _indexCreatorProvider;
 
-  public BloomFilterHandler(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      BloomFilterCreatorProvider indexCreatorProvider) {
-    _indexDir = indexDir;
+  public BloomFilterHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
     _segmentMetadata = segmentMetadata;
     _bloomFilterConfigs = indexLoadingConfig.getBloomFilterConfigs();
-    _indexCreatorProvider = indexCreatorProvider;
   }
 
   @Override
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
     Set<String> columnsToAddBF = new HashSet<>(_bloomFilterConfigs.keySet());
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.BLOOM_FILTER);
-    for (String column : existingColumns) {
-      if (!columnsToAddBF.remove(column)) {
-        return true;
-      }
-    }
-    return !columnsToAddBF.isEmpty();
+    return !existingColumns.equals(columnsToAddBF);
   }
 
   @Override
-  public void updateIndices(SegmentDirectory.Writer segmentWriter)
+  public void updateIndices(SegmentDirectory.Writer segmentWriter, IndexCreatorProvider indexCreatorProvider)
       throws Exception {
     Set<String> columnsToAddBF = new HashSet<>(_bloomFilterConfigs.keySet());
     // Remove indices not set in table config any more.
@@ -97,19 +88,21 @@ public class BloomFilterHandler implements IndexHandler {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       if (columnMetadata != null) {
         if (columnMetadata.hasDictionary()) {
-          createBloomFilterForColumn(segmentWriter, columnMetadata);
+          createBloomFilterForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
         }
         // TODO: Support raw index
       }
     }
   }
 
-  private void createBloomFilterForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
+  private void createBloomFilterForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
+      BloomFilterCreatorProvider indexCreatorProvider)
       throws Exception {
+    File indexDir = _segmentMetadata.getIndexDir();
     String segmentName = _segmentMetadata.getName();
     String columnName = columnMetadata.getColumnName();
-    File bloomFilterFileInProgress = new File(_indexDir, columnName + ".bloom.inprogress");
-    File bloomFilterFile = new File(_indexDir, columnName + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
+    File bloomFilterFileInProgress = new File(indexDir, columnName + ".bloom.inprogress");
+    File bloomFilterFile = new File(indexDir, columnName + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
 
     if (!bloomFilterFileInProgress.exists()) {
       // Marker file does not exist, which means last run ended normally.
@@ -125,8 +118,8 @@ public class BloomFilterHandler implements IndexHandler {
     BloomFilterConfig bloomFilterConfig = _bloomFilterConfigs.get(columnName);
     LOGGER.info("Creating new bloom filter for segment: {}, column: {} with config: {}", segmentName, columnName,
         bloomFilterConfig);
-    try (BloomFilterCreator bloomFilterCreator = _indexCreatorProvider.newBloomFilterCreator(
-        IndexCreationContext.builder().withIndexDir(_indexDir).withColumnMetadata(columnMetadata)
+    try (BloomFilterCreator bloomFilterCreator = indexCreatorProvider.newBloomFilterCreator(
+        IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata)
             .build().forBloomFilter(bloomFilterConfig));
         Dictionary dictionary = getDictionaryReader(columnMetadata, segmentWriter)) {
       int length = dictionary.length();

@@ -31,6 +31,8 @@ import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
+import org.apache.pinot.segment.spi.index.IndexingOverrides;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
@@ -96,9 +98,10 @@ public class SegmentPreProcessor implements AutoCloseable {
       }
 
       // Update single-column indices, like inverted index, json index etc.
+      IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
       for (ColumnIndexType type : ColumnIndexType.values()) {
-        IndexHandlerFactory.getIndexHandler(type, _indexDir, _segmentMetadata, _indexLoadingConfig)
-            .updateIndices(segmentWriter);
+        IndexHandlerFactory.getIndexHandler(type, _segmentMetadata, _indexLoadingConfig)
+            .updateIndices(segmentWriter, indexCreatorProvider);
       }
 
       // Create/modify/remove star-trees if required.
@@ -141,7 +144,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       }
       // Check if there is need to update single-column indices, like inverted index, json index etc.
       for (ColumnIndexType type : ColumnIndexType.values()) {
-        if (IndexHandlerFactory.getIndexHandler(type, null, _segmentMetadata, _indexLoadingConfig)
+        if (IndexHandlerFactory.getIndexHandler(type, _segmentMetadata, _indexLoadingConfig)
             .needUpdateIndices(segmentReader)) {
           return true;
         }
