@@ -54,15 +54,13 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
     List<MessageAndOffset> filtered = new ArrayList<>(messageAndOffsets.size());
     long lastOffset = startOffset;
     for (ConsumerRecord<String, Bytes> messageAndOffset : messageAndOffsets) {
-      if (messageAndOffset != null) {
-        Bytes message = messageAndOffset.value();
-        long offset = messageAndOffset.offset();
-        if (offset >= startOffset & (endOffset > offset | endOffset == -1)) {
-          if (message != null) {
-            filtered.add(new MessageAndOffset(message.get(), offset));
-          }
-          lastOffset = offset;
+      Bytes message = messageAndOffset.value();
+      long offset = messageAndOffset.offset();
+      if (offset >= startOffset & (endOffset > offset | endOffset == -1)) {
+        if (message != null) {
+          filtered.add(new MessageAndOffset(message.get(), offset));
         }
+        lastOffset = offset;
       }
     }
     return new KafkaMessageBatch(messageAndOffsets.size(), lastOffset, filtered);
