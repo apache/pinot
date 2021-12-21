@@ -31,6 +31,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
@@ -196,59 +197,55 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload)
+  public void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload,
+      Semaphore refreshThreadsSemaphore)
       throws Exception {
-    LOGGER.info("Reloading single segment: {} in table: {}", segmentName, tableNameWithType);
-    SegmentMetadata segmentMetadata = getSegmentMetadata(tableNameWithType, segmentName);
-    if (segmentMetadata == null) {
-      LOGGER.info("Segment metadata is null. Skip reloading segment: {} in table: {}", segmentName, tableNameWithType);
-      return;
+    try {
+      acquireSema(segmentName, refreshThreadsSemaphore);
+      LOGGER.info("Reloading single segment: {} in table: {}", segmentName, tableNameWithType);
+      SegmentMetadata segmentMetadata = getSegmentMetadata(tableNameWithType, segmentName);
+      if (segmentMetadata == null) {
+        LOGGER.info("Segment metadata is null. Skip reloading segment: {} in table: {}", segmentName,
+            tableNameWithType);
+        return;
+      }
+
+      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+      Preconditions.checkNotNull(tableConfig);
+
+      Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
+
+      reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
+
+      LOGGER.info("Reloaded single segment: {} in table: {}", segmentName, tableNameWithType);
+    } finally {
+      refreshThreadsSemaphore.release();
     }
-
-    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-    Preconditions.checkNotNull(tableConfig);
-
-    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
-
-    reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
-
-    LOGGER.info("Reloaded single segment: {} in table: {}", segmentName, tableNameWithType);
   }
 
   @Override
-  public void reloadAllSegments(String tableNameWithType, boolean forceDownload, int parallelism)
+  public void reloadAllSegments(String tableNameWithType, boolean forceDownload, Semaphore refreshThreadSemaphore)
       throws Exception {
     LOGGER.info("Reloading all segments in table: {}", tableNameWithType);
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkNotNull(tableConfig);
-    Preconditions.checkArgument(parallelism > 0, "Invalid reload parallelism: %s, must be at least 1", parallelism);
-
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
-
     List<String> failedSegments = new ArrayList<>();
-
     List<SegmentMetadata> segmentsMetadata = getAllSegmentsMetadata(tableNameWithType);
-
-    int nosWorkers = Math.min(segmentsMetadata.size(), parallelism);
-
-    if (nosWorkers < parallelism) {
-      LOGGER.info(
-          "No. of segments: {} in table: {} less than passed reload parallelism, loading all segments in parallel",
-          nosWorkers, tableNameWithType);
-    }
-
-    ExecutorService workers = Executors.newFixedThreadPool(nosWorkers);
-
+    ExecutorService workers = Executors.newCachedThreadPool();
     final AtomicReference<Exception> sampleException = new AtomicReference<>();
 
     CompletableFuture.allOf(segmentsMetadata.stream().map(segmentMetadata -> CompletableFuture.runAsync(() -> {
       try {
+        acquireSema("ALL", refreshThreadSemaphore);
         reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
       } catch (Exception e) {
         String segmentName = segmentMetadata.getName();
         LOGGER.error("Caught exception while reloading segment: {} in table: {}", segmentName, tableNameWithType, e);
         failedSegments.add(segmentName);
         sampleException.set(e);
+      } finally {
+        refreshThreadSemaphore.release();
       }
     }, workers)).toArray(CompletableFuture[]::new)).get();
 
@@ -258,6 +255,20 @@ public class HelixInstanceDataManager implements InstanceDataManager {
               segmentsMetadata.size(), failedSegments, tableNameWithType), sampleException.get());
     }
     LOGGER.info("Reloaded all segments in table: {}", tableNameWithType);
+  }
+
+  private void acquireSema(String context, Semaphore refreshThreadSemaphore)
+      throws InterruptedException {
+    if (refreshThreadSemaphore != null) {
+      long startTime = System.currentTimeMillis();
+      LOGGER.info("Waiting for lock to refresh : {}, queue-length: {}", context,
+          refreshThreadSemaphore.getQueueLength());
+      refreshThreadSemaphore.acquire();
+      LOGGER.info("Acquired lock to refresh segment: {} (lock-time={}ms, queue-length={})", context,
+          System.currentTimeMillis() - startTime, refreshThreadSemaphore.getQueueLength());
+    } else {
+      LOGGER.info("Locking of refresh threads disabled (segment: {})", context);
+    }
   }
 
   private void reloadSegment(String tableNameWithType, SegmentMetadata segmentMetadata, TableConfig tableConfig,

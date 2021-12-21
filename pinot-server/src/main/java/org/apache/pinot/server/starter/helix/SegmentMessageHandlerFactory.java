@@ -129,13 +129,11 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
 
   private class SegmentReloadMessageHandler extends DefaultMessageHandler {
     private final boolean _forceDownload;
-    private final int _reloadParallelism;
 
     SegmentReloadMessageHandler(SegmentReloadMessage segmentReloadMessage, ServerMetrics metrics,
         NotificationContext context) {
       super(segmentReloadMessage, metrics, context);
       _forceDownload = segmentReloadMessage.shouldForceDownload();
-      _reloadParallelism = segmentReloadMessage.getReloadParallelism();
     }
 
     @Override
@@ -145,14 +143,13 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       _logger.info("Handling message: {}", _message);
       try {
         if (_segmentName.equals("")) {
-          acquireSema("ALL", _logger);
           // NOTE: the method aborts if any segment reload encounters an unhandled exception,
-          // and can lead to inconsistent state across segments
-          _instanceDataManager.reloadAllSegments(_tableNameWithType, _forceDownload, _reloadParallelism);
+          // and can lead to inconsistent state across segments.
+          _instanceDataManager.reloadAllSegments(_tableNameWithType, _forceDownload,
+              _refreshThreadSemaphore);
         } else {
           // Reload one segment
-          acquireSema(_segmentName, _logger);
-          _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName, _forceDownload);
+          _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName, _forceDownload, _refreshThreadSemaphore);
         }
         helixTaskResult.setSuccess(true);
       } catch (Throwable e) {
@@ -161,8 +158,6 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         // (without any corresponding logs to indicate failure!) in the callable path
         throw new RuntimeException(
             "Caught exception while reloading segment: " + _segmentName + " in table: " + _tableNameWithType, e);
-      } finally {
-        releaseSema();
       }
       return helixTaskResult;
     }

@@ -21,6 +21,7 @@ package org.apache.pinot.core.data.manager;
 import java.io.File;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Semaphore;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.ConfigurationException;
@@ -89,14 +90,15 @@ public interface InstanceDataManager {
    * one before loading. Download happens when local segment's CRC mismatches the one of
    * the remote segment; but can also be forced to do regardless of CRC.
    */
-  void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload)
+  void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload,
+      Semaphore refreshThreadsSemaphore)
       throws Exception;
 
   /**
    * Reloads all segments of a table.
-   * @param parallelism number of segments to reload in parallel
+   * @param refreshThreadSemaphore the semaphore to control the number of reloads in parallel.
    */
-  void reloadAllSegments(String tableNameWithType, boolean forceDownload, int parallelism)
+  void reloadAllSegments(String tableNameWithType, boolean forceDownload, Semaphore refreshThreadSemaphore)
       throws Exception;
 
   /**
