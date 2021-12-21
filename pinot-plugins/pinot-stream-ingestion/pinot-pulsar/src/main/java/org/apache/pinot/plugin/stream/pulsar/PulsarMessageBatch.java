@@ -73,7 +73,7 @@ public class PulsarMessageBatch implements MessageBatch<byte[]> {
    * and returns the first record in the new ledger.
    */
   @Override
-  public StreamPartitionMsgOffset getNextStreamParitionMsgOffsetAtIndex(int index) {
+  public StreamPartitionMsgOffset getNextStreamPartitionMsgOffsetAtIndex(int index) {
     MessageIdImpl currentMessageId = MessageIdImpl.convertToMessageIdImpl(_messageList.get(index).getMessageId());
     MessageId nextMessageId = DefaultImplementation
         .newMessageId(currentMessageId.getLedgerId(), currentMessageId.getEntryId() + 1,

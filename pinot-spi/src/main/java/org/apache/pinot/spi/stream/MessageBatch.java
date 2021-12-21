@@ -84,7 +84,7 @@ public interface MessageBatch<T> {
    * @param index
    * @return
    */
-  default StreamPartitionMsgOffset getNextStreamParitionMsgOffsetAtIndex(int index) {
+  default StreamPartitionMsgOffset getNextStreamPartitionMsgOffsetAtIndex(int index) {
     return new LongMsgOffset(getNextStreamMessageOffsetAtIndex(index));
   }
 
@@ -92,7 +92,7 @@ public interface MessageBatch<T> {
    * @return last offset in the batch
    */
   default StreamPartitionMsgOffset getOffsetOfNextBatch() {
-    return getNextStreamParitionMsgOffsetAtIndex(getMessageCount() - 1);
+    return getNextStreamPartitionMsgOffsetAtIndex(getMessageCount() - 1);
   }
 
   /**

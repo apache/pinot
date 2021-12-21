@@ -549,7 +549,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                 realtimeRowsDroppedMeter);
       }
 
-      _currentOffset = messagesAndOffsets.getNextStreamParitionMsgOffsetAtIndex(index);
+      _currentOffset = messagesAndOffsets.getNextStreamPartitionMsgOffsetAtIndex(index);
       _numRowsIndexed = _realtimeSegment.getNumDocsIndexed();
       _numRowsConsumed++;
       streamMessageCount++;
