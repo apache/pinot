@@ -60,7 +60,7 @@ public class MessageIdStreamOffset implements StreamPartitionMsgOffset {
   }
 
   @Override
-  public int compareTo(Object other) {
+  public int compareTo(StreamPartitionMsgOffset other) {
     MessageIdStreamOffset messageIdStreamOffset = (MessageIdStreamOffset) other;
     return _messageId.compareTo(messageIdStreamOffset.getMessageId());
   }

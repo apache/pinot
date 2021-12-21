@@ -473,7 +473,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
     ClusterIntegrationTestUtils
         .pushAvroIntoKafka(avroFiles, "localhost:" + getKafkaPort(), getKafkaTopic(), getMaxNumKafkaMessagesPerBatch(),
-            getKafkaMessageHeader(), getPartitionColumn());
+            getKafkaMessageHeader(), getPartitionColumn(), injectTombstones());
+  }
+
+  protected boolean injectTombstones() {
+    return false;
   }
 
   protected List<File> getAllAvroFiles()
