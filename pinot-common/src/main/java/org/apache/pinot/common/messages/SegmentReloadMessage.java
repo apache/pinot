@@ -32,7 +32,6 @@ import org.apache.helix.model.Message;
  */
 public class SegmentReloadMessage extends Message {
   public static final String RELOAD_SEGMENT_MSG_SUB_TYPE = "RELOAD_SEGMENT";
-  public static final String RELOAD_PARALLELISM = "RELOAD_PARALLELISM";
 
   private static final String FORCE_DOWNLOAD_KEY = "forceDownload";
 
@@ -50,13 +49,6 @@ public class SegmentReloadMessage extends Message {
     znRecord.setBooleanField(FORCE_DOWNLOAD_KEY, forceDownload);
   }
 
-  public SegmentReloadMessage(@Nonnull String tableNameWithType, @Nullable String segmentName, boolean forceDownload,
-      int parallelism) {
-    this(tableNameWithType, segmentName, forceDownload);
-    ZNRecord znRecord = getRecord();
-    znRecord.setIntField(RELOAD_PARALLELISM, parallelism);
-  }
-
   public SegmentReloadMessage(Message message) {
     super(message.getRecord());
     String msgSubType = message.getMsgSubType();
@@ -66,10 +58,5 @@ public class SegmentReloadMessage extends Message {
 
   public boolean shouldForceDownload() {
     return getRecord().getBooleanField(FORCE_DOWNLOAD_KEY, false);
-  }
-
-  public int getReloadParallelism() {
-    //reload segments sequentially by default
-    return getRecord().getIntField(RELOAD_PARALLELISM, 1);
   }
 }

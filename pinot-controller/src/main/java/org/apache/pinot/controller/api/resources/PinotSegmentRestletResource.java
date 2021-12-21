@@ -501,7 +501,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Whether to force server to download segment") @QueryParam("forceDownload")
-      @DefaultValue("false") boolean forceDownload, @QueryParam("parallelism") @DefaultValue("1") int parallelism) {
+      @DefaultValue("false") boolean forceDownload) {
     TableType tableTypeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
     TableType tableTypeFromRequest = Constants.validateTableType(tableTypeStr);
     // When rawTableName is provided but w/o table type, Pinot tries to reload both OFFLINE
@@ -516,7 +516,7 @@ public class PinotSegmentRestletResource {
         .getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableTypeFromRequest, LOGGER);
     Map<String, Integer> numMessagesSentPerTable = new LinkedHashMap<>();
     for (String tableNameWithType : tableNamesWithType) {
-      int numMsgSent = _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, forceDownload, parallelism);
+      int numMsgSent = _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, forceDownload);
       numMessagesSentPerTable.put(tableNameWithType, numMsgSent);
     }
     return new SuccessResponse("Sent " + numMessagesSentPerTable + " reload messages");
@@ -531,14 +531,13 @@ public class PinotSegmentRestletResource {
       notes = "Reload all segments (deprecated, use 'POST /segments/{tableName}/reload' instead)")
   public SuccessResponse reloadAllSegmentsDeprecated1(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @QueryParam("parallelism") @DefaultValue("1") int parallelism) {
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
     List<String> tableNamesWithType = ResourceUtils
         .getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, Constants.validateTableType(tableTypeStr),
             LOGGER);
     int numMessagesSent = 0;
     for (String tableNameWithType : tableNamesWithType) {
-      numMessagesSent += _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, false, parallelism);
+      numMessagesSent += _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, false);
     }
     return new SuccessResponse("Sent " + numMessagesSent + " reload messages");
   }
@@ -552,9 +551,8 @@ public class PinotSegmentRestletResource {
       notes = "Reload all segments (deprecated, use 'POST /segments/{tableName}/reload' instead)")
   public SuccessResponse reloadAllSegmentsDeprecated2(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @QueryParam("parallelism") @DefaultValue("1") int parallelism) {
-    return reloadAllSegmentsDeprecated1(tableName, tableTypeStr, parallelism);
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
+    return reloadAllSegmentsDeprecated1(tableName, tableTypeStr);
   }
 
   @DELETE

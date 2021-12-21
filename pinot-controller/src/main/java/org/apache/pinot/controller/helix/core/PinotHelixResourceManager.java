@@ -1155,7 +1155,7 @@ public class PinotHelixResourceManager {
       LOGGER.info("Reloading tables with name: {}", schemaName);
       List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
       for (String tableNameWithType : tableNamesWithType) {
-        reloadAllSegments(tableNameWithType, false, 1);
+        reloadAllSegments(tableNameWithType, false);
       }
     }
   }
@@ -1894,9 +1894,9 @@ public class PinotHelixResourceManager {
     sendSegmentRefreshMessage(tableNameWithType, segmentName, true, true);
   }
 
-  public int reloadAllSegments(String tableNameWithType, boolean forceDownload, int parallelism) {
-    LOGGER.info("Sending reload message for table: {} with forceDownload: {}, parallelism: {}", tableNameWithType,
-        forceDownload, parallelism);
+  public int reloadAllSegments(String tableNameWithType, boolean forceDownload) {
+    LOGGER.info("Sending reload message for table: {} with forceDownload: {}", tableNameWithType,
+        forceDownload);
 
     if (forceDownload) {
       TableType tt = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
@@ -1911,7 +1911,7 @@ public class PinotHelixResourceManager {
     recipientCriteria.setResource(tableNameWithType);
     recipientCriteria.setSessionSpecific(true);
     SegmentReloadMessage segmentReloadMessage =
-        new SegmentReloadMessage(tableNameWithType, null, forceDownload, parallelism);
+        new SegmentReloadMessage(tableNameWithType, null, forceDownload);
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
 
     // Infinite timeout on the recipient
