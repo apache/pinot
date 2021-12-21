@@ -24,10 +24,8 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -152,7 +150,7 @@ public class TableConfigsRestletResource {
       notes = "Add the TableConfigs using the tableConfigsStr json")
   public SuccessResponse addConfig(
       String tableConfigsStr,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|INGEST)")
+      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK)")
       @QueryParam("validationTypesToSkip") String typesToSkip, @Context HttpHeaders httpHeaders, 
       @Context Request request) {
     TableConfigs tableConfigs;
@@ -284,7 +282,7 @@ public class TableConfigsRestletResource {
   public SuccessResponse updateConfig(
       @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName")
           String tableName,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|INGEST)")
+      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK)")
       @QueryParam("validationTypesToSkip") String typesToSkip,
       @ApiParam(value = "Reload the table if the new schema is backward compatible") @DefaultValue("false")
       @QueryParam("reload") boolean reload, String tableConfigsStr)
@@ -358,8 +356,8 @@ public class TableConfigsRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Validate the TableConfigs", notes = "Validate the TableConfigs")
   public String validateConfig(String tableConfigsStr,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|INGEST)")
-      @QueryParam("typeToSkip") String typesToSkip) {
+      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK)")
+      @QueryParam("validationTypesToSkip") String typesToSkip) {
     TableConfigs tableConfigs;
     try {
       tableConfigs = JsonUtils.stringToObject(tableConfigsStr, TableConfigs.class);
@@ -377,10 +375,6 @@ public class TableConfigsRestletResource {
   }
 
   private String validateConfig(TableConfigs tableConfigs, String typesToSkip) {
-    List<TableConfigUtils.ValidationType> skippedTypes = typesToSkip == null ? Collections.emptyList()
-        : Arrays.stream(typesToSkip.split(","))
-            .map(TableConfigUtils.ValidationType::valueOf)
-            .collect(Collectors.toList());
     String rawTableName = tableConfigs.getTableName();
     TableConfig offlineTableConfig = tableConfigs.getOffline();
     TableConfig realtimeTableConfig = tableConfigs.getRealtime();
@@ -401,14 +395,14 @@ public class TableConfigsRestletResource {
         Preconditions.checkState(offlineRawTableName.equals(rawTableName),
             "Name in 'offline' table config: %s must be equal to 'tableName': %s", offlineRawTableName, rawTableName);
         TableConfigUtils.validateTableName(offlineTableConfig);
-        TableConfigUtils.validate(offlineTableConfig, skippedTypes, schema);
+        TableConfigUtils.validate(offlineTableConfig, schema, typesToSkip);
       }
       if (realtimeTableConfig != null) {
         String realtimeRawTableName = TableNameBuilder.extractRawTableName(realtimeTableConfig.getTableName());
         Preconditions.checkState(realtimeRawTableName.equals(rawTableName),
             "Name in 'realtime' table config: %s must be equal to 'tableName': %s", realtimeRawTableName, rawTableName);
         TableConfigUtils.validateTableName(realtimeTableConfig);
-        TableConfigUtils.validate(realtimeTableConfig, skippedTypes, schema);
+        TableConfigUtils.validate(realtimeTableConfig, schema, typesToSkip);
       }
       if (offlineTableConfig != null && realtimeTableConfig != null) {
         TableConfigUtils.verifyHybridTableConfigs(rawTableName, offlineTableConfig, realtimeTableConfig);

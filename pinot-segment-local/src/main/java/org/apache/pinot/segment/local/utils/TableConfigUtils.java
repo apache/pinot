@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableSet;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -83,10 +84,10 @@ public final class TableConfigUtils {
   private static final String REALTIME_TO_OFFLINE_TASK_TYPE = "RealtimeToOfflineSegmentsTask";
 
   /**
-   * @see TableConfigUtils#validate(TableConfig, List, Schema)
+   * @see TableConfigUtils#validate(TableConfig, Schema, String)
    */
   public static void validate(TableConfig tableConfig, @Nullable Schema schema) {
-    validate(tableConfig, Collections.emptyList(), schema);
+    validate(tableConfig, schema, null);
   }
 
   /**
@@ -99,7 +100,8 @@ public final class TableConfigUtils {
    *
    * TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
    */
-  public static void validate(TableConfig tableConfig, List<ValidationType> skipTypes, @Nullable Schema schema) {
+  public static void validate(TableConfig tableConfig, @Nullable Schema schema, @Nullable String typesToSkip) {
+    List<ValidationType> skipTypes = parseTypesToSkipString(typesToSkip);
     if (tableConfig.getTableType() == TableType.REALTIME) {
       Preconditions.checkState(schema != null, "Schema should not be null for REALTIME table");
     }
@@ -108,20 +110,24 @@ public final class TableConfigUtils {
     // skip all validation if skip type ALL is selected. 
     if (!skipTypes.contains(ValidationType.ALL)) {
       validateValidationConfig(tableConfig, schema);
-      if (!skipTypes.contains(ValidationType.INGEST)) {
-        validateIngestionConfig(tableConfig, schema);
-      }
+      validateIngestionConfig(tableConfig, schema);
       validateTierConfigList(tableConfig.getTierConfigsList());
-      if (!skipTypes.contains(ValidationType.INDEX)) {
-        validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
-        validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);
+      validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
+      validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);
+      if (!skipTypes.contains(ValidationType.UPSERT)) {
+        validateUpsertConfig(tableConfig, schema);
+        validatePartialUpsertStrategies(tableConfig, schema);
       }
-      validateUpsertConfig(tableConfig, schema);
-      validatePartialUpsertStrategies(tableConfig, schema);
       if (!skipTypes.contains(ValidationType.TASK)) {
         validateTaskConfigs(tableConfig, schema);
       }
     }
+  }
+
+  private static List<ValidationType> parseTypesToSkipString(String typesToSkip) {
+    return typesToSkip == null ? Collections.emptyList() : Arrays.stream(typesToSkip.split(","))
+        .map(TableConfigUtils.ValidationType::valueOf)
+        .collect(Collectors.toList());
   }
 
   /**
@@ -849,6 +855,6 @@ public final class TableConfigUtils {
 
   // enum of all the skip-able validation types.
   public enum ValidationType {
-    ALL, TASK, INDEX, INGEST
+    ALL, TASK, UPSERT
   }
 }
