@@ -152,12 +152,13 @@ public class TableConfigsRestletResource {
       notes = "Add the TableConfigs using the tableConfigsStr json")
   public SuccessResponse addConfig(
       String tableConfigsStr,
-      @ApiParam(value = "comma separated list of validation skip") @QueryParam("skipValidate") String skipValidate,
-      @Context HttpHeaders httpHeaders, @Context Request request) {
+      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|INGEST)")
+      @QueryParam("validationTypesToSkip") String typesToSkip, @Context HttpHeaders httpHeaders, 
+      @Context Request request) {
     TableConfigs tableConfigs;
     try {
       tableConfigs = JsonUtils.stringToObject(tableConfigsStr, TableConfigs.class);
-      validateConfig(tableConfigs, skipValidate);
+      validateConfig(tableConfigs, typesToSkip);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, String.format("Invalid TableConfigs. %s", e.getMessage()),
           Response.Status.BAD_REQUEST, e);
@@ -283,7 +284,8 @@ public class TableConfigsRestletResource {
   public SuccessResponse updateConfig(
       @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName")
           String tableName,
-      @ApiParam(value = "comma separated list of validation skip") @QueryParam("skipValidate") String skipValidate,
+      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|INGEST)")
+      @QueryParam("validationTypesToSkip") String typesToSkip,
       @ApiParam(value = "Reload the table if the new schema is backward compatible") @DefaultValue("false")
       @QueryParam("reload") boolean reload, String tableConfigsStr)
       throws Exception {
@@ -292,7 +294,7 @@ public class TableConfigsRestletResource {
       tableConfigs = JsonUtils.stringToObject(tableConfigsStr, TableConfigs.class);
       Preconditions.checkState(tableConfigs.getTableName().equals(tableName),
           "'tableName' in TableConfigs: %s must match provided tableName: %s", tableConfigs.getTableName(), tableName);
-      validateConfig(tableConfigs, skipValidate);
+      validateConfig(tableConfigs, typesToSkip);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, String.format("Invalid TableConfigs: %s", tableName),
           Response.Status.BAD_REQUEST, e);
@@ -356,7 +358,8 @@ public class TableConfigsRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Validate the TableConfigs", notes = "Validate the TableConfigs")
   public String validateConfig(String tableConfigsStr,
-      @ApiParam(value = "comma separated list of validation skip") @QueryParam("skipValidate") String skipValidate) {
+      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|INGEST)")
+      @QueryParam("typeToSkip") String typesToSkip) {
     TableConfigs tableConfigs;
     try {
       tableConfigs = JsonUtils.stringToObject(tableConfigsStr, TableConfigs.class);
@@ -364,7 +367,7 @@ public class TableConfigsRestletResource {
       throw new ControllerApplicationException(LOGGER,
           String.format("Invalid TableConfigs json string: %s", tableConfigsStr), Response.Status.BAD_REQUEST, e);
     }
-    return validateConfig(tableConfigs, skipValidate);
+    return validateConfig(tableConfigs, typesToSkip);
   }
 
   private void tuneConfig(TableConfig tableConfig, Schema schema) {
@@ -373,9 +376,11 @@ public class TableConfigsRestletResource {
     TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
   }
 
-  private String validateConfig(TableConfigs tableConfigs, String skipValidate) {
-    List<TableConfigUtils.ValidationType> skippedTypes = Arrays.stream(skipValidate.split(","))
-        .map(TableConfigUtils.ValidationType::valueOf).collect(Collectors.toList());
+  private String validateConfig(TableConfigs tableConfigs, String typesToSkip) {
+    List<TableConfigUtils.ValidationType> skippedTypes = typesToSkip == null ? Collections.emptyList()
+        : Arrays.stream(typesToSkip.split(","))
+            .map(TableConfigUtils.ValidationType::valueOf)
+            .collect(Collectors.toList());
     String rawTableName = tableConfigs.getTableName();
     TableConfig offlineTableConfig = tableConfigs.getOffline();
     TableConfig realtimeTableConfig = tableConfigs.getRealtime();

@@ -105,19 +105,22 @@ public final class TableConfigUtils {
     }
     // Sanitize the table config before validation
     sanitize(tableConfig);
-    validateValidationConfig(tableConfig, schema);
-    if (!skipTypes.contains(ValidationType.INGEST)) {
-      validateIngestionConfig(tableConfig, schema);
-    }
-    validateTierConfigList(tableConfig.getTierConfigsList());
-    if (!skipTypes.contains(ValidationType.INDEX)) {
-      validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
-      validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);
-    }
-    validateUpsertConfig(tableConfig, schema);
-    validatePartialUpsertStrategies(tableConfig, schema);
-    if (!skipTypes.contains(ValidationType.TASK)) {
-      validateTaskConfigs(tableConfig, schema);
+    // skip all validation if skip type ALL is selected. 
+    if (!skipTypes.contains(ValidationType.ALL)) {
+      validateValidationConfig(tableConfig, schema);
+      if (!skipTypes.contains(ValidationType.INGEST)) {
+        validateIngestionConfig(tableConfig, schema);
+      }
+      validateTierConfigList(tableConfig.getTierConfigsList());
+      if (!skipTypes.contains(ValidationType.INDEX)) {
+        validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
+        validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);
+      }
+      validateUpsertConfig(tableConfig, schema);
+      validatePartialUpsertStrategies(tableConfig, schema);
+      if (!skipTypes.contains(ValidationType.TASK)) {
+        validateTaskConfigs(tableConfig, schema);
+      }
     }
   }
 
@@ -846,6 +849,6 @@ public final class TableConfigUtils {
 
   // enum of all the skip-able validation types.
   public enum ValidationType {
-    TASK, INDEX, INGEST
+    ALL, TASK, INDEX, INGEST
   }
 }
