@@ -31,6 +31,11 @@ public class KafkaMessageBatch implements MessageBatch<byte[]> {
   private final int _unfilteredMessageCount;
   private final long _lastOffset;
 
+  /**
+   * @param unfilteredMessageCount how many messages were received from the topic before being filtered
+   * @param lastOffset the offset of the last message in the batch
+   * @param batch the messages, which may be smaller than {@see unfilteredMessageCount}
+   */
   public KafkaMessageBatch(int unfilteredMessageCount, long lastOffset, List<MessageAndOffset> batch) {
     _messageList = batch;
     _lastOffset = lastOffset;
