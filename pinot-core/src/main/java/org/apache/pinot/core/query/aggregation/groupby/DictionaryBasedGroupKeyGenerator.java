@@ -266,7 +266,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
     private void processSingleValue(int numDocs, int[] dictIds, int[] outGroupIds) {
       System.arraycopy(dictIds, 0, outGroupIds, 0, numDocs);
-      for (int i = 0; i < numDocs; i++) {
+      for (int i = 0; i < numDocs && _numKeys < _globalGroupIdUpperBound; i++) {
         if (!_flags[outGroupIds[i]]) {
           _numKeys++;
           _flags[outGroupIds[i]] = true;
@@ -284,8 +284,8 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         // if the flag is false, then increase the key num
         if (!_flags[groupId]) {
           _numKeys++;
+          _flags[groupId] = true;
         }
-        _flags[groupId] = true;
       }
     }
 
@@ -296,8 +296,8 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         for (int groupId : groupIds) {
           if (!_flags[groupId]) {
             _numKeys++;
+            _flags[groupId] = true;
           }
-          _flags[groupId] = true;
         }
         outGroupIds[i] = groupIds;
       }
