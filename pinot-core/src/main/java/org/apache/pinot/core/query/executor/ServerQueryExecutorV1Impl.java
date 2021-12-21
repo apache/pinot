@@ -145,9 +145,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     long querySchedulingTimeMs = System.currentTimeMillis() - queryArrivalTimeMs;
     if (querySchedulingTimeMs >= queryTimeoutMs) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS, 1);
-      String errorMessage =
-          String.format("Query scheduling took %dms (longer than query timeout of %dms)", querySchedulingTimeMs,
-              queryTimeoutMs);
+      String errorMessage = String
+          .format("Query scheduling took %dms (longer than query timeout of %dms) on server: %s", querySchedulingTimeMs,
+              queryTimeoutMs, _instanceDataManager.getInstanceId());
       DataTable dataTable = DataTableBuilder.getEmptyDataTable();
       dataTable.addException(QueryException.getException(QueryException.QUERY_SCHEDULING_TIMEOUT_ERROR, errorMessage));
       LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
@@ -156,7 +156,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
     if (tableDataManager == null) {
-      String errorMessage = "Failed to find table: " + tableNameWithType;
+      String errorMessage = String
+          .format("Failed to find table: %s on server: %s", tableNameWithType, _instanceDataManager.getInstanceId());
       DataTable dataTable = DataTableBuilder.getEmptyDataTable();
       dataTable.addException(QueryException.getException(QueryException.SERVER_TABLE_MISSING_ERROR, errorMessage));
       LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
