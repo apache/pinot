@@ -73,7 +73,7 @@ public class KafkaMessageBatch implements MessageBatch<byte[]> {
   }
 
   @Override
-  public StreamPartitionMsgOffset getNextStreamParitionMsgOffsetAtIndex(int index) {
+  public StreamPartitionMsgOffset getNextStreamPartitionMsgOffsetAtIndex(int index) {
     return new LongMsgOffset(_messageList.get(index).getNextOffset());
   }
 
