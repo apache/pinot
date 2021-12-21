@@ -377,20 +377,21 @@ export default function CustomizedTables({
     return (<span>{str.toString()}</span>);
   };
 
-  const [isModalOpen, setModalOpen] = React.useState(false);
-  const handleModalOpen = () => setModalOpen(true);
-  const handleModalClose = () => setModalOpen(false);
-
-  const makeCell = (cellData) => {
+  const makeCell = (cellData, idx) => {
     if (Object.prototype.toString.call(cellData) === '[object Object]') {
       if (_.has(cellData, 'component') && cellData.component) {
+        const [isModalOpen, setModalOpen] = React.useState(false);
+        const handleModalOpen = () => setModalOpen(true);
+        const handleModalClose = () => setModalOpen(false);
+
         let cell = (styleCell(cellData.value))
         let statusModal = (
             <Dialog
-                maxWidth="xl"
+                key={idx}
                 onClose={handleModalClose}
                 open={isModalOpen}
-                scroll="paper"
+                fullWidth={true}
+                maxWidth={'xl'}
             >
               {cellData.component}
             </Dialog>
@@ -403,7 +404,12 @@ export default function CustomizedTables({
         );
         if (_.has(cellData, 'tooltip') && cellData.tooltip) {
           cell = (
-              <Tooltip title={cellData.tooltip} placement="top" arrow>
+              <Tooltip
+                  key={idx}
+                  title={cellData.tooltip}
+                  placement="top"
+                  arrow
+              >
                 {cell}
               </Tooltip>
           )
@@ -416,7 +422,12 @@ export default function CustomizedTables({
         );
       } else if (_.has(cellData, 'tooltip') && cellData.tooltip) {
         return (
-            <Tooltip title={cellData.tooltip} placement="top" arrow>
+            <Tooltip
+                key={idx}
+                title={cellData.tooltip}
+                placement="top"
+                arrow
+            >
               {styleCell(cellData.value)}
             </Tooltip>
         );
@@ -511,7 +522,7 @@ export default function CustomizedTables({
                             className={isCellClickable ? classes.isCellClickable : (isSticky ? classes.isSticky : '')}
                             onClick={() => {cellClickCallback && cellClickCallback(cell);}}
                           >
-                            {makeCell(cell)}
+                            {makeCell(cell, idx)}
                           </StyledTableCell>
                         );
                       })}

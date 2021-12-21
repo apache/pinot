@@ -70,10 +70,10 @@ const getSegmentStatus = (idealStateObj, externalViewObj) => {
   if (idealSegmentCount !== externalSegmentCount) {
     let segmentStatusComponent = (
         <ReactDiffViewer
-            oldValue={JSON.stringify(idealStateObj)}
-            newValue={JSON.stringify(externalViewObj)}
+            oldValue={JSON.stringify(idealStateObj, null, 2)}
+            newValue={JSON.stringify(externalViewObj, null, 2)}
             splitView={true}
-            hideLineNumbers
+            showDiffOnly={true}
             leftTitle={"Ideal State"}
             rightTitle={"External View"}
             compareMethod={DiffMethod.WORDS}
@@ -92,10 +92,10 @@ const getSegmentStatus = (idealStateObj, externalViewObj) => {
       if (!_.isEqual(idealStateObj[segmentKey], externalViewObj[segmentKey])) {
         let segmentStatusComponent = (
             <ReactDiffViewer
-                oldValue={JSON.stringify(idealStateObj)}
-                newValue={JSON.stringify(externalViewObj)}
+                oldValue={JSON.stringify(idealStateObj, null, 2)}
+                newValue={JSON.stringify(externalViewObj, null, 2)}
                 splitView={true}
-                hideLineNumbers
+                showDiffOnly={true}
                 leftTitle={"Ideal State"}
                 rightTitle={"External View"}
                 compareMethod={DiffMethod.WORDS}
