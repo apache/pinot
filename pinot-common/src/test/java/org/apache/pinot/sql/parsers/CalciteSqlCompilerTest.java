@@ -691,9 +691,9 @@ public class CalciteSqlCompilerTest {
         CalciteSqlParser.compileToPinotQuery(
             "SELECT * FROM myTable where foo LIKE '%--%' and \"b--a----r\" = 'he---ll-o' option(a=b)"
             + "-- select * from vegetables OPTION (delicious=yes)");
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 0);
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
     Assert.assertEquals(pinotQuery, CalciteSqlParser.compileToPinotQuery(
-        "SELECT * FROM myTable where foo LIKE '%--%' and \"b--a----r\" = 'he---ll-o'"
+        "SELECT * FROM myTable where foo LIKE '%--%' and \"b--a----r\" = 'he---ll-o' option(a=b)"
         + "-- select * from vegetables"));
 
     // ensure that using `--` as signpost to remove commented out query options does not impact query
@@ -714,6 +714,31 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(pinotQuery, CalciteSqlParser.compileToPinotQuery(
         "SELECT ktoptionsx, option(), \"option()\" FROM myTable option (a=b) "
         + "-- select * from vegetables"));
+  }
+
+  @Test
+  public void testCommentRemoval() {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
+        "select * from tablea --- hello world -- bye world");
+    Assert.assertEquals(pinotQuery, CalciteSqlParser.compileToPinotQuery(
+        "select * from tablea"));
+
+    pinotQuery =
+        CalciteSqlParser.compileToPinotQuery("SELECT * FROM myTable where foo = '---ab---c-' and \"cola\" like '%--%' "
+            + "\n\r-- select * from vegetables OPTION (delicious=yes)");
+    Assert.assertEquals(pinotQuery, CalciteSqlParser.compileToPinotQuery(
+        "SELECT * FROM myTable where foo = '---ab---c-' and \"cola\" like '%--%'"));
+
+    pinotQuery =
+        CalciteSqlParser.compileToPinotQuery("SELECT * FROM myTable where foo = '---ab---c-'"
+            + "\nand \"cola\" like '%--%' "
+            + "\n -- blah blah"
+            + "\norder by colc -- desc"
+            + "\n\r-- select * from vegetables OPTION (delicious=yes)");
+    Assert.assertEquals(pinotQuery, CalciteSqlParser.compileToPinotQuery(
+        "SELECT * FROM myTable where foo = '---ab---c-'"
+            + "\nand \"cola\" like '%--%' "
+            + "\norder by colc"));
   }
 
   @Test

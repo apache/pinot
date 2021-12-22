@@ -122,7 +122,7 @@ public class CalciteSqlParser {
     sql = removeTerminatingSemicolon(sql);
 
     // Extract OPTION statements from sql as Calcite Parser doesn't parse it.
-    sql = removeCommentedOptionsFromSql(sql);
+    sql = removeComments(sql);
     List<String> options = extractOptionsFromSql(sql);
     if (!options.isEmpty()) {
       sql = removeOptionsFromSql(sql);
@@ -415,27 +415,76 @@ public class CalciteSqlParser {
     return results;
   }
 
-  // for query options present in commented out query
-  // such as `SELECT * FROM tablex -- SELECT * FROM tabley OPTION(k=v)`
-  // use `--` pattern as signpost to detect and remove query options in commented out query
-  // NOTE: THIS FAILS WHEN the `--` pattern is found in string literals, identifiers
-  // Query `SELECT * FROM tablex WHERE cola LIKE '%---%' OPTION (a=b)` will be parsed as
-  // `SELECT * FROM tablex WHERE cola LIKE '%---%'`
-  // NOTE: We are removing commented options from the query, and not the commented part itself
-  // so as to not distort the query. For ex, we want to avoid the following conversion:
-  // `SELECT * FROM tableA where colA LIKE '%--%'` to `SELECT * FROM tableA where colA LIKE '%%'`
-  private static String removeCommentedOptionsFromSql(String sql) {
-    boolean match = sql.contains(COMMENTED_QUERY_PATTERN);
-    if (match) {
-      int indexOfMatch = sql.indexOf(COMMENTED_QUERY_PATTERN);
-      return sql.substring(0, indexOfMatch) + removeOptionsFromSql(sql.substring(indexOfMatch));
-    }
-    return sql;
-  }
-
   private static String removeOptionsFromSql(String sql) {
     Matcher matcher = OPTIONS_REGEX_PATTEN.matcher(sql);
     return matcher.replaceAll("");
+  }
+
+  // Detect comments in query and remove them
+  // We don't simply want to remove the query after the `--` pattern, because
+  // 1. multi-line queries can have comments in the middle of the query
+  // 2. `--` pattern maybe present in string literals and identifiers.
+  // For ex: SELECT * FROM tablea WHERE cola = 'hello--world'
+  // The query content between `--` pattern and newline / end of line will be removed
+  // `--` that falls between single / double quotes will be ignored
+  private static String removeComments(String sql) {
+    Pattern tokensToMatch = Pattern.compile("'|\"|-{2,}|[\n\r]+");
+    Matcher matcher = tokensToMatch.matcher(sql);
+
+    String signpost, tokenToMatch;
+    int fromIndex, toIndex;
+    // retainFromIndex & retainToIndex arrays contains locations at which to crop query
+    List<Integer> retainFromIndex = new ArrayList<Integer>();
+    List<Integer> retainToIndex = new ArrayList<Integer>();
+
+    retainFromIndex.add(0);
+
+    while (matcher.find()) {
+      fromIndex = matcher.start();
+      toIndex = matcher.end();
+      signpost = sql.substring(fromIndex, toIndex);
+
+      // if newline encountered, don't store crop location
+      if (signpost.contains("\n") | signpost.contains("\r")) {
+        continue;
+      }
+      while (matcher.find()) {
+        toIndex = matcher.end();
+        tokenToMatch = sql.substring(matcher.start(), toIndex);
+
+        // if matching pair found, like in the case of quotes, don't store crop location
+        if (tokenToMatch.equals(signpost)) {
+          break;
+        }
+        if (tokenToMatch.contains("\n") | tokenToMatch.contains("\r")) {
+          // if newline encountered after `--` pattern, store crop locations
+          if (signpost.contains("--")) {
+            retainToIndex.add(fromIndex);
+            retainFromIndex.add(toIndex);
+            break;
+          }
+          // else don't store crop location
+          break;
+        }
+      }
+      if ((matcher.hitEnd()) & signpost.contains("--")) {
+        // if end of line encountered after `--` pattern, store crop location
+        retainToIndex.add(fromIndex);
+        retainFromIndex.add(sql.length());
+        break;
+      }
+    }
+    retainToIndex.add(sql.length());
+
+    if (retainFromIndex.size() != retainToIndex.size()) {
+      throw new SqlCompilationException("Query parsing error: Unable to detect query comments");
+    }
+
+    StringBuilder sqlWithoutComments = new StringBuilder();
+    for (int i=0; i<retainFromIndex.size(); i++) {
+      sqlWithoutComments.append(sql, retainFromIndex.get(i), retainToIndex.get(i));
+    }
+    return sqlWithoutComments.toString();
   }
 
   private static List<Expression> convertDistinctSelectList(SqlNodeList selectList) {
