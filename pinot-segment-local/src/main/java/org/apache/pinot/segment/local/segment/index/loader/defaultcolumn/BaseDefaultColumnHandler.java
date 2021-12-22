@@ -126,6 +126,12 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     _segmentProperties = SegmentMetadataImpl.getPropertiesConfiguration(indexDir);
   }
 
+  @Override
+  public boolean needUpdateDefaultColumns() {
+    Map<String, DefaultColumnAction> defaultColumnActionMap = computeDefaultColumnActionMap();
+    return !defaultColumnActionMap.isEmpty();
+  }
+
   /**
    * {@inheritDoc}
    */

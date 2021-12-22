@@ -175,6 +175,26 @@ public class ImmutableSegmentLoader {
     return segment;
   }
 
+  /**
+   * Check segment directory against the table config and schema to see if any preprocessing is needed,
+   * like changing segment format, adding new indices or updating default columns.
+   */
+  public static boolean needPreprocess(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
+      @Nullable Schema schema)
+      throws Exception {
+    if (needConvertSegmentFormat(indexLoadingConfig, segmentDirectory.getSegmentMetadata())) {
+      return true;
+    }
+    SegmentPreProcessor preProcessor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema);
+    return preProcessor.needProcess();
+  }
+
+  private static boolean needConvertSegmentFormat(IndexLoadingConfig indexLoadingConfig,
+      SegmentMetadataImpl segmentMetadata) {
+    SegmentVersion segmentVersionToLoad = indexLoadingConfig.getSegmentVersion();
+    return segmentVersionToLoad != null && segmentVersionToLoad != segmentMetadata.getVersion();
+  }
+
   private static void convertSegmentFormat(File indexDir, IndexLoadingConfig indexLoadingConfig,
       SegmentMetadataImpl localSegmentMetadata)
       throws Exception {

@@ -157,6 +157,10 @@ public abstract class SegmentDirectory implements Closeable {
 
     public abstract boolean hasIndexFor(String column, ColumnIndexType type);
 
+    public SegmentDirectory toSegmentDirectory() {
+      return SegmentDirectory.this;
+    }
+
     public abstract String toString();
   }
 
@@ -191,10 +195,6 @@ public abstract class SegmentDirectory implements Closeable {
 
     public abstract void save()
         throws IOException;
-
-    public SegmentDirectory toSegmentDirectory() {
-      return SegmentDirectory.this;
-    }
 
     public abstract String toString();
   }

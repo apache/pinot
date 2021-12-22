@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader;
 
-import java.io.File;
 import org.apache.pinot.segment.local.segment.index.loader.bloomfilter.BloomFilterHandler;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.FSTIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.H3IndexHandler;
@@ -27,7 +26,6 @@ import org.apache.pinot.segment.local.segment.index.loader.invertedindex.JsonInd
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.RangeIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.TextIndexHandler;
 import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
-import org.apache.pinot.segment.spi.index.IndexingOverrides;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -37,31 +35,34 @@ public class IndexHandlerFactory {
   private IndexHandlerFactory() {
   }
 
-  private static final IndexHandler NO_OP_HANDLER = () -> {
+  private static final IndexHandler NO_OP_HANDLER = new IndexHandler() {
+    @Override
+    public void updateIndices(SegmentDirectory.Writer segmentWriter, IndexCreatorProvider indexCreatorProvider) {
+    }
+
+    @Override
+    public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
+      return false;
+    }
   };
 
-  public static IndexHandler getIndexHandler(ColumnIndexType type, File indexDir, SegmentMetadataImpl segmentMetadata,
-      IndexLoadingConfig indexLoadingConfig, SegmentDirectory.Writer segmentWriter) {
-    IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
+  public static IndexHandler getIndexHandler(ColumnIndexType type, SegmentMetadataImpl segmentMetadata,
+      IndexLoadingConfig indexLoadingConfig) {
     switch (type) {
       case INVERTED_INDEX:
-        return new InvertedIndexHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter,
-            indexCreatorProvider);
+        return new InvertedIndexHandler(segmentMetadata, indexLoadingConfig);
       case RANGE_INDEX:
-        return new RangeIndexHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter,
-            indexCreatorProvider);
+        return new RangeIndexHandler(segmentMetadata, indexLoadingConfig);
       case TEXT_INDEX:
-        return new TextIndexHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter, indexCreatorProvider);
+        return new TextIndexHandler(segmentMetadata, indexLoadingConfig);
       case FST_INDEX:
-        return new FSTIndexHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter,
-            indexLoadingConfig.getFSTIndexType(), indexCreatorProvider);
+        return new FSTIndexHandler(segmentMetadata, indexLoadingConfig);
       case JSON_INDEX:
-        return new JsonIndexHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter, indexCreatorProvider);
+        return new JsonIndexHandler(segmentMetadata, indexLoadingConfig);
       case H3_INDEX:
-        return new H3IndexHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter, indexCreatorProvider);
+        return new H3IndexHandler(segmentMetadata, indexLoadingConfig);
       case BLOOM_FILTER:
-        return new BloomFilterHandler(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter,
-            indexCreatorProvider);
+        return new BloomFilterHandler(segmentMetadata, indexLoadingConfig);
       default:
         return NO_OP_HANDLER;
     }

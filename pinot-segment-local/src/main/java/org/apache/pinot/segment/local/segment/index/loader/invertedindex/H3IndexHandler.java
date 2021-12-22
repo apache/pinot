@@ -25,19 +25,19 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial.OffHeapH3IndexCreator;
 import org.apache.pinot.segment.local.segment.index.loader.IndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.creator.GeoSpatialIndexCreatorProvider;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.creator.GeoSpatialIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
-import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
@@ -52,49 +52,51 @@ import org.slf4j.LoggerFactory;
 public class H3IndexHandler implements IndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(H3IndexHandler.class);
 
-  private final File _indexDir;
-  private final SegmentMetadataImpl _segmentMetadata;
-  private final SegmentDirectory.Writer _segmentWriter;
+  private final SegmentMetadata _segmentMetadata;
   private final Map<String, H3IndexConfig> _h3Configs;
-  private final IndexCreatorProvider _indexCreatorProvider;
 
-  public H3IndexHandler(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Writer segmentWriter, IndexCreatorProvider indexCreatorProvider) {
-    _indexDir = indexDir;
+  public H3IndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
     _segmentMetadata = segmentMetadata;
-    _segmentWriter = segmentWriter;
     _h3Configs = indexLoadingConfig.getH3IndexConfigs();
-    _indexCreatorProvider = indexCreatorProvider;
   }
 
   @Override
-  public void updateIndices()
+  public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
+    Set<String> columnsToAddIdx = new HashSet<>(_h3Configs.keySet());
+    Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.H3_INDEX);
+    return !existingColumns.equals(columnsToAddIdx);
+  }
+
+  @Override
+  public void updateIndices(SegmentDirectory.Writer segmentWriter, IndexCreatorProvider indexCreatorProvider)
       throws Exception {
     Set<String> columnsToAddIdx = new HashSet<>(_h3Configs.keySet());
     // Remove indices not set in table config any more
     String segmentName = _segmentMetadata.getName();
-    Set<String> existingColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.H3_INDEX);
+    Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.H3_INDEX);
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Removing existing H3 index from segment: {}, column: {}", segmentName, column);
-        _segmentWriter.removeIndex(column, ColumnIndexType.H3_INDEX);
+        segmentWriter.removeIndex(column, ColumnIndexType.H3_INDEX);
         LOGGER.info("Removed existing H3 index from segment: {}, column: {}", segmentName, column);
       }
     }
     for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       if (columnMetadata != null) {
-        createH3IndexForColumn(columnMetadata);
+        createH3IndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
       }
     }
   }
 
-  private void createH3IndexForColumn(ColumnMetadata columnMetadata)
+  private void createH3IndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
+      GeoSpatialIndexCreatorProvider indexCreatorProvider)
       throws Exception {
+    File indexDir = _segmentMetadata.getIndexDir();
     String segmentName = _segmentMetadata.getName();
-    String column = columnMetadata.getColumnName();
-    File inProgress = new File(_indexDir, column + V1Constants.Indexes.H3_INDEX_FILE_EXTENSION + ".inprogress");
-    File h3IndexFile = new File(_indexDir, column + V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
+    String columnName = columnMetadata.getColumnName();
+    File inProgress = new File(indexDir, columnName + V1Constants.Indexes.H3_INDEX_FILE_EXTENSION + ".inprogress");
+    File h3IndexFile = new File(indexDir, columnName + V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
 
     if (!inProgress.exists()) {
       // Marker file does not exist, which means last run ended normally.
@@ -108,34 +110,36 @@ public class H3IndexHandler implements IndexHandler {
     }
 
     // Create new H3 index for the column.
-    LOGGER.info("Creating new H3 index for segment: {}, column: {}", segmentName, column);
+    LOGGER.info("Creating new H3 index for segment: {}, column: {}", segmentName, columnName);
     Preconditions
         .checkState(columnMetadata.getDataType() == DataType.BYTES, "H3 index can only be applied to BYTES columns");
     if (columnMetadata.hasDictionary()) {
-      handleDictionaryBasedColumn(columnMetadata);
+      handleDictionaryBasedColumn(segmentWriter, columnMetadata, indexCreatorProvider);
     } else {
-      handleNonDictionaryBasedColumn(columnMetadata);
+      handleNonDictionaryBasedColumn(segmentWriter, columnMetadata, indexCreatorProvider);
     }
 
     // For v3, write the generated H3 index file into the single file and remove it.
     if (_segmentMetadata.getVersion() == SegmentVersion.v3) {
-      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, h3IndexFile, ColumnIndexType.H3_INDEX);
+      LoaderUtils.writeIndexToV3Format(segmentWriter, columnName, h3IndexFile, ColumnIndexType.H3_INDEX);
     }
 
     // Delete the marker file.
     FileUtils.deleteQuietly(inProgress);
 
-    LOGGER.info("Created H3 index for segment: {}, column: {}", segmentName, column);
+    LOGGER.info("Created H3 index for segment: {}, column: {}", segmentName, columnName);
   }
 
-  private void handleDictionaryBasedColumn(ColumnMetadata columnMetadata)
+  private void handleDictionaryBasedColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
+      GeoSpatialIndexCreatorProvider indexCreatorProvider)
       throws IOException {
+    File indexDir = _segmentMetadata.getIndexDir();
     String columnName = columnMetadata.getColumnName();
-    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
+    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata);
-        GeoSpatialIndexCreator h3IndexCreator = _indexCreatorProvider.newGeoSpatialIndexCreator(
-            IndexCreationContext.builder().withIndexDir(_indexDir).withColumnMetadata(columnMetadata)
+        Dictionary dictionary = LoaderUtils.getDictionary(segmentWriter, columnMetadata);
+        GeoSpatialIndexCreator h3IndexCreator = indexCreatorProvider.newGeoSpatialIndexCreator(
+            IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata)
                 .build().forGeospatialIndex(_h3Configs.get(columnName)))) {
       int numDocs = columnMetadata.getTotalDocs();
       for (int i = 0; i < numDocs; i++) {
@@ -146,13 +150,16 @@ public class H3IndexHandler implements IndexHandler {
     }
   }
 
-  private void handleNonDictionaryBasedColumn(ColumnMetadata columnMetadata)
+  private void handleNonDictionaryBasedColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
+      GeoSpatialIndexCreatorProvider indexCreatorProvider)
       throws Exception {
+    File indexDir = _segmentMetadata.getIndexDir();
     String columnName = columnMetadata.getColumnName();
-    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
+    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        OffHeapH3IndexCreator h3IndexCreator = new OffHeapH3IndexCreator(_indexDir, columnName,
-            _h3Configs.get(columnName).getResolution())) {
+        GeoSpatialIndexCreator h3IndexCreator = indexCreatorProvider.newGeoSpatialIndexCreator(
+            IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata)
+                .build().forGeospatialIndex(_h3Configs.get(columnName)))) {
       int numDocs = columnMetadata.getTotalDocs();
       for (int i = 0; i < numDocs; i++) {
         h3IndexCreator.add(GeometrySerializer.deserialize(forwardIndexReader.getBytes(i, readerContext)));

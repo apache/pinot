@@ -35,12 +35,13 @@ import org.apache.pinot.segment.local.segment.index.readers.IntDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.LongDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.BloomFilterCreatorProvider;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
-import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
@@ -54,32 +55,32 @@ import org.slf4j.LoggerFactory;
 public class BloomFilterHandler implements IndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BloomFilterHandler.class);
 
-  private final File _indexDir;
-  private final SegmentMetadataImpl _segmentMetadata;
-  private final SegmentDirectory.Writer _segmentWriter;
+  private final SegmentMetadata _segmentMetadata;
   private final Map<String, BloomFilterConfig> _bloomFilterConfigs;
-  private final BloomFilterCreatorProvider _indexCreatorProvider;
 
-  public BloomFilterHandler(File indexDir, SegmentMetadataImpl segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Writer segmentWriter, BloomFilterCreatorProvider indexCreatorProvider) {
-    _indexDir = indexDir;
-    _segmentWriter = segmentWriter;
+  public BloomFilterHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
     _segmentMetadata = segmentMetadata;
     _bloomFilterConfigs = indexLoadingConfig.getBloomFilterConfigs();
-    _indexCreatorProvider = indexCreatorProvider;
   }
 
   @Override
-  public void updateIndices()
+  public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
+    Set<String> columnsToAddBF = new HashSet<>(_bloomFilterConfigs.keySet());
+    Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.BLOOM_FILTER);
+    return !existingColumns.equals(columnsToAddBF);
+  }
+
+  @Override
+  public void updateIndices(SegmentDirectory.Writer segmentWriter, IndexCreatorProvider indexCreatorProvider)
       throws Exception {
     Set<String> columnsToAddBF = new HashSet<>(_bloomFilterConfigs.keySet());
     // Remove indices not set in table config any more.
     String segmentName = _segmentMetadata.getName();
-    Set<String> existingColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.BLOOM_FILTER);
+    Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.BLOOM_FILTER);
     for (String column : existingColumns) {
       if (!columnsToAddBF.remove(column)) {
         LOGGER.info("Removing existing bloom filter from segment: {}, column: {}", segmentName, column);
-        _segmentWriter.removeIndex(column, ColumnIndexType.BLOOM_FILTER);
+        segmentWriter.removeIndex(column, ColumnIndexType.BLOOM_FILTER);
         LOGGER.info("Removed existing bloom filter from segment: {}, column: {}", segmentName, column);
       }
     }
@@ -87,19 +88,21 @@ public class BloomFilterHandler implements IndexHandler {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       if (columnMetadata != null) {
         if (columnMetadata.hasDictionary()) {
-          createBloomFilterForColumn(columnMetadata);
+          createBloomFilterForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
         }
         // TODO: Support raw index
       }
     }
   }
 
-  private void createBloomFilterForColumn(ColumnMetadata columnMetadata)
+  private void createBloomFilterForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
+      BloomFilterCreatorProvider indexCreatorProvider)
       throws Exception {
+    File indexDir = _segmentMetadata.getIndexDir();
     String segmentName = _segmentMetadata.getName();
     String columnName = columnMetadata.getColumnName();
-    File bloomFilterFileInProgress = new File(_indexDir, columnName + ".bloom.inprogress");
-    File bloomFilterFile = new File(_indexDir, columnName + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
+    File bloomFilterFileInProgress = new File(indexDir, columnName + ".bloom.inprogress");
+    File bloomFilterFile = new File(indexDir, columnName + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
 
     if (!bloomFilterFileInProgress.exists()) {
       // Marker file does not exist, which means last run ended normally.
@@ -115,10 +118,10 @@ public class BloomFilterHandler implements IndexHandler {
     BloomFilterConfig bloomFilterConfig = _bloomFilterConfigs.get(columnName);
     LOGGER.info("Creating new bloom filter for segment: {}, column: {} with config: {}", segmentName, columnName,
         bloomFilterConfig);
-    try (BloomFilterCreator bloomFilterCreator = _indexCreatorProvider.newBloomFilterCreator(
-        IndexCreationContext.builder().withIndexDir(_indexDir).withColumnMetadata(columnMetadata)
+    try (BloomFilterCreator bloomFilterCreator = indexCreatorProvider.newBloomFilterCreator(
+        IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata)
             .build().forBloomFilter(bloomFilterConfig));
-        Dictionary dictionary = getDictionaryReader(columnMetadata, _segmentWriter)) {
+        Dictionary dictionary = getDictionaryReader(columnMetadata, segmentWriter)) {
       int length = dictionary.length();
       for (int i = 0; i < length; i++) {
         bloomFilterCreator.add(dictionary.getStringValue(i));
@@ -128,7 +131,7 @@ public class BloomFilterHandler implements IndexHandler {
 
     // For v3, write the generated bloom filter file into the single file and remove it.
     if (_segmentMetadata.getVersion() == SegmentVersion.v3) {
-      LoaderUtils.writeIndexToV3Format(_segmentWriter, columnName, bloomFilterFile, ColumnIndexType.BLOOM_FILTER);
+      LoaderUtils.writeIndexToV3Format(segmentWriter, columnName, bloomFilterFile, ColumnIndexType.BLOOM_FILTER);
     }
 
     // Delete the marker file.

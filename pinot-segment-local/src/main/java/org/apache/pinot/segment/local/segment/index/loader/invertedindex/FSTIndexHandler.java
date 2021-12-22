@@ -31,6 +31,7 @@ import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.creator.TextIndexCreatorProvider;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
@@ -66,33 +67,32 @@ import static org.apache.pinot.segment.spi.V1Constants.Indexes.FST_INDEX_FILE_EX
 public class FSTIndexHandler implements IndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(FSTIndexHandler.class);
 
-  private final File _indexDir;
   private final SegmentMetadata _segmentMetadata;
-  private final SegmentDirectory.Writer _segmentWriter;
   private final Set<String> _columnsToAddIdx;
   private final FSTType _fstType;
-  private final TextIndexCreatorProvider _indexCreatorProvider;
 
-  public FSTIndexHandler(File indexDir, SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory.Writer segmentWriter, FSTType fstType, TextIndexCreatorProvider indexCreatorProvider) {
-    _indexDir = indexDir;
+  public FSTIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
     _segmentMetadata = segmentMetadata;
-    _segmentWriter = segmentWriter;
+    _fstType = indexLoadingConfig.getFSTIndexType();
     _columnsToAddIdx = new HashSet<>(indexLoadingConfig.getFSTIndexColumns());
-    _fstType = fstType;
-    _indexCreatorProvider = indexCreatorProvider;
   }
 
   @Override
-  public void updateIndices()
+  public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
+    Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.FST_INDEX);
+    return !existingColumns.equals(_columnsToAddIdx);
+  }
+
+  @Override
+  public void updateIndices(SegmentDirectory.Writer segmentWriter, IndexCreatorProvider indexCreatorProvider)
       throws Exception {
     // Remove indices not set in table config any more
     String segmentName = _segmentMetadata.getName();
-    Set<String> existingColumns = _segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.FST_INDEX);
+    Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.FST_INDEX);
     for (String column : existingColumns) {
       if (!_columnsToAddIdx.remove(column)) {
         LOGGER.info("Removing existing FST index from segment: {}, column: {}", segmentName, column);
-        _segmentWriter.removeIndex(column, ColumnIndexType.FST_INDEX);
+        segmentWriter.removeIndex(column, ColumnIndexType.FST_INDEX);
         LOGGER.info("Removed existing FST index from segment: {}, column: {}", segmentName, column);
       }
     }
@@ -100,7 +100,7 @@ public class FSTIndexHandler implements IndexHandler {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       if (columnMetadata != null) {
         checkUnsupportedOperationsForFSTIndex(columnMetadata);
-        createFSTIndexForColumn(columnMetadata);
+        createFSTIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
       }
     }
   }
@@ -121,12 +121,14 @@ public class FSTIndexHandler implements IndexHandler {
     }
   }
 
-  private void createFSTIndexForColumn(ColumnMetadata columnMetadata)
+  private void createFSTIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
+      TextIndexCreatorProvider indexCreatorProvider)
       throws IOException {
+    File indexDir = _segmentMetadata.getIndexDir();
     String segmentName = _segmentMetadata.getName();
-    String column = columnMetadata.getColumnName();
-    File inProgress = new File(_indexDir, column + ".fst.inprogress");
-    File fstIndexFile = new File(_indexDir, column + FST_INDEX_FILE_EXTENSION);
+    String columnName = columnMetadata.getColumnName();
+    File inProgress = new File(indexDir, columnName + ".fst.inprogress");
+    File fstIndexFile = new File(indexDir, columnName + FST_INDEX_FILE_EXTENSION);
 
     if (!inProgress.exists()) {
       // Create a marker file.
@@ -135,14 +137,14 @@ public class FSTIndexHandler implements IndexHandler {
       FileUtils.deleteQuietly(fstIndexFile);
     }
 
-    LOGGER.info("Creating new FST index for column: {} in segment: {}, cardinality: {}", column, segmentName,
+    LOGGER.info("Creating new FST index for column: {} in segment: {}, cardinality: {}", columnName, segmentName,
         columnMetadata.getCardinality());
 
-    TextIndexCreator fstIndexCreator = _indexCreatorProvider.newTextIndexCreator(
-        IndexCreationContext.builder().withIndexDir(_indexDir).withColumnMetadata(columnMetadata)
-            .build().forFSTIndex(_fstType, null));
+    TextIndexCreator fstIndexCreator = indexCreatorProvider.newTextIndexCreator(
+        IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata).build()
+            .forFSTIndex(_fstType, null));
 
-    try (Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata)) {
+    try (Dictionary dictionary = LoaderUtils.getDictionary(segmentWriter, columnMetadata)) {
       for (int dictId = 0; dictId < dictionary.length(); dictId++) {
         fstIndexCreator.add(dictionary.getStringValue(dictId));
       }
@@ -151,11 +153,11 @@ public class FSTIndexHandler implements IndexHandler {
 
     // For v3, write the generated range index file into the single file and remove it.
     if (_segmentMetadata.getVersion() == SegmentVersion.v3) {
-      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, fstIndexFile, ColumnIndexType.FST_INDEX);
+      LoaderUtils.writeIndexToV3Format(segmentWriter, columnName, fstIndexFile, ColumnIndexType.FST_INDEX);
     }
 
     // Delete the marker file.
     FileUtils.deleteQuietly(inProgress);
-    LOGGER.info("Created FST index for segment: {}, column: {}", segmentName, column);
+    LOGGER.info("Created FST index for segment: {}, column: {}", segmentName, columnName);
   }
 }
