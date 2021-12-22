@@ -154,9 +154,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
             acquireSema(_segmentName, _logger);
             _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName, _forceDownload);
           } finally {
-            if (_refreshThreadSemaphore != null) {
-              _refreshThreadSemaphore.release();
-            }
+            releaseSema();
           }
         }
         helixTaskResult.setSuccess(true);
