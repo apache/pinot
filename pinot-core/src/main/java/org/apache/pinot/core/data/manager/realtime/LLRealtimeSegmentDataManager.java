@@ -397,6 +397,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       try {
         messageBatch = _partitionGroupConsumer
             .fetchMessages(_currentOffset, null, _partitionLevelStreamConfig.getFetchTimeoutMillis());
+        if (_segmentLogger.isDebugEnabled()) {
+          _segmentLogger.debug("message batch received. filter={} unfiltered={} endOfPartitionGroup={}",
+              messageBatch.getUnfilteredMessageCount(), messageBatch.getMessageCount(),
+              messageBatch.isEndOfPartitionGroup());
+        }
         _endOfPartitionGroup = messageBatch.isEndOfPartitionGroup();
         _consecutiveErrorCount = 0;
       } catch (PermanentConsumerException e) {
@@ -426,8 +431,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       } else if (messageBatch.getUnfilteredMessageCount() > 0) {
         // we consumed something from the stream but filtered all the content out,
         // so we need to advance the offsets to avoid getting stuck
-        _currentOffset = messageBatch.getOffsetOfNextBatch();
-        lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(_currentOffset);
+        StreamPartitionMsgOffset nextOffset = messageBatch.getOffsetOfNextBatch();
+        if (_segmentLogger.isDebugEnabled()) {
+          _segmentLogger.debug("Skipped empty batch. Advancing from {} to {}", _currentOffset, nextOffset);
+        }
+        _currentOffset = nextOffset;
+        lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(nextOffset);
       } else {
         // We did not consume any rows. Update the partition-consuming metric only if we have been idling for a long
         // time.
@@ -459,6 +468,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     GenericRow reuse = new GenericRow();
     for (int index = 0; index < messagesAndOffsets.getMessageCount(); index++) {
       if (_shouldStop || endCriteriaReached()) {
+        if (_segmentLogger.isDebugEnabled()) {
+          _segmentLogger.debug("stop processing message batch early shouldStop: {}", _shouldStop);
+        }
         break;
       }
       if (!canTakeMore) {
@@ -556,9 +568,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
     updateCurrentDocumentCountMetrics();
     if (streamMessageCount != 0) {
-      _segmentLogger.debug("Indexed {} messages ({} messages read from stream) current offset {}", indexedMessageCount,
-          streamMessageCount, _currentOffset);
+      if (_segmentLogger.isDebugEnabled()) {
+        _segmentLogger.debug("Indexed {} messages ({} messages read from stream) current offset {}",
+            indexedMessageCount, streamMessageCount, _currentOffset);
+      }
     } else if (messagesAndOffsets.getUnfilteredMessageCount() == 0) {
+      if (_segmentLogger.isDebugEnabled()) {
+        _segmentLogger.debug("empty batch received - sleeping for {}ms", idlePipeSleepTimeMillis);
+      }
       // If there were no messages to be fetched from stream, wait for a little bit as to avoid hammering the stream
       Uninterruptibles.sleepUninterruptibly(idlePipeSleepTimeMillis, TimeUnit.MILLISECONDS);
     }
