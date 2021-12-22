@@ -54,6 +54,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.reduce.DataTableReducerContext;
 import org.apache.pinot.core.query.reduce.HavingFilterHandler;
 import org.apache.pinot.core.query.reduce.PostAggregationHandler;
+import org.apache.pinot.core.query.reduce.ReducerUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GapfillUtils;
@@ -84,12 +85,12 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
   private final Map<Key, Object[]> _previousByGroupKey;
   private final int _numOfGroupByKeys;
   private final List<Integer> _groupByKeyIndexes;
-  private final boolean [] _isGroupBySelections;
+  private final boolean[] _isGroupBySelections;
   private int _timeBucketIndex = -1;
 
   public GapFillGroupByDataTableReducer(QueryContext queryContext) {
-    Preconditions.checkArgument(
-        queryContext.getBrokerRequest().getPinotQuery() != null, "GapFill can only be applied to sql query");
+    Preconditions.checkArgument(queryContext.getBrokerRequest().getPinotQuery() != null,
+        "GapFill can only be applied to sql query");
     _queryContext = queryContext;
     _aggregationFunctions = queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
@@ -108,16 +109,15 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
     }
 
     List<ExpressionContext> args = gapFillSelection.getFunction().getArguments();
-    Preconditions.checkArgument(
-        args.size() == 5, "PostAggregateGapFill does not have correct number of arguments.");
-    Preconditions.checkArgument(
-        args.get(1).getLiteral() != null, "The second argument of PostAggregateGapFill should be TimeFormatter.");
-    Preconditions.checkArgument(
-        args.get(2).getLiteral() != null, "The third argument of PostAggregateGapFill should be start time.");
-    Preconditions.checkArgument(
-        args.get(3).getLiteral() != null, "The fourth argument of PostAggregateGapFill should be end time.");
-    Preconditions.checkArgument(
-        args.get(4).getLiteral() != null, "The fifth argument of PostAggregateGapFill should be time bucket size.");
+    Preconditions.checkArgument(args.size() == 5, "PostAggregateGapFill does not have correct number of arguments.");
+    Preconditions.checkArgument(args.get(1).getLiteral() != null,
+        "The second argument of PostAggregateGapFill should be TimeFormatter.");
+    Preconditions.checkArgument(args.get(2).getLiteral() != null,
+        "The third argument of PostAggregateGapFill should be start time.");
+    Preconditions.checkArgument(args.get(3).getLiteral() != null,
+        "The fourth argument of PostAggregateGapFill should be end time.");
+    Preconditions.checkArgument(args.get(4).getLiteral() != null,
+        "The fifth argument of PostAggregateGapFill should be time bucket size.");
 
     boolean orderByTimeBucket = false;
     if (_queryContext.getOrderByExpressions() != null && !_queryContext.getOrderByExpressions().isEmpty()) {
@@ -126,8 +126,8 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
           firstOrderByExpression.isAsc() && firstOrderByExpression.getExpression().equals(gapFillSelection);
     }
 
-    Preconditions.checkArgument(
-        orderByTimeBucket, "PostAggregateGapFill does not work if the time bucket is not ordered.");
+    Preconditions.checkArgument(orderByTimeBucket,
+        "PostAggregateGapFill does not work if the time bucket is not ordered.");
 
     _dateTimeFormatter = new DateTimeFormatSpec(args.get(1).getLiteral());
     _dateTimeGranularity = new DateTimeGranularitySpec(args.get(4).getLiteral());
@@ -195,7 +195,7 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
   }
 
   private Key constructGroupKeys(Object[] row) {
-    Object [] groupKeys = new Object[_numOfGroupByKeys];
+    Object[] groupKeys = new Object[_numOfGroupByKeys];
     for (int i = 0; i < _numOfGroupByKeys; i++) {
       groupKeys[i] = row[_groupByKeyIndexes.get(i)];
     }
@@ -421,48 +421,18 @@ public class GapFillGroupByDataTableReducer implements DataTableReducer {
     ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     long timeOutMs = reducerContext.getReduceTimeOutMs() - (System.currentTimeMillis() - start);
     try {
-      reducerContext.getExecutorService().invokeAll(reduceGroups.stream()
-          .map(reduceGroup -> new TraceCallable<Void>() {
-            @Override
-            public Void callJob() throws Exception {
-              for (DataTable dataTable : reduceGroup) {
-                int numRows = dataTable.getNumberOfRows();
-                for (int rowId = 0; rowId < numRows; rowId++) {
-                  Object[] values = new Object[_numColumns];
-                  for (int colId = 0; colId < _numColumns; colId++) {
-                    switch (storedColumnDataTypes[colId]) {
-                      case INT:
-                        values[colId] = dataTable.getInt(rowId, colId);
-                        break;
-                      case LONG:
-                        values[colId] = dataTable.getLong(rowId, colId);
-                        break;
-                      case FLOAT:
-                        values[colId] = dataTable.getFloat(rowId, colId);
-                        break;
-                      case DOUBLE:
-                        values[colId] = dataTable.getDouble(rowId, colId);
-                        break;
-                      case STRING:
-                        values[colId] = dataTable.getString(rowId, colId);
-                        break;
-                      case BYTES:
-                        values[colId] = dataTable.getBytes(rowId, colId);
-                        break;
-                      case OBJECT:
-                        values[colId] = dataTable.getObject(rowId, colId);
-                        break;
-                      // Add other aggregation intermediate result / group-by column type supports here
-                      default:
-                        throw new IllegalStateException();
-                    }
-                  }
-                  indexedTable.upsert(new Record(values));
-              }
+      reducerContext.getExecutorService().invokeAll(reduceGroups.stream().map(reduceGroup -> new TraceCallable<Void>() {
+        @Override
+        public Void callJob() {
+          for (DataTable dataTable : reduceGroup) {
+            int numRows = dataTable.getNumberOfRows();
+            for (int rowId = 0; rowId < numRows; rowId++) {
+              indexedTable.upsert(ReducerUtils.getRecord(dataTable, rowId, storedColumnDataTypes));
             }
-            return null;
           }
-          }).collect(Collectors.toList()), timeOutMs, TimeUnit.MILLISECONDS);
+          return null;
+        }
+      }).collect(Collectors.toList()), timeOutMs, TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
       throw new TimeoutException("Timed out in broker reduce phase.");
     }

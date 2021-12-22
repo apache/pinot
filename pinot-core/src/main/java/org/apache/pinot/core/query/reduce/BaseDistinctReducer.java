@@ -18,13 +18,10 @@
  */
 package org.apache.pinot.core.query.reduce;
 
-import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Record;
@@ -37,31 +34,14 @@ import org.apache.pinot.core.util.QueryOptionsUtils;
 /**
  * Helper class to reduce data tables and set results of distinct query into the BrokerResponseNative
  */
-public abstract class DistinctReducerBase {
+public abstract class BaseDistinctReducer {
   protected final DistinctAggregationFunction _distinctAggregationFunction;
   protected final boolean _responseFormatSql;
 
   // TODO: queryOptions.isPreserveType() is ignored for DISTINCT queries.
-  public DistinctReducerBase(QueryContext queryContext, DistinctAggregationFunction distinctAggregationFunction) {
+  public BaseDistinctReducer(QueryContext queryContext, DistinctAggregationFunction distinctAggregationFunction) {
     _distinctAggregationFunction = distinctAggregationFunction;
     _responseFormatSql = QueryOptionsUtils.isResponseFormatSQL(queryContext.getQueryOptions());
-  }
-
-  protected SelectionResults reduceToSelectionResult(DistinctTable distinctTable) {
-    List<Serializable[]> rows = new ArrayList<>(distinctTable.size());
-    DataSchema dataSchema = distinctTable.getDataSchema();
-    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
-    int numColumns = columnDataTypes.length;
-    Iterator<Record> iterator = distinctTable.getFinalResult();
-    while (iterator.hasNext()) {
-      Object[] values = iterator.next().getValues();
-      Serializable[] row = new Serializable[numColumns];
-      for (int i = 0; i < numColumns; i++) {
-        row[i] = columnDataTypes[i].convertAndFormat(values[i]);
-      }
-      rows.add(row);
-    }
-    return new SelectionResults(Arrays.asList(dataSchema.getColumnNames()), rows);
   }
 
   protected ResultTable reduceToResultTable(DistinctTable distinctTable) {

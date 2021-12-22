@@ -19,15 +19,19 @@
 package org.apache.pinot.core.query.reduce.datatable;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.reduce.AggregationReducerBase;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.reduce.BaseAggregationReducer;
 import org.apache.pinot.core.query.reduce.DataTableReducerContext;
 import org.apache.pinot.core.query.reduce.PostAggregationHandler;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -39,13 +43,16 @@ import org.apache.pinot.core.util.QueryOptionsUtils;
  * Helper class to reduce and set Aggregation results into the BrokerResponseNative
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class AggregationDataTableReducer extends AggregationReducerBase implements DataTableReducer {
+public class AggregationDataTableReducer extends BaseAggregationReducer implements DataTableReducer {
+  private final boolean _responseFormatSql;
+  private final boolean _preserveType;
 
   public AggregationDataTableReducer(QueryContext queryContext) {
-    super(queryContext, queryContext.getAggregationFunctions());
+    super(queryContext);
+
     Map<String, String> queryOptions = queryContext.getQueryOptions();
-    _preserveType = QueryOptionsUtils.isPreserveType(queryOptions);
     _responseFormatSql = QueryOptionsUtils.isResponseFormatSQL(queryOptions);
+    _preserveType = QueryOptionsUtils.isPreserveType(queryOptions);
   }
 
   /**
@@ -84,5 +91,26 @@ public class AggregationDataTableReducer extends AggregationReducerBase implemen
     } else {
       brokerResponseNative.setAggregationResults(reduceToAggregationResults(finalResults, dataSchema.getColumnNames()));
     }
+  }
+
+  /**
+   * Sets aggregation results into AggregationResults
+   */
+  private List<AggregationResult> reduceToAggregationResults(Serializable[] finalResults, String[] columnNames) {
+    int numAggregationFunctions = _aggregationFunctions.length;
+    List<AggregationResult> aggregationResults = new ArrayList<>(numAggregationFunctions);
+    if (_preserveType) {
+      for (int i = 0; i < numAggregationFunctions; i++) {
+        aggregationResults.add(new AggregationResult(columnNames[i],
+            _aggregationFunctions[i].getFinalResultColumnType().format(finalResults[i])));
+      }
+    } else {
+      // Format the values into strings
+      for (int i = 0; i < numAggregationFunctions; i++) {
+        aggregationResults.add(new AggregationResult(columnNames[i], AggregationFunctionUtils.formatValue(
+            _aggregationFunctions[i].getFinalResultColumnType().format(finalResults[i]))));
+      }
+    }
+    return aggregationResults;
   }
 }

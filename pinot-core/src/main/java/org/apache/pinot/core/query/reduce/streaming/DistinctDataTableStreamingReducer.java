@@ -22,8 +22,8 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
+import org.apache.pinot.core.query.reduce.BaseDistinctReducer;
 import org.apache.pinot.core.query.reduce.DataTableReducerContext;
-import org.apache.pinot.core.query.reduce.DistinctReducerBase;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 
@@ -31,11 +31,10 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 /**
  * Helper class to reduce data tables and set results of distinct query into the BrokerResponseNative
  */
-public class DistinctDataTableStreamingReducer extends DistinctReducerBase implements StreamingReducer {
+public class DistinctDataTableStreamingReducer extends BaseDistinctReducer implements StreamingReducer {
 
   private DistinctTable _mainDistinctTable;
 
-    // TODO: queryOptions.isPreserveType() is ignored for DISTINCT queries.
   public DistinctDataTableStreamingReducer(QueryContext queryContext,
       DistinctAggregationFunction distinctAggregationFunction) {
     super(queryContext, distinctAggregationFunction);
@@ -43,7 +42,6 @@ public class DistinctDataTableStreamingReducer extends DistinctReducerBase imple
 
   @Override
   public void init(DataTableReducerContext dataTableReducerContext) {
-    _mainDistinctTable = null;
   }
 
   /**
@@ -65,8 +63,9 @@ public class DistinctDataTableStreamingReducer extends DistinctReducerBase imple
     if (!distinctTable.isEmpty()) {
       if (_mainDistinctTable == null) {
         // Construct a main DistinctTable and merge all non-empty DistinctTables into it
-        _mainDistinctTable = new DistinctTable(distinctTable.getDataSchema(),
-            _distinctAggregationFunction.getOrderByExpressions(), _distinctAggregationFunction.getLimit());
+        _mainDistinctTable =
+            new DistinctTable(distinctTable.getDataSchema(), _distinctAggregationFunction.getOrderByExpressions(),
+                _distinctAggregationFunction.getLimit());
       }
       _mainDistinctTable.mergeTable(distinctTable);
     }
@@ -74,6 +73,8 @@ public class DistinctDataTableStreamingReducer extends DistinctReducerBase imple
 
   @Override
   public BrokerResponseNative seal() {
+    // TODO: Handle case where reduce() is not called
+
     BrokerResponseNative brokerResponseNative = new BrokerResponseNative();
     // Up until now, we have treated DISTINCT similar to another aggregation function even in terms
     // of the result from function and merging results.

@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.core.query.reduce.streaming;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -31,43 +29,33 @@ import org.apache.pinot.core.query.reduce.DataTableReducerContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.core.util.QueryOptionsUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class SelectionOnlyStreamingReducer implements StreamingReducer {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SelectionOnlyStreamingReducer.class);
-
   private final QueryContext _queryContext;
-  private final boolean _preserveType;
   private final int _limit;
+  private final List<Object[]> _rows;
 
   private DataSchema _dataSchema;
-  private DataTableReducerContext _dataTableReducerContext;
-  private List<Object[]> _rows;
 
   public SelectionOnlyStreamingReducer(QueryContext queryContext) {
     _queryContext = queryContext;
     _limit = _queryContext.getLimit();
-    Map<String, String> queryOptions = queryContext.getQueryOptions();
-    Preconditions.checkState(QueryOptionsUtils.isResponseFormatSQL(queryOptions), "only SQL response is supported");
-
-    _preserveType = QueryOptionsUtils.isPreserveType(queryOptions);
-    _dataSchema = null;
-  }
-
-  @Override
-  public void init(DataTableReducerContext dataTableReducerContext) {
-    _dataTableReducerContext = dataTableReducerContext;
     _rows = new ArrayList<>(Math.min(_limit, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
   }
 
   @Override
+  public void init(DataTableReducerContext dataTableReducerContext) {
+  }
+
+  @Override
   public synchronized void reduce(ServerRoutingInstance key, DataTable dataTable) {
-    // get dataSchema
-    _dataSchema = _dataSchema == null ? dataTable.getDataSchema() : _dataSchema;
+    if (_dataSchema == null) {
+      _dataSchema = dataTable.getDataSchema();
+    }
+
     // TODO: For data table map with more than one data tables, remove conflicting data tables
+    // TODO: Early terminate when enough rows are collected
     reduceWithoutOrdering(dataTable, _limit);
   }
 
@@ -84,9 +72,11 @@ public class SelectionOnlyStreamingReducer implements StreamingReducer {
 
   @Override
   public BrokerResponseNative seal() {
+    // TODO: Handle case where reduce() is not called
+
     BrokerResponseNative brokerResponseNative = new BrokerResponseNative();
     List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(_queryContext, _dataSchema);
-    if (_dataSchema != null && _rows.size() > 0) {
+    if (_rows.size() > 0) {
       brokerResponseNative.setResultTable(
           SelectionOperatorUtils.renderResultTableWithoutOrdering(_rows, _dataSchema, selectionColumns));
     } else {

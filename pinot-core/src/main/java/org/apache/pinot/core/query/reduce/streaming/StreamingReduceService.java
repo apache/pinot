@@ -62,7 +62,8 @@ public class StreamingReduceService extends BaseReduceService {
 
   public BrokerResponseNative reduceOnStreamResponse(BrokerRequest brokerRequest,
       Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> serverResponseMap, long reduceTimeOutMs,
-      @Nullable BrokerMetrics brokerMetrics) throws IOException {
+      @Nullable BrokerMetrics brokerMetrics)
+      throws IOException {
     if (serverResponseMap.isEmpty()) {
       // Empty response.
       return BrokerResponseNative.empty();
@@ -111,12 +112,15 @@ public class StreamingReduceService extends BaseReduceService {
 
   private static void processIterativeServerResponse(StreamingReducer reducer, ExecutorService executorService,
       Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> serverResponseMap, long reduceTimeOutMs,
-      ExecutionStatsAggregator aggregator) throws Exception {
+      ExecutionStatsAggregator aggregator)
+      throws Exception {
+    // TODO: This should rely on DataTableReducerContext.getMaxReduceThreadsPerQuery() instead of using all the threads
+
     int cnt = 0;
     Future[] futures = new Future[serverResponseMap.size()];
     CountDownLatch countDownLatch = new CountDownLatch(serverResponseMap.size());
 
-    for (Map.Entry<ServerRoutingInstance, Iterator<Server.ServerResponse>> entry: serverResponseMap.entrySet()) {
+    for (Map.Entry<ServerRoutingInstance, Iterator<Server.ServerResponse>> entry : serverResponseMap.entrySet()) {
       futures[cnt++] = executorService.submit(() -> {
         Iterator<Server.ServerResponse> streamingResponses = entry.getValue();
         try {

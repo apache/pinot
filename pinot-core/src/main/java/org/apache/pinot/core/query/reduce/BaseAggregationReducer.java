@@ -18,17 +18,12 @@
  */
 package org.apache.pinot.core.query.reduce;
 
-import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
-import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
@@ -36,15 +31,13 @@ import org.apache.pinot.core.query.request.context.QueryContext;
  * Helper class to reduce and set Aggregation results into the BrokerResponseNative
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public abstract class AggregationReducerBase {
+public abstract class BaseAggregationReducer {
   protected final QueryContext _queryContext;
   protected final AggregationFunction[] _aggregationFunctions;
-  protected boolean _preserveType;
-  protected boolean _responseFormatSql;
 
-  public AggregationReducerBase(QueryContext queryContext, AggregationFunction[] aggregationFunctions) {
+  public BaseAggregationReducer(QueryContext queryContext) {
     _queryContext = queryContext;
-    _aggregationFunctions = aggregationFunctions;
+    _aggregationFunctions = queryContext.getAggregationFunctions();
   }
 
   protected void mergedResults(Object[] intermediateResults, DataSchema dataSchema, DataTable dataTable) {
@@ -87,27 +80,6 @@ public abstract class AggregationReducerBase {
       row[i] = columnDataTypes[i].format(row[i]);
     }
     return new ResultTable(dataSchema, Collections.singletonList(row));
-  }
-
-  /**
-   * Sets aggregation results into AggregationResults
-   */
-  protected List<AggregationResult> reduceToAggregationResults(Serializable[] finalResults, String[] columnNames) {
-    int numAggregationFunctions = _aggregationFunctions.length;
-    List<AggregationResult> aggregationResults = new ArrayList<>(numAggregationFunctions);
-    if (_preserveType) {
-      for (int i = 0; i < numAggregationFunctions; i++) {
-        aggregationResults.add(new AggregationResult(columnNames[i],
-            _aggregationFunctions[i].getFinalResultColumnType().format(finalResults[i])));
-      }
-    } else {
-      // Format the values into strings
-      for (int i = 0; i < numAggregationFunctions; i++) {
-        aggregationResults.add(new AggregationResult(columnNames[i], AggregationFunctionUtils.formatValue(
-            _aggregationFunctions[i].getFinalResultColumnType().format(finalResults[i]))));
-      }
-    }
-    return aggregationResults;
   }
 
   /**

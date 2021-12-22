@@ -28,7 +28,7 @@ import org.apache.pinot.core.query.reduce.datatable.ExplainPlanDataTableReducer;
 import org.apache.pinot.core.query.reduce.datatable.GapFillGroupByDataTableReducer;
 import org.apache.pinot.core.query.reduce.datatable.GroupByDataTableReducer;
 import org.apache.pinot.core.query.reduce.datatable.SelectionDataTableReducer;
-import org.apache.pinot.core.query.reduce.streaming.AggregationDataTableStreamingReducer;
+import org.apache.pinot.core.query.reduce.streaming.AggregationStreamingReducer;
 import org.apache.pinot.core.query.reduce.streaming.DistinctDataTableStreamingReducer;
 import org.apache.pinot.core.query.reduce.streaming.GroupByDataTableStreamingReducer;
 import org.apache.pinot.core.query.reduce.streaming.SelectionOnlyStreamingReducer;
@@ -82,9 +82,10 @@ public final class ResultReducerFactory {
     AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
     if (aggregationFunctions == null) {
       if (queryContext.getOrderByExpressions() != null) {
-        throw new UnsupportedOperationException("Only selection queries are supported");
+        // TODO: Support selection order-by
+        throw new UnsupportedOperationException("Streaming selection order-by query is not supported");
       }
-      // Simple election query
+      // Selection only query
       return new SelectionOnlyStreamingReducer(queryContext);
     } else {
       // Aggregation query
@@ -95,10 +96,10 @@ public final class ResultReducerFactory {
           return new DistinctDataTableStreamingReducer(queryContext,
               (DistinctAggregationFunction) aggregationFunctions[0]);
         } else {
-          return new AggregationDataTableStreamingReducer(queryContext);
+          return new AggregationStreamingReducer(queryContext);
         }
       } else if (GapfillUtils.isPostAggregateGapfill(queryContext)) {
-        throw new UnsupportedOperationException("unsupported!");
+        throw new UnsupportedOperationException("Streaming gap-fill query is not supported");
       } else {
         // Aggregation group-by query
         return new GroupByDataTableStreamingReducer(queryContext);

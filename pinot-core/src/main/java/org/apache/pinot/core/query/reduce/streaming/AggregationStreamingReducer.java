@@ -19,40 +19,33 @@
 package org.apache.pinot.core.query.reduce.streaming;
 
 import java.io.Serializable;
-import java.util.Map;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.reduce.AggregationReducerBase;
+import org.apache.pinot.core.query.reduce.BaseAggregationReducer;
 import org.apache.pinot.core.query.reduce.DataTableReducerContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.core.util.QueryOptionsUtils;
 
 
 /**
  * Helper class to reduce and set Aggregation results into the BrokerResponseNative
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class AggregationDataTableStreamingReducer extends AggregationReducerBase implements StreamingReducer {
+public class AggregationStreamingReducer extends BaseAggregationReducer implements StreamingReducer {
+  private final Object[] _intermediateResults;
 
   private DataSchema _dataSchema;
-  private DataTableReducerContext _dataTableReducerContext;
 
-  private Object[] _intermediateResults;
+  public AggregationStreamingReducer(QueryContext queryContext) {
+    super(queryContext);
 
-  public AggregationDataTableStreamingReducer(QueryContext queryContext) {
-    super(queryContext, queryContext.getAggregationFunctions());
-    Map<String, String> queryOptions = queryContext.getQueryOptions();
-    _preserveType = QueryOptionsUtils.isPreserveType(queryOptions);
     _intermediateResults = new Object[_aggregationFunctions.length];
-    _dataSchema = null;
   }
 
   @Override
   public void init(DataTableReducerContext dataTableReducerContext) {
-    _dataTableReducerContext = dataTableReducerContext;
   }
 
   /**
@@ -62,13 +55,17 @@ public class AggregationDataTableStreamingReducer extends AggregationReducerBase
    */
   @Override
   public synchronized void reduce(ServerRoutingInstance key, DataTable dataTable) {
-    _dataSchema = _dataSchema == null ? dataTable.getDataSchema() : _dataSchema;
+    if (_dataSchema == null) {
+      _dataSchema = dataTable.getDataSchema();
+    }
+
     // Merge results from all data tables
     mergedResults(_intermediateResults, _dataSchema, dataTable);
   }
 
   @Override
   public BrokerResponseNative seal() {
+    // TODO: Handle case where reduce() is not called
 
     Serializable[] finalResults = new Serializable[_aggregationFunctions.length];
     for (int i = 0; i < _aggregationFunctions.length; i++) {
