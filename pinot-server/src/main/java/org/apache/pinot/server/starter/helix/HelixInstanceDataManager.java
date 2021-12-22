@@ -36,6 +36,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import javax.validation.constraints.Null;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
@@ -199,26 +200,27 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload)
       throws Exception {
-      LOGGER.info("Reloading single segment: {} in table: {}", segmentName, tableNameWithType);
-      SegmentMetadata segmentMetadata = getSegmentMetadata(tableNameWithType, segmentName);
-      if (segmentMetadata == null) {
-        LOGGER.info("Segment metadata is null. Skip reloading segment: {} in table: {}", segmentName,
-            tableNameWithType);
-        return;
-      }
+    LOGGER.info("Reloading single segment: {} in table: {}", segmentName, tableNameWithType);
+    SegmentMetadata segmentMetadata = getSegmentMetadata(tableNameWithType, segmentName);
+    if (segmentMetadata == null) {
+      LOGGER.info("Segment metadata is null. Skip reloading segment: {} in table: {}", segmentName,
+          tableNameWithType);
+      return;
+    }
 
-      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-      Preconditions.checkNotNull(tableConfig);
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+    Preconditions.checkNotNull(tableConfig);
 
-      Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
 
-      reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
+    reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
 
-      LOGGER.info("Reloaded single segment: {} in table: {}", segmentName, tableNameWithType);
+    LOGGER.info("Reloaded single segment: {} in table: {}", segmentName, tableNameWithType);
   }
 
   @Override
-  public void reloadAllSegments(String tableNameWithType, boolean forceDownload, Semaphore refreshThreadSemaphore)
+  public void reloadAllSegments(String tableNameWithType, boolean forceDownload,
+      @Nullable Semaphore refreshThreadSemaphore)
       throws Exception {
     LOGGER.info("Reloading all segments in table: {}", tableNameWithType);
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
@@ -239,7 +241,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         failedSegments.add(segmentName);
         sampleException.set(e);
       } finally {
-        refreshThreadSemaphore.release();
+        if (refreshThreadSemaphore != null) {
+          refreshThreadSemaphore.release();
+        }
       }
     }, workers)).toArray(CompletableFuture[]::new)).get();
 

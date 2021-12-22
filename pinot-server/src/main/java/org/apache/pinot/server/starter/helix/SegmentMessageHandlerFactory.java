@@ -145,6 +145,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         if (_segmentName.equals("")) {
           // NOTE: the method aborts if any segment reload encounters an unhandled exception,
           // and can lead to inconsistent state across segments.
+          //we don't acquire any permit here as they'll be acquired by worked threads later
           _instanceDataManager.reloadAllSegments(_tableNameWithType, _forceDownload,
               _refreshThreadSemaphore);
         } else {
@@ -153,7 +154,9 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
             acquireSema(_segmentName, _logger);
             _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName, _forceDownload);
           } finally {
-            _refreshThreadSemaphore.release();
+            if (_refreshThreadSemaphore != null) {
+              _refreshThreadSemaphore.release();
+            }
           }
         }
         helixTaskResult.setSuccess(true);

@@ -1895,8 +1895,7 @@ public class PinotHelixResourceManager {
   }
 
   public int reloadAllSegments(String tableNameWithType, boolean forceDownload) {
-    LOGGER.info("Sending reload message for table: {} with forceDownload: {}", tableNameWithType,
-        forceDownload);
+    LOGGER.info("Sending reload message for table: {} with forceDownload: {}", tableNameWithType, forceDownload);
 
     if (forceDownload) {
       TableType tt = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
@@ -1910,8 +1909,7 @@ public class PinotHelixResourceManager {
     recipientCriteria.setInstanceName("%");
     recipientCriteria.setResource(tableNameWithType);
     recipientCriteria.setSessionSpecific(true);
-    SegmentReloadMessage segmentReloadMessage =
-        new SegmentReloadMessage(tableNameWithType, null, forceDownload);
+    SegmentReloadMessage segmentReloadMessage = new SegmentReloadMessage(tableNameWithType, null, forceDownload);
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
 
     // Infinite timeout on the recipient
