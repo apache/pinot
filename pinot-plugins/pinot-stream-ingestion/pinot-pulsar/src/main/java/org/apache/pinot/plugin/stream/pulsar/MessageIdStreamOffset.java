@@ -19,7 +19,7 @@
 package org.apache.pinot.plugin.stream.pulsar;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pulsar.client.api.MessageId;
 import org.slf4j.Logger;
@@ -44,8 +44,8 @@ public class MessageIdStreamOffset implements StreamPartitionMsgOffset {
    */
   public MessageIdStreamOffset(String messageId) {
     try {
-      _messageId = MessageId.fromByteArray(messageId.getBytes(StandardCharsets.UTF_8));
-    } catch (IOException e) {
+      _messageId = MessageId.fromByteArray(Hex.decodeHex(messageId));
+    } catch (Exception e) {
       LOGGER.warn("Cannot parse message id " + messageId, e);
     }
   }
@@ -67,6 +67,6 @@ public class MessageIdStreamOffset implements StreamPartitionMsgOffset {
 
   @Override
   public String toString() {
-    return _messageId.toString();
+    return Hex.encodeHexString(_messageId.toByteArray());
   }
 }
