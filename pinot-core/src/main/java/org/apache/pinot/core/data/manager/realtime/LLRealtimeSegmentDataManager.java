@@ -638,8 +638,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                   } else {
                     // Could not build segment for some reason. We can only download it.
                     _state = State.ERROR;
-                    _realtimeTableDataManager.addSegmentError(_segmentNameStr,
-                        new SegmentErrorInfo(System.currentTimeMillis(), "Could not build segment", null));
+                    _segmentLogger.error("Could not build segment for {}", _segmentNameStr);
                   }
                   break;
                 default:
@@ -653,8 +652,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               if (_segmentBuildDescriptor == null) {
                 // We could not build the segment. Go into error state.
                 _state = State.ERROR;
-                _realtimeTableDataManager.addSegmentError(_segmentNameStr,
-                    new SegmentErrorInfo(System.currentTimeMillis(), "Could not build segment", null));
+                _segmentLogger.error("Could not build segment for {}", _segmentNameStr);
               } else {
                 success = commitSegment(response.getControllerVipUrl(),
                     response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit());
@@ -824,6 +822,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       } catch (Exception e) {
         _segmentLogger.error("Could not build segment", e);
         FileUtils.deleteQuietly(tempSegmentFolder);
+        _realtimeTableDataManager.addSegmentError(_segmentNameStr,
+            new SegmentErrorInfo(System.currentTimeMillis(), "Could not build segment", e));
         return null;
       }
       final long buildTimeMillis = now() - lockAcquireTimeMillis;
@@ -872,15 +872,20 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
         File metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
         if (metadataFile == null) {
-          _segmentLogger
-              .error("Failed to find file: {} under index directory: {}", V1Constants.MetadataKeys.METADATA_FILE_NAME,
-                  indexDir);
+          String errorMessage = String.format("Failed to find file: %s under index directory: %s",
+              V1Constants.MetadataKeys.METADATA_FILE_NAME, indexDir);
+          _segmentLogger.error(errorMessage);
+          _realtimeTableDataManager
+              .addSegmentError(_segmentNameStr, new SegmentErrorInfo(System.currentTimeMillis(), errorMessage, null));
           return null;
         }
         File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
         if (creationMetaFile == null) {
-          _segmentLogger
-              .error("Failed to find file: {} under index directory: {}", V1Constants.SEGMENT_CREATION_META, indexDir);
+          String errorMessage = String.format("Failed to find file: %s under index directory: %s",
+              V1Constants.SEGMENT_CREATION_META, indexDir);
+          _segmentLogger.error(errorMessage);
+          _realtimeTableDataManager
+              .addSegmentError(_segmentNameStr, new SegmentErrorInfo(System.currentTimeMillis(), errorMessage, null));
           return null;
         }
         Map<String, File> metadataFiles = new HashMap<>();
@@ -894,7 +899,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             segmentSizeBytes);
       }
     } catch (InterruptedException e) {
-      _segmentLogger.error("Interrupted while waiting for semaphore");
+      String errorMessage = "Interrupted while waiting for semaphore";
+      _segmentLogger.error(errorMessage, e);
+      _realtimeTableDataManager
+          .addSegmentError(_segmentNameStr, new SegmentErrorInfo(System.currentTimeMillis(), errorMessage, e));
       return null;
     } finally {
       if (_segBuildSemaphore != null) {
@@ -948,7 +956,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (descriptor == null) {
       return false;
     }
-
     _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
     return true;
   }
