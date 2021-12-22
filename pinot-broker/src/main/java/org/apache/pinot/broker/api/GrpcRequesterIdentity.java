@@ -16,18 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce;
+package org.apache.pinot.broker.api;
 
-import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.transport.ServerRoutingInstance;
-
-
-public interface StreamingReducer {
-
-  void init(StreamingReducerContext streamingReducerContext);
-
-  void reduce(ServerRoutingInstance key, DataTable dataTable);
-
-  BrokerResponseNative seal();
+/**
+ * Identity container for GRPC requests.
+ */
+public class GrpcRequesterIdentity extends RequesterIdentity {
 }

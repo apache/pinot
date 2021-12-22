@@ -39,6 +39,7 @@ import org.apache.helix.model.Message;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
+import org.apache.pinot.broker.broker.GrpcBrokerServiceApplication;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.GrpcBrokerRequestHandler;
@@ -100,6 +101,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected AccessControlFactory _accessControlFactory;
   protected BrokerRequestHandler _brokerRequestHandler;
   protected BrokerAdminApiApplication _brokerAdminApplication;
+  protected GrpcBrokerRequestHandler _grpcBrokerRequestHandler;
+  protected GrpcBrokerServiceApplication _grpcBrokerServiceApplication;
   protected ClusterChangeMediator _clusterChangeMediator;
   // Participant Helix manager handles Helix functionality such as state transitions and messages
   protected HelixManager _participantHelixManager;
@@ -236,13 +239,19 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // Configure TLS for netty connection to server
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_TLS_PREFIX);
 
-    if (_brokerConf.getProperty(Broker.BROKER_REQUEST_HANDLER_TYPE, Broker.DEFAULT_BROKER_REQUEST_HANDLER_TYPE)
-        .equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
-      LOGGER.info("Starting Grpc BrokerRequestHandler.");
-      _brokerRequestHandler =
-          new GrpcBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
-              queryQuotaManager, tableCache, _brokerMetrics, null);
-    } else { // default request handler type, e.g. netty
+    String requestHandlerType =
+        _brokerConf.getProperty(Broker.BROKER_REQUEST_HANDLER_TYPE, Broker.DEFAULT_BROKER_REQUEST_HANDLER_TYPE);
+    if (_brokerConf.getProperty(Broker.CONFIG_OF_ENABLE_GRPC_BROKER, Broker.DEFAULT_ENABLE_GRPC_BROKER)
+        || requestHandlerType.equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
+      LOGGER.info("Starting GrpcBrokerRequestHandler.");
+      _grpcBrokerRequestHandler =
+          new GrpcBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory, queryQuotaManager,
+              tableCache, _brokerMetrics, null);
+      _grpcBrokerServiceApplication = new GrpcBrokerServiceApplication(_routingManager, _grpcBrokerRequestHandler,
+          _brokerMetrics, _brokerConf);
+      _grpcBrokerServiceApplication.start();
+    }
+    if (requestHandlerType.equalsIgnoreCase(Broker.NETTY_BROKER_REQUEST_HANDLER_TYPE)) {
       LOGGER.info("Starting Netty BrokerRequestHandler.");
       if (_brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false)) {
         _brokerRequestHandler =
@@ -253,6 +262,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
             new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
                 queryQuotaManager, tableCache, _brokerMetrics, null);
       }
+    } else {
+      LOGGER.info("Using Grpc BrokerRequestHandler.");
+      _brokerRequestHandler = _grpcBrokerRequestHandler;
     }
 
     LOGGER.info("Starting broker admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
@@ -383,6 +395,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       Thread.sleep(delayShutdownTimeMs);
     } catch (Exception e) {
       LOGGER.error("Caught exception while waiting for shutdown delay of {}ms", delayShutdownTimeMs, e);
+    }
+
+    if (_grpcBrokerServiceApplication != null) {
+      LOGGER.info("Shutting down GRPC request handler and broker admin application");
+      _grpcBrokerRequestHandler.shutDown();
+      _grpcBrokerServiceApplication.shutdown();
     }
 
     LOGGER.info("Shutting down request handler and broker admin application");

@@ -18,19 +18,17 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import io.grpc.stub.StreamObserver;
 import java.util.concurrent.ExecutorService;
+import org.apache.pinot.common.proto.Broker;
 
 
 /**
  * POJO class to encapsulate DataTableReducer context information
  */
-public class DataTableReducerContext {
+public class StreamingReducerContext extends DataTableReducerContext {
 
-  protected final ExecutorService _executorService;
-  protected final int _maxReduceThreadsPerQuery;
-  protected final long _reduceTimeOutMs;
-  // used for SQL GROUP BY
-  protected final int _groupByTrimThreshold;
+  private final StreamObserver<Broker.BrokerResponse> _streamObserver;
 
   /**
    * Constructor for the class.
@@ -40,27 +38,13 @@ public class DataTableReducerContext {
    * @param reduceTimeOutMs Reduce Phase timeOut in ms
    * @param groupByTrimThreshold trim threshold for SQL group by
    */
-  public DataTableReducerContext(ExecutorService executorService, int maxReduceThreadsPerQuery, long reduceTimeOutMs,
-      int groupByTrimThreshold) {
-    _executorService = executorService;
-    _maxReduceThreadsPerQuery = maxReduceThreadsPerQuery;
-    _reduceTimeOutMs = reduceTimeOutMs;
-    _groupByTrimThreshold = groupByTrimThreshold;
+  public StreamingReducerContext(ExecutorService executorService, StreamObserver<Broker.BrokerResponse> streamObserver,
+      int maxReduceThreadsPerQuery, long reduceTimeOutMs, int groupByTrimThreshold) {
+    super(executorService, maxReduceThreadsPerQuery, reduceTimeOutMs, groupByTrimThreshold);
+    _streamObserver = streamObserver;
   }
 
-  public ExecutorService getExecutorService() {
-    return _executorService;
-  }
-
-  public int getMaxReduceThreadsPerQuery() {
-    return _maxReduceThreadsPerQuery;
-  }
-
-  public long getReduceTimeOutMs() {
-    return _reduceTimeOutMs;
-  }
-
-  public int getGroupByTrimThreshold() {
-    return _groupByTrimThreshold;
+  public StreamObserver<Broker.BrokerResponse> getStreamObserver() {
+    return _streamObserver;
   }
 }

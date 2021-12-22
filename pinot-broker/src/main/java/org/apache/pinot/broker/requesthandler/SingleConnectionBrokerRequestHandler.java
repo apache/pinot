@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
+import com.google.common.base.Preconditions;
+import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -33,6 +35,7 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
+import org.apache.pinot.common.proto.Broker;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
@@ -82,8 +85,10 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
   protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
-      long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
+      StreamObserver<Broker.BrokerResponse> streamObserver, long timeoutMs, ServerStats serverStats,
+      RequestStatistics requestStatistics)
       throws Exception {
+    Preconditions.checkState(streamObserver == null, "Netty connection handler doesn't support streaming query");
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
 
     String rawTableName = TableNameBuilder.extractRawTableName(originalBrokerRequest.getQuerySource().getTableName());

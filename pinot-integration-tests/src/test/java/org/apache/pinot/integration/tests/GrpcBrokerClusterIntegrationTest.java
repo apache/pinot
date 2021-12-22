@@ -18,16 +18,27 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.protobuf.ByteString;
+import io.grpc.ManagedChannelBuilder;
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.proto.Broker;
+import org.apache.pinot.common.proto.PinotStreamingQueryServiceGrpc;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
+import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -39,6 +50,8 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
   private static final String TENANT_NAME = "TestTenant";
   private static final int NUM_OFFLINE_SEGMENTS = 8;
   private static final int NUM_REALTIME_SEGMENTS = 6;
+
+  private PinotStreamingGrpcQueryClient _queryClient;
 
   @Override
   protected String getBrokerTenant() {
@@ -91,6 +104,9 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
     // https://github.com/apache/pinot/pull/7839
     // waitForAllDocsLoaded(600_000L);
     Thread.sleep(5000);
+
+    _queryClient = new PinotStreamingGrpcQueryClient("localhost",
+        CommonConstants.Helix.DEFAULT_BROKER_STREAMING_QUERY_PORT);
   }
 
   protected void startHybridCluster()
@@ -105,7 +121,9 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
 
     startController(properties);
 
-    startBroker();
+    PinotConfiguration brokerConfig = getDefaultBrokerConfiguration();
+    brokerConfig.setProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_GRPC_BROKER, true);
+    startBrokers(1, DEFAULT_BROKER_PORT, getZkUrl(), brokerConfig.toMap());
 
     // Enable gRPC server
     PinotConfiguration serverConfig = getDefaultServerConfiguration();
@@ -127,5 +145,57 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
     testSqlQuery(sql, Collections.singletonList(sql));
     sql = "SELECT ArrTime, DaysSinceEpoch, Carrier FROM mytable LIMIT 10000000";
     testSqlQuery(sql, Collections.singletonList(sql));
+  }
+
+  @Test
+  public void testGrpcBrokerStreamingRequestOnSelectionOnlyQuery()
+      throws Exception {
+    String sql;
+    sql = "SELECT * FROM mytable LIMIT 1000000";
+    Assert.assertEquals(testStreamingSqlQuery(sql), postSqlQuery(sql).get("resultTable").get("rows").size());
+    sql = "SELECT * FROM mytable WHERE DaysSinceEpoch > 16312 LIMIT 10000000";
+    Assert.assertEquals(testStreamingSqlQuery(sql), postSqlQuery(sql).get("resultTable").get("rows").size());
+    sql = "SELECT ArrTime, DaysSinceEpoch, Carrier FROM mytable LIMIT 10000000";
+    Assert.assertEquals(testStreamingSqlQuery(sql), postSqlQuery(sql).get("resultTable").get("rows").size());
+  }
+
+  private int testStreamingSqlQuery(String sql)
+      throws Exception {
+    ObjectNode payload = JsonUtils.newObjectNode();
+    payload.put("sql", sql);
+    payload.put("queryOptions", "groupByMode=sql;responseFormat=sql");
+    Iterator<Broker.BrokerResponse> responseIterator =
+        _queryClient.submit(Broker.BrokerRequest.newBuilder()
+            .setBrokerRequestBytes(ByteString.copyFrom(payload.toString(), StandardCharsets.UTF_8))
+            .build());
+    int rowCount = 0;
+    while (responseIterator.hasNext()) {
+      Broker.BrokerResponse response = responseIterator.next();
+      ByteString bytes = response.getPayload();
+      if (response.getMetadataMap().get("TYPE").equals("DATA")) {
+        ResultTable resultTable = JsonUtils.bytesToObject(bytes.toByteArray(), ResultTable.class);
+        rowCount += resultTable.getRows().size();
+      } else {
+        BrokerResponseNative brokerResponse = JsonUtils.bytesToObject(bytes.toByteArray(), BrokerResponseNative.class);
+        Assert.assertEquals(brokerResponse.getResultTable().getRows().size(), 0);
+      }
+    }
+    return rowCount;
+  }
+
+  private static class PinotStreamingGrpcQueryClient {
+    private final PinotStreamingQueryServiceGrpc.PinotStreamingQueryServiceBlockingStub _blockingStub;
+
+    public PinotStreamingGrpcQueryClient(String host, int port) {
+      _blockingStub = PinotStreamingQueryServiceGrpc.newBlockingStub(ManagedChannelBuilder
+          .forAddress(host, port)
+          .maxInboundMessageSize(128 * 1024 * 1024)
+          .usePlaintext()
+          .build());
+    }
+
+    public Iterator<Broker.BrokerResponse> submit(Broker.BrokerRequest brokerRequest) {
+      return _blockingStub.submit(brokerRequest);
+    }
   }
 }

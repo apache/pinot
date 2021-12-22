@@ -148,6 +148,8 @@ public class CommonConstants {
     public static final int DEFAULT_SERVER_NETTYTLS_PORT = 8091;
     public static final String KEY_OF_BROKER_QUERY_PORT = "pinot.broker.client.queryPort";
     public static final int DEFAULT_BROKER_QUERY_PORT = 8099;
+    public static final String KEY_OF_BROKER_STREAMING_QUERY_PORT = "pinot.broker.grpc.streaming.port";
+    public static final int DEFAULT_BROKER_STREAMING_QUERY_PORT = 9876;
     public static final String KEY_OF_SERVER_NETTY_HOST = "pinot.server.netty.host";
     public static final String KEY_OF_MINION_HOST = "pinot.minion.host";
     public static final String KEY_OF_MINION_PORT = "pinot.minion.port";
@@ -221,6 +223,9 @@ public class CommonConstants {
     public static final String NETTY_BROKER_REQUEST_HANDLER_TYPE = "netty";
     public static final String GRPC_BROKER_REQUEST_HANDLER_TYPE = "grpc";
     public static final String DEFAULT_BROKER_REQUEST_HANDLER_TYPE = NETTY_BROKER_REQUEST_HANDLER_TYPE;
+
+    public static final String CONFIG_OF_ENABLE_GRPC_BROKER = "pinot.broker.grpc.enable";
+    public static final boolean DEFAULT_ENABLE_GRPC_BROKER = false;
 
     public static final String BROKER_TLS_PREFIX = "pinot.broker.tls";
     public static final String BROKER_NETTYTLS_ENABLED = "pinot.broker.nettytls.enabled";

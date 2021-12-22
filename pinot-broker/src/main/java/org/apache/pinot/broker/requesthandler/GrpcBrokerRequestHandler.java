@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
+import io.grpc.stub.StreamObserver;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -30,6 +31,7 @@ import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.proto.Broker;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -78,11 +80,11 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   @Override
-  protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
+  public BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
-      long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
-      throws Exception {
+      StreamObserver<Broker.BrokerResponse> streamObserver, long timeoutMs, ServerStats serverStats,
+      RequestStatistics requestStatistics) throws Exception {
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
 
     String rawTableName = TableNameBuilder.extractRawTableName(originalBrokerRequest.getQuerySource().getTableName());
@@ -102,7 +104,7 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
           realtimeBrokerRequest, realtimeRoutingTable, timeoutMs, true, 1);
     }
     BrokerResponseNative brokerResponse = _streamingReduceService.reduceOnStreamResponse(
-        originalBrokerRequest, responseMap, timeoutMs, _brokerMetrics);
+        originalBrokerRequest, responseMap, streamObserver, timeoutMs, _brokerMetrics);
     return brokerResponse;
   }
 

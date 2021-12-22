@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
@@ -29,6 +30,7 @@ import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.proto.Broker;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
@@ -58,7 +60,8 @@ public class StreamingReduceService extends BaseReduceService {
   }
 
   public BrokerResponseNative reduceOnStreamResponse(BrokerRequest brokerRequest,
-      Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> serverResponseMap, long reduceTimeOutMs,
+      Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> serverResponseMap,
+      StreamObserver<Broker.BrokerResponse> streamObserver, long reduceTimeOutMs,
       @Nullable BrokerMetrics brokerMetrics) throws IOException {
     if (serverResponseMap.isEmpty()) {
       // Empty response.
@@ -81,8 +84,8 @@ public class StreamingReduceService extends BaseReduceService {
     ExecutionStatsAggregator aggregator = new ExecutionStatsAggregator(enableTrace);
 
     // Process server response.
-    DataTableReducerContext dataTableReducerContext =
-        new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
+    StreamingReducerContext dataTableReducerContext =
+        new StreamingReducerContext(_reduceExecutorService, streamObserver, _maxReduceThreadsPerQuery, reduceTimeOutMs,
             _groupByTrimThreshold);
     StreamingReducer streamingReducer = ResultReducerFactory.getStreamingReducer(queryContext);
 

@@ -18,11 +18,15 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
+import com.google.protobuf.ByteString;
+import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.proto.Broker;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -31,6 +35,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.QueryOptionsUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,8 +48,9 @@ public class SelectionOnlyStreamingReducer implements StreamingReducer {
   private final int _limit;
 
   private DataSchema _dataSchema;
-  private DataTableReducerContext _dataTableReducerContext;
+  private StreamingReducerContext _streamingReducerContext;
   private List<Object[]> _rows;
+  private StreamObserver<Broker.BrokerResponse> _streamObserver;
 
   public SelectionOnlyStreamingReducer(QueryContext queryContext) {
     _queryContext = queryContext;
@@ -57,8 +63,9 @@ public class SelectionOnlyStreamingReducer implements StreamingReducer {
   }
 
   @Override
-  public void init(DataTableReducerContext dataTableReducerContext) {
-    _dataTableReducerContext = dataTableReducerContext;
+  public void init(StreamingReducerContext streamingReducerContext) {
+    _streamingReducerContext = streamingReducerContext;
+    _streamObserver = _streamingReducerContext.getStreamObserver();
     _rows = new ArrayList<>(Math.min(_limit, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
   }
 
@@ -78,6 +85,19 @@ public class SelectionOnlyStreamingReducer implements StreamingReducer {
       } else {
         break;
       }
+    }
+    if (_streamObserver != null) {
+      BrokerResponseNative partialResponse = seal();
+      try {
+        _streamObserver.onNext(Broker.BrokerResponse.newBuilder()
+            // TODO: create a meaningful payload structure similar to DataTable.
+            .setPayload(ByteString.copyFrom(JsonUtils.objectToBytes(partialResponse.getResultTable())))
+            .putMetadata("TYPE", "DATA")
+            .build());
+      } catch (JsonProcessingException e) {
+        _streamObserver.onError(e);
+      }
+      _rows.clear();
     }
   }
 

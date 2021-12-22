@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.RateLimiter;
+import io.grpc.stub.StreamObserver;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -175,6 +176,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   public BrokerResponseNative handleRequest(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
       RequestStatistics requestStatistics)
       throws Exception {
+    return handleRequestInternal(request, requesterIdentity, requestStatistics, null);
+  }
+
+  public BrokerResponseNative handleRequestInternal(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
+      RequestStatistics requestStatistics,
+      StreamObserver<org.apache.pinot.common.proto.Broker.BrokerResponse> streamObserver)
+      throws Exception {
+
     long requestId = _requestIdGenerator.incrementAndGet();
     requestStatistics.setBrokerId(_brokerId);
     requestStatistics.setRequestId(requestId);
@@ -192,7 +201,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     if (request.has(Broker.Request.SQL)) {
       return handleSQLRequest(requestId, request.get(Broker.Request.SQL).asText(), request, requesterIdentity,
-          requestStatistics);
+          requestStatistics, streamObserver);
     } else {
       return handlePQLRequest(requestId, request.get(Broker.Request.PQL).asText(), request, requesterIdentity,
           requestStatistics);
@@ -200,7 +209,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   private BrokerResponseNative handleSQLRequest(long requestId, String query, JsonNode request,
-      @Nullable RequesterIdentity requesterIdentity, RequestStatistics requestStatistics)
+      @Nullable RequesterIdentity requesterIdentity, RequestStatistics requestStatistics,
+      StreamObserver<org.apache.pinot.common.proto.Broker.BrokerResponse> streamObserver)
       throws Exception {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
     requestStatistics.setPql(query);
@@ -522,7 +532,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     BrokerResponseNative brokerResponse =
         processBrokerRequest(requestId, brokerRequest, offlineBrokerRequest, offlineRoutingTable, realtimeBrokerRequest,
-            realtimeRoutingTable, remainingTimeMs, serverStats, requestStatistics);
+            realtimeRoutingTable, streamObserver, remainingTimeMs, serverStats, requestStatistics);
     brokerResponse.setExceptions(exceptions);
     long executionEndTimeNs = System.nanoTime();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION,
@@ -845,7 +855,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     ServerStats serverStats = new ServerStats();
     BrokerResponseNative brokerResponse =
         processBrokerRequest(requestId, brokerRequest, offlineBrokerRequest, offlineRoutingTable, realtimeBrokerRequest,
-            realtimeRoutingTable, remainingTimeMs, serverStats, requestStatistics);
+            realtimeRoutingTable, null, remainingTimeMs, serverStats, requestStatistics);
     long executionEndTimeNs = System.nanoTime();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION,
         executionEndTimeNs - routingEndTimeNs);
@@ -1002,7 +1012,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       Preconditions.checkState(subqueryLiteral != null, "Second argument of IN_SUBQUERY must be a literal (subquery)");
       String subquery = subqueryLiteral.getStringValue();
       BrokerResponseNative response =
-          handleSQLRequest(requestId, subquery, jsonRequest, requesterIdentity, requestStatistics);
+          handleSQLRequest(requestId, subquery, jsonRequest, requesterIdentity, requestStatistics, null);
       if (response.getExceptionsSize() != 0) {
         throw new RuntimeException("Caught exception while executing subquery: " + subquery);
       }
@@ -2037,8 +2047,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected abstract BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
-      long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
-      throws Exception;
+      StreamObserver<org.apache.pinot.common.proto.Broker.BrokerResponse> streamObserver, long timeoutMs,
+      BaseBrokerRequestHandler.ServerStats serverStats, RequestStatistics requestStatistics) throws Exception;
 
   /**
    * Helper class to pass the per server statistics.
