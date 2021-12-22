@@ -36,7 +36,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import javax.validation.constraints.Null;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
