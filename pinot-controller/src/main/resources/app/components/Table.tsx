@@ -377,19 +377,20 @@ export default function CustomizedTables({
     return (<span>{str.toString()}</span>);
   };
 
-  const makeCell = (cellData, idx) => {
+  const [modalStatus, setModalOpen] = React.useState({});
+  const handleModalOpen = (rowIndex) => () => setModalOpen({...modalStatus, [rowIndex]: true});
+  const handleModalClose = (rowIndex) => () => setModalOpen({...modalStatus, [rowIndex]: false});
+
+  const makeCell = (cellData, rowIndex) => {
     if (Object.prototype.toString.call(cellData) === '[object Object]') {
       if (_.has(cellData, 'component') && cellData.component) {
-        const [isModalOpen, setModalOpen] = React.useState(false);
-        const handleModalOpen = () => setModalOpen(true);
-        const handleModalClose = () => setModalOpen(false);
+
 
         let cell = (styleCell(cellData.value))
         let statusModal = (
             <Dialog
-                key={idx}
-                onClose={handleModalClose}
-                open={isModalOpen}
+                onClose={handleModalClose(rowIndex)}
+                open={_.get(modalStatus, rowIndex, false)}
                 fullWidth={true}
                 maxWidth={'xl'}
             >
@@ -399,13 +400,12 @@ export default function CustomizedTables({
         cell = (
             React.cloneElement(
                 cell,
-                {onClick: handleModalOpen},
+                {onClick: handleModalOpen(rowIndex)},
             )
         );
         if (_.has(cellData, 'tooltip') && cellData.tooltip) {
           cell = (
               <Tooltip
-                  key={idx}
                   title={cellData.tooltip}
                   placement="top"
                   arrow
@@ -423,7 +423,6 @@ export default function CustomizedTables({
       } else if (_.has(cellData, 'tooltip') && cellData.tooltip) {
         return (
             <Tooltip
-                key={idx}
                 title={cellData.tooltip}
                 placement="top"
                 arrow
@@ -522,7 +521,7 @@ export default function CustomizedTables({
                             className={isCellClickable ? classes.isCellClickable : (isSticky ? classes.isSticky : '')}
                             onClick={() => {cellClickCallback && cellClickCallback(cell);}}
                           >
-                            {makeCell(cell, idx)}
+                            {makeCell(cell, index)}
                           </StyledTableCell>
                         );
                       })}
