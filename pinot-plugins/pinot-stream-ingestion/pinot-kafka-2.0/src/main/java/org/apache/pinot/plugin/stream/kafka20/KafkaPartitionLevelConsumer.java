@@ -30,10 +30,14 @@ import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHandler
     implements PartitionLevelConsumer {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionLevelConsumer.class);
 
   public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition);
@@ -48,6 +52,10 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
   }
 
   public MessageBatch<byte[]> fetchMessages(long startOffset, long endOffset, int timeoutMillis) {
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("poll consumer: {}, startOffset: {}, endOffset:{} timeout: {}ms", _topicPartition, startOffset,
+          endOffset, timeoutMillis);
+    }
     _consumer.seek(_topicPartition, startOffset);
     ConsumerRecords<String, Bytes> consumerRecords = _consumer.poll(Duration.ofMillis(timeoutMillis));
     List<ConsumerRecord<String, Bytes>> messageAndOffsets = consumerRecords.records(_topicPartition);
@@ -59,8 +67,12 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       if (offset >= startOffset & (endOffset > offset | endOffset == -1)) {
         if (message != null) {
           filtered.add(new MessageAndOffset(message.get(), offset));
+        } else if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("tombstone message at offset {}", offset);
         }
         lastOffset = offset;
+      } else if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("filter message at offset {} (outside of offset range {} {})", offset, startOffset, endOffset);
       }
     }
     return new KafkaMessageBatch(messageAndOffsets.size(), lastOffset, filtered);
