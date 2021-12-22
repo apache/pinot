@@ -131,6 +131,11 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
           values[i] = (int) getDouble(docIds[i], context);
         }
         break;
+      case STRING:
+        for (int i = 0; i < length; i++) {
+          values[i] = Integer.parseInt(getString(docIds[i], context));
+        }
+        break;
       default:
         throw new IllegalArgumentException();
     }
@@ -163,6 +168,11 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
       case DOUBLE:
         for (int i = 0; i < length; i++) {
           values[i] = (long) getDouble(docIds[i], context);
+        }
+        break;
+      case STRING:
+        for (int i = 0; i < length; i++) {
+          values[i] = Long.parseLong(getString(docIds[i], context));
         }
         break;
       default:
@@ -199,6 +209,11 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
           values[i] = (float) getDouble(docIds[i], context);
         }
         break;
+      case STRING:
+        for (int i = 0; i < length; i++) {
+          values[i] = Float.parseFloat(getString(docIds[i], context));
+        }
+        break;
       default:
         throw new IllegalArgumentException();
     }
@@ -231,6 +246,11 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
       case DOUBLE:
         for (int i = 0; i < length; i++) {
           values[i] = getDouble(docIds[i], context);
+        }
+        break;
+      case STRING:
+        for (int i = 0; i < length; i++) {
+          values[i] = Double.parseDouble(getString(docIds[i], context));
         }
         break;
       default:

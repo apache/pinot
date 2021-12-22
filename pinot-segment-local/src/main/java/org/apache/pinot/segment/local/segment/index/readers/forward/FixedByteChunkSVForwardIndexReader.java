@@ -54,7 +54,7 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForward
 
   @Override
   public void readValuesSV(int[] docIds, int length, int[] values, ChunkReaderContext context) {
-    if (!_isCompressed && isContiguousRange(docIds, length)) {
+    if (getValueType().getStoredType().isFixedWidth() && !_isCompressed && isContiguousRange(docIds, length)) {
       switch (getValueType().getStoredType()) {
         case INT: {
           int minOffset = docIds[0] * Integer.BYTES;
@@ -96,7 +96,7 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForward
 
   @Override
   public void readValuesSV(int[] docIds, int length, long[] values, ChunkReaderContext context) {
-    if (!_isCompressed && isContiguousRange(docIds, length)) {
+    if (getValueType().getStoredType().isFixedWidth() && !_isCompressed && isContiguousRange(docIds, length)) {
       switch (getValueType().getStoredType()) {
         case INT: {
           int minOffset = docIds[0] * Integer.BYTES;
@@ -138,7 +138,7 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForward
 
   @Override
   public void readValuesSV(int[] docIds, int length, float[] values, ChunkReaderContext context) {
-    if (!_isCompressed && isContiguousRange(docIds, length)) {
+    if (getValueType().getStoredType().isFixedWidth() && !_isCompressed && isContiguousRange(docIds, length)) {
       switch (getValueType().getStoredType()) {
         case INT: {
           int minOffset = docIds[0] * Integer.BYTES;
@@ -180,7 +180,7 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkSVForward
 
   @Override
   public void readValuesSV(int[] docIds, int length, double[] values, ChunkReaderContext context) {
-    if (!_isCompressed && isContiguousRange(docIds, length)) {
+    if (getValueType().getStoredType().isFixedWidth() && !_isCompressed && isContiguousRange(docIds, length)) {
       switch (getValueType().getStoredType()) {
         case INT: {
           int minOffset = docIds[0] * Integer.BYTES;
