@@ -145,7 +145,8 @@ public class SegmentFlushThresholdComputer {
       long targetSegmentNumRows = (long) (currentNumRows * ROWS_MULTIPLIER_WHEN_TIME_THRESHOLD_HIT);
       targetSegmentNumRows = capNumRowsIfOverflow(targetSegmentNumRows);
       logStringBuilder.append("Setting segment size for {} as {}");
-      SegmentSizeBasedFlushThresholdUpdater.LOGGER.info(logStringBuilder.toString(), newSegmentName, targetSegmentNumRows);
+      SegmentSizeBasedFlushThresholdUpdater.LOGGER.info(logStringBuilder.toString(),
+          newSegmentName, targetSegmentNumRows);
       return (int) targetSegmentNumRows;
     }
 
