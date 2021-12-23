@@ -88,7 +88,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       HelixTaskResult result = new HelixTaskResult();
       _logger.info("Handling message: {}", _message);
       try {
-        _segmentRefreshSemaphore.acquireSema(_segmentName, LOGGER);
+        _segmentRefreshSemaphore.acquireSema(_segmentName, _logger);
         // The number of retry times depends on the retry count in Constants.
         _instanceDataManager.addOrReplaceSegment(_tableNameWithType, _segmentName);
         result.setSuccess(true);
@@ -125,7 +125,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
               _segmentRefreshSemaphore);
         } else {
           // Reload one segment
-          _segmentRefreshSemaphore.acquireSema(_segmentName, LOGGER);
+          _segmentRefreshSemaphore.acquireSema(_segmentName, _logger);
           try {
             _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName, _forceDownload);
           } finally {

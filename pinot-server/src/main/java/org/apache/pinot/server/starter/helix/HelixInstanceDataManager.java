@@ -261,20 +261,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     LOGGER.info("Reloaded all segments in table: {}", tableNameWithType);
   }
 
-  private void acquireSema(String context, Semaphore refreshThreadSemaphore)
-      throws InterruptedException {
-    if (refreshThreadSemaphore != null) {
-      long startTime = System.currentTimeMillis();
-      LOGGER.info("Waiting for lock to refresh : {}, queue-length: {}", context,
-          refreshThreadSemaphore.getQueueLength());
-      refreshThreadSemaphore.acquire();
-      LOGGER.info("Acquired lock to refresh segment: {} (lock-time={}ms, queue-length={})", context,
-          System.currentTimeMillis() - startTime, refreshThreadSemaphore.getQueueLength());
-    } else {
-      LOGGER.info("Locking of refresh threads disabled (segment: {})", context);
-    }
-  }
-
   private void reloadSegment(String tableNameWithType, SegmentMetadata segmentMetadata, TableConfig tableConfig,
       @Nullable Schema schema, boolean forceDownload)
       throws Exception {
