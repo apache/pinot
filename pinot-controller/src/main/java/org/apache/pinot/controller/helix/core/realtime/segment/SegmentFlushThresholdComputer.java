@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
+import java.time.Clock;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -25,9 +26,6 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
-
-import static org.apache.pinot.controller.helix.core.realtime.segment.SegmentSizeBasedFlushThresholdUpdater.LOGGER;
-
 
 public class SegmentFlushThresholdComputer {
   public static final int MINIMUM_NUM_ROWS_THRESHOLD = 10_000;
@@ -40,7 +38,7 @@ public class SegmentFlushThresholdComputer {
   private final Clock _clock;
 
   public SegmentFlushThresholdComputer() {
-    this(new SystemClock(), 0);
+    this(Clock.systemUTC(), 0);
   }
 
   public SegmentFlushThresholdComputer(Clock clock, double latestSegmentRowsToSizeRatio) {
@@ -68,13 +66,13 @@ public class SegmentFlushThresholdComputer {
       if (_latestSegmentRowsToSizeRatio > 0) { // new partition group added case
         long targetSegmentNumRows = (long) (desiredSegmentSizeBytes * _latestSegmentRowsToSizeRatio);
         targetSegmentNumRows = capNumRowsIfOverflow(targetSegmentNumRows);
-        LOGGER.info(
+        SegmentSizeBasedFlushThresholdUpdater.LOGGER.info(
             "Committing segment zk metadata is not available, using prev ratio {}, setting rows threshold for {} as {}",
             _latestSegmentRowsToSizeRatio, newSegmentName, targetSegmentNumRows);
         return (int) targetSegmentNumRows;
       } else {
         final int autotuneInitialRows = streamConfig.getFlushAutotuneInitialRows();
-        LOGGER.info(
+        SegmentSizeBasedFlushThresholdUpdater.LOGGER.info(
             "Committing segment zk metadata is not available, setting threshold for {} as {}", newSegmentName,
             autotuneInitialRows);
         return autotuneInitialRows;
@@ -84,16 +82,16 @@ public class SegmentFlushThresholdComputer {
     final long committingSegmentSizeBytes = committingSegmentDescriptor.getSegmentSizeBytes();
     if (committingSegmentSizeBytes <= 0) { // repair segment case
       final int targetNumRows = committingSegmentZKMetadata.getSizeThresholdToFlushSegment();
-      LOGGER.info(
+      SegmentSizeBasedFlushThresholdUpdater.LOGGER.info(
           "Committing segment size is not available, setting thresholds from previous segment for {} as {}",
           newSegmentName, targetNumRows);
       return targetNumRows;
     }
 
-    final long timeConsumed = _clock.currentTimeMillis() - committingSegmentZKMetadata.getCreationTime();
+    final long timeConsumed = _clock.millis() - committingSegmentZKMetadata.getCreationTime();
     final long numRowsConsumed = committingSegmentZKMetadata.getTotalDocs();
     final int numRowsThreshold = committingSegmentZKMetadata.getSizeThresholdToFlushSegment();
-    LOGGER.info(
+    SegmentSizeBasedFlushThresholdUpdater.LOGGER.info(
         "{}: Data from committing segment: Time {}  numRows {} threshold {} segmentSize(bytes) {}",
         newSegmentName, TimeUtils.convertMillisToPeriod(timeConsumed), numRowsConsumed, numRowsThreshold,
         committingSegmentSizeBytes);
@@ -106,8 +104,7 @@ public class SegmentFlushThresholdComputer {
     // However, when we start a new table or change controller mastership, we can have any partition completing first.
     // It is best to learn the ratio as quickly as we can, so we allow any partition to supply the value.
     int smallestAvailablePartitionGroupId =
-        partitionGroupMetadataList.stream().mapToInt(PartitionGroupMetadata::getPartitionGroupId).min()
-            .orElseGet(() -> 0);
+        partitionGroupMetadataList.stream().mapToInt(PartitionGroupMetadata::getPartitionGroupId).min().orElse(0);
 
     if (new LLCSegmentName(newSegmentName).getPartitionGroupId() == smallestAvailablePartitionGroupId
         || _latestSegmentRowsToSizeRatio == 0) {
@@ -148,7 +145,7 @@ public class SegmentFlushThresholdComputer {
       long targetSegmentNumRows = (long) (currentNumRows * ROWS_MULTIPLIER_WHEN_TIME_THRESHOLD_HIT);
       targetSegmentNumRows = capNumRowsIfOverflow(targetSegmentNumRows);
       logStringBuilder.append("Setting segment size for {} as {}");
-      LOGGER.info(logStringBuilder.toString(), newSegmentName, targetSegmentNumRows);
+      SegmentSizeBasedFlushThresholdUpdater.LOGGER.info(logStringBuilder.toString(), newSegmentName, targetSegmentNumRows);
       return (int) targetSegmentNumRows;
     }
 
@@ -165,7 +162,7 @@ public class SegmentFlushThresholdComputer {
       }
     }
     targetSegmentNumRows = capNumRowsIfOverflow(targetSegmentNumRows);
-    LOGGER.info(
+    SegmentSizeBasedFlushThresholdUpdater.LOGGER.info(
         "Committing segment size {}, current ratio {}, setting threshold for {} as {}",
         committingSegmentSizeBytes, _latestSegmentRowsToSizeRatio, newSegmentName, targetSegmentNumRows);
 

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
+import java.time.Clock;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -57,7 +59,7 @@ public class SegmentFlushThresholdComputerTest {
     double segmentRowsToSizeRatio = 1.5;
     long segmentSizeBytes = 20000L;
     SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer(
-        new SystemClock(), segmentRowsToSizeRatio);
+        Clock.systemUTC(), segmentRowsToSizeRatio);
 
     PartitionLevelStreamConfig streamConfig = mock(PartitionLevelStreamConfig.class);
     when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(segmentSizeBytes);
@@ -80,7 +82,7 @@ public class SegmentFlushThresholdComputerTest {
     double segmentRowsToSizeRatio = 1.5;
     long segmentSizeBytes = 2000L;
     SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer(
-        new SystemClock(), segmentRowsToSizeRatio);
+        Clock.systemUTC(), segmentRowsToSizeRatio);
 
     PartitionLevelStreamConfig streamConfig = mock(PartitionLevelStreamConfig.class);
     when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(segmentSizeBytes);
@@ -122,8 +124,7 @@ public class SegmentFlushThresholdComputerTest {
   @Test
   public void testApplyMultiplierToTotalDocsWhenTimeThresholdNotReached() {
     long currentTime = 1640216032391L;
-    Clock clock = mock(Clock.class);
-    when(clock.currentTimeMillis()).thenReturn(currentTime);
+    Clock clock = Clock.fixed(java.time.Instant.ofEpochMilli(currentTime), ZoneId.of("UTC"));
 
     SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer(clock);
 
@@ -154,8 +155,7 @@ public class SegmentFlushThresholdComputerTest {
   @Test
   public void testApplyMultiplierToAdjustedTotalDocsWhenTimeThresholdIsReached() {
     long currentTime = 1640216032391L;
-    Clock clock = mock(Clock.class);
-    when(clock.currentTimeMillis()).thenReturn(currentTime);
+    Clock clock = Clock.fixed(java.time.Instant.ofEpochMilli(currentTime), ZoneId.of("UTC"));
 
     SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer(clock);
 
@@ -186,16 +186,10 @@ public class SegmentFlushThresholdComputerTest {
 
   @Test
   public void testSegmentSizeTooSmall() {
-    long currentTime = 1640216032391L;
-    Clock clock = mock(Clock.class);
-    when(clock.currentTimeMillis()).thenReturn(currentTime);
-
-    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer(clock);
+    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer();
 
     PartitionLevelStreamConfig streamConfig = mock(PartitionLevelStreamConfig.class);
     when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(300_0000L);
-    when(streamConfig.getFlushThresholdTimeMillis()).thenReturn(
-        MILLISECONDS.convert(1, TimeUnit.HOURS));
 
     CommittingSegmentDescriptor committingSegmentDescriptor = mock(CommittingSegmentDescriptor.class);
     when(committingSegmentDescriptor.getSegmentSizeBytes()).thenReturn(500_0000L);
@@ -203,8 +197,6 @@ public class SegmentFlushThresholdComputerTest {
     SegmentZKMetadata committingSegmentZKMetadata = mock(SegmentZKMetadata.class);
     when(committingSegmentZKMetadata.getTotalDocs()).thenReturn(30_000L);
     when(committingSegmentZKMetadata.getSizeThresholdToFlushSegment()).thenReturn(20_000);
-    when(committingSegmentZKMetadata.getCreationTime()).thenReturn(
-        currentTime - MILLISECONDS.convert(2, TimeUnit.HOURS));
 
     List<PartitionGroupMetadata> partitionGroupMetadataList = new ArrayList<>();
     int threshold = computer.computeThreshold(
@@ -218,16 +210,10 @@ public class SegmentFlushThresholdComputerTest {
 
   @Test
   public void testSegmentSizeTooBig() {
-    long currentTime = 1640216032391L;
-    Clock clock = mock(Clock.class);
-    when(clock.currentTimeMillis()).thenReturn(currentTime);
-
-    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer(clock);
+    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer();
 
     PartitionLevelStreamConfig streamConfig = mock(PartitionLevelStreamConfig.class);
     when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(500_0000L);
-    when(streamConfig.getFlushThresholdTimeMillis()).thenReturn(
-        MILLISECONDS.convert(1, TimeUnit.HOURS));
 
     CommittingSegmentDescriptor committingSegmentDescriptor = mock(CommittingSegmentDescriptor.class);
     when(committingSegmentDescriptor.getSegmentSizeBytes()).thenReturn(200_0000L);
@@ -235,8 +221,6 @@ public class SegmentFlushThresholdComputerTest {
     SegmentZKMetadata committingSegmentZKMetadata = mock(SegmentZKMetadata.class);
     when(committingSegmentZKMetadata.getTotalDocs()).thenReturn(30_000L);
     when(committingSegmentZKMetadata.getSizeThresholdToFlushSegment()).thenReturn(20_000);
-    when(committingSegmentZKMetadata.getCreationTime()).thenReturn(
-        currentTime - MILLISECONDS.convert(2, TimeUnit.HOURS));
 
     List<PartitionGroupMetadata> partitionGroupMetadataList = new ArrayList<>();
     int threshold = computer.computeThreshold(
@@ -250,16 +234,10 @@ public class SegmentFlushThresholdComputerTest {
 
   @Test
   public void testSegmentSizeJustRight() {
-    long currentTime = 1640216032391L;
-    Clock clock = mock(Clock.class);
-    when(clock.currentTimeMillis()).thenReturn(currentTime);
-
-    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer(clock);
+    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer();
 
     PartitionLevelStreamConfig streamConfig = mock(PartitionLevelStreamConfig.class);
     when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(300_0000L);
-    when(streamConfig.getFlushThresholdTimeMillis()).thenReturn(
-        MILLISECONDS.convert(1, TimeUnit.HOURS));
 
     CommittingSegmentDescriptor committingSegmentDescriptor = mock(CommittingSegmentDescriptor.class);
     when(committingSegmentDescriptor.getSegmentSizeBytes()).thenReturn(250_0000L);
@@ -267,8 +245,6 @@ public class SegmentFlushThresholdComputerTest {
     SegmentZKMetadata committingSegmentZKMetadata = mock(SegmentZKMetadata.class);
     when(committingSegmentZKMetadata.getTotalDocs()).thenReturn(30_000L);
     when(committingSegmentZKMetadata.getSizeThresholdToFlushSegment()).thenReturn(20_000);
-    when(committingSegmentZKMetadata.getCreationTime()).thenReturn(
-        currentTime - MILLISECONDS.convert(2, TimeUnit.HOURS));
 
     List<PartitionGroupMetadata> partitionGroupMetadataList = new ArrayList<>();
     int threshold = computer.computeThreshold(
@@ -282,16 +258,10 @@ public class SegmentFlushThresholdComputerTest {
 
   @Test
   public void testNoRows() {
-    long currentTime = 1640216032391L;
-    Clock clock = mock(Clock.class);
-    when(clock.currentTimeMillis()).thenReturn(currentTime);
-
-    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer(clock);
+    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer();
 
     PartitionLevelStreamConfig streamConfig = mock(PartitionLevelStreamConfig.class);
     when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(300_0000L);
-    when(streamConfig.getFlushThresholdTimeMillis()).thenReturn(
-        MILLISECONDS.convert(1, TimeUnit.HOURS));
 
     CommittingSegmentDescriptor committingSegmentDescriptor = mock(CommittingSegmentDescriptor.class);
     when(committingSegmentDescriptor.getSegmentSizeBytes()).thenReturn(250_0000L);
@@ -299,8 +269,6 @@ public class SegmentFlushThresholdComputerTest {
     SegmentZKMetadata committingSegmentZKMetadata = mock(SegmentZKMetadata.class);
     when(committingSegmentZKMetadata.getTotalDocs()).thenReturn(0L);
     when(committingSegmentZKMetadata.getSizeThresholdToFlushSegment()).thenReturn(0);
-    when(committingSegmentZKMetadata.getCreationTime()).thenReturn(
-        currentTime - MILLISECONDS.convert(2, TimeUnit.HOURS));
 
     List<PartitionGroupMetadata> partitionGroupMetadataList = new ArrayList<>();
     int threshold = computer.computeThreshold(
@@ -312,19 +280,12 @@ public class SegmentFlushThresholdComputerTest {
     assertEquals(threshold, 10_000);
   }
 
-
   @Test
   public void testAdjustRowsToSizeRatio() {
-    long currentTime = 1640216032391L;
-    Clock clock = mock(Clock.class);
-    when(clock.currentTimeMillis()).thenReturn(currentTime);
-
-    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer(clock);
+    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer();
 
     PartitionLevelStreamConfig streamConfig = mock(PartitionLevelStreamConfig.class);
     when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(300_0000L);
-    when(streamConfig.getFlushThresholdTimeMillis()).thenReturn(
-        MILLISECONDS.convert(1, TimeUnit.HOURS));
 
     CommittingSegmentDescriptor committingSegmentDescriptor = mock(CommittingSegmentDescriptor.class);
     when(committingSegmentDescriptor.getSegmentSizeBytes()).thenReturn(200_000L);
@@ -332,8 +293,6 @@ public class SegmentFlushThresholdComputerTest {
     SegmentZKMetadata committingSegmentZKMetadata = mock(SegmentZKMetadata.class);
     when(committingSegmentZKMetadata.getTotalDocs()).thenReturn(30_000L, 50_000L);
     when(committingSegmentZKMetadata.getSizeThresholdToFlushSegment()).thenReturn(60_000);
-    when(committingSegmentZKMetadata.getCreationTime()).thenReturn(
-        currentTime - MILLISECONDS.convert(2, TimeUnit.HOURS));
 
     List<PartitionGroupMetadata> partitionGroupMetadataList = new ArrayList<>();
 
