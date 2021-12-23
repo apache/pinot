@@ -105,9 +105,7 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
 
     startController(properties);
 
-    PinotConfiguration brokerConfig = getDefaultBrokerConfiguration();
-    brokerConfig.setProperty(CommonConstants.Broker.BROKER_REQUEST_HANDLER_TYPE, "grpc");
-    startBrokers(1, DEFAULT_BROKER_PORT, getZkUrl(), brokerConfig.toMap());
+    startBrokers(1, DEFAULT_BROKER_PORT, getZkUrl(), Collections.singletonMap(CommonConstants.Broker.BROKER_REQUEST_HANDLER_TYPE, "grpc"));
 
     // Enable gRPC server
     PinotConfiguration serverConfig = getDefaultServerConfiguration();
