@@ -45,6 +45,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.util.SegmentRefreshSemaphore;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
 import org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploader;
 import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
@@ -219,7 +220,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   @Override
   public void reloadAllSegments(String tableNameWithType, boolean forceDownload,
-      @Nullable Semaphore refreshThreadSemaphore)
+      SegmentRefreshSemaphore segmentRefreshSemaphore)
       throws Exception {
     LOGGER.info("Reloading all segments in table: {}", tableNameWithType);
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
@@ -231,20 +232,26 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     final AtomicReference<Exception> sampleException = new AtomicReference<>();
     //calling thread hasn't acquired any permit so we don't reload any segments using it.
     CompletableFuture.allOf(segmentsMetadata.stream().map(segmentMetadata -> CompletableFuture.runAsync(() -> {
+      String segmentName = segmentMetadata.getName();
       try {
-        acquireSema("ALL", refreshThreadSemaphore);
-        reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
+        segmentRefreshSemaphore.acquireSema(segmentMetadata.getName(), LOGGER);
+        try {
+          reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
+        } catch (Exception e) {
+          LOGGER.error("Caught exception while reloading segment: {} in table: {}", segmentName, tableNameWithType, e);
+          failedSegments.add(segmentName);
+          sampleException.set(e);
+        } finally {
+          segmentRefreshSemaphore.releaseSema();
+        }
       } catch (Exception e) {
-        String segmentName = segmentMetadata.getName();
         LOGGER.error("Caught exception while reloading segment: {} in table: {}", segmentName, tableNameWithType, e);
         failedSegments.add(segmentName);
         sampleException.set(e);
-      } finally {
-        if (refreshThreadSemaphore != null) {
-          refreshThreadSemaphore.release();
-        }
       }
     }, workers)).toArray(CompletableFuture[]::new)).get();
+
+    workers.shutdownNow();
 
     if (sampleException.get() != null) {
       throw new RuntimeException(
@@ -427,4 +434,5 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   public SegmentUploader getSegmentUploader() {
     return _segmentUploader;
   }
+
 }
