@@ -65,12 +65,14 @@ public abstract class BaseChunkSVForwardIndexWriter implements Closeable {
    * @param chunkSize Size of chunk
    * @param sizeOfEntry Size of entry (in bytes), max size for variable byte implementation.
    * @param version version of File
+   * @param fixed if the data type is fixed width (required for version validation)
    * @throws IOException if the file isn't found or can't be mapped
    */
   protected BaseChunkSVForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
-      int numDocsPerChunk, int chunkSize, int sizeOfEntry, int version)
+      int numDocsPerChunk, int chunkSize, int sizeOfEntry, int version, boolean fixed)
       throws IOException {
-    Preconditions.checkArgument(version == DEFAULT_VERSION || version == CURRENT_VERSION);
+    Preconditions.checkArgument(version == DEFAULT_VERSION || version == CURRENT_VERSION
+        || (fixed && version == 4));
     _chunkSize = chunkSize;
     _chunkCompressor = ChunkCompressorFactory.getCompressor(compressionType);
     _headerEntryChunkOffsetSize = getHeaderEntryChunkOffsetSize(version);
@@ -87,6 +89,7 @@ public abstract class BaseChunkSVForwardIndexWriter implements Closeable {
       case 2:
         return FILE_HEADER_ENTRY_CHUNK_OFFSET_SIZE_V1V2;
       case 3:
+      case 4:
         return FILE_HEADER_ENTRY_CHUNK_OFFSET_SIZE_V3;
       default:
         throw new IllegalStateException("Invalid version: " + version);

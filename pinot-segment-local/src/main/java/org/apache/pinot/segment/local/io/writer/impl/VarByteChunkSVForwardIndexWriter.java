@@ -80,7 +80,7 @@ public class VarByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexWri
     super(file, compressionType, totalDocs, numDocsPerChunk,
         numDocsPerChunk * (CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE + lengthOfLongestEntry),
         // chunkSize
-        lengthOfLongestEntry, writerVersion);
+        lengthOfLongestEntry, writerVersion, false);
 
     _chunkHeaderOffset = 0;
     _chunkHeaderSize = numDocsPerChunk * CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;

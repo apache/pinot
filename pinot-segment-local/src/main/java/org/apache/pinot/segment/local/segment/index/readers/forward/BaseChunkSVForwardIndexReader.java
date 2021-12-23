@@ -26,8 +26,6 @@ import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWrit
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
-import org.apache.pinot.segment.spi.memory.CleanerUtil;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
@@ -37,8 +35,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Base implementation for chunk-based single-value raw (non-dictionary-encoded) forward index reader.
  */
-public abstract class BaseChunkSVForwardIndexReader
-    implements ForwardIndexReader<BaseChunkSVForwardIndexReader.ChunkReaderContext> {
+public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReader<ChunkReaderContext> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseChunkSVForwardIndexReader.class);
 
   protected final PinotDataBuffer _dataBuffer;
@@ -114,7 +111,10 @@ public abstract class BaseChunkSVForwardIndexReader
     if (context.getChunkId() == chunkId) {
       return context.getChunkBuffer();
     }
+    return decompressChunk(chunkId, context);
+  }
 
+  protected ByteBuffer decompressChunk(int chunkId, ChunkReaderContext context) {
     int chunkSize;
     long chunkPosition = getChunkPosition(chunkId);
 
@@ -171,46 +171,5 @@ public abstract class BaseChunkSVForwardIndexReader
   public void close() {
     // NOTE: DO NOT close the PinotDataBuffer here because it is tracked by the caller and might be reused later. The
     // caller is responsible of closing the PinotDataBuffer.
-  }
-
-  /**
-   * Context for the chunk-based forward index readers.
-   * <p>Information saved in the context can be used by subsequent reads as cache:
-   * <ul>
-   *   <li>
-   *     Chunk Buffer from the previous read. Useful if the subsequent read is from the same buffer, as it avoids extra
-   *     chunk decompression.
-   *   </li>
-   *   <li>Id for the chunk</li>
-   * </ul>
-   */
-  public static class ChunkReaderContext implements ForwardIndexReaderContext {
-    private final ByteBuffer _chunkBuffer;
-    private int _chunkId;
-
-    public ChunkReaderContext(int maxChunkSize) {
-      _chunkBuffer = ByteBuffer.allocateDirect(maxChunkSize);
-      _chunkId = -1;
-    }
-
-    public ByteBuffer getChunkBuffer() {
-      return _chunkBuffer;
-    }
-
-    public int getChunkId() {
-      return _chunkId;
-    }
-
-    public void setChunkId(int chunkId) {
-      _chunkId = chunkId;
-    }
-
-    @Override
-    public void close()
-        throws IOException {
-      if (CleanerUtil.UNMAP_SUPPORTED) {
-        CleanerUtil.getCleaner().freeBuffer(_chunkBuffer);
-      }
-    }
   }
 }
