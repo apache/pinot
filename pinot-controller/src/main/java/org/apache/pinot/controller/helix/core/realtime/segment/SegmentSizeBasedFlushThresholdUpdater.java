@@ -38,15 +38,15 @@ import org.slf4j.LoggerFactory;
  */
 public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpdater {
   public static final Logger LOGGER = LoggerFactory.getLogger(SegmentSizeBasedFlushThresholdUpdater.class);
-  private final SegmentFlushThresholdComputer flushThresholdComputer;
+  private final SegmentFlushThresholdComputer _flushThresholdComputer;
 
   @VisibleForTesting
   double getLatestSegmentRowsToSizeRatio() {
-    return flushThresholdComputer. getLatestSegmentRowsToSizeRatio();
+    return _flushThresholdComputer.getLatestSegmentRowsToSizeRatio();
   }
 
   public SegmentSizeBasedFlushThresholdUpdater() {
-    flushThresholdComputer = new SegmentFlushThresholdComputer();
+    _flushThresholdComputer = new SegmentFlushThresholdComputer();
   }
 
   // synchronized since this method could be called for multiple partitions of the same table in different threads
@@ -56,11 +56,9 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
       @Nullable SegmentZKMetadata committingSegmentZKMetadata, int maxNumPartitionsPerInstance,
       List<PartitionGroupMetadata> partitionGroupMetadataList) {
 
-    int threshold = flushThresholdComputer.computeThreshold(streamConfig, committingSegmentDescriptor,
+    int threshold = _flushThresholdComputer.computeThreshold(streamConfig, committingSegmentDescriptor,
         committingSegmentZKMetadata, partitionGroupMetadataList, newSegmentZKMetadata.getSegmentName());
 
     newSegmentZKMetadata.setSizeThresholdToFlushSegment(threshold);
   }
-
-
 }

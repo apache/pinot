@@ -56,7 +56,8 @@ public class SegmentFlushThresholdComputerTest {
   public void testUseLastSegmentSizeTimesRatioIfFirstSegmentInPartitionAndNewPartitionGroup() {
     double segmentRowsToSizeRatio = 1.5;
     long segmentSizeBytes = 20000L;
-    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer(new SystemClock(), segmentRowsToSizeRatio);
+    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer(
+        new SystemClock(), segmentRowsToSizeRatio);
 
     PartitionLevelStreamConfig streamConfig = mock(PartitionLevelStreamConfig.class);
     when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(segmentSizeBytes);
@@ -75,10 +76,11 @@ public class SegmentFlushThresholdComputerTest {
   }
 
   @Test
-  public void testUseLastSegmentSizeTimesRatioIfFirstSegmentInPartitionAndNewPartitionGroupMinimumSize10_000Rows() {
+  public void testUseLastSegmentSizeTimesRatioIfFirstSegmentInPartitionAndNewPartitionGroupMinimumSize10000Rows() {
     double segmentRowsToSizeRatio = 1.5;
     long segmentSizeBytes = 2000L;
-    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer(new SystemClock(), segmentRowsToSizeRatio);
+    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer(
+        new SystemClock(), segmentRowsToSizeRatio);
 
     PartitionLevelStreamConfig streamConfig = mock(PartitionLevelStreamConfig.class);
     when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(segmentSizeBytes);

@@ -44,8 +44,8 @@ public class SegmentFlushThresholdComputer {
   }
 
   public SegmentFlushThresholdComputer(Clock clock, double latestSegmentRowsToSizeRatio) {
-    this._clock = clock;
-    this._latestSegmentRowsToSizeRatio = latestSegmentRowsToSizeRatio;
+    _clock = clock;
+    _latestSegmentRowsToSizeRatio = latestSegmentRowsToSizeRatio;
   }
 
   public SegmentFlushThresholdComputer(Clock clock) {
