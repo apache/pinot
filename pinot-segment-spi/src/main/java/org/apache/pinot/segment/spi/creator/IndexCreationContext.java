@@ -336,7 +336,6 @@ public interface IndexCreationContext {
       _bloomFilterConfig = bloomFilterConfig;
     }
 
-    @Nullable
     public BloomFilterConfig getBloomFilterConfig() {
       return _bloomFilterConfig;
     }
