@@ -22,13 +22,13 @@ import com.google.common.base.Preconditions;
 import java.lang.reflect.Constructor;
 import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nullable;
-import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.scheduler.fcfs.BoundedFCFSScheduler;
 import org.apache.pinot.core.query.scheduler.fcfs.FCFSQueryScheduler;
 import org.apache.pinot.core.query.scheduler.tokenbucket.TokenPriorityScheduler;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,11 +41,12 @@ public class QuerySchedulerFactory {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(QuerySchedulerFactory.class);
-  private static final String FCFS_ALGORITHM = "fcfs";
-  private static final String DEFAULT_QUERY_SCHEDULER_ALGORITHM = FCFS_ALGORITHM;
+
+  public static final String FCFS_ALGORITHM = "fcfs";
   public static final String TOKEN_BUCKET_ALGORITHM = "tokenbucket";
   public static final String BOUNDED_FCFS_ALGORITHM = "bounded_fcfs";
   public static final String ALGORITHM_NAME_CONFIG_KEY = "name";
+  public static final String DEFAULT_QUERY_SCHEDULER_ALGORITHM = FCFS_ALGORITHM;
 
   /**
    * Static factory to instantiate query scheduler based on scheduler configuration.
@@ -60,21 +61,26 @@ public class QuerySchedulerFactory {
     Preconditions.checkNotNull(schedulerConfig);
     Preconditions.checkNotNull(queryExecutor);
 
-    String schedulerName =
-        schedulerConfig.getProperty(ALGORITHM_NAME_CONFIG_KEY, DEFAULT_QUERY_SCHEDULER_ALGORITHM).toLowerCase();
-    if (schedulerName.equals(FCFS_ALGORITHM)) {
-      LOGGER.info("Using FCFS query scheduler");
-      return new FCFSQueryScheduler(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
-    } else if (schedulerName.equals(TOKEN_BUCKET_ALGORITHM)) {
-      LOGGER.info("Using Priority Token Bucket scheduler");
-      return TokenPriorityScheduler.create(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
-    } else if (schedulerName.equals(BOUNDED_FCFS_ALGORITHM)) {
-      return BoundedFCFSScheduler.create(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
+    String schedulerName = schedulerConfig.getProperty(ALGORITHM_NAME_CONFIG_KEY, DEFAULT_QUERY_SCHEDULER_ALGORITHM);
+    QueryScheduler scheduler;
+    switch (schedulerName.toLowerCase()) {
+      case FCFS_ALGORITHM:
+        scheduler = new FCFSQueryScheduler(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
+        break;
+      case TOKEN_BUCKET_ALGORITHM:
+        scheduler = TokenPriorityScheduler.create(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
+        break;
+      case BOUNDED_FCFS_ALGORITHM:
+        scheduler = BoundedFCFSScheduler.create(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
+        break;
+      default:
+        scheduler =
+            getQuerySchedulerByClassName(schedulerName, schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
+        break;
     }
 
-    // didn't find by name so try by classname
-    QueryScheduler scheduler = getQuerySchedulerByClassName(schedulerName, schedulerConfig, queryExecutor);
     if (scheduler != null) {
+      LOGGER.info("Using {} scheduler", scheduler.name());
       return scheduler;
     }
 
@@ -82,19 +88,19 @@ public class QuerySchedulerFactory {
     // because it's better to execute with poor algorithm than completely fail.
     // Failure on bad configuration will cause outage vs an inferior algorithm that
     // will provide degraded service
-
     LOGGER.warn("Scheduler {} not found. Using default FCFS query scheduler", schedulerName);
     return new FCFSQueryScheduler(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
   }
 
   @Nullable
   private static QueryScheduler getQuerySchedulerByClassName(String className, PinotConfiguration schedulerConfig,
-      QueryExecutor queryExecutor) {
+      QueryExecutor queryExecutor, ServerMetrics serverMetrics, LongAccumulator latestQueryTime) {
     try {
-      Constructor<?> constructor =
-          Class.forName(className).getDeclaredConstructor(Configuration.class, QueryExecutor.class);
+      Constructor<?> constructor = PluginManager.get().loadClass(className)
+          .getDeclaredConstructor(PinotConfiguration.class, QueryExecutor.class, ServerMetrics.class,
+              LongAccumulator.class);
       constructor.setAccessible(true);
-      return (QueryScheduler) constructor.newInstance(schedulerConfig, queryExecutor);
+      return (QueryScheduler) constructor.newInstance(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
     } catch (Exception e) {
       LOGGER.error("Failed to instantiate scheduler class by name: {}", className, e);
       return null;
