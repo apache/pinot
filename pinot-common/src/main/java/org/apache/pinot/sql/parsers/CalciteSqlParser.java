@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.sql.parsers;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -56,6 +57,7 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.utils.Pairs;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
@@ -117,11 +119,13 @@ public class CalciteSqlParser {
 
   public static PinotQuery compileToPinotQuery(String sql)
       throws SqlCompilationException {
-    // Removes the terminating semicolon if any
+    // Remove the comments from the query
+    sql = removeComments(sql);
+
+    // Remove the terminating semicolon from the query
     sql = removeTerminatingSemicolon(sql);
 
     // Extract OPTION statements from sql as Calcite Parser doesn't parse it.
-    sql = removeComments(sql);
     List<String> options = extractOptionsFromSql(sql);
     if (!options.isEmpty()) {
       sql = removeOptionsFromSql(sql);
@@ -419,71 +423,99 @@ public class CalciteSqlParser {
     return matcher.replaceAll("");
   }
 
-  // Detect comments in query and remove them
-  // We don't simply want to remove the query after the `--` pattern, because
-  // 1. multi-line queries can have comments in the middle of the query
-  // 2. `--` pattern maybe present in string literals and identifiers.
-  // For ex: SELECT * FROM tablea WHERE cola = 'hello--world'
-  // The query content between `--` pattern and newline / end of line will be removed
-  // `--` that falls between single / double quotes will be ignored
-  private static String removeComments(String sql) {
-    Pattern tokensToMatch = Pattern.compile("'|\"|-{2,}|[\n\r]+");
-    Matcher matcher = tokensToMatch.matcher(sql);
+  /**
+   * Removes comments from the query.
+   * NOTE: Comment indicator within single quotes (literal) and double quotes (identifier) are ignored.
+   */
+  @VisibleForTesting
+  static String removeComments(String sql) {
+    boolean openSingleQuote = false;
+    boolean openDoubleQuote = false;
+    boolean commented = false;
+    boolean singleLineCommented = false;
+    boolean multiLineCommented = false;
+    int commentStartIndex = -1;
+    List<Pairs.IntPair> commentedParts = new ArrayList<>();
 
-    String signpost, tokenToMatch;
-    int fromIndex, toIndex;
-    // retainFromIndex & retainToIndex arrays contains locations at which to crop query
-    List<Integer> retainFromIndex = new ArrayList<Integer>();
-    List<Integer> retainToIndex = new ArrayList<Integer>();
-
-    retainFromIndex.add(0);
-
-    while (matcher.find()) {
-      fromIndex = matcher.start();
-      toIndex = matcher.end();
-      signpost = sql.substring(fromIndex, toIndex);
-
-      // if newline encountered, don't store crop location
-      if (signpost.contains("\n") | signpost.contains("\r")) {
-        continue;
-      }
-      while (matcher.find()) {
-        toIndex = matcher.end();
-        tokenToMatch = sql.substring(matcher.start(), toIndex);
-
-        // if matching pair found, like in the case of quotes, don't store crop location
-        if (tokenToMatch.equals(signpost)) {
-          break;
-        }
-        if (tokenToMatch.contains("\n") | tokenToMatch.contains("\r")) {
-          // if newline encountered after `--` pattern, store crop locations
-          if (signpost.contains("--")) {
-            retainToIndex.add(fromIndex);
-            retainFromIndex.add(toIndex);
-            break;
+    int length = sql.length();
+    int index = 0;
+    while (index < length) {
+      switch (sql.charAt(index)) {
+        case '\'':
+          if (!commented && !openDoubleQuote) {
+            openSingleQuote = !openSingleQuote;
           }
-          // else don't store crop location
           break;
+        case '"':
+          if (!commented && !openSingleQuote) {
+            openDoubleQuote = !openDoubleQuote;
+          }
+          break;
+        case '-':
+          // Single line comment start indicator: --
+          if (!commented && !openSingleQuote && !openDoubleQuote && index < length - 1
+              && sql.charAt(index + 1) == '-') {
+            commented = true;
+            singleLineCommented = true;
+            commentStartIndex = index;
+            index++;
+          }
+          break;
+        case '\n':
+          // Single line comment end indicator: \n
+          if (singleLineCommented) {
+            commentedParts.add(new Pairs.IntPair(commentStartIndex, index + 1));
+            commented = false;
+            singleLineCommented = false;
+            commentStartIndex = -1;
+          }
+          break;
+        case '/':
+          // Multi-line comment start indicator: /*
+          if (!commented && !openSingleQuote && !openDoubleQuote && index < length - 1
+              && sql.charAt(index + 1) == '*') {
+            commented = true;
+            multiLineCommented = true;
+            commentStartIndex = index;
+            index++;
+          }
+          break;
+        case '*':
+          // Multi-line comment end indicator: */
+          if (multiLineCommented && index < length - 1 && sql.charAt(index + 1) == '/') {
+            commentedParts.add(new Pairs.IntPair(commentStartIndex, index + 2));
+            commented = false;
+            multiLineCommented = false;
+            commentStartIndex = -1;
+            index++;
+          }
+          break;
+      }
+      index++;
+    }
+
+    if (commentedParts.isEmpty()) {
+      if (singleLineCommented) {
+        return sql.substring(0, commentStartIndex);
+      } else {
+        return sql;
+      }
+    } else {
+      StringBuilder stringBuilder = new StringBuilder();
+      int startIndex = 0;
+      for (Pairs.IntPair commentedPart : commentedParts) {
+        stringBuilder.append(sql, startIndex, commentedPart.getLeft()).append(' ');
+        startIndex = commentedPart.getRight();
+      }
+      if (startIndex < length) {
+        if (singleLineCommented) {
+          stringBuilder.append(sql, startIndex, commentStartIndex);
+        } else {
+          stringBuilder.append(sql, startIndex, length);
         }
       }
-      if ((matcher.hitEnd()) & signpost.contains("--")) {
-        // if end of line encountered after `--` pattern, store crop location
-        retainToIndex.add(fromIndex);
-        retainFromIndex.add(sql.length());
-        break;
-      }
+      return stringBuilder.toString();
     }
-    retainToIndex.add(sql.length());
-
-    if (retainFromIndex.size() != retainToIndex.size()) {
-      throw new SqlCompilationException("Query parsing error: Unable to detect query comments");
-    }
-
-    StringBuilder sqlWithoutComments = new StringBuilder();
-    for (int i=0; i<retainFromIndex.size(); i++) {
-      sqlWithoutComments.append(sql, retainFromIndex.get(i), retainToIndex.get(i));
-    }
-    return sqlWithoutComments.toString();
   }
 
   private static List<Expression> convertDistinctSelectList(SqlNodeList selectList) {

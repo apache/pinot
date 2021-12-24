@@ -654,91 +654,56 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(pinotQuery.getQueryOptions().get("delicious"), "yes");
     Assert.assertEquals(pinotQuery.getQueryOptions().get("foo"), "1234");
     Assert.assertEquals(pinotQuery.getQueryOptions().get("bar"), "'potato'");
-
-    pinotQuery = CalciteSqlParser.compileToPinotQuery(
-        "select * from vegetables\n" + "-- select * from vegetables OPTION (delicious=yes) option"
-            + "(bar='potato')");
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 0);
-
-    pinotQuery = CalciteSqlParser.compileToPinotQuery(
-        "select * from vegetables OPTION (delicious=yes, foo=1234, bar='potato') --"
-            + " select * from vegetables OPTION (delicious=no) option"
-            + "(bar='tomato')");
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 3);
-    Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("delicious"));
-    Assert.assertEquals(pinotQuery.getQueryOptions().get("delicious"), "yes");
-    Assert.assertEquals(pinotQuery.getQueryOptions().get("foo"), "1234");
-    Assert.assertEquals(pinotQuery.getQueryOptions().get("bar"), "'potato'");
-
-    pinotQuery =
-        CalciteSqlParser.compileToPinotQuery("SELECT SUM('foo'), MAX(bar) FROM myTable GROUP BY 'foo', bar"
-            + "-- select * from vegetables OPTION (delicious=yes)");
-    List<Expression> selectFunctionList = pinotQuery.getSelectList();
-    Assert.assertEquals(selectFunctionList.size(), 2);
-    Assert.assertEquals(selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getLiteral().getStringValue(),
-        "foo");
-    Assert.assertEquals(selectFunctionList.get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
-        "bar");
-    List<Expression> groupbyList = pinotQuery.getGroupByList();
-    Assert.assertEquals(groupbyList.size(), 2);
-    Assert.assertEquals(groupbyList.get(0).getLiteral().getStringValue(), "foo");
-    Assert.assertEquals(groupbyList.get(1).getIdentifier().getName(), "bar");
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 0);
-
-    // ensure that using `--` as signpost to remove commented out query options does not impact
-    // usage of `--` in identifiers and string literals
-    pinotQuery =
-        CalciteSqlParser.compileToPinotQuery(
-            "SELECT * FROM myTable where foo LIKE '%--%' and \"b--a----r\" = 'he---ll-o' option(a=b)"
-            + "-- select * from vegetables OPTION (delicious=yes)");
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
-    Assert.assertEquals(pinotQuery, CalciteSqlParser.compileToPinotQuery(
-        "SELECT * FROM myTable where foo LIKE '%--%' and \"b--a----r\" = 'he---ll-o' option(a=b)"
-        + "-- select * from vegetables"));
-
-    // ensure that using `--` as signpost to remove commented out query options does not impact query
-    pinotQuery =
-        CalciteSqlParser.compileToPinotQuery("SELECT * FROM myTable where foo = '----' "
-            + "-- select * from vegetables OPTION (delicious=yes)");
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 0);
-    Assert.assertEquals(pinotQuery, CalciteSqlParser.compileToPinotQuery("SELECT * FROM myTable where foo = '----' "
-        + "-- select * from vegetables"));
-
-    // ensure that `option` used in identifiers does not get removed by the query options regex
-    pinotQuery =
-        CalciteSqlParser.compileToPinotQuery("SELECT ktoptionsx, option(), \"option()\" FROM myTable option (a=b) "
-            + "-- select * from vegetables OPTION (delicious=yes)");
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
-    Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("a"));
-    Assert.assertEquals(pinotQuery.getQueryOptions().get("a"), "b");
-    Assert.assertEquals(pinotQuery, CalciteSqlParser.compileToPinotQuery(
-        "SELECT ktoptionsx, option(), \"option()\" FROM myTable option (a=b) "
-        + "-- select * from vegetables"));
   }
 
   @Test
-  public void testCommentRemoval() {
-    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
-        "select * from tablea --- hello world -- bye world");
-    Assert.assertEquals(pinotQuery, CalciteSqlParser.compileToPinotQuery(
-        "select * from tablea"));
+  public void testRemoveComments() {
+    testRemoveComments("select * from myTable", "select * from myTable");
+    testRemoveComments("select * from myTable--hello", "select * from myTable");
+    testRemoveComments("select * from myTable--hello\n", "select * from myTable");
+    testRemoveComments("select * from--hello\nmyTable", "select * from myTable");
+    testRemoveComments("select * from/*hello*/myTable", "select * from myTable");
+    // Multi-line comment must have end indicator
+    testRemoveComments("select * from myTable/*hello", "select * from myTable/*hello");
+    testRemoveComments("select * from myTable--", "select * from myTable");
+    testRemoveComments("select * from myTable--\n", "select * from myTable");
+    testRemoveComments("select * from--\nmyTable", "select * from myTable");
+    testRemoveComments("select * from/**/myTable", "select * from myTable");
+    // End indicator itself has no effect
+    testRemoveComments("select * from\nmyTable", "select * from\nmyTable");
+    testRemoveComments("select * from*/myTable", "select * from*/myTable");
 
-    pinotQuery =
-        CalciteSqlParser.compileToPinotQuery("SELECT * FROM myTable where foo = '---ab---c-' and \"cola\" like '%--%' "
-            + "\n\r-- select * from vegetables OPTION (delicious=yes)");
-    Assert.assertEquals(pinotQuery, CalciteSqlParser.compileToPinotQuery(
-        "SELECT * FROM myTable where foo = '---ab---c-' and \"cola\" like '%--%'"));
+    // Mix of single line and multi-line comment indicators
+    testRemoveComments("select * from myTable--hello--world", "select * from myTable");
+    testRemoveComments("select * from myTable--hello/*world", "select * from myTable");
+    testRemoveComments("select * from myTable--hello\n--world", "select * from myTable");
+    testRemoveComments("select * from myTable--hello\n/*--world*/", "select * from myTable");
+    testRemoveComments("select * from myTable/*hello--world*/", "select * from myTable");
+    testRemoveComments("select * from myTable/*hello--\nworld*/", "select * from myTable");
+    testRemoveComments("select * from myTable/*hello*/--world", "select * from myTable");
+    testRemoveComments("select * from myTable/*hello*/--world\n", "select * from myTable");
 
-    pinotQuery =
-        CalciteSqlParser.compileToPinotQuery("SELECT * FROM myTable where foo = '---ab---c-'"
-            + "\nand \"cola\" like '%--%' "
-            + "\n -- blah blah"
-            + "\norder by colc -- desc"
-            + "\n\r-- select * from vegetables OPTION (delicious=yes)");
-    Assert.assertEquals(pinotQuery, CalciteSqlParser.compileToPinotQuery(
-        "SELECT * FROM myTable where foo = '---ab---c-'"
-            + "\nand \"cola\" like '%--%' "
-            + "\norder by colc"));
+    // Comment indicator within quotes
+    testRemoveComments("select * from \"myTable--hello\"", "select * from \"myTable--hello\"");
+    testRemoveComments("select * from \"myTable/*hello*/\"", "select * from \"myTable/*hello*/\"");
+    testRemoveComments("select '--' from myTable", "select '--' from myTable");
+    testRemoveComments("select '/*' from myTable", "select '/*' from myTable");
+    testRemoveComments("select '/**/' from myTable", "select '/**/' from myTable");
+    testRemoveComments("select * from \"my\"\"Table--hello\"", "select * from \"my\"\"Table--hello\"");
+    testRemoveComments("select * from \"my\"\"Table/*hello*/\"", "select * from \"my\"\"Table/*hello*/\"");
+    testRemoveComments("select '''--' from myTable", "select '''--' from myTable");
+    testRemoveComments("select '''/*' from myTable", "select '''/*' from myTable");
+    testRemoveComments("select '''/**/' from myTable", "select '''/**/' from myTable");
+
+    // Comment indicator outside of quotes
+    testRemoveComments("select * from \"myTable\"--hello", "select * from \"myTable\"");
+    testRemoveComments("select * from \"myTable\"/*hello*/", "select * from \"myTable\"");
+    testRemoveComments("select ''--from myTable", "select ''");
+    testRemoveComments("select ''/**/from myTable", "select '' from myTable");
+  }
+
+  private void testRemoveComments(String sqlWithComments, String expectedSqlWithoutComments) {
+    Assert.assertEquals(CalciteSqlParser.removeComments(sqlWithComments).trim(), expectedSqlWithoutComments.trim());
   }
 
   @Test
@@ -2520,23 +2485,20 @@ public class CalciteSqlCompilerTest {
 
   @Test
   public void testInvalidQueryWithSemicolon() {
-    Assert.expectThrows(SqlCompilationException.class,
-            () -> CalciteSqlParser.compileToPinotQuery(";"));
+    Assert.expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToPinotQuery(";"));
+
+    Assert.expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToPinotQuery(";;;;"));
 
     Assert.expectThrows(SqlCompilationException.class,
-            () -> CalciteSqlParser.compileToPinotQuery(";;;;"));
-
-    Assert.expectThrows(SqlCompilationException.class,
-            () -> CalciteSqlParser.compileToPinotQuery("SELECT col1, count(*) FROM foo GROUP BY ; col1"));
+        () -> CalciteSqlParser.compileToPinotQuery("SELECT col1, count(*) FROM foo GROUP BY ; col1"));
 
     // Query having multiple SQL statements
-    Assert.expectThrows(SqlCompilationException.class,
-            () -> CalciteSqlParser.compileToPinotQuery("SELECT col1, count(*) FROM foo GROUP BY col1; SELECT col2,"
-                    + "count(*) FROM foo GROUP BY col2"));
+    Assert.expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToPinotQuery(
+        "SELECT col1, count(*) FROM foo GROUP BY col1; SELECT col2," + "count(*) FROM foo GROUP BY col2"));
 
     // Query having multiple SQL statements with trailing and leading whitespaces
-    Assert.expectThrows(SqlCompilationException.class,
-            () -> CalciteSqlParser.compileToPinotQuery("        SELECT col1, count(*) FROM foo GROUP BY col1;   "
-                    + "SELECT col2, count(*) FROM foo GROUP BY col2             "));
+    Assert.expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToPinotQuery(
+        "        SELECT col1, count(*) FROM foo GROUP BY col1;   "
+            + "SELECT col2, count(*) FROM foo GROUP BY col2             "));
   }
 }
