@@ -657,6 +657,56 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
+  public void testRemoveComments() {
+    testRemoveComments("select * from myTable", "select * from myTable");
+    testRemoveComments("select * from myTable--hello", "select * from myTable");
+    testRemoveComments("select * from myTable--hello\n", "select * from myTable");
+    testRemoveComments("select * from--hello\nmyTable", "select * from myTable");
+    testRemoveComments("select * from/*hello*/myTable", "select * from myTable");
+    // Multi-line comment must have end indicator
+    testRemoveComments("select * from myTable/*hello", "select * from myTable/*hello");
+    testRemoveComments("select * from myTable--", "select * from myTable");
+    testRemoveComments("select * from myTable--\n", "select * from myTable");
+    testRemoveComments("select * from--\nmyTable", "select * from myTable");
+    testRemoveComments("select * from/**/myTable", "select * from myTable");
+    // End indicator itself has no effect
+    testRemoveComments("select * from\nmyTable", "select * from\nmyTable");
+    testRemoveComments("select * from*/myTable", "select * from*/myTable");
+
+    // Mix of single line and multi-line comment indicators
+    testRemoveComments("select * from myTable--hello--world", "select * from myTable");
+    testRemoveComments("select * from myTable--hello/*world", "select * from myTable");
+    testRemoveComments("select * from myTable--hello\n--world", "select * from myTable");
+    testRemoveComments("select * from myTable--hello\n/*--world*/", "select * from myTable");
+    testRemoveComments("select * from myTable/*hello--world*/", "select * from myTable");
+    testRemoveComments("select * from myTable/*hello--\nworld*/", "select * from myTable");
+    testRemoveComments("select * from myTable/*hello*/--world", "select * from myTable");
+    testRemoveComments("select * from myTable/*hello*/--world\n", "select * from myTable");
+
+    // Comment indicator within quotes
+    testRemoveComments("select * from \"myTable--hello\"", "select * from \"myTable--hello\"");
+    testRemoveComments("select * from \"myTable/*hello*/\"", "select * from \"myTable/*hello*/\"");
+    testRemoveComments("select '--' from myTable", "select '--' from myTable");
+    testRemoveComments("select '/*' from myTable", "select '/*' from myTable");
+    testRemoveComments("select '/**/' from myTable", "select '/**/' from myTable");
+    testRemoveComments("select * from \"my\"\"Table--hello\"", "select * from \"my\"\"Table--hello\"");
+    testRemoveComments("select * from \"my\"\"Table/*hello*/\"", "select * from \"my\"\"Table/*hello*/\"");
+    testRemoveComments("select '''--' from myTable", "select '''--' from myTable");
+    testRemoveComments("select '''/*' from myTable", "select '''/*' from myTable");
+    testRemoveComments("select '''/**/' from myTable", "select '''/**/' from myTable");
+
+    // Comment indicator outside of quotes
+    testRemoveComments("select * from \"myTable\"--hello", "select * from \"myTable\"");
+    testRemoveComments("select * from \"myTable\"/*hello*/", "select * from \"myTable\"");
+    testRemoveComments("select ''--from myTable", "select ''");
+    testRemoveComments("select ''/**/from myTable", "select '' from myTable");
+  }
+
+  private void testRemoveComments(String sqlWithComments, String expectedSqlWithoutComments) {
+    Assert.assertEquals(CalciteSqlParser.removeComments(sqlWithComments).trim(), expectedSqlWithoutComments.trim());
+  }
+
+  @Test
   public void testIdentifierQuoteCharacter() {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
         "select avg(attributes.age) as avg_age from person group by attributes.address_city");
@@ -2435,23 +2485,20 @@ public class CalciteSqlCompilerTest {
 
   @Test
   public void testInvalidQueryWithSemicolon() {
-    Assert.expectThrows(SqlCompilationException.class,
-            () -> CalciteSqlParser.compileToPinotQuery(";"));
+    Assert.expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToPinotQuery(";"));
+
+    Assert.expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToPinotQuery(";;;;"));
 
     Assert.expectThrows(SqlCompilationException.class,
-            () -> CalciteSqlParser.compileToPinotQuery(";;;;"));
-
-    Assert.expectThrows(SqlCompilationException.class,
-            () -> CalciteSqlParser.compileToPinotQuery("SELECT col1, count(*) FROM foo GROUP BY ; col1"));
+        () -> CalciteSqlParser.compileToPinotQuery("SELECT col1, count(*) FROM foo GROUP BY ; col1"));
 
     // Query having multiple SQL statements
-    Assert.expectThrows(SqlCompilationException.class,
-            () -> CalciteSqlParser.compileToPinotQuery("SELECT col1, count(*) FROM foo GROUP BY col1; SELECT col2,"
-                    + "count(*) FROM foo GROUP BY col2"));
+    Assert.expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToPinotQuery(
+        "SELECT col1, count(*) FROM foo GROUP BY col1; SELECT col2," + "count(*) FROM foo GROUP BY col2"));
 
     // Query having multiple SQL statements with trailing and leading whitespaces
-    Assert.expectThrows(SqlCompilationException.class,
-            () -> CalciteSqlParser.compileToPinotQuery("        SELECT col1, count(*) FROM foo GROUP BY col1;   "
-                    + "SELECT col2, count(*) FROM foo GROUP BY col2             "));
+    Assert.expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToPinotQuery(
+        "        SELECT col1, count(*) FROM foo GROUP BY col1;   "
+            + "SELECT col2, count(*) FROM foo GROUP BY col2             "));
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.sql.parsers;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -56,6 +57,7 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.utils.Pairs;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
@@ -117,7 +119,10 @@ public class CalciteSqlParser {
 
   public static PinotQuery compileToPinotQuery(String sql)
       throws SqlCompilationException {
-    // Removes the terminating semicolon if any
+    // Remove the comments from the query
+    sql = removeComments(sql);
+
+    // Remove the terminating semicolon from the query
     sql = removeTerminatingSemicolon(sql);
 
     // Extract OPTION statements from sql as Calcite Parser doesn't parse it.
@@ -416,6 +421,103 @@ public class CalciteSqlParser {
   private static String removeOptionsFromSql(String sql) {
     Matcher matcher = OPTIONS_REGEX_PATTEN.matcher(sql);
     return matcher.replaceAll("");
+  }
+
+  /**
+   * Removes comments from the query.
+   * NOTE: Comment indicator within single quotes (literal) and double quotes (identifier) are ignored.
+   */
+  @VisibleForTesting
+  static String removeComments(String sql) {
+    boolean openSingleQuote = false;
+    boolean openDoubleQuote = false;
+    boolean commented = false;
+    boolean singleLineCommented = false;
+    boolean multiLineCommented = false;
+    int commentStartIndex = -1;
+    List<Pairs.IntPair> commentedParts = new ArrayList<>();
+
+    int length = sql.length();
+    int index = 0;
+    while (index < length) {
+      switch (sql.charAt(index)) {
+        case '\'':
+          if (!commented && !openDoubleQuote) {
+            openSingleQuote = !openSingleQuote;
+          }
+          break;
+        case '"':
+          if (!commented && !openSingleQuote) {
+            openDoubleQuote = !openDoubleQuote;
+          }
+          break;
+        case '-':
+          // Single line comment start indicator: --
+          if (!commented && !openSingleQuote && !openDoubleQuote && index < length - 1
+              && sql.charAt(index + 1) == '-') {
+            commented = true;
+            singleLineCommented = true;
+            commentStartIndex = index;
+            index++;
+          }
+          break;
+        case '\n':
+          // Single line comment end indicator: \n
+          if (singleLineCommented) {
+            commentedParts.add(new Pairs.IntPair(commentStartIndex, index + 1));
+            commented = false;
+            singleLineCommented = false;
+            commentStartIndex = -1;
+          }
+          break;
+        case '/':
+          // Multi-line comment start indicator: /*
+          if (!commented && !openSingleQuote && !openDoubleQuote && index < length - 1
+              && sql.charAt(index + 1) == '*') {
+            commented = true;
+            multiLineCommented = true;
+            commentStartIndex = index;
+            index++;
+          }
+          break;
+        case '*':
+          // Multi-line comment end indicator: */
+          if (multiLineCommented && index < length - 1 && sql.charAt(index + 1) == '/') {
+            commentedParts.add(new Pairs.IntPair(commentStartIndex, index + 2));
+            commented = false;
+            multiLineCommented = false;
+            commentStartIndex = -1;
+            index++;
+          }
+          break;
+        default:
+          break;
+      }
+      index++;
+    }
+
+    if (commentedParts.isEmpty()) {
+      if (singleLineCommented) {
+        return sql.substring(0, commentStartIndex);
+      } else {
+        return sql;
+      }
+    } else {
+      StringBuilder stringBuilder = new StringBuilder();
+      int startIndex = 0;
+      for (Pairs.IntPair commentedPart : commentedParts) {
+        stringBuilder.append(sql, startIndex, commentedPart.getLeft()).append(' ');
+        startIndex = commentedPart.getRight();
+      }
+      if (startIndex < length) {
+        if (singleLineCommented) {
+          stringBuilder.append(sql, startIndex, commentStartIndex);
+        } else {
+          stringBuilder.append(sql, startIndex, length);
+        }
+      }
+      return stringBuilder.toString();
+    }
   }
 
   private static List<Expression> convertDistinctSelectList(SqlNodeList selectList) {
