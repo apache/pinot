@@ -38,7 +38,7 @@ public class SegmentRefreshSemaphore {
     }
   }
 
-  public void acquireSema(String context, Logger logger)
+  public void acquireSema(String segmentName, Logger logger)
       throws InterruptedException {
     if (_semaphore != null) {
       long startTime = System.currentTimeMillis();
