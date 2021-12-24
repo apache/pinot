@@ -42,13 +42,13 @@ public class SegmentRefreshSemaphore {
       throws InterruptedException {
     if (_semaphore != null) {
       long startTime = System.currentTimeMillis();
-      logger.info("Waiting for lock to refresh : {}, queue-length: {}", context,
+      logger.info("Waiting for lock to refresh : {}, queue-length: {}", segmentName,
           _semaphore.getQueueLength());
       _semaphore.acquire();
-      logger.info("Acquired lock to refresh segment: {} (lock-time={}ms, queue-length={})", context,
+      logger.info("Acquired lock to refresh segment: {} (lock-time={}ms, queue-length={})", segmentName,
           System.currentTimeMillis() - startTime, _semaphore.getQueueLength());
     } else {
-      logger.info("Locking of refresh threads disabled (segment: {})", context);
+      logger.info("Locking of refresh threads disabled (segment: {})", segmentName);
     }
   }
 
