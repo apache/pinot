@@ -236,10 +236,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         segmentRefreshSemaphore.acquireSema(segmentMetadata.getName(), LOGGER);
         try {
           reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
-        } catch (Exception e) {
-          LOGGER.error("Caught exception while reloading segment: {} in table: {}", segmentName, tableNameWithType, e);
-          failedSegments.add(segmentName);
-          sampleException.set(e);
         } finally {
           segmentRefreshSemaphore.releaseSema();
         }
@@ -419,5 +415,4 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   public SegmentUploader getSegmentUploader() {
     return _segmentUploader;
   }
-
 }
