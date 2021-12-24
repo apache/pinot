@@ -490,6 +490,8 @@ public class CalciteSqlParser {
             index++;
           }
           break;
+        default:
+          break;
       }
       index++;
     }
