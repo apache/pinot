@@ -101,7 +101,7 @@ public final class TableConfigUtils {
    * TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
    */
   public static void validate(TableConfig tableConfig, @Nullable Schema schema, @Nullable String typesToSkip) {
-    List<ValidationType> skipTypes = parseTypesToSkipString(typesToSkip);
+    Set<ValidationType> skipTypes = parseTypesToSkipString(typesToSkip);
     if (tableConfig.getTableType() == TableType.REALTIME) {
       Preconditions.checkState(schema != null, "Schema should not be null for REALTIME table");
     }
@@ -124,10 +124,10 @@ public final class TableConfigUtils {
     }
   }
 
-  private static List<ValidationType> parseTypesToSkipString(String typesToSkip) {
-    return typesToSkip == null ? Collections.emptyList() : Arrays.stream(typesToSkip.split(","))
-        .map(TableConfigUtils.ValidationType::valueOf)
-        .collect(Collectors.toList());
+  private static Set<ValidationType> parseTypesToSkipString(@Nullable String typesToSkip) {
+    return typesToSkip == null ? Collections.emptySet() : Arrays.stream(typesToSkip.split(","))
+        .map(s -> ValidationType.valueOf(s.toUpperCase()))
+        .collect(Collectors.toSet());
   }
 
   /**

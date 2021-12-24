@@ -155,8 +155,8 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Adds a table", notes = "Adds a table")
   public SuccessResponse addTable(
       String tableConfigStr,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK)")
-      @QueryParam("validationTypesToSkip") String typesToSkip, @Context HttpHeaders httpHeaders,
+      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
+      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
     // TODO introduce a table config ctor with json string.
     TableConfig tableConfig;
@@ -439,8 +439,8 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Updates table config for a table", notes = "Updates table config for a table")
   public SuccessResponse updateTableConfig(
       @ApiParam(value = "Name of the table to update", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK)")
-      @QueryParam("validationTypesToSkip") String typesToSkip, String tableConfigString)
+      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
+      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, String tableConfigString)
       throws Exception {
     TableConfig tableConfig;
     try {
@@ -494,8 +494,8 @@ public class PinotTableRestletResource {
           + " This allows us to validate table config before apply.")
   public String checkTableConfig(
       String tableConfigStr,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK)")
-      @QueryParam("validationTypesToSkip") String typesToSkip) {
+      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
+      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip) {
     TableConfig tableConfig;
     try {
       tableConfig = JsonUtils.stringToObject(tableConfigStr, TableConfig.class);
@@ -503,7 +503,7 @@ public class PinotTableRestletResource {
       String msg = String.format("Invalid table config json string: %s", tableConfigStr);
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
-    return validateConfig(tableConfig, typesToSkip, _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig));
+    return validateConfig(tableConfig, _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig), typesToSkip);
   }
 
   @Deprecated
@@ -518,17 +518,17 @@ public class PinotTableRestletResource {
           + " This allows us to validate table config before apply.")
   public String validateTableAndSchema(
       TableAndSchemaConfig tableSchemaConfig,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK)")
-      @QueryParam("validationTypesToSkip") String typesToSkip) {
+      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
+      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip) {
     TableConfig tableConfig = tableSchemaConfig.getTableConfig();
     Schema schema = tableSchemaConfig.getSchema();
     if (schema == null) {
       schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
     }
-    return validateConfig(tableSchemaConfig.getTableConfig(), typesToSkip, schema);
+    return validateConfig(tableSchemaConfig.getTableConfig(), schema, typesToSkip);
   }
 
-  private String validateConfig(TableConfig tableConfig, String typesToSkip, Schema schema) {
+  private String validateConfig(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip) {
     try {
       if (schema == null) {
         throw new SchemaNotFoundException("Got empty schema");
