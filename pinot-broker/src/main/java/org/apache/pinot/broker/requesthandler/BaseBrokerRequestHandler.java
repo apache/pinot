@@ -1459,8 +1459,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       Map<String, String> columnNameMap) {
     Map<String, String> aliasMap = new HashMap<>();
     if (pinotQuery != null) {
+      Expression selectStarExpr = null;
       for (Expression expression : pinotQuery.getSelectList()) {
         fixColumnName(rawTableName, expression, columnNameMap, aliasMap, isCaseInsensitive);
+        //check if the select expression is '*'
+        if (selectStarExpr == null && expression.isSetIdentifier() && expression.getIdentifier().getName()
+            .equals("*")) {
+          selectStarExpr = expression;
+        }
+      }
+      //if query has a '*' selection along with other columns
+      if (selectStarExpr != null && pinotQuery.getSelectList().size() > 1) {
+        expandStarExpressionToActualColumns(pinotQuery, columnNameMap, selectStarExpr);
       }
       Expression filterExpression = pinotQuery.getFilterExpression();
       if (filterExpression != null) {
@@ -1485,6 +1495,33 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         fixColumnName(rawTableName, havingExpression, columnNameMap, aliasMap, isCaseInsensitive);
       }
     }
+  }
+
+  private static void expandStarExpressionToActualColumns(PinotQuery pinotQuery, Map<String, String> columnNameMap,
+      Expression selectStarExpr) {
+    //select query has * along with other columns in select list, then expand * to all columns
+    List<Expression> selections = pinotQuery.getSelectList();
+    List<Expression> newSelections = new ArrayList<>();
+    for (Expression selection : selections) {
+      if (selection.equals(selectStarExpr)) {
+        //expand '*' to actual columns, exclude default virtual columns
+        for (String value : columnNameMap.values()) {
+          if (isNotDefaultVirtualColumn(value)) {
+            Expression identifierExpression = RequestUtils.createIdentifierExpression(value);
+            newSelections.add(identifierExpression);
+          }
+        }
+      } else {
+        newSelections.add(selection);
+      }
+    }
+    pinotQuery.setSelectList(newSelections);
+  }
+
+  private static boolean isNotDefaultVirtualColumn(String value) {
+    return !value.equals(CommonConstants.Segment.BuiltInVirtualColumn.DOCID) &&
+        !value.equals(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME) && !value.equals(
+        CommonConstants.Segment.BuiltInVirtualColumn.HOSTNAME);
   }
 
   /**

@@ -1,0 +1,71 @@
+package org.apache.pinot.broker.requesthandler;
+
+import com.google.common.collect.ImmutableMap;
+import java.util.List;
+import java.util.Map;
+import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.testng.Assert;
+import org.testng.annotations.Test;
+
+
+public class SelectStarWithOtherColsRewriteTest {
+
+  private static final Map<String, String> COL_MAP;
+
+  static {
+    ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
+    builder.put("homeRuns", "homeRuns");
+    builder.put("playerStint", "playerStint");
+    builder.put("groundedIntoDoublePlays", "groundedIntoDoublePlays");
+    builder.put("playerID", "playerID");
+    builder.put("$segmentName", "$segmentName");
+    builder.put("$docId", "$docId");
+    builder.put("$hostName", "$hostName");
+    COL_MAP = builder.build();
+  }
+
+  @Test
+  public void testHappyCase() {
+    String sql = "SELECT $segmentName,*,$hostName FROM baseballStats";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
+    List<Expression> newSelections = pinotQuery.getSelectList();
+    Assert.assertEquals(newSelections.get(0).getIdentifier().getName(), "$segmentName");
+    Assert.assertEquals(newSelections.get(1).getIdentifier().getName(), "homeRuns");
+    Assert.assertEquals(newSelections.get(2).getIdentifier().getName(), "playerStint");
+    Assert.assertEquals(newSelections.get(3).getIdentifier().getName(), "groundedIntoDoublePlays");
+    Assert.assertEquals(newSelections.get(4).getIdentifier().getName(), "playerID");
+    Assert.assertEquals(newSelections.get(5).getIdentifier().getName(), "$hostName");
+  }
+
+  @Test
+  public void testDupCols() {
+    String sql = "SELECT playerID,homeRuns,* FROM baseballStats";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
+    List<Expression> newSelections = pinotQuery.getSelectList();
+    Assert.assertEquals(newSelections.get(0).getIdentifier().getName(), "playerID");
+    Assert.assertEquals(newSelections.get(1).getIdentifier().getName(), "homeRuns");
+    Assert.assertEquals(newSelections.get(2).getIdentifier().getName(), "homeRuns");
+    Assert.assertEquals(newSelections.get(3).getIdentifier().getName(), "playerStint");
+    Assert.assertEquals(newSelections.get(4).getIdentifier().getName(), "groundedIntoDoublePlays");
+    Assert.assertEquals(newSelections.get(5).getIdentifier().getName(), "playerID");
+  }
+
+  @Test
+  public void testOrder() {
+    String sql = "SELECT playerID,*,homeRuns FROM baseballStats";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
+    List<Expression> newSelections = pinotQuery.getSelectList();
+    Assert.assertEquals(newSelections.get(0).getIdentifier().getName(), "playerID");
+    Assert.assertEquals(newSelections.get(1).getIdentifier().getName(), "homeRuns");
+    Assert.assertEquals(newSelections.get(2).getIdentifier().getName(), "playerStint");
+    Assert.assertEquals(newSelections.get(3).getIdentifier().getName(), "groundedIntoDoublePlays");
+    Assert.assertEquals(newSelections.get(4).getIdentifier().getName(), "playerID");
+    Assert.assertEquals(newSelections.get(5).getIdentifier().getName(), "homeRuns");
+  }
+
+}
