@@ -84,7 +84,7 @@ import software.amazon.awssdk.utils.AttributeMap;
 
 
 @LocalstackDockerProperties(services = {"kinesis"})
-@Test(enabled = false)
+@Test(enabled = true)
 public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeKinesisIntegrationTest.class);
 
