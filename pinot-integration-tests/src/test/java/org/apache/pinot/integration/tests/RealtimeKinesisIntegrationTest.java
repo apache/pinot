@@ -19,6 +19,8 @@
 package org.apache.pinot.integration.tests;
 
 import cloud.localstack.Localstack;
+import cloud.localstack.ServiceName;
+import cloud.localstack.docker.annotation.IEnvironmentVariableProvider;
 import cloud.localstack.docker.annotation.LocalstackDockerAnnotationProcessor;
 import cloud.localstack.docker.annotation.LocalstackDockerConfiguration;
 import cloud.localstack.docker.annotation.LocalstackDockerProperties;
@@ -83,7 +85,7 @@ import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 import software.amazon.awssdk.utils.AttributeMap;
 
 
-@LocalstackDockerProperties(services = {"kinesis"}, portEdge = "4591")
+@LocalstackDockerProperties(services = {ServiceName.KINESIS}, portEdge = "4591", environmentVariableProvider = RealtimeKinesisIntegrationTest.HostnameEnvProvider.class, imageTag = "0.13.0.10")
 @Test(enabled = true)
 public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeKinesisIntegrationTest.class);
@@ -483,6 +485,16 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
       if (dockerInfo.toLowerCase().contains("error")) {
         throw new IllegalStateException("Docker daemon is not running!");
       }
+    }
+  }
+
+
+  public static class HostnameEnvProvider implements IEnvironmentVariableProvider {
+    @Override
+    public Map<String, String> getEnvironmentVariables() {
+      Map<String, String> env = new HashMap<>();
+      env.put("LOCALSTACK_HOSTNAME", "127.0.0.1");
+      return env;
     }
   }
 }
