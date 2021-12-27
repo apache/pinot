@@ -20,7 +20,6 @@ package org.apache.pinot.integration.tests;
 
 import cloud.localstack.Localstack;
 import cloud.localstack.ServiceName;
-import cloud.localstack.docker.annotation.IEnvironmentVariableProvider;
 import cloud.localstack.docker.annotation.LocalstackDockerAnnotationProcessor;
 import cloud.localstack.docker.annotation.LocalstackDockerConfiguration;
 import cloud.localstack.docker.annotation.LocalstackDockerProperties;
