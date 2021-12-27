@@ -50,4 +50,16 @@ public class DefaultSegmentDirectoryLoader implements SegmentDirectoryLoader {
     return new SegmentLocalFSDirectory(new File(indexDir),
         ReadMode.valueOf(segmentDirectoryConfigs.getProperty(IndexLoadingConfig.READ_MODE_KEY)));
   }
+
+  @Override
+  public void upload(File indexDir, SegmentDirectoryLoaderContext segmentLoaderContext)
+      throws Exception {
+    // Noop if tier backend is local disk.
+  }
+
+  @Override
+  public void download(File indexDir, SegmentDirectoryLoaderContext segmentLoaderContext)
+      throws Exception {
+    // Noop if tier backend is local disk.
+  }
 }

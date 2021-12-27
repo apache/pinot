@@ -138,7 +138,6 @@ public class LoaderUtils {
   public static void reloadFailureRecovery(File indexDir)
       throws IOException {
     File parentDir = indexDir.getParentFile();
-
     // Recover index directory from segment backup directory if the segment backup directory exists
     File segmentBackupDir = new File(parentDir, indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
     if (segmentBackupDir.exists()) {
@@ -160,5 +159,37 @@ public class LoaderUtils {
       LOGGER.info("Trying to delete segment temporary directory: {}", segmentTempDir);
       FileUtils.forceDelete(segmentTempDir);
     }
+  }
+
+  public static void createBackup(File indexDir)
+      throws IOException {
+    if (!indexDir.exists()) {
+      return;
+    }
+    File parentDir = indexDir.getParentFile();
+    File segmentBackupDir = new File(parentDir, indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
+    // Rename index directory to segment backup directory (atomic)
+    Preconditions.checkState(indexDir.renameTo(segmentBackupDir),
+        "Failed to rename index directory: %s to segment backup directory: %s", indexDir, segmentBackupDir);
+    // Copy the backup dir back to proceed.
+    FileUtils.copyDirectory(segmentBackupDir, indexDir);
+  }
+
+  public static void removeBackup(File indexDir)
+      throws IOException {
+    // Rename segment backup directory to segment temporary directory (atomic)
+    // The reason to first rename then delete is that, renaming is an atomic operation, but deleting is not. When we
+    // rename the segment backup directory to segment temporary directory, we know the reload already succeeded, so
+    // that we can safely delete the segment temporary directory
+    File parentDir = indexDir.getParentFile();
+    File segmentBackupDir = new File(parentDir, indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
+    if (!segmentBackupDir.exists()) {
+      return;
+    }
+    File segmentTempDir = new File(parentDir, indexDir.getName() + CommonConstants.Segment.SEGMENT_TEMP_DIR_SUFFIX);
+    Preconditions.checkState(segmentBackupDir.renameTo(segmentTempDir),
+        "Failed to rename segment backup directory: %s to segment temporary directory: %s", segmentBackupDir,
+        segmentTempDir);
+    FileUtils.deleteDirectory(segmentTempDir);
   }
 }
