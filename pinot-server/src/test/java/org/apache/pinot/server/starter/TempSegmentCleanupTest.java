@@ -153,7 +153,7 @@ public class TempSegmentCleanupTest {
           Paths.get(segmentDir.toString(), "v3", "creation.meta").toFile().createNewFile());
     }
     Assert.assertEquals(getDataDirFileCount(), 15);
-    Thread.sleep(10);
+    Thread.sleep(100);
     long currentTimestamp = System.currentTimeMillis();
 
     for (int i = 0; i < 5; i++) {
