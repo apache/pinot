@@ -85,8 +85,7 @@ import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 import software.amazon.awssdk.utils.AttributeMap;
 
 
-@LocalstackDockerProperties(services = {ServiceName.KINESIS}, portEdge = "4591",
-    environmentVariableProvider = RealtimeKinesisIntegrationTest.HostnameEnvProvider.class, imageTag = "0.13.0.10")
+@LocalstackDockerProperties(services = {ServiceName.KINESIS}, portEdge = "4591", imageTag = "0.12.15")
 @Test(enabled = true)
 public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeKinesisIntegrationTest.class);
@@ -484,15 +483,6 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
       if (dockerInfo.toLowerCase().contains("error")) {
         throw new IllegalStateException("Docker daemon is not running!");
       }
-    }
-  }
-
-  public static class HostnameEnvProvider implements IEnvironmentVariableProvider {
-    @Override
-    public Map<String, String> getEnvironmentVariables() {
-      Map<String, String> env = new HashMap<>();
-      env.put("LOCALSTACK_HOSTNAME", "127.0.0.1");
-      return env;
     }
   }
 }
