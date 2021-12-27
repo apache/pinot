@@ -33,25 +33,25 @@ import org.testng.annotations.Test;
 
 public class TempSegmentCleanupTest {
 
-  private File dataDir;
+  private File _dataDir;
 
   @BeforeMethod
   public void createTempDir()
       throws IOException {
-    dataDir = Files.createTempDirectory("pinot_data").toFile();
+    _dataDir = Files.createTempDirectory("pinot_data").toFile();
   }
 
   @AfterMethod
   public void deleteTempDir() {
     try {
-      Files.delete(dataDir.toPath());
+      Files.delete(_dataDir.toPath());
     } catch (IOException e) {
       return;
     }
   }
 
   private long getDataDirFileCount() {
-    return FileUtils.listFiles(dataDir, null, true).stream().count();
+    return FileUtils.listFiles(_dataDir, null, true).stream().count();
   }
 
   @Test
@@ -59,14 +59,14 @@ public class TempSegmentCleanupTest {
       throws IOException {
     long currentTimestamp = System.currentTimeMillis();
     deleteTempDir();
-    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, dataDir);
+    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, _dataDir);
   }
 
   @Test
   public void worksWithEmptyDirectory()
       throws IOException {
     long currentTimestamp = System.currentTimeMillis();
-    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, dataDir);
+    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, _dataDir);
     Assert.assertEquals(getDataDirFileCount(), 0);
   }
 
@@ -74,7 +74,7 @@ public class TempSegmentCleanupTest {
   public void deletesTmpDirectories()
       throws IOException {
     for (int i = 0; i < 5; i++) {
-      Path segmentDir = Paths.get(dataDir.getAbsolutePath(), "tmp-segment-" + i);
+      Path segmentDir = Paths.get(_dataDir.getAbsolutePath(), "tmp-segment-" + i);
       Assert.assertTrue(Paths.get(segmentDir.toString(), "v3").toFile().mkdirs());
       Assert.assertTrue(
           Paths.get(segmentDir.toString(), "v3", "star_tree_index").toFile().createNewFile());
@@ -86,7 +86,7 @@ public class TempSegmentCleanupTest {
     Assert.assertEquals(getDataDirFileCount(), 15);
 
     long currentTimestamp = System.currentTimeMillis();
-    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, dataDir);
+    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, _dataDir);
     Assert.assertEquals(getDataDirFileCount(), 0);
   }
 
@@ -94,7 +94,7 @@ public class TempSegmentCleanupTest {
   public void deletesNestedTmpDirectories()
       throws IOException {
     for (int i = 0; i < 5; i++) {
-      Path segmentDir = Paths.get(dataDir.getAbsolutePath(), "nested_1", "nested_2", "tmp-segment-" + i);
+      Path segmentDir = Paths.get(_dataDir.getAbsolutePath(), "nested_1", "nested_2", "tmp-segment-" + i);
       Assert.assertTrue(Paths.get(segmentDir.toString(), "v3").toFile().mkdirs());
       Assert.assertTrue(
           Paths.get(segmentDir.toString(), "v3", "star_tree_index").toFile().createNewFile());
@@ -106,7 +106,7 @@ public class TempSegmentCleanupTest {
     Assert.assertEquals(getDataDirFileCount(), 15);
 
     long currentTimestamp = System.currentTimeMillis();
-    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, dataDir);
+    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, _dataDir);
     Assert.assertEquals(getDataDirFileCount(), 0);
   }
 
@@ -114,7 +114,7 @@ public class TempSegmentCleanupTest {
   public void doesNotDeleteTmpFiles()
       throws IOException {
     for (int i = 0; i < 5; i++) {
-      Path segmentDir = Paths.get(dataDir.getAbsolutePath(), "segment-" + i);
+      Path segmentDir = Paths.get(_dataDir.getAbsolutePath(), "segment-" + i);
       Assert.assertTrue(Paths.get(segmentDir.toString(), "v3").toFile().mkdirs());
       Assert.assertTrue(
           Paths.get(segmentDir.toString(), "v3", "tmp-star_tree_index").toFile().createNewFile());
@@ -123,7 +123,7 @@ public class TempSegmentCleanupTest {
       Assert.assertTrue(
           Paths.get(segmentDir.toString(), "v3", "tmp-creation.meta").toFile().createNewFile());
 
-      Path nestedSegmentDir = Paths.get(dataDir.getAbsolutePath(), "nested_1", "segment-" + i * 10);
+      Path nestedSegmentDir = Paths.get(_dataDir.getAbsolutePath(), "nested_1", "segment-" + i * 10);
       Assert.assertTrue(Paths.get(nestedSegmentDir.toString(), "v3").toFile().mkdirs());
       Assert.assertTrue(
           Paths.get(nestedSegmentDir.toString(), "v3", "star_tree_index").toFile().createNewFile());
@@ -135,7 +135,7 @@ public class TempSegmentCleanupTest {
     Assert.assertEquals(getDataDirFileCount(), 30);
 
     long currentTimestamp = System.currentTimeMillis();
-    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, dataDir);
+    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, _dataDir);
     Assert.assertEquals(getDataDirFileCount(), 30);
   }
 
@@ -143,7 +143,7 @@ public class TempSegmentCleanupTest {
   public void onlyDeletesDirectoriesAfterCutoffTime()
       throws IOException, InterruptedException {
     for (int i = 0; i < 5; i++) {
-      Path segmentDir = Paths.get(dataDir.getAbsolutePath(), "tmp-segment-" + i);
+      Path segmentDir = Paths.get(_dataDir.getAbsolutePath(), "tmp-segment-" + i);
       Assert.assertTrue(Paths.get(segmentDir.toString(), "v3").toFile().mkdirs());
       Assert.assertTrue(
           Paths.get(segmentDir.toString(), "v3", "star_tree_index").toFile().createNewFile());
@@ -157,7 +157,7 @@ public class TempSegmentCleanupTest {
     long currentTimestamp = System.currentTimeMillis();
 
     for (int i = 0; i < 5; i++) {
-      Path segmentDir = Paths.get(dataDir.getAbsolutePath(), "tmp-segment2-" + i);
+      Path segmentDir = Paths.get(_dataDir.getAbsolutePath(), "tmp-segment2-" + i);
       Assert.assertTrue(Paths.get(segmentDir.toString(), "v3").toFile().mkdirs());
       Assert.assertTrue(
           Paths.get(segmentDir.toString(), "v3", "star_tree_index").toFile().createNewFile());
@@ -168,7 +168,7 @@ public class TempSegmentCleanupTest {
     }
     Assert.assertEquals(getDataDirFileCount(), 30);
 
-    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, dataDir);
+    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, _dataDir);
     Assert.assertEquals(getDataDirFileCount(), 15);
   }
 
@@ -176,7 +176,7 @@ public class TempSegmentCleanupTest {
   public void deletesTmpDirectoriesAndKeepsNonTmpDirectories()
       throws IOException {
     for (int i = 0; i < 5; i++) {
-      Path tmpSegmentDir = Paths.get(dataDir.getAbsolutePath(), "tmp-segment-" + i);
+      Path tmpSegmentDir = Paths.get(_dataDir.getAbsolutePath(), "tmp-segment-" + i);
       Assert.assertTrue(Paths.get(tmpSegmentDir.toString(), "v3").toFile().mkdirs());
       Assert.assertTrue(
           Paths.get(tmpSegmentDir.toString(), "v3", "star_tree_index").toFile().createNewFile());
@@ -185,7 +185,7 @@ public class TempSegmentCleanupTest {
       Assert.assertTrue(
           Paths.get(tmpSegmentDir.toString(), "v3", "creation.meta").toFile().createNewFile());
 
-      Path segmentDir = Paths.get(dataDir.getAbsolutePath(), "segment-" + i * 10);
+      Path segmentDir = Paths.get(_dataDir.getAbsolutePath(), "segment-" + i * 10);
       Assert.assertTrue(Paths.get(segmentDir.toString(), "v3").toFile().mkdirs());
       Assert.assertTrue(
           Paths.get(segmentDir.toString(), "v3", "star_tree_index").toFile().createNewFile());
@@ -197,7 +197,7 @@ public class TempSegmentCleanupTest {
     Assert.assertEquals(getDataDirFileCount(), 30);
 
     long currentTimestamp = System.currentTimeMillis();
-    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, dataDir);
+    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, _dataDir);
     Assert.assertEquals(getDataDirFileCount(), 15);
   }
 
@@ -205,7 +205,7 @@ public class TempSegmentCleanupTest {
   public void deletesNestedTmpDirectoriesAndKeepsNonTmpDirectories()
       throws IOException {
     for (int i = 0; i < 5; i++) {
-      Path tmpSegmentDir = Paths.get(dataDir.getAbsolutePath(), "nested_1", "nested_2", "tmp-segment-" + i);
+      Path tmpSegmentDir = Paths.get(_dataDir.getAbsolutePath(), "nested_1", "nested_2", "tmp-segment-" + i);
       Assert.assertTrue(Paths.get(tmpSegmentDir.toString(), "v3").toFile().mkdirs());
       Assert.assertTrue(
           Paths.get(tmpSegmentDir.toString(), "v3", "star_tree_index").toFile().createNewFile());
@@ -214,7 +214,7 @@ public class TempSegmentCleanupTest {
       Assert.assertTrue(
           Paths.get(tmpSegmentDir.toString(), "v3", "creation.meta").toFile().createNewFile());
 
-      Path segmentDir = Paths.get(dataDir.getAbsolutePath(), "nested_1", "nested_2", "segment-" + i * 10);
+      Path segmentDir = Paths.get(_dataDir.getAbsolutePath(), "nested_1", "nested_2", "segment-" + i * 10);
       Assert.assertTrue(Paths.get(segmentDir.toString(), "v3").toFile().mkdirs());
       Assert.assertTrue(
           Paths.get(segmentDir.toString(), "v3", "star_tree_index").toFile().createNewFile());
@@ -226,7 +226,7 @@ public class TempSegmentCleanupTest {
     Assert.assertEquals(getDataDirFileCount(), 30);
 
     long currentTimestamp = System.currentTimeMillis();
-    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, dataDir);
+    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, _dataDir);
     Assert.assertEquals(getDataDirFileCount(), 15);
   }
 
@@ -235,7 +235,7 @@ public class TempSegmentCleanupTest {
       throws IOException {
     for (int i = 0; i < 5; i++) {
 
-      Path tmpSegmentDir = Paths.get(dataDir.getAbsolutePath(), "tmp-segment-" + i);
+      Path tmpSegmentDir = Paths.get(_dataDir.getAbsolutePath(), "tmp-segment-" + i);
       Assert.assertTrue(Paths.get(tmpSegmentDir.toString(), "v3").toFile().mkdirs());
       Assert.assertTrue(
           Paths.get(tmpSegmentDir.toString(), "v3", "star_tree_index").toFile().createNewFile());
@@ -244,7 +244,7 @@ public class TempSegmentCleanupTest {
       Assert.assertTrue(
           Paths.get(tmpSegmentDir.toString(), "v3", "creation.meta").toFile().createNewFile());
 
-      Path nestedOnceTmpSegmentDir = Paths.get(dataDir.getAbsolutePath(), "nested_1", "tmp-segment-" + i);
+      Path nestedOnceTmpSegmentDir = Paths.get(_dataDir.getAbsolutePath(), "nested_1", "tmp-segment-" + i);
       Assert.assertTrue(Paths.get(nestedOnceTmpSegmentDir.toString(), "v3").toFile().mkdirs());
       Assert.assertTrue(
           Paths.get(nestedOnceTmpSegmentDir.toString(), "v3", "star_tree_index").toFile().createNewFile());
@@ -253,7 +253,7 @@ public class TempSegmentCleanupTest {
       Assert.assertTrue(
           Paths.get(nestedOnceTmpSegmentDir.toString(), "v3", "creation.meta").toFile().createNewFile());
 
-      Path nestedTwiceTmpSegmentDir = Paths.get(dataDir.getAbsolutePath(), "nested_1", "nested_2", "tmp-segment-" + i);
+      Path nestedTwiceTmpSegmentDir = Paths.get(_dataDir.getAbsolutePath(), "nested_1", "nested_2", "tmp-segment-" + i);
       Assert.assertTrue(Paths.get(nestedTwiceTmpSegmentDir.toString(), "v3").toFile().mkdirs());
       Assert.assertTrue(
           Paths.get(nestedTwiceTmpSegmentDir.toString(), "v3", "star_tree_index").toFile().createNewFile());
@@ -262,7 +262,7 @@ public class TempSegmentCleanupTest {
       Assert.assertTrue(
           Paths.get(nestedTwiceTmpSegmentDir.toString(), "v3", "creation.meta").toFile().createNewFile());
 
-      Path segmentDir = Paths.get(dataDir.getAbsolutePath(), "segment-" + i * 10);
+      Path segmentDir = Paths.get(_dataDir.getAbsolutePath(), "segment-" + i * 10);
       Assert.assertTrue(Paths.get(segmentDir.toString(), "v3").toFile().mkdirs());
       Assert.assertTrue(
           Paths.get(segmentDir.toString(), "v3", "star_tree_index").toFile().createNewFile());
@@ -271,7 +271,7 @@ public class TempSegmentCleanupTest {
       Assert.assertTrue(
           Paths.get(segmentDir.toString(), "v3", "creation.meta").toFile().createNewFile());
 
-      Path nestedOnceSegmentDir = Paths.get(dataDir.getAbsolutePath(), "nested_1", "segment-" + i * 10);
+      Path nestedOnceSegmentDir = Paths.get(_dataDir.getAbsolutePath(), "nested_1", "segment-" + i * 10);
       Assert.assertTrue(Paths.get(nestedOnceSegmentDir.toString(), "v3").toFile().mkdirs());
       Assert.assertTrue(
           Paths.get(nestedOnceSegmentDir.toString(), "v3", "star_tree_index").toFile().createNewFile());
@@ -280,7 +280,7 @@ public class TempSegmentCleanupTest {
       Assert.assertTrue(
           Paths.get(nestedOnceSegmentDir.toString(), "v3", "creation.meta").toFile().createNewFile());
 
-      Path nestedTwiceSegmentDir = Paths.get(dataDir.getAbsolutePath(), "nested_1", "nested_2", "segment-" + i * 10);
+      Path nestedTwiceSegmentDir = Paths.get(_dataDir.getAbsolutePath(), "nested_1", "nested_2", "segment-" + i * 10);
       Assert.assertTrue(Paths.get(nestedTwiceSegmentDir.toString(), "v3").toFile().mkdirs());
       Assert.assertTrue(
           Paths.get(nestedTwiceSegmentDir.toString(), "v3", "star_tree_index").toFile().createNewFile());
@@ -292,7 +292,7 @@ public class TempSegmentCleanupTest {
     Assert.assertEquals(getDataDirFileCount(), 90);
 
     long currentTimestamp = System.currentTimeMillis();
-    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, dataDir);
+    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, _dataDir);
     Assert.assertEquals(getDataDirFileCount(), 45);
   }
 }
