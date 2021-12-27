@@ -389,7 +389,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
     IOFileFilter beforeStartTimeFilter = new AgeFileFilter(startTime, true);
     IOFileFilter tmpPrefixFilter = new PrefixFileFilter("tmp-");
-    List<IOFileFilter> tmpFilters = List.of(beforeStartTimeFilter, tmpPrefixFilter, DirectoryFileFilter.INSTANCE);
+    List<IOFileFilter> tmpFilters = Arrays.asList(beforeStartTimeFilter, tmpPrefixFilter, DirectoryFileFilter.INSTANCE);
     IOFileFilter oldTmpDirectoryFileFilter = new AndFileFilter(tmpFilters);
 
     AtomicInteger numDeletedDirectories = new AtomicInteger();
