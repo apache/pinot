@@ -141,7 +141,9 @@ public class TempSegmentCleanupTest {
 
   @Test
   public void onlyDeletesDirectoriesAfterCutoffTime()
-      throws IOException, InterruptedException {
+      throws IOException {
+
+    long currentTimestamp = System.currentTimeMillis();
     for (int i = 0; i < 5; i++) {
       Path segmentDir = Paths.get(_dataDir.getAbsolutePath(), "tmp-segment-" + i);
       Assert.assertTrue(Paths.get(segmentDir.toString(), "v3").toFile().mkdirs());
@@ -151,10 +153,9 @@ public class TempSegmentCleanupTest {
           Paths.get(segmentDir.toString(), "v3", "columns.psf").toFile().createNewFile());
       Assert.assertTrue(
           Paths.get(segmentDir.toString(), "v3", "creation.meta").toFile().createNewFile());
+      segmentDir.toFile().setLastModified(currentTimestamp - 1000);
     }
     Assert.assertEquals(getDataDirFileCount(), 15);
-    Thread.sleep(100);
-    long currentTimestamp = System.currentTimeMillis();
 
     for (int i = 0; i < 5; i++) {
       Path segmentDir = Paths.get(_dataDir.getAbsolutePath(), "tmp-segment2-" + i);
@@ -165,6 +166,7 @@ public class TempSegmentCleanupTest {
           Paths.get(segmentDir.toString(), "v3", "columns.psf").toFile().createNewFile());
       Assert.assertTrue(
           Paths.get(segmentDir.toString(), "v3", "creation.meta").toFile().createNewFile());
+      segmentDir.toFile().setLastModified(currentTimestamp + 1000);
     }
     Assert.assertEquals(getDataDirFileCount(), 30);
 
