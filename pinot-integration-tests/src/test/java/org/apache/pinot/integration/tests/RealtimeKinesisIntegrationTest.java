@@ -84,8 +84,7 @@ import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 import software.amazon.awssdk.utils.AttributeMap;
 
 
-@LocalstackDockerProperties(services = {ServiceName.KINESIS}, portEdge = "4591", imageTag = "0.12.15")
-@Test(enabled = true)
+@LocalstackDockerProperties(services = {ServiceName.KINESIS}, imageTag = "0.12.15")
 public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeKinesisIntegrationTest.class);
 
@@ -95,7 +94,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
   public static final int MAX_RECORDS_TO_FETCH = Integer.MAX_VALUE;
 
   public static final String REGION = "us-east-1";
-  public static final String LOCALSTACK_KINESIS_ENDPOINT = "http://localhost:4591";
+  public static final String LOCALSTACK_KINESIS_ENDPOINT = "http://localhost:4566";
   public static final int NUM_SHARDS = 10;
 
   // Localstack Kinesis doesn't support large rows.
