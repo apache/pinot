@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -29,8 +33,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.filefilter.AgeFileFilter;
+import org.apache.commons.io.filefilter.AndFileFilter;
+import org.apache.commons.io.filefilter.DirectoryFileFilter;
+import org.apache.commons.io.filefilter.IOFileFilter;
+import org.apache.commons.io.filefilter.PrefixFileFilter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
@@ -363,6 +376,41 @@ public abstract class BaseServerStarter implements ServiceStartable {
         ServiceStatus.getStatusDescription());
   }
 
+  /**
+   * Recursively deletes all data directories starting with tmp- last modified before the startTime.
+   * @param startTime start time of the application
+   * @param dataDir data directory to start from
+   */
+  @VisibleForTesting
+  public static void deleteTempFilesSinceApplicationStart(long startTime, @Nonnull File dataDir) {
+    if (!dataDir.exists() || !dataDir.isDirectory()) {
+      LOGGER.warn("Data directory {} does not exist or is not a directory", dataDir);
+      return;
+    }
+    IOFileFilter beforeStartTimeFilter = new AgeFileFilter(startTime, true);
+    IOFileFilter tmpPrefixFilter = new PrefixFileFilter("tmp-");
+    List<IOFileFilter> tmpFilters = List.of(beforeStartTimeFilter, tmpPrefixFilter, DirectoryFileFilter.INSTANCE);
+    IOFileFilter oldTmpDirectoryFileFilter = new AndFileFilter(tmpFilters);
+
+    AtomicInteger numDeletedDirectories = new AtomicInteger();
+    try (Stream<Path> walk = Files.walk(dataDir.toPath())) {
+      walk.forEach(path -> {
+        if (oldTmpDirectoryFileFilter.accept(path.toFile())) {
+          try {
+            FileUtils.deleteDirectory(path.toFile());
+            LOGGER.info("Deleted temporary file: {}", path);
+            numDeletedDirectories.incrementAndGet();
+          } catch (IOException e) {
+            LOGGER.warn("Failed to delete temporary file: {}", path, e);
+          }
+        }
+      });
+    } catch (IOException e) {
+      LOGGER.error("Failed to delete old tmp directories", e);
+    }
+    LOGGER.info("Deleted {} old tmp directories", numDeletedDirectories);
+  }
+
   @Override
   public ServiceRole getServiceRole() {
     return ServiceRole.SERVER;
@@ -373,6 +421,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
       throws Exception {
     LOGGER.info("Starting Pinot server");
     long startTimeMs = System.currentTimeMillis();
+
+    if (_serverConf.getProperty(Server.CONFIG_OF_STARTUP_ENABLE_TEMP_CLEANUP,
+        Server.DEFAULT_STARTUP_ENABLE_TEMP_CLEANUP)) {
+      File dataDir = new File(_serverConf.getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR));
+      deleteTempFilesSinceApplicationStart(startTimeMs, dataDir);
+    }
 
     // install default SSL context if necessary (even if not force-enabled everywhere)
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_serverConf, Server.SERVER_TLS_PREFIX);

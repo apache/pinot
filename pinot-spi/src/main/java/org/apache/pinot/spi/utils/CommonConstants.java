@@ -350,6 +350,10 @@ public class CommonConstants {
     public static final String CONFIG_OF_SHUTDOWN_RESOURCE_CHECK_INTERVAL_MS =
         "pinot.server.shutdown.resourceCheckIntervalMs";
     public static final long DEFAULT_SHUTDOWN_RESOURCE_CHECK_INTERVAL_MS = 10_000L;
+    public static final String CONFIG_OF_STARTUP_ENABLE_TEMP_CLEANUP =
+        "pinot.server.startup.enablePeriodicTasks";
+    // TODO: make this true once we are confident about this cleanup
+    public static final boolean DEFAULT_STARTUP_ENABLE_TEMP_CLEANUP = false;
 
     public static final String DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "ALL";
 
