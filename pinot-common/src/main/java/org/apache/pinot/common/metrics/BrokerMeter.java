@@ -120,8 +120,4 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   public boolean isGlobal() {
     return _global;
   }
-
-  public static void main(String[] args) {
-    System.out.println(BrokerMeter.values().length);
-  }
 }
