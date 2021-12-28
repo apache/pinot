@@ -40,7 +40,7 @@ syntax = "proto3";
 package org.apache.pinot.common.proto;
 
 service PinotQueryWorker {
-  rpc Submit(QueryRequest) returns (stream QueryResponse);
+  rpc Submit(QueryRequest) returns (QueryResponse);
 }
 
 message QueryRequest {

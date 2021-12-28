@@ -1,4 +1,4 @@
 package org.apache.pinot.query;
 
-public class RunnerEnvironment {
+public class QueryWorkerTest {
 }
