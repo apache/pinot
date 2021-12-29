@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.time.Clock;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -27,7 +28,7 @@ import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
 
-public class SegmentFlushThresholdComputer {
+class SegmentFlushThresholdComputer {
   public static final int MINIMUM_NUM_ROWS_THRESHOLD = 10_000;
   static final double CURRENT_SEGMENT_RATIO_WEIGHT = 0.1;
   static final double PREVIOUS_SEGMENT_RATIO_WEIGHT = 0.9;
@@ -37,16 +38,18 @@ public class SegmentFlushThresholdComputer {
   private double _latestSegmentRowsToSizeRatio;
   private final Clock _clock;
 
-  public SegmentFlushThresholdComputer() {
+  SegmentFlushThresholdComputer() {
     this(Clock.systemUTC(), 0);
   }
 
-  public SegmentFlushThresholdComputer(Clock clock, double latestSegmentRowsToSizeRatio) {
+  @VisibleForTesting
+  SegmentFlushThresholdComputer(Clock clock, double latestSegmentRowsToSizeRatio) {
     _clock = clock;
     _latestSegmentRowsToSizeRatio = latestSegmentRowsToSizeRatio;
   }
 
-  public SegmentFlushThresholdComputer(Clock clock) {
+  @VisibleForTesting
+  SegmentFlushThresholdComputer(Clock clock) {
     this(clock, 0);
   }
 
