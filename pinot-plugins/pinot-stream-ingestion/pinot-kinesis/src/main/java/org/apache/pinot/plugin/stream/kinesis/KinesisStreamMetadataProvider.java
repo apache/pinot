@@ -108,8 +108,6 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
       if (shard == null) { // Shard has expired
         shardsEnded.add(shardId);
         continue;
-        // FIXME: Here we assume that we were done consuming the shard before it expired.
-        //  Handle edge case where consumer lags behind, resulting in shard to expire before it is all consumed
       }
 
       StreamPartitionMsgOffset newStartOffset;
