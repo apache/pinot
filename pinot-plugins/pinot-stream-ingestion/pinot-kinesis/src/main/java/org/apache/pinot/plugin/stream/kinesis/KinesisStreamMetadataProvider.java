@@ -110,7 +110,10 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
       Shard shard = shardIdToShardMap.get(shardId);
       if (shard == null) { // Shard has expired
         shardsEnded.add(shardId);
-        LOGGER.warn("Kinesis shard with id: " + shardId + " has expired. There can be potential data loss.");
+        String lastConsumedSequenceID = kinesisStartCheckpoint.getShardToStartSequenceMap().get(shardId);
+        LOGGER.warn("Kinesis shard with id: " + shardId
+            + " has expired. Data has been consumed from the shard till sequence number: " + lastConsumedSequenceID
+            + ". There can be potential data loss.");
         continue;
       }
 
