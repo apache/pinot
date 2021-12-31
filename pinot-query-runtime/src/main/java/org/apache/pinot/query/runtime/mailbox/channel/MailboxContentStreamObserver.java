@@ -50,6 +50,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
 
   @Override
   public void onCompleted() {
-    // .. no-op. the observer is closed from the sender side.
+    this._buffer.clear();
+    this._responseObserver.onCompleted();
   }
 }

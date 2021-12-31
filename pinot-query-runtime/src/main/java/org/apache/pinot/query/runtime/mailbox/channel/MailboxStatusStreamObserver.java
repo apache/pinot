@@ -47,7 +47,10 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
     this._isRunning.set(true);
     _executorService.submit(() -> {
       while (_isRunning.get()) {
-        this._mailboxContentStreamObserver.onNext(_buffer.poll());
+        Mailbox.MailboxContent content = _buffer.poll();
+        if (content != null) {
+          this._mailboxContentStreamObserver.onNext(content);
+        }
       }
     });
   }
@@ -71,8 +74,6 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
   @Override
   public void onCompleted() {
     this._isRunning.set(false);
-    // send onCompleted to the server indicating this stream has finished.
-    this._mailboxContentStreamObserver.onCompleted();
     this.shutdown();
   }
 }

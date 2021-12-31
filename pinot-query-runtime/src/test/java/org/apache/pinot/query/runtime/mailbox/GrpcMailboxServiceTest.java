@@ -28,7 +28,6 @@ public class GrpcMailboxServiceTest extends GrpcMailboxServiceTestBase {
     Mailbox.MailboxContent testContent = getTestMailboxContent(mailboxId);
     Thread.sleep(100);
     sendingMailbox.send(testContent);
-    sendingMailbox.complete();
     Thread.sleep(100);
     Mailbox.MailboxContent receivedContent = receivingMailbox.receive();
 

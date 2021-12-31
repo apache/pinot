@@ -1,16 +1,50 @@
 package org.apache.pinot.query.runtime;
 
+import com.google.common.collect.Lists;
 import io.grpc.ManagedChannelBuilder;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.query.QueryEnvironmentTestUtils;
 import org.apache.pinot.query.dispatch.QueryDispatcher;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
 public class QueryWorkerTest extends QueryRuntimeTestBase {
+  protected int QUERY_WORKER_COUNT = 2;
+  protected Map<Integer, QueryWorker> _queryWorkerMap = new HashMap<>();
+  protected Map<Integer, ServerInstance> _queryWorkerInstanceMap = new HashMap<>();
+
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+
+    for (int i = 0; i < QUERY_WORKER_COUNT; i++) {
+      int availablePort = QueryEnvironmentTestUtils.getAvailablePort();
+      QueryWorker workerService = new QueryWorker(availablePort, mockQueryRunner());
+      workerService.start();
+      _queryWorkerMap.put(availablePort, workerService);
+      _queryWorkerInstanceMap.put(availablePort, mockServerInstance(availablePort));
+    }
+
+    List<Integer> portList = Lists.newArrayList(_queryWorkerMap.keySet());
+
+    setupRoutingManager(1, portList.get(0), portList.get(1));
+  }
+
+  @AfterClass
+  public void tearDown() {
+    for (QueryWorker worker : _queryWorkerMap.values()) {
+      worker.shutdown();
+    }
+  }
 
   @Test
   public void testWorkerAcceptsWorkerRequestCorrect()

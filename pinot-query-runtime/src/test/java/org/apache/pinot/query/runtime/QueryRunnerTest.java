@@ -51,7 +51,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 
-public class QueryRunnerTest extends QueryRuntimeTestBase{
+public class QueryRunnerTest extends QueryRuntimeTestBase {
   private static final Random RANDOM_REQUEST_ID_GEN = new Random();
   private static final File INDEX_DIR_A = new File(FileUtils.getTempDirectory(), "QueryRunnerTest_tableA");
   private static final File INDEX_DIR_B = new File(FileUtils.getTempDirectory(), "QueryRunnerTest_tableB");

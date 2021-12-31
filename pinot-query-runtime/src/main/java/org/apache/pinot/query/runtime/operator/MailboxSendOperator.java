@@ -120,14 +120,16 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
     SendingMailbox<Mailbox.MailboxContent> sendingMailbox =
         _mailboxService.getSendingMailbox(mailboxId);
     sendingMailbox.send(toMailboxContent(mailboxId, dataTable));
-//    sendingMailbox.complete();
   }
 
   private Mailbox.MailboxContent toMailboxContent(String mailboxId, DataTable dataTable)
       throws IOException {
+    // TODO: we only return SINGLE DataTable thus we replied with a FINISHED flag.
+    // this should only be attached when previous operator.getNextBlock() returns null.
     return Mailbox.MailboxContent.newBuilder()
         .setMailboxId(mailboxId)
         .setPayload(ByteString.copyFrom(new DataTableBlock(dataTable).toBytes()))
+        .putMetadata("FINISHED", "TRUE")
         .build();
   }
 

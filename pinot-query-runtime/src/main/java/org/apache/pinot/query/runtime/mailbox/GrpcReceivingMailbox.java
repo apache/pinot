@@ -26,12 +26,18 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<MailboxContent> {
 
   @Override
   public MailboxContent receive() throws Exception {
+    MailboxContent mailboxContent = null;
     if (waitForInitialize()) {
-      return _contentStreamObserver.poll();
+      mailboxContent = _contentStreamObserver.poll();
     }
-    return null;
+    // TODO: fix return. this should also indicate a termination.
+    if (mailboxContent == null || mailboxContent.getMetadataMap().get("FINISHED") != null) {
+      _contentStreamObserver.onCompleted();
+    }
+    return mailboxContent;
   }
 
+  // TODO: fix busy wait. This should be guarded by timeout.
   private boolean waitForInitialize() throws Exception {
     while (true) {
       if (_initialized.get()) {
