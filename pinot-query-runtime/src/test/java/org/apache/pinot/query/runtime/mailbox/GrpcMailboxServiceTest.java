@@ -2,9 +2,11 @@ package org.apache.pinot.query.runtime.mailbox;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
-import java.nio.charset.StandardCharsets;
+import java.io.IOException;
 import java.util.Map;
 import org.apache.pinot.common.proto.Mailbox;
+import org.apache.pinot.core.common.datatable.DataTableBuilder;
+import org.apache.pinot.query.runtime.blocks.DataTableBlock;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -16,8 +18,7 @@ public class GrpcMailboxServiceTest extends GrpcMailboxServiceTestBase {
     Preconditions.checkState(_mailboxServices.size() >= 2);
     Map.Entry<Integer, GrpcMailboxService> sender = _mailboxServices.firstEntry();
     Map.Entry<Integer, GrpcMailboxService> receiver = _mailboxServices.lastEntry();
-    String mailboxId = String.format("happyPath:partitionKey:localhost:%d:localhost:%d",
-        sender.getKey(), receiver.getKey());
+    String mailboxId = String.format("happyPath:partitionKey:localhost:localhost:%d", receiver.getKey());
     SendingMailbox<Mailbox.MailboxContent> sendingMailbox =
         sender.getValue().getSendingMailbox(mailboxId);
     ReceivingMailbox<Mailbox.MailboxContent> receivingMailbox =
@@ -27,17 +28,18 @@ public class GrpcMailboxServiceTest extends GrpcMailboxServiceTestBase {
     Mailbox.MailboxContent testContent = getTestMailboxContent(mailboxId);
     Thread.sleep(100);
     sendingMailbox.send(testContent);
+    sendingMailbox.complete();
     Thread.sleep(100);
     Mailbox.MailboxContent receivedContent = receivingMailbox.receive();
 
     Assert.assertEquals(receivedContent, testContent);
   }
 
-  private Mailbox.MailboxContent getTestMailboxContent(String mailboxId) {
+  private Mailbox.MailboxContent getTestMailboxContent(String mailboxId) throws IOException {
     return Mailbox.MailboxContent.newBuilder()
         .setMailboxId(mailboxId)
         .putAllMetadata(Map.of("key", "value"))
-        .setPayload(ByteString.copyFrom("dummy", StandardCharsets.UTF_8))
+        .setPayload(ByteString.copyFrom(new DataTableBlock(DataTableBuilder.getEmptyDataTable()).toBytes()))
         .build();
   }
 }

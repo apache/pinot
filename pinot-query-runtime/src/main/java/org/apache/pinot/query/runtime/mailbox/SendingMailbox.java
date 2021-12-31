@@ -22,4 +22,9 @@ public interface SendingMailbox<T> {
    * @throws UnsupportedOperationException
    */
   void send(T data) throws UnsupportedOperationException;
+
+  /**
+   * Complete delivery of the current mailbox.
+   */
+  void complete();
 }

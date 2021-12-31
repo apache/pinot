@@ -8,10 +8,7 @@ public final class Utils {
 
   public static String constructChannelId(String mailboxId) {
     MailboxIdentifier mailboxIdentifier = toMailboxIdentifier(mailboxId);
-    String[] toAuthority = mailboxIdentifier.getToAuthority().split(":");
-    // sender port is the opened Grpc server port via GRPC mailbox.
-    // receiver port doesn't matter.
-    return JOINER.join(toAuthority[0], toAuthority[1]);
+    return JOINER.join(mailboxIdentifier.getToHost(), mailboxIdentifier.getToPort());
   }
 
   public static MailboxIdentifier toMailboxIdentifier(String mailboxId) {

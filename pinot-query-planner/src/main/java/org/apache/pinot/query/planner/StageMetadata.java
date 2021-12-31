@@ -1,5 +1,6 @@
 package org.apache.pinot.query.planner;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -9,7 +10,7 @@ import org.apache.pinot.query.planner.nodes.StageNode;
 import org.apache.pinot.query.planner.nodes.TableScanNode;
 
 
-public class StageMetadata {
+public class StageMetadata implements Serializable {
   private List<String> _scannedTables;
 
   // used for assigning server/worker nodes.

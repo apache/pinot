@@ -1,4 +1,4 @@
-package org.apache.pinot.query;
+package org.apache.pinot.query.runtime;
 
 import com.google.common.base.Preconditions;
 import io.grpc.Server;
@@ -8,6 +8,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
@@ -37,6 +38,7 @@ public class QueryWorker extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   public void start() {
     LOGGER.info("Starting QueryWorker");
     try {
+      _queryRunner.start();
       _server.start();
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -46,6 +48,7 @@ public class QueryWorker extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   public void shutdown() {
     LOGGER.info("Shutting down QueryWorker");
     try {
+      _queryRunner.shutDown();
       _server.shutdown().awaitTermination();
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
@@ -56,11 +59,13 @@ public class QueryWorker extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   public void submit(Worker.QueryRequest request, StreamObserver<Worker.QueryResponse> responseObserver) {
     // Deserialize the request
     WorkerQueryRequest workerQueryRequest;
-    try (ByteArrayInputStream bs = new ByteArrayInputStream(request.toByteArray());
+    Map<String, String> requestMetadataMap;
+    try (ByteArrayInputStream bs = new ByteArrayInputStream(request.getSerializedQueryPlan().toByteArray());
         ObjectInputStream is = new ObjectInputStream(bs)) {
       Object o = is.readObject();
       Preconditions.checkState(o instanceof WorkerQueryRequest, "invalid worker query request object");
       workerQueryRequest = (WorkerQueryRequest) o;
+      requestMetadataMap = request.getMetadataMap();
     } catch (Exception e) {
       LOGGER.error("Caught exception while deserializing the request: {}", request, e);
       responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Bad request").withCause(e).asException());
@@ -68,13 +73,14 @@ public class QueryWorker extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     }
 
     // return dispatch successful.
+    // TODO: return meaningful value here.
     responseObserver.onNext(Worker.QueryResponse.newBuilder().putMetadata("OK", "OK").build());
     responseObserver.onCompleted();
 
     // Process the query
     try {
       // TODO: break this into parsing and execution, so that responseObserver can return upon parsing complete.
-      _queryRunner.processQuery(workerQueryRequest, _executorService);
+      _queryRunner.processQuery(workerQueryRequest, _executorService, requestMetadataMap);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing request", e);
       throw new RuntimeException(e);

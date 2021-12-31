@@ -2,15 +2,38 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.proto.Mailbox;
+import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.runtime.blocks.DataTableBlock;
+import org.apache.pinot.query.runtime.mailbox.MailboxService;
+import org.apache.pinot.query.runtime.mailbox.ReceivingMailbox;
+import org.apache.pinot.query.runtime.mailbox.StringMailboxIdentifier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class MailboxReceiveOperator extends BaseOperator<DataTableBlock> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MailboxReceiveOperator.class);
 
-  public MailboxReceiveOperator() {
+  private final MailboxService<Mailbox.MailboxContent> _mailboxService;
+  private final List<ServerInstance> _sendingStageInstances;
+  private final String _hostName;
+  private final int _port;
+  private final String _jobId;
+  private final String _stageId;
 
+  public MailboxReceiveOperator(MailboxService<Mailbox.MailboxContent> mailboxService,
+      List<ServerInstance> sendingStageInstances, String hostName, int port, String jobId, String stageId) {
+    _mailboxService = mailboxService;
+    _sendingStageInstances = sendingStageInstances;
+    _hostName = hostName;
+    _port = port;
+    _jobId = jobId;
+    _stageId = stageId;
   }
 
   @Override
@@ -31,6 +54,23 @@ public class MailboxReceiveOperator extends BaseOperator<DataTableBlock> {
 
   @Override
   protected DataTableBlock getNextBlock() {
+    // TODO: do a round robin check against all MailboxContentStreamObservers and find which one that has data.
+    for (ServerInstance sendingInstance : _sendingStageInstances) {
+      try {
+        ReceivingMailbox<Mailbox.MailboxContent> receivingMailbox =
+            _mailboxService.getReceivingMailbox(toMailboxId(sendingInstance));
+        Mailbox.MailboxContent mailboxContent = receivingMailbox.receive();
+        DataTable dataTable = DataTableFactory.getDataTable(mailboxContent.getPayload().asReadOnlyByteBuffer());
+        return new DataTableBlock(dataTable);
+      } catch (Exception e) {
+        LOGGER.error(String.format("Error receiving data from mailbox %s", sendingInstance), e);
+      }
+    }
     return null;
+  }
+
+  private String toMailboxId(ServerInstance serverInstance) {
+    return new StringMailboxIdentifier(String.format("%s_%s", _jobId, _stageId), "NULL",
+        serverInstance.getHostname(), _hostName, _port).toString();
   }
 }

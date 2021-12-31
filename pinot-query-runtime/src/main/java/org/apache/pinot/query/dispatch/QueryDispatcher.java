@@ -2,10 +2,8 @@ package org.apache.pinot.query.dispatch;
 
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannelBuilder;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +40,7 @@ public class QueryDispatcher {
         int port = serverInstance.getGrpcPort();
         DispatchClient client = getOrCreateDispatchClient(host, port);
         Worker.QueryResponse response = client.submit(Worker.QueryRequest.newBuilder()
-            .setSerializedQueryPlan(constructStagePlan(queryPlan, stageId, serverInstance)).build());
+            .setSerializedQueryPlan(constructSerializedStageQueryRequest(queryPlan, stageId, serverInstance)).build());
         if (response.containsMetadata("ERROR")) {
           throw new RuntimeException(String.format("Unable to execute query plan at stage %s on server %s: ERROR: %s",
               stageId, serverInstance, response));
@@ -52,10 +50,9 @@ public class QueryDispatcher {
   }
 
   // construct a stage plan based on queryPlan and the particular stage, and the instance of the server;
-  private ByteString constructStagePlan(QueryPlan queryPlan, String stageId, ServerInstance serverInstance) {
-    WorkerQueryRequest workerQueryRequest =
-        new WorkerQueryRequest(stageId, serverInstance, queryPlan.getQueryStageMap().get(stageId),
-            queryPlan.getStageMetadataMap());
+  public static ByteString constructSerializedStageQueryRequest(QueryPlan queryPlan, String stageId,
+      ServerInstance serverInstance) {
+    WorkerQueryRequest workerQueryRequest = constructStageQueryRequest(queryPlan, stageId, serverInstance);
     try (ByteArrayOutputStream bs = new ByteArrayOutputStream();
         ObjectOutputStream os = new ObjectOutputStream(bs)) {
       os.writeObject(workerQueryRequest);
@@ -64,6 +61,12 @@ public class QueryDispatcher {
       LOGGER.error("Error when creating stage plan!");
       throw new RuntimeException(e);
     }
+  }
+
+  public static WorkerQueryRequest constructStageQueryRequest(QueryPlan queryPlan, String stageId,
+      ServerInstance serverInstance) {
+    return new WorkerQueryRequest(stageId, serverInstance, queryPlan.getQueryStageMap().get(stageId),
+            queryPlan.getStageMetadataMap());
   }
 
   private DispatchClient getOrCreateDispatchClient(String host, int port) {

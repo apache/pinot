@@ -1,5 +1,6 @@
 package org.apache.pinot.query.runtime.blocks;
 
+import java.io.IOException;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockDocIdSet;
@@ -42,5 +43,9 @@ public class DataTableBlock implements Block {
   @Override
   public BlockMetadata getMetadata() {
     throw new UnsupportedOperationException();
+  }
+
+  public byte[] toBytes() throws IOException {
+    return _dataTable.toBytes();
   }
 }

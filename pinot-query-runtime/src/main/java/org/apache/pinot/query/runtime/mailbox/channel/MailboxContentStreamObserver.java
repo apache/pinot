@@ -5,8 +5,6 @@ import java.util.concurrent.ArrayBlockingQueue;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.query.runtime.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.runtime.mailbox.GrpcReceivingMailbox;
-import org.apache.pinot.query.runtime.mailbox.MailboxService;
-import org.apache.pinot.query.runtime.mailbox.ReceivingMailbox;
 
 
 /**
@@ -52,6 +50,6 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
 
   @Override
   public void onCompleted() {
-    this._responseObserver.onCompleted();
+    // .. no-op. the observer is closed from the sender side.
   }
 }

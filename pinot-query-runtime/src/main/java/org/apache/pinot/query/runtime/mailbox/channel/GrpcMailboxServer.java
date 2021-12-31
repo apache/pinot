@@ -7,13 +7,9 @@ import java.io.IOException;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.query.runtime.mailbox.GrpcMailboxService;
-import org.apache.pinot.query.runtime.mailbox.GrpcReceivingMailbox;
-import org.apache.pinot.query.runtime.mailbox.MailboxService;
-import org.apache.pinot.query.runtime.mailbox.ReceivingMailbox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static io.grpc.stub.ServerCalls.asyncUnimplementedStreamingCall;
 
 
 public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {

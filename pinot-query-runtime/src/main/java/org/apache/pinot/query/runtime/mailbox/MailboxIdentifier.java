@@ -9,7 +9,9 @@ public interface MailboxIdentifier {
 
   String getPartitionKey();
 
-  String getFromAuthority();
+  String getFromHost();
 
-  String getToAuthority();
+  String getToHost();
+
+  int getToPort();
 }

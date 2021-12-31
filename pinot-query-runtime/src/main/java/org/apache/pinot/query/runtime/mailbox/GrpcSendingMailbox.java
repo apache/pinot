@@ -38,6 +38,11 @@ public class GrpcSendingMailbox implements SendingMailbox<MailboxContent> {
   }
 
   @Override
+  public void complete() {
+    _statusStreamObserver.onCompleted();
+  }
+
+  @Override
   public String getMailboxId() {
     return _mailboxId;
   }
