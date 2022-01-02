@@ -2,9 +2,12 @@ package org.apache.pinot.query.runtime.mailbox.channel;
 
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.query.runtime.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.runtime.mailbox.GrpcReceivingMailbox;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -14,20 +17,28 @@ import org.apache.pinot.query.runtime.mailbox.GrpcReceivingMailbox;
  * mailbox content to the receiving mailbox buffer; response with the remaining buffer size of the receiving mailbox.
  */
 public class MailboxContentStreamObserver implements StreamObserver<Mailbox.MailboxContent> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MailboxContentStreamObserver.class);
   private static final int DEFAULT_MAILBOX_QUEUE_CAPACITY = 5;
   private static final long DEFAULT_MAILBOX_POLL_TIMEOUT = 1000L;
   private final GrpcMailboxService _mailboxService;
   private final StreamObserver<Mailbox.MailboxStatus> _responseObserver;
-  private final ArrayBlockingQueue<Mailbox.MailboxContent> _buffer;
+  private ArrayBlockingQueue<Mailbox.MailboxContent> _receivingBuffer;
 
   public MailboxContentStreamObserver(GrpcMailboxService mailboxService, StreamObserver<Mailbox.MailboxStatus> responseObserver) {
     _mailboxService = mailboxService;
     _responseObserver = responseObserver;
-    _buffer = new ArrayBlockingQueue<>(DEFAULT_MAILBOX_QUEUE_CAPACITY);
+    _receivingBuffer = new ArrayBlockingQueue<>(DEFAULT_MAILBOX_QUEUE_CAPACITY);
   }
 
   public Mailbox.MailboxContent poll() {
-    return _buffer.poll();
+    while (_receivingBuffer != null) {
+      try {
+        return _receivingBuffer.poll(DEFAULT_MAILBOX_POLL_TIMEOUT, TimeUnit.MILLISECONDS);
+      } catch (InterruptedException e) {
+        LOGGER.error("Interrupt occurred while waiting for mailbox content", e);
+      }
+    }
+    return null;
   }
 
   @Override
@@ -35,10 +46,10 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
     GrpcReceivingMailbox receivingMailbox = (GrpcReceivingMailbox) _mailboxService.getReceivingMailbox(mailboxContent.getMailboxId());
     receivingMailbox.init(this);
     // when the receiving end receives a message. put it in the mailbox queue and returns the buffer available.
-    _buffer.offer(mailboxContent);
+    _receivingBuffer.offer(mailboxContent);
     Mailbox.MailboxStatus status = Mailbox.MailboxStatus.newBuilder()
         .setMailboxId(mailboxContent.getMailboxId())
-        .putMetadata("buffer.size", String.valueOf(_buffer.remainingCapacity()))
+        .putMetadata("buffer.size", String.valueOf(_receivingBuffer.remainingCapacity()))
         .build();
     _responseObserver.onNext(status);
   }
@@ -50,7 +61,8 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
 
   @Override
   public void onCompleted() {
-    this._buffer.clear();
+    this._receivingBuffer.clear();
+    this._receivingBuffer = null;
     this._responseObserver.onCompleted();
   }
 }

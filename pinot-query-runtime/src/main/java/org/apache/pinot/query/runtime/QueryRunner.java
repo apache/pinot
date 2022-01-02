@@ -43,7 +43,7 @@ public class QueryRunner {
    * Initializes the query executor.
    * <p>Should be called only once and before calling any other method.
    */
-  void init(PinotConfiguration config, InstanceDataManager instanceDataManager,
+  public void init(PinotConfiguration config, InstanceDataManager instanceDataManager,
       MailboxService<Mailbox.MailboxContent> mailboxService, ServerMetrics serverMetrics)
       throws ConfigurationException {
     String instanceId = config.getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID);
@@ -60,17 +60,17 @@ public class QueryRunner {
     _workerExecutor.init(config, serverMetrics);
   }
 
-  void start() {
+  public void start() {
     _serverExecutor.start();
     _workerExecutor.start();
   }
 
-  void shutDown() {
+  public void shutDown() {
     _workerExecutor.shutDown();
     _mailboxService.shutdown();
   }
 
-  void processQuery(WorkerQueryRequest workerQueryRequest, ExecutorService executorService,
+  public void processQuery(WorkerQueryRequest workerQueryRequest, ExecutorService executorService,
       Map<String, String> requestMetadataMap) {
     if (isLeafStage(workerQueryRequest)) {
       // TODO: make server query request return via mailbox, this is a hack to gather the non-streaming data table
@@ -86,7 +86,7 @@ public class QueryRunner {
       StageMetadata receivingStageMetadata = workerQueryRequest.getMetadataMap().get(sendNode.getReceiverStageId());
       MailboxSendOperator mailboxSendOperator =
           new MailboxSendOperator(_mailboxService, dataTable, receivingStageMetadata.getServerInstances(),
-              sendNode.getExchangeType(), _hostName, String.valueOf(serverQueryRequest.getRequestId()),
+              sendNode.getExchangeType(), _hostName, _port, String.valueOf(serverQueryRequest.getRequestId()),
               sendNode.getStageId());
       mailboxSendOperator.nextBlock();
     } else {

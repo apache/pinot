@@ -31,6 +31,7 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
   private final List<ServerInstance> _receivingStageInstances;
   private final RelDistribution.Type _exchangeType;
   private final String _serverHostName;
+  private final int _serverPort;
   private final String _jobId;
   private final String _stageId;
   private final MailboxService<Mailbox.MailboxContent> _mailboxService;
@@ -39,12 +40,13 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
 
   public MailboxSendOperator(MailboxService<Mailbox.MailboxContent> mailboxService,
       InstanceResponseOperator instanceResponseOperator, List<ServerInstance> receivingStageInstances,
-      RelDistribution.Type exchangeType, String hostName, String jobId, String stageId) {
+      RelDistribution.Type exchangeType, String hostName, int port, String jobId, String stageId) {
     _mailboxService = mailboxService;
     _instanceResponseOperator = instanceResponseOperator;
     _receivingStageInstances = receivingStageInstances;
     _exchangeType = exchangeType;
     _serverHostName = hostName;
+    _serverPort = port;
     _jobId = jobId;
     _stageId = stageId;
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPE.contains(_exchangeType),
@@ -57,13 +59,14 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
    * creation of MailboxSendOperator we should not use this API.
    */
   public MailboxSendOperator(MailboxService<Mailbox.MailboxContent> mailboxService, DataTable dataTable,
-      List<ServerInstance> receivingStageInstances, RelDistribution.Type exchangeType, String hostName, String jobId,
-      String stageId) {
+      List<ServerInstance> receivingStageInstances, RelDistribution.Type exchangeType, String hostName, int port,
+      String jobId, String stageId) {
     _mailboxService = mailboxService;
     _dataTable = dataTable;
     _receivingStageInstances = receivingStageInstances;
     _exchangeType = exchangeType;
     _serverHostName = hostName;
+    _serverPort = port;
     _jobId = jobId;
     _stageId = stageId;
   }
@@ -134,7 +137,7 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
   }
 
   private String toMailboxId(ServerInstance serverInstance) {
-    return new StringMailboxIdentifier(String.format("%s_%s", _jobId, _stageId), "NULL", _serverHostName,
+    return new StringMailboxIdentifier(String.format("%s_%s", _jobId, _stageId), "NULL", _serverHostName, _serverPort,
         serverInstance.getHostname(), serverInstance.getGrpcPort()).toString();
   }
 }

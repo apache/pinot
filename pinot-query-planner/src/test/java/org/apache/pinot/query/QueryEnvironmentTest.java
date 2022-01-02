@@ -61,7 +61,7 @@ public class QueryEnvironmentTest {
         Assert.assertEquals(
             e.getValue().getServerInstances().stream().map(ServerInstance::toString).collect(Collectors.toList()),
             tables.get(0).equals("a") ? List.of("Server_localhost_1", "Server_localhost_2")
-                : List.of("Server_localhost_2"));
+                : List.of("Server_localhost_1"));
       } else if (!e.getKey().equals("ROOT")) {
         // join stage should have both servers used.
         Assert.assertEquals(

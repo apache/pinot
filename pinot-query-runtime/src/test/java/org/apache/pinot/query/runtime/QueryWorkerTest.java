@@ -8,19 +8,23 @@ import java.util.Map;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestUtils;
 import org.apache.pinot.query.dispatch.QueryDispatcher;
 import org.apache.pinot.query.planner.QueryPlan;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class QueryWorkerTest extends QueryRuntimeTestBase {
-  protected int QUERY_WORKER_COUNT = 2;
-  protected Map<Integer, QueryWorker> _queryWorkerMap = new HashMap<>();
-  protected Map<Integer, ServerInstance> _queryWorkerInstanceMap = new HashMap<>();
+public class QueryWorkerTest {
+  private int QUERY_WORKER_COUNT = 2;
+  private Map<Integer, QueryWorker> _queryWorkerMap = new HashMap<>();
+  private Map<Integer, ServerInstance> _queryWorkerInstanceMap = new HashMap<>();
+
+  private QueryEnvironment _queryEnvironment;
 
   @BeforeClass
   public void setUp()
@@ -28,15 +32,16 @@ public class QueryWorkerTest extends QueryRuntimeTestBase {
 
     for (int i = 0; i < QUERY_WORKER_COUNT; i++) {
       int availablePort = QueryEnvironmentTestUtils.getAvailablePort();
-      QueryWorker workerService = new QueryWorker(availablePort, mockQueryRunner());
+      QueryWorker workerService = new QueryWorker(availablePort, Mockito.mock(QueryRunner.class));
       workerService.start();
       _queryWorkerMap.put(availablePort, workerService);
-      _queryWorkerInstanceMap.put(availablePort, mockServerInstance(availablePort));
+      _queryWorkerInstanceMap.put(availablePort, QueryEnvironmentTestUtils.getServerInstance(availablePort));
     }
 
     List<Integer> portList = Lists.newArrayList(_queryWorkerMap.keySet());
 
-    setupRoutingManager(1, portList.get(0), portList.get(1));
+    // reducer port doesn't matter, we are testing the worker instance not GRPC.
+    _queryEnvironment = QueryEnvironmentTestUtils.getQueryEnvironment(1, portList.get(0), portList.get(1));
   }
 
   @AfterClass
@@ -51,7 +56,7 @@ public class QueryWorkerTest extends QueryRuntimeTestBase {
       throws Exception {
     QueryPlan queryPlan = _queryEnvironment.sqlQuery("SELECT * FROM a JOIN b ON a.c1 = b.c2");
 
-    String singleServerStage = getStage(queryPlan, 1);
+    String singleServerStage = QueryEnvironmentTestUtils.getTestStageByServerCount(queryPlan, 1);
 
     Worker.QueryRequest queryRequest = getQueryRequest(queryPlan, singleServerStage);
 

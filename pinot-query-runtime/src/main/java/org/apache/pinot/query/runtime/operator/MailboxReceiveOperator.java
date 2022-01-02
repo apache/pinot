@@ -55,15 +55,30 @@ public class MailboxReceiveOperator extends BaseOperator<DataTableBlock> {
   @Override
   protected DataTableBlock getNextBlock() {
     // TODO: do a round robin check against all MailboxContentStreamObservers and find which one that has data.
-    for (ServerInstance sendingInstance : _sendingStageInstances) {
-      try {
-        ReceivingMailbox<Mailbox.MailboxContent> receivingMailbox =
-            _mailboxService.getReceivingMailbox(toMailboxId(sendingInstance));
-        Mailbox.MailboxContent mailboxContent = receivingMailbox.receive();
-        DataTable dataTable = DataTableFactory.getDataTable(mailboxContent.getPayload().asReadOnlyByteBuffer());
-        return new DataTableBlock(dataTable);
-      } catch (Exception e) {
-        LOGGER.error(String.format("Error receiving data from mailbox %s", sendingInstance), e);
+    DataTableBlock dataTableBlock = null;
+    boolean hasOpenedMailbox = true;
+    while (hasOpenedMailbox) {
+      hasOpenedMailbox = false;
+      for (ServerInstance sendingInstance : _sendingStageInstances) {
+        try {
+          ReceivingMailbox<Mailbox.MailboxContent> receivingMailbox = _mailboxService.getReceivingMailbox(toMailboxId(sendingInstance));
+          // TODO this is not threadsafe.
+          // make sure only one thread is checking receiving mailbox and calling receive() then close()
+          if (!receivingMailbox.isClosed()) {
+            hasOpenedMailbox = true;
+            Mailbox.MailboxContent mailboxContent = receivingMailbox.receive();
+            if (mailboxContent != null) {
+              DataTable dataTable = DataTableFactory.getDataTable(mailboxContent.getPayload().asReadOnlyByteBuffer());
+              return new DataTableBlock(dataTable);
+            } else {
+              LOGGER.debug(String.format("MailboxContent from %s for job %s-%s has finished.", sendingInstance, _jobId,
+                  _stageId));
+              receivingMailbox.close();
+            }
+          }
+        } catch (Exception e) {
+          LOGGER.error(String.format("Error receiving data from mailbox %s", sendingInstance), e);
+        }
       }
     }
     return null;
@@ -71,6 +86,6 @@ public class MailboxReceiveOperator extends BaseOperator<DataTableBlock> {
 
   private String toMailboxId(ServerInstance serverInstance) {
     return new StringMailboxIdentifier(String.format("%s_%s", _jobId, _stageId), "NULL",
-        serverInstance.getHostname(), _hostName, _port).toString();
+        serverInstance.getHostname(), serverInstance.getGrpcPort(), _hostName, _port).toString();
   }
 }

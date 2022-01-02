@@ -22,4 +22,15 @@ public interface ReceivingMailbox<T> {
    * @throws Exception
    */
   T receive() throws Exception;
+
+  /**
+   * Check if mailbox is closed.
+   * @return
+   */
+  boolean isClosed();
+
+  /**
+   * Declair a mailbox close.
+   */
+  void close();
 }

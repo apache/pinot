@@ -18,7 +18,8 @@ public class GrpcMailboxServiceTest extends GrpcMailboxServiceTestBase {
     Preconditions.checkState(_mailboxServices.size() >= 2);
     Map.Entry<Integer, GrpcMailboxService> sender = _mailboxServices.firstEntry();
     Map.Entry<Integer, GrpcMailboxService> receiver = _mailboxServices.lastEntry();
-    String mailboxId = String.format("happyPath:partitionKey:localhost:localhost:%d", receiver.getKey());
+    String mailboxId = String.format("happyPath:partitionKey:localhost:%d:localhost:%d",
+        sender.getKey(), receiver.getKey());
     SendingMailbox<Mailbox.MailboxContent> sendingMailbox =
         sender.getValue().getSendingMailbox(mailboxId);
     ReceivingMailbox<Mailbox.MailboxContent> receivingMailbox =
