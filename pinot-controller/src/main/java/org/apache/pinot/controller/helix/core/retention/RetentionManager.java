@@ -214,7 +214,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         // 1. The original segments can be deleted once the merged segments are successfully uploaded
         // 2. The zombie lineage entry & merged segments should be deleted if the segment replacement failed in
         //    the middle
-        Set<String> segmentsForTable = new HashSet<>(_pinotHelixResourceManager.getSegmentsFor(tableNameWithType));
+        Set<String> segmentsForTable =
+            new HashSet<>(_pinotHelixResourceManager.getSegmentsFor(tableNameWithType, false));
         List<String> segmentsToDelete = new ArrayList<>();
         for (String lineageEntryId : segmentLineage.getLineageEntryIds()) {
           LineageEntry lineageEntry = segmentLineage.getLineageEntry(lineageEntryId);
