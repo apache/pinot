@@ -27,7 +27,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
  * Interface for creating and loading the {@link SegmentDirectory} instance using provided config.
  *
  * The segment may be kept in local or remote tier backend. When the segment needs reprocessing,
- * like to add or remote indices, the SegmentDirectoryLoader downloads the segment from tier backend
+ * like to add or remove indices, the SegmentDirectoryLoader downloads the segment from tier backend
  * to a local directory to reprocess it, then uploads the reprocessed segment back to the tier backend.
  * If the tier backend is local disk (which is by default), download and upload operations can be noop.
  * If the tier backend is some remote store, the two operations would transfer data over the network.

@@ -279,7 +279,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         return;
       }
       try {
-        if (reloadMutableSegment(tableNameWithType, segmentName, segmentDataManager, schema)) {
+        if (reloadSegmentWithNullIndexDir(tableNameWithType, segmentName, segmentDataManager, schema)) {
           // A mutable segment has been found and reloaded.
           return;
         }
@@ -306,15 +306,21 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     }
   }
 
+  /**
+   * Try to reload a segment without a local index directory. The segment can be a consuming
+   * segment from a REALTIME table, or an immutable segment on remote tier backend.
+   * @return true if the segment is loaded.
+   */
   @VisibleForTesting
-  boolean reloadMutableSegment(String tableNameWithType, String segmentName,
+  boolean reloadSegmentWithNullIndexDir(String tableNameWithType, String segmentName,
       SegmentDataManager segmentDataManager, @Nullable Schema schema) {
     IndexSegment segment = segmentDataManager.getSegment();
     if (segment instanceof ImmutableSegment) {
-      LOGGER.info("Reloading OFFLINE segment: {} in table: {} not using local tier backend", segmentName,
+      LOGGER.info("Found an immutable segment: {} in table: {} on remote tier backend", segmentName,
           tableNameWithType);
       return false;
     }
+    // Found a mutable/consuming segment from REALTIME table.
     if (!_instanceDataManagerConfig.shouldReloadConsumingSegment()) {
       LOGGER.info("Skip reloading REALTIME consuming segment: {} in table: {}", segmentName, tableNameWithType);
       return true;

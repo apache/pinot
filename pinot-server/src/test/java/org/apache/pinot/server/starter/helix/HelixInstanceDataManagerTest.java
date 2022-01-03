@@ -62,9 +62,9 @@ public class HelixInstanceDataManagerTest {
     SegmentDataManager segMgr = mock(SegmentDataManager.class);
 
     when(segMgr.getSegment()).thenReturn(mock(ImmutableSegment.class));
-    assertFalse(mgr.reloadMutableSegment("table01", "seg01", segMgr, null));
+    assertFalse(mgr.reloadSegmentWithNullIndexDir("table01", "seg01", segMgr, null));
 
     when(segMgr.getSegment()).thenReturn(mock(MutableSegment.class));
-    assertTrue(mgr.reloadMutableSegment("table01", "seg01", segMgr, null));
+    assertTrue(mgr.reloadSegmentWithNullIndexDir("table01", "seg01", segMgr, null));
   }
 }
