@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.loader;
 
+import java.io.File;
 import java.net.URI;
 import org.apache.pinot.segment.local.loader.DefaultSegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
@@ -47,6 +48,16 @@ public class SegmentDirectoryLoaderRegistryTest {
   }
 
   private static class CustomSegmentDirectoryLoader implements SegmentDirectoryLoader {
+
+    @Override
+    public void upload(File indexDir, SegmentDirectoryLoaderContext segmentDirectoryLoaderContext)
+        throws Exception {
+    }
+
+    @Override
+    public void download(File indexDir, SegmentDirectoryLoaderContext segmentDirectoryLoaderContext)
+        throws Exception {
+    }
 
     @Override
     public SegmentDirectory load(URI indexDir, SegmentDirectoryLoaderContext segmentDirectoryLoaderContext)
