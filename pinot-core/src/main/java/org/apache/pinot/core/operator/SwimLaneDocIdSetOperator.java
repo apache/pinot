@@ -29,7 +29,7 @@ import org.apache.pinot.core.operator.blocks.CombinedFilterBlock;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
-import org.apache.pinot.core.operator.filter.CombinedFilterOperator;
+import org.apache.pinot.core.operator.filter.SharedCombinedFilterOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.Constants;
 
@@ -39,7 +39,7 @@ import org.apache.pinot.segment.spi.Constants;
 public class SwimLaneDocIdSetOperator extends DocIdSetOperator {
   private static final String OPERATOR_NAME = "SwimLaneDocIdSetOperator";
 
-  private final CombinedFilterOperator _filterOperator;
+  private final SharedCombinedFilterOperator _filterOperator;
   private final ExpressionContext _expressionContext;
   private final int _maxSizeOfDocIdSet;
 
@@ -47,7 +47,7 @@ public class SwimLaneDocIdSetOperator extends DocIdSetOperator {
   private BlockDocIdIterator _blockDocIdIterator;
   private int _currentDocId = 0;
 
-  public SwimLaneDocIdSetOperator(CombinedFilterOperator filterOperator, ExpressionContext expressionContext,
+  public SwimLaneDocIdSetOperator(SharedCombinedFilterOperator filterOperator, ExpressionContext expressionContext,
       int maxSizeOfDocIdSet) {
     super(filterOperator, maxSizeOfDocIdSet);
 

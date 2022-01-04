@@ -23,7 +23,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.SwimLaneDocIdSetOperator;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
-import org.apache.pinot.core.operator.filter.CombinedFilterOperator;
+import org.apache.pinot.core.operator.filter.SharedCombinedFilterOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 
@@ -66,11 +66,11 @@ public class DocIdSetPlanNode implements PlanNode {
         filterOperator = new FilterPlanNode(_indexSegment, _queryContext, null).run();
       }
 
-      if (!(filterOperator instanceof CombinedFilterOperator)) {
+      if (!(filterOperator instanceof SharedCombinedFilterOperator)) {
         throw new IllegalStateException("Filter operator is not an instance of CombinedFilterOperator");
       }
 
-      return new SwimLaneDocIdSetOperator((CombinedFilterOperator) filterOperator,
+      return new SwimLaneDocIdSetOperator((SharedCombinedFilterOperator) filterOperator,
           _associatedExpressionContext, _maxDocPerCall);
     }
 

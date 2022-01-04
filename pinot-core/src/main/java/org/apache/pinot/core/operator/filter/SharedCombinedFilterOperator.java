@@ -37,14 +37,14 @@ import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
  * sub blocks. The main predicate block and sub blocks are ANDed before
  * returning.
  */
-public class CombinedFilterOperator extends BaseFilterOperator {
+public class SharedCombinedFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "CombinedFilterOperator";
 
   protected List<Pair<ExpressionContext, BaseFilterOperator>> _filterOperators;
   protected BaseFilterOperator _mainFilterOperator;
   protected CombinedFilterBlock _resultBlock;
 
-  public CombinedFilterOperator(List<Pair<ExpressionContext, BaseFilterOperator>> filterOperators,
+  public SharedCombinedFilterOperator(List<Pair<ExpressionContext, BaseFilterOperator>> filterOperators,
       BaseFilterOperator mainFilterOperator) {
     _filterOperators = filterOperators;
     _mainFilterOperator = mainFilterOperator;

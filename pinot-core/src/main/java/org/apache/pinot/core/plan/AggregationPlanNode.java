@@ -32,7 +32,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
-import org.apache.pinot.core.operator.filter.CombinedFilterOperator;
+import org.apache.pinot.core.operator.filter.SharedCombinedFilterOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.DictionaryBasedAggregationOperator;
 import org.apache.pinot.core.operator.query.MetadataBasedAggregationOperator;
@@ -173,7 +173,7 @@ public class AggregationPlanNode implements PlanNode {
       }
     }
 
-    CombinedFilterOperator combinedFilterOperator = new CombinedFilterOperator(baseFilterOperatorList,
+    SharedCombinedFilterOperator sharedCombinedFilterOperator = new SharedCombinedFilterOperator(baseFilterOperatorList,
         mainPredicateFilterOperator);
 
     // For each transform operator, associate it with the underlying expression. This allows
@@ -183,7 +183,7 @@ public class AggregationPlanNode implements PlanNode {
         : filterPredicatesAndMetadata) {
       Pair<TransformOperator,
           BaseOperator<IntermediateResultsBlock>> innerPair =
-          buildOperators(combinedFilterOperator, pair.getRight().getLeft(),
+          buildOperators(sharedCombinedFilterOperator, pair.getRight().getLeft(),
               true, pair.getLeft());
 
       transformOperatorMap.put(pair.getLeft(), innerPair.getLeft());
