@@ -80,7 +80,8 @@ public class CalciteSqlCompilerTest {
 
     pinotQuery = CalciteSqlParser.compileToPinotQuery(
         "SELECT Quantity,\n" + "SUM(CASE\n" + "    WHEN Quantity > 30 THEN 3\n" + "    WHEN Quantity > 20 THEN 2\n"
-            + "    WHEN Quantity > 10 THEN 1\n" + "    ELSE 0\n" + "END) AS new_sum_quant\n" + "FROM OrderDetails");
+            + "    WHEN Quantity > 10 THEN 1\n" + "    ELSE 0\n" + "END) AS new_sum_quant\n" + "FROM OrderDetails "
+            + "GROUP BY Quantity");
     Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "Quantity");
     asFunc = pinotQuery.getSelectList().get(1).getFunctionCall();
     Assert.assertEquals(asFunc.getOperator(), SqlKind.AS.name());
@@ -2477,7 +2478,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("skipUpsert"));
 
     // Check for the query where the literal has semicolon
-    sql = "select col1, count(*) from foo where col1 = 'x;y' option(skipUpsert=true);";
+    sql = "select col1, count(*) from foo where col1 = 'x;y' GROUP BY col1 option(skipUpsert=true);";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
     Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("skipUpsert"));
@@ -2500,5 +2501,18 @@ public class CalciteSqlCompilerTest {
     Assert.expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToPinotQuery(
         "        SELECT col1, count(*) FROM foo GROUP BY col1;   "
             + "SELECT col2, count(*) FROM foo GROUP BY col2             "));
+  }
+
+  @Test
+  public void testInvalidQueryWithAggregateFunction() {
+    Assert.expectThrows(SqlCompilationException.class,
+        () -> CalciteSqlParser.compileToPinotQuery("SELECT col1, count(*) from foo"));
+
+    Assert.expectThrows(SqlCompilationException.class,
+       () -> CalciteSqlParser.compileToPinotQuery("SELECT UPPER(col1), count(*) from foo"));
+
+    Assert.expectThrows(SqlCompilationException.class,
+        () -> CalciteSqlParser.compileToPinotQuery("SELECT UPPER(col1), avg(col2) from foo"));
+
   }
 }

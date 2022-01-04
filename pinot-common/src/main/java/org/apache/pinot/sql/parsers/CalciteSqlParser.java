@@ -147,6 +147,9 @@ public class CalciteSqlParser {
   private static void validateGroupByClause(PinotQuery pinotQuery)
       throws SqlCompilationException {
     if (pinotQuery.getGroupByList() == null) {
+      if (containsAggregateAndColsInSelectClause(pinotQuery)) {
+        throw new SqlCompilationException("Columns and Aggregate functions can't co-exist without GROUP BY clause");
+      }
       return;
     }
     // Sanity check group by query: All non-aggregate expression in selection list should be also included in group
@@ -167,6 +170,18 @@ public class CalciteSqlParser {
     }
   }
 
+  private static boolean containsAggregateAndColsInSelectClause(PinotQuery pinotQuery) {
+    int aggregateExprCount = 0;
+    int identifierExprCount = 0;
+    for (Expression expr : pinotQuery.getSelectList()) {
+      if (isAggregateExpression(expr)) {
+        aggregateExprCount++;
+      } else if (expressionContainsColumn(expr)) {
+        identifierExprCount++;
+      }
+    }
+    return identifierExprCount > 0 && aggregateExprCount > 0;
+  }
   /*
    * Validate DISTINCT queries:
    * - No GROUP-BY clause
@@ -256,6 +271,25 @@ public class CalciteSqlParser {
     return false;
   }
 
+  public static boolean expressionContainsColumn(Expression expression) {
+    if (expression.getType() == ExpressionType.IDENTIFIER) {
+      return true;
+    } else if (expression.getType() == ExpressionType.LITERAL) {
+      return false;
+    } else if (isAsFunction(expression)) {
+      return expressionContainsColumn(expression.getFunctionCall().getOperands().get(0));
+    } else {
+      Function functionCall = expression.getFunctionCall();
+      if (functionCall.getOperandsSize() > 0) {
+        for (Expression operand : functionCall.getOperands()) {
+          if (expressionContainsColumn(operand)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+  }
   public static boolean isAsFunction(Expression expression) {
     return expression.getFunctionCall() != null && expression.getFunctionCall().getOperator().equalsIgnoreCase("AS");
   }
