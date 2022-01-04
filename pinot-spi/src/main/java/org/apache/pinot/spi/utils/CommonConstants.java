@@ -351,7 +351,7 @@ public class CommonConstants {
         "pinot.server.shutdown.resourceCheckIntervalMs";
     public static final long DEFAULT_SHUTDOWN_RESOURCE_CHECK_INTERVAL_MS = 10_000L;
     public static final String CONFIG_OF_STARTUP_ENABLE_TEMP_CLEANUP =
-        "pinot.server.startup.enablePeriodicTasks";
+        "pinot.server.startup.enableStartupTempCleanup";
     // TODO: make this true once we are confident about this cleanup
     public static final boolean DEFAULT_STARTUP_ENABLE_TEMP_CLEANUP = false;
 
