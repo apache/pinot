@@ -152,7 +152,7 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
     GrpcQueryClient queryClient = new GrpcQueryClient("localhost", CommonConstants.Server.DEFAULT_GRPC_PORT);
     String sql = "SELECT * FROM mytable_OFFLINE LIMIT 1000000";
     BrokerRequest brokerRequest = new Pql2Compiler().compileToBrokerRequest(sql);
-    List<String> segments = _helixResourceManager.getSegmentsFor("mytable_OFFLINE");
+    List<String> segments = _helixResourceManager.getSegmentsFor("mytable_OFFLINE", false);
 
     GrpcRequestBuilder requestBuilder = new GrpcRequestBuilder().setSegments(segments);
     testNonStreamingRequest(queryClient.submit(requestBuilder.setSql(sql).build()));
@@ -167,7 +167,7 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
   public void testQueryingGrpcServer(String sql)
       throws Exception {
     GrpcQueryClient queryClient = new GrpcQueryClient("localhost", CommonConstants.Server.DEFAULT_GRPC_PORT);
-    List<String> segments = _helixResourceManager.getSegmentsFor("mytable_OFFLINE");
+    List<String> segments = _helixResourceManager.getSegmentsFor("mytable_OFFLINE", false);
 
     GrpcRequestBuilder requestBuilder = new GrpcRequestBuilder().setSegments(segments);
     DataTable dataTable = collectNonStreamingRequestResult(queryClient.submit(requestBuilder.setSql(sql).build()));

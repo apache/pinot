@@ -464,7 +464,7 @@ public class PinotHelixResourceManagerTest {
           "downloadUrl");
     }
     List<String> segmentsForTable =
-        ControllerTestUtils.getHelixResourceManager().getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
+        ControllerTestUtils.getHelixResourceManager().getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, false);
     Assert.assertEquals(segmentsForTable.size(), 5);
 
     List<String> segmentsFrom = new ArrayList<>();

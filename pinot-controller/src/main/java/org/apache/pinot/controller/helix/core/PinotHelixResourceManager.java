@@ -587,10 +587,15 @@ public class PinotHelixResourceManager {
    * Returns the segments for the given table.
    *
    * @param tableNameWithType Table name with type suffix
+   * @param shouldExcludeReplacedSegments whether to return the list of segments that doesn't contain replaced segments.
    * @return List of segment names
    */
-  public List<String> getSegmentsFor(String tableNameWithType) {
-    return ZKMetadataProvider.getSegments(_propertyStore, tableNameWithType);
+  public List<String> getSegmentsFor(String tableNameWithType, boolean shouldExcludeReplacedSegments) {
+    List<String> segmentsFromPropertiesStore = ZKMetadataProvider.getSegments(_propertyStore, tableNameWithType);
+    if (shouldExcludeReplacedSegments) {
+      return excludeReplacedSegments(tableNameWithType, segmentsFromPropertiesStore);
+    }
+    return segmentsFromPropertiesStore;
   }
 
   /**
@@ -606,7 +611,7 @@ public class PinotHelixResourceManager {
     List<String> selectedSegments;
     // If no start and end timestamp specified, just select all the segments.
     if (startTimestamp == Long.MIN_VALUE && endTimestamp == Long.MAX_VALUE) {
-      selectedSegments = getSegmentsFor(tableNameWithType);
+      selectedSegments = getSegmentsFor(tableNameWithType, false);
     } else {
       selectedSegments = new ArrayList<>();
       List<SegmentZKMetadata> segmentZKMetadataList = getSegmentsZKMetadata(tableNameWithType);
@@ -617,12 +622,21 @@ public class PinotHelixResourceManager {
         }
       }
     }
+    return excludeReplacedSegments(tableNameWithType, selectedSegments);
+  }
+
+  /**
+   * Given the list of segment names, exclude all the replaced segments which cannot be queried.
+   * @param tableNameWithType table name with type
+   * @param segments list of input segment names
+   */
+  private List<String> excludeReplacedSegments(String tableNameWithType, List<String> segments) {
     // Fetch the segment lineage metadata, and filter segments based on segment lineage.
     SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, tableNameWithType);
     if (segmentLineage == null) {
-      return selectedSegments;
+      return segments;
     } else {
-      Set<String> selectedSegmentSet = new HashSet<>(selectedSegments);
+      Set<String> selectedSegmentSet = new HashSet<>(segments);
       SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(selectedSegmentSet, segmentLineage);
       return new ArrayList<>(selectedSegmentSet);
     }
@@ -1618,7 +1632,7 @@ public class PinotHelixResourceManager {
     }
 
     // Remove all stored segments for the table
-    _segmentDeletionManager.removeSegmentsFromStore(offlineTableName, getSegmentsFor(offlineTableName));
+    _segmentDeletionManager.removeSegmentsFromStore(offlineTableName, getSegmentsFor(offlineTableName, false));
     LOGGER.info("Deleting table {}: Removed stored segments", offlineTableName);
 
     // Remove segment metadata
@@ -1662,7 +1676,7 @@ public class PinotHelixResourceManager {
     }
 
     // Remove all stored segments for the table
-    _segmentDeletionManager.removeSegmentsFromStore(realtimeTableName, getSegmentsFor(realtimeTableName));
+    _segmentDeletionManager.removeSegmentsFromStore(realtimeTableName, getSegmentsFor(realtimeTableName, false));
     LOGGER.info("Deleting table {}: Removed stored segments", realtimeTableName);
 
     // Remove segment metadata
@@ -2755,7 +2769,7 @@ public class PinotHelixResourceManager {
     String segmentLineageEntryId = SegmentLineageUtils.generateLineageEntryId();
 
     // Check that all the segments from 'segmentsFrom' exist in the table
-    Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType));
+    Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType, false));
     Preconditions.checkArgument(segmentsForTable.containsAll(segmentsFrom), String.format(
         "Not all segments from 'segmentsFrom' are available in the table. (tableName = '%s', segmentsFrom = '%s', "
             + "segmentsTo = '%s', segmentsFromTable = '%s')", tableNameWithType, segmentsFrom, segmentsTo,
@@ -2892,7 +2906,7 @@ public class PinotHelixResourceManager {
         }
 
         // Check that all the segments from 'segmentsTo' exist in the table
-        Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType));
+        Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType, false));
         Preconditions.checkArgument(segmentsForTable.containsAll(lineageEntry.getSegmentsTo()), String.format(
             "Not all segments from 'segmentsTo' are available in the table. (tableName = '%s', segmentsTo = '%s', "
                 + "segmentsFromTable = '%s')", tableNameWithType, lineageEntry.getSegmentsTo(), segmentsForTable));

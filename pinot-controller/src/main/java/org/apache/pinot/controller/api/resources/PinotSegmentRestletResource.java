@@ -163,17 +163,26 @@ public class PinotSegmentRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/segments/{tableName}")
-  @ApiOperation(value = "List all segments", notes = "List all segments")
+  @ApiOperation(value = "List all segments. An optional 'excludeReplacedSegments' parameter is used to get the"
+      + " list of segments which has not yet been replaced (determined by segment lineage entries) and can be queried"
+      + " from the table. The value is false by default.",
+      // TODO: more and more filters can be added later on, like excludeErrorSegments, excludeConsumingSegments, etc.
+      notes = "List all segments")
   public List<Map<TableType, List<String>>> getSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "Whether to exclude replaced segments in the response, which have been replaced"
+          + " specified in the segment lineage entries and cannot be queried from the table")
+      @QueryParam("excludeReplacedSegments") String excludeReplacedSegments) {
     List<String> tableNamesWithType = ResourceUtils
         .getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, Constants.validateTableType(tableTypeStr),
             LOGGER);
+    boolean shouldExcludeReplacedSegments = Boolean.parseBoolean(excludeReplacedSegments);
     List<Map<TableType, List<String>>> resultList = new ArrayList<>(tableNamesWithType.size());
     for (String tableNameWithType : tableNamesWithType) {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-      List<String> segments = _pinotHelixResourceManager.getSegmentsFor(tableNameWithType);
+      List<String> segments =
+          _pinotHelixResourceManager.getSegmentsFor(tableNameWithType, shouldExcludeReplacedSegments);
       resultList.add(Collections.singletonMap(tableType, segments));
     }
     return resultList;
@@ -585,7 +594,7 @@ public class PinotSegmentRestletResource {
     }
     String tableNameWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
-    deleteSegmentsInternal(tableNameWithType, _pinotHelixResourceManager.getSegmentsFor(tableNameWithType));
+    deleteSegmentsInternal(tableNameWithType, _pinotHelixResourceManager.getSegmentsFor(tableNameWithType, false));
     return new SuccessResponse("All segments of table " + tableNameWithType + " deleted");
   }
 
