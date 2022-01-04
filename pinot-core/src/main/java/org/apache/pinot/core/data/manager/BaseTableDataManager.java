@@ -375,7 +375,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         // The loaded segment is still consistent with current table config or schema.
         LOGGER.info("Segment: {} of table: {} is consistent with table config and schema", segmentName,
             _tableNameWithType);
-        addSegment(ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, schema));
+        loadSegment(segmentDirectory, indexLoadingConfig, schema);
         return;
       }
       // If any discrepancy is found, get the segment from tier backend, reprocess and load it.
@@ -445,13 +445,19 @@ public abstract class BaseTableDataManager implements TableDataManager {
       segmentDirectoryLoader.upload(indexDir, loaderContext);
       // Create the SegmentDirectory object with the newly processed segment from tier backend.
       segmentDirectory = segmentDirectoryLoader.load(indexDir.toURI(), loaderContext);
-      addSegment(ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, schema));
+      loadSegment(segmentDirectory, indexLoadingConfig, schema);
     } catch (Exception e) {
       closeSegmentDirectoryQuietly(segmentDirectory);
       LOGGER.error("Failed to load newly processed segment: {} of table: {} due to error: {}", segmentName,
           _tableNameWithType, e.getMessage());
       throw e;
     }
+  }
+
+  private void loadSegment(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
+      @Nullable Schema schema)
+      throws Exception {
+    addSegment(ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, schema));
   }
 
   protected boolean allowDownloadRawSegment(String segmentName, SegmentZKMetadata zkMetadata) {

@@ -279,7 +279,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         return;
       }
       try {
-        if (reloadSegmentWithNullIndexDir(tableNameWithType, segmentName, segmentDataManager, schema)) {
+        if (reloadMutableSegment(tableNameWithType, segmentName, segmentDataManager, schema)) {
           // A mutable segment has been found and reloaded.
           return;
         }
@@ -307,17 +307,15 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   /**
-   * Try to reload a segment without a local index directory. The segment can be a consuming
-   * segment from a REALTIME table, or an immutable segment on remote tier backend.
-   * @return true if the segment is loaded.
+   * Try to reload a mutable segment.
+   * @return true if the segment is mutable; false if the segment is immutable.
    */
   @VisibleForTesting
-  boolean reloadSegmentWithNullIndexDir(String tableNameWithType, String segmentName,
+  boolean reloadMutableSegment(String tableNameWithType, String segmentName,
       SegmentDataManager segmentDataManager, @Nullable Schema schema) {
     IndexSegment segment = segmentDataManager.getSegment();
     if (segment instanceof ImmutableSegment) {
-      LOGGER.info("Found an immutable segment: {} in table: {} on remote tier backend", segmentName,
-          tableNameWithType);
+      LOGGER.info("Found an immutable segment: {} in table: {}", segmentName, tableNameWithType);
       return false;
     }
     // Found a mutable/consuming segment from REALTIME table.
@@ -349,13 +347,13 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     try {
       segmentLock.lock();
 
-      // But if table mgr is not created or the segment is not loaded yet, the localMetadata
+      // But if table mgr is not created or the segment is not loaded yet, the segmentMetadata
       // is set to null. Then, addOrReplaceSegment method will load the segment accordingly.
-      SegmentMetadata localMetadata = getSegmentMetadata(tableNameWithType, segmentName);
+      SegmentMetadata segmentMetadata = getSegmentMetadata(tableNameWithType, segmentName);
 
       _tableDataManagerMap.computeIfAbsent(tableNameWithType, k -> createTableDataManager(k, tableConfig))
           .addOrReplaceSegment(segmentName, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig), zkMetadata,
-              localMetadata);
+              segmentMetadata);
       LOGGER.info("Added or replaced segment: {} of table: {}", segmentName, tableNameWithType);
     } finally {
       segmentLock.unlock();

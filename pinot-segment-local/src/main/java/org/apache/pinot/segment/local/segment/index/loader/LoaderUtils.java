@@ -138,6 +138,7 @@ public class LoaderUtils {
   public static void reloadFailureRecovery(File indexDir)
       throws IOException {
     File parentDir = indexDir.getParentFile();
+
     // Recover index directory from segment backup directory if the segment backup directory exists
     File segmentBackupDir = new File(parentDir, indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
     if (segmentBackupDir.exists()) {
