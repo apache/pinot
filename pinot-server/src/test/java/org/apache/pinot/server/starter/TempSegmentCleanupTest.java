@@ -59,14 +59,14 @@ public class TempSegmentCleanupTest {
       throws IOException {
     long currentTimestamp = System.currentTimeMillis();
     deleteTempDir();
-    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, _dataDir);
+    BaseServerStarter.deleteTempFilesSinceCutoffTime(currentTimestamp, _dataDir);
   }
 
   @Test
   public void worksWithEmptyDirectory()
       throws IOException {
     long currentTimestamp = System.currentTimeMillis();
-    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, _dataDir);
+    BaseServerStarter.deleteTempFilesSinceCutoffTime(currentTimestamp, _dataDir);
     Assert.assertEquals(getDataDirFileCount(), 0);
   }
 
@@ -86,7 +86,7 @@ public class TempSegmentCleanupTest {
     Assert.assertEquals(getDataDirFileCount(), 15);
 
     long currentTimestamp = System.currentTimeMillis();
-    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, _dataDir);
+    BaseServerStarter.deleteTempFilesSinceCutoffTime(currentTimestamp, _dataDir);
     Assert.assertEquals(getDataDirFileCount(), 0);
   }
 
@@ -106,7 +106,7 @@ public class TempSegmentCleanupTest {
     Assert.assertEquals(getDataDirFileCount(), 15);
 
     long currentTimestamp = System.currentTimeMillis();
-    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, _dataDir);
+    BaseServerStarter.deleteTempFilesSinceCutoffTime(currentTimestamp, _dataDir);
     Assert.assertEquals(getDataDirFileCount(), 0);
   }
 
@@ -135,7 +135,7 @@ public class TempSegmentCleanupTest {
     Assert.assertEquals(getDataDirFileCount(), 30);
 
     long currentTimestamp = System.currentTimeMillis();
-    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, _dataDir);
+    BaseServerStarter.deleteTempFilesSinceCutoffTime(currentTimestamp, _dataDir);
     Assert.assertEquals(getDataDirFileCount(), 30);
   }
 
@@ -170,7 +170,7 @@ public class TempSegmentCleanupTest {
     }
     Assert.assertEquals(getDataDirFileCount(), 30);
 
-    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, _dataDir);
+    BaseServerStarter.deleteTempFilesSinceCutoffTime(currentTimestamp, _dataDir);
     Assert.assertEquals(getDataDirFileCount(), 15);
   }
 
@@ -199,7 +199,7 @@ public class TempSegmentCleanupTest {
     Assert.assertEquals(getDataDirFileCount(), 30);
 
     long currentTimestamp = System.currentTimeMillis();
-    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, _dataDir);
+    BaseServerStarter.deleteTempFilesSinceCutoffTime(currentTimestamp, _dataDir);
     Assert.assertEquals(getDataDirFileCount(), 15);
   }
 
@@ -228,7 +228,7 @@ public class TempSegmentCleanupTest {
     Assert.assertEquals(getDataDirFileCount(), 30);
 
     long currentTimestamp = System.currentTimeMillis();
-    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, _dataDir);
+    BaseServerStarter.deleteTempFilesSinceCutoffTime(currentTimestamp, _dataDir);
     Assert.assertEquals(getDataDirFileCount(), 15);
   }
 
@@ -294,7 +294,7 @@ public class TempSegmentCleanupTest {
     Assert.assertEquals(getDataDirFileCount(), 90);
 
     long currentTimestamp = System.currentTimeMillis();
-    BaseServerStarter.deleteTempFilesSinceApplicationStart(currentTimestamp, _dataDir);
+    BaseServerStarter.deleteTempFilesSinceCutoffTime(currentTimestamp, _dataDir);
     Assert.assertEquals(getDataDirFileCount(), 45);
   }
 }

@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -382,7 +383,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
    * @param dataDir data directory to start from
    */
   @VisibleForTesting
-  public static void deleteTempFilesSinceApplicationStart(long startTime, @Nonnull File dataDir) {
+  public static void deleteTempFilesSinceCutoffTime(long startTime, @Nonnull File dataDir) {
     if (!dataDir.exists() || !dataDir.isDirectory()) {
       LOGGER.warn("Data directory {} does not exist or is not a directory", dataDir);
       return;
@@ -425,7 +426,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     if (_serverConf.getProperty(Server.CONFIG_OF_STARTUP_ENABLE_TEMP_CLEANUP,
         Server.DEFAULT_STARTUP_ENABLE_TEMP_CLEANUP)) {
       File dataDir = new File(_serverConf.getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR));
-      deleteTempFilesSinceApplicationStart(startTimeMs, dataDir);
+      // We use 3 hours as the cutoff time as a general heuristic for when
+      // tmp directories should be deleted as they are definitely no longer being used.
+      long cutoffTimeMs = startTimeMs - Duration.ofHours(3).toMillis();
+      deleteTempFilesSinceCutoffTime(cutoffTimeMs, dataDir);
     }
 
     // install default SSL context if necessary (even if not force-enabled everywhere)
