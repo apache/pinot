@@ -26,6 +26,7 @@ import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.DistinctOperator;
+import org.apache.pinot.core.operator.query.FilteredAggregationOperator;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -54,7 +55,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
         + "MAX(column3) FILTER(WHERE column3 IS NOT NULL), "
         + "SUM(column3), AVG(column7) FILTER(WHERE column7 > 0) FROM testTable WHERE column3 > 0";
 
-    AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
+    FilteredAggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils
         .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(),
