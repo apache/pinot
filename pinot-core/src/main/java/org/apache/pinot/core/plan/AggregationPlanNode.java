@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -33,12 +32,10 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.CombinedFilterOperator;
-import org.apache.pinot.core.operator.filter.SharedCombinedFilterOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.DictionaryBasedAggregationOperator;
 import org.apache.pinot.core.operator.query.FilteredAggregationOperator;
 import org.apache.pinot.core.operator.query.MetadataBasedAggregationOperator;
-import org.apache.pinot.core.operator.transform.CombinedTransformOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
@@ -279,8 +276,7 @@ public class AggregationPlanNode implements PlanNode {
                   aggregationFunctionColumnPairs, null,
                       predicateEvaluatorsMap, null, _queryContext.getDebugOptions()).run();
               AggregationOperator aggregationOperator = new AggregationOperator(aggregationFunctions,
-                  transformOperator, numTotalDocs,
-                  true, false);
+                  transformOperator, numTotalDocs, true);
 
               return Pair.of(transformOperator, aggregationOperator);
             }
@@ -292,7 +288,7 @@ public class AggregationPlanNode implements PlanNode {
     TransformOperator transformOperator = new TransformPlanNode(_indexSegment, _queryContext,
           expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL, filterOperator).run();
     AggregationOperator aggregationOperator = new AggregationOperator(aggregationFunctions,
-        transformOperator, numTotalDocs, false, false);
+        transformOperator, numTotalDocs, false);
 
     return Pair.of(transformOperator, aggregationOperator);
   }

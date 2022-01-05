@@ -106,7 +106,6 @@ public class FilteredAggregationOperator extends BaseOperator<IntermediateResult
 
   @Override
   public String toExplainString() {
-    // TODO: To be added
-    return null;
+    return EXPLAIN_NAME;
   }
 }
