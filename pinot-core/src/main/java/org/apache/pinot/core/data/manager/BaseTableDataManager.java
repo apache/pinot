@@ -75,6 +75,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected String _tableNameWithType;
   protected String _tableDataDir;
   protected File _indexDir;
+  protected File _resourceTmpDir;
   protected Logger _logger;
   protected HelixManager _helixManager;
   protected String _authToken;
@@ -102,6 +103,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (!_indexDir.exists()) {
       Preconditions.checkState(_indexDir.mkdirs());
     }
+    _resourceTmpDir = new File(_indexDir, "tmp");
+    // Delete and recreate the tmp directory if it exists as it may contain old files from previous runs.
+    _resourceTmpDir.delete();
+    Preconditions.checkState(_resourceTmpDir.mkdirs());
     _errorCache = errorCache;
     _logger = LoggerFactory.getLogger(_tableNameWithType + "-" + getClass().getSimpleName());
 
@@ -423,7 +428,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   private File downloadSegmentFromDeepStore(String segmentName, SegmentZKMetadata zkMetadata)
       throws Exception {
-    File tempRootDir = getSegmentDataDir("tmp-" + segmentName + "-" + UUID.randomUUID());
+    File tempRootDir = getTmpSegmentDataDir("tmp-" + segmentName + "-" + UUID.randomUUID());
     FileUtils.forceMkdir(tempRootDir);
     try {
       File tarFile = downloadAndDecrypt(segmentName, zkMetadata, tempRootDir);
@@ -478,6 +483,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @VisibleForTesting
   File getSegmentDataDir(String segmentName) {
     return new File(_indexDir, segmentName);
+  }
+
+  @VisibleForTesting
+  protected File getTmpSegmentDataDir(String segmentName) {
+    return new File(_resourceTmpDir, segmentName);
   }
 
   @VisibleForTesting

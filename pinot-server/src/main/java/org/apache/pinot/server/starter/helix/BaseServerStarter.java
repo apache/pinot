@@ -377,41 +377,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
         ServiceStatus.getStatusDescription());
   }
 
-  /**
-   * Recursively deletes all data directories starting with tmp- last modified before the startTime.
-   * @param startTime start time of the application
-   * @param dataDir data directory to start from
-   */
-  @VisibleForTesting
-  public static void deleteTempFilesSinceCutoffTime(long startTime, @Nonnull File dataDir) {
-    if (!dataDir.exists() || !dataDir.isDirectory()) {
-      LOGGER.warn("Data directory {} does not exist or is not a directory", dataDir);
-      return;
-    }
-    IOFileFilter beforeStartTimeFilter = new AgeFileFilter(startTime, true);
-    IOFileFilter tmpPrefixFilter = new PrefixFileFilter("tmp-");
-    List<IOFileFilter> tmpFilters = Arrays.asList(beforeStartTimeFilter, tmpPrefixFilter, DirectoryFileFilter.INSTANCE);
-    IOFileFilter oldTmpDirectoryFileFilter = new AndFileFilter(tmpFilters);
-
-    AtomicInteger numDeletedDirectories = new AtomicInteger();
-    try (Stream<Path> walk = Files.walk(dataDir.toPath())) {
-      walk.forEach(path -> {
-        if (oldTmpDirectoryFileFilter.accept(path.toFile())) {
-          try {
-            FileUtils.deleteDirectory(path.toFile());
-            LOGGER.info("Deleted temporary file: {}", path);
-            numDeletedDirectories.incrementAndGet();
-          } catch (IOException e) {
-            LOGGER.warn("Failed to delete temporary file: {}", path, e);
-          }
-        }
-      });
-    } catch (IOException e) {
-      LOGGER.error("Failed to delete old tmp directories", e);
-    }
-    LOGGER.info("Deleted {} old tmp directories", numDeletedDirectories);
-  }
-
   @Override
   public ServiceRole getServiceRole() {
     return ServiceRole.SERVER;
@@ -422,15 +387,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
       throws Exception {
     LOGGER.info("Starting Pinot server");
     long startTimeMs = System.currentTimeMillis();
-
-    if (_serverConf.getProperty(Server.CONFIG_OF_STARTUP_ENABLE_TEMP_CLEANUP,
-        Server.DEFAULT_STARTUP_ENABLE_TEMP_CLEANUP)) {
-      File dataDir = new File(_serverConf.getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR));
-      // We use 3 hours as the cutoff time as a general heuristic for when
-      // tmp directories should be deleted as they are definitely no longer being used.
-      long cutoffTimeMs = startTimeMs - Duration.ofHours(3).toMillis();
-      deleteTempFilesSinceCutoffTime(cutoffTimeMs, dataDir);
-    }
 
     // install default SSL context if necessary (even if not force-enabled everywhere)
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_serverConf, Server.SERVER_TLS_PREFIX);

@@ -1350,7 +1350,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), serverMetrics);
       _startOffset = _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset());
       _currentOffset = _streamPartitionMsgOffsetFactory.create(_startOffset);
-      _resourceTmpDir = new File(resourceDataDir, "_tmp");
+      _resourceTmpDir = new File(resourceDataDir, "tmp");
       if (!_resourceTmpDir.exists()) {
         _resourceTmpDir.mkdirs();
       }
