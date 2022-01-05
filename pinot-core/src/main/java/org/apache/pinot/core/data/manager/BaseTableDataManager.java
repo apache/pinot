@@ -106,7 +106,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _resourceTmpDir = new File(_indexDir, "tmp");
     // Delete and recreate the tmp directory if it exists as it may contain old files from previous runs.
     _resourceTmpDir.delete();
-    Preconditions.checkState(_resourceTmpDir.mkdirs());
+    if (!_resourceTmpDir.exists()) {
+      Preconditions.checkState(_resourceTmpDir.mkdirs());
+    }
     _errorCache = errorCache;
     _logger = LoggerFactory.getLogger(_tableNameWithType + "-" + getClass().getSimpleName());
 
