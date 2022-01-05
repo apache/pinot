@@ -33,7 +33,10 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   public Mailbox.MailboxContent poll() {
     while (_receivingBuffer != null) {
       try {
-        return _receivingBuffer.poll(DEFAULT_MAILBOX_POLL_TIMEOUT, TimeUnit.MILLISECONDS);
+        Mailbox.MailboxContent content = _receivingBuffer.poll(DEFAULT_MAILBOX_POLL_TIMEOUT, TimeUnit.MILLISECONDS);
+        if (content != null) {
+          return content;
+        }
       } catch (InterruptedException e) {
         LOGGER.error("Interrupt occurred while waiting for mailbox content", e);
       }
@@ -46,11 +49,13 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
     GrpcReceivingMailbox receivingMailbox = (GrpcReceivingMailbox) _mailboxService.getReceivingMailbox(mailboxContent.getMailboxId());
     receivingMailbox.init(this);
     // when the receiving end receives a message. put it in the mailbox queue and returns the buffer available.
+    int remainingCapacity = _receivingBuffer.remainingCapacity() - 1;
     _receivingBuffer.offer(mailboxContent);
     Mailbox.MailboxStatus status = Mailbox.MailboxStatus.newBuilder()
         .setMailboxId(mailboxContent.getMailboxId())
-        .putMetadata("buffer.size", String.valueOf(_receivingBuffer.remainingCapacity()))
+        .putMetadata("buffer.size", String.valueOf(remainingCapacity))
         .build();
+    // TODO: fix race condition for closing response observer before sending the response metadata.
     _responseObserver.onNext(status);
   }
 

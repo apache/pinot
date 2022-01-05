@@ -1,22 +1,63 @@
 package org.apache.pinot.query.planner.nodes;
 
+import com.google.common.base.Preconditions;
+import javax.xml.crypto.KeySelector;
+import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.logical.LogicalJoin;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexInputRef;
+import org.apache.calcite.sql.SqlKind;
+import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 
 
 public class JoinNode extends AbstractStageNode {
-  private final String _expression;
+  private final JoinRelType _joinType;
+  private final RelDataType _leftRowType;
+  private final RelDataType _rightRowType;
+  private final int _leftOperandIndex;
+  private final int _rightOperandIndex;
 
   public JoinNode(LogicalJoin node, String currentStageId) {
     super(currentStageId);
-    _expression = toExpression(node);
+    _joinType = node.getJoinType();
+    RexCall joinCondition = (RexCall) node.getCondition();
+    Preconditions.checkState(joinCondition.getOperator().getKind().equals(SqlKind.EQUALS)
+        && joinCondition.getOperands().size() == 2, "only equality JOIN is supported");
+    Preconditions.checkState(joinCondition.getOperands().get(0) instanceof RexInputRef, "only reference supported");
+    Preconditions.checkState(joinCondition.getOperands().get(1) instanceof RexInputRef, "only reference supported");
+    _leftRowType = node.getLeft().getRowType();
+    _rightRowType = node.getRight().getRowType();
+    _leftOperandIndex = ((RexInputRef) joinCondition.getOperands().get(0)).getIndex();
+    _rightOperandIndex = ((RexInputRef) joinCondition.getOperands().get(1)).getIndex();
   }
 
-  private String toExpression(LogicalJoin node) {
-    // TODO: make it real.
-    return node.getDigest();
+  public JoinRelType getJoinType() {
+    return _joinType;
   }
 
-  public String getExpression() {
-    return _expression;
+  public RelDataType getLeftRowType() {
+    return _leftRowType;
+  }
+
+  public RelDataType getRightRowType() {
+    return _rightRowType;
+  }
+
+  public int getLeftOperandIndex() {
+    return _leftOperandIndex;
+  }
+
+  public int getRightOperandIndex() {
+    return _rightOperandIndex;
+  }
+
+  public FieldSelectionKeySelector getLeftJoinKeySelector() {
+    return new FieldSelectionKeySelector(_leftOperandIndex);
+  }
+
+
+  public FieldSelectionKeySelector getRightJoinKeySelector() {
+    return new FieldSelectionKeySelector(_rightOperandIndex - _leftRowType.getFieldNames().size());
   }
 }

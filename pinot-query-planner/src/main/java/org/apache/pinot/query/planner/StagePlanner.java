@@ -26,6 +26,7 @@ public class StagePlanner {
 
   private Map<String, StageNode> _queryStageMap;
   private Map<String, StageMetadata> _stageMetadataMap;
+  private int _stageIdCounter;
 
   public StagePlanner(PlannerContext PlannerContext, WorkerManager workerManager) {
     _PlannerContext = PlannerContext;
@@ -36,13 +37,15 @@ public class StagePlanner {
     // clear the state
     _queryStageMap = new HashMap<>();
     _stageMetadataMap = new HashMap<>();
+    _stageIdCounter = 0;
 
     // walk the plan and create stages.
     StageNode globalStageRoot = walkRelPlan(relRoot, getNewStageId());
 
     // global root needs to send results back to the ROOT, a.k.a. the client response node.
     // the last stage is always a broadcast-gather.
-    StageNode globalReceiverNode = new MailboxReceiveNode("ROOT", globalStageRoot.getStageId());
+    StageNode globalReceiverNode = new MailboxReceiveNode("ROOT", globalStageRoot.getStageId(),
+        RelDistribution.Type.BROADCAST_DISTRIBUTED);
     StageNode globalSenderNode = new MailboxSendNode(globalStageRoot, globalReceiverNode.getStageId(),
         RelDistribution.Type.BROADCAST_DISTRIBUTED);
     _queryStageMap.put(globalSenderNode.getStageId(), globalSenderNode);
@@ -70,7 +73,7 @@ public class StagePlanner {
       RelDistribution.Type exchangeType = ((LogicalExchange) node).distribution.getType();
 
       // 2. make an exchange sender and receiver node pair
-      StageNode mailboxReceiver = new MailboxReceiveNode(currentStageId, nextStageRoot.getStageId());
+      StageNode mailboxReceiver = new MailboxReceiveNode(currentStageId, nextStageRoot.getStageId(), exchangeType);
       StageNode mailboxSender = new MailboxSendNode(nextStageRoot, mailboxReceiver.getStageId(), exchangeType);
 
       // 3. put the sender side as a completed stage.
@@ -94,7 +97,7 @@ public class StagePlanner {
     return (node instanceof LogicalExchange);
   }
 
-  private static String getNewStageId() {
-    return UUID.randomUUID().toString();
+  private String getNewStageId() {
+    return String.valueOf(_stageIdCounter++);
   }
 }

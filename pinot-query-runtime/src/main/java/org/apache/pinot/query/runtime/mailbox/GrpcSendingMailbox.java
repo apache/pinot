@@ -2,6 +2,7 @@ package org.apache.pinot.query.runtime.mailbox;
 
 import io.grpc.ManagedChannel;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.query.runtime.mailbox.channel.MailboxStatusStreamObserver;
@@ -11,6 +12,7 @@ public class GrpcSendingMailbox implements SendingMailbox<MailboxContent> {
   private final GrpcMailboxService _mailboxService;
   private final String _mailboxId;
   private final AtomicBoolean _initialized = new AtomicBoolean(false);
+  private final AtomicInteger _totalMsgSent = new AtomicInteger(0);
 
   private MailboxStatusStreamObserver _statusStreamObserver;
 
@@ -35,6 +37,7 @@ public class GrpcSendingMailbox implements SendingMailbox<MailboxContent> {
       init();
     }
     _statusStreamObserver.offer(data);
+    _totalMsgSent.incrementAndGet();
   }
 
   @Override

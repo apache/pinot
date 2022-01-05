@@ -10,6 +10,7 @@ import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.query.dispatch.WorkerQueryRequest;
@@ -40,8 +41,9 @@ import static org.mockito.Mockito.when;
 
 public class QueryServerEnclosure {
   private static final int NUM_ROWS = 5;
+  private static final int DEFAULT_EXECUTOR_THREAD_NUM = 5;
 
-  private final ExecutorService _testExecutor = Executors.newFixedThreadPool(1);
+  private final ExecutorService _testExecutor;
   private final int _grpcPort;
   private final Map<String, Object> _runnerConfig = new HashMap<>();
   private final Map<String, List<ImmutableSegment>> _segmentMap = new HashMap<>();
@@ -70,6 +72,8 @@ public class QueryServerEnclosure {
       _runnerConfig.put(CommonConstants.Server.CONFIG_OF_GRPC_PORT, _grpcPort);
       _runnerConfig.put(CommonConstants.Server.CONFIG_OF_INSTANCE_ID, String.format("Server_localhost_%d", _grpcPort));
       _queryRunner = new QueryRunner();
+      _testExecutor = Executors.newFixedThreadPool(DEFAULT_EXECUTOR_THREAD_NUM, new NamedThreadFactory(
+          "test_query_server_enclosure_on_" + _grpcPort + "_port"));
     } catch (Exception e) {
       throw new RuntimeException("Test Failed!", e);
     }

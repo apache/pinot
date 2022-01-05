@@ -1,5 +1,6 @@
 package org.apache.pinot.query.runtime;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.File;
@@ -7,6 +8,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import org.apache.calcite.rel.RelDistribution;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
@@ -15,7 +17,9 @@ import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.dispatch.QueryDispatcher;
 import org.apache.pinot.query.dispatch.WorkerQueryRequest;
 import org.apache.pinot.query.planner.QueryPlan;
+import org.apache.pinot.query.planner.nodes.MailboxReceiveNode;
 import org.apache.pinot.query.runtime.blocks.DataTableBlock;
+import org.apache.pinot.query.runtime.blocks.DataTableBlockUtils;
 import org.apache.pinot.query.runtime.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -92,7 +96,7 @@ public class QueryRunnerTest {
     Assert.assertEquals(dataTableBlock.getDataTable().getNumberOfRows(), 5);
     // next block should be null as all servers finished sending.
     dataTableBlock = mailboxReceiveOperator.nextBlock();
-    Assert.assertNull(dataTableBlock);
+    Assert.assertTrue(DataTableBlockUtils.isEndOfStream(dataTableBlock));
   }
 
   @Test
@@ -125,13 +129,52 @@ public class QueryRunnerTest {
     Assert.assertEquals(rowCount, 15);
     // assert that the next block is null (e.g. finished receiving).
     dataTableBlock = mailboxReceiveOperator.nextBlock();
-    Assert.assertNull(dataTableBlock);
+    Assert.assertTrue(DataTableBlockUtils.isEndOfStream(dataTableBlock));
+  }
+
+  @Test
+  public void testJoin()
+      throws Exception {
+    QueryPlan queryPlan = _queryEnvironment.sqlQuery("SELECT * FROM a JOIN b on a.c1 = b.c1");
+    Map<String, String> requestMetadataMap = ImmutableMap.of("RequestId", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
+    MailboxReceiveOperator mailboxReceiveOperator = null;
+    for (String stageId : queryPlan.getStageMetadataMap().keySet()) {
+      if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
+        MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(stageId);
+        mailboxReceiveOperator = createReduceStageOperator(
+            queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
+            requestMetadataMap.get("RequestId"), reduceNode.getSenderStageId(), _reducerGrpcPort);
+      } else {
+        for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
+          WorkerQueryRequest workerQueryRequest = QueryDispatcher.constructStageQueryRequest(queryPlan, stageId, serverInstance);
+          _servers.get(serverInstance).processQuery(workerQueryRequest, requestMetadataMap);
+        }
+      }
+    }
+    Preconditions.checkNotNull(mailboxReceiveOperator);
+
+    int count = 0;
+    int rowCount = 0;
+    DataTableBlock dataTableBlock;
+    while (count < 2) { // we have 2 servers sending data.
+      dataTableBlock = mailboxReceiveOperator.nextBlock();
+      if (dataTableBlock.getDataTable() != null) {
+        rowCount += dataTableBlock.getDataTable().getNumberOfRows();
+      }
+      count++;
+    }
+    // assert that everything from left table is joined with right table since both table have exactly the same data
+    // but table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1).
+    Assert.assertEquals(rowCount, 75);
+    // assert that the next block is null (e.g. finished receiving).
+    dataTableBlock = mailboxReceiveOperator.nextBlock();
+    Assert.assertTrue(DataTableBlockUtils.isEndOfStream(dataTableBlock));
   }
 
   protected MailboxReceiveOperator createReduceStageOperator(
       List<ServerInstance> sendingInstances, String jobId, String stageId, int port) {
-    MailboxReceiveOperator mailboxReceiveOperator = new MailboxReceiveOperator(_mailboxService, sendingInstances,
-        "localhost", port, jobId, stageId);
+    MailboxReceiveOperator mailboxReceiveOperator = new MailboxReceiveOperator(_mailboxService,
+        RelDistribution.Type.ANY, sendingInstances, "localhost", port, jobId, stageId);
     return mailboxReceiveOperator;
   }
 }

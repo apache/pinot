@@ -2,15 +2,18 @@ package org.apache.pinot.query.planner.nodes;
 
 import java.util.Collections;
 import java.util.List;
+import org.apache.calcite.rel.RelDistribution;
 
 
 public class MailboxReceiveNode extends AbstractStageNode {
 
   private final String _senderStageId;
+  private final RelDistribution.Type _exchangeType;
 
-  public MailboxReceiveNode(String stageId, String senderStageId) {
+  public MailboxReceiveNode(String stageId, String senderStageId, RelDistribution.Type exchangeType) {
     super(stageId);
     _senderStageId = senderStageId;
+    _exchangeType = exchangeType;
   }
 
   @Override
@@ -25,5 +28,9 @@ public class MailboxReceiveNode extends AbstractStageNode {
 
   public String getSenderStageId() {
     return _senderStageId;
+  }
+
+  public RelDistribution.Type getExchangeType() {
+    return _exchangeType;
   }
 }

@@ -1,6 +1,7 @@
 package org.apache.pinot.query.runtime;
 
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
@@ -13,6 +14,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.dispatch.WorkerQueryRequest;
@@ -25,11 +27,12 @@ public class QueryWorker extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
   private final Server _server;
   private final QueryRunner _queryRunner;
-  private final ExecutorService _executorService =
-      Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
+  private final ExecutorService _executorService;
 
   public QueryWorker(int port, QueryRunner queryRunner) {
     _server = ServerBuilder.forPort(port).addService(this).build();
+    _executorService = Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
+        new NamedThreadFactory("query_worker_on_" + port + "_port"));
     _queryRunner = queryRunner;
     LOGGER.info("Initialized QueryWorker on port: {} with numWorkerThreads: {}", port,
         ResourceManager.DEFAULT_QUERY_WORKER_THREADS);

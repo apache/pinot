@@ -1,5 +1,6 @@
 package org.apache.pinot.query.runtime;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -29,8 +30,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
  */
 public class QueryRunner {
   private static final String HOSTNAME_PORT_DELIMITER = "_";
-  private final ExecutorService _executorService =
-      Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
 
   // This is a temporary before merging the 2 type of executor.
   private ServerQueryExecutorV1Impl _serverExecutor;
@@ -57,7 +56,7 @@ public class QueryRunner {
     _serverExecutor = new ServerQueryExecutorV1Impl();
     _serverExecutor.init(config, instanceDataManager, serverMetrics);
     _workerExecutor = new WorkerQueryExecutor();
-    _workerExecutor.init(config, serverMetrics);
+    _workerExecutor.init(config, serverMetrics, mailboxService, _hostName, _port);
   }
 
   public void start() {
@@ -80,7 +79,7 @@ public class QueryRunner {
           requestMetadataMap);
 
       // send the data table via mailbox in one-off fashion (e.g. no block-level split, one data table/partition key)
-      DataTable dataTable = _serverExecutor.processQuery(serverQueryRequest, _executorService, null);
+      DataTable dataTable = _serverExecutor.processQuery(serverQueryRequest, executorService, null);
 
       MailboxSendNode sendNode = (MailboxSendNode) workerQueryRequest.getStageRoot();
       StageMetadata receivingStageMetadata = workerQueryRequest.getMetadataMap().get(sendNode.getReceiverStageId());
@@ -90,8 +89,7 @@ public class QueryRunner {
               sendNode.getStageId());
       mailboxSendOperator.nextBlock();
     } else {
-      // TODO: implement this.
-      _workerExecutor.processQuery(workerQueryRequest, executorService);
+      _workerExecutor.processQuery(workerQueryRequest, requestMetadataMap, executorService);
     }
   }
 
@@ -99,6 +97,7 @@ public class QueryRunner {
     String stageId = workerQueryRequest.getStageId();
     ServerInstance serverInstance = workerQueryRequest.getServerInstance();
     StageMetadata stageMetadata = workerQueryRequest.getMetadataMap().get(stageId);
-    return stageMetadata.getServerInstanceToSegmentsMap().get(serverInstance).size() > 0;
+    List<String> segments = stageMetadata.getServerInstanceToSegmentsMap().get(serverInstance);
+    return segments != null && segments.size() > 0;
   }
 }

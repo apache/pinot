@@ -11,10 +11,13 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.common.datatable.DataTableBuilder;
+import org.apache.pinot.core.common.datatable.DataTableUtils;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.InstanceResponseOperator;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.runtime.blocks.DataTableBlock;
+import org.apache.pinot.query.runtime.blocks.DataTableBlockUtils;
 import org.apache.pinot.query.runtime.mailbox.MailboxService;
 import org.apache.pinot.query.runtime.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.mailbox.StringMailboxIdentifier;
@@ -35,14 +38,14 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
   private final String _jobId;
   private final String _stageId;
   private final MailboxService<Mailbox.MailboxContent> _mailboxService;
-  private InstanceResponseOperator _instanceResponseOperator;
+  private BaseOperator<DataTableBlock> _dataTableBlockBaseOperator;
   private DataTable _dataTable;
 
   public MailboxSendOperator(MailboxService<Mailbox.MailboxContent> mailboxService,
-      InstanceResponseOperator instanceResponseOperator, List<ServerInstance> receivingStageInstances,
+      BaseOperator<DataTableBlock> dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
       RelDistribution.Type exchangeType, String hostName, int port, String jobId, String stageId) {
     _mailboxService = mailboxService;
-    _instanceResponseOperator = instanceResponseOperator;
+    _dataTableBlockBaseOperator = dataTableBlockBaseOperator;
     _receivingStageInstances = receivingStageInstances;
     _exchangeType = exchangeType;
     _serverHostName = hostName;
@@ -89,22 +92,34 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
 
   @Override
   protected DataTableBlock getNextBlock() {
-    // send the dataTableBlock.
-    // TODO: this should call InstanceResponseOperator to get the DataTable in the connected QueryExecutor.
-    // here we directly insert the dataTable during constructor. But the rest of the logic is the same.
+    DataTable dataTable;
+    DataTableBlock dataTableBlock = null;
+    if (_dataTableBlockBaseOperator != null) {
+      dataTableBlock = _dataTableBlockBaseOperator.nextBlock();
+      dataTable = dataTableBlock.getDataTable();
+    } else {
+      dataTable = _dataTable;
+    }
+    boolean isEndOfStream = dataTableBlock == null || DataTableBlockUtils.isEndOfStream(dataTableBlock);
     try {
-      DataTable dataTable = _dataTable;
       switch (_exchangeType) {
+        // TODO: random and singleton distribution should've been selected in planning phase.
+        case SINGLETON:
         case RANDOM_DISTRIBUTED:
-          int randomServerIdx = new Random().nextInt(_receivingStageInstances.size());
-          sendDataTableBlock(_receivingStageInstances.get(randomServerIdx), dataTable);
+          // TODO: make random distributed actually random, this impl only sends data to the first instances.
+          for (ServerInstance serverInstance : _receivingStageInstances) {
+            sendDataTableBlock(serverInstance, dataTable, isEndOfStream);
+            // we no longer need to send data to the rest of the receiving instances, but we still need to transfer
+            // the dataTable over indicating that we are a potential sender. thus next time a random server is selected
+            // it might still be useful.
+            dataTable = DataTableBlockUtils.getEmptyDataTable(dataTable.getDataSchema());
+          }
           break;
         case BROADCAST_DISTRIBUTED:
           for (ServerInstance serverInstance : _receivingStageInstances) {
-            sendDataTableBlock(serverInstance, dataTable);
+            sendDataTableBlock(serverInstance, dataTable, isEndOfStream);
           }
           break;
-        case SINGLETON:
         case HASH_DISTRIBUTED:
         case RANGE_DISTRIBUTED:
         case ROUND_ROBIN_DISTRIBUTED:
@@ -114,26 +129,25 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
     } catch (Exception e) {
       LOGGER.error("Exception occur while sending data via mailbox", e);
     }
-    return null;
+    return dataTableBlock;
   }
 
-  private void sendDataTableBlock(ServerInstance serverInstance, DataTable dataTable)
+  private void sendDataTableBlock(ServerInstance serverInstance, DataTable dataTable, boolean isEndOfStream)
       throws IOException {
     String mailboxId = toMailboxId(serverInstance);
     SendingMailbox<Mailbox.MailboxContent> sendingMailbox =
         _mailboxService.getSendingMailbox(mailboxId);
-    sendingMailbox.send(toMailboxContent(mailboxId, dataTable));
+    sendingMailbox.send(toMailboxContent(mailboxId, dataTable, isEndOfStream));
   }
 
-  private Mailbox.MailboxContent toMailboxContent(String mailboxId, DataTable dataTable)
+  private Mailbox.MailboxContent toMailboxContent(String mailboxId, DataTable dataTable, boolean isEndOfStream)
       throws IOException {
-    // TODO: we only return SINGLE DataTable thus we replied with a FINISHED flag.
-    // this should only be attached when previous operator.getNextBlock() returns null.
-    return Mailbox.MailboxContent.newBuilder()
-        .setMailboxId(mailboxId)
-        .setPayload(ByteString.copyFrom(new DataTableBlock(dataTable).toBytes()))
-        .putMetadata("FINISHED", "TRUE")
-        .build();
+    Mailbox.MailboxContent.Builder builder = Mailbox.MailboxContent.newBuilder().setMailboxId(mailboxId)
+        .setPayload(ByteString.copyFrom(new DataTableBlock(dataTable).toBytes()));
+    if (isEndOfStream) {
+      builder.putMetadata("FINISHED", "TRUE");
+    }
+    return builder.build();
   }
 
   private String toMailboxId(ServerInstance serverInstance) {
