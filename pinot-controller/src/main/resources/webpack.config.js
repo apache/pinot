@@ -46,10 +46,13 @@ module.exports = (env, argv) => {
     devServer: {
       compress: true,
       hot: true,
-      open: true,
-      proxy: {
-        '/': 'http://localhost:9000'
-      }
+      proxy: [
+        {
+            context: "/",
+            target: "http://localhost:9000",
+            changeOrigin: true,
+        },
+      ],
     },
     module: {
       rules: [
