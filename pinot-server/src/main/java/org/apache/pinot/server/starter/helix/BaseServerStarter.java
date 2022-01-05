@@ -18,13 +18,8 @@
  */
 package org.apache.pinot.server.starter.helix;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -34,17 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
-import java.util.stream.Stream;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.filefilter.AgeFileFilter;
-import org.apache.commons.io.filefilter.AndFileFilter;
-import org.apache.commons.io.filefilter.DirectoryFileFilter;
-import org.apache.commons.io.filefilter.IOFileFilter;
-import org.apache.commons.io.filefilter.PrefixFileFilter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;

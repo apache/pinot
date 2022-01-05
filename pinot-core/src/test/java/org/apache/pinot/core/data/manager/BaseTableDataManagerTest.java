@@ -301,7 +301,8 @@ public class BaseTableDataManagerTest {
     assertEquals(FileUtils.readFileToString(tarFile), "this is from somewhere remote");
 
     FakePinotCrypter fakeCrypter = (FakePinotCrypter) PinotCrypterFactory.create("fakePinotCrypter");
-    assertTrue(fakeCrypter._origFile.getAbsolutePath().endsWith("__table01__/tmp/test-download-decrypt/seg01.tar.gz.enc"));
+    assertTrue(
+        fakeCrypter._origFile.getAbsolutePath().endsWith("__table01__/tmp/test-download-decrypt/seg01.tar.gz.enc"));
     assertTrue(fakeCrypter._decFile.getAbsolutePath().endsWith("__table01__/tmp/test-download-decrypt/seg01.tar.gz"));
 
     try {
