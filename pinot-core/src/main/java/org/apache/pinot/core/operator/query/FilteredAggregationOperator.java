@@ -43,7 +43,7 @@ public class FilteredAggregationOperator extends BaseOperator<IntermediateResult
   private static final String EXPLAIN_NAME = "FILTERED_AGGREGATE";
 
   private final AggregationFunction[] _aggregationFunctions;
-  private final List<Pair<AggregationFunction[], TransformOperator>> _filteredAggregations;
+  private final List<Pair<AggregationFunction[], TransformOperator>> _aggFunctionsWithTransformOperator;
   private final long _numTotalDocs;
 
   private long _numDocsScanned;
@@ -51,9 +51,9 @@ public class FilteredAggregationOperator extends BaseOperator<IntermediateResult
   private long _numEntriesScannedPostFilter;
 
   public FilteredAggregationOperator(AggregationFunction[] aggregationFunctions,
-      List<Pair<AggregationFunction[], TransformOperator>> filteredAggregations, long numTotalDocs) {
+      List<Pair<AggregationFunction[], TransformOperator>> aggFunctionsWithTransformOperator, long numTotalDocs) {
     _aggregationFunctions = aggregationFunctions;
-    _filteredAggregations = filteredAggregations;
+    _aggFunctionsWithTransformOperator = aggFunctionsWithTransformOperator;
     _numTotalDocs = numTotalDocs;
   }
 
@@ -65,7 +65,8 @@ public class FilteredAggregationOperator extends BaseOperator<IntermediateResult
     for (int i = 0; i < numAggregations; i++) {
       resultIndexMap.put(_aggregationFunctions[i], i);
     }
-    for (Pair<AggregationFunction[], TransformOperator> filteredAggregation : _filteredAggregations) {
+
+    for (Pair<AggregationFunction[], TransformOperator> filteredAggregation : _aggFunctionsWithTransformOperator) {
       AggregationFunction[] aggregationFunctions = filteredAggregation.getLeft();
       AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(aggregationFunctions);
       TransformOperator transformOperator = filteredAggregation.getRight();
@@ -94,7 +95,7 @@ public class FilteredAggregationOperator extends BaseOperator<IntermediateResult
 
   @Override
   public List<Operator> getChildOperators() {
-    return _filteredAggregations.stream().map(Pair::getRight).collect(Collectors.toList());
+    return _aggFunctionsWithTransformOperator.stream().map(Pair::getRight).collect(Collectors.toList());
   }
 
   @Override

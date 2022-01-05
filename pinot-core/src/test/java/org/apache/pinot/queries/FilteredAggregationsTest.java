@@ -245,6 +245,24 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
 
     query =
+        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL % 10 = 0),"
+            + "SUM(NO_INDEX_COL),"
+            + "MAX(INT_COL) "
+            + "FROM MyTable";
+
+    nonFilterQuery =
+        "SELECT SUM("
+            + "CASE "
+            + "WHEN (INT_COL % 10 = 0) THEN INT_COL "
+            + "ELSE 0 "
+            + "END) AS total_sum,"
+            + "SUM(NO_INDEX_COL),"
+            + "MAX(INT_COL)"
+            + "FROM MyTable";
+
+    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
+
+    query =
         "SELECT AVG(INT_COL) FILTER(WHERE NO_INDEX_COL > -1)"
             + "FROM MyTable";
     nonFilterQuery =
@@ -473,6 +491,27 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
         + "ELSE 0 "
         + "END) AS total_avg "
         + "FROM MyTable WHERE NO_INDEX_COL > 5 AND NO_INDEX_COL < 29999";
+
+    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
+  }
+
+  @Test
+  public void testFoo() {
+    String query =
+        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL % 10 = 0),"
+            + "SUM(NO_INDEX_COL),"
+            + "MAX(INT_COL) "
+            + "FROM MyTable";
+
+    String nonFilterQuery =
+        "SELECT SUM("
+            + "CASE "
+            + "WHEN (INT_COL % 10 = 0) THEN INT_COL "
+            + "ELSE 0 "
+            + "END) AS total_sum,"
+            + "SUM(NO_INDEX_COL),"
+            + "MAX(INT_COL)"
+            + "FROM MyTable";
 
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
   }
