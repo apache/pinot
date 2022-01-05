@@ -49,7 +49,7 @@ const App = () => {
   const [redirectUri, setRedirectUri] = React.useState(null);
   const [clientId, setClientId] = React.useState(null);
   const [authWorkflow, setAuthWorkflow] = React.useState(null);
-  const [authorizationEndopoint, setAuthorizationEndopoint] = React.useState(
+  const [authorizationEndpoint, setAuthorizationEndpoint] = React.useState(
     null
   );
 
@@ -121,15 +121,8 @@ const App = () => {
 
           setIsAuthenticated(true);
         } else {
-          // Get authorization endpoint
-          const openIdConfigResponse = await PinotMethodUtils.getWellKnownOpenIdConfiguration(
-            issuer
-          );
-          setAuthorizationEndopoint(
-            openIdConfigResponse && openIdConfigResponse.authorization_endpoint
-              ? openIdConfigResponse.authorization_endpoint
-              : ''
-          );
+          // Set authorization endpoint
+          setAuthorizationEndpoint(`${issuer}/auth`);
 
           setLoading(false);
         }
@@ -151,11 +144,11 @@ const App = () => {
   }, [authWorkflow]);
 
   React.useEffect(() => {
-    if (authorizationEndopoint && oidcSignInFormRef && oidcSignInFormRef.current) {
-      // Authorization endpoint available; submit signin form
+    if (authorizationEndpoint && oidcSignInFormRef && oidcSignInFormRef.current) {
+      // Authorization endpoint available; submit sign in form
       oidcSignInFormRef.current.submit();
     }
-  }, [authorizationEndopoint]);
+  }, [authorizationEndpoint]);
 
   React.useEffect(() => {
     if (isAuthenticated) {
@@ -189,12 +182,12 @@ const App = () => {
       <NotificationContextProvider>
         <CustomNotification />
         {/* OIDC auth workflow */}
-        {authWorkflow && authWorkflow === AuthWorkflow.OIDC ? (
+        {authWorkflow && authWorkflow === AuthWorkflow.OIDC && !isAuthenticated ? (
           <>
             {/* OIDC sign in form */}
             <form
               hidden
-              action={authorizationEndopoint}
+              action={authorizationEndpoint}
               method="post"
               ref={oidcSignInFormRef}
             >
@@ -209,7 +202,7 @@ const App = () => {
           </>
         ) : (
           <>
-            {/* Non-OIDC auth workflow */}
+            {/* Non-OIDC/authenticated workflow */}
             {loading ? (
               <CircularProgress className={classes.loader} size={80} />
             ) : (
