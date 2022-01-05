@@ -62,6 +62,10 @@ public class MinionConstants {
     public static final String MERGED_SEGMENT_NAME_KEY = "mergedSegmentNameKey";
   }
 
+  public static class NoopTask {
+    public static final String TASK_TYPE = "noopTask";
+  }
+
   /**
    * Creates segments for the OFFLINE table, using completed segments from the corresponding REALTIME table
    */
