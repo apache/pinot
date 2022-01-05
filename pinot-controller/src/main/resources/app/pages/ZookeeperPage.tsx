@@ -193,13 +193,13 @@ const ZookeeperPage = () => {
             >
               {lastRefresh && renderLastRefresh()}
               <div className={classes.codeMirrorDiv}>
-                <CustomCodemirror data={currentNodeData} />
+                <CustomCodemirror data={currentNodeData} showLineWrapToggle />
               </div>
             </TabPanel>
             <TabPanel value={value} index={1} dir={theme.direction}>
               {lastRefresh && renderLastRefresh()}
               <div className={classes.codeMirrorDiv}>
-                <CustomCodemirror data={currentNodeMetadata} />
+                <CustomCodemirror data={currentNodeMetadata} showLineWrapToggle />
               </div>
             </TabPanel>
           </Grid>

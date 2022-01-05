@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.function;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
@@ -70,8 +69,15 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
         }
         String functionName = function.getFunctionName();
         FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
-        Preconditions.checkState(functionInfo != null, "Unsupported function: %s with %s parameters", functionName,
-            numArguments);
+        if (functionInfo == null) {
+          if (FunctionRegistry.containsFunction(functionName)) {
+            throw new IllegalStateException(
+              String.format("Unsupported function: %s with %d parameters", functionName, numArguments));
+          } else {
+            throw new IllegalStateException(
+              String.format("Unsupported function: %s not found", functionName));
+          }
+        }
         return new FunctionExecutionNode(functionInfo, childNodes);
       default:
         throw new IllegalStateException();

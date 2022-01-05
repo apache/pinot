@@ -31,6 +31,7 @@ import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -46,6 +47,7 @@ import org.slf4j.LoggerFactory;
 public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamingSelectionOnlyCombineOperator.class);
   private static final String OPERATOR_NAME = "StreamingSelectionOnlyCombineOperator";
+  private static final String EXPLAIN_NAME = "SELECT_STREAMING_COMBINE";
 
   // Special IntermediateResultsBlock to indicate that this is the last results block for an operator
   private static final IntermediateResultsBlock LAST_RESULTS_BLOCK =
@@ -69,17 +71,31 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
   }
 
   @Override
-  protected void processSegments(int taskIndex) {
-    for (int operatorIndex = taskIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
+  public String toExplainString() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected void processSegments(int threadIndex) {
+    for (int operatorIndex = threadIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
       Operator<IntermediateResultsBlock> operator = _operators.get(operatorIndex);
       IntermediateResultsBlock resultsBlock;
-      while ((resultsBlock = operator.nextBlock()) != null) {
-        Collection<Object[]> rows = resultsBlock.getSelectionResult();
-        assert rows != null;
-        long numRowsCollected = _numRowsCollected.addAndGet(rows.size());
-        _blockingQueue.offer(resultsBlock);
-        if (numRowsCollected >= _limit) {
-          return;
+      try {
+        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+          ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
+        }
+        while ((resultsBlock = operator.nextBlock()) != null) {
+          Collection<Object[]> rows = resultsBlock.getSelectionResult();
+          assert rows != null;
+          long numRowsCollected = _numRowsCollected.addAndGet(rows.size());
+          _blockingQueue.offer(resultsBlock);
+          if (numRowsCollected >= _limit) {
+            return;
+          }
+        }
+      } finally {
+        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+          ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
       }
       _blockingQueue.offer(LAST_RESULTS_BLOCK);

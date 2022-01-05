@@ -27,7 +27,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 
 public class IndexingConfig extends BaseJsonConfig {
 
-  public static final int DEFAULT_RANGE_INDEX_VERSION = 1;
+  public static final int DEFAULT_RANGE_INDEX_VERSION = 2;
 
   private List<String> _invertedIndexColumns;
   private List<String> _rangeIndexColumns;
@@ -41,6 +41,7 @@ public class IndexingConfig extends BaseJsonConfig {
   @Deprecated // Moved to {@link IngestionConfig#getStreamIngestionConfig}
   private Map<String, String> _streamConfigs;
   private String _segmentFormatVersion;
+  private FSTType _fstTypeForFSTIndex;
   private String _columnMinMaxValueGeneratorMode;
   private List<String> _noDictionaryColumns; // TODO: replace this with noDictionaryConfig.
   private Map<String, String> _noDictionaryConfig;
@@ -84,6 +85,14 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public int getRangeIndexVersion() {
     return _rangeIndexVersion;
+  }
+
+  public void setFSTIndexType(FSTType fstType) {
+    _fstTypeForFSTIndex = fstType;
+  }
+
+  public FSTType getFSTIndexType() {
+    return _fstTypeForFSTIndex;
   }
 
   public void setRangeIndexVersion(int rangeIndexVersion) {

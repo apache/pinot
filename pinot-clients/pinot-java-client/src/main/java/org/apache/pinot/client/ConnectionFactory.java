@@ -58,9 +58,31 @@ public class ConnectionFactory {
     }
   }
 
+  /**
+   * Creates a connection to a Pinot cluster, given its Zookeeper URL
+   *
+   * @param properties The Pinot connection properties
+   * @param zkUrl The URL to the Zookeeper cluster, must include the cluster name e.g host:port/chroot/pinot-cluster
+   * @param transport pinot transport
+   * @return A connection that connects to the brokers in the given Helix cluster
+   */
+  public static Connection fromZookeeper(Properties properties, String zkUrl, PinotClientTransport transport) {
+    try {
+      return fromZookeeper(properties, new DynamicBrokerSelector(zkUrl), transport);
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
+  }
+
   @VisibleForTesting
   static Connection fromZookeeper(DynamicBrokerSelector dynamicBrokerSelector, PinotClientTransport transport) {
-      return new Connection(dynamicBrokerSelector, transport);
+    return fromZookeeper(new Properties(), dynamicBrokerSelector, transport);
+  }
+
+  @VisibleForTesting
+  static Connection fromZookeeper(Properties properties, DynamicBrokerSelector dynamicBrokerSelector,
+      PinotClientTransport transport) {
+    return new Connection(properties, dynamicBrokerSelector, transport);
   }
 
   /**
@@ -81,7 +103,7 @@ public class ConnectionFactory {
    * @return A connection that connects to the brokers specified in the properties
    */
   public static Connection fromProperties(Properties properties, PinotClientTransport transport) {
-    return new Connection(Arrays.asList(properties.getProperty("brokerList").split(",")), transport);
+    return new Connection(properties, Arrays.asList(properties.getProperty("brokerList").split(",")), transport);
   }
 
   /**
@@ -103,6 +125,19 @@ public class ConnectionFactory {
    */
   public static Connection fromHostList(List<String> brokers, PinotClientTransport transport) {
     return new Connection(brokers, transport);
+  }
+
+  /**
+   * Creates a connection which sends queries randomly between the specified brokers.
+   *
+   * @param properties The Pinot connection properties
+   * @param brokers The list of brokers to send queries to
+   * @param transport pinot transport
+   * @return A connection to the set of brokers specified
+   */
+  public static Connection fromHostList(Properties properties, List<String> brokers,
+      PinotClientTransport transport) {
+    return new Connection(properties, brokers, transport);
   }
 
   private static PinotClientTransport getDefault() {

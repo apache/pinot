@@ -27,19 +27,12 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDictionary;
-import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVForwardIndexReader;
-import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
-import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkMVForwardIndexReader;
-import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
-import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
-import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
-import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.index.IndexingOverrides;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,28 +52,7 @@ public class LoaderUtils {
       throws IOException {
     PinotDataBuffer dataBuffer =
         segmentReader.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
-    if (columnMetadata.hasDictionary()) {
-      if (columnMetadata.isSingleValue()) {
-        if (columnMetadata.isSorted()) {
-          return new SortedIndexReaderImpl(dataBuffer, columnMetadata.getCardinality());
-        } else {
-          return new FixedBitSVForwardIndexReaderV2(dataBuffer, columnMetadata.getTotalDocs(),
-              columnMetadata.getBitsPerElement());
-        }
-      } else {
-        return new FixedBitMVForwardIndexReader(dataBuffer, columnMetadata.getTotalDocs(),
-            columnMetadata.getTotalNumberOfEntries(), columnMetadata.getBitsPerElement());
-      }
-    } else {
-      DataType storedType = columnMetadata.getDataType().getStoredType();
-      if (columnMetadata.isSingleValue()) {
-        return storedType.isFixedWidth() ? new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType)
-            : new VarByteChunkSVForwardIndexReader(dataBuffer, storedType);
-      } else {
-        return storedType.isFixedWidth() ? new FixedByteChunkMVForwardIndexReader(dataBuffer, storedType)
-            : new VarByteChunkMVForwardIndexReader(dataBuffer, storedType);
-      }
-    }
+    return IndexingOverrides.getIndexReaderProvider().newForwardIndexReader(dataBuffer, columnMetadata);
   }
 
   /**

@@ -33,8 +33,8 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
@@ -56,6 +56,8 @@ import org.slf4j.LoggerFactory;
 public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombineOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinMaxValueBasedSelectionOrderByCombineOperator.class);
   private static final String OPERATOR_NAME = "MinMaxValueBasedSelectionOrderByCombineOperator";
+  private static final String EXPLAIN_NAME = "COMBINE_SELECT_ORDERBY_MINMAX";
+
   // For min/max value based combine, when a thread detects that no more segments need to be processed, it inserts this
   // special IntermediateResultsBlock into the BlockingQueue to awake the main thread
   private static final IntermediateResultsBlock LAST_RESULTS_BLOCK =
@@ -82,8 +84,8 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
     String firstOrderByColumn = firstOrderByExpression.getExpression().getIdentifier();
 
     _minMaxValueContexts = new ArrayList<>(_numOperators);
-    for (Operator operator : _operators) {
-      _minMaxValueContexts.add(new MinMaxValueContext((SelectionOrderByOperator) operator, firstOrderByColumn));
+    for (Operator<IntermediateResultsBlock> operator : _operators) {
+      _minMaxValueContexts.add(new MinMaxValueContext(operator, firstOrderByColumn));
     }
     if (firstOrderByExpression.isAsc()) {
       // For ascending order, sort on column min value in ascending order
@@ -115,6 +117,11 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String toExplainString() {
+    return EXPLAIN_NAME;
   }
 
   /**
@@ -188,7 +195,18 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
       }
 
       // Process the segment
-      IntermediateResultsBlock resultsBlock = minMaxValueContext._operator.nextBlock();
+      Operator operator = minMaxValueContext._operator;
+      IntermediateResultsBlock resultsBlock;
+      try {
+        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+          ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
+        }
+        resultsBlock = (IntermediateResultsBlock) operator.nextBlock();
+      } finally {
+        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+          ((AcquireReleaseColumnsSegmentOperator) operator).release();
+        }
+      }
       PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
       if (selectionResult != null && selectionResult.size() == _numRowsToKeep) {
         // Segment result has enough rows, update the boundary value
@@ -289,11 +307,11 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
   }
 
   private static class MinMaxValueContext {
-    final SelectionOrderByOperator _operator;
+    final Operator<IntermediateResultsBlock> _operator;
     final Comparable _minValue;
     final Comparable _maxValue;
 
-    MinMaxValueContext(SelectionOrderByOperator operator, String column) {
+    MinMaxValueContext(Operator<IntermediateResultsBlock> operator, String column) {
       _operator = operator;
       DataSourceMetadata dataSourceMetadata = operator.getIndexSegment().getDataSource(column).getDataSourceMetadata();
       _minValue = dataSourceMetadata.getMinValue();

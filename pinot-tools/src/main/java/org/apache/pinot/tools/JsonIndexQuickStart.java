@@ -36,6 +36,11 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 
 public class JsonIndexQuickStart extends QuickStartBase {
 
+  @Override
+  public List<String> types() {
+    return Arrays.asList("OFFLINE_JSON_INDEX", "OFFLINE-JSON-INDEX", "BATCH_JSON_INDEX", "BATCH-JSON-INDEX");
+  }
+
   public void execute()
       throws Exception {
     File quickstartTmpDir = new File(_tmpDir, String.valueOf(System.currentTimeMillis()));

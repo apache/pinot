@@ -65,19 +65,39 @@ public class BrokerRequestToQueryContextConverter {
     List<String> aliasList = new ArrayList<>(selectList.size());
     selectExpressions = new ArrayList<>(selectList.size());
     for (Expression thriftExpression : selectList) {
-      ExpressionContext expression;
-      if (thriftExpression.getType() == ExpressionType.FUNCTION && thriftExpression.getFunctionCall().getOperator()
-          .equalsIgnoreCase("AS")) {
-        // Handle alias
-        List<Expression> operands = thriftExpression.getFunctionCall().getOperands();
-        expression = RequestContextUtils.getExpression(operands.get(0));
-        aliasList.add(operands.get(1).getIdentifier().getName());
+      // Handle alias
+      Expression expressionWithoutAlias = thriftExpression;
+      if (thriftExpression.getType() == ExpressionType.FUNCTION) {
+        Function function = thriftExpression.getFunctionCall();
+        List<Expression> operands = function.getOperands();
+        switch (function.getOperator().toUpperCase()) {
+          case "AS":
+            expressionWithoutAlias = operands.get(0);
+            aliasList.add(operands.get(1).getIdentifier().getName());
+            break;
+          case "DISTINCT":
+            int numOperands = operands.size();
+            for (int i = 0; i < numOperands; i++) {
+              Expression operand = operands.get(i);
+              Function operandFunction = operand.getFunctionCall();
+              if (operandFunction != null && operandFunction.getOperator().equalsIgnoreCase("AS")) {
+                operands.set(i, operandFunction.getOperands().get(0));
+                aliasList.add(operandFunction.getOperands().get(1).getIdentifier().getName());
+              } else {
+                aliasList.add(null);
+              }
+            }
+            break;
+          default:
+            // Add null as a placeholder for alias.
+            aliasList.add(null);
+            break;
+        }
       } else {
-        expression = RequestContextUtils.getExpression(thriftExpression);
-        // Add null as a place holder for alias.
+        // Add null as a placeholder for alias.
         aliasList.add(null);
       }
-      selectExpressions.add(expression);
+      selectExpressions.add(RequestContextUtils.getExpression(expressionWithoutAlias));
     }
 
     // WHERE

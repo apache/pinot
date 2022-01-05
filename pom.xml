@@ -31,7 +31,7 @@
 
   <groupId>org.apache.pinot</groupId>
   <artifactId>pinot</artifactId>
-  <version>0.9.0-SNAPSHOT</version>
+  <version>0.10.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Pinot</name>
   <description>A realtime distributed OLAP datastore</description>
@@ -122,7 +122,7 @@
     <zkclient.version>0.7</zkclient.version>
     <jackson.version>2.10.0</jackson.version>
     <zookeeper.version>3.5.8</zookeeper.version>
-    <async-http-client.version>1.9.21</async-http-client.version>
+    <async-http-client.version>2.12.3</async-http-client.version>
     <jersey.version>2.28</jersey.version>
     <grizzly.version>2.4.4</grizzly.version>
     <swagger.version>1.5.16</swagger.version>
@@ -147,8 +147,9 @@
     <snappy-java.version>1.1.1.7</snappy-java.version>
     <zstd-jni.version>1.4.9-5</zstd-jni.version>
     <lz4-java.version>1.7.1</lz4-java.version>
-    <log4j.version>2.11.2</log4j.version>
+    <log4j.version>2.17.1</log4j.version>
     <netty.version>4.1.54.Final</netty.version>
+    <netty-tcnative.version>2.0.36.Final</netty-tcnative.version>
     <reactivestreams.version>1.0.3</reactivestreams.version>
     <jts.version>1.16.1</jts.version>
     <h3.version>3.0.3</h3.version>
@@ -436,7 +437,7 @@
       <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>0.9.22</version>
+        <version>0.9.23</version>
       </dependency>
       <dependency>
         <groupId>com.101tec</groupId>
@@ -719,7 +720,7 @@
         <version>3.3.4</version>
       </dependency>
       <dependency>
-        <groupId>com.ning</groupId>
+        <groupId>org.asynchttpclient</groupId>
         <artifactId>async-http-client</artifactId>
         <version>${async-http-client.version}</version>
       </dependency>
@@ -1047,7 +1048,7 @@
       <dependency>
         <groupId>org.webjars</groupId>
         <artifactId>swagger-ui</artifactId>
-        <version>3.18.2</version>
+        <version>3.23.11</version>
       </dependency>
       <dependency>
         <groupId>com.clearspring.analytics</groupId>
@@ -1277,9 +1278,9 @@
         <version>3.0.12</version>
       </dependency>
       <dependency>
-        <groupId>args4j</groupId>
-        <artifactId>args4j</artifactId>
-        <version>2.32</version>
+        <groupId>info.picocli</groupId>
+        <artifactId>picocli</artifactId>
+        <version>4.6.1</version>
       </dependency>
       <dependency>
         <groupId>org.glassfish.tyrus.bundles</groupId>
@@ -1424,6 +1425,7 @@
           <configuration>
             <!-- Remove this after fixing all javadoc warnings -->
             <doclint>none</doclint>
+            <source>${jdk.version}</source>
           </configuration>
         </plugin>
         <plugin>

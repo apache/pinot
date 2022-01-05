@@ -21,18 +21,19 @@ package org.apache.pinot.tools.admin.command;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.GitHubEventsQuickstart;
-import org.kohsuke.args4j.Option;
+import picocli.CommandLine;
 
 
 /**
  * Command to run GitHubEventsQuickStart
  */
+@CommandLine.Command(name = "GitHubEventsQuickStart")
 public class GitHubEventsQuickStartCommand extends AbstractBaseAdminCommand implements Command {
 
-  @Option(name = "-personalAccessToken", required = true, metaVar = "<String>", usage = "GitHub personal access token.")
+  @CommandLine.Option(names = {"-personalAccessToken"}, required = true, description = "GitHub personal access token.")
   private String _personalAccessToken;
 
-  @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message.")
   private boolean _help = false;
 
   public void setPersonalAccessToken(String personalAccessToken) {

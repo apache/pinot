@@ -34,9 +34,10 @@ This docker build project is specialized for Pinot.
 You can also build directly with `docker build` command by setting arguments:
 ```bash
 docker build \
-	--build-arg PRESTO_BRANCH=master \
+	--build-arg PRESTO_GIT_URL=$PRESTO_GIT_URL \
+	--build-arg PRESTO_BRANCH=$PRESTO_BRANCH \
 	--tag apachepinot/pinot-presto:latest \
-	--target build .
+	.
 ```
 ## How to push
 

@@ -18,15 +18,11 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
-import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.ints.IntList;
-import org.apache.pinot.common.request.context.predicate.Predicate;
-import org.apache.pinot.segment.local.utils.fst.RegexpMatcher;
+import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
+import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-
-import static org.apache.pinot.common.request.context.predicate.Predicate.Type.REGEXP_LIKE;
 
 
 /**
@@ -37,91 +33,32 @@ public class FSTBasedRegexpPredicateEvaluatorFactory {
   }
 
   /**
-   * Creates a predicate evaluator which matches the regexp query pattern using
-   * FST Index available. FST Index is not yet present for consuming segments,
-   * so use newAutomatonBasedEvaluator for consuming segments.
+   * Creates a predicate evaluator which matches the regexp query pattern using FST Index available.
    *
+   * @param regexpLikePredicate REGEXP_LIKE predicate to evaluate
    * @param fstIndexReader FST Index reader
    * @param dictionary Dictionary for the column
-   * @param regexpQuery input query to match
    * @return Predicate evaluator
    */
-  public static BaseDictionaryBasedPredicateEvaluator newFSTBasedEvaluator(TextIndexReader fstIndexReader,
-      Dictionary dictionary, String regexpQuery) {
-    return new FSTBasedRegexpPredicateEvaluatorFactory.FSTBasedRegexpPredicateEvaluator(fstIndexReader, dictionary,
-        regexpQuery);
-  }
-
-  /**
-   * Creates a predicate evaluator which uses regex matching logic which is similar to
-   * FSTBasedRegexpPredicateEvaluator. This predicate evaluator is used for consuming
-   * segments and is there to make sure results are consistent between consuming and
-   * rolled out segments when FST index is enabled.
-   *
-   * @param dictionary Dictionary for the column
-   * @param regexpQuery input query to match
-   * @return Predicate evaluator
-   */
-  public static BaseDictionaryBasedPredicateEvaluator newAutomatonBasedEvaluator(Dictionary dictionary,
-      String regexpQuery) {
-    return new FSTBasedRegexpPredicateEvaluatorFactory.AutomatonBasedRegexpPredicateEvaluator(regexpQuery, dictionary);
-  }
-
-  /**
-   * This predicate evaluator is created to be used for consuming segments. This evaluator
-   * creates automaton following very similar logic to that of FSTBasedRegexpPredicateEvaluator,
-   * so the results stay consistent across consuming and rolled out segments.
-   */
-  private static class AutomatonBasedRegexpPredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
-    private final RegexpMatcher _regexpMatcher;
-    private final Dictionary _dictionary;
-    int[] _matchingDictIds;
-
-    public AutomatonBasedRegexpPredicateEvaluator(String searchQuery, Dictionary dictionary) {
-      _regexpMatcher = new RegexpMatcher(searchQuery, null);
-      _dictionary = dictionary;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return REGEXP_LIKE;
-    }
-
-    @Override
-    public boolean applySV(int dictId) {
-      return _regexpMatcher.match(_dictionary.getStringValue(dictId));
-    }
-
-    @Override
-    public int[] getMatchingDictIds() {
-      if (_matchingDictIds == null) {
-        IntList matchingDictIds = new IntArrayList();
-        int dictionarySize = _dictionary.length();
-        for (int dictId = 0; dictId < dictionarySize; dictId++) {
-          if (applySV(dictId)) {
-            matchingDictIds.add(dictId);
-          }
-        }
-        _matchingDictIds = matchingDictIds.toIntArray();
-      }
-      return _matchingDictIds;
-    }
+  public static BaseDictionaryBasedPredicateEvaluator newFSTBasedEvaluator(RegexpLikePredicate regexpLikePredicate,
+      TextIndexReader fstIndexReader, Dictionary dictionary) {
+    return new FSTBasedRegexpPredicateEvaluatorFactory.FSTBasedRegexpPredicateEvaluator(regexpLikePredicate,
+        fstIndexReader, dictionary);
   }
 
   /**
    * Matches regexp query using FSTIndexReader.
    */
   private static class FSTBasedRegexpPredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
-    private final TextIndexReader _fstIndexReader;
-    private final String _searchQuery;
-    private final ImmutableRoaringBitmap _dictIds;
-    private final Dictionary _dictionary;
+    final Dictionary _dictionary;
+    final ImmutableRoaringBitmap _dictIds;
 
-    public FSTBasedRegexpPredicateEvaluator(TextIndexReader fstIndexReader, Dictionary dictionary, String searchQuery) {
+    public FSTBasedRegexpPredicateEvaluator(RegexpLikePredicate regexpLikePredicate, TextIndexReader fstIndexReader,
+        Dictionary dictionary) {
+      super(regexpLikePredicate);
       _dictionary = dictionary;
-      _fstIndexReader = fstIndexReader;
-      _searchQuery = searchQuery;
-      _dictIds = _fstIndexReader.getDictIds(_searchQuery);
+      String searchQuery = RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(regexpLikePredicate.getValue());
+      _dictIds = fstIndexReader.getDictIds(searchQuery);
     }
 
     @Override
@@ -132,11 +69,6 @@ public class FSTBasedRegexpPredicateEvaluatorFactory {
     @Override
     public boolean isAlwaysTrue() {
       return _dictIds.getCardinality() == _dictionary.length();
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return REGEXP_LIKE;
     }
 
     @Override

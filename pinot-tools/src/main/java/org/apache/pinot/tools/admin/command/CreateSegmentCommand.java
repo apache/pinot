@@ -40,56 +40,58 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
  * Class to implement CreateSegment command.
  */
 @SuppressWarnings("unused")
+@CommandLine.Command(name = "CreateSegment")
 public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(CreateSegmentCommand.class);
 
-  @Option(name = "-dataDir", metaVar = "<string>", usage = "Directory containing the data.")
+  @CommandLine.Option(names = {"-dataDir"}, description = "Directory containing the data.")
   private String _dataDir;
 
-  @Option(name = "-format", metaVar = "<AVRO/CSV/JSON/THRIFT/PARQUET/ORC>", usage = "Input data format.")
+  @CommandLine.Option(names = {"-format"}, description = "Input data format.")
   private FileFormat _format;
 
-  @Option(name = "-outDir", metaVar = "<string>", usage = "Name of output directory.")
+  @CommandLine.Option(names = {"-outDir"}, description = "Name of output directory.")
   private String _outDir;
 
-  @Option(name = "-overwrite", usage = "Overwrite existing output directory.")
+  @CommandLine.Option(names = {"-overwrite"}, description = "Overwrite existing output directory.")
   private boolean _overwrite = false;
 
-  @Option(name = "-tableConfigFile", metaVar = "<string>", usage = "File containing table config for data.")
+  @CommandLine.Option(names = {"-tableConfigFile"}, description = "File containing table config for data.")
   private String _tableConfigFile;
 
-  @Option(name = "-schemaFile", metaVar = "<string>", usage = "File containing schema for data.")
+  @CommandLine.Option(names = {"-schemaFile"}, description = "File containing schema for data.")
   private String _schemaFile;
 
-  @Option(name = "-readerConfigFile", metaVar = "<string>", usage = "Config file for record reader.")
+  @CommandLine.Option(names = {"-readerConfigFile"}, description = "Config file for record reader.")
   private String _readerConfigFile;
 
-  @Option(name = "-retry", metaVar = "<int>",
-      usage = "Number of retries if encountered any segment creation failure, default is 0.")
+  @CommandLine.Option(names = {"-retry"}, 
+      description = "Number of retries if encountered any segment creation failure, default is 0.")
   private int _retry = 0;
 
-  @Option(name = "-failOnEmptySegment", usage = "Option to fail the segment creation if output is an empty segment.")
+  @CommandLine.Option(names = {"-failOnEmptySegment"},
+      description = "Option to fail the segment creation if output is an empty segment.")
   private boolean _failOnEmptySegment = false;
 
-  @Option(name = "-postCreationVerification",
-      usage = "Verify segment data file after segment creation. Please ensure you have enough local disk to hold data"
-          + " for verification")
+  @CommandLine.Option(names = {"-postCreationVerification"},
+      description = "Verify segment data file after segment creation. Please ensure you have enough local disk to"
+          + " hold data for verification")
   private boolean _postCreationVerification = false;
 
-  @Option(name = "-numThreads", metaVar = "<int>", usage = "Parallelism while generating segments, default is 1.")
+  @CommandLine.Option(names = {"-numThreads"}, description = "Parallelism while generating segments, default is 1.")
   private int _numThreads = 1;
 
   @SuppressWarnings("FieldCanBeLocal")
-  @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message.")
   private boolean _help = false;
 
   public CreateSegmentCommand setDataDir(String dataDir) {

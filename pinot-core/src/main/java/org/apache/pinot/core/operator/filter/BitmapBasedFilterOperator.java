@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import java.util.Collections;
+import java.util.List;
+import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.EmptyFilterBlock;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
@@ -31,6 +35,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 @SuppressWarnings("rawtypes")
 public class BitmapBasedFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "BitmapBasedFilterOperator";
+  private static final String EXPLAIN_NAME = "FILTER_INVERTED_INDEX";
 
   private final PredicateEvaluator _predicateEvaluator;
   private final InvertedIndexReader _invertedIndexReader;
@@ -98,5 +103,21 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Collections.emptyList();
+  }
+
+  @Override
+  public String toExplainString() {
+    StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(indexLookUp:inverted_index");
+    Predicate predicate = _predicateEvaluator != null ? _predicateEvaluator.getPredicate() : null;
+    if (predicate != null) {
+      stringBuilder.append(",operator:").append(predicate.getType());
+      stringBuilder.append(",predicate:").append(predicate.toString());
+    }
+    return stringBuilder.append(')').toString();
   }
 }

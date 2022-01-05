@@ -85,7 +85,7 @@ spec:
             path: {{ .Values.minion.probes.endpoint }}
             port: {{ .Values.minion.service.port }}
         {{- end }}
-        {{- if .Values.minion.probes.livenessEnabled }}
+        {{- if .Values.minion.probes.readinessEnabled }}
         readinessProbe:
           initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
           periodSeconds: {{ .Values.probes.periodSeconds }}

@@ -20,44 +20,45 @@ package org.apache.pinot.tools.filesystem;
 
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
+@CommandLine.Command
 public class PinotFSBenchmarkRunner extends AbstractBaseCommand implements Command {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotFSBenchmarkRunner.class);
 
-  @Option(name = "-mode", required = true, metaVar = "<String>",
-      usage = "Test mode. (ALL|LISTFILES|READWRITE|DELETE|RENAME)")
+  @CommandLine.Option(names = {"-mode"}, required = true,
+      description = "Test mode. (ALL|LISTFILES|READWRITE|DELETE|RENAME)")
   private String _mode;
 
-  @Option(name = "-pinotFSConfigFile", required = true, metaVar = "<String>",
-      usage = "Path for PinotFS configuration file")
+  @CommandLine.Option(names = {"-pinotFSConfigFile"}, required = true, 
+      description = "Path for PinotFS configuration file")
   private String _pinotFSConfigFile;
 
-  @Option(name = "-baseDirectoryUri", required = true, metaVar = "<String>",
-      usage = "Temp directory path for running benchmark against. e.g. file:///path/to/test, abfss://host/path...")
+  @CommandLine.Option(names = {"-baseDirectoryUri"}, required = true, 
+      description = "Temp dir path for running benchmark against. e.g. file:///path/to/test, abfss://host/path...")
   private String _baseDirectoryUri;
 
-  @Option(name = "-localTempDir", required = false, metaVar = "<String>", usage = "Local temp directory for benchmark.")
+  @CommandLine.Option(names = {"-localTempDir"}, required = false, description = "Local temp directory for benchmark.")
   private String _localTempDir;
 
-  @Option(name = "-numSegmentsForListTest", required = false, metaVar = "<Integer>",
-      usage = "The number of segments to create before running listFiles test.")
+  @CommandLine.Option(names = {"-numSegmentsForListTest"}, required = false, 
+      description = "The number of segments to create before running listFiles test.")
   private Integer _numSegmentsForListTest;
 
-  @Option(name = "-dataSizeInMBsForCopyTest", required = false, metaVar = "<Integer>",
-      usage = "Data size in MB for copy test. (e.g. 1024 = 1GB)")
+  @CommandLine.Option(names = {"-dataSizeInMBsForCopyTest"}, required = false, 
+      description = "Data size in MB for copy test. (e.g. 1024 = 1GB)")
   private Integer _dataSizeInMBsForCopyTest;
 
-  @Option(name = "-numOps", required = false, metaVar = "<Integer>",
-      usage = "The number of trials of operations when running a benchmark.")
+  @CommandLine.Option(names = {"-numOps"}, required = false, 
+      description = "The number of trials of operations when running a benchmark.")
   private Integer _numOps;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help = false;
 
   @Override

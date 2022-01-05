@@ -42,7 +42,7 @@ public class LongMsgOffset implements StreamPartitionMsgOffset {
   }
 
   @Override
-  public int compareTo(Object other) {
+  public int compareTo(StreamPartitionMsgOffset other) {
     return Long.compare(_offset, ((LongMsgOffset) other)._offset);
   }
 

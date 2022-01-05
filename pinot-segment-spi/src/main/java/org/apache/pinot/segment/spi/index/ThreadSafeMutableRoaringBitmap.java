@@ -48,6 +48,11 @@ public class ThreadSafeMutableRoaringBitmap {
     _mutableRoaringBitmap.remove(docId);
   }
 
+  public synchronized void replace(int oldDocId, int newDocId) {
+    _mutableRoaringBitmap.remove(oldDocId);
+    _mutableRoaringBitmap.add(newDocId);
+  }
+
   public synchronized MutableRoaringBitmap getMutableRoaringBitmap() {
     return _mutableRoaringBitmap.clone();
   }

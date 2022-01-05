@@ -27,6 +27,7 @@ import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
@@ -46,7 +47,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  */
 public class H3IndexFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "H3IndexFilterOperator";
-
+  private static final String EXPLAIN_NAME = "FILTER_H3_INDEX";
   private final IndexSegment _segment;
   private final Predicate _predicate;
   private final int _numDocs;
@@ -242,5 +243,18 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Collections.emptyList();
+  }
+
+  @Override
+  public String toExplainString() {
+    StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(indexLookUp:h3_index");
+    stringBuilder.append(",operator:").append(_predicate.getType());
+    stringBuilder.append(",predicate:").append(_predicate.toString());
+    return stringBuilder.append(')').toString();
   }
 }

@@ -121,6 +121,12 @@ declare module 'Models' {
     minConsumingFreshnessTimeMs: number
     offlineThreadCpuTimeNs: number
     realtimeThreadCpuTimeNs: number
+    offlineSystemActivitiesCpuTimeNs: number
+    realtimeSystemActivitiesCpuTimeNs: number
+    offlineResponseSerializationCpuTimeNs: number
+    realtimeResponseSerializationCpuTimeNs: number
+    offlineTotalCpuTimeNs: number
+    realtimeTotalCpuTimeNs: number
   };
 
   export type ClusterName = {

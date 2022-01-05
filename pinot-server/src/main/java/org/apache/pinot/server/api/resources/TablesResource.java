@@ -68,8 +68,8 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.server.api.access.AccessControl;
-import org.apache.pinot.server.api.access.AccessControlFactory;
+import org.apache.pinot.server.access.AccessControl;
+import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -259,6 +259,14 @@ public class TablesResource {
       @ApiParam(value = "Segment name", required = true) @PathParam("segmentName") String segmentName,
       @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
           List<String> columns) {
+    for (int i = 0; i < columns.size(); i++) {
+      try {
+        columns.set(i, URLDecoder.decode(columns.get(i), StandardCharsets.UTF_8.name()));
+      } catch (UnsupportedEncodingException e) {
+        throw new RuntimeException(e.getCause());
+      }
+    }
+
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
     try {
       segmentName = URLDecoder.decode(segmentName, StandardCharsets.UTF_8.name());
@@ -269,14 +277,6 @@ public class TablesResource {
     if (segmentDataManager == null) {
       throw new WebApplicationException(String.format("Table %s segments %s does not exist", tableName, segmentName),
           Response.Status.NOT_FOUND);
-    }
-
-    for (int i = 0; i < columns.size(); i++) {
-      try {
-        columns.set(i, URLDecoder.decode(columns.get(i), StandardCharsets.UTF_8.name()));
-      } catch (UnsupportedEncodingException e) {
-        throw new RuntimeException(e.getCause());
-      }
     }
 
     try {

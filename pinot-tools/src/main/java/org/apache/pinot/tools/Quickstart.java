@@ -33,6 +33,11 @@ import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 
 public class Quickstart extends QuickStartBase {
+  @Override
+  public List<String> types() {
+    return Arrays.asList("OFFLINE", "BATCH");
+  }
+
   private static final String TAB = "\t\t";
   private static final String NEW_LINE = "\n";
 
@@ -60,6 +65,12 @@ public class Quickstart extends QuickStartBase {
 
   public Map<String, Object> getConfigOverrides() {
     return null;
+  }
+
+  protected void waitForBootstrapToComplete(QuickstartRunner runner)
+      throws Exception {
+    printStatus(Color.CYAN, "***** Waiting for 5 seconds for the server to fetch the assigned segment *****");
+    Thread.sleep(5000);
   }
 
   public static void printStatus(Color color, String message) {
@@ -196,8 +207,7 @@ public class Quickstart extends QuickStartBase {
     printStatus(Color.CYAN, "***** Bootstrap baseballStats table *****");
     runner.bootstrapTable();
 
-    printStatus(Color.CYAN, "***** Waiting for 5 seconds for the server to fetch the assigned segment *****");
-    Thread.sleep(5000);
+    waitForBootstrapToComplete(runner);
 
     printStatus(Color.YELLOW, "***** Offline quickstart setup complete *****");
 

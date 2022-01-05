@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
@@ -94,7 +93,6 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.SegmentType;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -156,7 +154,6 @@ public class PinotLLCRealtimeSegmentManager {
   private final MetadataEventNotifierFactory _metadataEventNotifierFactory;
   private final int _numIdealStateUpdateLocks;
   private final Lock[] _idealStateUpdateLocks;
-  private final TableConfigCache _tableConfigCache;
   private final FlushThresholdUpdateManager _flushThresholdUpdateManager;
   private final boolean _isDeepStoreLLCSegmentUploadRetryEnabled;
 
@@ -180,7 +177,6 @@ public class PinotLLCRealtimeSegmentManager {
     for (int i = 0; i < _numIdealStateUpdateLocks; i++) {
       _idealStateUpdateLocks[i] = new ReentrantLock();
     }
-    _tableConfigCache = new TableConfigCache(_propertyStore);
     _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
     _isDeepStoreLLCSegmentUploadRetryEnabled = controllerConf.isDeepStoreRetryUploadLLCSegmentEnabled();
     if (_isDeepStoreLLCSegmentUploadRetryEnabled) {
@@ -316,7 +312,7 @@ public class PinotLLCRealtimeSegmentManager {
     for (PartitionGroupMetadata partitionGroupMetadata : newPartitionGroupMetadataList) {
       String segmentName =
           setupNewPartitionGroup(tableConfig, streamConfig, partitionGroupMetadata, currentTimeMs, instancePartitions,
-              numPartitionGroups, numReplicas, newPartitionGroupMetadataList);
+              numPartitionGroups, numReplicas, newPartitionGroupMetadataList, false);
 
       updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, segmentName, segmentAssignment,
           instancePartitionsMap);
@@ -343,16 +339,20 @@ public class PinotLLCRealtimeSegmentManager {
     _helixResourceManager.deleteSegments(realtimeTableName, segmentsToRemove);
   }
 
+  // TODO: Consider using TableCache to read the table config
   @VisibleForTesting
   public TableConfig getTableConfig(String realtimeTableName) {
+    TableConfig tableConfig;
     try {
-      return _tableConfigCache.getTableConfig(realtimeTableName);
-    } catch (ExecutionException e) {
+      tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, realtimeTableName);
+    } catch (Exception e) {
       _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_ZOOKEEPER_FETCH_FAILURES, 1L);
-      throw new IllegalStateException(
-          "Caught exception while loading table config from property store to cache for table: " + realtimeTableName,
-          e);
+      throw e;
     }
+    if (tableConfig == null) {
+      throw new IllegalStateException("Failed to find table config for table: " + realtimeTableName);
+    }
+    return tableConfig;
   }
 
   @VisibleForTesting
@@ -672,8 +672,6 @@ public class PinotLLCRealtimeSegmentManager {
             segmentName, startOffset, creationTimeMs);
 
     SegmentZKMetadata newSegmentZKMetadata = new SegmentZKMetadata(segmentName);
-    newSegmentZKMetadata.setTableName(realtimeTableName);
-    newSegmentZKMetadata.setSegmentType(SegmentType.REALTIME);
     newSegmentZKMetadata.setCreationTime(creationTimeMs);
     newSegmentZKMetadata.setStartOffset(startOffset);
     // Leave maxOffset as null.
@@ -727,7 +725,7 @@ public class PinotLLCRealtimeSegmentManager {
       PartitionFunction partitionFunction = columnMetadata.getPartitionFunction();
       if (partitionFunction != null) {
         ColumnPartitionMetadata columnPartitionMetadata =
-            new ColumnPartitionMetadata(partitionFunction.toString(), partitionFunction.getNumPartitions(),
+            new ColumnPartitionMetadata(partitionFunction.getName(), partitionFunction.getNumPartitions(),
                 columnMetadata.getPartitions());
         return new SegmentPartitionMetadata(Collections.singletonMap(entry.getKey(), columnPartitionMetadata));
       }
@@ -1193,7 +1191,7 @@ public class PinotLLCRealtimeSegmentManager {
       if (!latestSegmentZKMetadataMap.containsKey(partitionGroupId)) {
         String newSegmentName =
             setupNewPartitionGroup(tableConfig, streamConfig, partitionGroupMetadata, currentTimeMs, instancePartitions,
-                numPartitions, numReplicas, newPartitionGroupMetadataList);
+                numPartitions, numReplicas, newPartitionGroupMetadataList, true);
         updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, newSegmentName, segmentAssignment,
             instancePartitionsMap);
       }
@@ -1232,10 +1230,16 @@ public class PinotLLCRealtimeSegmentManager {
    */
   private String setupNewPartitionGroup(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
       PartitionGroupMetadata partitionGroupMetadata, long creationTimeMs, InstancePartitions instancePartitions,
-      int numPartitionGroups, int numReplicas, List<PartitionGroupMetadata> partitionGroupMetadataList) {
+      int numPartitionGroups, int numReplicas, List<PartitionGroupMetadata> partitionGroupMetadataList,
+      boolean isLiveTable) {
     String realtimeTableName = tableConfig.getTableName();
     int partitionGroupId = partitionGroupMetadata.getPartitionGroupId();
-    String startOffset = partitionGroupMetadata.getStartOffset().toString();
+    StreamPartitionMsgOffset startOffset;
+    if (isLiveTable) {
+      startOffset = getPartitionGroupSmallestOffset(streamConfig, partitionGroupId);
+    } else {
+      startOffset = partitionGroupMetadata.getStartOffset();
+    }
     LOGGER.info("Setting up new partition group: {} for table: {}", partitionGroupId, realtimeTableName);
 
     String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
@@ -1243,7 +1247,8 @@ public class PinotLLCRealtimeSegmentManager {
         new LLCSegmentName(rawTableName, partitionGroupId, STARTING_SEQUENCE_NUMBER, creationTimeMs);
     String newSegmentName = newLLCSegmentName.getSegmentName();
 
-    CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(null, startOffset, 0);
+    CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(null,
+        startOffset.toString(), 0);
     createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, creationTimeMs,
         committingSegmentDescriptor, null, instancePartitions, numPartitionGroups, numReplicas,
         partitionGroupMetadataList);

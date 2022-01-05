@@ -42,6 +42,7 @@ import org.glassfish.jersey.server.ResourceConfig;
 public class BrokerAdminApiApplication extends ResourceConfig {
   private static final String RESOURCE_PACKAGE = "org.apache.pinot.broker.api.resources";
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
+  public static final String BROKER_INSTANCE_ID = "brokerInstanceId";
 
   private HttpServer _httpServer;
 
@@ -56,6 +57,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         bind(routingManager).to(RoutingManager.class);
         bind(brokerRequestHandler).to(BrokerRequestHandler.class);
         bind(brokerMetrics).to(BrokerMetrics.class);
+        bind(brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID)).named(BROKER_INSTANCE_ID);
       }
     });
     register(JacksonFeature.class);
@@ -92,7 +94,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     _httpServer.getServerConfiguration().addHttpHandler(httpHandler, "/api/", "/help/");
 
     URL swaggerDistLocation =
-        BrokerAdminApiApplication.class.getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/3.18.2/");
+        BrokerAdminApiApplication.class.getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/3.23.11/");
     CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
     _httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }

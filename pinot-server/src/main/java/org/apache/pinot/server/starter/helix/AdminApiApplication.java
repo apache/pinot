@@ -30,7 +30,7 @@ import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
-import org.apache.pinot.server.api.access.AccessControlFactory;
+import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -51,6 +51,7 @@ public class AdminApiApplication extends ResourceConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(AdminApiApplication.class);
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
   public static final String RESOURCE_PACKAGE = "org.apache.pinot.server.api.resources";
+  public static final String SERVER_INSTANCE_ID = "serverInstanceId";
 
   private final ServerInstance _serverInstance;
   private final AccessControlFactory _accessControlFactory;
@@ -69,6 +70,7 @@ public class AdminApiApplication extends ResourceConfig {
       protected void configure() {
         bind(_serverInstance).to(ServerInstance.class);
         bind(accessControlFactory).to(AccessControlFactory.class);
+        bind(serverConf.getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID)).named(SERVER_INSTANCE_ID);
       }
     });
 
@@ -132,7 +134,7 @@ public class AdminApiApplication extends ResourceConfig {
     httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/help/");
 
     URL swaggerDistLocation =
-        AdminApiApplication.class.getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/3.18.2/");
+        AdminApiApplication.class.getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/3.23.11/");
     CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
     httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }

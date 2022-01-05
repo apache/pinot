@@ -18,7 +18,14 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import org.apache.pinot.common.request.context.predicate.Predicate;
+
+
 public abstract class BaseRawValueBasedPredicateEvaluator extends BasePredicateEvaluator {
+
+  protected BaseRawValueBasedPredicateEvaluator(Predicate predicate) {
+    super(predicate);
+  }
 
   @Override
   public final boolean isDictionaryBased() {

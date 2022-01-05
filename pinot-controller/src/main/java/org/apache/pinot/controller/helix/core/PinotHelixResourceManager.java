@@ -587,10 +587,15 @@ public class PinotHelixResourceManager {
    * Returns the segments for the given table.
    *
    * @param tableNameWithType Table name with type suffix
+   * @param shouldExcludeReplacedSegments whether to return the list of segments that doesn't contain replaced segments.
    * @return List of segment names
    */
-  public List<String> getSegmentsFor(String tableNameWithType) {
-    return ZKMetadataProvider.getSegments(_propertyStore, tableNameWithType);
+  public List<String> getSegmentsFor(String tableNameWithType, boolean shouldExcludeReplacedSegments) {
+    List<String> segmentsFromPropertiesStore = ZKMetadataProvider.getSegments(_propertyStore, tableNameWithType);
+    if (shouldExcludeReplacedSegments) {
+      return excludeReplacedSegments(tableNameWithType, segmentsFromPropertiesStore);
+    }
+    return segmentsFromPropertiesStore;
   }
 
   /**
@@ -606,7 +611,7 @@ public class PinotHelixResourceManager {
     List<String> selectedSegments;
     // If no start and end timestamp specified, just select all the segments.
     if (startTimestamp == Long.MIN_VALUE && endTimestamp == Long.MAX_VALUE) {
-      selectedSegments = getSegmentsFor(tableNameWithType);
+      selectedSegments = getSegmentsFor(tableNameWithType, false);
     } else {
       selectedSegments = new ArrayList<>();
       List<SegmentZKMetadata> segmentZKMetadataList = getSegmentsZKMetadata(tableNameWithType);
@@ -617,13 +622,24 @@ public class PinotHelixResourceManager {
         }
       }
     }
+    return excludeReplacedSegments(tableNameWithType, selectedSegments);
+  }
+
+  /**
+   * Given the list of segment names, exclude all the replaced segments which cannot be queried.
+   * @param tableNameWithType table name with type
+   * @param segments list of input segment names
+   */
+  private List<String> excludeReplacedSegments(String tableNameWithType, List<String> segments) {
     // Fetch the segment lineage metadata, and filter segments based on segment lineage.
-    ZNRecord segmentLineageZNRecord =
-        SegmentLineageAccessHelper.getSegmentLineageZNRecord(_propertyStore, tableNameWithType);
-    SegmentLineage segmentLineage = SegmentLineage.fromZNRecord(segmentLineageZNRecord);
-    Set<String> selectedSegmentSet = new HashSet<>(selectedSegments);
-    SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(selectedSegmentSet, segmentLineage);
-    return new ArrayList<>(selectedSegmentSet);
+    SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, tableNameWithType);
+    if (segmentLineage == null) {
+      return segments;
+    } else {
+      Set<String> selectedSegmentSet = new HashSet<>(segments);
+      SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(selectedSegmentSet, segmentLineage);
+      return new ArrayList<>(selectedSegmentSet);
+    }
   }
 
   /**
@@ -1616,7 +1632,7 @@ public class PinotHelixResourceManager {
     }
 
     // Remove all stored segments for the table
-    _segmentDeletionManager.removeSegmentsFromStore(offlineTableName, getSegmentsFor(offlineTableName));
+    _segmentDeletionManager.removeSegmentsFromStore(offlineTableName, getSegmentsFor(offlineTableName, false));
     LOGGER.info("Deleting table {}: Removed stored segments", offlineTableName);
 
     // Remove segment metadata
@@ -1660,7 +1676,7 @@ public class PinotHelixResourceManager {
     }
 
     // Remove all stored segments for the table
-    _segmentDeletionManager.removeSegmentsFromStore(realtimeTableName, getSegmentsFor(realtimeTableName));
+    _segmentDeletionManager.removeSegmentsFromStore(realtimeTableName, getSegmentsFor(realtimeTableName, false));
     LOGGER.info("Deleting table {}: Removed stored segments", realtimeTableName);
 
     // Remove segment metadata
@@ -1775,8 +1791,7 @@ public class PinotHelixResourceManager {
       instancePartitionsType = InstancePartitionsType.CONSUMING;
       // Build the realtime segment zk metadata with necessary fields.
       SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
-      ZKMetadataUtils
-          .updateSegmentMetadata(segmentZKMetadata, segmentMetadata, CommonConstants.Segment.SegmentType.REALTIME);
+      ZKMetadataUtils.updateSegmentMetadata(segmentZKMetadata, segmentMetadata);
       segmentZKMetadata.setDownloadUrl(downloadUrl);
       segmentZKMetadata.setCrypterName(crypter);
       segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.UPLOADED);
@@ -1785,8 +1800,7 @@ public class PinotHelixResourceManager {
       instancePartitionsType = InstancePartitionsType.OFFLINE;
       // Build the offline segment zk metadata with necessary fields.
       SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
-      ZKMetadataUtils
-          .updateSegmentMetadata(segmentZKMetadata, segmentMetadata, CommonConstants.Segment.SegmentType.OFFLINE);
+      ZKMetadataUtils.updateSegmentMetadata(segmentZKMetadata, segmentMetadata);
       segmentZKMetadata.setDownloadUrl(downloadUrl);
       segmentZKMetadata.setCrypterName(crypter);
       segmentZKMetadata.setPushTime(System.currentTimeMillis());
@@ -1879,8 +1893,7 @@ public class PinotHelixResourceManager {
     // ZK metadata to refresh the segment (server will compare the segment ZK metadata with the local metadata to decide
     // whether to download the new segment; broker will update the the segment partition info & time boundary based on
     // the segment ZK metadata)
-    ZKMetadataUtils
-        .updateSegmentMetadata(segmentZKMetadata, segmentMetadata, CommonConstants.Segment.SegmentType.OFFLINE);
+    ZKMetadataUtils.updateSegmentMetadata(segmentZKMetadata, segmentMetadata);
     segmentZKMetadata.setRefreshTime(System.currentTimeMillis());
     segmentZKMetadata.setDownloadUrl(downloadUrl);
     segmentZKMetadata.setCrypterName(crypter);
@@ -2745,16 +2758,18 @@ public class PinotHelixResourceManager {
    * @param tableNameWithType Table name with type
    * @param segmentsFrom a list of segments to be merged
    * @param segmentsTo a list of merged segments
+   * @param forceCleanup True for enabling the force segment cleanup
    * @return Segment lineage entry id
    *
    * @throws InvalidConfigException
    */
-  public String startReplaceSegments(String tableNameWithType, List<String> segmentsFrom, List<String> segmentsTo) {
+  public String startReplaceSegments(String tableNameWithType, List<String> segmentsFrom, List<String> segmentsTo,
+      boolean forceCleanup) {
     // Create a segment lineage entry id
     String segmentLineageEntryId = SegmentLineageUtils.generateLineageEntryId();
 
     // Check that all the segments from 'segmentsFrom' exist in the table
-    Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType));
+    Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType, false));
     Preconditions.checkArgument(segmentsForTable.containsAll(segmentsFrom), String.format(
         "Not all segments from 'segmentsFrom' are available in the table. (tableName = '%s', segmentsFrom = '%s', "
             + "segmentsTo = '%s', segmentsFromTable = '%s')", tableNameWithType, segmentsFrom, segmentsTo,
@@ -2784,33 +2799,61 @@ public class PinotHelixResourceManager {
         Preconditions.checkArgument(segmentLineage.getLineageEntry(segmentLineageEntryId) == null,
             String.format("SegmentLineageEntryId (%s) already exists in the segment lineage.", segmentLineageEntryId));
 
+        List<String> segmentsToCleanUp = new ArrayList<>();
         for (String entryId : segmentLineage.getLineageEntryIds()) {
           LineageEntry lineageEntry = segmentLineage.getLineageEntry(entryId);
 
-          // Check that any segment from 'segmentsFrom' does not appear twice.
-          Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsFrom(), segmentsFrom), String.format(
-              "It is not allowed to merge segments that are already merged. (tableName = %s, segmentsFrom from "
-                  + "existing lineage entry = %s, requested segmentsFrom = %s)", tableNameWithType,
-              lineageEntry.getSegmentsFrom(), segmentsFrom));
+          // If the lineage entry is in 'REVERTED' state, no need to go through the validation because we can regard
+          // the entry as not existing.
+          if (lineageEntry.getState() == LineageEntryState.REVERTED) {
+            continue;
+          }
 
-          // Check that merged segments name cannot be the same.
-          Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsTo(), segmentsTo), String.format(
-              "It is not allowed to have the same segment name for merged segments. (tableName = %s, segmentsTo from "
-                  + "existing lineage entry = %s, requested segmentsTo = %s)", tableNameWithType,
-              lineageEntry.getSegmentsTo(), segmentsTo));
+          // By here, the lineage entry is either 'IN_PROGRESS' or 'COMPLETED'.
+
+          // When 'forceCleanup' is enabled, we need to proactively revert the lineage entry when we find the lineage
+          // entry with the same 'segmentFrom' values.
+          if (forceCleanup && lineageEntry.getState() == LineageEntryState.IN_PROGRESS && CollectionUtils
+              .isEqualCollection(segmentsFrom, lineageEntry.getSegmentsFrom())) {
+            // Update segment lineage entry to 'REVERTED'
+            updateSegmentLineageEntryToReverted(tableNameWithType, segmentLineage, entryId, lineageEntry);
+
+            // Add segments for proactive clean-up.
+            segmentsToCleanUp.addAll(lineageEntry.getSegmentsTo());
+          } else {
+            // Check that any segment from 'segmentsFrom' does not appear twice.
+            Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsFrom(), segmentsFrom), String
+                .format("It is not allowed to replace segments that are already replaced. (tableName = %s, "
+                        + "segmentsFrom from the existing lineage entry = %s, requested segmentsFrom = %s)",
+                    tableNameWithType, lineageEntry.getSegmentsFrom(), segmentsFrom));
+
+            // Check that any segment from 'segmentTo' does not appear twice.
+            Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsTo(), segmentsTo), String.format(
+                "It is not allowed to have the same segment name for segments in 'segmentsTo'. (tableName = %s, "
+                    + "segmentsTo from the existing lineage entry = %s, requested segmentsTo = %s)", tableNameWithType,
+                lineageEntry.getSegmentsTo(), segmentsTo));
+          }
         }
 
         // Update lineage entry
         segmentLineage.addLineageEntry(segmentLineageEntryId,
             new LineageEntry(segmentsFrom, segmentsTo, LineageEntryState.IN_PROGRESS, System.currentTimeMillis()));
 
-        // Write back to the lineage entry
-        return SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion);
+        // Write back to the lineage entry to the property store
+        if (SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion)) {
+          // Trigger the proactive segment clean up if needed. Once the lineage is updated in the property store, it
+          // is safe to physically delete segments.
+          if (!segmentsToCleanUp.isEmpty()) {
+            deleteSegments(tableNameWithType, segmentsToCleanUp);
+          }
+          return true;
+        } else {
+          return false;
+        }
       });
     } catch (Exception e) {
-      String errorMsg = String
-          .format("Failed while updating the segment lineage. (tableName = %s, segmentsFrom = %s, segmentsTo = %s)",
-              tableNameWithType, segmentsFrom, segmentsTo);
+      String errorMsg = String.format("Failed to update the segment lineage during startReplaceSegments. "
+          + "(tableName = %s, segmentsFrom = %s, segmentsTo = %s)", tableNameWithType, segmentsFrom, segmentsTo);
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg, e);
     }
@@ -2854,15 +2897,16 @@ public class PinotHelixResourceManager {
             .format("Invalid segment lineage entry id (tableName='%s', segmentLineageEntryId='%s')", tableNameWithType,
                 segmentLineageEntryId));
 
-        // NO-OPS if the entry is already completed
-        if (lineageEntry.getState() == LineageEntryState.COMPLETED) {
-          LOGGER.warn("Lineage entry state is already COMPLETED. Nothing to update. (tableNameWithType={}, "
-              + "segmentLineageEntryId={})", tableNameWithType, segmentLineageEntryId);
+        // NO-OPS if the entry is already 'COMPLETED' or 'REVERTED'
+        if (lineageEntry.getState() != LineageEntryState.IN_PROGRESS) {
+          LOGGER.warn("Lineage entry state is not 'IN_PROGRESS'. Cannot update to 'COMPLETED'. (tableNameWithType={}, "
+                  + "segmentLineageEntryId={}, state={})", tableNameWithType, segmentLineageEntryId,
+              lineageEntry.getState());
           return true;
         }
 
         // Check that all the segments from 'segmentsTo' exist in the table
-        Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType));
+        Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType, false));
         Preconditions.checkArgument(segmentsForTable.containsAll(lineageEntry.getSegmentsTo()), String.format(
             "Not all segments from 'segmentsTo' are available in the table. (tableName = '%s', segmentsTo = '%s', "
                 + "segmentsFromTable = '%s')", tableNameWithType, lineageEntry.getSegmentsTo(), segmentsForTable));
@@ -2895,9 +2939,8 @@ public class PinotHelixResourceManager {
         }
       });
     } catch (Exception e) {
-      String errorMsg = String
-          .format("Failed to update the segment lineage. (tableName = %s, segmentLineageEntryId = %s)",
-              tableNameWithType, segmentLineageEntryId);
+      String errorMsg = String.format("Failed to update the segment lineage during endReplaceSegments. "
+          + "(tableName = %s, segmentLineageEntryId = %s)", tableNameWithType, segmentLineageEntryId);
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg, e);
     }
@@ -2905,6 +2948,93 @@ public class PinotHelixResourceManager {
     // Only successful attempt can reach here
     LOGGER.info("endReplaceSegments is successfully processed. (tableNameWithType = {}, segmentLineageEntryId = {})",
         tableNameWithType, segmentLineageEntryId);
+  }
+
+  /**
+   * Revert the segment replacement
+   *
+   * 1. Compute validation
+   * 2. Update the lineage entry state to "REVERTED" and write metadata to the property store
+   *
+   * Update is done with retry logic along with read-modify-write block for achieving atomic update of the lineage
+   * metadata.
+   *
+   * @param tableNameWithType
+   * @param segmentLineageEntryId
+   */
+  public void revertReplaceSegments(String tableNameWithType, String segmentLineageEntryId, boolean forceRevert) {
+    try {
+      DEFAULT_RETRY_POLICY.attempt(() -> {
+        // Fetch the segment lineage metadata
+        ZNRecord segmentLineageZNRecord =
+            SegmentLineageAccessHelper.getSegmentLineageZNRecord(_propertyStore, tableNameWithType);
+        Preconditions.checkArgument(segmentLineageZNRecord != null, String
+            .format("Segment lineage does not exist. (tableNameWithType = '%s', segmentLineageEntryId = '%s')",
+                tableNameWithType, segmentLineageEntryId));
+        SegmentLineage segmentLineage = SegmentLineage.fromZNRecord(segmentLineageZNRecord);
+        int expectedVersion = segmentLineageZNRecord.getVersion();
+
+        // Look up the lineage entry based on the segment lineage entry id
+        LineageEntry lineageEntry = segmentLineage.getLineageEntry(segmentLineageEntryId);
+        Preconditions.checkArgument(lineageEntry != null, String
+            .format("Invalid segment lineage entry id (tableName='%s', segmentLineageEntryId='%s')", tableNameWithType,
+                segmentLineageEntryId));
+
+        // We do not allow to revert the lineage entry with 'REVERTED' state. For 'IN_PROGRESS", we only allow to
+        // revert when 'forceRevert' is set to true.
+        if (lineageEntry.getState() == LineageEntryState.REVERTED || (
+            lineageEntry.getState() == LineageEntryState.IN_PROGRESS && !forceRevert)) {
+          String errorMsg = String.format(
+              "Lineage state is not valid. Cannot update the lineage entry to be 'REVERTED'. (tableNameWithType=%s, "
+                  + "segmentLineageEntryId=%s, segmentLineageEntryState=%s, forceRevert=%s)", tableNameWithType,
+              segmentLineageEntryId, lineageEntry.getState(), forceRevert);
+          throw new RuntimeException(errorMsg);
+        }
+
+        // Update segment lineage entry to 'REVERTED'
+        updateSegmentLineageEntryToReverted(tableNameWithType, segmentLineage, segmentLineageEntryId, lineageEntry);
+
+        // Write back to the lineage entry
+        if (SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion)) {
+          // If the segment lineage metadata is successfully updated, we need to trigger brokers to rebuild the
+          // routing table because it is possible that there has been no EV change but the routing result may be
+          // different after updating the lineage entry.
+          sendRoutingTableRebuildMessage(tableNameWithType);
+
+          // Invoke the proactive clean-up for segments that we no longer needs in case 'forceRevert' is enabled
+          if (forceRevert) {
+            deleteSegments(tableNameWithType, lineageEntry.getSegmentsTo());
+          }
+          return true;
+        } else {
+          return false;
+        }
+      });
+    } catch (Exception e) {
+      String errorMsg = String.format("Failed to update the segment lineage during revertReplaceSegments. "
+          + "(tableName = %s, segmentLineageEntryId = %s)", tableNameWithType, segmentLineageEntryId);
+      LOGGER.error(errorMsg, e);
+      throw new RuntimeException(errorMsg, e);
+    }
+
+    // Only successful attempt can reach here
+    LOGGER.info("revertReplaceSegments is successfully processed. (tableNameWithType = {}, segmentLineageEntryId = {})",
+        tableNameWithType, segmentLineageEntryId);
+  }
+
+  private void updateSegmentLineageEntryToReverted(String tableNameWithType, SegmentLineage segmentLineage,
+      String segmentLineageEntryId, LineageEntry lineageEntry) {
+    // Check that all segments from 'segmentsFrom' are in ONLINE state in the external view.
+    Set<String> onlineSegments = getOnlineSegmentsFromExternalView(tableNameWithType);
+    Preconditions.checkArgument(onlineSegments.containsAll(lineageEntry.getSegmentsFrom()), String.format(
+        "Failed to update the lineage to be 'REVERTED'. Not all segments from 'segmentFrom' are in ONLINE state "
+            + "in the external view. (tableName = '%s', segmentsFrom = '%s', onlineSegments = '%s'", tableNameWithType,
+        lineageEntry.getSegmentsFrom(), onlineSegments));
+
+    // Update lineage entry
+    segmentLineage.updateLineageEntry(segmentLineageEntryId,
+        new LineageEntry(lineageEntry.getSegmentsFrom(), lineageEntry.getSegmentsTo(), LineageEntryState.REVERTED,
+            System.currentTimeMillis()));
   }
 
   private void waitForSegmentsBecomeOnline(String tableNameWithType, Set<String> segmentsToCheck)
@@ -2967,7 +3097,7 @@ public class PinotHelixResourceManager {
     }
     return hosts;
   }
-  
+
   /*
    * Uncomment and use for testing on a real cluster
   public static void main(String[] args) throws Exception {

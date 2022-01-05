@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
@@ -66,7 +67,7 @@ import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.server.api.access.AccessControlFactory;
+import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
@@ -221,6 +222,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     int realtimeConsumptionCatchupWaitMs = _serverConf
         .getProperty(Server.CONFIG_OF_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS,
             Server.DEFAULT_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS);
+    boolean isOffsetBasedConsumptionStatusCheckerEnabled = _serverConf
+        .getProperty(Server.CONFIG_OF_ENABLE_REALTIME_OFFSET_BASED_CONSUMPTION_STATUS_CHECKER,
+            Server.DEFAULT_ENABLE_REALTIME_OFFSET_BASED_CONSUMPTION_STATUS_CHECKER);
 
     // collect all resources which have this instance in the ideal state
     List<String> resourcesToMonitor = new ArrayList<>();
@@ -265,12 +269,16 @@ public abstract class BaseServerStarter implements ServiceStartable {
             _instanceId, resourcesToMonitor, minResourcePercentForStartup));
     boolean foundConsuming = !consumingSegments.isEmpty();
     if (checkRealtime && foundConsuming) {
-      OffsetBasedConsumptionStatusChecker consumptionStatusChecker =
-          new OffsetBasedConsumptionStatusChecker(_serverInstance.getInstanceDataManager(), consumingSegments);
+      Supplier<Integer> getNumConsumingSegmentsNotReachedTheirLatestOffset = null;
+      if (isOffsetBasedConsumptionStatusCheckerEnabled) {
+        OffsetBasedConsumptionStatusChecker consumptionStatusChecker =
+            new OffsetBasedConsumptionStatusChecker(_serverInstance.getInstanceDataManager(), consumingSegments);
+        getNumConsumingSegmentsNotReachedTheirLatestOffset =
+            consumptionStatusChecker::getNumConsumingSegmentsNotReachedTheirLatestOffset;
+      }
       serviceStatusCallbackListBuilder.add(
           new ServiceStatus.RealtimeConsumptionCatchupServiceStatusCallback(_helixManager, _helixClusterName,
-              _instanceId, realtimeConsumptionCatchupWaitMs,
-              consumptionStatusChecker::getNumConsumingSegmentsNotReachedTheirLatestOffset));
+              _instanceId, realtimeConsumptionCatchupWaitMs, getNumConsumingSegmentsNotReachedTheirLatestOffset));
     }
     LOGGER.info("Registering service status handler");
     ServiceStatus.setServiceStatusCallback(_instanceId,
@@ -329,7 +337,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
         Server.DEFAULT_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS);
 
     while (System.currentTimeMillis() < endTimeMs) {
-      Status serviceStatus = ServiceStatus.getServiceStatus();
+      Status serviceStatus = ServiceStatus.getServiceStatus(_instanceId);
       long currentTimeMs = System.currentTimeMillis();
       if (serviceStatus == Status.GOOD) {
         LOGGER.info("Service status is GOOD after {}ms", currentTimeMs - startTimeMs);
@@ -374,13 +382,26 @@ public abstract class BaseServerStarter implements ServiceStartable {
       TlsUtils.installDefaultSSLSocketFactory(tlsDefaults);
     }
 
+    LOGGER.info("Initializing accessControlFactory");
+    String accessControlFactoryClass =
+        _serverConf.getProperty(Server.ACCESS_CONTROL_FACTORY_CLASS, Server.DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);
+    LOGGER.info("Using class: {} as the AccessControlFactory", accessControlFactoryClass);
+    final AccessControlFactory accessControlFactory;
+    try {
+      accessControlFactory = PluginManager.get().createInstance(accessControlFactoryClass);
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while creating new AccessControlFactory instance using class '" + accessControlFactoryClass
+              + "'", e);
+    }
+
     LOGGER.info("Initializing server instance and registering state model factory");
     Utils.logVersions();
     ControllerLeaderLocator.create(_helixManager);
     ServerSegmentCompletionProtocolHandler
         .init(_serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
     ServerConf serverInstanceConfig = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(_serverConf);
-    _serverInstance = new ServerInstance(serverInstanceConfig, _helixManager);
+    _serverInstance = new ServerInstance(serverInstanceConfig, _helixManager, accessControlFactory);
     ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     initSegmentFetcher(_serverConf);
@@ -398,17 +419,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     updateInstanceConfigIfNeeded();
 
     // Start restlet server for admin API endpoint
-    String accessControlFactoryClass =
-        _serverConf.getProperty(Server.ACCESS_CONTROL_FACTORY_CLASS, Server.DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);
-    LOGGER.info("Using class: {} as the AccessControlFactory", accessControlFactoryClass);
-    final AccessControlFactory accessControlFactory;
-    try {
-      accessControlFactory = PluginManager.get().createInstance(accessControlFactoryClass);
-    } catch (Exception e) {
-      throw new RuntimeException(
-          "Caught exception while creating new AccessControlFactory instance using class '" + accessControlFactoryClass
-              + "'", e);
-    }
 
     // Update admin API port
     LOGGER.info("Starting server admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));

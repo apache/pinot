@@ -136,8 +136,16 @@ public class ValidationMetrics {
    * @param missingSegmentCount The number of missing segments
    */
   public void updateMissingSegmentCountGauge(final String resource, final int missingSegmentCount) {
-    final String fullGaugeName = makeGaugeName(resource, "missingSegmentCount");
-    makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, missingSegmentCount);
+    makeGauge(resource, ValidationMetricName.MISSING_SEGMENT_COUNT, _storedValueGaugeFactory, missingSegmentCount);
+  }
+
+  /**
+   * Cleans up the missing segment count gauge.
+   *
+   * @param resource The resource for which the gauge is removed
+   */
+  public void cleanupMissingSegmentCountGauge(final String resource) {
+    removeGauge(resource, ValidationMetricName.MISSING_SEGMENT_COUNT);
   }
 
   /**
@@ -148,9 +156,17 @@ public class ValidationMetrics {
    *                               if there is no such time.
    */
   public void updateOfflineSegmentDelayGauge(final String resource, final long lastOfflineSegmentTime) {
-    final String fullGaugeNameHours = makeGaugeName(resource, "offlineSegmentDelayHours");
-    makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory,
+    makeGauge(resource, ValidationMetricName.OFFLINE_SEGMENT_DELAY_HOURS, _currentTimeMillisDeltaGaugeHoursFactory,
         lastOfflineSegmentTime);
+  }
+
+  /**
+   * Cleans up offline segment delay gauge.
+   *
+   * @param resource The resource for which the gauge is removed
+   */
+  public void cleanupOfflineSegmentDelayGauge(final String resource) {
+    removeGauge(resource, ValidationMetricName.OFFLINE_SEGMENT_DELAY_HOURS);
   }
 
   /**
@@ -161,9 +177,17 @@ public class ValidationMetrics {
    *                           such time.
    */
   public void updateLastPushTimeGauge(final String resource, final long lastPushTimeMillis) {
-    final String fullGaugeNameHours = makeGaugeName(resource, "lastPushTimeDelayHours");
-    makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory,
+    makeGauge(resource, ValidationMetricName.LAST_PUSH_TIME_DELAY_HOURS, _currentTimeMillisDeltaGaugeHoursFactory,
         lastPushTimeMillis);
+  }
+
+  /**
+   * Cleans up the last push time gauge.
+   *
+   * @param resource The resource for which the gauge is removed
+   */
+  public void cleanupLastPushTimeGauge(final String resource) {
+    removeGauge(resource, ValidationMetricName.LAST_PUSH_TIME_DELAY_HOURS);
   }
 
   /**
@@ -173,8 +197,16 @@ public class ValidationMetrics {
    * @param documentCount Total document count for the given resource name or table name
    */
   public void updateTotalDocumentCountGauge(final String resource, final long documentCount) {
-    final String fullGaugeName = makeGaugeName(resource, "TotalDocumentCount");
-    makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, documentCount);
+    makeGauge(resource, ValidationMetricName.TOTAL_DOCUMENT_COUNT, _storedValueGaugeFactory, documentCount);
+  }
+
+  /**
+   * Cleans up the total document count gauge.
+   *
+   * @param resource The resource for which the gauge is removed
+   */
+  public void cleanupTotalDocumentCountGauge(final String resource) {
+    removeGauge(resource, ValidationMetricName.TOTAL_DOCUMENT_COUNT);
   }
 
   /**
@@ -184,8 +216,7 @@ public class ValidationMetrics {
    * @param partitionCount Number of partitions that do not have any segment in CONSUMING state.
    */
   public void updateNonConsumingPartitionCountMetric(final String resource, final int partitionCount) {
-    final String fullGaugeName = makeGaugeName(resource, "NonConsumingPartitionCount");
-    makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, partitionCount);
+    makeGauge(resource, ValidationMetricName.NON_CONSUMING_PARTITION_COUNT, _storedValueGaugeFactory, partitionCount);
   }
 
   /**
@@ -195,8 +226,16 @@ public class ValidationMetrics {
    * @param segmentCount Total segment count for the given resource name or table name
    */
   public void updateSegmentCountGauge(final String resource, final long segmentCount) {
-    final String fullGaugeName = makeGaugeName(resource, "SegmentCount");
-    makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, segmentCount);
+    makeGauge(resource, ValidationMetricName.SEGMENT_COUNT, _storedValueGaugeFactory, segmentCount);
+  }
+
+  /**
+   * Cleans up the segment count gauge.
+   *
+   * @param resource The resource for which the gauge is removed
+   */
+  public void cleanupSegmentCountGauge(final String resource) {
+    removeGauge(resource, ValidationMetricName.SEGMENT_COUNT);
   }
 
   @VisibleForTesting
@@ -208,15 +247,25 @@ public class ValidationMetrics {
     return PinotMetricUtils.makePinotMetricName(ValidationMetrics.class, gaugeName);
   }
 
-  private void makeGauge(final String gaugeName, final PinotMetricName metricName, final GaugeFactory<?> gaugeFactory,
-      final long value) {
-    if (!_gaugeValues.containsKey(gaugeName)) {
-      _gaugeValues.put(gaugeName, value);
-      PinotMetricUtils.makeGauge(_metricsRegistry, metricName, gaugeFactory.buildGauge(gaugeName));
+  private void makeGauge(final String resource, final ValidationMetricName validationMetricName,
+      final GaugeFactory<?> gaugeFactory, final long value) {
+    final String fullGaugeName = makeGaugeName(resource, validationMetricName.getMetricName());
+    PinotMetricName metricName = makeMetricName(fullGaugeName);
+    if (!_gaugeValues.containsKey(fullGaugeName)) {
+      _gaugeValues.put(fullGaugeName, value);
+      PinotMetricUtils.makeGauge(_metricsRegistry, metricName, gaugeFactory.buildGauge(fullGaugeName));
       _metricNames.add(metricName);
     } else {
-      _gaugeValues.put(gaugeName, value);
+      _gaugeValues.put(fullGaugeName, value);
     }
+  }
+
+  private void removeGauge(final String resource, final ValidationMetricName validationMetricName) {
+    final String fullGaugeName = makeGaugeName(resource, validationMetricName.getMetricName());
+    PinotMetricName pinotMetricName = makeMetricName(fullGaugeName);
+    PinotMetricUtils.removeMetric(_metricsRegistry, pinotMetricName);
+    _metricNames.remove(pinotMetricName);
+    _gaugeValues.remove(fullGaugeName);
   }
 
   /**
@@ -238,5 +287,27 @@ public class ValidationMetrics {
       return 0;
     }
     return value;
+  }
+
+  /**
+   * Names of validation metrics.
+   */
+  public enum ValidationMetricName {
+    MISSING_SEGMENT_COUNT("missingSegmentCount"),
+    OFFLINE_SEGMENT_DELAY_HOURS("offlineSegmentDelayHours"),
+    LAST_PUSH_TIME_DELAY_HOURS("lastPushTimeDelayHours"),
+    TOTAL_DOCUMENT_COUNT("TotalDocumentCount"),
+    NON_CONSUMING_PARTITION_COUNT("NonConsumingPartitionCount"),
+    SEGMENT_COUNT("SegmentCount");
+
+    private final String _metricName;
+
+    ValidationMetricName(String metricName) {
+      _metricName = metricName;
+    }
+
+    public String getMetricName() {
+      return _metricName;
+    }
   }
 }

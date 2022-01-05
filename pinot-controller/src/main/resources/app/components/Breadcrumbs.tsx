@@ -42,6 +42,10 @@ interface LinkRouterProps extends LinkProps {
 }
 
 const LinkRouter = (props: LinkRouterProps) => (
+  // We ignore this for now as there is a more complex setup required
+  // to make component={RouterLink} work correctly with typescript.
+  // See https://mui.com/guides/routing/
+  // @ts-ignore
   <Link {...props} component={RouterLink} />
 );
 

@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.regex.Pattern;
-import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -70,13 +69,9 @@ public class RegexpLikePredicateEvaluatorFactory {
     int[] _matchingDictIds;
 
     public DictionaryBasedRegexpLikePredicateEvaluator(RegexpLikePredicate regexpLikePredicate, Dictionary dictionary) {
+      super(regexpLikePredicate);
       _pattern = Pattern.compile(regexpLikePredicate.getValue(), PATTERN_FLAG);
       _dictionary = dictionary;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.REGEXP_LIKE;
     }
 
     @Override
@@ -104,12 +99,8 @@ public class RegexpLikePredicateEvaluatorFactory {
     final Pattern _pattern;
 
     public RawValueBasedRegexpLikePredicateEvaluator(RegexpLikePredicate regexpLikePredicate) {
+      super(regexpLikePredicate);
       _pattern = Pattern.compile(regexpLikePredicate.getValue(), PATTERN_FLAG);
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.REGEXP_LIKE;
     }
 
     @Override

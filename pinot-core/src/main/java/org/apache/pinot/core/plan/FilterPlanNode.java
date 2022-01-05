@@ -31,7 +31,6 @@ import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
-import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
@@ -47,7 +46,6 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.QueryOptionsUtils;
-import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
@@ -187,8 +185,7 @@ public class FilterPlanNode implements PlanNode {
           }
           switch (predicate.getType()) {
             case TEXT_MATCH:
-              return new TextMatchFilterOperator(dataSource.getTextIndex(), ((TextMatchPredicate) predicate).getValue(),
-                  _numDocs);
+              return new TextMatchFilterOperator(dataSource.getTextIndex(), (TextMatchPredicate) predicate, _numDocs);
             case REGEXP_LIKE:
               // FST Index is available only for rolled out segments. So, we use different evaluator for rolled out and
               // consuming segments.
@@ -200,14 +197,8 @@ public class FilterPlanNode implements PlanNode {
               // similar to that of FSTBasedEvaluator, else use regular flow of getting predicate evaluator.
               if (dataSource.getFSTIndex() != null) {
                 predicateEvaluator =
-                    FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator(dataSource.getFSTIndex(),
-                        dataSource.getDictionary(), RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(
-                            ((RegexpLikePredicate) predicate).getValue()));
-              } else if (dataSource instanceof MutableDataSource && ((MutableDataSource) dataSource).isFSTEnabled()) {
-                predicateEvaluator =
-                    FSTBasedRegexpPredicateEvaluatorFactory.newAutomatonBasedEvaluator(dataSource.getDictionary(),
-                        RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(
-                            ((RegexpLikePredicate) predicate).getValue()));
+                    FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator((RegexpLikePredicate) predicate,
+                        dataSource.getFSTIndex(), dataSource.getDictionary());
               } else {
                 predicateEvaluator =
                     PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
@@ -217,9 +208,9 @@ public class FilterPlanNode implements PlanNode {
               return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, _numDocs);
             case JSON_MATCH:
               JsonIndexReader jsonIndex = dataSource.getJsonIndex();
-              Preconditions.checkState(jsonIndex != null, "Cannot apply JSON_MATCH on column: %s without json index",
-                  column);
-              return new JsonMatchFilterOperator(jsonIndex, ((JsonMatchPredicate) predicate).getValue(), _numDocs);
+              Preconditions
+                  .checkState(jsonIndex != null, "Cannot apply JSON_MATCH on column: %s without json index", column);
+              return new JsonMatchFilterOperator(jsonIndex, (JsonMatchPredicate) predicate, _numDocs);
             case IS_NULL:
               NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
               if (nullValueVector != null) {

@@ -31,7 +31,6 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.SegmentType;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -134,9 +133,7 @@ public class SegmentZKMetadataTest {
   private ZNRecord getTestDoneRealtimeSegmentZNRecord() {
     String segmentName = "testTable_R_1000_2000_groupId0_part0";
     ZNRecord record = new ZNRecord(segmentName);
-    record.setSimpleField(CommonConstants.Segment.SEGMENT_NAME, segmentName);
     record.setSimpleField(CommonConstants.Segment.INDEX_VERSION, "v1");
-    record.setEnumField(CommonConstants.Segment.SEGMENT_TYPE, CommonConstants.Segment.SegmentType.REALTIME);
     record.setEnumField(CommonConstants.Segment.Realtime.STATUS, CommonConstants.Segment.Realtime.Status.DONE);
     record.setLongField(CommonConstants.Segment.START_TIME, 1000);
     record.setLongField(CommonConstants.Segment.END_TIME, 2000);
@@ -151,7 +148,6 @@ public class SegmentZKMetadataTest {
 
   private SegmentZKMetadata getTestDoneRealtimeSegmentZKMetadata() {
     SegmentZKMetadata realtimeSegmentMetadata = new SegmentZKMetadata("testTable_R_1000_2000_groupId0_part0");
-    realtimeSegmentMetadata.setSegmentType(SegmentType.REALTIME);
     realtimeSegmentMetadata.setIndexVersion("v1");
     realtimeSegmentMetadata.setStartTime(1000);
     realtimeSegmentMetadata.setEndTime(2000);
@@ -168,9 +164,7 @@ public class SegmentZKMetadataTest {
   private ZNRecord getTestInProgressRealtimeSegmentZNRecord() {
     String segmentName = "testTable_R_1000_groupId0_part0";
     ZNRecord record = new ZNRecord(segmentName);
-    record.setSimpleField(CommonConstants.Segment.SEGMENT_NAME, segmentName);
     record.setSimpleField(CommonConstants.Segment.INDEX_VERSION, "v1");
-    record.setEnumField(CommonConstants.Segment.SEGMENT_TYPE, CommonConstants.Segment.SegmentType.REALTIME);
     record.setEnumField(CommonConstants.Segment.Realtime.STATUS, CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
     record.setLongField(CommonConstants.Segment.START_TIME, 1000);
     record.setSimpleField(CommonConstants.Segment.TIME_UNIT, TimeUnit.HOURS.toString());
@@ -182,7 +176,6 @@ public class SegmentZKMetadataTest {
 
   private SegmentZKMetadata getTestInProgressRealtimeSegmentZKMetadata() {
     SegmentZKMetadata realtimeSegmentMetadata = new SegmentZKMetadata("testTable_R_1000_groupId0_part0");
-    realtimeSegmentMetadata.setSegmentType(SegmentType.REALTIME);
     realtimeSegmentMetadata.setIndexVersion("v1");
     realtimeSegmentMetadata.setStartTime(1000);
     realtimeSegmentMetadata.setTimeUnit(TimeUnit.HOURS);
@@ -196,26 +189,23 @@ public class SegmentZKMetadataTest {
   private ZNRecord getTestOfflineSegmentZNRecord() {
     String segmentName = "testTable_O_3000_4000";
     ZNRecord record = new ZNRecord(segmentName);
-    record.setSimpleField(CommonConstants.Segment.SEGMENT_NAME, segmentName);
     record.setSimpleField(CommonConstants.Segment.CRYPTER_NAME, "testCrypter");
     record.setSimpleField(CommonConstants.Segment.INDEX_VERSION, "v1");
-    record.setEnumField(CommonConstants.Segment.SEGMENT_TYPE, CommonConstants.Segment.SegmentType.OFFLINE);
     record.setLongField(CommonConstants.Segment.START_TIME, 1000);
     record.setLongField(CommonConstants.Segment.END_TIME, 2000);
     record.setSimpleField(CommonConstants.Segment.TIME_UNIT, TimeUnit.HOURS.toString());
     record.setLongField(CommonConstants.Segment.TOTAL_DOCS, 50000);
     record.setLongField(CommonConstants.Segment.CRC, 54321);
     record.setLongField(CommonConstants.Segment.CREATION_TIME, 1000);
-    record.setSimpleField(CommonConstants.Segment.Offline.DOWNLOAD_URL, "http://localhost:8000/testTable_O_3000_4000");
-    record.setLongField(CommonConstants.Segment.Offline.PUSH_TIME, 4000);
-    record.setLongField(CommonConstants.Segment.Offline.REFRESH_TIME, 8000);
+    record.setSimpleField(CommonConstants.Segment.DOWNLOAD_URL, "http://localhost:8000/testTable_O_3000_4000");
+    record.setLongField(CommonConstants.Segment.PUSH_TIME, 4000);
+    record.setLongField(CommonConstants.Segment.REFRESH_TIME, 8000);
     record.setMapField(CommonConstants.Segment.CUSTOM_MAP, ImmutableMap.of("k1", "v1", "k2", "v2"));
     return record;
   }
 
   private SegmentZKMetadata getTestOfflineSegmentZKMetadata() {
     SegmentZKMetadata offlineSegmentMetadata = new SegmentZKMetadata("testTable_O_3000_4000");
-    offlineSegmentMetadata.setSegmentType(CommonConstants.Segment.SegmentType.OFFLINE);
     offlineSegmentMetadata.setCrypterName("testCrypter");
     offlineSegmentMetadata.setIndexVersion("v1");
     offlineSegmentMetadata.setStartTime(1000);

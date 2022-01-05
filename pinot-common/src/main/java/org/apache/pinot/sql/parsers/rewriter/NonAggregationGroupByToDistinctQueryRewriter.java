@@ -22,7 +22,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Set;
 import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -60,12 +59,7 @@ public class NonAggregationGroupByToDistinctQueryRewriter implements QueryRewrit
       if (groupByIdentifiers.containsAll(selectIdentifiers)) {
         Expression distinctExpression = RequestUtils.getFunctionExpression("DISTINCT");
         for (Expression select : pinotQuery.getSelectList()) {
-          if (CalciteSqlParser.isAsFunction(select)) {
-            Function asFunc = select.getFunctionCall();
-            distinctExpression.getFunctionCall().addToOperands(asFunc.getOperands().get(0));
-          } else {
-            distinctExpression.getFunctionCall().addToOperands(select);
-          }
+          distinctExpression.getFunctionCall().addToOperands(select);
         }
         pinotQuery.setSelectList(Arrays.asList(distinctExpression));
         pinotQuery.setGroupByList(Collections.emptyList());

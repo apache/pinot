@@ -20,8 +20,10 @@ package org.apache.pinot.core.operator.query;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -37,6 +39,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 @SuppressWarnings("rawtypes")
 public class MetadataBasedAggregationOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "MetadataBasedAggregationOperator";
+  private static final String EXPLAIN_NAME = "AGGREGATE_METADATA";
 
   private final AggregationFunction[] _aggregationFunctions;
   private final SegmentMetadata _segmentMetadata;
@@ -70,6 +73,16 @@ public class MetadataBasedAggregationOperator extends BaseOperator<IntermediateR
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String toExplainString() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Collections.emptyList();
   }
 
   @Override

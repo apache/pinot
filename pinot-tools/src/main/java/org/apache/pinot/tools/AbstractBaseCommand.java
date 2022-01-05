@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.tools;
 
-import java.lang.reflect.Field;
-import org.kohsuke.args4j.Option;
-
 
 public class AbstractBaseCommand {
   public static final String DEFAULT_ZK_ADDRESS = "localhost:2181";
@@ -47,16 +44,6 @@ public class AbstractBaseCommand {
 
   public void printUsage() {
     System.out.println("Usage: " + this.getName());
-
-    for (Field f : this.getClass().getDeclaredFields()) {
-      if (f.isAnnotationPresent(Option.class)) {
-        Option option = f.getAnnotation(Option.class);
-
-        System.out.println(String
-            .format("\t%-25s %-30s: %s (required=%s)", option.name(), option.metaVar(), option.usage(),
-                option.required()));
-      }
-    }
     printExamples();
   }
 

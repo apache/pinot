@@ -56,6 +56,15 @@ public class TarGzCompressionUtils {
    */
   public static void createTarGzFile(File inputFile, File outputFile)
       throws IOException {
+    createTarGzFile(new File[]{inputFile}, outputFile);
+  }
+
+  /**
+   * Creates a tar.gz file from a list of input file/directories to the output file. The output file must have
+   * ".tar.gz" as the file extension.
+   */
+  public static void createTarGzFile(File[] inputFiles, File outputFile)
+      throws IOException {
     Preconditions.checkArgument(outputFile.getName().endsWith(TAR_GZ_FILE_EXTENSION),
         "Output file: %s does not have '.tar.gz' file extension", outputFile);
     try (OutputStream fileOut = Files.newOutputStream(outputFile.toPath());
@@ -64,7 +73,10 @@ public class TarGzCompressionUtils {
         TarArchiveOutputStream tarGzOut = new TarArchiveOutputStream(gzipOut)) {
       tarGzOut.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_STAR);
       tarGzOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
-      addFileToTarGz(tarGzOut, inputFile, "");
+
+      for (File inputFile : inputFiles) {
+        addFileToTarGz(tarGzOut, inputFile, "");
+      }
     }
   }
 

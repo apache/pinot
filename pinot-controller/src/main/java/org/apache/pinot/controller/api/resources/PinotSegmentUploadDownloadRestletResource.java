@@ -308,7 +308,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       throw e;
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
-      throw new ControllerApplicationException(LOGGER, "Caught internal server exception while uploading segment",
+      throw new ControllerApplicationException(LOGGER, "Exception while uploading segment: " + e.getMessage(),
           Response.Status.INTERNAL_SERVER_ERROR, e);
     } finally {
       FileUtils.deleteQuietly(tempEncryptedFile);
@@ -544,15 +544,24 @@ public class PinotSegmentUploadDownloadRestletResource {
   @ApiOperation(value = "Start to replace segments", notes = "Start to replace segments")
   public Response startReplaceSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      StartReplaceSegmentsRequest startReplaceSegmentsRequest) {
+      @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "Force cleanup") @QueryParam("forceCleanup") @DefaultValue("false") boolean forceCleanup,
+      @ApiParam(value = "Fields belonging to start replace segment request", required = true)
+          StartReplaceSegmentsRequest startReplaceSegmentsRequest) {
     try {
+      TableType tableType = Constants.validateTableType(tableTypeStr);
+      if (tableType == null) {
+        throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
+            Response.Status.BAD_REQUEST);
+      }
       String tableNameWithType =
-          TableNameBuilder.forType(TableType.valueOf(tableTypeStr.toUpperCase())).tableNameWithType(tableName);
+          ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
       String segmentLineageEntryId = _pinotHelixResourceManager
           .startReplaceSegments(tableNameWithType, startReplaceSegmentsRequest.getSegmentsFrom(),
-              startReplaceSegmentsRequest.getSegmentsTo());
+              startReplaceSegmentsRequest.getSegmentsTo(), forceCleanup);
       return Response.ok(JsonUtils.newObjectNode().put("segmentLineageEntryId", segmentLineageEntryId)).build();
+    } catch (WebApplicationException wae) {
+      throw wae;
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
@@ -565,16 +574,54 @@ public class PinotSegmentUploadDownloadRestletResource {
   @ApiOperation(value = "End to replace segments", notes = "End to replace segments")
   public Response endReplaceSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Segment lineage entry id returned by startReplaceSegments API")
+      @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "Segment lineage entry id returned by startReplaceSegments API", required = true)
       @QueryParam("segmentLineageEntryId") String segmentLineageEntryId) {
     try {
+      TableType tableType = Constants.validateTableType(tableTypeStr);
+      if (tableType == null) {
+        throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
+            Response.Status.BAD_REQUEST);
+      }
       String tableNameWithType =
-          TableNameBuilder.forType(TableType.valueOf(tableTypeStr.toUpperCase())).tableNameWithType(tableName);
+          ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
       // Check that the segment lineage entry id is valid
       Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
       _pinotHelixResourceManager.endReplaceSegments(tableNameWithType, segmentLineageEntryId);
       return Response.ok().build();
+    } catch (WebApplicationException wae) {
+      throw wae;
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  @POST
+  @Path("segments/{tableName}/revertReplaceSegments")
+  @Authenticate(AccessType.UPDATE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Revert segments replacement", notes = "Revert segments replacement")
+  public Response revertReplaceSegments(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "Segment lineage entry id to revert", required = true)
+      @QueryParam("segmentLineageEntryId") String segmentLineageEntryId,
+      @ApiParam(value = "Force revert in case the user knows that the lineage entry is interrupted")
+      @QueryParam("forceRevert") @DefaultValue("false") boolean forceRevert) {
+    try {
+      TableType tableType = Constants.validateTableType(tableTypeStr);
+      if (tableType == null) {
+        throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
+            Response.Status.BAD_REQUEST);
+      }
+      String tableNameWithType =
+          ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+      // Check that the segment lineage entry id is valid
+      Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
+      _pinotHelixResourceManager.revertReplaceSegments(tableNameWithType, segmentLineageEntryId, forceRevert);
+      return Response.ok().build();
+    } catch (WebApplicationException wae) {
+      throw wae;
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }

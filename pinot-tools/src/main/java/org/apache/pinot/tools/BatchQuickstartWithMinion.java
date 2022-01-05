@@ -25,6 +25,10 @@ import org.apache.pinot.tools.admin.PinotAdministrator;
 
 
 public class BatchQuickstartWithMinion extends Quickstart {
+  @Override
+  public List<String> types() {
+    return Arrays.asList("OFFLINE_MINION", "BATCH_MINION", "OFFLINE-MINION", "BATCH-MINION");
+  }
 
   public String getBootstrapDataDir() {
     return "examples/minions/batch/baseballStats";

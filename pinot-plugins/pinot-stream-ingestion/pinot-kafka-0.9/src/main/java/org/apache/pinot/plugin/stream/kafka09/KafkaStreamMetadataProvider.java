@@ -24,7 +24,6 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
 import kafka.api.PartitionOffsetRequestInfo;
 import kafka.common.TopicAndPartition;
 import kafka.javaapi.OffsetRequest;
@@ -145,11 +144,6 @@ public class KafkaStreamMetadataProvider extends KafkaConnectionHandler implemen
     throw new TimeoutException();
   }
 
-  public synchronized long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
-      throws java.util.concurrent.TimeoutException {
-    throw new UnsupportedOperationException("The use of this method s not supported");
-  }
-
   /**
    * Fetches the numeric Kafka offset for this partition for a symbolic name ("largest" or "smallest").
    *
@@ -160,9 +154,8 @@ public class KafkaStreamMetadataProvider extends KafkaConnectionHandler implemen
    * @return An offset
    */
   @Override
-  public synchronized StreamPartitionMsgOffset fetchStreamPartitionOffset(@Nonnull OffsetCriteria offsetCriteria,
-      long timeoutMillis)
-      throws java.util.concurrent.TimeoutException {
+  public synchronized StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria,
+      long timeoutMillis) {
     Preconditions.checkState(_isPartitionProvided,
         "Cannot fetch partition offset. StreamMetadataProvider created without partition information");
     Preconditions.checkNotNull(offsetCriteria);

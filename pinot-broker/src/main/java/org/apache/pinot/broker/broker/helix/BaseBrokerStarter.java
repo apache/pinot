@@ -41,6 +41,7 @@ import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.GrpcBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
 import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.common.Utils;
@@ -84,6 +85,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected String _hostname;
   protected int _port;
   protected String _instanceId;
+  protected final List<ClusterChangeHandler> _idealStateChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _externalViewChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _instanceConfigChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _liveInstanceChangeHandlers = new ArrayList<>();
@@ -139,6 +141,15 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // non-positive value, so set the default value as 1.
     System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW,
         _brokerConf.getProperty(Helix.CONFIG_OF_BROKER_FLAPPING_TIME_WINDOW_MS, Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
+  }
+
+  /**
+   * Adds an ideal state change handler to handle Helix ideal state change callbacks.
+   * <p>NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
+   * handlers from running. For slow change handler, make it asynchronous.
+   */
+  public void addIdealStateChangeHandler(ClusterChangeHandler idealStateChangeHandler) {
+    _idealStateChangeHandlers.add(idealStateChangeHandler);
   }
 
   /**
@@ -225,14 +236,23 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // Configure TLS for netty connection to server
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_TLS_PREFIX);
 
-    if (_brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false)) {
+    if (_brokerConf.getProperty(Broker.BROKER_REQUEST_HANDLER_TYPE, Broker.DEFAULT_BROKER_REQUEST_HANDLER_TYPE)
+        .equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
+      LOGGER.info("Starting Grpc BrokerRequestHandler.");
       _brokerRequestHandler =
-          new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
-              queryQuotaManager, tableCache, _brokerMetrics, tlsDefaults);
-    } else {
-      _brokerRequestHandler =
-          new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
+          new GrpcBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
               queryQuotaManager, tableCache, _brokerMetrics, null);
+    } else { // default request handler type, e.g. netty
+      LOGGER.info("Starting Netty BrokerRequestHandler.");
+      if (_brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false)) {
+        _brokerRequestHandler =
+            new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
+                queryQuotaManager, tableCache, _brokerMetrics, tlsDefaults);
+      } else {
+        _brokerRequestHandler =
+            new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
+                queryQuotaManager, tableCache, _brokerMetrics, null);
+      }
     }
 
     LOGGER.info("Starting broker admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
@@ -241,6 +261,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _brokerAdminApplication.start(_listenerConfigs);
 
     LOGGER.info("Initializing cluster change mediator");
+    for (ClusterChangeHandler idealStateChangeHandler : _idealStateChangeHandlers) {
+      idealStateChangeHandler.init(_spectatorHelixManager);
+    }
+    _idealStateChangeHandlers.add(_routingManager);
     for (ClusterChangeHandler externalViewChangeHandler : _externalViewChangeHandlers) {
       externalViewChangeHandler.init(_spectatorHelixManager);
     }
@@ -255,6 +279,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       liveInstanceChangeHandler.init(_spectatorHelixManager);
     }
     Map<ChangeType, List<ClusterChangeHandler>> clusterChangeHandlersMap = new HashMap<>();
+    clusterChangeHandlersMap.put(ChangeType.IDEAL_STATE, _idealStateChangeHandlers);
     clusterChangeHandlersMap.put(ChangeType.EXTERNAL_VIEW, _externalViewChangeHandlers);
     clusterChangeHandlersMap.put(ChangeType.INSTANCE_CONFIG, _instanceConfigChangeHandlers);
     if (!_liveInstanceChangeHandlers.isEmpty()) {
@@ -262,6 +287,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
     _clusterChangeMediator = new ClusterChangeMediator(clusterChangeHandlersMap, _brokerMetrics);
     _clusterChangeMediator.start();
+    _spectatorHelixManager.addIdealStateChangeListener(_clusterChangeMediator);
     _spectatorHelixManager.addExternalViewChangeListener(_clusterChangeMediator);
     _spectatorHelixManager.addInstanceConfigChangeListener(_clusterChangeMediator);
     if (!_liveInstanceChangeHandlers.isEmpty()) {

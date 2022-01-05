@@ -30,7 +30,6 @@ import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
-import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -77,54 +76,54 @@ public class InPredicateEvaluatorFactory {
         for (String value : values) {
           matchingValues.add(Integer.parseInt(value));
         }
-        return new IntRawValueBasedInPredicateEvaluator(matchingValues);
+        return new IntRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
       }
       case LONG: {
         LongSet matchingValues = new LongOpenHashSet(hashSetSize);
         for (String value : values) {
           matchingValues.add(Long.parseLong(value));
         }
-        return new LongRawValueBasedInPredicateEvaluator(matchingValues);
+        return new LongRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
       }
       case FLOAT: {
         FloatSet matchingValues = new FloatOpenHashSet(hashSetSize);
         for (String value : values) {
           matchingValues.add(Float.parseFloat(value));
         }
-        return new FloatRawValueBasedInPredicateEvaluator(matchingValues);
+        return new FloatRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
       }
       case DOUBLE: {
         DoubleSet matchingValues = new DoubleOpenHashSet(hashSetSize);
         for (String value : values) {
           matchingValues.add(Double.parseDouble(value));
         }
-        return new DoubleRawValueBasedInPredicateEvaluator(matchingValues);
+        return new DoubleRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
       }
       case BOOLEAN: {
         IntSet matchingValues = new IntOpenHashSet(hashSetSize);
         for (String value : values) {
           matchingValues.add(BooleanUtils.toInt(value));
         }
-        return new IntRawValueBasedInPredicateEvaluator(matchingValues);
+        return new IntRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
       }
       case TIMESTAMP: {
         LongSet matchingValues = new LongOpenHashSet(hashSetSize);
         for (String value : values) {
           matchingValues.add(TimestampUtils.toMillisSinceEpoch(value));
         }
-        return new LongRawValueBasedInPredicateEvaluator(matchingValues);
+        return new LongRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
       }
       case STRING: {
         Set<String> matchingValues = new ObjectOpenHashSet<>(hashSetSize);
         matchingValues.addAll(values);
-        return new StringRawValueBasedInPredicateEvaluator(matchingValues);
+        return new StringRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
       }
       case BYTES: {
         Set<ByteArray> matchingValues = new ObjectOpenHashSet<>(hashSetSize);
         for (String value : values) {
           matchingValues.add(BytesUtils.toByteArray(value));
         }
-        return new BytesRawValueBasedInPredicateEvaluator(matchingValues);
+        return new BytesRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
       }
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
@@ -137,6 +136,7 @@ public class InPredicateEvaluatorFactory {
     int[] _matchingDictIds;
 
     DictionaryBasedInPredicateEvaluator(InPredicate inPredicate, Dictionary dictionary, DataType dataType) {
+      super(inPredicate);
       List<String> values = inPredicate.getValues();
       _matchingDictIdSet = new IntOpenHashSet(HashUtil.getMinHashSetSize(values.size()));
       for (String value : values) {
@@ -151,11 +151,6 @@ public class InPredicateEvaluatorFactory {
       } else if (dictionary.length() == _numMatchingDictIds) {
         _alwaysTrue = true;
       }
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.IN;
     }
 
     @Override
@@ -180,13 +175,9 @@ public class InPredicateEvaluatorFactory {
   private static final class IntRawValueBasedInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final IntSet _matchingValues;
 
-    IntRawValueBasedInPredicateEvaluator(IntSet matchingValues) {
+    IntRawValueBasedInPredicateEvaluator(InPredicate inPredicate, IntSet matchingValues) {
+      super(inPredicate);
       _matchingValues = matchingValues;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.IN;
     }
 
     @Override
@@ -203,13 +194,9 @@ public class InPredicateEvaluatorFactory {
   private static final class LongRawValueBasedInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final LongSet _matchingValues;
 
-    LongRawValueBasedInPredicateEvaluator(LongSet matchingValues) {
+    LongRawValueBasedInPredicateEvaluator(InPredicate inPredicate, LongSet matchingValues) {
+      super(inPredicate);
       _matchingValues = matchingValues;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.IN;
     }
 
     @Override
@@ -226,13 +213,9 @@ public class InPredicateEvaluatorFactory {
   private static final class FloatRawValueBasedInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final FloatSet _matchingValues;
 
-    FloatRawValueBasedInPredicateEvaluator(FloatSet matchingValues) {
+    FloatRawValueBasedInPredicateEvaluator(InPredicate inPredicate, FloatSet matchingValues) {
+      super(inPredicate);
       _matchingValues = matchingValues;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.IN;
     }
 
     @Override
@@ -249,13 +232,9 @@ public class InPredicateEvaluatorFactory {
   private static final class DoubleRawValueBasedInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final DoubleSet _matchingValues;
 
-    DoubleRawValueBasedInPredicateEvaluator(DoubleSet matchingValues) {
+    DoubleRawValueBasedInPredicateEvaluator(InPredicate inPredicate, DoubleSet matchingValues) {
+      super(inPredicate);
       _matchingValues = matchingValues;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.IN;
     }
 
     @Override
@@ -272,13 +251,9 @@ public class InPredicateEvaluatorFactory {
   private static final class StringRawValueBasedInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final Set<String> _matchingValues;
 
-    StringRawValueBasedInPredicateEvaluator(Set<String> matchingValues) {
+    StringRawValueBasedInPredicateEvaluator(InPredicate inPredicate, Set<String> matchingValues) {
+      super(inPredicate);
       _matchingValues = matchingValues;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.IN;
     }
 
     @Override
@@ -295,13 +270,9 @@ public class InPredicateEvaluatorFactory {
   private static final class BytesRawValueBasedInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     final Set<ByteArray> _matchingValues;
 
-    BytesRawValueBasedInPredicateEvaluator(Set<ByteArray> matchingValues) {
+    BytesRawValueBasedInPredicateEvaluator(InPredicate inPredicate, Set<ByteArray> matchingValues) {
+      super(inPredicate);
       _matchingValues = matchingValues;
-    }
-
-    @Override
-    public Predicate.Type getPredicateType() {
-      return Predicate.Type.IN;
     }
 
     @Override

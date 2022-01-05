@@ -46,7 +46,6 @@ public class TierSegmentSelectorTest {
     String segmentName = "segment_0";
     String tableNameWithType = "myTable_OFFLINE";
     SegmentZKMetadata offlineSegmentZKMetadata = new SegmentZKMetadata(segmentName);
-    offlineSegmentZKMetadata.setSegmentType(CommonConstants.Segment.SegmentType.OFFLINE);
     offlineSegmentZKMetadata.setStartTime((now - TimeUnit.DAYS.toMillis(9)));
     offlineSegmentZKMetadata.setEndTime((now - TimeUnit.DAYS.toMillis(8)));
     offlineSegmentZKMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
@@ -82,7 +81,6 @@ public class TierSegmentSelectorTest {
     segmentName = "myTable__4__1__" + now;
     tableNameWithType = "myTable_REALTIME";
     SegmentZKMetadata realtimeSegmentZKMetadata = new SegmentZKMetadata(segmentName);
-    realtimeSegmentZKMetadata.setSegmentType(CommonConstants.Segment.SegmentType.REALTIME);
     realtimeSegmentZKMetadata.setStartTime(TimeUnit.MILLISECONDS.toHours(now - TimeUnit.DAYS.toMillis(3)));
     realtimeSegmentZKMetadata.setEndTime(TimeUnit.MILLISECONDS.toHours((now - TimeUnit.DAYS.toMillis(2))));
     realtimeSegmentZKMetadata.setTimeUnit(TimeUnit.HOURS);

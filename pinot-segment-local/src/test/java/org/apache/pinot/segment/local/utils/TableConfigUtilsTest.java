@@ -357,7 +357,8 @@ public class TableConfigUtilsTest {
 
     // input field name used as destination field
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("myCol", "reverse(myCol)")), null))
+            new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("myCol", "reverse(myCol)")),
+                null))
         .build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
@@ -504,32 +505,32 @@ public class TableConfigUtilsTest {
     TableConfigUtils.validate(tableConfig, schema);
 
     // 1 tier configs
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(Lists
-        .newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE"))).build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
+        Lists.newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d",
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null))).build();
     TableConfigUtils.validate(tableConfig, schema);
 
     // 2 tier configs, case insensitive check
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(Lists
-        .newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE.toLowerCase(), "30d",
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE"),
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
+        Lists.newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE.toLowerCase(), "30d",
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null),
             new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "40d",
-                TierFactory.PINOT_SERVER_STORAGE_TYPE.toLowerCase(), "tier2_tag_OFFLINE"))).build();
+                TierFactory.PINOT_SERVER_STORAGE_TYPE.toLowerCase(), "tier2_tag_OFFLINE", null, null))).build();
     TableConfigUtils.validate(tableConfig, schema);
 
     //realtime table
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
         .setTierConfigList(Lists.newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d",
-                TierFactory.PINOT_SERVER_STORAGE_TYPE.toLowerCase(), "tier1_tag_OFFLINE"),
+                TierFactory.PINOT_SERVER_STORAGE_TYPE.toLowerCase(), "tier1_tag_OFFLINE", null, null),
             new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE.toLowerCase(), "40d",
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE"))).build();
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE", null, null))).build();
     TableConfigUtils.validate(tableConfig, schema);
 
     // tier name empty
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(Lists
-        .newArrayList(
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
+        Lists.newArrayList(
             new TierConfig("", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", TierFactory.PINOT_SERVER_STORAGE_TYPE,
-                "tier1_tag_OFFLINE"))).build();
+                "tier1_tag_OFFLINE", null, null))).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should have failed due to empty tier name");
@@ -538,11 +539,11 @@ public class TableConfigUtilsTest {
     }
 
     // tier name repeats
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(Lists
-        .newArrayList(new TierConfig("sameTierName", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d",
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE"),
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
+        Lists.newArrayList(new TierConfig("sameTierName", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d",
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null),
             new TierConfig("sameTierName", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "100d",
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE"))).build();
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE", null, null))).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should have failed due to duplicate tier name");
@@ -551,11 +552,11 @@ public class TableConfigUtilsTest {
     }
 
     // segmentSelectorType invalid
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(Lists
-        .newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d",
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE"),
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
+        Lists.newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d",
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null),
             new TierConfig("tier2", "unsupportedSegmentSelector", "40d", TierFactory.PINOT_SERVER_STORAGE_TYPE,
-                "tier2_tag_OFFLINE"))).build();
+                "tier2_tag_OFFLINE", null, null))).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should have failed due to invalid segmentSelectorType");
@@ -564,11 +565,11 @@ public class TableConfigUtilsTest {
     }
 
     // segmentAge not provided for TIME segmentSelectorType
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(Lists
-        .newArrayList(
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
+        Lists.newArrayList(
             new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, null, TierFactory.PINOT_SERVER_STORAGE_TYPE,
-                "tier1_tag_OFFLINE"), new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "40d",
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE"))).build();
+                "tier1_tag_OFFLINE", null, null), new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "40d",
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE", null, null))).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should have failed due to missing segmentAge");
@@ -577,11 +578,11 @@ public class TableConfigUtilsTest {
     }
 
     // segmentAge invalid
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(Lists
-        .newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d",
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE"),
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
+        Lists.newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d",
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null),
             new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "3600",
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE"))).build();
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE", null, null))).build();
 
     try {
       TableConfigUtils.validate(tableConfig, schema);
@@ -591,10 +592,11 @@ public class TableConfigUtilsTest {
     }
 
     // storageType invalid
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(Lists
-        .newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", "unsupportedStorageType",
-            "tier1_tag_OFFLINE"), new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "40d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE"))).build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
+        Lists.newArrayList(
+            new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", "unsupportedStorageType",
+                "tier1_tag_OFFLINE", null, null), new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "40d",
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE", null, null))).build();
 
     try {
       TableConfigUtils.validate(tableConfig, schema);
@@ -604,11 +606,11 @@ public class TableConfigUtilsTest {
     }
 
     // serverTag not provided for PINOT_SERVER storageType
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(Lists
-        .newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d",
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE"),
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
+        Lists.newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d",
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null),
             new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "40d",
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, null))).build();
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, null, null, null))).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should have failed due to ");
@@ -617,11 +619,11 @@ public class TableConfigUtilsTest {
     }
 
     // serverTag invalid
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(Lists
-        .newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d",
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag"),
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
+        Lists.newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d",
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag", null, null),
             new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "40d",
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE"))).build();
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE", null, null))).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should have failed due to invalid server tag");
@@ -655,8 +657,7 @@ public class TableConfigUtilsTest {
         .setNoDictionaryColumns(Arrays.asList("myCol1")).build();
 
     try {
-      FieldConfig fieldConfig =
-          new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null);
+      FieldConfig fieldConfig = new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
@@ -712,24 +713,12 @@ public class TableConfigUtilsTest {
         .setNoDictionaryColumns(Arrays.asList("myCol2", "intCol")).build();
     try {
       FieldConfig fieldConfig =
-          new FieldConfig("myCol2", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null, null);
-      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
-      TableConfigUtils.validate(tableConfig, schema);
-      Assert.fail("Should fail since TEXT index is enabled on multi value column");
-    } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "TEXT Index is only supported for single value string columns");
-    }
-
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setNoDictionaryColumns(Arrays.asList("myCol2", "intCol")).build();
-    try {
-      FieldConfig fieldConfig =
           new FieldConfig("intCol", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail since TEXT index is enabled on non String column");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "TEXT Index is only supported for single value string columns");
+      Assert.assertEquals(e.getMessage(), "TEXT Index is only supported for string columns");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -747,9 +736,8 @@ public class TableConfigUtilsTest {
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     try {
-      FieldConfig fieldConfig =
-          new FieldConfig("intCol", FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(),
-              FieldConfig.CompressionCodec.SNAPPY, null);
+      FieldConfig fieldConfig = new FieldConfig("intCol", FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(),
+          FieldConfig.CompressionCodec.SNAPPY, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail since dictionary encoding does not support compression codec snappy");
@@ -759,9 +747,8 @@ public class TableConfigUtilsTest {
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     try {
-      FieldConfig fieldConfig =
-          new FieldConfig("intCol", FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(),
-              FieldConfig.CompressionCodec.ZSTANDARD, null);
+      FieldConfig fieldConfig = new FieldConfig("intCol", FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(),
+          FieldConfig.CompressionCodec.ZSTANDARD, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail since dictionary encoding does not support compression codec zstandard");
@@ -1083,8 +1070,8 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertConfig(tableConfig, schema);
       Assert.fail();
     } catch (IllegalStateException e) {
-      Assert
-          .assertEquals(e.getMessage(), "Could not find streamConfigs for REALTIME table: " + TABLE_NAME + "_REALTIME");
+      Assert.assertEquals(e.getMessage(),
+          "Could not find streamConfigs for REALTIME table: " + TABLE_NAME + "_REALTIME");
     }
 
     Map<String, String> streamConfigs = getStreamConfigs();
@@ -1116,8 +1103,9 @@ public class TableConfigUtilsTest {
         .setStreamConfigs(streamConfigs).build();
     TableConfigUtils.validateUpsertConfig(tableConfig, schema);
 
-    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Lists.newArrayList("myCol"), null, Collections
-        .singletonList(new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, "myCol").toColumnName()), 10);
+    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Lists.newArrayList("myCol"), null,
+        Collections.singletonList(
+            new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, "myCol").toColumnName()), 10);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null))
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
@@ -1202,23 +1190,19 @@ public class TableConfigUtilsTest {
 
   @Test
   public void testTaskConfig() {
-    Schema schema = new Schema.SchemaBuilder()
-        .setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING).build();
-    Map<String, String> realtimeToOfflineTaskConfig = ImmutableMap.of(
-        "schedule", "0 */10 * ? * * *",
-        "bucketTimePeriod", "6h",
-        "bufferTimePeriod", "5d",
-        "mergeType", "rollup",
-        "myCol.aggregationType", "max"
-    );
-    Map<String, String> segmentGenerationAndPushTaskConfig = ImmutableMap.of(
-        "schedule", "0 */10 * ? * * *"
-    );
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
-            "RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig,
-            "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig)))
-        .build();
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+            .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+            .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+            .build();
+    Map<String, String> realtimeToOfflineTaskConfig =
+        ImmutableMap.of("schedule", "0 */10 * ? * * *", "bucketTimePeriod", "6h", "bufferTimePeriod", "5d", "mergeType",
+            "rollup", "myCol.aggregationType", "max");
+    Map<String, String> segmentGenerationAndPushTaskConfig = ImmutableMap.of("schedule", "0 */10 * ? * * *");
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(
+        new TableTaskConfig(ImmutableMap.of("RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig,
+            "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig))).build();
 
     // validate valid config
     TableConfigUtils.validateTaskConfigs(tableConfig, schema);
@@ -1226,11 +1210,9 @@ public class TableConfigUtilsTest {
     // invalid schedule
     HashMap<String, String> invalidScheduleConfig = new HashMap<>(segmentGenerationAndPushTaskConfig);
     invalidScheduleConfig.put("schedule", "garbage");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
-            "RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig,
-            "SegmentGenerationAndPushTask", invalidScheduleConfig)))
-        .build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of("RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig, "SegmentGenerationAndPushTask",
+            invalidScheduleConfig))).build();
     try {
       TableConfigUtils.validateTaskConfigs(tableConfig, schema);
       Assert.fail();
@@ -1239,27 +1221,26 @@ public class TableConfigUtilsTest {
     }
 
     // invalid Upsert config with RealtimeToOfflineTask
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null))
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
-            "RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig,
-            "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig)))
-        .build();
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null)).setTaskConfig(new TableTaskConfig(
+            ImmutableMap.of("RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig,
+                "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig))).build();
     try {
       TableConfigUtils.validateTaskConfigs(tableConfig, schema);
       Assert.fail();
     } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("RealtimeToOfflineTask doesn't support upsert ingestion mode"));
+      Assert.assertTrue(e.getMessage().contains("RealtimeToOfflineTask doesn't support upsert table"));
     }
+    // validate that TASK config will be skipped with skip string.
+    TableConfigUtils.validate(tableConfig, schema, "TASK,UPSERT");
 
     // invalid period
     HashMap<String, String> invalidPeriodConfig = new HashMap<>(realtimeToOfflineTaskConfig);
     invalidPeriodConfig.put("roundBucketTimePeriod", "garbage");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
-            "RealtimeToOfflineSegmentsTask", invalidPeriodConfig,
-            "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig)))
-        .build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidPeriodConfig, "SegmentGenerationAndPushTask",
+            segmentGenerationAndPushTaskConfig))).build();
     try {
       TableConfigUtils.validateTaskConfigs(tableConfig, schema);
       Assert.fail();
@@ -1270,11 +1251,9 @@ public class TableConfigUtilsTest {
     // invalid mergeType
     HashMap<String, String> invalidMergeType = new HashMap<>(realtimeToOfflineTaskConfig);
     invalidMergeType.put("mergeType", "garbage");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
-            "RealtimeToOfflineSegmentsTask", invalidMergeType,
-            "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig)))
-        .build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidMergeType, "SegmentGenerationAndPushTask",
+            segmentGenerationAndPushTaskConfig))).build();
     try {
       TableConfigUtils.validateTaskConfigs(tableConfig, schema);
       Assert.fail();
@@ -1285,11 +1264,9 @@ public class TableConfigUtilsTest {
     // invalid column
     HashMap<String, String> invalidColumnConfig = new HashMap<>(realtimeToOfflineTaskConfig);
     invalidColumnConfig.put("score.aggregationType", "max");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
-            "RealtimeToOfflineSegmentsTask", invalidColumnConfig,
-            "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig)))
-        .build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidColumnConfig, "SegmentGenerationAndPushTask",
+            segmentGenerationAndPushTaskConfig))).build();
     try {
       TableConfigUtils.validateTaskConfigs(tableConfig, schema);
       Assert.fail();
@@ -1300,11 +1277,9 @@ public class TableConfigUtilsTest {
     // invalid agg
     HashMap<String, String> invalidAggConfig = new HashMap<>(realtimeToOfflineTaskConfig);
     invalidAggConfig.put("myCol.aggregationType", "garbage");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
-            "RealtimeToOfflineSegmentsTask", invalidAggConfig,
-            "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig)))
-        .build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidAggConfig, "SegmentGenerationAndPushTask",
+            segmentGenerationAndPushTaskConfig))).build();
     try {
       TableConfigUtils.validateTaskConfigs(tableConfig, schema);
       Assert.fail();
@@ -1318,8 +1293,8 @@ public class TableConfigUtilsTest {
     streamConfigs.put("streamType", "kafka");
     streamConfigs.put("stream.kafka.consumer.type", "highLevel");
     streamConfigs.put("stream.kafka.topic.name", "test");
-    streamConfigs
-        .put("stream.kafka.decoder.class.name", "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
+    streamConfigs.put("stream.kafka.decoder.class.name",
+        "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
     return streamConfigs;
   }
 }

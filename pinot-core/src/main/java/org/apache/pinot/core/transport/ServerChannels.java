@@ -30,6 +30,7 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.SslProvider;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.concurrent.ThreadSafe;
@@ -121,7 +122,8 @@ public class ServerChannels {
 
     private void attachSSLHandler(SocketChannel ch) {
       try {
-        SslContextBuilder sslContextBuilder = SslContextBuilder.forClient();
+        SslContextBuilder sslContextBuilder = SslContextBuilder.forClient()
+            .sslProvider(SslProvider.valueOf(_tlsConfig.getSslProvider()));
 
         if (_tlsConfig.getKeyStorePath() != null) {
           sslContextBuilder.keyManager(TlsUtils.createKeyManagerFactory(_tlsConfig));

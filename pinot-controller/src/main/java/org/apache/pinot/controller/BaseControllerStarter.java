@@ -110,6 +110,7 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseControllerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseControllerStarter.class);
 
+  public static final String CONTROLLER_INSTANCE_ID = "controllerInstanceId";
   private static final String METRICS_REGISTRY_NAME = "pinot.controller.metrics";
   private static final Long DATA_DIRECTORY_MISSING_VALUE = 1000000L;
   private static final Long DATA_DIRECTORY_EXCEPTION_VALUE = 1100000L;
@@ -445,6 +446,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       @Override
       protected void configure() {
         bind(_config).to(ControllerConf.class);
+        bind(_helixParticipantInstanceId).named(CONTROLLER_INSTANCE_ID);
         bind(_helixResourceManager).to(PinotHelixResourceManager.class);
         bind(_helixTaskResourceManager).to(PinotHelixTaskResourceManager.class);
         bind(_segmentCompletionManager).to(SegmentCompletionManager.class);

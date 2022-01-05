@@ -28,7 +28,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAccumulator;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -53,6 +52,7 @@ import org.slf4j.LoggerFactory;
  * Abstract class providing common scheduler functionality
  * including query runner and query worker pool
  */
+@SuppressWarnings("UnstableApiUsage")
 public abstract class QueryScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryScheduler.class);
 
@@ -78,13 +78,13 @@ public abstract class QueryScheduler {
    * @param resourceManager for managing server thread resources
    * @param serverMetrics server metrics collector
    */
-  public QueryScheduler(@Nonnull PinotConfiguration config, @Nonnull QueryExecutor queryExecutor,
-      @Nonnull ResourceManager resourceManager, @Nonnull ServerMetrics serverMetrics,
-      @Nonnull LongAccumulator latestQueryTime) {
+  public QueryScheduler(PinotConfiguration config, QueryExecutor queryExecutor, ResourceManager resourceManager,
+      ServerMetrics serverMetrics, LongAccumulator latestQueryTime) {
     Preconditions.checkNotNull(config);
     Preconditions.checkNotNull(queryExecutor);
     Preconditions.checkNotNull(resourceManager);
     Preconditions.checkNotNull(serverMetrics);
+    Preconditions.checkNotNull(latestQueryTime);
 
     _serverMetrics = serverMetrics;
     _resourceManager = resourceManager;
@@ -103,8 +103,7 @@ public abstract class QueryScheduler {
    * @return Listenable future for query result representing serialized response. It is possible that the
    *    future may return immediately or be scheduled for execution at a later time.
    */
-  @Nonnull
-  public abstract ListenableFuture<byte[]> submit(@Nonnull ServerQueryRequest queryRequest);
+  public abstract ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest);
 
   /**
    * Query scheduler name for logging
@@ -133,8 +132,8 @@ public abstract class QueryScheduler {
    * @return Future task that can be scheduled for execution on an ExecutorService. Ideally, this future
    * should be executed on a different executor service than {@code e} to avoid deadlock.
    */
-  protected ListenableFutureTask<byte[]> createQueryFutureTask(@Nonnull ServerQueryRequest queryRequest,
-      @Nonnull ExecutorService executorService) {
+  protected ListenableFutureTask<byte[]> createQueryFutureTask(ServerQueryRequest queryRequest,
+      ExecutorService executorService) {
     return ListenableFutureTask.create(() -> processQueryAndSerialize(queryRequest, executorService));
   }
 
@@ -144,10 +143,8 @@ public abstract class QueryScheduler {
    * @param executorService Executor service to use for parallelizing query processing
    * @return serialized query response
    */
-  @SuppressWarnings("Duplicates")
   @Nullable
-  protected byte[] processQueryAndSerialize(@Nonnull ServerQueryRequest queryRequest,
-      @Nonnull ExecutorService executorService) {
+  protected byte[] processQueryAndSerialize(ServerQueryRequest queryRequest, ExecutorService executorService) {
     _latestQueryTime.accumulate(System.currentTimeMillis());
     DataTable dataTable;
     try {
@@ -188,6 +185,11 @@ public abstract class QueryScheduler {
         Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.RESIZE_TIME_MS.getName(), INVALID_RESIZE_TIME_MS));
     long threadCpuTimeNs =
         Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.THREAD_CPU_TIME_NS.getName(), "0"));
+    long systemActivitiesCpuTimeNs =
+        Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName(), "0"));
+    long responseSerializationCpuTimeNs =
+        Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(), "0"));
+    long totalCpuTimeNs = threadCpuTimeNs + systemActivitiesCpuTimeNs + responseSerializationCpuTimeNs;
 
     if (numDocsScanned > 0) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_DOCS_SCANNED, numDocsScanned);
@@ -210,6 +212,18 @@ public abstract class QueryScheduler {
       _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.EXECUTION_THREAD_CPU_TIME_NS, threadCpuTimeNs,
           TimeUnit.NANOSECONDS);
     }
+    if (systemActivitiesCpuTimeNs > 0) {
+      _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.SYSTEM_ACTIVITIES_CPU_TIME_NS,
+          systemActivitiesCpuTimeNs, TimeUnit.NANOSECONDS);
+    }
+    if (responseSerializationCpuTimeNs > 0) {
+      _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.RESPONSE_SER_CPU_TIME_NS,
+          responseSerializationCpuTimeNs, TimeUnit.NANOSECONDS);
+    }
+    if (totalCpuTimeNs > 0) {
+      _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.TOTAL_CPU_TIME_NS, totalCpuTimeNs,
+          TimeUnit.NANOSECONDS);
+    }
 
     TimerContext timerContext = queryRequest.getTimerContext();
     int numSegmentsQueried = queryRequest.getSegmentsToQuery().size();
@@ -219,16 +233,16 @@ public abstract class QueryScheduler {
     // Please add new entries at the end
     if (_queryLogRateLimiter.tryAcquire() || forceLog(schedulerWaitMs, numDocsScanned)) {
       LOGGER.info("Processed requestId={},table={},segments(queried/processed/matched/consuming)={}/{}/{}/{},"
-              + "schedulerWaitMs={},reqDeserMs={},totalExecMs={},resSerMs={},totalTimeMs={},"
-              + "minConsumingFreshnessMs={},broker={},"
-              + "numDocsScanned={},scanInFilter={},scanPostFilter={},sched={},threadCpuTimeNs={}", requestId,
-          tableNameWithType, numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched, numSegmentsConsuming,
-          schedulerWaitMs, timerContext.getPhaseDurationMs(ServerQueryPhase.REQUEST_DESERIALIZATION),
+              + "schedulerWaitMs={},reqDeserMs={},totalExecMs={},resSerMs={},totalTimeMs={},minConsumingFreshnessMs={},"
+              + "broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={},"
+              + "threadCpuTimeNs(total/thread/sysActivity/resSer)={}/{}/{}/{}", requestId, tableNameWithType,
+          numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched, numSegmentsConsuming, schedulerWaitMs,
+          timerContext.getPhaseDurationMs(ServerQueryPhase.REQUEST_DESERIALIZATION),
           timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
           timerContext.getPhaseDurationMs(ServerQueryPhase.RESPONSE_SERIALIZATION),
           timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), minConsumingFreshnessMs,
           queryRequest.getBrokerId(), numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, name(),
-          threadCpuTimeNs);
+          totalCpuTimeNs, threadCpuTimeNs, systemActivitiesCpuTimeNs, responseSerializationCpuTimeNs);
 
       // Limit the dropping log message at most once per second.
       if (_numDroppedLogRateLimiter.tryAcquire()) {
@@ -279,7 +293,7 @@ public abstract class QueryScheduler {
    * @return serialized response bytes
    */
   @Nullable
-  private byte[] serializeDataTable(@Nonnull ServerQueryRequest queryRequest, @Nonnull DataTable dataTable) {
+  private byte[] serializeDataTable(ServerQueryRequest queryRequest, DataTable dataTable) {
     TimerContext timerContext = queryRequest.getTimerContext();
     TimerContext.Timer responseSerializationTimer =
         timerContext.startNewPhaseTimer(ServerQueryPhase.RESPONSE_SERIALIZATION);
@@ -301,11 +315,8 @@ public abstract class QueryScheduler {
   }
 
   /**
-   * Error response future in case of internal error where query response is not available. This can happen
-   * if the query can not be executed or
-   * @param queryRequest
-   * @param error error code to send
-   * @return
+   * Error response future in case of internal error where query response is not available. This can happen if the query
+   * can not be executed.
    */
   protected ListenableFuture<byte[]> immediateErrorResponse(ServerQueryRequest queryRequest,
       ProcessingException error) {

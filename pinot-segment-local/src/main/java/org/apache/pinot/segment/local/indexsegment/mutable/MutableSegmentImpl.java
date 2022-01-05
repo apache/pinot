@@ -230,6 +230,7 @@ public class MutableSegmentImpl implements MutableSegment {
     Set<String> noDictionaryColumns = config.getNoDictionaryColumns();
     Set<String> invertedIndexColumns = config.getInvertedIndexColumns();
     Set<String> textIndexColumns = config.getTextIndexColumns();
+    // TODO: Add mutable FST and wire it up
     Set<String> fstIndexColumns = config.getFSTIndexColumns();
     Set<String> jsonIndexColumns = config.getJsonIndexColumns();
     Map<String, H3IndexConfig> h3IndexConfigs = config.getH3IndexConfigs();
@@ -296,8 +297,8 @@ public class MutableSegmentImpl implements MutableSegment {
         int estimatedCardinality = (int) (_statsHistory.getEstimatedCardinality(column) * 1.1);
         String dictionaryAllocationContext =
             buildAllocationContext(_segmentName, column, V1Constants.Dict.FILE_EXTENSION);
-        dictionary = MutableDictionaryFactory
-            .getMutableDictionary(storedType, _offHeap, _memoryManager, dictionaryColumnSize,
+        dictionary =
+            MutableDictionaryFactory.getMutableDictionary(storedType, _offHeap, _memoryManager, dictionaryColumnSize,
                 Math.min(estimatedCardinality, _capacity), dictionaryAllocationContext);
 
         if (fieldSpec.isSingleValueField()) {
@@ -354,8 +355,7 @@ public class MutableSegmentImpl implements MutableSegment {
       // TODO: Support range index and bloom filter for mutable segment
       _indexContainerMap.put(column,
           new IndexContainer(fieldSpec, partitionFunction, partitions, new NumValuesInfo(), forwardIndex, dictionary,
-              invertedIndexReader, null, textIndex, fstIndexColumns.contains(column), jsonIndex, h3Index, null,
-              nullValueVector));
+              invertedIndexReader, null, textIndex, jsonIndex, h3Index, null, nullValueVector));
     }
 
     if (_realtimeLuceneReaders != null) {
@@ -406,9 +406,9 @@ public class MutableSegmentImpl implements MutableSegment {
       // So to continue aggregating metrics for such cases, we will create dictionary even
       // if the column is part of noDictionary set from table config
       if (fieldSpec instanceof DimensionFieldSpec && _aggregateMetrics && (dataType == STRING || dataType == BYTES)) {
-        _logger
-            .info("Aggregate metrics is enabled. Will create dictionary in consuming segment for column {} of type {}",
-                column, dataType.toString());
+        _logger.info(
+            "Aggregate metrics is enabled. Will create dictionary in consuming segment for column {} of type {}",
+            column, dataType.toString());
         return false;
       }
       // So don't create dictionary if the column is member of noDictionary, is single-value
@@ -422,7 +422,7 @@ public class MutableSegmentImpl implements MutableSegment {
   public SegmentPartitionConfig getSegmentPartitionConfig() {
     if (_partitionColumn != null) {
       return new SegmentPartitionConfig(Collections.singletonMap(_partitionColumn,
-          new ColumnPartitionConfig(_partitionFunction.toString(), _partitionFunction.getNumPartitions())));
+          new ColumnPartitionConfig(_partitionFunction.getName(), _partitionFunction.getNumPartitions())));
     } else {
       return null;
     }
@@ -472,12 +472,14 @@ public class MutableSegmentImpl implements MutableSegment {
       throws IOException {
     boolean canTakeMore;
     if (isUpsertEnabled()) {
-      row = handleUpsert(row, _numDocsIndexed);
-
-      updateDictionary(row);
-      addNewRow(row);
-      // Update number of documents indexed at last to make the latest row queryable
+      PartitionUpsertMetadataManager.RecordInfo recordInfo = getRecordInfo(row, _numDocsIndexed);
+      GenericRow updatedRow = _partitionUpsertMetadataManager.updateRecord(row, recordInfo);
+      updateDictionary(updatedRow);
+      addNewRow(updatedRow);
+      // Update number of documents indexed before handling the upsert metadata so that the record becomes queryable
+      // once validated
       canTakeMore = _numDocsIndexed++ < _capacity;
+      _partitionUpsertMetadataManager.addRecord(this, recordInfo);
     } else {
       // Update dictionary first
       updateDictionary(row);
@@ -511,14 +513,12 @@ public class MutableSegmentImpl implements MutableSegment {
     return _upsertMode != UpsertConfig.Mode.NONE;
   }
 
-  private GenericRow handleUpsert(GenericRow row, int docId) {
+  private PartitionUpsertMetadataManager.RecordInfo getRecordInfo(GenericRow row, int docId) {
     PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
     Object upsertComparisonValue = row.getValue(_upsertComparisonColumn);
-    Preconditions
-        .checkState(upsertComparisonValue instanceof Comparable, "Upsert comparison column: %s must be comparable",
-            _upsertComparisonColumn);
-    return _partitionUpsertMetadataManager.updateRecord(this,
-        new PartitionUpsertMetadataManager.RecordInfo(primaryKey, docId, (Comparable) upsertComparisonValue), row);
+    Preconditions.checkState(upsertComparisonValue instanceof Comparable,
+        "Upsert comparison column: %s must be comparable", _upsertComparisonColumn);
+    return new PartitionUpsertMetadataManager.RecordInfo(primaryKey, docId, (Comparable) upsertComparisonValue);
   }
 
   private void updateDictionary(GenericRow row) {
@@ -833,9 +833,8 @@ public class MutableSegmentImpl implements MutableSegment {
       if (_numDocsIndexed > 0) {
         int numSeconds = (int) ((System.currentTimeMillis() - _startTimeMillis) / 1000);
         long totalMemBytes = _memoryManager.getTotalAllocatedBytes();
-        _logger
-            .info("Segment used {} bytes of memory for {} rows consumed in {} seconds", totalMemBytes, _numDocsIndexed,
-                numSeconds);
+        _logger.info("Segment used {} bytes of memory for {} rows consumed in {} seconds", totalMemBytes,
+            _numDocsIndexed, numSeconds);
 
         RealtimeSegmentStatsHistory.SegmentStats segmentStats = new RealtimeSegmentStatsHistory.SegmentStats();
         for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
@@ -996,15 +995,15 @@ public class MutableSegmentImpl implements MutableSegment {
     for (FieldSpec fieldSpec : _physicalMetricFieldSpecs) {
       String metric = fieldSpec.getName();
       if (!noDictionaryColumns.contains(metric)) {
-        _logger
-            .warn("Metrics aggregation cannot be turned ON in presence of dictionary encoded metrics, eg: {}", metric);
+        _logger.warn("Metrics aggregation cannot be turned ON in presence of dictionary encoded metrics, eg: {}",
+            metric);
         _aggregateMetrics = false;
         break;
       }
 
       if (!fieldSpec.isSingleValueField()) {
-        _logger
-            .warn("Metrics aggregation cannot be turned ON in presence of multi-value metric columns, eg: {}", metric);
+        _logger.warn("Metrics aggregation cannot be turned ON in presence of multi-value metric columns, eg: {}",
+            metric);
         _aggregateMetrics = false;
         break;
       }
@@ -1015,8 +1014,8 @@ public class MutableSegmentImpl implements MutableSegment {
     for (FieldSpec fieldSpec : _physicalDimensionFieldSpecs) {
       String dimension = fieldSpec.getName();
       if (noDictionaryColumns.contains(dimension)) {
-        _logger
-            .warn("Metrics aggregation cannot be turned ON in presence of no-dictionary dimensions, eg: {}", dimension);
+        _logger.warn("Metrics aggregation cannot be turned ON in presence of no-dictionary dimensions, eg: {}",
+            dimension);
         _aggregateMetrics = false;
         break;
       }
@@ -1032,9 +1031,9 @@ public class MutableSegmentImpl implements MutableSegment {
     // Time columns should be dictionary encoded.
     for (String timeColumnName : _physicalTimeColumnNames) {
       if (noDictionaryColumns.contains(timeColumnName)) {
-        _logger
-            .warn("Metrics aggregation cannot be turned ON in presence of no-dictionary datetime/time columns, eg: {}",
-                timeColumnName);
+        _logger.warn(
+            "Metrics aggregation cannot be turned ON in presence of no-dictionary datetime/time columns, eg: {}",
+            timeColumnName);
         _aggregateMetrics = false;
         break;
       }
@@ -1090,7 +1089,6 @@ public class MutableSegmentImpl implements MutableSegment {
     final RangeIndexReader _rangeIndex;
     final MutableH3Index _h3Index;
     final RealtimeLuceneTextIndexReader _textIndex;
-    final boolean _enableFST;
     final MutableJsonIndex _jsonIndex;
     final BloomFilterReader _bloomFilter;
     final MutableNullValueVector _nullValueVector;
@@ -1105,7 +1103,7 @@ public class MutableSegmentImpl implements MutableSegment {
     IndexContainer(FieldSpec fieldSpec, @Nullable PartitionFunction partitionFunction,
         @Nullable Set<Integer> partitions, NumValuesInfo numValuesInfo, MutableForwardIndex forwardIndex,
         @Nullable MutableDictionary dictionary, @Nullable RealtimeInvertedIndexReader invertedIndex,
-        @Nullable RangeIndexReader rangeIndex, @Nullable RealtimeLuceneTextIndexReader textIndex, boolean enableFST,
+        @Nullable RangeIndexReader rangeIndex, @Nullable RealtimeLuceneTextIndexReader textIndex,
         @Nullable MutableJsonIndex jsonIndex, @Nullable MutableH3Index h3Index, @Nullable BloomFilterReader bloomFilter,
         @Nullable MutableNullValueVector nullValueVector) {
       _fieldSpec = fieldSpec;
@@ -1119,7 +1117,6 @@ public class MutableSegmentImpl implements MutableSegment {
       _h3Index = h3Index;
 
       _textIndex = textIndex;
-      _enableFST = enableFST;
       _jsonIndex = jsonIndex;
       _bloomFilter = bloomFilter;
       _nullValueVector = nullValueVector;
@@ -1128,8 +1125,7 @@ public class MutableSegmentImpl implements MutableSegment {
     DataSource toDataSource() {
       return new MutableDataSource(_fieldSpec, _numDocsIndexed, _numValuesInfo._numValues,
           _numValuesInfo._maxNumValuesPerMVEntry, _partitionFunction, _partitions, _minValue, _maxValue, _forwardIndex,
-          _dictionary, _invertedIndex, _rangeIndex, _textIndex, _enableFST, _jsonIndex, _h3Index, _bloomFilter,
-          _nullValueVector);
+          _dictionary, _invertedIndex, _rangeIndex, _textIndex, _jsonIndex, _h3Index, _bloomFilter, _nullValueVector);
     }
 
     @Override
@@ -1151,8 +1147,8 @@ public class MutableSegmentImpl implements MutableSegment {
         try {
           _invertedIndex.close();
         } catch (Exception e) {
-          _logger
-              .error("Caught exception while closing inverted index for column: {}, continuing with error", column, e);
+          _logger.error("Caught exception while closing inverted index for column: {}, continuing with error", column,
+              e);
         }
       }
       if (_rangeIndex != null) {

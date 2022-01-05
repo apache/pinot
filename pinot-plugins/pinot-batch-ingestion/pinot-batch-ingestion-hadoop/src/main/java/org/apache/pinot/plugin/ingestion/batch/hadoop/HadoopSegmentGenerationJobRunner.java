@@ -63,6 +63,7 @@ import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.pinot.common.segment.generation.SegmentGenerationUtils.PINOT_PLUGINS_TAR_GZ;
 import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_INCLUDE_PROPERTY_NAME;
 
 
@@ -390,27 +391,41 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
   }
 
   protected void packPluginsToDistributedCache(Job job, PinotFS outputDirFS, URI stagingDirURI) {
-    File pluginsRootDir = new File(PluginManager.get().getPluginsRootDir());
-    if (pluginsRootDir.exists()) {
-      try {
-        File pluginsTarGzFile = File.createTempFile("pinot-plugins-", ".tar.gz");
-        TarGzCompressionUtils.createTarGzFile(pluginsRootDir, pluginsTarGzFile);
+    String[] pluginDirectories = PluginManager.get().getPluginsDirectories();
+    if (pluginDirectories == null) {
+      LOGGER.warn("Plugin directories is null, nothing to pack to distributed cache");
+      return;
+    }
 
-        // Copy to staging directory
-        Path cachedPluginsTarball = new Path(stagingDirURI.toString(), SegmentGenerationUtils.PINOT_PLUGINS_TAR_GZ);
-        outputDirFS.copyFromLocalFile(pluginsTarGzFile, cachedPluginsTarball.toUri());
-        job.addCacheFile(cachedPluginsTarball.toUri());
-      } catch (Exception e) {
-        LOGGER.error("Failed to tar plugins directory and upload to staging dir", e);
-        throw new RuntimeException(e);
-      }
+    ArrayList<File> validPluginDirectories = new ArrayList();
 
-      String pluginsIncludes = System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME);
-      if (pluginsIncludes != null) {
-        job.getConfiguration().set(PLUGINS_INCLUDE_PROPERTY_NAME, pluginsIncludes);
+    for (String pluginsDirPath : pluginDirectories) {
+      File pluginsDir = new File(pluginsDirPath);
+      if (pluginsDir.exists()) {
+        validPluginDirectories.add(pluginsDir);
+      } else {
+        LOGGER.warn("Cannot find Pinot plugins directory at [{}]", pluginsDirPath);
+        return;
       }
-    } else {
-      LOGGER.warn("Cannot find local Pinot plugins directory at [{}]", pluginsRootDir);
+    }
+
+    File pluginsTarGzFile = new File(PINOT_PLUGINS_TAR_GZ);
+    try {
+      File[] files = validPluginDirectories.toArray(new File[0]);
+      TarGzCompressionUtils.createTarGzFile(files, pluginsTarGzFile);
+
+      // Copy to staging directory
+      Path cachedPluginsTarball = new Path(stagingDirURI.toString(), SegmentGenerationUtils.PINOT_PLUGINS_TAR_GZ);
+      outputDirFS.copyFromLocalFile(pluginsTarGzFile, cachedPluginsTarball.toUri());
+      job.addCacheFile(cachedPluginsTarball.toUri());
+    } catch (Exception e) {
+      LOGGER.error("Failed to tar plugins directories and upload to staging dir", e);
+      throw new RuntimeException(e);
+    }
+
+    String pluginsIncludes = System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME);
+    if (pluginsIncludes != null) {
+      job.getConfiguration().set(PLUGINS_INCLUDE_PROPERTY_NAME, pluginsIncludes);
     }
   }
 

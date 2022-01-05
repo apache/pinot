@@ -150,7 +150,9 @@ public abstract class AbstractRecordReaderTest {
   }
 
   protected Set<String> getSourceFields(Schema schema) {
-    return Sets.newHashSet(schema.getColumnNames());
+    Set<String> sourceFields = Sets.newHashSet(schema.getColumnNames());
+    sourceFields.add("column_not_in_source");
+    return sourceFields;
   }
 
   @BeforeClass

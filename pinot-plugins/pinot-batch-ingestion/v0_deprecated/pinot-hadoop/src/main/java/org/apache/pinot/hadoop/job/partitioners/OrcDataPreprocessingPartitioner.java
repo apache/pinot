@@ -20,9 +20,11 @@ package org.apache.pinot.hadoop.job.partitioners;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.WritableComparable;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.orc.mapred.OrcStruct;
 import org.apache.orc.mapred.OrcValue;
@@ -39,20 +41,30 @@ public class OrcDataPreprocessingPartitioner extends Partitioner<WritableCompara
   private Configuration _conf;
   private String _partitionColumn;
   private PartitionFunction _partitionFunction;
+  private String _partitionColumnDefaultNullValue;
   private int _partitionColumnId = -1;
+  private int _numReducers = -1;
+
+  private final AtomicInteger _counter = new AtomicInteger(0);
 
   @Override
   public void setConf(Configuration conf) {
     _conf = conf;
     _partitionColumn = conf.get(InternalConfigConstants.PARTITION_COLUMN_CONFIG);
     String partitionFunctionName = conf.get(InternalConfigConstants.PARTITION_FUNCTION_CONFIG);
-    int numPartitions = Integer.parseInt(conf.get(InternalConfigConstants.NUM_PARTITIONS_CONFIG));
-    _partitionFunction = PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions);
+    String numPartitionsString = conf.get(InternalConfigConstants.NUM_PARTITIONS_CONFIG);
+    int numPartitions = -1;
+    if (_partitionColumn != null) {
+      numPartitions = Integer.parseInt(numPartitionsString);
+      _partitionFunction = PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions);
+    } else {
+      _numReducers = Integer.parseInt(conf.get(MRJobConfig.NUM_REDUCES));
+    }
+    _partitionColumnDefaultNullValue = conf.get(InternalConfigConstants.PARTITION_COLUMN_DEFAULT_NULL_VALUE);
     LOGGER.info(
         "Initialized OrcDataPreprocessingPartitioner with partitionColumn: {}, partitionFunction: {}, numPartitions: "
-            + "{}",
-        _partitionColumn,
-        partitionFunctionName, numPartitions);
+            + "{}, default null value: {}",
+        _partitionColumn, partitionFunctionName, numPartitions, _partitionColumnDefaultNullValue);
   }
 
   @Override
@@ -62,25 +74,33 @@ public class OrcDataPreprocessingPartitioner extends Partitioner<WritableCompara
 
   @Override
   public int getPartition(WritableComparable key, OrcValue value, int numPartitions) {
-    OrcStruct orcStruct = (OrcStruct) value.value;
-    if (_partitionColumnId == -1) {
-      List<String> fieldNames = orcStruct.getSchema().getFieldNames();
-      _partitionColumnId = fieldNames.indexOf(_partitionColumn);
-      Preconditions.checkState(_partitionColumnId != -1, "Failed to find partition column: %s in the ORC fields: %s",
-          _partitionColumn, fieldNames);
-      LOGGER.info("Field id for partition column: {} is: {}", _partitionColumn, _partitionColumnId);
+    if (_partitionColumn == null) {
+      return Math.abs(_counter.getAndIncrement()) % _numReducers;
+    } else {
+      OrcStruct orcStruct = (OrcStruct) value.value;
+      if (_partitionColumnId == -1) {
+        List<String> fieldNames = orcStruct.getSchema().getFieldNames();
+        _partitionColumnId = fieldNames.indexOf(_partitionColumn);
+        Preconditions.checkState(_partitionColumnId != -1, "Failed to find partition column: %s in the ORC fields: %s",
+            _partitionColumn, fieldNames);
+        LOGGER.info("Field id for partition column: {} is: {}", _partitionColumn, _partitionColumnId);
+      }
+      WritableComparable partitionColumnValue = orcStruct.getFieldValue(_partitionColumnId);
+      String convertedValueString;
+      if (partitionColumnValue == null) {
+        convertedValueString = _partitionColumnDefaultNullValue;
+      } else {
+        try {
+          Object convertedValue = OrcUtils.convert(partitionColumnValue);
+          convertedValueString = convertedValue.toString();
+        } catch (Exception e) {
+          throw new IllegalStateException(String
+              .format("Caught exception while processing partition column: %s, id: %d in ORC struct: %s",
+                  _partitionColumn, _partitionColumnId, orcStruct), e);
+        }
+      }
+      // NOTE: Always partition with String type value because Broker uses String type value to prune segments
+      return _partitionFunction.getPartition(convertedValueString);
     }
-    WritableComparable partitionColumnValue = orcStruct.getFieldValue(_partitionColumnId);
-    Object convertedValue;
-    try {
-      convertedValue = OrcUtils.convert(partitionColumnValue);
-    } catch (Exception e) {
-      throw new IllegalStateException(
-          String.format("Caught exception while processing partition column: %s, id: %d in ORC struct: %s",
-              _partitionColumn, _partitionColumnId, orcStruct),
-          e);
-    }
-    // NOTE: Always partition with String type value because Broker uses String type value to prune segments
-    return _partitionFunction.getPartition(convertedValue.toString());
   }
 }

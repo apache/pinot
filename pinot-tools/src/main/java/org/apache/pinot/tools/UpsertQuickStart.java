@@ -24,6 +24,7 @@ import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.ZkStarter;
@@ -40,6 +41,11 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
 public class UpsertQuickStart extends QuickStartBase {
+  @Override
+  public List<String> types() {
+    return Collections.singletonList("UPSERT");
+  }
+
   private StreamDataServerStartable _kafkaStarter;
 
   public static void main(String[] args)

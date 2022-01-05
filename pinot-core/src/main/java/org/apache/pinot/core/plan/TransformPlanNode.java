@@ -68,7 +68,7 @@ public class TransformPlanNode implements PlanNode {
     ProjectionOperator projectionOperator =
         new ProjectionPlanNode(_indexSegment, _queryContext, projectionColumns, _maxDocsPerCall, _filterOperator).run();
     if (hasNonIdentifierExpression) {
-      return new TransformOperator(projectionOperator, _expressions);
+      return new TransformOperator(_queryContext, projectionOperator, _expressions);
     } else {
       return new PassThroughTransformOperator(projectionOperator, _expressions);
     }

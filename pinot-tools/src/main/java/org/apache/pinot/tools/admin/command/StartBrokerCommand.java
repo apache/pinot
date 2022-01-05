@@ -29,42 +29,67 @@ import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 
 /**
  * Class to implement StartBroker command.
  *
  */
+@CommandLine.Command(name = "StartBroker")
 public class StartBrokerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartBrokerCommand.class);
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+      description = "Print this message.")
   private boolean _help = false;
 
-  @Option(name = "-brokerHost", required = false, metaVar = "<String>", usage = "host name for broker.")
+  @CommandLine.Option(names = {"-brokerHost"}, required = false, description = "host name for broker.")
   private String _brokerHost;
 
-  @Option(name = "-brokerPort", required = false, metaVar = "<int>", usage = "Broker port number to use for query.")
+  @CommandLine.Option(names = {"-brokerPort"}, required = false, description = "Broker port number to use for query.")
   private int _brokerPort = CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;
 
-  @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "HTTP address of Zookeeper.")
+  @CommandLine.Option(names = {"-zkAddress"}, required = false, description = "HTTP address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
 
-  @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
+  @CommandLine.Option(names = {"-clusterName"}, required = false, description = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
 
-  @Option(name = "-configFileName", required = false,
-      aliases = {"-config", "-configFile", "-brokerConfig", "-brokerConf"}, metaVar = "<Config File Name>",
-      usage = "Broker Starter Config file.", forbids = {"-brokerHost", "-brokerPort"})
+  @CommandLine.Option(names = {"-configFileName", "-config", "-configFile", "-brokerConfig", "-brokerConf"},
+      required = false, description = "Broker Starter Config file.")
+      // TODO: support forbids = {"-brokerHost", "-brokerPort"})
   private String _configFileName;
 
   private Map<String, Object> _configOverrides = new HashMap<>();
 
   public boolean getHelp() {
     return _help;
+  }
+
+  public String getBrokerHost() {
+    return _brokerHost;
+  }
+
+  public int getBrokerPort() {
+    return _brokerPort;
+  }
+
+  public String getZkAddress() {
+    return _zkAddress;
+  }
+
+  public String getClusterName() {
+    return _clusterName;
+  }
+
+  public String getConfigFileName() {
+    return _configFileName;
+  }
+
+  public Map<String, Object> getConfigOverrides() {
+    return _configOverrides;
   }
 
   @Override
@@ -136,7 +161,7 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
     }
   }
 
-  private Map<String, Object> getBrokerConf()
+  protected Map<String, Object> getBrokerConf()
       throws ConfigurationException, SocketException, UnknownHostException {
     Map<String, Object> properties = new HashMap<>();
     if (_configFileName != null) {

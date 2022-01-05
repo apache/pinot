@@ -48,12 +48,26 @@ public class ObfuscatorTest {
     _map.put("secret", "SECRET");
     _map.put("a.secret", "SECRET");
     _map.put("mysecret", "SECRET");
+    _map.put("mySecret", "SECRET");
     _map.put("password", "SECRET");
     _map.put("a.password", "SECRET");
     _map.put("mypassword", "SECRET");
+    _map.put("myPassword", "SECRET");
+    _map.put("keytab", "SECRET");
+    _map.put("a.keytab", "SECRET");
+    _map.put("mykeytab", "SECRET");
+    _map.put("myKeytab", "SECRET");
     _map.put("token", "SECRET");
     _map.put("a.token", "SECRET");
     _map.put("mytoken", "SECRET");
+    _map.put("myToken", "SECRET");
+
+    _map.put("secretKey", "SECRET");
+    _map.put("secretkey", "SECRET");
+    _map.put("secret_key", "SECRET");
+    _map.put("mysecretKey", "SECRET");
+    _map.put("mySecretKey", "SECRET");
+    _map.put("a.secretKey", "SECRET");
 
     _nestedMap = new HashMap<>();
     _nestedMap.put("value", "VALUE");

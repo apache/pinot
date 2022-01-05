@@ -41,9 +41,11 @@ public class InternalConfigConstants {
   public static final String PARTITION_COLUMN_CONFIG = "partition.column";
   public static final String NUM_PARTITIONS_CONFIG = "num.partitions";
   public static final String PARTITION_FUNCTION_CONFIG = "partition.function";
+  public static final String PARTITION_COLUMN_DEFAULT_NULL_VALUE = "partition.default.null.value";
 
   public static final String SORTING_COLUMN_CONFIG = "sorting.column";
   public static final String SORTING_COLUMN_TYPE = "sorting.type";
+  public static final String SORTING_COLUMN_DEFAULT_NULL_VALUE = "sorting.default.null.value";
   public static final String ENABLE_PARTITIONING = "enable.partitioning";
 
   @Deprecated

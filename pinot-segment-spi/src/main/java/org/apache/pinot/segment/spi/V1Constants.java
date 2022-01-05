@@ -44,7 +44,6 @@ public class V1Constants {
     public static final String BITMAP_INVERTED_INDEX_FILE_EXTENSION = ".bitmap.inv";
     public static final String BITMAP_RANGE_INDEX_FILE_EXTENSION = ".bitmap.range";
     public static final String FST_INDEX_FILE_EXTENSION = ".lucene.fst";
-    public static final String NATIVE_FST_INDEX_FILE_EXTENSION = ".native.fst";
     public static final String JSON_INDEX_FILE_EXTENSION = ".json.idx";
     public static final String H3_INDEX_FILE_EXTENSION = ".h3.idx";
     public static final String BLOOM_FILTER_FILE_EXTENSION = ".bloom";
@@ -100,21 +99,6 @@ public class V1Constants {
       public static final String PARTITION_VALUES = "partitionValues";
       public static final String DATETIME_FORMAT = "datetimeFormat";
       public static final String DATETIME_GRANULARITY = "datetimeGranularity";
-
-      // TODO: Remove these 2 fields after releasing 0.8.0 because they are always set to true and never used
-      @Deprecated
-      public static final String HAS_NULL_VALUE = "hasNullValue";
-      @Deprecated
-      public static final String HAS_INVERTED_INDEX = "hasInvertedIndex";
-
-      // TODO: Remove these 3 fields after releasing 0.8.0 because the index info is maintained within the DataSource
-      //       based on the actual indexes loaded
-      @Deprecated
-      public static final String HAS_FST_INDEX = "hasFSTIndex";
-      @Deprecated
-      public static final String TEXT_INDEX_TYPE = "textIndexType";
-      @Deprecated
-      public static final String HAS_JSON_INDEX = "hasJsonIndex";
 
       public static final String COLUMN_PROPS_KEY_PREFIX = "column.";
 

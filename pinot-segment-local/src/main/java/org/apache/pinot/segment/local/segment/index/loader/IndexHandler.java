@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader;
 
+import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
+
+
 /**
  * Interface for index handlers, which update the corresponding type of indices,
  * like adding, removing or converting the format.
@@ -26,6 +30,12 @@ public interface IndexHandler {
   /**
    * Adds new indices and removes obsolete indices.
    */
-  void updateIndices()
+  void updateIndices(SegmentDirectory.Writer segmentWriter, IndexCreatorProvider indexCreatorProvider)
       throws Exception;
+
+  /**
+   * Check if there is a need to add new indices or removes obsolete indices.
+   * @return true if there is a need to update.
+   */
+  boolean needUpdateIndices(SegmentDirectory.Reader segmentReader);
 }

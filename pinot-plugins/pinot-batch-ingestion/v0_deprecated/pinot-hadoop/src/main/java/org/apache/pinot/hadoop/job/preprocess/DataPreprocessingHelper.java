@@ -58,9 +58,11 @@ public abstract class DataPreprocessingHelper {
   String _partitionColumn;
   int _numPartitions;
   String _partitionFunction;
+  String _partitionColumnDefaultNullValue;
 
   String _sortingColumn;
   private FieldSpec.DataType _sortingColumnType;
+  String _sortingColumnDefaultNullValue;
 
   private int _numOutputFiles;
   private int _maxNumRecordsPerFile;
@@ -79,16 +81,19 @@ public abstract class DataPreprocessingHelper {
   }
 
   public void registerConfigs(TableConfig tableConfig, Schema tableSchema, String partitionColumn, int numPartitions,
-      String partitionFunction, String sortingColumn, FieldSpec.DataType sortingColumnType, int numOutputFiles,
+      String partitionFunction, String partitionColumnDefaultNullValue, String sortingColumn,
+      FieldSpec.DataType sortingColumnType, String sortingColumnDefaultNullValue, int numOutputFiles,
       int maxNumRecordsPerFile) {
     _tableConfig = tableConfig;
     _pinotTableSchema = tableSchema;
     _partitionColumn = partitionColumn;
     _numPartitions = numPartitions;
     _partitionFunction = partitionFunction;
+    _partitionColumnDefaultNullValue = partitionColumnDefaultNullValue;
 
     _sortingColumn = sortingColumn;
     _sortingColumnType = sortingColumnType;
+    _sortingColumnDefaultNullValue = sortingColumnDefaultNullValue;
 
     _numOutputFiles = numOutputFiles;
     _maxNumRecordsPerFile = maxNumRecordsPerFile;
@@ -113,6 +118,7 @@ public abstract class DataPreprocessingHelper {
       LOGGER.info("Adding sorting column: {} to job config", _sortingColumn);
       jobConf.set(InternalConfigConstants.SORTING_COLUMN_CONFIG, _sortingColumn);
       jobConf.set(InternalConfigConstants.SORTING_COLUMN_TYPE, _sortingColumnType.name());
+      jobConf.set(InternalConfigConstants.SORTING_COLUMN_DEFAULT_NULL_VALUE, _sortingColumnDefaultNullValue);
 
       switch (_sortingColumnType) {
         case INT:
@@ -148,8 +154,8 @@ public abstract class DataPreprocessingHelper {
       if (_partitionFunction != null) {
         jobConf.set(InternalConfigConstants.PARTITION_FUNCTION_CONFIG, _partitionFunction);
       }
+      jobConf.set(InternalConfigConstants.PARTITION_COLUMN_DEFAULT_NULL_VALUE, _partitionColumnDefaultNullValue);
       jobConf.setInt(InternalConfigConstants.NUM_PARTITIONS_CONFIG, numReduceTasks);
-      job.setPartitionerClass(getPartitioner());
     } else {
       if (_numOutputFiles > 0) {
         numReduceTasks = _numOutputFiles;
@@ -158,6 +164,7 @@ public abstract class DataPreprocessingHelper {
         numReduceTasks = _inputDataPaths.size();
       }
     }
+    job.setPartitionerClass(getPartitioner());
     // Maximum number of records per output file
     jobConf
         .set(InternalConfigConstants.PREPROCESSING_MAX_NUM_RECORDS_PER_FILE, Integer.toString(_maxNumRecordsPerFile));
@@ -198,7 +205,10 @@ public abstract class DataPreprocessingHelper {
           job.getConfiguration().set(InternalConfigConstants.SEGMENT_TIME_TYPE, formatSpec.getColumnUnit().toString());
           job.getConfiguration()
               .set(InternalConfigConstants.SEGMENT_TIME_FORMAT, formatSpec.getTimeFormat().toString());
-          job.getConfiguration().set(InternalConfigConstants.SEGMENT_TIME_SDF_PATTERN, formatSpec.getSDFPattern());
+          String sdfPattern = formatSpec.getSDFPattern();
+          if (sdfPattern != null) {
+            job.getConfiguration().set(InternalConfigConstants.SEGMENT_TIME_SDF_PATTERN, formatSpec.getSDFPattern());
+          }
         }
       }
       job.getConfiguration().set(InternalConfigConstants.SEGMENT_PUSH_FREQUENCY,

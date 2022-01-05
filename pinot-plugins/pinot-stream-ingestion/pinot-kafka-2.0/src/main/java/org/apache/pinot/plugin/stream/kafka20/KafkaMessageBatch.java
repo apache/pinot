@@ -18,10 +18,7 @@
  */
 package org.apache.pinot.plugin.stream.kafka20;
 
-import java.util.ArrayList;
 import java.util.List;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.plugin.stream.kafka.MessageAndOffset;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
@@ -30,17 +27,29 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 public class KafkaMessageBatch implements MessageBatch<byte[]> {
 
-  private List<MessageAndOffset> _messageList = new ArrayList<>();
+  private final List<MessageAndOffset> _messageList;
+  private final int _unfilteredMessageCount;
+  private final long _lastOffset;
 
-  public KafkaMessageBatch(Iterable<ConsumerRecord<String, Bytes>> iterable) {
-    for (ConsumerRecord<String, Bytes> record : iterable) {
-      _messageList.add(new MessageAndOffset(record.value().get(), record.offset()));
-    }
+  /**
+   * @param unfilteredMessageCount how many messages were received from the topic before being filtered
+   * @param lastOffset the offset of the last message in the batch
+   * @param batch the messages, which may be smaller than {@see unfilteredMessageCount}
+   */
+  public KafkaMessageBatch(int unfilteredMessageCount, long lastOffset, List<MessageAndOffset> batch) {
+    _messageList = batch;
+    _lastOffset = lastOffset;
+    _unfilteredMessageCount = unfilteredMessageCount;
   }
 
   @Override
   public int getMessageCount() {
     return _messageList.size();
+  }
+
+  @Override
+  public int getUnfilteredMessageCount() {
+    return _unfilteredMessageCount;
   }
 
   @Override
@@ -64,7 +73,12 @@ public class KafkaMessageBatch implements MessageBatch<byte[]> {
   }
 
   @Override
-  public StreamPartitionMsgOffset getNextStreamParitionMsgOffsetAtIndex(int index) {
+  public StreamPartitionMsgOffset getNextStreamPartitionMsgOffsetAtIndex(int index) {
     return new LongMsgOffset(_messageList.get(index).getNextOffset());
+  }
+
+  @Override
+  public StreamPartitionMsgOffset getOffsetOfNextBatch() {
+    return new LongMsgOffset(_lastOffset + 1);
   }
 }

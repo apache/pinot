@@ -29,6 +29,11 @@ public interface PredicateEvaluator {
    */
 
   /**
+   * Get the predicate.
+   */
+  Predicate getPredicate();
+
+  /**
    * Get the predicate type.
    */
   Predicate.Type getPredicateType();

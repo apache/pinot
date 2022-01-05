@@ -18,11 +18,14 @@
  */
 package org.apache.pinot.core.operator;
 
-import org.apache.pinot.core.common.Block;
+import java.util.Collections;
+import java.util.List;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
 
 
 /**
@@ -35,13 +38,16 @@ import org.apache.pinot.segment.spi.IndexSegment;
  * The reason this is done is the planners access segment buffers,
  * and we need to acquire the segment before any access is made to the buffers.
  */
-public class AcquireReleaseColumnsSegmentOperator extends BaseOperator {
+@SuppressWarnings("unchecked")
+public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "AcquireReleaseColumnsSegmentOperator";
+  private static final String EXPLAIN_NAME = "ACQUIRE_RELEASE_COLUMNS_SEGMENT";
 
   private final PlanNode _planNode;
   private final IndexSegment _indexSegment;
   private final FetchContext _fetchContext;
-  private Operator _childOperator;
+
+  private Operator<IntermediateResultsBlock> _childOperator;
 
   public AcquireReleaseColumnsSegmentOperator(PlanNode planNode, IndexSegment indexSegment, FetchContext fetchContext) {
     _planNode = planNode;
@@ -53,8 +59,8 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator {
    * Runs the planNode to get the childOperator, and then proceeds with execution.
    */
   @Override
-  protected Block getNextBlock() {
-    _childOperator = _planNode.run();
+  protected IntermediateResultsBlock getNextBlock() {
+    _childOperator = (Operator<IntermediateResultsBlock>) _planNode.run();
     return _childOperator.nextBlock();
   }
 
@@ -62,6 +68,10 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator {
    * Acquires the indexSegment using the provided fetchContext
    */
   public void acquire() {
+    // do not acquire if interrupted (similar to the check inside the nextBlock())
+    if (Thread.interrupted()) {
+      throw new EarlyTerminationException();
+    }
     _indexSegment.acquire(_fetchContext);
   }
 
@@ -75,6 +85,20 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String toExplainString() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Collections.singletonList(_childOperator);
+  }
+
+  public IndexSegment getIndexSegment() {
+    return _indexSegment;
   }
 
   @Override

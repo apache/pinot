@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import java.util.Collections;
+import java.util.List;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
@@ -36,6 +39,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "RangeFilterOperator";
+  private static final String EXPLAIN_NAME = "FILTER_RANGE_INDEX";
 
   // NOTE: Range index can only apply to dictionary-encoded columns for now
   // TODO: Support raw index columns
@@ -128,5 +132,18 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Collections.emptyList();
+  }
+
+  @Override
+  public String toExplainString() {
+    StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(indexLookUp:range_index");
+    stringBuilder.append(",operator:").append(_rangePredicateEvaluator.getPredicateType());
+    stringBuilder.append(",predicate:").append(_rangePredicateEvaluator.getPredicate().toString());
+    return stringBuilder.append(')').toString();
   }
 }

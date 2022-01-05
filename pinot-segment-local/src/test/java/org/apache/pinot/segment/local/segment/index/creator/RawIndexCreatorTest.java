@@ -29,14 +29,15 @@ import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.segment.local.loader.LocalSegmentDirectoryLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.segment.local.segment.index.readers.forward.BaseChunkSVForwardIndexReader;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
@@ -168,11 +169,9 @@ public class RawIndexCreatorTest {
   public void testStringRawIndexCreator()
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(STRING_COLUMN);
-    try (VarByteChunkSVForwardIndexReader rawIndexReader = new VarByteChunkSVForwardIndexReader(
-        indexBuffer,
+    try (VarByteChunkSVForwardIndexReader rawIndexReader = new VarByteChunkSVForwardIndexReader(indexBuffer,
         DataType.STRING);
-        BaseChunkSVForwardIndexReader.ChunkReaderContext readerContext = rawIndexReader
-            .createContext()) {
+        ChunkReaderContext readerContext = rawIndexReader.createContext()) {
       _recordReader.rewind();
       for (int row = 0; row < NUM_ROWS; row++) {
         GenericRow expectedRow = _recordReader.next();
@@ -192,9 +191,8 @@ public class RawIndexCreatorTest {
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(column);
     try (FixedByteChunkSVForwardIndexReader rawIndexReader = new FixedByteChunkSVForwardIndexReader(
-        indexBuffer,
-        dataType); BaseChunkSVForwardIndexReader.ChunkReaderContext readerContext = rawIndexReader
-        .createContext()) {
+        indexBuffer, dataType);
+        ChunkReaderContext readerContext = rawIndexReader.createContext()) {
       _recordReader.rewind();
       for (int row = 0; row < NUM_ROWS; row++) {
         GenericRow expectedRow = _recordReader.next();
@@ -215,7 +213,7 @@ public class RawIndexCreatorTest {
     try (VarByteChunkMVForwardIndexReader rawIndexReader = new VarByteChunkMVForwardIndexReader(
         indexBuffer,
         DataType.STRING);
-        BaseChunkSVForwardIndexReader.ChunkReaderContext readerContext = rawIndexReader
+        ChunkReaderContext readerContext = rawIndexReader
             .createContext()) {
       _recordReader.rewind();
       int maxNumberOfMultiValues = _segmentDirectory.getSegmentMetadata()
@@ -249,7 +247,7 @@ public class RawIndexCreatorTest {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(BYTES_MV_COLUMN);
     try (VarByteChunkMVForwardIndexReader rawIndexReader = new VarByteChunkMVForwardIndexReader(
         indexBuffer, DataType.BYTES);
-        BaseChunkSVForwardIndexReader.ChunkReaderContext readerContext = rawIndexReader
+        ChunkReaderContext readerContext = rawIndexReader
             .createContext()) {
       _recordReader.rewind();
       int maxNumberOfMultiValues = _segmentDirectory.getSegmentMetadata()
@@ -326,9 +324,10 @@ public class RawIndexCreatorTest {
     driver.init(config, recordReader);
     driver.build();
     Map<String, Object> props = new HashMap<>();
-    props.put(LocalSegmentDirectoryLoader.READ_MODE_KEY, ReadMode.mmap.toString());
-    _segmentDirectory = SegmentDirectoryLoaderRegistry.getLocalSegmentDirectoryLoader()
-        .load(driver.getOutputDirectory().toURI(), new PinotConfiguration(props));
+    props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap.toString());
+    _segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
+        .load(driver.getOutputDirectory().toURI(),
+            new SegmentDirectoryLoaderContext(tableConfig, null, null, new PinotConfiguration(props)));
     _segmentReader = _segmentDirectory.createReader();
     recordReader.rewind();
     return recordReader;
@@ -371,8 +370,8 @@ public class RawIndexCreatorTest {
    * @param docId Document id
    * @return Value read from index
    */
-  private Object readValueFromIndex(FixedByteChunkSVForwardIndexReader rawIndexReader,
-      BaseChunkSVForwardIndexReader.ChunkReaderContext readerContext, int docId) {
+  private Object readValueFromIndex(FixedByteChunkSVForwardIndexReader rawIndexReader, ChunkReaderContext readerContext,
+      int docId) {
     switch (rawIndexReader.getValueType()) {
       case INT:
         return rawIndexReader.getInt(docId, readerContext);

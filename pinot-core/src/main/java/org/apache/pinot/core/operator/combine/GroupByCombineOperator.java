@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
@@ -51,6 +52,7 @@ import org.slf4j.LoggerFactory;
 public class GroupByCombineOperator extends BaseCombineOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(GroupByCombineOperator.class);
   private static final String OPERATOR_NAME = "GroupByCombineOperator";
+  private static final String EXPLAIN_NAME = "COMBINE_GROUPBY";
 
   // Use a higher limit for groups stored across segments. For most cases, most groups from each segment should be the
   // same, thus the total number of groups across segments should be equal or slightly higher than the number of groups
@@ -99,44 +101,59 @@ public class GroupByCombineOperator extends BaseCombineOperator {
     return OPERATOR_NAME;
   }
 
+  @Override
+  public String toExplainString() {
+    return EXPLAIN_NAME;
+  }
+
   /**
    * Executes query on one segment in a worker thread and merges the results into the results map.
    */
   @Override
   protected void processSegments(int taskIndex) {
     for (int operatorIndex = taskIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
-      IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) _operators.get(operatorIndex).nextBlock();
+      Operator operator = _operators.get(operatorIndex);
+      try {
+        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+          ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
+        }
+        IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) _operators.get(operatorIndex).nextBlock();
 
-      // Merge processing exceptions.
-      List<ProcessingException> processingExceptionsToMerge = resultsBlock.getProcessingExceptions();
-      if (processingExceptionsToMerge != null) {
-        _mergedProcessingExceptions.addAll(processingExceptionsToMerge);
-      }
+        // Merge processing exceptions.
+        List<ProcessingException> processingExceptionsToMerge = resultsBlock.getProcessingExceptions();
+        if (processingExceptionsToMerge != null) {
+          _mergedProcessingExceptions.addAll(processingExceptionsToMerge);
+        }
 
-      // Merge aggregation group-by result.
-      AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-      if (aggregationGroupByResult != null) {
-        // Iterate over the group-by keys, for each key, update the group-by result in the _resultsMap.
-        Iterator<GroupKeyGenerator.StringGroupKey> groupKeyIterator =
-            aggregationGroupByResult.getStringGroupKeyIterator();
-        while (groupKeyIterator.hasNext()) {
-          GroupKeyGenerator.StringGroupKey groupKey = groupKeyIterator.next();
-          _resultsMap.compute(groupKey._stringKey, (key, value) -> {
-            if (value == null) {
-              if (_numGroups.getAndIncrement() < _interSegmentNumGroupsLimit) {
-                value = new Object[_numAggregationFunctions];
+        // Merge aggregation group-by result.
+        AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+        if (aggregationGroupByResult != null) {
+          // Iterate over the group-by keys, for each key, update the group-by result in the _resultsMap.
+          Iterator<GroupKeyGenerator.StringGroupKey> groupKeyIterator =
+              aggregationGroupByResult.getStringGroupKeyIterator();
+          while (groupKeyIterator.hasNext()) {
+            GroupKeyGenerator.StringGroupKey groupKey = groupKeyIterator.next();
+            _resultsMap.compute(groupKey._stringKey, (key, value) -> {
+              if (value == null) {
+                if (_numGroups.getAndIncrement() < _interSegmentNumGroupsLimit) {
+                  value = new Object[_numAggregationFunctions];
+                  for (int i = 0; i < _numAggregationFunctions; i++) {
+                    value[i] = aggregationGroupByResult.getResultForKey(groupKey, i);
+                  }
+                }
+              } else {
                 for (int i = 0; i < _numAggregationFunctions; i++) {
-                  value[i] = aggregationGroupByResult.getResultForKey(groupKey, i);
+                  value[i] =
+                      _aggregationFunctions[i].merge(value[i], aggregationGroupByResult.getResultForKey(groupKey, i));
                 }
               }
-            } else {
-              for (int i = 0; i < _numAggregationFunctions; i++) {
-                value[i] =
-                    _aggregationFunctions[i].merge(value[i], aggregationGroupByResult.getResultForKey(groupKey, i));
-              }
-            }
-            return value;
-          });
+              return value;
+            });
+          }
+        }
+      } finally {
+        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+          ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
       }
     }

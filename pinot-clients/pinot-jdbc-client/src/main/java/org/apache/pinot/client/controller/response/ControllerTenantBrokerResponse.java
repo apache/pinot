@@ -21,13 +21,13 @@ package org.apache.pinot.client.controller.response;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
-import com.ning.http.client.Response;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.asynchttpclient.Response;
 
 
 public class ControllerTenantBrokerResponse {

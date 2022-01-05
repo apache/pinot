@@ -24,6 +24,7 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Properties;
 import org.apache.pinot.client.base.AbstractBaseConnection;
 import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
@@ -40,10 +41,19 @@ public class PinotConnection extends AbstractBaseConnection {
   private PinotControllerTransport _controllerTransport;
 
   PinotConnection(String controllerURL, PinotClientTransport transport, String tenant) {
-    this(controllerURL, transport, tenant, null);
+    this(new Properties(), controllerURL, transport, tenant, null);
+  }
+
+  PinotConnection(Properties properties, String controllerURL, PinotClientTransport transport, String tenant) {
+    this(properties, controllerURL, transport, tenant, null);
   }
 
   PinotConnection(String controllerURL, PinotClientTransport transport, String tenant,
+      PinotControllerTransport controllerTransport) {
+    this(new Properties(), controllerURL, transport, tenant, controllerTransport);
+  }
+
+  PinotConnection(Properties properties, String controllerURL, PinotClientTransport transport, String tenant,
       PinotControllerTransport controllerTransport) {
     _closed = false;
     _controllerURL = controllerURL;
@@ -53,7 +63,7 @@ public class PinotConnection extends AbstractBaseConnection {
       _controllerTransport = controllerTransport;
     }
     List<String> brokers = getBrokerList(controllerURL, tenant);
-    _session = new org.apache.pinot.client.Connection(brokers, transport);
+    _session = new org.apache.pinot.client.Connection(properties, brokers, transport);
   }
 
   public org.apache.pinot.client.Connection getSession() {

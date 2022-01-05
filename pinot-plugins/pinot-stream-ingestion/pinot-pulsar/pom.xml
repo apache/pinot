@@ -26,7 +26,7 @@
   <parent>
     <artifactId>pinot-stream-ingestion</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.9.0-SNAPSHOT</version>
+    <version>0.10.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
 
@@ -47,7 +47,6 @@
     <grpc-proto.version>1.12.0</grpc-proto.version>
     <grpc-context.version>1.14.0</grpc-context.version>
     <bouncycastle.version>1.68</bouncycastle.version>
-    <netty-tcnative.version>2.0.36.Final</netty-tcnative.version>
     <commons-codec.version>1.11</commons-codec.version>
     <caffeine.version>2.6.2</caffeine.version>
     <codehaus-annotations.version>1.17</codehaus-annotations.version>

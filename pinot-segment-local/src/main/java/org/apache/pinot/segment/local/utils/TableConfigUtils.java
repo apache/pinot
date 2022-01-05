@@ -22,6 +22,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableSet;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -77,8 +79,16 @@ public final class TableConfigUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigUtils.class);
   private static final String SCHEDULE_KEY = "schedule";
   private static final String STAR_TREE_CONFIG_NAME = "StarTreeIndex Config";
+
   // supported TableTaskTypes, must be identical to the one return in the impl of {@link PinotTaskGenerator}.
   private static final String REALTIME_TO_OFFLINE_TASK_TYPE = "RealtimeToOfflineSegmentsTask";
+
+  /**
+   * @see TableConfigUtils#validate(TableConfig, Schema, String)
+   */
+  public static void validate(TableConfig tableConfig, @Nullable Schema schema) {
+    validate(tableConfig, schema, null);
+  }
 
   /**
    * Performs table config validations. Includes validations for the following:
@@ -90,20 +100,34 @@ public final class TableConfigUtils {
    *
    * TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
    */
-  public static void validate(TableConfig tableConfig, @Nullable Schema schema) {
+  public static void validate(TableConfig tableConfig, @Nullable Schema schema, @Nullable String typesToSkip) {
+    Set<ValidationType> skipTypes = parseTypesToSkipString(typesToSkip);
     if (tableConfig.getTableType() == TableType.REALTIME) {
       Preconditions.checkState(schema != null, "Schema should not be null for REALTIME table");
     }
     // Sanitize the table config before validation
     sanitize(tableConfig);
-    validateValidationConfig(tableConfig, schema);
-    validateIngestionConfig(tableConfig, schema);
-    validateTierConfigList(tableConfig.getTierConfigsList());
-    validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
-    validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);
-    validateUpsertConfig(tableConfig, schema);
-    validatePartialUpsertStrategies(tableConfig, schema);
-    validateTaskConfigs(tableConfig, schema);
+    // skip all validation if skip type ALL is selected. 
+    if (!skipTypes.contains(ValidationType.ALL)) {
+      validateValidationConfig(tableConfig, schema);
+      validateIngestionConfig(tableConfig, schema);
+      validateTierConfigList(tableConfig.getTierConfigsList());
+      validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
+      validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);
+      if (!skipTypes.contains(ValidationType.UPSERT)) {
+        validateUpsertConfig(tableConfig, schema);
+        validatePartialUpsertStrategies(tableConfig, schema);
+      }
+      if (!skipTypes.contains(ValidationType.TASK)) {
+        validateTaskConfigs(tableConfig, schema);
+      }
+    }
+  }
+
+  private static Set<ValidationType> parseTypesToSkipString(@Nullable String typesToSkip) {
+    return typesToSkip == null ? Collections.emptySet() : Arrays.stream(typesToSkip.split(","))
+        .map(s -> ValidationType.valueOf(s.toUpperCase()))
+        .collect(Collectors.toSet());
   }
 
   /**
@@ -331,7 +355,7 @@ public final class TableConfigUtils {
         if (taskTypeConfigName.equals(REALTIME_TO_OFFLINE_TASK_TYPE)) {
           // check table is not upsert
           Preconditions.checkState(tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE,
-              "RealtimeToOfflineTask doesn't support upsert ingestion mode!");
+              "RealtimeToOfflineTask doesn't support upsert table!");
           // check no malformed period
           TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bufferTimePeriod", "2d"));
           TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bucketTimePeriod", "1d"));
@@ -678,13 +702,12 @@ public final class TableConfigUtils {
               Preconditions.checkArgument(fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY,
                   "FST Index is only enabled on dictionary encoded columns");
               Preconditions.checkState(fieldConfigColSpec.isSingleValueField()
-                      && fieldConfigColSpec.getDataType() == DataType.STRING,
+                      && fieldConfigColSpec.getDataType().getStoredType() == DataType.STRING,
                   "FST Index is only supported for single value string columns");
               break;
             case TEXT:
-              Preconditions.checkState(fieldConfigColSpec.isSingleValueField()
-                      && fieldConfigColSpec.getDataType() == DataType.STRING,
-                  "TEXT Index is only supported for single value string columns");
+              Preconditions.checkState(fieldConfigColSpec.getDataType().getStoredType() == DataType.STRING,
+                  "TEXT Index is only supported for string columns");
               break;
             default:
               break;
@@ -828,5 +851,10 @@ public final class TableConfigUtils {
           "Time column names are different for table: %s! Offline time column name: %s. Realtime time column name: %s",
           rawTableName, offlineTimeColumnName, realtimeTimeColumnName));
     }
+  }
+
+  // enum of all the skip-able validation types.
+  public enum ValidationType {
+    ALL, TASK, UPSERT
   }
 }

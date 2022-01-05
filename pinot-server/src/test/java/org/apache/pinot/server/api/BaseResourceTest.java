@@ -47,7 +47,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
-import org.apache.pinot.server.api.access.AllowAllAccessFactory;
+import org.apache.pinot.server.access.AllowAllAccessFactory;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.helix.AdminApiApplication;
 import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
@@ -127,6 +127,13 @@ public abstract class BaseResourceTest {
     setUpSegment(offlineTableName, null, "default", _offlineIndexSegments);
 
     PinotConfiguration serverConf = DefaultHelixStarterServerConfig.loadDefaultServerConf();
+    String hostname = serverConf.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,
+        serverConf.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false)
+            ? NetUtils.getHostnameOrAddress() : NetUtils.getHostAddress());
+    int port = serverConf.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT,
+        CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
+    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID,
+        CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port);
     _adminApiApplication = new AdminApiApplication(serverInstance, new AllowAllAccessFactory(), serverConf);
     _adminApiApplication.start(Collections.singletonList(
         new ListenerConfig(CommonConstants.HTTP_PROTOCOL, "0.0.0.0", CommonConstants.Server.DEFAULT_ADMIN_API_PORT,

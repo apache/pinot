@@ -24,9 +24,11 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -49,6 +51,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 @SuppressWarnings("rawtypes")
 public class DictionaryBasedAggregationOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "DictionaryBasedAggregationOperator";
+  private static final String EXPLAIN_NAME = "AGGREGATE_DICTIONARY";
 
   private final AggregationFunction[] _aggregationFunctions;
   private final Map<String, Dictionary> _dictionaryMap;
@@ -152,6 +155,16 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String toExplainString() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Collections.emptyList();
   }
 
   @Override

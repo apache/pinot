@@ -106,6 +106,8 @@ public class QueryException {
   public static final ProcessingException DATA_TABLE_DESERIALIZATION_ERROR =
       new ProcessingException(DATA_TABLE_DESERIALIZATION_ERROR_CODE);
   public static final ProcessingException FUTURE_CALL_ERROR = new ProcessingException(FUTURE_CALL_ERROR_CODE);
+  public static final ProcessingException BROKER_SEGMENT_UNAVAILABLE_ERROR =
+      new ProcessingException(BROKER_SEGMENT_UNAVAILABLE_ERROR_CODE);
   public static final ProcessingException BROKER_TIMEOUT_ERROR = new ProcessingException(BROKER_TIMEOUT_ERROR_CODE);
   public static final ProcessingException BROKER_RESOURCE_MISSING_ERROR =
       new ProcessingException(BROKER_RESOURCE_MISSING_ERROR_CODE);

@@ -27,6 +27,7 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.core.minion.RawIndexConverter;
 import org.apache.pinot.plugin.minion.tasks.BaseSingleSegmentConversionExecutor;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
+import org.apache.pinot.segment.spi.index.IndexingOverrides;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
@@ -39,7 +40,8 @@ public class ConvertToRawIndexTaskExecutor extends BaseSingleSegmentConversionEx
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     new RawIndexConverter(rawTableName, indexDir, workingDir,
-        configs.get(MinionConstants.ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY)).convert();
+        configs.get(MinionConstants.ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY),
+        IndexingOverrides.getIndexCreatorProvider()).convert();
     return new SegmentConversionResult.Builder().setFile(workingDir)
         .setTableNameWithType(configs.get(MinionConstants.TABLE_NAME_KEY))
         .setSegmentName(configs.get(MinionConstants.SEGMENT_NAME_KEY)).build();

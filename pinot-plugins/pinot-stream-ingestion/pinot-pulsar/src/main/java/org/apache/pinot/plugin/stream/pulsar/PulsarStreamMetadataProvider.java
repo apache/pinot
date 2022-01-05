@@ -22,8 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
-import javax.annotation.Nonnull;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
@@ -45,12 +43,11 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
     implements StreamMetadataProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarStreamMetadataProvider.class);
 
-  private StreamConfig _streamConfig;
-  private int _partition;
+  private final StreamConfig _streamConfig;
+  private final int _partition;
 
   public PulsarStreamMetadataProvider(String clientId, StreamConfig streamConfig) {
-    super(clientId, streamConfig, 0);
-    _streamConfig = streamConfig;
+    this(clientId, streamConfig, 0);
   }
 
   public PulsarStreamMetadataProvider(String clientId, StreamConfig streamConfig, int partition) {
@@ -68,10 +65,6 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
     }
   }
 
-  public synchronized long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis) {
-    throw new UnsupportedOperationException("The use of this method is not supported");
-  }
-
   /**
    * Fetch the messageId and use it as offset.
    * If offset criteria is smallest, the message id of earliest record in the partition is returned.
@@ -83,8 +76,7 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
    * @param timeoutMillis fetch timeout
    */
   @Override
-  public StreamPartitionMsgOffset fetchStreamPartitionOffset(@Nonnull OffsetCriteria offsetCriteria,
-      long timeoutMillis) {
+  public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
     Preconditions.checkNotNull(offsetCriteria);
     try {
       MessageId offset = null;
@@ -99,12 +91,12 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
           offset = _reader.readNext().getMessageId();
         }
       } else {
-        throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria.toString());
+        throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria);
       }
       return new MessageIdStreamOffset(offset);
     } catch (PulsarClientException e) {
       LOGGER.error("Cannot fetch offsets for partition " + _partition + " and topic " + _topic + " and offsetCriteria "
-          + offsetCriteria.toString(), e);
+          + offsetCriteria, e);
       return null;
     }
   }
@@ -115,8 +107,7 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
    */
   @Override
   public List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
-      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis)
-      throws TimeoutException, IOException {
+      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis) {
     List<PartitionGroupMetadata> newPartitionGroupMetadataList = new ArrayList<>();
 
     for (PartitionGroupConsumptionStatus partitionGroupConsumptionStatus : partitionGroupConsumptionStatuses) {
@@ -139,8 +130,8 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
 
           if (reader.hasMessageAvailable()) {
             Message message = reader.readNext();
-            newPartitionGroupMetadataList
-                .add(new PartitionGroupMetadata(p, new MessageIdStreamOffset(message.getMessageId())));
+            newPartitionGroupMetadataList.add(
+                new PartitionGroupMetadata(p, new MessageIdStreamOffset(message.getMessageId())));
           }
         }
       }
