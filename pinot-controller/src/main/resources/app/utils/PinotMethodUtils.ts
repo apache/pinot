@@ -69,6 +69,7 @@ import {
   authenticateUser,
   getSegmentDebugInfo
 } from '../requests';
+import { baseApi } from './axios-config';
 import Utils from './Utils';
 const JSONbig = require('json-bigint')({'storeAsString': true})
 
@@ -811,10 +812,28 @@ const getAuthInfo = () => {
   });
 };
 
+const getWellKnownOpenIdConfiguration = (issuer) => {
+  return baseApi
+    .get(`${issuer}/.well-known/openid-configuration`)
+    .then((response) => {
+      return response.data;
+    });
+};
+
 const verifyAuth = (authToken) => {
   return authenticateUser(authToken).then((response)=>{
     return response.data;
   });
+};
+
+const getAccessTokenFromHashParams = () => {
+  let accessToken = '';
+  const urlSearchParams = new URLSearchParams(location.hash.substr(1));
+  if (urlSearchParams.has('access_token')) {
+    accessToken = urlSearchParams.get('access_token') as string;
+  }
+
+  return accessToken;
 };
 
 export default {
@@ -867,5 +886,7 @@ export default {
   getAllSchemaDetails,
   getTableState,
   getAuthInfo,
-  verifyAuth
+  getWellKnownOpenIdConfiguration,
+  verifyAuth,
+  getAccessTokenFromHashParams
 };
