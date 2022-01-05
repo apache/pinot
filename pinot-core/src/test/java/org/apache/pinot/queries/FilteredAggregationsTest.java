@@ -495,27 +495,6 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
   }
 
-  @Test
-  public void testFoo() {
-    String query =
-        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL % 10 = 0),"
-            + "SUM(NO_INDEX_COL),"
-            + "MAX(INT_COL) "
-            + "FROM MyTable";
-
-    String nonFilterQuery =
-        "SELECT SUM("
-            + "CASE "
-            + "WHEN (INT_COL % 10 = 0) THEN INT_COL "
-            + "ELSE 0 "
-            + "END) AS total_sum,"
-            + "SUM(NO_INDEX_COL),"
-            + "MAX(INT_COL)"
-            + "FROM MyTable";
-
-    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
-  }
-
   @Test(expectedExceptions = IllegalStateException.class)
   public void testGroupBySupport() {
     String query =
