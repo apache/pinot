@@ -137,7 +137,8 @@ public class AggregationPlanNode implements PlanNode {
    * @param aggregationFunctions Aggregation functions in the query
    * @param numTotalDocs Number of total docs
    */
-  private BaseOperator<IntermediateResultsBlock> buildOperatorForFilteredAggregations(BaseFilterOperator mainPredicateFilterOperator,
+  private BaseOperator<IntermediateResultsBlock> buildOperatorForFilteredAggregations(
+      BaseFilterOperator mainPredicateFilterOperator,
       TransformOperator mainTransformOperator,
       AggregationFunction[] aggregationFunctions, int numTotalDocs) {
     Map<ExpressionContext, Pair<List<AggregationFunction>, TransformOperator>> expressionContextToAggFuncsMap =
@@ -189,8 +190,8 @@ public class AggregationPlanNode implements PlanNode {
         new ArrayList<>();
 
     // Convert to array since FilteredAggregationOperator expects it
-    for (Pair<List<AggregationFunction>, TransformOperator> pair:
-        expressionContextToAggFuncsMap.values()) {
+    for (Pair<List<AggregationFunction>, TransformOperator> pair
+        : expressionContextToAggFuncsMap.values()) {
       List<AggregationFunction> aggregationFunctionList = pair.getLeft();
 
       if (aggregationFunctionList == null) {
