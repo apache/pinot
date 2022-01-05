@@ -35,7 +35,10 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 
 
 /**
- * The <code>AggregationOperator</code> class provides the operator for aggregation only query on a single segment.
+ * This operator processes a collection of filtered (and potentially non filtered) aggregations.
+ *
+ * For a query with either all aggregations being filtered or a mix of filtered and non filtered aggregations,
+ * FilteredAggregationOperator will come into execution.
  */
 @SuppressWarnings("rawtypes")
 public class FilteredAggregationOperator extends BaseOperator<IntermediateResultsBlock> {
@@ -50,6 +53,8 @@ public class FilteredAggregationOperator extends BaseOperator<IntermediateResult
   private long _numEntriesScannedInFilter;
   private long _numEntriesScannedPostFilter;
 
+  // We can potentially do away with aggregationFunctions parameter, but its cleaner to pass it in than to construct
+  // it from aggFunctionsWithTransformOperator
   public FilteredAggregationOperator(AggregationFunction[] aggregationFunctions,
       List<Pair<AggregationFunction[], TransformOperator>> aggFunctionsWithTransformOperator, long numTotalDocs) {
     _aggregationFunctions = aggregationFunctions;

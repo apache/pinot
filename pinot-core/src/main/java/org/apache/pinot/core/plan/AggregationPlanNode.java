@@ -82,7 +82,7 @@ public class AggregationPlanNode implements PlanNode {
       int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
       AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
 
-      return buildOperatorForFilteredAggregationsV2(filterOperatorPair.getRight(), pair.getLeft(),
+      return buildOperatorForFilteredAggregations(filterOperatorPair.getRight(), pair.getLeft(),
           aggregationFunctions,
           numTotalDocs);
     }
@@ -131,12 +131,13 @@ public class AggregationPlanNode implements PlanNode {
   }
 
   /**
-   * Build a CombinedTransformOperator given the main predicate filter operator and the corresponding
-   * aggregation functions.
+   * Build a FilteredAggregationOperator given the parameters.
    * @param mainPredicateFilterOperator Filter operator corresponding to the main predicate
+   * @param mainTransformOperator Transform operator corresponding to the main predicate
    * @param aggregationFunctions Aggregation functions in the query
+   * @param numTotalDocs Number of total docs
    */
-  private BaseOperator<IntermediateResultsBlock> buildOperatorForFilteredAggregationsV2(BaseFilterOperator mainPredicateFilterOperator,
+  private BaseOperator<IntermediateResultsBlock> buildOperatorForFilteredAggregations(BaseFilterOperator mainPredicateFilterOperator,
       TransformOperator mainTransformOperator,
       AggregationFunction[] aggregationFunctions, int numTotalDocs) {
     Map<ExpressionContext, List<AggregationFunction>> expressionContextToAggFuncsMap =
@@ -148,7 +149,7 @@ public class AggregationPlanNode implements PlanNode {
     List<AggregationFunction> nonFilteredAggregationFunctions = new ArrayList<>();
 
     // For each aggregation function, check if the aggregation function is a filtered agg.
-    // If it is, populate the corresponding filter operator and metadata
+    // If it is, populate the corresponding filter operator and corresponding transform operator
     for (AggregationFunction aggregationFunction : aggregationFunctions) {
       if (aggregationFunction instanceof FilterableAggregationFunction) {
         FilterableAggregationFunction filterableAggregationFunction =
