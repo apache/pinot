@@ -140,12 +140,8 @@ public class AggregationPlanNode implements PlanNode {
   private BaseOperator<IntermediateResultsBlock> buildOperatorForFilteredAggregations(BaseFilterOperator mainPredicateFilterOperator,
       TransformOperator mainTransformOperator,
       AggregationFunction[] aggregationFunctions, int numTotalDocs) {
-    Map<ExpressionContext, List<AggregationFunction>> expressionContextToAggFuncsMap =
+    Map<ExpressionContext, Pair<List<AggregationFunction>, TransformOperator>> expressionContextToAggFuncsMap =
         new HashMap<>();
-    List<Pair<ExpressionContext, TransformOperator>> expressionContextTransformOperatorMap =
-        new ArrayList<>();
-    List<Pair<AggregationFunction[], TransformOperator>> aggToTransformOpList =
-        new ArrayList<>();
     List<AggregationFunction> nonFilteredAggregationFunctions = new ArrayList<>();
 
     // For each aggregation function, check if the aggregation function is a filtered agg.
@@ -159,7 +155,7 @@ public class AggregationPlanNode implements PlanNode {
             .getAssociatedExpressionContext();
 
         if (expressionContextToAggFuncsMap.containsKey(currentFilterExpression)) {
-          expressionContextToAggFuncsMap.get(currentFilterExpression).add(aggregationFunction);
+          expressionContextToAggFuncsMap.get(currentFilterExpression).getLeft().add(aggregationFunction);
           continue;
         }
 
@@ -178,21 +174,24 @@ public class AggregationPlanNode implements PlanNode {
         // fetching the relevant TransformOperator when resolving blocks during aggregation
         // execution
 
-        expressionContextTransformOperatorMap.add(Pair.of(currentFilterExpression, innerPair.getLeft()));
-
         List aggFunctionList = new ArrayList<>();
 
         aggFunctionList.add(aggregationFunction);
 
-        expressionContextToAggFuncsMap.put(currentFilterExpression, aggFunctionList);
+        expressionContextToAggFuncsMap.put(currentFilterExpression,
+            Pair.of(aggFunctionList, innerPair.getLeft()));
       } else {
         nonFilteredAggregationFunctions.add(aggregationFunction);
       }
     }
 
-    for (Pair<ExpressionContext, TransformOperator> pair:
-        expressionContextTransformOperatorMap) {
-      List<AggregationFunction> aggregationFunctionList = expressionContextToAggFuncsMap.get(pair.getLeft());
+    List<Pair<AggregationFunction[], TransformOperator>> aggToTransformOpList =
+        new ArrayList<>();
+
+    // Convert to array since FilteredAggregationOperator expects it
+    for (Pair<List<AggregationFunction>, TransformOperator> pair:
+        expressionContextToAggFuncsMap.values()) {
+      List<AggregationFunction> aggregationFunctionList = pair.getLeft();
 
       if (aggregationFunctionList == null) {
         throw new IllegalStateException("Null aggregation list seen");
