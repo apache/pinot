@@ -98,7 +98,8 @@ public class WorkerQueryExecutor {
        return new BroadcastJoinOperator(leftOperator, rightOperator, joinNode.getLeftJoinKeySelector(),
            joinNode.getRightJoinKeySelector());
     } else {
-      throw new UnsupportedOperationException("");
+      throw new UnsupportedOperationException(String.format("Stage node type %s is not supported!",
+          stageNode.getClass().getSimpleName()));
     }
   }
 }

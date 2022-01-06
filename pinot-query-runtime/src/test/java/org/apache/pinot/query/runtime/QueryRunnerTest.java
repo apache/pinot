@@ -4,12 +4,14 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestUtils;
@@ -28,6 +30,8 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.apache.pinot.core.query.selection.SelectionOperatorUtils.extractRowFromDataTable;
 
 
 public class QueryRunnerTest {
@@ -135,7 +139,7 @@ public class QueryRunnerTest {
   @Test
   public void testJoin()
       throws Exception {
-    QueryPlan queryPlan = _queryEnvironment.sqlQuery("SELECT * FROM a JOIN b on a.c1 = b.c1");
+    QueryPlan queryPlan = _queryEnvironment.sqlQuery("SELECT * FROM a JOIN b on a.c1 = b.c2");
     Map<String, String> requestMetadataMap = ImmutableMap.of("RequestId", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
     MailboxReceiveOperator mailboxReceiveOperator = null;
     for (String stageId : queryPlan.getStageMetadataMap().keySet()) {
@@ -155,17 +159,26 @@ public class QueryRunnerTest {
 
     int count = 0;
     int rowCount = 0;
+    List<Object[]> resultRows = new ArrayList<>();
     DataTableBlock dataTableBlock;
     while (count < 2) { // we have 2 servers sending data.
       dataTableBlock = mailboxReceiveOperator.nextBlock();
       if (dataTableBlock.getDataTable() != null) {
-        rowCount += dataTableBlock.getDataTable().getNumberOfRows();
+        DataTable dataTable = dataTableBlock.getDataTable();
+        int numRows = dataTable.getNumberOfRows();
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          resultRows.add(extractRowFromDataTable(dataTable, rowId));
+        }
+        rowCount += numRows;
       }
       count++;
     }
-    // assert that everything from left table is joined with right table since both table have exactly the same data
-    // but table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1).
-    Assert.assertEquals(rowCount, 75);
+
+    // Assert that each of the 5 categories from left table is joined with right table.
+    // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
+    // thus the final JOIN result will be 5 x (3 x 1).
+    Assert.assertEquals(rowCount, 15);
+
     // assert that the next block is null (e.g. finished receiving).
     dataTableBlock = mailboxReceiveOperator.nextBlock();
     Assert.assertTrue(DataTableBlockUtils.isEndOfStream(dataTableBlock));

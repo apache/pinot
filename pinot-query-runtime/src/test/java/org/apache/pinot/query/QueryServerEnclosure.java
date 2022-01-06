@@ -39,9 +39,24 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 
+/**
+ * Query server enclosure for testing Pinot query planner & runtime.
+ *
+ * This enclosure simulates a deployable component of Pinot that serves
+ *   - regular Pinot query server (that serves segment-based queries)
+ *   - intermediate stage queries (such as JOIN operator that awaits data scanned from left/right tables)
+ *
+ * Inside this construct it runs a regular pinot QueryExecutor as well as the new runtime - WorkerExecutor
+ * Depending on the query request type it gets routed to either one of the two for execution.
+ *
+ * It also runs a GRPC Mailbox service that runs the new transport layer protocol as the backbone for all
+ * multi-stage query communication.
+ */
 public class QueryServerEnclosure {
   private static final int NUM_ROWS = 5;
   private static final int DEFAULT_EXECUTOR_THREAD_NUM = 5;
+  private static final String[] STRING_FIELD_LIST = new String[]{"foo", "bar", "alice", "bob", "charlie"};
+  private static final int[] INT_FIELD_LIST = new int[]{1, 2, 42};
 
   private final ExecutorService _testExecutor;
   private final int _grpcPort;
@@ -105,14 +120,13 @@ public class QueryServerEnclosure {
   }
 
   public ImmutableSegment buildSegment(File indexDir, String tableName, String segmentName) throws Exception {
-    GenericRow row = new GenericRow();
-    row.putValue("c1", "foo");
-    row.putValue("c2", "bar");
-    row.putValue("c3", 1);
-    row.putValue("t", System.currentTimeMillis());
-
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
+      GenericRow row = new GenericRow();
+      row.putValue("c1", STRING_FIELD_LIST[i % STRING_FIELD_LIST.length]);
+      row.putValue("c2", STRING_FIELD_LIST[(i + 2) % STRING_FIELD_LIST.length]);
+      row.putValue("c3", INT_FIELD_LIST[i % INT_FIELD_LIST.length]);
+      row.putValue("t", System.currentTimeMillis());
       rows.add(row);
     }
 
