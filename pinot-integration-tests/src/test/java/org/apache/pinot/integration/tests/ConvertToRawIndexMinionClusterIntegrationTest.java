@@ -102,6 +102,10 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
     File[] indexDirs = tableDataDir.listFiles();
     Assert.assertNotNull(indexDirs);
     for (File indexDir : indexDirs) {
+      // Skip the tmp directory since these are only temporary segments
+      if (indexDir.getName().equals("tmp")) {
+        continue;
+      }
       SegmentMetadata segmentMetadata = new SegmentMetadataImpl(indexDir);
       for (String columnName : segmentMetadata.getSchema().getColumnNames()) {
         Assert.assertTrue(segmentMetadata.getColumnMetadataFor(columnName).hasDictionary());

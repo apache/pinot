@@ -465,6 +465,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    */
   private void untarAndMoveSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, File segmentTarFile)
       throws IOException {
+    // This could leave temporary directories in _indexDir if JVM shuts down before the temp directory is deleted.
+    // This is fine since the temporary directories are deleted when the table data manager calls init.
     File tempSegmentDir = getTmpSegmentDataDir("tmp-" + segmentName + "." + System.currentTimeMillis());
     try {
       File tempIndexDir = TarGzCompressionUtils.untar(segmentTarFile, tempSegmentDir).get(0);
