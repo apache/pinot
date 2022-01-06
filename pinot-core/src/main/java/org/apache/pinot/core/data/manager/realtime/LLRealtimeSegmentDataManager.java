@@ -398,8 +398,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         messageBatch = _partitionGroupConsumer
             .fetchMessages(_currentOffset, null, _partitionLevelStreamConfig.getFetchTimeoutMillis());
         if (_segmentLogger.isDebugEnabled()) {
-          _segmentLogger.debug("message batch received. filter={} unfiltered={} endOfPartitionGroup={}",
-              messageBatch.getUnfilteredMessageCount(), messageBatch.getMessageCount(),
+          _segmentLogger.debug("message batch received. filtered={} unfiltered={} endOfPartitionGroup={}",
+              messageBatch.getMessageCount(), messageBatch.getUnfilteredMessageCount(),
               messageBatch.isEndOfPartitionGroup());
         }
         _endOfPartitionGroup = messageBatch.isEndOfPartitionGroup();
