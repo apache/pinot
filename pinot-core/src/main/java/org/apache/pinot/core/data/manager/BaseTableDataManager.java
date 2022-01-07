@@ -309,7 +309,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         indexDir = downloadSegment(segmentName, zkMetadata);
       } else {
         LOGGER.info("Reload existing segment: {} of table: {}", segmentName, _tableNameWithType);
-        try (SegmentDirectory segmentDirectory = getSegmentDirectory(segmentName, indexLoadingConfig)) {
+        try (SegmentDirectory segmentDirectory = initSegmentDirectory(segmentName, indexLoadingConfig)) {
           segmentDirectory.copyTo(indexDir);
         }
       }
@@ -341,9 +341,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
       return;
     }
 
-    // The segment is not loaded by the server yet, but it may still kept by the server.
-    // So try to load the segment. If the segment does not exist or fails to load, then
-    // download the segment from deep store to load it again.
+    // The segment is not loaded by the server if the metadata object is null. But the segment
+    // may still be kept on the server. For example when server gets restarted, the segment is
+    // still on the server but the metadata object has not been initialized yet. In this case,
+    // we should check if the segment exists on server and try to load it. If the segment does
+    // not exist or fails to get loaded, we download segment from deep store to load it again.
     if (localMetadata == null && tryLoadExistingSegment(segmentName, indexLoadingConfig, zkMetadata)) {
       return;
     }
@@ -470,8 +472,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (!segmentBackupDir.exists()) {
       return;
     }
-    File segmentTempDir = new File(parentDir, indexDir.getName() + CommonConstants.Segment.SEGMENT_TEMP_DIR_SUFFIX);
     // Rename segment backup directory to segment temporary directory (atomic).
+    File segmentTempDir = new File(parentDir, indexDir.getName() + CommonConstants.Segment.SEGMENT_TEMP_DIR_SUFFIX);
     Preconditions.checkState(segmentBackupDir.renameTo(segmentTempDir),
         "Failed to rename segment backup directory: %s to segment temporary directory: %s", segmentBackupDir,
         segmentTempDir);
@@ -486,7 +488,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
     // Creates the SegmentDirectory object to access the segment metadata.
     // The metadata is null if the segment doesn't exist yet.
-    SegmentDirectory segmentDirectory = tryGetSegmentDirectory(segmentName, indexLoadingConfig);
+    SegmentDirectory segmentDirectory = tryInitSegmentDirectory(segmentName, indexLoadingConfig);
     SegmentMetadataImpl segmentMetadata = (segmentDirectory == null) ? null : segmentDirectory.getSegmentMetadata();
 
     // If the segment doesn't exist on server or its CRC has changed, then we
@@ -516,7 +518,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         // Close the stale SegmentDirectory object and recreate it with reprocessed segment.
         closeSegmentDirectoryQuietly(segmentDirectory);
         ImmutableSegmentLoader.preprocess(indexDir, indexLoadingConfig, schema);
-        segmentDirectory = getSegmentDirectory(segmentName, indexLoadingConfig);
+        segmentDirectory = initSegmentDirectory(segmentName, indexLoadingConfig);
       }
       ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, schema);
       addSegment(segment);
@@ -530,17 +532,17 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private SegmentDirectory tryGetSegmentDirectory(String segmentName, IndexLoadingConfig indexLoadingConfig) {
+  private SegmentDirectory tryInitSegmentDirectory(String segmentName, IndexLoadingConfig indexLoadingConfig) {
     try {
-      return getSegmentDirectory(segmentName, indexLoadingConfig);
+      return initSegmentDirectory(segmentName, indexLoadingConfig);
     } catch (Exception e) {
-      LOGGER.warn("Attempt to get SegmentDirectory for segment: {} of table: {} failed with error: {}", segmentName,
+      LOGGER.warn("Failed to initialize SegmentDirectory for segment: {} of table: {} with error: {}", segmentName,
           _tableNameWithType, e.getMessage());
       return null;
     }
   }
 
-  private SegmentDirectory getSegmentDirectory(String segmentName, IndexLoadingConfig indexLoadingConfig)
+  private SegmentDirectory initSegmentDirectory(String segmentName, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     SegmentDirectoryLoaderContext loaderContext =
         new SegmentDirectoryLoaderContext(indexLoadingConfig.getTableConfig(), indexLoadingConfig.getInstanceId(),
