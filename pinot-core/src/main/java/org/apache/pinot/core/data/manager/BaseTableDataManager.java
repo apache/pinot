@@ -104,8 +104,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
       Preconditions.checkState(_indexDir.mkdirs());
     }
     _resourceTmpDir = new File(_indexDir, "tmp");
-    // Delete and recreate the tmp directory if it exists as it may contain old files from previous runs.
-    _resourceTmpDir.delete();
+    // This is meant to cleanup temp resources from TableDataManager. But other code using this same
+    // directory will have those deleted as well.
+    FileUtils.deleteQuietly(_resourceTmpDir);
     if (!_resourceTmpDir.exists()) {
       Preconditions.checkState(_resourceTmpDir.mkdirs());
     }
