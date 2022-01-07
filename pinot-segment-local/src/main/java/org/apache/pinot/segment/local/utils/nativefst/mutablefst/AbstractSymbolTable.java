@@ -16,8 +16,7 @@
 
 package org.apache.pinot.segment.local.utils.nativefst.mutablefst;
 
-import com.carrotsearch.hppc.IntObjectOpenHashMap;
-import com.carrotsearch.hppc.ObjectIntOpenHashMap;
+
 import com.carrotsearch.hppc.cursors.IntCursor;
 import com.carrotsearch.hppc.cursors.ObjectCursor;
 import com.carrotsearch.hppc.cursors.ObjectIntCursor;
@@ -27,8 +26,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
-import utils.FstUtils;
-import java.util.Iterator;
+import org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils.FstUtils;
 
 
 /**
@@ -51,8 +49,9 @@ public abstract class AbstractSymbolTable implements SymbolTable {
    */
   public static int maxIdIn(SymbolTable table) {
     int max = 0;
-    for (ObjectIntCursor<String> cursor : table) {
-      max = Math.max(max, cursor.value);
+    for (SymbolTable it = table; it.hasNext(); ) {
+      Object2IntMap.Entry<String> cursor = it.next();
+      max = Math.max(max, cursor.getIntValue());
     }
     return max;
   }
@@ -84,9 +83,10 @@ public abstract class AbstractSymbolTable implements SymbolTable {
 
     this.symbolToId = new Object2IntOpenHashMap<>(copyFrom.size());
     this.idToSymbol = new Int2ObjectOpenHashMap<>(copyFrom.size());
-    for (ObjectIterator<Object2IntMap.Entry<String>> cursor : copyFrom) {
-      symbolToId.put(cursor.key, cursor.value);
-      idToSymbol.put(cursor.value, cursor.key);
+    for (SymbolTable it = copyFrom; it.hasNext(); ) {
+      Object2IntMap.Entry<String> cursor = it.next();
+      symbolToId.put(cursor.getKey(), cursor.getIntValue());
+      idToSymbol.put(cursor.getIntValue(), cursor.getKey());
     }
   }
 
@@ -96,17 +96,9 @@ public abstract class AbstractSymbolTable implements SymbolTable {
   }
 
   @Override
-  public Iterator<ObjectIterator<Object2IntMap.Entry<String>>> iterator() {
+  public
+  ObjectIterator<Object2IntMap.Entry<String>> iterator() {
     return symbolToId.object2IntEntrySet().iterator();
-  }
-
-  @Override
-  public Iterable<IntCursor> indexes() {
-    return idToSymbol.keys();
-  }
-
-  public Iterable<String> symbols() {
-    return Iterables.transform(symbolToId.keys(), keyFromContainer);
   }
 
   /**
@@ -134,7 +126,6 @@ public abstract class AbstractSymbolTable implements SymbolTable {
   @Override
   public boolean equals(Object o) {
     return FstUtils.symbolTableEquals(this, o);
-
   }
 
   @Override

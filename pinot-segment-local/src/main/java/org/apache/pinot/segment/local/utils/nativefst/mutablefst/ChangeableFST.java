@@ -23,7 +23,7 @@ import javax.annotation.Nullable;
  * Client interface for an FST abstracting either the mutable or immutable FST
  * @author Atri Sharma
  */
-public interface Fst {
+public interface ChangeableFST {
 
   String EPS = "<eps>";
 
@@ -78,36 +78,6 @@ public interface Fst {
    * @return
    */
   boolean isUsingStateSymbols();
-
-  /**
-   * Shortcut method for `getInputSymbols().getSize()`
-   * @return
-   */
-  int getInputSymbolCount();
-
-  /**
-   * Shortcut methods for `getOutputSymbolCount().getSize()`
-   * @return
-   */
-  int getOutputSymbolCount();
-
-  /**
-   * Returns the smybol index (mapping) for the given input symbol or throws IllegalArgumentException if
-   * no mapping exists for this symbol
-   * @see SymbolTable#get(String)
-   * @param symbol
-   * @return
-   */
-  int lookupInputSymbol(String symbol);
-
-  /**
-   * Returns the smybol index (mapping) for the given output symbol or throws IllegalArgumentException if
-   * no mapping exists for this symbol
-   * @see SymbolTable#get(String)
-   * @param symbol
-   * @return
-   */
-  int lookupOutputSymbol(String symbol);
 
   /**
    * throws an exception if the FST is constructed in an invalid state

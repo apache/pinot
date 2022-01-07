@@ -36,7 +36,7 @@ public interface Arc {
   /**
    * Get the reference to the next state in the FST; note that you get call `getNextState().getId()` to get the
    * FST state id for that state but some operations will be constructing new results and state ids will not be
-   * consistent across them (obviously). If you are using state symbols/labels then the labels will be constistent
+   * consistent across them (obviously). If you are using state symbols/labels then the labels will be consistent
    * @return
    */
   State getNextState();

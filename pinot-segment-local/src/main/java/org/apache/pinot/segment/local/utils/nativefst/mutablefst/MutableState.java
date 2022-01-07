@@ -18,7 +18,8 @@ package org.apache.pinot.segment.local.utils.nativefst.mutablefst;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import utils.FstUtils;
+import org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils.FstUtils;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -30,16 +31,11 @@ import java.util.Set;
  * The fst's mutable state implementation.
  *
  * Holds its outgoing {@link MutableArc} objects in an ArrayList allowing additions/deletions
- *
- * @author John Salatas jsalatas@users.sourceforge.net
  */
 public class MutableState implements State {
 
   // State's Id
   protected int id = -1;
-
-  // Final weight
-  private double finalWeight = Double.NaN;
 
   // Outgoing arcs
   private final ArrayList<MutableArc> arcs;
@@ -58,14 +54,6 @@ public class MutableState implements State {
   }
 
   /**
-   * Constructor specifying the state's final weight
-   */
-  public MutableState(double finalWeight) {
-    this.finalWeight = finalWeight;
-    this.arcs = Lists.newArrayList();
-  }
-
-  /**
    * Constructor specifying the initial capacity of the arc's ArrayList (this is an optimization used in various
    * operations)
    */
@@ -79,23 +67,6 @@ public class MutableState implements State {
    */
   public void arcSort(Comparator<Arc> cmp) {
     Collections.sort(arcs, cmp);
-  }
-
-  /**
-   * Get the state's final Weight
-   */
-  @Override
-  public double getFinalWeight() {
-    return finalWeight;
-  }
-
-  /**
-   * Set the state's final weight
-   *
-   * @param fnlfloat the final weight to set
-   */
-  public void setFinalWeight(double fnlfloat) {
-    this.finalWeight = fnlfloat;
   }
 
   /**
@@ -137,7 +108,7 @@ public class MutableState implements State {
 
   @Override
   public String toString() {
-    return "(" + id + ", " + finalWeight + ")";
+    return "(" + id +  ")";
   }
 
   /* friend methods to let the fst maintain state's state */
@@ -163,13 +134,12 @@ public class MutableState implements State {
   @Override
   public boolean equals(Object o) {
     return FstUtils.stateEquals(this, o);
-
   }
 
   @Override
   public int hashCode() {
     int result = id;
-    long temp = finalWeight != +0.0 ? Double.doubleToLongBits(finalWeight) : 0;
+    long temp = 0;
     result = 31 * result * ((int) (temp ^ (temp >>> 32)));
     result = 31 * result + (arcs != null ? arcs.hashCode() : 0);
     return result;

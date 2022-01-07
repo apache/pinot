@@ -26,13 +26,6 @@ import java.util.List;
 public interface State {
 
   /**
-   * The final weight assigned to this state (note that this will depend on what semiring is being used to build the
-   * FST
-   * @return
-   */
-  double getFinalWeight();
-
-  /**
    * The id for this state; ids are internal and can change through transformations. If you need some stable labeling
    * of states then use state labels (i.e. a state symbol table)
    * @return

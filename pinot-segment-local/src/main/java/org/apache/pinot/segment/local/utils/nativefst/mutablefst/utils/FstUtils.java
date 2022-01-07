@@ -19,12 +19,11 @@ package org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils;
 import com.carrotsearch.hppc.cursors.ObjectIntCursor;
 import com.google.common.math.DoubleMath;
 
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.Arc;
-import org.apache.pinot.segment.local.utils.nativefst.mutablefst.Fst;
-import org.apache.pinot.segment.local.utils.nativefst.mutablefst.MutableSymbolTable;
+import org.apache.pinot.segment.local.utils.nativefst.mutablefst.ChangeableFST;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.State;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.SymbolTable;
-import org.apache.pinot.segment.local.utils.nativefst.mutablefst.WriteableSymbolTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,40 +89,41 @@ public class FstUtils {
     if (thisFstObj == null || thatFstObj == null) {
       return false;
     }
-    if (!Fst.class.isAssignableFrom(thisFstObj.getClass()) || !Fst.class.isAssignableFrom(thatFstObj.getClass())) {
+    if (!ChangeableFST.class.isAssignableFrom(thisFstObj.getClass()) || !ChangeableFST.class.isAssignableFrom(thatFstObj.getClass())) {
       return false;
     }
 
-    Fst thisFst = (Fst) thisFstObj;
-    Fst thatFst = (Fst) thatFstObj;
+    ChangeableFST thisChangeableFST = (ChangeableFST) thisFstObj;
+    ChangeableFST thatChangeableFST = (ChangeableFST) thatFstObj;
 
 
-    if (thisFst.getStateCount() != thatFst.getStateCount()) {
-      reporter.report("fst.statecount", thisFst.getStateCount(), thatFst.getStateCount());
+    if (thisChangeableFST.getStateCount() != thatChangeableFST.getStateCount()) {
+      reporter.report("fst.statecount", thisChangeableFST.getStateCount(), thatChangeableFST.getStateCount());
       return false;
     }
-    for (int i = 0; i < thisFst.getStateCount(); i++) {
-      State thisState = thisFst.getState(i);
-      State thatState = thatFst.getState(i);
+    for (int i = 0; i < thisChangeableFST.getStateCount(); i++) {
+      State thisState = thisChangeableFST.getState(i);
+      State thatState = thatChangeableFST.getState(i);
       if (!FstUtils.stateEquals(thisState, thatState, epsilon, reporter)) {
         reporter.report("fst.state", thisState, thatState);
         return false;
       }
     }
-    if (thisFst.getStartState() != null ? (thisFst.getStartState().getId() != thatFst.getStartState().getId()) : thatFst.getStartState() != null) {
-      reporter.report("fst.startstate", thisFst.getStartState(), thatFst.getStartState());
+    if (thisChangeableFST.getStartState() != null ? (thisChangeableFST.getStartState().getId() != thatChangeableFST.getStartState().getId()) : thatChangeableFST.getStartState() != null) {
+      reporter.report("fst.startstate", thisChangeableFST.getStartState(), thatChangeableFST.getStartState());
       return false;
     }
-    if (thisFst.getInputSymbols() != null ? !FstUtils.symbolTableEquals(thisFst.getInputSymbols(), thatFst.getInputSymbols(), reporter) : thatFst.getInputSymbols() != null) {
-      reporter.report("fst.inputSymbols", thisFst.getInputSymbols(), thatFst.getInputSymbols());
+    if (thisChangeableFST.getInputSymbols() != null ? !FstUtils.symbolTableEquals(thisChangeableFST.getInputSymbols(), thatChangeableFST.getInputSymbols(), reporter) : thatChangeableFST.getInputSymbols() != null) {
+      reporter.report("fst.inputSymbols", thisChangeableFST.getInputSymbols(), thatChangeableFST.getInputSymbols());
       return false;
     }
-    if (thisFst.getStateSymbols() != null ? !FstUtils.symbolTableEquals(thisFst.getStateSymbols(), thatFst.getStateSymbols(), reporter) : thatFst.getStateSymbols() != null) {
-      reporter.report("fst.stateSymbols", thisFst.getStateSymbols(), thatFst.getStateSymbols());
+    if (thisChangeableFST.getStateSymbols() != null ? !FstUtils.symbolTableEquals(thisChangeableFST.getStateSymbols(), thatChangeableFST.getStateSymbols(), reporter) : thatChangeableFST.getStateSymbols() != null) {
+      reporter.report("fst.stateSymbols", thisChangeableFST.getStateSymbols(), thatChangeableFST.getStateSymbols());
       return false;
     }
-    if (!(thisFst.getOutputSymbols() != null ? FstUtils.symbolTableEquals(thisFst.getOutputSymbols(), thatFst.getOutputSymbols(), reporter) :thatFst.getOutputSymbols() == null)) {
-      reporter.report("fst.outSymbols", thisFst.getOutputSymbols(), thatFst.getOutputSymbols());
+    if (!(thisChangeableFST.getOutputSymbols() != null ? FstUtils.symbolTableEquals(thisChangeableFST.getOutputSymbols(), thatChangeableFST.getOutputSymbols(), reporter) :
+        thatChangeableFST.getOutputSymbols() == null)) {
+      reporter.report("fst.outSymbols", thisChangeableFST.getOutputSymbols(), thatChangeableFST.getOutputSymbols());
       return false;
     }
     return true;
@@ -186,10 +186,7 @@ public class FstUtils {
       reporter.report("state.id", thisState.getId(), thatState.getId());
       return false;
     }
-    if (!DoubleMath.fuzzyEquals(thatState.getFinalWeight(), thisState.getFinalWeight(), epsilon)) {
-      reporter.report("state.finalWeight", thisState.getFinalWeight(), thatState.getFinalWeight());
-      return false;
-    }
+
     if (thisState.getArcs().size() != thatState.getArcs().size()) {
       reporter.report("state.arcCount", thisState.getArcCount(), thatState.getArcCount());
       return false;
@@ -230,15 +227,16 @@ public class FstUtils {
       reporter.report("symbolTable.size", thisS.size(), thatS.size());
       return false;
     }
-    for (ObjectIntCursor<String> cursor : thisS) {
-      if (thatS.contains(cursor.key)) {
-        int thatV = thatS.get(cursor.key);
-        if (thatV == cursor.value) {
+    for (SymbolTable it = thisS; it.hasNext(); ) {
+      Object2IntMap.Entry<String> cursor = it.next();
+      if (thatS.contains(cursor.getKey())) {
+        int thatV = thatS.get(cursor.getKey());
+        if (thatV == cursor.getIntValue()) {
           continue;
         }
-        reporter.report("symbolTable.key", cursor.value, thatV);
+        reporter.report("symbolTable.key", cursor.getIntValue(), thatV);
       } else {
-        reporter.report("symbolTable.missingKey", cursor.key, cursor.value);
+        reporter.report("symbolTable.missingKey", cursor.getKey(), cursor.getIntValue());
       }
       return false;
     }

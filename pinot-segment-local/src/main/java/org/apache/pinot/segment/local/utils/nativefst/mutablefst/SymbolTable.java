@@ -18,6 +18,7 @@ package org.apache.pinot.segment.local.utils.nativefst.mutablefst;
 
 import com.carrotsearch.hppc.cursors.IntCursor;
 import com.carrotsearch.hppc.cursors.ObjectIntCursor;
+
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.Iterator;
@@ -27,7 +28,7 @@ import java.util.Iterator;
  * Base interface for a symbol table which is a mapping of symbols to integers
  * @author Atri Sharma
  */
-public interface SymbolTable extends Iterable<ObjectIterator<Object2IntMap.Entry<String>>> {
+public interface SymbolTable extends ObjectIterator<Object2IntMap.Entry<String>> {
 
   /**
    * How many symbol mappings are in this table
@@ -42,23 +43,7 @@ public interface SymbolTable extends Iterable<ObjectIterator<Object2IntMap.Entry
    * local scope as it will change the value at each step of iteration
    * @return
    */
-  @Override
-  Iterator<ObjectIterator<Object2IntMap.Entry<String>>> iterator();
-
-  /**
-   * Produces an iterator over the indexes in the mapping (e.g. all assigned symbol index values).
-   * NOTE that the returned iterable is of an IntCursor and each call to `next()` will return the
-   * same cursor instance but with the contained values updated. Do NOT let the cursor escape the
-   * local scope.
-   * @return
-   */
-  Iterable<IntCursor> indexes();
-
-  /**
-   * Procudes an iterable of all of the string symbols that are contained in this symbol table
-   * @return
-   */
-  Iterable<String> symbols();
+  ObjectIterator<Object2IntMap.Entry<String>> iterator();
 
   /**
    * Return the index of this symbol in this symbol table or throw IllegalArgumentException if no

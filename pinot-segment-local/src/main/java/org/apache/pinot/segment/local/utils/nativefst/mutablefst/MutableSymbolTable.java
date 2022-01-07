@@ -18,6 +18,9 @@ package org.apache.pinot.segment.local.utils.nativefst.mutablefst;
 
 import com.carrotsearch.hppc.cursors.IntObjectCursor;
 import com.google.common.collect.Lists;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.List;
 
 
@@ -56,14 +59,14 @@ public class MutableSymbolTable extends AbstractSymbolTable implements Writeable
   }
 
   private void putMappingOrThrow(String symbol, int id) {
-    if (!symbolToId.putIfAbsent(symbol, id)) {
+    if (symbolToId.putIfAbsent(symbol, id) != symbolToId.defaultReturnValue()) {
       if (symbolToId.get(symbol) != id) {
         throw new IllegalArgumentException("Putting a contradictory mapping of " + symbol + " to " + id + " when its"
                                            + " already " + symbolToId.get(symbol));
       }
       return; // already have the mapping and we silently drop dups
     }
-    if (!idToSymbol.putIfAbsent(id, symbol)) {
+    if (idToSymbol.putIfAbsent(id, symbol) != idToSymbol.defaultReturnValue()) {
       throw new IllegalStateException("Somehow the id->symbol table is wrong for " + symbol + " to " + id + " got " +
                                       idToSymbol.get(id));
     }
@@ -93,8 +96,9 @@ public class MutableSymbolTable extends AbstractSymbolTable implements Writeable
       return;
     }
     int max = -1;
-    for (IntObjectCursor<String> cursor : idToSymbol) {
-      max = Math.max(max, cursor.key);
+    for (ObjectIterator<Int2ObjectMap.Entry<String>> it = idToSymbol.int2ObjectEntrySet().iterator(); it.hasNext(); ) {
+      Int2ObjectMap.Entry<String> cursor = it.next();
+      max = Math.max(max, cursor.getIntKey());
     }
     nextId = max + 1;
   }
@@ -131,9 +135,9 @@ public class MutableSymbolTable extends AbstractSymbolTable implements Writeable
   @Override
   public int getOrAdd(String symbol) {
     int thisId = nextId;
-    if (symbolToId.putIfAbsent(symbol, thisId)) {
+    if (symbolToId.putIfAbsent(symbol, thisId) != symbolToId.defaultReturnValue()) {
       nextId += 1;
-      if (!idToSymbol.putIfAbsent(thisId, symbol)) {
+      if (idToSymbol.putIfAbsent(thisId, symbol) == idToSymbol.defaultReturnValue()) {
         throw new IllegalStateException("idToSymbol is inconsistent for " + symbol);
       }
       return thisId;
@@ -148,5 +152,15 @@ public class MutableSymbolTable extends AbstractSymbolTable implements Writeable
     if (id >= nextId) {
       nextId = id + 1;
     }
+  }
+
+  @Override
+  public boolean hasNext() {
+    return false;
+  }
+
+  @Override
+  public Object2IntMap.Entry<String> next() {
+    return null;
   }
 }

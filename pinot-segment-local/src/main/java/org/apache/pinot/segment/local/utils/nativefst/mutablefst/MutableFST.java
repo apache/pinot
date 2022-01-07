@@ -35,37 +35,35 @@ import static com.google.common.base.Preconditions.checkState;
  * A mutable finite state transducer implementation that allows you to build WFSTs via the API.
  * This is not thread safe; convert to an ImmutableFst if you need to share across threads.
  */
-public class MutableFst implements Fst {
+public class MutableFST implements ChangeableFST {
 
-  public static MutableFst emptyWithCopyOfSymbols(Fst fst) {
-    MutableFst copy = new MutableFst(fst.getSemiring(),
-                                     FstUtils.symbolTableEffectiveCopy(fst.getInputSymbols()),
-                                     FstUtils.symbolTableEffectiveCopy(fst.getOutputSymbols())
-    );
-    if (fst.isUsingStateSymbols()) {
-      copy.useStateSymbols(new MutableSymbolTable(fst.getStateSymbols()));
+  public static MutableFST emptyWithCopyOfSymbols(MutableFST mutableFST) {
+    MutableFST copy = new MutableFST(mutableFST.states, mutableFST.inputSymbols, mutableFST.outputSymbols);
+
+    if (mutableFST.isUsingStateSymbols()) {
+      copy.useStateSymbols(new MutableSymbolTable(mutableFST.getStateSymbols()));
     }
+
     return copy;
   }
 
   /**
    * Make a deep copy of the given FST. The symbol tables are "effectively deep copied" meaning that they will
    * take advantage of any immutable tables (using the UnionSymbolTable) to avoid doing a large deep copy.
-   * @param fst
+   * @param mutableFST
    * @return
    */
-  public static MutableFst copyFrom(Fst fst) {
-    MutableFst copy = emptyWithCopyOfSymbols(fst);
+  public static MutableFST copyFrom(MutableFST mutableFST) {
+    MutableFST copy = emptyWithCopyOfSymbols(mutableFST);
     // build up states
-    for (int i = 0; i < fst.getStateCount(); i++) {
-      State source = fst.getState(i);
+    for (int i = 0; i < mutableFST.getStateCount(); i++) {
+      State source = mutableFST.getState(i);
       MutableState target = new MutableState(source.getArcCount());
-      target.setFinalWeight(source.getFinalWeight());
       copy.setState(i, target);
     }
     // build arcs now that we have target state refs
-    for (int i = 0; i < fst.getStateCount(); i++) {
-      State source = fst.getState(i);
+    for (int i = 0; i < mutableFST.getStateCount(); i++) {
+      State source = mutableFST.getState(i);
       MutableState target = copy.getState(i);
       for (int j = 0; j < source.getArcCount(); j++) {
         Arc sarc = source.getArc(j);
@@ -75,7 +73,7 @@ public class MutableFst implements Fst {
         target.addArc(tarc);
       }
     }
-    MutableState newStart = copy.getState(fst.getStartState().getId());
+    MutableState newStart = copy.getState(mutableFST.getStartState().getId());
     copy.setStart(newStart);
     return copy;
   }
@@ -86,7 +84,7 @@ public class MutableFst implements Fst {
   private WriteableSymbolTable outputSymbols;
   private MutableSymbolTable stateSymbols;
 
-  public MutableFst() {
+  public MutableFST() {
     this(new MutableSymbolTable(), new MutableSymbolTable());
   }
 
@@ -96,11 +94,7 @@ public class MutableFst implements Fst {
    *
    * @param numStates the initial capacity
    */
-  public MutableFst(int numStates) {
-    this(new ArrayList<MutableState>(numStates), new MutableSymbolTable(), new MutableSymbolTable());
-  }
-
-  public MutableFst(int numStates) {
+  public MutableFST(int numStates) {
     this(new ArrayList<MutableState>(numStates), new MutableSymbolTable(), new MutableSymbolTable());
   }
 
@@ -112,21 +106,17 @@ public class MutableFst implements Fst {
    * @param inputSymbolsToOwn
    * @param outputSymbolsToOwn
    */
-  public MutableFst(WriteableSymbolTable inputSymbolsToOwn, WriteableSymbolTable outputSymbolsToOwn) {
-    this(Lists.<MutableState>newArrayList(), inputSymbolsToOwn, outputSymbolsToOwn);
+  public MutableFST(WriteableSymbolTable inputSymbolsToOwn, WriteableSymbolTable outputSymbolsToOwn) {
+    this(Lists.newArrayList(), inputSymbolsToOwn, outputSymbolsToOwn);
   }
 
-  public MutableFst(
-      WriteableSymbolTable inputSymbolsToOwn, WriteableSymbolTable outputSymbolsToOwn) {
-    this(Lists.<MutableState>newArrayList(), makeDefaultRing(), inputSymbolsToOwn, outputSymbolsToOwn);
-  }
-
-  protected MutableFst(ArrayList<MutableState> states, Semiring semiring, WriteableSymbolTable inputSymbols,
+  protected MutableFST(ArrayList<MutableState> states, WriteableSymbolTable inputSymbols,
                        WriteableSymbolTable outputSymbols) {
     this.states = states;
-    this.semiring = semiring;
     this.inputSymbols = inputSymbols;
     this.outputSymbols = outputSymbols;
+
+    this.stateSymbols = new MutableSymbolTable();
   }
 
   @Nullable
@@ -144,36 +134,11 @@ public class MutableFst implements Fst {
   }
 
   /**
-   * Indicates that this FST will be using state symbols
-   */
-  public void useStateSymbols() {
-    Preconditions.checkState(this.states.isEmpty(), "cannot switch to using state symbols after states are constructed");
-    this.stateSymbols = new MutableSymbolTable();
-  }
-
-  /**
-   * Indicates that this FST will not be using state symbols; you might do this after constructing
-   * a complicated FST but before freezing it to reduce runtime/serialization space if you dont
-   * need the state symbols for runtime; note that if you later call useStateSymbols
-   */
-  public void dropStateSymbols() {
-    this.stateSymbols = null;
-  }
-
-  /**
    * Get the initial states
    */
   @Override
   public MutableState getStartState() {
     return start;
-  }
-
-  /**
-   * Get the semiring
-   */
-  @Override
-  public Semiring getSemiring() {
-    return semiring;
   }
 
   /**
@@ -184,16 +149,9 @@ public class MutableFst implements Fst {
   public MutableState setStart(MutableState start) {
     checkArgument(start.getId() >= 0, "must set id before setting start");
     throwIfSymbolTableMissingId(start.getId());
-    correctStateWeight(start);
+
     this.start = start;
     return start;
-  }
-
-  private void correctStateWeight(MutableState state) {
-    checkState(semiring != null, "semiring not initialized before adding states");
-    if (Double.isNaN(state.getFinalWeight())) {
-      state.setFinalWeight(semiring.zero());
-    }
   }
 
   public MutableState newStartState() {
@@ -235,6 +193,14 @@ public class MutableFst implements Fst {
     return addState(state, null);
   }
 
+  public int lookupInputSymbol(String symbol) {
+    return inputSymbols.get(symbol);
+  }
+
+  public int lookupOutputSymbol(String symbol) {
+    return outputSymbols.get(symbol);
+  }
+
   public MutableState addState(MutableState state, @Nullable String newStateSymbol) {
     checkArgument(state.getId() == -1, "trying to add a state that already has id");
     this.states.add(state);
@@ -246,7 +212,6 @@ public class MutableFst implements Fst {
     } else {
       Preconditions.checkState(newStateSymbol == null, "cant pass state name if not using symbol table");
     }
-    correctStateWeight(state);
     return state;
   }
 
@@ -263,18 +228,11 @@ public class MutableFst implements Fst {
     }
     Preconditions.checkState(this.states.get(id) == null, "cant write two states with ", id);
     this.states.set(id, state);
-    correctStateWeight(state);
     return state;
   }
 
   public MutableState newState() {
     return newState(null);
-  }
-
-  public MutableState newState(double finalWeight) {
-    MutableState newState = newState();
-    newState.setFinalWeight(finalWeight);
-    return newState;
   }
 
   public MutableState newState(@Nullable String newStateSymbol) {
@@ -297,41 +255,37 @@ public class MutableFst implements Fst {
    * @param inSymbol
    * @param outSymbol
    * @param endStateSymbol
-   * @param weight
    * @return
    */
-  public MutableArc addArc(String startStateSymbol, String inSymbol, String outSymbol, String endStateSymbol, double weight) {
+  public MutableArc addArc(String startStateSymbol, String inSymbol, String outSymbol, String endStateSymbol) {
     Preconditions.checkNotNull(stateSymbols, "cant use this without state symbols; call useStateSymbols()");
     return addArc(
         getOrNewState(startStateSymbol),
         inSymbol,
         outSymbol,
-        getOrNewState(endStateSymbol),
-        weight
+        getOrNewState(endStateSymbol)
     );
   }
 
-  public MutableArc addArc(String startStateSymbol, int inSymbolId, int outSymbolId, String endStateSymbol, double weight) {
+  public MutableArc addArc(String startStateSymbol, int inSymbolId, int outSymbolId, String endStateSymbol) {
     Preconditions.checkNotNull(stateSymbols, "cant use this without state symbols; call useStateSymbols()");
     return addArc(
         getOrNewState(startStateSymbol),
         inSymbolId,
         outSymbolId,
-        getOrNewState(endStateSymbol),
-        weight
+        getOrNewState(endStateSymbol)
     );
   }
 
-  public MutableArc addArc(MutableState startState, String inSymbol, String outSymbol, MutableState endState, double weight) {
-    return addArc(startState, inputSymbols.getOrAdd(inSymbol), outputSymbols.getOrAdd(outSymbol), endState, weight);
+  public MutableArc addArc(MutableState startState, String inSymbol, String outSymbol, MutableState endState) {
+    return addArc(startState, inputSymbols.getOrAdd(inSymbol), outputSymbols.getOrAdd(outSymbol), endState);
   }
 
-  public MutableArc addArc(MutableState startState, int inSymbolId, int outSymbolId, MutableState endState, double weight) {
+  public MutableArc addArc(MutableState startState, int inSymbolId, int outSymbolId, MutableState endState) {
     checkArgument(this.states.get(startState.getId()) == startState, "cant pass state that doesnt exist in fst");
     checkArgument(this.states.get(endState.getId()) == endState, "cant pass end state that doesnt exist in fst");
     MutableArc newArc = new MutableArc(inSymbolId,
                                         outSymbolId,
-                                        weight,
                                         endState);
     startState.addArc(newArc);
     endState.addIncomingState(startState);
@@ -349,69 +303,20 @@ public class MutableFst implements Fst {
   }
 
   @Override
-  public int getInputSymbolCount() {
-    return inputSymbols.size();
-  }
-
-  @Override
-  public int getOutputSymbolCount() {
-    return outputSymbols.size();
-  }
-
-  public void setInputSymbolsAsCopyFromThatOutput(Fst that) {
-    this.inputSymbols = FstUtils.symbolTableEffectiveCopy(that.getOutputSymbols());
-  }
-
-  public void setOutputSymbolsAsCopyFromThatInput(Fst that) {
-    this.outputSymbols = FstUtils.symbolTableEffectiveCopy(that.getInputSymbols());
-  }
-
-  public void setOutputSymbolsAsCopy(SymbolTable copyFrom) {
-    this.outputSymbols = FstUtils.symbolTableEffectiveCopy(copyFrom);
-  }
-
-  public void setInputSymbolsAsCopy(SymbolTable copyFrom) {
-    this.inputSymbols = FstUtils.symbolTableEffectiveCopy(copyFrom);
-  }
-
-  @Override
-  public int lookupInputSymbol(String symbol) {
-    return inputSymbols.get(symbol);
-  }
-
-  @Override
-  public int lookupOutputSymbol(String symbol) {
-    return outputSymbols.get(symbol);
-  }
-
-  @Override
   public boolean isUsingStateSymbols() {
     return stateSymbols != null;
   }
 
   @Override
   public void throwIfInvalid() {
-    Preconditions.checkNotNull(semiring, "must have a semiring");
     Preconditions.checkNotNull(start, "must have a start state");
-  }
-
-  /**
-   * Writes a binary version of this to a file out to disk. Be aware that binary serialization
-   * format may change over time. We write a version number there and will do a best effort
-   * to keep the formats backwards and forwards compatible across major version changes, but
-   * the text format will always be backwards/forwards so consider saving in that format instead
-   * @param file
-   * @throws IOException
-   */
-  public void saveModel(File file) throws IOException {
-    FstInputOutput.writeFstToBinaryFile(this, file);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("Fst(start=").append(start).append(", isyms=").append(inputSymbols).append(", osyms=").append(
-        outputSymbols).append(", semiring=").append(semiring).append(")\n");
+        outputSymbols);
     for (State s : states) {
       sb.append("  ").append(s).append("\n");
       int numArcs = s.getArcCount();
@@ -531,7 +436,7 @@ public class MutableFst implements Fst {
 
   @Override
   public int hashCode() {
-    int result = semiring != null ? semiring.hashCode() : 0;
+    int result = 0;
     result = 31 * result + (states != null ? states.hashCode() : 0);
     result = 31 * result + (start != null ? start.hashCode() : 0);
     result = 31 * result + (inputSymbols != null ? inputSymbols.hashCode() : 0);
