@@ -39,11 +39,6 @@ public class MutableSymbolTable extends AbstractSymbolTable implements Writeable
     this.nextId = 0;
   }
 
-  // protected constructor used by the union symbol table
-  MutableSymbolTable(int nextId) {
-    this.nextId = nextId;
-  }
-
   /**
    * Construct a new mutable symbol table from the given symbol table
    * @param copyFrom

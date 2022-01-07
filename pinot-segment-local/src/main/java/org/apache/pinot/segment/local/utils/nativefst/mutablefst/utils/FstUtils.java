@@ -16,12 +16,9 @@
 
 package org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils;
 
-import com.carrotsearch.hppc.cursors.ObjectIntCursor;
-import com.google.common.math.DoubleMath;
-
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.Arc;
-import org.apache.pinot.segment.local.utils.nativefst.mutablefst.ChangeableFST;
+import org.apache.pinot.segment.local.utils.nativefst.mutablefst.MutableFST;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.State;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.SymbolTable;
 import org.slf4j.Logger;
@@ -89,41 +86,38 @@ public class FstUtils {
     if (thisFstObj == null || thatFstObj == null) {
       return false;
     }
-    if (!ChangeableFST.class.isAssignableFrom(thisFstObj.getClass()) || !ChangeableFST.class.isAssignableFrom(thatFstObj.getClass())) {
+    if (!MutableFST.class.isAssignableFrom(thisFstObj.getClass()) || !MutableFST.class.isAssignableFrom(thatFstObj.getClass())) {
       return false;
     }
 
-    ChangeableFST thisChangeableFST = (ChangeableFST) thisFstObj;
-    ChangeableFST thatChangeableFST = (ChangeableFST) thatFstObj;
+    MutableFST thisMutableFST = (MutableFST) thisFstObj;
+    MutableFST thatMutableFST = (MutableFST) thatFstObj;
 
 
-    if (thisChangeableFST.getStateCount() != thatChangeableFST.getStateCount()) {
-      reporter.report("fst.statecount", thisChangeableFST.getStateCount(), thatChangeableFST.getStateCount());
+    if (thisMutableFST.getStateCount() != thatMutableFST.getStateCount()) {
+      reporter.report("fst.statecount", thisMutableFST.getStateCount(), thatMutableFST.getStateCount());
       return false;
     }
-    for (int i = 0; i < thisChangeableFST.getStateCount(); i++) {
-      State thisState = thisChangeableFST.getState(i);
-      State thatState = thatChangeableFST.getState(i);
+    for (int i = 0; i < thisMutableFST.getStateCount(); i++) {
+      State thisState = thisMutableFST.getState(i);
+      State thatState = thatMutableFST.getState(i);
       if (!FstUtils.stateEquals(thisState, thatState, epsilon, reporter)) {
         reporter.report("fst.state", thisState, thatState);
         return false;
       }
     }
-    if (thisChangeableFST.getStartState() != null ? (thisChangeableFST.getStartState().getId() != thatChangeableFST.getStartState().getId()) : thatChangeableFST.getStartState() != null) {
-      reporter.report("fst.startstate", thisChangeableFST.getStartState(), thatChangeableFST.getStartState());
+    if (thisMutableFST.getStartState() != null ? (thisMutableFST.getStartState().getId() != thatMutableFST.getStartState().getId()) : thatMutableFST.getStartState() != null) {
+      reporter.report("fst.startstate", thisMutableFST.getStartState(), thatMutableFST.getStartState());
       return false;
     }
-    if (thisChangeableFST.getInputSymbols() != null ? !FstUtils.symbolTableEquals(thisChangeableFST.getInputSymbols(), thatChangeableFST.getInputSymbols(), reporter) : thatChangeableFST.getInputSymbols() != null) {
-      reporter.report("fst.inputSymbols", thisChangeableFST.getInputSymbols(), thatChangeableFST.getInputSymbols());
+
+    if (thisMutableFST.getStateSymbols() != null ? !FstUtils.symbolTableEquals(thisMutableFST.getStateSymbols(), thatMutableFST.getStateSymbols(), reporter) : thatMutableFST.getStateSymbols() != null) {
+      reporter.report("fst.stateSymbols", thisMutableFST.getStateSymbols(), thatMutableFST.getStateSymbols());
       return false;
     }
-    if (thisChangeableFST.getStateSymbols() != null ? !FstUtils.symbolTableEquals(thisChangeableFST.getStateSymbols(), thatChangeableFST.getStateSymbols(), reporter) : thatChangeableFST.getStateSymbols() != null) {
-      reporter.report("fst.stateSymbols", thisChangeableFST.getStateSymbols(), thatChangeableFST.getStateSymbols());
-      return false;
-    }
-    if (!(thisChangeableFST.getOutputSymbols() != null ? FstUtils.symbolTableEquals(thisChangeableFST.getOutputSymbols(), thatChangeableFST.getOutputSymbols(), reporter) :
-        thatChangeableFST.getOutputSymbols() == null)) {
-      reporter.report("fst.outSymbols", thisChangeableFST.getOutputSymbols(), thatChangeableFST.getOutputSymbols());
+    if (!(thisMutableFST.getOutputSymbols() != null ? FstUtils.symbolTableEquals(thisMutableFST.getOutputSymbols(), thatMutableFST.getOutputSymbols(), reporter) :
+        thatMutableFST.getOutputSymbols() == null)) {
+      reporter.report("fst.outSymbols", thisMutableFST.getOutputSymbols(), thatMutableFST.getOutputSymbols());
       return false;
     }
     return true;
@@ -146,9 +140,7 @@ public class FstUtils {
     }
     Arc thisArc = (Arc) thisArcObj;
     Arc thatArc = (Arc) thatArcObj;
-    if (thisArc.getIlabel() != thatArc.getIlabel()) {
-      return false;
-    }
+
     if (thisArc.getNextState().getId() != thatArc.getNextState().getId()) {
         return false;
     }

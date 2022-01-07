@@ -24,38 +24,18 @@ import org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils.FstUtils;
  */
 public class MutableArc implements Arc {
 
-  private int iLabel;
   private int oLabel;
   private MutableState nextState;
 
   /**
    * Arc Constructor
    *
-   * @param iLabel    the input label's id
    * @param oLabel    the output label's id
    * @param nextState the arc's next state
    */
-  public MutableArc(int iLabel, int oLabel, MutableState nextState) {
-    this.iLabel = iLabel;
+  public MutableArc(int oLabel, MutableState nextState) {
     this.oLabel = oLabel;
     this.nextState = nextState;
-  }
-
-  /**
-   * Get the input label's id
-   */
-  @Override
-  public int getIlabel() {
-    return iLabel;
-  }
-
-  /**
-   * Set the input label's id
-   *
-   * @param iLabel the input label's id to set
-   */
-  public void setIlabel(int iLabel) {
-    this.iLabel = iLabel;
   }
 
   /**
@@ -101,7 +81,6 @@ public class MutableArc implements Arc {
   public int hashCode() {
     int result = 1;
 
-    result = 31 * result + iLabel;
     result = 31 * result + oLabel;
     result = 31 * result + (nextState != null ? nextState.getId() : 0);
     return result;
@@ -109,7 +88,7 @@ public class MutableArc implements Arc {
 
   @Override
   public String toString() {
-    return "(" + iLabel + ", " + oLabel + ", " + nextState
+    return "(" + oLabel + ", " + nextState
            + ")";
   }
 }

@@ -22,12 +22,6 @@ package org.apache.pinot.segment.local.utils.nativefst.mutablefst;
 public interface Arc {
 
   /**
-   * Get the index of the input symbol for this edge of the fst
-   * @return
-   */
-  int getIlabel();
-
-  /**
    * Get the index of the output symbol for this edge of the fst
    * @return
    */
