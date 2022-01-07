@@ -53,12 +53,14 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Pair;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.slf4j.Logger;
@@ -286,23 +288,40 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public void reloadSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata,
-      SegmentMetadata segmentMetadata, @Nullable Schema schema, boolean forceDownload)
+      SegmentMetadata localMetadata, @Nullable Schema schema, boolean forceDownload)
       throws Exception {
     File indexDir = getSegmentDataDir(segmentName);
-    // Create backup dir to make segment reloading atomic for local tier backend.
-    LoaderUtils.createBackup(indexDir);
     try {
-      boolean shouldDownloadRawSegment = forceDownload || !hasSameCRC(zkMetadata, segmentMetadata);
-      if (shouldDownloadRawSegment && allowDownloadRawSegment(segmentName, zkMetadata)) {
-        downloadRawSegmentAndProcess(segmentName, indexLoadingConfig, zkMetadata, schema);
+      // Create backup directory to handle failure of segment reloading.
+      createBackup(indexDir);
+
+      // Download segment from deep store if CRC changes or forced to download;
+      // otherwise, copy backup directory back to the original index directory.
+      // And then continue to load the segment from the index directory.
+      boolean shouldDownload = forceDownload || !hasSameCRC(zkMetadata, localMetadata);
+      if (shouldDownload && allowDownload(segmentName, zkMetadata)) {
+        if (forceDownload) {
+          LOGGER.info("Segment: {} of table: {} is forced to download", segmentName, _tableNameWithType);
+        } else {
+          LOGGER.info("Download segment:{} of table: {} as crc changes from: {} to: {}", segmentName,
+              _tableNameWithType, localMetadata.getCrc(), zkMetadata.getCrc());
+        }
+        indexDir = downloadSegment(segmentName, zkMetadata);
       } else {
-        downloadTierSegmentAndProcess(segmentName, indexLoadingConfig, schema);
+        LOGGER.info("Reload existing segment: {} of table: {}", segmentName, _tableNameWithType);
+        try (SegmentDirectory segmentDirectory = getSegmentDirectory(segmentName, indexLoadingConfig)) {
+          segmentDirectory.copyTo(indexDir);
+        }
       }
-      // Remove backup dir to mark the completion of reloading for local tier backend.
-      LoaderUtils.removeBackup(indexDir);
+
+      // Load from index directory and replace the old segment in memory.
+      ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema);
+      addSegment(segment);
+
+      // Remove backup directory to mark the completion of segment reloading.
+      removeBackup(indexDir);
     } catch (Exception reloadFailureException) {
       try {
-        // Recover the segment dir from backup dir for local tier backend.
         LoaderUtils.reloadFailureRecovery(indexDir);
       } catch (Exception recoveryFailureException) {
         LOGGER.error("Failed to recover after reload failure", recoveryFailureException);
@@ -314,157 +333,43 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public void addOrReplaceSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
-      SegmentZKMetadata zkMetadata, @Nullable SegmentMetadata segmentMetadata)
+      SegmentZKMetadata zkMetadata, @Nullable SegmentMetadata localMetadata)
       throws Exception {
-    // Non-null segment metadata means the segment has already been loaded.
-    if (segmentMetadata != null) {
-      if (hasSameCRC(zkMetadata, segmentMetadata)) {
-        // Simply returns if the CRC hasn't changed. The table config may have changed
-        // since segment is loaded, but that is handled by reloadSegment() method.
-        LOGGER.info("Segment: {} of table: {} has crc: {} same as before, already loaded, do nothing", segmentName,
-            _tableNameWithType, segmentMetadata.getCrc());
-      } else {
-        // Download the raw segment, reprocess and load it if the CRC has changed.
-        LOGGER.info("Segment: {} of table: {} already loaded but its crc: {} differs from new crc: {}", segmentName,
-            _tableNameWithType, segmentMetadata.getCrc(), zkMetadata.getCrc());
-        downloadRawSegmentAndProcess(segmentName, indexLoadingConfig, zkMetadata,
-            ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType));
-      }
+    if (localMetadata != null && hasSameCRC(zkMetadata, localMetadata)) {
+      LOGGER.info("Segment: {} of table: {} has crc: {} same as before, already loaded, do nothing", segmentName,
+          _tableNameWithType, localMetadata.getCrc());
       return;
     }
 
-    // For local tier backend, try to recover the segment from potential
-    // reload failure. Continue upon any failure.
-    File indexDir = getSegmentDataDir(segmentName);
-    recoverReloadFailureQuietly(_tableNameWithType, segmentName, indexDir);
-
-    // Creates the SegmentDirectory object to access the segment metadata that
-    // may be from local tier backend or remote tier backend.
-    SegmentDirectory segmentDirectory = null;
-    try {
-      SegmentDirectoryLoaderContext loaderContext =
-          new SegmentDirectoryLoaderContext(indexLoadingConfig.getTableConfig(), indexLoadingConfig.getInstanceId(),
-              segmentName, indexLoadingConfig.getSegmentDirectoryConfigs());
-      SegmentDirectoryLoader segmentDirectoryLoader =
-          SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
-      segmentDirectory = segmentDirectoryLoader.load(indexDir.toURI(), loaderContext);
-    } catch (Exception e) {
-      LOGGER.warn("Failed to create SegmentDirectory for segment: {} of table: {} due to error: {}", segmentName,
-          _tableNameWithType, e.getMessage());
-    }
-
-    // Download the raw segment, reprocess and load it if it is never loaded or its CRC has changed.
-    if (segmentDirectory == null) {
-      LOGGER.info("Segment: {} of table: {} does not exist", segmentName, _tableNameWithType);
-      downloadRawSegmentAndProcess(segmentName, indexLoadingConfig, zkMetadata,
-          ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType));
-      return;
-    }
-    if (!hasSameCRC(zkMetadata, segmentDirectory.getSegmentMetadata())) {
-      LOGGER.info("Segment: {} of table: {} has crc: {} different from new crc: {}", segmentName,
-          _tableNameWithType, segmentDirectory.getSegmentMetadata().getCrc(), zkMetadata.getCrc());
-      closeSegmentDirectoryQuietly(segmentDirectory);
-      downloadRawSegmentAndProcess(segmentName, indexLoadingConfig, zkMetadata,
-          ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType));
+    // The segment is not loaded by the server yet, but it may still kept by the server.
+    // So try to load the segment. If the segment does not exist or fails to load, then
+    // download the segment from deep store to load it again.
+    if (localMetadata == null && tryLoadExistingSegment(segmentName, indexLoadingConfig, zkMetadata)) {
       return;
     }
 
-    try {
-      Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
-      if (!ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, schema)) {
-        // The loaded segment is still consistent with current table config or schema.
-        LOGGER.info("Segment: {} of table: {} is consistent with table config and schema", segmentName,
-            _tableNameWithType);
-        loadSegment(segmentDirectory, indexLoadingConfig, schema);
-        return;
-      }
-      // If any discrepancy is found, get the segment from tier backend, reprocess and load it.
-      LOGGER.info("Segment: {} of table: {} needs reprocess to reflect latest table config and schema", segmentName,
-          _tableNameWithType);
-      // Close the stale SegmentDirectory object before loading the newly processed segment.
-      closeSegmentDirectoryQuietly(segmentDirectory);
-      downloadTierSegmentAndProcess(segmentName, indexLoadingConfig, schema);
-    } catch (Exception e) {
-      closeSegmentDirectoryQuietly(segmentDirectory);
-      LOGGER.error("Failed to reprocess and load segment: {} of table: {}", segmentName, _tableNameWithType, e);
-      downloadRawSegmentAndProcess(segmentName, indexLoadingConfig, zkMetadata,
-          ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType));
+    Preconditions.checkState(allowDownload(segmentName, zkMetadata), "Segment: %s of table: %s does not allow download",
+        segmentName, _tableNameWithType);
+
+    // Download segment and replace the local one, either due to failure to recover local segment,
+    // or the segment data is updated and has new CRC now.
+    if (localMetadata == null) {
+      LOGGER.info("Download segment: {} of table: {} as it doesn't exist", segmentName, _tableNameWithType);
+    } else {
+      LOGGER.info("Download segment: {} of table: {} as crc changes from: {} to: {}", segmentName,
+          _tableNameWithType, localMetadata.getCrc(), zkMetadata.getCrc());
     }
+    File indexDir = downloadSegment(segmentName, zkMetadata);
+    addSegment(indexDir, indexLoadingConfig);
+    LOGGER.info("Downloaded and loaded segment: {} of table: {} with crc: {}", segmentName, _tableNameWithType,
+        zkMetadata.getCrc());
   }
 
-  /**
-   * Get the segment from the configured tier backend, reprocess it with the latest table
-   * config and schema and then load it. Please note that the segment is from tier backend,
-   * not deep store, for incremental processing.
-   */
-  private void downloadTierSegmentAndProcess(String segmentName, IndexLoadingConfig indexLoadingConfig,
-      @Nullable Schema schema)
-      throws Exception {
-    SegmentDirectoryLoaderContext loaderContext =
-        new SegmentDirectoryLoaderContext(indexLoadingConfig.getTableConfig(), indexLoadingConfig.getInstanceId(),
-            segmentName, indexLoadingConfig.getSegmentDirectoryConfigs());
-    SegmentDirectoryLoader segmentDirectoryLoader =
-        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
-    File indexDir = getSegmentDataDir(segmentName);
-    segmentDirectoryLoader.download(indexDir, loaderContext);
-    processAndLoadSegment(segmentDirectoryLoader, loaderContext, segmentName, indexDir, indexLoadingConfig, schema);
-    LOGGER.info("Reprocessed tier segment: {} of table: {} and loaded it", segmentName, _tableNameWithType);
-  }
-
-  /**
-   * This method downloads the raw segment from the deep store and process it, mainly
-   * for cases where segment CRC has changed or the existing segment fails to load.
-   */
-  private void downloadRawSegmentAndProcess(String segmentName, IndexLoadingConfig indexLoadingConfig,
-      SegmentZKMetadata zkMetadata, @Nullable Schema schema)
-      throws Exception {
-    Preconditions.checkState(allowDownloadRawSegment(segmentName, zkMetadata),
-        "Segment: %s of table: %s does not allow download raw segment", segmentName, _tableNameWithType);
-
-    SegmentDirectoryLoaderContext loaderContext =
-        new SegmentDirectoryLoaderContext(indexLoadingConfig.getTableConfig(), indexLoadingConfig.getInstanceId(),
-            segmentName, indexLoadingConfig.getSegmentDirectoryConfigs());
-    SegmentDirectoryLoader segmentDirectoryLoader =
-        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
-    File indexDir = downloadRawSegment(segmentName, zkMetadata);
-    processAndLoadSegment(segmentDirectoryLoader, loaderContext, segmentName, indexDir, indexLoadingConfig, schema);
-    LOGGER.info("Downloaded raw segment: {} of table: {} with crc: {} and loaded it", segmentName,
-        _tableNameWithType, zkMetadata.getCrc());
-  }
-
-  private void processAndLoadSegment(SegmentDirectoryLoader segmentDirectoryLoader,
-      SegmentDirectoryLoaderContext loaderContext, String segmentName, File indexDir,
-      IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema)
-      throws Exception {
-    // Preprocess the segment locally with current table config and schema.
-    ImmutableSegmentLoader.preprocess(indexDir, indexLoadingConfig, schema);
-
-    SegmentDirectory segmentDirectory = null;
-    try {
-      // Upload the processed segment to server tier backend, which can be local or remote.
-      segmentDirectoryLoader.upload(indexDir, loaderContext);
-      // Create the SegmentDirectory object with the newly processed segment from tier backend.
-      segmentDirectory = segmentDirectoryLoader.load(indexDir.toURI(), loaderContext);
-      loadSegment(segmentDirectory, indexLoadingConfig, schema);
-    } catch (Exception e) {
-      closeSegmentDirectoryQuietly(segmentDirectory);
-      LOGGER.error("Failed to load newly processed segment: {} of table: {} due to error: {}", segmentName,
-          _tableNameWithType, e.getMessage());
-      throw e;
-    }
-  }
-
-  private void loadSegment(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
-      @Nullable Schema schema)
-      throws Exception {
-    addSegment(ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, schema));
-  }
-
-  protected boolean allowDownloadRawSegment(String segmentName, SegmentZKMetadata zkMetadata) {
+  protected boolean allowDownload(String segmentName, SegmentZKMetadata zkMetadata) {
     return true;
   }
 
-  protected File downloadRawSegment(String segmentName, SegmentZKMetadata zkMetadata)
+  protected File downloadSegment(String segmentName, SegmentZKMetadata zkMetadata)
       throws Exception {
     // TODO: may support download from peer servers for RealTime table.
     return downloadSegmentFromDeepStore(segmentName, zkMetadata);
@@ -534,6 +439,118 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return new File(_resourceTmpDir, segmentName);
   }
 
+  /**
+   * Create a backup directory to handle failure of segment reloading.
+   * First rename index directory to segment backup directory so that original segment have all file
+   * descriptors point to the segment backup directory to ensure original segment serves queries properly.
+   * The original index directory is restored lazily, as depending on the conditions,
+   * it may be restored from the backup directory or segment downloaded from deep store.
+   */
+  private void createBackup(File indexDir) {
+    if (!indexDir.exists()) {
+      return;
+    }
+    File parentDir = indexDir.getParentFile();
+    File segmentBackupDir = new File(parentDir, indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
+    // Rename index directory to segment backup directory (atomic).
+    Preconditions.checkState(indexDir.renameTo(segmentBackupDir),
+        "Failed to rename index directory: %s to segment backup directory: %s", indexDir, segmentBackupDir);
+  }
+
+  /**
+   * Remove the backup directory to mark the completion of segment reloading.
+   * First rename then delete is as renaming is an atomic operation, but deleting is not.
+   * When we rename the segment backup directory to segment temporary directory, we know the reload
+   * already succeeded, so that we can safely delete the segment temporary directory.
+   */
+  private void removeBackup(File indexDir)
+      throws IOException {
+    File parentDir = indexDir.getParentFile();
+    File segmentBackupDir = new File(parentDir, indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
+    if (!segmentBackupDir.exists()) {
+      return;
+    }
+    File segmentTempDir = new File(parentDir, indexDir.getName() + CommonConstants.Segment.SEGMENT_TEMP_DIR_SUFFIX);
+    // Rename segment backup directory to segment temporary directory (atomic).
+    Preconditions.checkState(segmentBackupDir.renameTo(segmentTempDir),
+        "Failed to rename segment backup directory: %s to segment temporary directory: %s", segmentBackupDir,
+        segmentTempDir);
+    FileUtils.deleteDirectory(segmentTempDir);
+  }
+
+  private boolean tryLoadExistingSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
+      SegmentZKMetadata zkMetadata) {
+    // Try to recover the segment from potential segment reloading failure.
+    File indexDir = getSegmentDataDir(segmentName);
+    recoverReloadFailureQuietly(_tableNameWithType, segmentName, indexDir);
+
+    // Creates the SegmentDirectory object to access the segment metadata.
+    // The metadata is null if the segment doesn't exist yet.
+    SegmentDirectory segmentDirectory = tryGetSegmentDirectory(segmentName, indexLoadingConfig);
+    SegmentMetadataImpl segmentMetadata = (segmentDirectory == null) ? null : segmentDirectory.getSegmentMetadata();
+
+    // If the segment doesn't exist on server or its CRC has changed, then we
+    // need to fall back to download the segment from deep store to load it.
+    if (segmentMetadata == null) {
+      LOGGER.info("Segment: {} of table: {} does not exist", segmentName, _tableNameWithType);
+      return false;
+    }
+    if (!hasSameCRC(zkMetadata, segmentMetadata)) {
+      LOGGER.info("Segment: {} of table: {} has crc change from: {} to: {}", segmentName, _tableNameWithType,
+          segmentMetadata.getCrc(), zkMetadata.getCrc());
+      return false;
+    }
+
+    try {
+      // If the segment is still kept by the server, then we can
+      // either load it directly if it's still consistent with latest table config and schema;
+      // or reprocess it to reflect latest table config and schema before loading.
+      Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+      if (!ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, schema)) {
+        LOGGER.info("Segment: {} of table: {} is consistent with latest table config and schema", segmentName,
+            _tableNameWithType);
+      } else {
+        LOGGER.info("Segment: {} of table: {} needs reprocess to reflect latest table config and schema", segmentName,
+            _tableNameWithType);
+        segmentDirectory.copyTo(indexDir);
+        // Close the stale SegmentDirectory object and recreate it with reprocessed segment.
+        closeSegmentDirectoryQuietly(segmentDirectory);
+        ImmutableSegmentLoader.preprocess(indexDir, indexLoadingConfig, schema);
+        segmentDirectory = getSegmentDirectory(segmentName, indexLoadingConfig);
+      }
+      ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, schema);
+      addSegment(segment);
+      LOGGER.info("Loaded existing segment: {} of table: {} with crc: {}", segmentName, _tableNameWithType,
+          zkMetadata.getCrc());
+      return true;
+    } catch (Exception e) {
+      LOGGER.error("Failed to load existing segment: {} of table: {} with crc: {}", segmentName, _tableNameWithType, e);
+      closeSegmentDirectoryQuietly(segmentDirectory);
+      return false;
+    }
+  }
+
+  private SegmentDirectory tryGetSegmentDirectory(String segmentName, IndexLoadingConfig indexLoadingConfig) {
+    try {
+      return getSegmentDirectory(segmentName, indexLoadingConfig);
+    } catch (Exception e) {
+      LOGGER.warn("Attempt to get SegmentDirectory for segment: {} of table: {} failed with error: {}", segmentName,
+          _tableNameWithType, e.getMessage());
+      return null;
+    }
+  }
+
+  private SegmentDirectory getSegmentDirectory(String segmentName, IndexLoadingConfig indexLoadingConfig)
+      throws Exception {
+    SegmentDirectoryLoaderContext loaderContext =
+        new SegmentDirectoryLoaderContext(indexLoadingConfig.getTableConfig(), indexLoadingConfig.getInstanceId(),
+            segmentName, indexLoadingConfig.getSegmentDirectoryConfigs());
+    SegmentDirectoryLoader segmentDirectoryLoader =
+        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
+    File indexDir = getSegmentDataDir(segmentName);
+    return segmentDirectoryLoader.load(indexDir.toURI(), loaderContext);
+  }
+
   private static boolean hasSameCRC(SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata) {
     return zkMetadata.getCrc() == Long.parseLong(localMetadata.getCrc());
   }
@@ -542,7 +559,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
     try {
       LoaderUtils.reloadFailureRecovery(indexDir);
     } catch (Exception e) {
-      LOGGER.warn("Failed to recover segment: {} of table: {}", segmentName, tableNameWithType, e);
+      LOGGER.warn("Failed to recover segment: {} of table: {} due to error: {}", segmentName, tableNameWithType,
+          e.getMessage());
     }
   }
 
@@ -551,7 +569,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       try {
         segmentDirectory.close();
       } catch (Exception e) {
-        // ignore
+        LOGGER.warn("Failed to close SegmentDirectory due to error: {}", e.getMessage());
       }
     }
   }

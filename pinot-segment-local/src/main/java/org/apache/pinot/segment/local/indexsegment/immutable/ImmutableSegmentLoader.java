@@ -108,13 +108,20 @@ public class ImmutableSegmentLoader {
     if (needPreprocess) {
       preprocess(indexDir, indexLoadingConfig, schema);
     }
+    String segmentName = segmentMetadata.getName();
     SegmentDirectoryLoaderContext segmentLoaderContext =
         new SegmentDirectoryLoaderContext(indexLoadingConfig.getTableConfig(), indexLoadingConfig.getInstanceId(),
-            segmentMetadata.getName(), indexLoadingConfig.getSegmentDirectoryConfigs());
+            segmentName, indexLoadingConfig.getSegmentDirectoryConfigs());
     SegmentDirectoryLoader segmentLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
     SegmentDirectory segmentDirectory = segmentLoader.load(indexDir.toURI(), segmentLoaderContext);
-    return load(segmentDirectory, indexLoadingConfig, schema);
+    try {
+      return load(segmentDirectory, indexLoadingConfig, schema);
+    } catch (Exception e) {
+      LOGGER.error("Failed to load segment: {} with SegmentDirectory", segmentName, e);
+      segmentDirectory.close();
+      throw e;
+    }
   }
 
   /**

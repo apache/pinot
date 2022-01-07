@@ -39,18 +39,18 @@ public class RealtimeTableDataManagerTest {
     String partitionRange = "ALL";
     String sequenceNumber = "1234567";
     HLCSegmentName hlc = new HLCSegmentName(groupId, partitionRange, sequenceNumber);
-    assertFalse(mgr.allowDownloadRawSegment(hlc.getSegmentName(), null));
+    assertFalse(mgr.allowDownload(hlc.getSegmentName(), null));
 
     LLCSegmentName llc = new LLCSegmentName("tbl01", 0, 1000000, System.currentTimeMillis());
     SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
     when(zkmd.getStatus()).thenReturn(Status.IN_PROGRESS);
-    assertFalse(mgr.allowDownloadRawSegment(llc.getSegmentName(), zkmd));
+    assertFalse(mgr.allowDownload(llc.getSegmentName(), zkmd));
 
     when(zkmd.getStatus()).thenReturn(Status.DONE);
     when(zkmd.getDownloadUrl()).thenReturn("");
-    assertFalse(mgr.allowDownloadRawSegment(llc.getSegmentName(), zkmd));
+    assertFalse(mgr.allowDownload(llc.getSegmentName(), zkmd));
 
     when(zkmd.getDownloadUrl()).thenReturn("remote");
-    assertTrue(mgr.allowDownloadRawSegment(llc.getSegmentName(), zkmd));
+    assertTrue(mgr.allowDownload(llc.getSegmentName(), zkmd));
   }
 }

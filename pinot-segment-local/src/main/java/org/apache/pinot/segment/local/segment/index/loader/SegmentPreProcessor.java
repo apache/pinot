@@ -83,7 +83,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       return;
     }
 
-    // Segment processing has to be done with a local dir.
+    // Segment processing has to be done with a local directory.
     File indexDir = new File(_indexDirURI);
 
     // This fixes the issue of temporary files not getting deleted after creating new inverted indexes.

@@ -36,6 +36,7 @@ import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,6 +63,15 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   private final ReadMode _readMode;
 
   private ColumnIndexDirectory _columnIndexDirectory;
+
+  // Create an empty SegmentLocalFSDirectory object mainly used to
+  // prepare env for subsequent processing on the segment.
+  public SegmentLocalFSDirectory(File directory) {
+    _indexDir = directory;
+    _segmentDirectory = null;
+    _segmentLock = new SegmentLock();
+    _readMode = null;
+  }
 
   public SegmentLocalFSDirectory(File directory, ReadMode readMode)
       throws IOException {
@@ -92,6 +102,20 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   @Override
   public URI getIndexDir() {
     return _indexDir.toURI();
+  }
+
+  @Override
+  public void copyTo(File dest)
+      throws Exception {
+    File src = _indexDir;
+    if (!src.exists()) {
+      // If the original one doesn't exist, then try the backup directory.
+      File parentDir = _indexDir.getParentFile();
+      src = new File(parentDir, _indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
+    }
+    if (src.exists() && !src.equals(dest)) {
+      FileUtils.copyDirectory(src, dest);
+    }
   }
 
   @Override

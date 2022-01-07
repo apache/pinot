@@ -347,13 +347,13 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     try {
       segmentLock.lock();
 
-      // But if table mgr is not created or the segment is not loaded yet, the segmentMetadata
+      // But if table mgr is not created or the segment is not loaded yet, the localMetadata
       // is set to null. Then, addOrReplaceSegment method will load the segment accordingly.
-      SegmentMetadata segmentMetadata = getSegmentMetadata(tableNameWithType, segmentName);
+      SegmentMetadata localMetadata = getSegmentMetadata(tableNameWithType, segmentName);
 
       _tableDataManagerMap.computeIfAbsent(tableNameWithType, k -> createTableDataManager(k, tableConfig))
           .addOrReplaceSegment(segmentName, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig), zkMetadata,
-              segmentMetadata);
+              localMetadata);
       LOGGER.info("Added or replaced segment: {} of table: {}", segmentName, tableNameWithType);
     } finally {
       segmentLock.unlock();

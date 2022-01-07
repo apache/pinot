@@ -90,14 +90,14 @@ public interface TableDataManager {
    * @param segmentName the segment to reload
    * @param indexLoadingConfig the latest table config to load segment
    * @param zkMetadata the segment metadata from zookeeper
-   * @param segmentMetadata the segment metadata object held by server right now,
-   *                        which must not be null to reload the segment
+   * @param localMetadata the segment metadata object held by server right now,
+   *                      which must not be null to reload the segment
    * @param schema the latest table schema to load segment
    * @param forceDownload whether to force to download raw segment to reload
    * @throws Exception thrown upon failure when to reload the segment
    */
   void reloadSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata,
-      SegmentMetadata segmentMetadata, @Nullable Schema schema, boolean forceDownload)
+      SegmentMetadata localMetadata, @Nullable Schema schema, boolean forceDownload)
       throws Exception;
 
   /**
@@ -110,12 +110,12 @@ public interface TableDataManager {
    * @param segmentName the segment to add or replace
    * @param indexLoadingConfig the latest table config to load segment
    * @param zkMetadata the segment metadata from zookeeper
-   * @param segmentMetadata the segment metadata object held by server, which can be null when
-   *                        the server is restarted or the segment is newly added to the table
+   * @param localMetadata the segment metadata object held by server, which can be null when
+   *                      the server is restarted or the segment is newly added to the table
    * @throws Exception thrown upon failure when to add or replace the segment
    */
   void addOrReplaceSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata,
-      @Nullable SegmentMetadata segmentMetadata)
+      @Nullable SegmentMetadata localMetadata)
       throws Exception;
 
   /**

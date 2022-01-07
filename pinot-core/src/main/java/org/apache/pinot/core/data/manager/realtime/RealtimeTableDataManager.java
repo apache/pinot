@@ -410,7 +410,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   @Override
-  protected boolean allowDownloadRawSegment(String segmentName, SegmentZKMetadata zkMetadata) {
+  protected boolean allowDownload(String segmentName, SegmentZKMetadata zkMetadata) {
     // Only LLC immutable segment allows download.
     if (SegmentName.isHighLevelConsumerSegmentName(segmentName) || zkMetadata.getStatus() == Status.IN_PROGRESS) {
       return false;
