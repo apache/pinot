@@ -234,7 +234,7 @@ const getQueryResults = (params, url, checkedOptions) => {
     // if sql api throws error, handle here
     if(typeof queryResponse === 'string'){
       errorStr = queryResponse;
-    } else if(queryResponse.exceptions.length){
+    } else if (queryResponse && queryResponse.exceptions && queryResponse.exceptions.length) {
       errorStr = JSON.stringify(queryResponse.exceptions, null, 2);
     } else
     {
