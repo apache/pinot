@@ -144,9 +144,6 @@ public class FstUtils {
     if (thisArc.getNextState().getId() != thatArc.getNextState().getId()) {
         return false;
     }
-    if (thisArc.getOlabel() != thatArc.getOlabel()) {
-      return false;
-    }
 
     return true;
   }

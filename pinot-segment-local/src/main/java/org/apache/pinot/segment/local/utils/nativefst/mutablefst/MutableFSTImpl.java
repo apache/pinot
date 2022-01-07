@@ -65,7 +65,7 @@ public class MutableFSTImpl implements MutableFST {
         Arc sarc = source.getArc(j);
         MutableState nextTargetState = copy.getState(sarc.getNextState().getId());
         MutableArc
-            tarc = new MutableArc(sarc.getOlabel(), sarc.getOutputSymbol(), nextTargetState);
+            tarc = new MutableArc(sarc.getOutputSymbol(), nextTargetState);
         target.addArc(tarc);
       }
     }
@@ -244,14 +244,10 @@ public class MutableFSTImpl implements MutableFST {
     );
   }
 
-  public MutableArc addArc(MutableState startState, String outSymbol, MutableState endState) {
-    return addArc(startState, outputSymbols.getOrAdd(outSymbol), outSymbol, endState);
-  }
-
-  public MutableArc addArc(MutableState startState, int outSymbolId, String outputSymbol, MutableState endState) {
+  public MutableArc addArc(MutableState startState, String outputSymbol, MutableState endState) {
     checkArgument(this.states.get(startState.getId()) == startState, "cant pass state that doesnt exist in fst");
     checkArgument(this.states.get(endState.getId()) == endState, "cant pass end state that doesnt exist in fst");
-    MutableArc newArc = new MutableArc(outSymbolId, outputSymbol,
+    MutableArc newArc = new MutableArc(outputSymbol,
                                         endState);
     startState.addArc(newArc);
     endState.addIncomingState(startState);

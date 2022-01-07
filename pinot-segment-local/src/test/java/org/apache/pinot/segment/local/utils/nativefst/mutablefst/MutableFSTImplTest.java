@@ -45,53 +45,10 @@ public class MutableFSTImplTest {
     assertEquals("_A", fst.getStateSymbols().invert().keyForId(stateA.getId()));
     assertEquals(1, stateA.getArcCount());
     MutableArc arc = stateA.getArc(0);
-    assertEquals(fst.lookupOutputSymbol("B"), arc.getOlabel());
+
     assertEquals(fst.getState("_B").getId(), arc.getNextState().getId());
     assertTrue(arc.hashCode() != 0);
     assertTrue(StringUtils.isNotBlank(arc.toString()));
-  }
-
-  @Test
-  public void shouldCopyWithTranslatedSymbols() {
-    MutableFSTImpl fst = new MutableFSTImpl();
-    MutableState s0 = fst.newStartState("<start>");
-    MutableState s1 = fst.newState();
-    MutableState s2 = fst.newState();
-
-    fst.getOutputSymbols().getOrAdd("A");
-    fst.getOutputSymbols().getOrAdd("B");
-    fst.getOutputSymbols().getOrAdd("C");
-    fst.getOutputSymbols().getOrAdd("D");
-    fst.addArc(s0, "a", s1);
-    fst.addArc(s1, "b", s2);
-    fst.addArc(s0, "c", s2);
-    fst.addArc(s2, "d", s2);
-
-    MutableSymbolTable newIn = new MutableSymbolTable();
-    newIn.put("a", 101);
-    newIn.put("b", 102);
-    newIn.put("c", 103);
-    newIn.put("d", 104);
-    MutableSymbolTable newOut = new MutableSymbolTable();
-    newOut.put("A", 201);
-    newOut.put("B", 202);
-    newOut.put("C", 203);
-    newOut.put("D", 204);
-
-    MutableFSTImpl result = MutableFSTImpl.copyFrom(fst);
-
-    MutableState rs0 = result.getState(0);
-    MutableState rs1 = result.getState(1);
-    MutableState rs2 = result.getState(2);
-
-    assertEquals(201, rs0.getArc(0).getOlabel());
-
-    assertEquals(203, rs0.getArc(1).getOlabel());
-
-
-    assertEquals(202, rs1.getArc(0).getOlabel());
-
-    assertEquals(204, rs2.getArc(0).getOlabel());
   }
 
   private MutableFSTImpl createStateSymbolFst() {
@@ -179,7 +136,6 @@ public class MutableFSTImplTest {
     assertEquals(1, stateA.getArcCount());
     MutableArc arc = stateA.getArc(0);
 
-    assertEquals(fst.lookupOutputSymbol("b"), arc.getOlabel());
     assertEquals(fst.getState("_B").getId(), arc.getNextState().getId());
     assertTrue(arc.hashCode() != 0);
     assertTrue(StringUtils.isNotBlank(arc.toString()));
