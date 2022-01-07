@@ -33,6 +33,11 @@ public interface State {
   int getId();
 
   /**
+   * Is the state the last state for a path?
+   */
+  boolean isTerminal();
+
+  /**
    * The outgoing arc count in this state (including self-loops)
    * @return
    */

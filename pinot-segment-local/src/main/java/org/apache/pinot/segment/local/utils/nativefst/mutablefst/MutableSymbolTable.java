@@ -130,9 +130,9 @@ public class MutableSymbolTable extends AbstractSymbolTable implements Writeable
   @Override
   public int getOrAdd(String symbol) {
     int thisId = nextId;
-    if (symbolToId.putIfAbsent(symbol, thisId) != symbolToId.defaultReturnValue()) {
+    if (symbolToId.putIfAbsent(symbol, thisId) == symbolToId.defaultReturnValue()) {
       nextId += 1;
-      if (idToSymbol.putIfAbsent(thisId, symbol) == idToSymbol.defaultReturnValue()) {
+      if (idToSymbol.putIfAbsent(thisId, symbol) != idToSymbol.defaultReturnValue()) {
         throw new IllegalStateException("idToSymbol is inconsistent for " + symbol);
       }
       return thisId;

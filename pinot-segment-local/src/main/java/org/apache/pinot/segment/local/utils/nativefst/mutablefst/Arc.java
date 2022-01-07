@@ -27,6 +27,8 @@ public interface Arc {
    */
   int getOlabel();
 
+  String getOutputSymbol();
+
   /**
    * Get the reference to the next state in the FST; note that you get call `getNextState().getId()` to get the
    * FST state id for that state but some operations will be constructing new results and state ids will not be

@@ -26,8 +26,6 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils.FstUtils;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkState;
-
 
 /**
  * A mutable finite state transducer implementation that allows you to build WFSTs via the API.
@@ -56,7 +54,7 @@ public class MutableFSTImpl implements MutableFST {
     // build up states
     for (int i = 0; i < mutableFSTImpl.getStateCount(); i++) {
       State source = mutableFSTImpl.getState(i);
-      MutableState target = new MutableState(source.getArcCount());
+      MutableState target = new MutableState();
       copy.setState(i, target);
     }
     // build arcs now that we have target state refs
@@ -67,7 +65,7 @@ public class MutableFSTImpl implements MutableFST {
         Arc sarc = source.getArc(j);
         MutableState nextTargetState = copy.getState(sarc.getNextState().getId());
         MutableArc
-            tarc = new MutableArc(sarc.getOlabel(), nextTargetState);
+            tarc = new MutableArc(sarc.getOlabel(), sarc.getOutputSymbol(), nextTargetState);
         target.addArc(tarc);
       }
     }
@@ -83,16 +81,6 @@ public class MutableFSTImpl implements MutableFST {
 
   public MutableFSTImpl() {
     this(new MutableSymbolTable());
-  }
-
-  /**
-   * Constructor specifying the initial capacity of the states ArrayList (this is an optimization used in various
-   * operations)
-   *
-   * @param numStates the initial capacity
-   */
-  public MutableFSTImpl(int numStates) {
-    this(new ArrayList<MutableState>(numStates), new MutableSymbolTable());
   }
 
   /**
@@ -256,23 +244,14 @@ public class MutableFSTImpl implements MutableFST {
     );
   }
 
-  public MutableArc addArc(String startStateSymbol, int outSymbolId, String endStateSymbol) {
-    Preconditions.checkNotNull(stateSymbols, "cant use this without state symbols; call useStateSymbols()");
-    return addArc(
-        getOrNewState(startStateSymbol),
-        outSymbolId,
-        getOrNewState(endStateSymbol)
-    );
-  }
-
   public MutableArc addArc(MutableState startState, String outSymbol, MutableState endState) {
-    return addArc(startState, outputSymbols.getOrAdd(outSymbol), endState);
+    return addArc(startState, outputSymbols.getOrAdd(outSymbol), outSymbol, endState);
   }
 
-  public MutableArc addArc(MutableState startState, int outSymbolId, MutableState endState) {
+  public MutableArc addArc(MutableState startState, int outSymbolId, String outputSymbol, MutableState endState) {
     checkArgument(this.states.get(startState.getId()) == startState, "cant pass state that doesnt exist in fst");
     checkArgument(this.states.get(endState.getId()) == endState, "cant pass end state that doesnt exist in fst");
-    MutableArc newArc = new MutableArc(outSymbolId,
+    MutableArc newArc = new MutableArc(outSymbolId, outputSymbol,
                                         endState);
     startState.addArc(newArc);
     endState.addIncomingState(startState);

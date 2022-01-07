@@ -37,29 +37,20 @@ public class MutableState implements State {
   // State's Id
   protected int id = -1;
 
+  // Is terminal
+  protected boolean isTerminal;
+
   // Outgoing arcs
   private final ArrayList<MutableArc> arcs;
 
   // Incoming arcs (at least states with arcs that are incoming to us)
   private final Set<MutableState> incomingStates = Sets.newIdentityHashSet();
 
-  // initial number of arcs; this is only used during deserialization and should be ignored otherwise
-  protected int initialNumArcs = -1;
-
   /**
    * Default Constructor
    */
   public MutableState() {
     arcs = Lists.newArrayList();
-  }
-
-  /**
-   * Constructor specifying the initial capacity of the arc's ArrayList (this is an optimization used in various
-   * operations)
-   */
-  public MutableState(int initialNumArcs) {
-    this.initialNumArcs = initialNumArcs;
-    arcs = Lists.newArrayListWithCapacity(initialNumArcs);
   }
 
   /**
@@ -79,6 +70,15 @@ public class MutableState implements State {
 
   public void setId(int id) {
     this.id = id;
+  }
+
+  @Override
+  public boolean isTerminal() {
+    return isTerminal;
+  }
+
+  public void setIsTerminal(boolean isTerminal) {
+    this.isTerminal = isTerminal;
   }
 
   /**
