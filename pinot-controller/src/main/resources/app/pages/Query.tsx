@@ -474,23 +474,23 @@ const QueryPage = () => {
               <AppLoader />
             ) : (
               <>
+                {queryStats.columns.length ? (
+                    <Grid item xs style={{ backgroundColor: 'white' }}>
+                      <CustomizedTables
+                          title="Query Response Stats"
+                          data={queryStats}
+                          showSearchBox={true}
+                          inAccordionFormat={true}
+                      />
+                    </Grid>
+                ) : null}
+
                 {resultError ? (
                   <Alert severity="error" className={classes.sqlError}>
                     {resultError}
                   </Alert>
                 ) : (
                   <>
-                    {queryStats.columns.length ? (
-                      <Grid item xs style={{ backgroundColor: 'white' }}>
-                        <CustomizedTables
-                          title="Query Response Stats"
-                          data={queryStats}
-                          showSearchBox={true}
-                          inAccordionFormat={true}
-                        />
-                      </Grid>
-                    ) : null}
-
                     <Grid item xs style={{ backgroundColor: 'white' }}>
                       {resultData.columns.length ? (
                         <>
