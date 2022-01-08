@@ -228,57 +228,60 @@ const getQueryResults = (params, url, checkedOptions) => {
     let queryResponse = null;
     queryResponse = getAsObject(data);
 
-    // if sql api throws error, handle here
-    if(typeof queryResponse === 'string'){
-      return {error: queryResponse};
-    } else if(queryResponse.exceptions.length){
-      return {error: JSON.stringify(queryResponse.exceptions, null, 2)};
-    }
-
+    let errorStr = '';
     let dataArray = [];
     let columnList = [];
-    if (checkedOptions.querySyntaxPQL === true) {
-      if (queryResponse) {
-        if (queryResponse.selectionResults) {
-          // Selection query
-          columnList = queryResponse.selectionResults.columns;
-          dataArray = queryResponse.selectionResults.results;
-        } else if (!queryResponse.aggregationResults[0]?.groupByResult) {
-          // Simple aggregation query
-          columnList = _.map(
-            queryResponse.aggregationResults,
-            (aggregationResult) => {
-              return { title: aggregationResult.function };
-            }
-          );
+    // if sql api throws error, handle here
+    if(typeof queryResponse === 'string'){
+      errorStr = queryResponse;
+    } else if (queryResponse && queryResponse.exceptions && queryResponse.exceptions.length) {
+      errorStr = JSON.stringify(queryResponse.exceptions, null, 2);
+    } else
+    {
+      if (checkedOptions.querySyntaxPQL === true)
+      {
+        if (queryResponse)
+        {
+          if (queryResponse.selectionResults)
+          {
+            // Selection query
+            columnList = queryResponse.selectionResults.columns;
+            dataArray = queryResponse.selectionResults.results;
+          }
+          else if (!queryResponse.aggregationResults[0]?.groupByResult)
+          {
+            // Simple aggregation query
+            columnList = _.map(queryResponse.aggregationResults, (aggregationResult) => {
+              return {title: aggregationResult.function};
+            });
 
-          dataArray.push(
-            _.map(queryResponse.aggregationResults, (aggregationResult) => {
+            dataArray.push(_.map(queryResponse.aggregationResults, (aggregationResult) => {
               return aggregationResult.value;
-            })
-          );
-        } else if (queryResponse.aggregationResults[0]?.groupByResult) {
-          // Aggregation group by query
-          // TODO - Revisit
-          const columns = queryResponse.aggregationResults[0].groupByColumns;
-          columns.push(queryResponse.aggregationResults[0].function);
-          columnList = _.map(columns, (columnName) => {
-            return columnName;
-          });
+            }));
+          }
+          else if (queryResponse.aggregationResults[0]?.groupByResult)
+          {
+            // Aggregation group by query
+            // TODO - Revisit
+            const columns = queryResponse.aggregationResults[0].groupByColumns;
+            columns.push(queryResponse.aggregationResults[0].function);
+            columnList = _.map(columns, (columnName) => {
+              return columnName;
+            });
 
-          dataArray = _.map(
-            queryResponse.aggregationResults[0].groupByResult,
-            (aggregationGroup) => {
+            dataArray = _.map(queryResponse.aggregationResults[0].groupByResult, (aggregationGroup) => {
               const row = aggregationGroup.group;
               row.push(aggregationGroup.value);
               return row;
-            }
-          );
+            });
+          }
         }
       }
-    } else if (queryResponse.resultTable?.dataSchema?.columnNames?.length) {
-      columnList = queryResponse.resultTable.dataSchema.columnNames;
-      dataArray = queryResponse.resultTable.rows;
+      else if (queryResponse.resultTable?.dataSchema?.columnNames?.length)
+      {
+        columnList = queryResponse.resultTable.dataSchema.columnNames;
+        dataArray = queryResponse.resultTable.rows;
+      }
     }
 
     const columnStats = ['timeUsedMs',
@@ -306,6 +309,7 @@ const getQueryResults = (params, url, checkedOptions) => {
     ];
 
     return {
+      error: errorStr,
       result: {
         columns: columnList,
         records: dataArray,
