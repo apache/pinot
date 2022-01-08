@@ -123,6 +123,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final String NUM_ROWS_KEY = "numRows";
   private static final String COLUMN_LENGTH_MAP_KEY = "columnLengthMap";
   private static final String COLUMN_CARDINALITY_MAP_KEY = "columnCardinalityMap";
+  private static final String MAX_NUM_MULTI_VALUES_MAP_KEY = "maxNumMultiValuesMap";
   // TODO: This might lead to flaky test, as this disk size is not deterministic
   //       as it depends on the iteration order of a HashSet.
   private static final int DISK_SIZE_IN_BYTES = 20796000;
@@ -1832,21 +1833,63 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testAggregateMetadataAPI()
       throws IOException {
-    JsonNode oneColumnResponse = JsonUtils.stringToJsonNode(
-        sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=DestCityMarketID"));
-    assertEquals(oneColumnResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
-    assertEquals(oneColumnResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
-    assertEquals(oneColumnResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
-    assertEquals(oneColumnResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 1);
-    assertEquals(oneColumnResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 1);
+    JsonNode oneSVColumnResponse = JsonUtils
+        .stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=DestCityMarketID"));
+    assertEquals(oneSVColumnResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
+    assertEquals(oneSVColumnResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
+    assertEquals(oneSVColumnResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
+    assertEquals(oneSVColumnResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 1);
+    assertEquals(oneSVColumnResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 1);
+    // DestCityMarketID is a SV column
+    assertEquals(oneSVColumnResponse.get(MAX_NUM_MULTI_VALUES_MAP_KEY).size(), 0);
 
-    JsonNode threeColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl
+    JsonNode oneMVColumnResponse = JsonUtils
+        .stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=DivLongestGTimes"));
+    assertEquals(oneMVColumnResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
+    assertEquals(oneMVColumnResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
+    assertEquals(oneMVColumnResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
+    assertEquals(oneMVColumnResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 1);
+    assertEquals(oneMVColumnResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 1);
+    // DivLongestGTimes is a MV column
+    assertEquals(oneMVColumnResponse.get(MAX_NUM_MULTI_VALUES_MAP_KEY).size(), 1);
+
+    JsonNode threeSVColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl
         + "/tables/mytable/metadata?columns=DivActualElapsedTime&columns=CRSElapsedTime&columns=OriginStateName"));
-    assertEquals(threeColumnsResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
-    assertEquals(threeColumnsResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
-    assertEquals(threeColumnsResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
-    assertEquals(threeColumnsResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 3);
-    assertEquals(threeColumnsResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 3);
+    assertEquals(threeSVColumnsResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
+    assertEquals(threeSVColumnsResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
+    assertEquals(threeSVColumnsResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
+    assertEquals(threeSVColumnsResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 3);
+    assertEquals(threeSVColumnsResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 3);
+    assertEquals(threeSVColumnsResponse.get(MAX_NUM_MULTI_VALUES_MAP_KEY).size(), 0);
+
+    JsonNode threeSVColumnsWholeEncodedResponse = JsonUtils.stringToJsonNode(sendGetRequest(
+        _controllerBaseApiUrl + "/tables/mytable/metadata?columns="
+            + "DivActualElapsedTime%26columns%3DCRSElapsedTime%26columns%3DOriginStateName"));
+    assertEquals(threeSVColumnsWholeEncodedResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
+    assertEquals(threeSVColumnsWholeEncodedResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
+    assertEquals(threeSVColumnsWholeEncodedResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
+    assertEquals(threeSVColumnsWholeEncodedResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 3);
+    assertEquals(threeSVColumnsWholeEncodedResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 3);
+    assertEquals(threeSVColumnsWholeEncodedResponse.get(MAX_NUM_MULTI_VALUES_MAP_KEY).size(), 0);
+
+    JsonNode threeMVColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl
+        + "/tables/mytable/metadata?columns=DivLongestGTimes&columns=DivWheelsOns&columns=DivAirports"));
+    assertEquals(threeMVColumnsResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
+    assertEquals(threeMVColumnsResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
+    assertEquals(threeMVColumnsResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
+    assertEquals(threeMVColumnsResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 3);
+    assertEquals(threeMVColumnsResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 3);
+    assertEquals(threeMVColumnsResponse.get(MAX_NUM_MULTI_VALUES_MAP_KEY).size(), 3);
+
+    JsonNode threeMVColumnsWholeEncodedResponse = JsonUtils.stringToJsonNode(sendGetRequest(
+        _controllerBaseApiUrl + "/tables/mytable/metadata?columns="
+            + "DivLongestGTimes%26columns%3DDivWheelsOns%26columns%3DDivAirports"));
+    assertEquals(threeMVColumnsWholeEncodedResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
+    assertEquals(threeMVColumnsWholeEncodedResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
+    assertEquals(threeMVColumnsWholeEncodedResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
+    assertEquals(threeMVColumnsWholeEncodedResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 3);
+    assertEquals(threeMVColumnsWholeEncodedResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 3);
+    assertEquals(threeMVColumnsWholeEncodedResponse.get(MAX_NUM_MULTI_VALUES_MAP_KEY).size(), 3);
 
     JsonNode zeroColumnResponse =
         JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata"));
@@ -1855,21 +1898,39 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(zeroColumnResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
     assertEquals(zeroColumnResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 0);
     assertEquals(zeroColumnResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 0);
+    assertEquals(zeroColumnResponse.get(MAX_NUM_MULTI_VALUES_MAP_KEY).size(), 0);
 
-    JsonNode allColumnResponse =
+    JsonNode starColumnResponse =
         JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=*"));
-    assertEquals(allColumnResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
-    assertEquals(allColumnResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
-    assertEquals(allColumnResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
-    assertEquals(allColumnResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 82);
-    assertEquals(allColumnResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 82);
+    validateAllColumnsResponse(starColumnResponse);
 
-    allColumnResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        _controllerBaseApiUrl + "/tables/mytable/metadata?columns=CRSElapsedTime&columns=*&columns=OriginStateName"));
-    assertEquals(allColumnResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
-    assertEquals(allColumnResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
-    assertEquals(allColumnResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
-    assertEquals(allColumnResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 82);
-    assertEquals(allColumnResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 82);
+    JsonNode starEncodedColumnResponse =
+        JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=%2A"));
+    validateAllColumnsResponse(starEncodedColumnResponse);
+
+    JsonNode starWithExtraColumnResponse = JsonUtils.stringToJsonNode(sendGetRequest(
+        _controllerBaseApiUrl + "/tables/mytable/metadata?columns="
+            + "CRSElapsedTime&columns=*&columns=OriginStateName"));
+    validateAllColumnsResponse(starWithExtraColumnResponse);
+
+    JsonNode starWithExtraEncodedColumnResponse = JsonUtils.stringToJsonNode(sendGetRequest(
+        _controllerBaseApiUrl + "/tables/mytable/metadata?columns="
+            + "CRSElapsedTime&columns=%2A&columns=OriginStateName"));
+    validateAllColumnsResponse(starWithExtraEncodedColumnResponse);
+
+    JsonNode starWithExtraColumnWholeEncodedResponse = JsonUtils.stringToJsonNode(sendGetRequest(
+        _controllerBaseApiUrl + "/tables/mytable/metadata?columns="
+            + "CRSElapsedTime%26columns%3D%2A%26columns%3DOriginStateName"));
+    validateAllColumnsResponse(starWithExtraColumnWholeEncodedResponse);
+  }
+
+  private void validateAllColumnsResponse(JsonNode response) {
+    assertEquals(response.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
+    assertEquals(response.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
+    assertEquals(response.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
+    // mytable has 82 columns, among them 9 of the columns are MV columns.
+    assertEquals(response.get(COLUMN_LENGTH_MAP_KEY).size(), 82);
+    assertEquals(response.get(COLUMN_CARDINALITY_MAP_KEY).size(), 82);
+    assertEquals(response.get(MAX_NUM_MULTI_VALUES_MAP_KEY).size(), 9);
   }
 }
