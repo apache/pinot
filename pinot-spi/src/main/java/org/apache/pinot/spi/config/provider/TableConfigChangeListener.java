@@ -3,6 +3,7 @@ package org.apache.pinot.spi.config.provider;
 import java.util.List;
 import org.apache.pinot.spi.config.table.TableConfig;
 
+
 /**
  * Interface for a listener on table config changes
  */

@@ -159,8 +159,7 @@ public class TableCache implements PinotConfigProvider {
   }
 
   @Override
-  public void registerTableConfigChangeListener(
-      TableConfigChangeListener tableConfigChangeListener) {
+  public void registerTableConfigChangeListener(TableConfigChangeListener tableConfigChangeListener) {
     _tableConfigChangeListeners.add(tableConfigChangeListener);
   }
 

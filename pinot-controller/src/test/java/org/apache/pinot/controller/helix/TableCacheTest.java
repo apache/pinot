@@ -172,7 +172,8 @@ public class TableCacheTest {
   }
 
   @Test
-  public void testChangeListeners() throws Exception {
+  public void testChangeListeners()
+      throws Exception {
     PinotConfigProvider configProvider = new TableCache(ControllerTestUtils.getPropertyStore(), true);
     TestSchemaChangeListener schemaChangeListener = new TestSchemaChangeListener();
     configProvider.registerSchemaChangeListener(schemaChangeListener);
