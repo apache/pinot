@@ -16,15 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils.helix;
+package org.apache.pinot.common.config.provider;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.I0Itec.zkclient.IZkChildListener;
 import org.I0Itec.zkclient.IZkDataListener;
@@ -34,6 +38,9 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.spi.config.provider.PinotConfigProvider;
+import org.apache.pinot.spi.config.provider.SchemaChangeListener;
+import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -45,10 +52,11 @@ import org.slf4j.LoggerFactory;
 
 
 /**
+ * An implementation of {@link PinotConfigProvider}
  * The {@code TableCache} caches all the table configs and schemas within the cluster, and listens on ZK changes to keep
  * them in sync. It also maintains the table name map and the column name map for case-insensitive queries.
  */
-public class TableCache {
+public class TableCache implements PinotConfigProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableCache.class);
   private static final String TABLE_CONFIG_PARENT_PATH = "/CONFIGS/TABLE";
   private static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
@@ -57,10 +65,13 @@ public class TableCache {
   private static final String LOWER_CASE_OFFLINE_TABLE_SUFFIX = "_offline";
   private static final String LOWER_CASE_REALTIME_TABLE_SUFFIX = "_realtime";
 
+  private final Set<TableConfigChangeListener> _tableConfigChangeListeners = new HashSet<>();
+  private final Set<SchemaChangeListener> _schemaChangeListeners = new HashSet<>();
+
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final boolean _caseInsensitive;
 
-  private final TableConfigChangeListener _tableConfigChangeListener = new TableConfigChangeListener();
+  private final ZkTableConfigChangeListener _zkTableConfigChangeListener = new ZkTableConfigChangeListener();
   // Key is table name with type suffix, value is table config
   private final Map<String, TableConfig> _tableConfigMap = new ConcurrentHashMap<>();
   // Key is table name (with or without type suffix), value is schema name
@@ -70,7 +81,7 @@ public class TableCache {
   // For case-insensitive mode only
   private final Map<String, String> _tableNameMap;
 
-  private final SchemaChangeListener _schemaChangeListener = new SchemaChangeListener();
+  private final ZkSchemaChangeListener _zkSchemaChangeListener = new ZkSchemaChangeListener();
   // Key is schema name, value is schema info
   private final Map<String, SchemaInfo> _schemaInfoMap = new ConcurrentHashMap<>();
 
@@ -79,9 +90,9 @@ public class TableCache {
     _caseInsensitive = caseInsensitive;
     _tableNameMap = caseInsensitive ? new ConcurrentHashMap<>() : null;
 
-    synchronized (_tableConfigChangeListener) {
+    synchronized (_zkTableConfigChangeListener) {
       // Subscribe child changes before reading the data to avoid missing changes
-      _propertyStore.subscribeChildChanges(TABLE_CONFIG_PARENT_PATH, _tableConfigChangeListener);
+      _propertyStore.subscribeChildChanges(TABLE_CONFIG_PARENT_PATH, _zkTableConfigChangeListener);
 
       List<String> tables = _propertyStore.getChildNames(TABLE_CONFIG_PARENT_PATH, AccessOption.PERSISTENT);
       if (CollectionUtils.isNotEmpty(tables)) {
@@ -93,9 +104,9 @@ public class TableCache {
       }
     }
 
-    synchronized (_schemaChangeListener) {
+    synchronized (_zkSchemaChangeListener) {
       // Subscribe child changes before reading the data to avoid missing changes
-      _propertyStore.subscribeChildChanges(SCHEMA_PARENT_PATH, _schemaChangeListener);
+      _propertyStore.subscribeChildChanges(SCHEMA_PARENT_PATH, _zkSchemaChangeListener);
 
       List<String> tables = _propertyStore.getChildNames(SCHEMA_PARENT_PATH, AccessOption.PERSISTENT);
       if (CollectionUtils.isNotEmpty(tables)) {
@@ -142,24 +153,37 @@ public class TableCache {
    * Returns the table config for the given table, or {@code null} if it does not exist.
    */
   @Nullable
+  @Override
   public TableConfig getTableConfig(String tableNameWithType) {
     return _tableConfigMap.get(tableNameWithType);
+  }
+
+  @Override
+  public void registerTableConfigChangeListener(
+      TableConfigChangeListener tableConfigChangeListener) {
+    _tableConfigChangeListeners.add(tableConfigChangeListener);
   }
 
   /**
    * Returns the schema for the given table, or {@code null} if it does not exist.
    */
   @Nullable
+  @Override
   public Schema getSchema(String rawTableName) {
     String schemaName = _schemaNameMap.getOrDefault(rawTableName, rawTableName);
     SchemaInfo schemaInfo = _schemaInfoMap.get(schemaName);
     return schemaInfo != null ? schemaInfo._schema : null;
   }
 
+  @Override
+  public void registerSchemaChangeListener(SchemaChangeListener schemaChangeListener) {
+    _schemaChangeListeners.add(schemaChangeListener);
+  }
+
   private void addTableConfigs(List<String> paths) {
     // Subscribe data changes before reading the data to avoid missing changes
     for (String path : paths) {
-      _propertyStore.subscribeDataChanges(path, _tableConfigChangeListener);
+      _propertyStore.subscribeDataChanges(path, _zkTableConfigChangeListener);
     }
     List<ZNRecord> znRecords = _propertyStore.get(paths, null, AccessOption.PERSISTENT);
     for (ZNRecord znRecord : znRecords) {
@@ -195,7 +219,7 @@ public class TableCache {
   }
 
   private void removeTableConfig(String path) {
-    _propertyStore.unsubscribeDataChanges(path, _tableConfigChangeListener);
+    _propertyStore.unsubscribeDataChanges(path, _zkTableConfigChangeListener);
     String tableNameWithType = path.substring(TABLE_CONFIG_PATH_PREFIX.length());
     _tableConfigMap.remove(tableNameWithType);
     removeSchemaName(tableNameWithType);
@@ -232,7 +256,7 @@ public class TableCache {
   private void addSchemas(List<String> paths) {
     // Subscribe data changes before reading the data to avoid missing changes
     for (String path : paths) {
-      _propertyStore.subscribeDataChanges(path, _schemaChangeListener);
+      _propertyStore.subscribeDataChanges(path, _zkSchemaChangeListener);
     }
     List<ZNRecord> znRecords = _propertyStore.get(paths, null, AccessOption.PERSISTENT);
     for (ZNRecord znRecord : znRecords) {
@@ -281,12 +305,24 @@ public class TableCache {
   }
 
   private void removeSchema(String path) {
-    _propertyStore.unsubscribeDataChanges(path, _schemaChangeListener);
+    _propertyStore.unsubscribeDataChanges(path, _zkSchemaChangeListener);
     String schemaName = path.substring(SCHEMA_PATH_PREFIX.length());
     _schemaInfoMap.remove(schemaName);
   }
 
-  private class TableConfigChangeListener implements IZkChildListener, IZkDataListener {
+  private void notifyTableConfigChangeListeners() {
+    for (TableConfigChangeListener tableConfigChangeListener : _tableConfigChangeListeners) {
+      tableConfigChangeListener.onChange(Lists.newArrayList(_tableConfigMap.values()));
+    }
+  }
+
+  private void notifySchemaChangeListeners() {
+    for (SchemaChangeListener schemaChangeListener : _schemaChangeListeners) {
+      schemaChangeListener.onChange(_schemaInfoMap.values().stream().map(s -> s._schema).collect(Collectors.toList()));
+    }
+  }
+
+  private class ZkTableConfigChangeListener implements IZkChildListener, IZkDataListener {
 
     @Override
     public synchronized void handleChildChange(String path, List<String> tableNamesWithType) {
@@ -304,6 +340,7 @@ public class TableCache {
       if (!pathsToAdd.isEmpty()) {
         addTableConfigs(pathsToAdd);
       }
+      notifyTableConfigChangeListeners();
     }
 
     @Override
@@ -315,6 +352,7 @@ public class TableCache {
         } catch (Exception e) {
           LOGGER.error("Caught exception while refreshing table config for ZNRecord: {}", znRecord.getId(), e);
         }
+        notifyTableConfigChangeListeners();
       }
     }
 
@@ -323,10 +361,11 @@ public class TableCache {
       // NOTE: The path here is the absolute ZK path instead of the relative path to the property store.
       String tableNameWithType = path.substring(path.lastIndexOf('/') + 1);
       removeTableConfig(TABLE_CONFIG_PATH_PREFIX + tableNameWithType);
+      notifyTableConfigChangeListeners();
     }
   }
 
-  private class SchemaChangeListener implements IZkChildListener, IZkDataListener {
+  private class ZkSchemaChangeListener implements IZkChildListener, IZkDataListener {
 
     @Override
     public synchronized void handleChildChange(String path, List<String> schemaNames) {
@@ -344,6 +383,7 @@ public class TableCache {
       if (!pathsToAdd.isEmpty()) {
         addSchemas(pathsToAdd);
       }
+      notifySchemaChangeListeners();
     }
 
     @Override
@@ -355,6 +395,7 @@ public class TableCache {
         } catch (Exception e) {
           LOGGER.error("Caught exception while refreshing schema for ZNRecord: {}", znRecord.getId(), e);
         }
+        notifySchemaChangeListeners();
       }
     }
 
@@ -363,6 +404,7 @@ public class TableCache {
       // NOTE: The path here is the absolute ZK path instead of the relative path to the property store.
       String schemaName = path.substring(path.lastIndexOf('/') + 1);
       removeSchema(SCHEMA_PATH_PREFIX + schemaName);
+      notifySchemaChangeListeners();
     }
   }
 

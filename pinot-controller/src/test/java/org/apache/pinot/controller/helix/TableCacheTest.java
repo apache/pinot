@@ -20,9 +20,13 @@ package org.apache.pinot.controller.helix;
 
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.utils.helix.TableCache;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.controller.ControllerTestUtils;
+import org.apache.pinot.spi.config.provider.PinotConfigProvider;
+import org.apache.pinot.spi.config.provider.SchemaChangeListener;
+import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -32,6 +36,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -164,6 +169,59 @@ public class TableCacheTest {
     assertNull(tableCache.getColumnNameMap(SCHEMA_NAME));
     assertNull(tableCache.getSchema(RAW_TABLE_NAME));
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
+  }
+
+  @Test
+  public void testChangeListeners() throws Exception {
+    PinotConfigProvider configProvider = new TableCache(ControllerTestUtils.getPropertyStore(), true);
+    TestSchemaChangeListener schemaChangeListener = new TestSchemaChangeListener();
+    configProvider.registerSchemaChangeListener(schemaChangeListener);
+    TestTableConfigChangeListener tableConfigChangeListener = new TestTableConfigChangeListener();
+    configProvider.registerTableConfigChangeListener(tableConfigChangeListener);
+
+    Assert.assertNull(schemaChangeListener._schemaList);
+    Assert.assertNull(tableConfigChangeListener._tableConfigList);
+
+    // Add a schema
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(SCHEMA_NAME).addSingleValueDimension("testColumn", DataType.INT)
+            .build();
+    ControllerTestUtils.getHelixResourceManager().addSchema(schema, false);
+    // Wait for at most 10 seconds for the callback to add the schema to the cache
+    TestUtils.waitForCondition(aVoid -> configProvider.getSchema(SCHEMA_NAME) != null, 10_000L,
+        "Failed to add the schema to the cache");
+    Assert.assertNotNull(schemaChangeListener._schemaList);
+    Assert.assertEquals(schemaChangeListener._schemaList.size(), 1);
+    Assert.assertEquals(schemaChangeListener._schemaList.get(0).getSchemaName(), SCHEMA_NAME);
+
+    // Add a table config
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setSchemaName(SCHEMA_NAME).build();
+    ControllerTestUtils.getHelixResourceManager().addTable(tableConfig);
+    // Wait for at most 10 seconds for the callback to add the table config to the cache
+    TestUtils.waitForCondition(aVoid -> configProvider.getTableConfig(OFFLINE_TABLE_NAME) != null, 10_000L,
+        "Failed to add the table config to the cache");
+    Assert.assertNotNull(tableConfigChangeListener._tableConfigList);
+    Assert.assertEquals(tableConfigChangeListener._tableConfigList.size(), 1);
+    Assert.assertEquals(tableConfigChangeListener._tableConfigList.get(0).getTableName(), OFFLINE_TABLE_NAME);
+  }
+
+  private static class TestTableConfigChangeListener implements TableConfigChangeListener {
+    private List<TableConfig> _tableConfigList;
+
+    @Override
+    public void onChange(List<TableConfig> tableConfigList) {
+      _tableConfigList = tableConfigList;
+    }
+  }
+
+  private static class TestSchemaChangeListener implements SchemaChangeListener {
+    private List<Schema> _schemaList;
+
+    @Override
+    public void onChange(List<Schema> schemaList) {
+      _schemaList = schemaList;
+    }
   }
 
   @AfterClass
