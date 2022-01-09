@@ -124,6 +124,10 @@ public class TarGzCompressionUtils {
   public static List<File> untar(InputStream inputStream, File outputDir)
       throws IOException {
     String outputDirCanonicalPath = outputDir.getCanonicalPath();
+    // Prevent partial path traversal
+    if (!outputDirCanonicalPath.endsWith(File.separator)) {
+      outputDirCanonicalPath += File.separator;
+    }
     List<File> untarredFiles = new ArrayList<>();
     try (InputStream bufferedIn = new BufferedInputStream(inputStream);
         InputStream gzipIn = new GzipCompressorInputStream(bufferedIn);
@@ -146,7 +150,13 @@ public class TarGzCompressionUtils {
           }
         } else {
           File parentFile = outputFile.getParentFile();
-          if (!parentFile.getCanonicalPath().startsWith(outputDirCanonicalPath)) {
+          String parentFileCanonicalPath = parentFile.getCanonicalPath();
+
+          // Ensure parentFile's canonical path is separator terminated, since outputDirCanonicalPath is.
+          if (!parentFileCanonicalPath.endsWith(File.separator)) {
+            parentFileCanonicalPath += File.separator;
+          }
+          if (!parentFileCanonicalPath.startsWith(outputDirCanonicalPath)) {
             throw new IOException(String
                 .format("Trying to create directory: %s outside of the output directory: %s", parentFile, outputDir));
           }
