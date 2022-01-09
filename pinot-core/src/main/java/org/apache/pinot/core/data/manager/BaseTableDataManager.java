@@ -493,13 +493,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
     // If the segment doesn't exist on server or its CRC has changed, then we
     // need to fall back to download the segment from deep store to load it.
-    if (segmentMetadata == null) {
-      LOGGER.info("Segment: {} of table: {} does not exist", segmentName, _tableNameWithType);
-      return false;
-    }
-    if (!hasSameCRC(zkMetadata, segmentMetadata)) {
-      LOGGER.info("Segment: {} of table: {} has crc change from: {} to: {}", segmentName, _tableNameWithType,
-          segmentMetadata.getCrc(), zkMetadata.getCrc());
+    if (segmentMetadata == null || !hasSameCRC(zkMetadata, segmentMetadata)) {
+      if (segmentMetadata == null) {
+        LOGGER.info("Segment: {} of table: {} does not exist", segmentName, _tableNameWithType);
+      } else if (!hasSameCRC(zkMetadata, segmentMetadata)) {
+        LOGGER.info("Segment: {} of table: {} has crc change from: {} to: {}", segmentName, _tableNameWithType,
+            segmentMetadata.getCrc(), zkMetadata.getCrc());
+      }
+      closeSegmentDirectoryQuietly(segmentDirectory);
       return false;
     }
 
