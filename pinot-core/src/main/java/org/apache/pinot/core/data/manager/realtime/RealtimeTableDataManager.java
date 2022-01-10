@@ -288,7 +288,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     boolean isLLCSegment = SegmentName.isLowLevelConsumerSegmentName(segmentName);
     if (segmentDir.exists()) {
       // Segment already exists on disk
-      if (segmentZKMetadata.getStatus() == Status.DONE) {
+      if (segmentZKMetadata.getStatus() == Status.DONE || segmentZKMetadata.getStatus() == Status.UPLOADED) {
         // Metadata has been committed, load the local segment
         try {
           addSegment(ImmutableSegmentLoader.load(segmentDir, indexLoadingConfig, schema));

@@ -26,8 +26,6 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
-import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.CrcUtils;
@@ -36,12 +34,15 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.creator.ForwardIndexCreatorProvider;
+import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -82,13 +83,14 @@ public class RawIndexConverter {
   private final File _convertedIndexDir;
   private final PropertiesConfiguration _convertedProperties;
   private final String _columnsToConvert;
+  private final ForwardIndexCreatorProvider _indexCreatorProvider;
 
   /**
    * NOTE: original segment should be in V1 format.
    * TODO: support V3 format
    */
   public RawIndexConverter(String rawTableName, File originalIndexDir, File convertedIndexDir,
-      @Nullable String columnsToConvert)
+      @Nullable String columnsToConvert, ForwardIndexCreatorProvider indexCreatorProvider)
       throws Exception {
     FileUtils.copyDirectory(originalIndexDir, convertedIndexDir);
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
@@ -101,6 +103,7 @@ public class RawIndexConverter {
     _convertedProperties =
         new PropertiesConfiguration(new File(_convertedIndexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
     _columnsToConvert = columnsToConvert;
+    _indexCreatorProvider = indexCreatorProvider;
   }
 
   public boolean convert()
@@ -205,11 +208,11 @@ public class RawIndexConverter {
     assert dictionary != null;
     DataType storedType = dictionary.getValueType();
     int numDocs = _originalSegmentMetadata.getTotalDocs();
-    int lengthOfLongestEntry = _originalSegmentMetadata.getColumnMetadataFor(columnName).getColumnMaxLength();
-    try (ForwardIndexCreator rawIndexCreator = SegmentColumnarIndexCreator
-        .getRawIndexCreatorForSVColumn(_convertedIndexDir, ChunkCompressionType.LZ4, columnName,
-            storedType, numDocs, lengthOfLongestEntry, false,
-            BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
+    ColumnMetadata columnMetadata = _originalSegmentMetadata.getColumnMetadataFor(columnName);
+    try (ForwardIndexCreator rawIndexCreator = _indexCreatorProvider.newForwardIndexCreator(
+        IndexCreationContext.builder().withIndexDir(_convertedIndexDir).withColumnMetadata(columnMetadata)
+            .withFieldSpec(new DimensionFieldSpec(columnName, storedType, columnMetadata.isSingleValue()))
+            .withDictionary(false).build().forForwardIndex(ChunkCompressionType.LZ4, null));
         ForwardIndexReaderContext readerContext = reader.createContext()) {
       switch (storedType) {
         case INT:

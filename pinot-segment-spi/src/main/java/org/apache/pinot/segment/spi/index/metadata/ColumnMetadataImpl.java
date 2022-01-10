@@ -289,6 +289,10 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     return builder.build();
   }
 
+  public static Builder builder() {
+    return new Builder();
+  }
+
   public static class Builder {
     private FieldSpec _fieldSpec;
     private int _totalDocs;

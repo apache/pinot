@@ -857,7 +857,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected void start() {
+    protected void startConsumerThread() {
       // Do nothing.
     }
 

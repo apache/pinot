@@ -222,7 +222,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
     assertEquals(timeBoundaryInfo.getTimeValue(), Integer.toString(currentEndTime - 1));
 
     // Refresh a segment with a new end time
-    String segmentToRefresh = _helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME).get(0);
+    String segmentToRefresh = _helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, true).get(0);
     int newEndTime = currentEndTime + 10;
     SegmentZKMetadata segmentZKMetadata =
         _helixResourceManager.getSegmentZKMetadata(OFFLINE_TABLE_NAME, segmentToRefresh);

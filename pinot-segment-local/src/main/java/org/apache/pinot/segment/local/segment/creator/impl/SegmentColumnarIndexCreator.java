@@ -33,30 +33,16 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
-import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedByteRawIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueVarByteRawIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial.OffHeapH3IndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial.OnHeapH3IndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OffHeapJsonIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OnHeapJsonIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.inv.text.LuceneFSTIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
-import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexCreator;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
+import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
 import org.apache.pinot.segment.spi.creator.SegmentCreator;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.IndexingOverrides;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.GeoSpatialIndexCreator;
@@ -64,9 +50,7 @@ import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
-import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
-import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -99,6 +83,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   private SegmentGeneratorConfig _config;
   private Map<String, ColumnIndexCreationInfo> _indexCreationInfoMap;
+  private final IndexCreatorProvider _indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
   private final Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
   private final Map<String, ForwardIndexCreator> _forwardIndexCreatorMap = new HashMap<>();
   private final Map<String, DictionaryBasedInvertedIndexCreator> _invertedIndexCreatorMap = new HashMap<>();
@@ -179,126 +164,70 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
 
       String columnName = fieldSpec.getName();
-      DataType storedType = fieldSpec.getDataType().getStoredType();
-      ColumnIndexCreationInfo indexCreationInfo = indexCreationInfoMap.get(columnName);
-      Preconditions.checkNotNull(indexCreationInfo, "Missing index creation info for column: %s", columnName);
-      boolean dictEnabledColumn = createDictionaryForColumn(indexCreationInfo, segmentCreationSpec, fieldSpec);
+      ColumnIndexCreationInfo columnIndexCreationInfo = indexCreationInfoMap.get(columnName);
+      Preconditions.checkNotNull(columnIndexCreationInfo, "Missing index creation info for column: %s", columnName);
+      boolean dictEnabledColumn = createDictionaryForColumn(columnIndexCreationInfo, segmentCreationSpec, fieldSpec);
+      Preconditions.checkState(dictEnabledColumn || !invertedIndexColumns.contains(columnName),
+          "Cannot create inverted index for raw index column: %s", columnName);
 
+      IndexCreationContext.Common context = IndexCreationContext.builder()
+          .withIndexDir(_indexDir)
+          .withCardinality(columnIndexCreationInfo.getDistinctValueCount())
+          .withDictionary(dictEnabledColumn)
+          .withFieldSpec(fieldSpec)
+          .withTotalDocs(segmentIndexCreationInfo.getTotalDocs())
+          .withTotalNumberOfEntries(columnIndexCreationInfo.getTotalNumberOfEntries())
+          .withColumnIndexCreationInfo(columnIndexCreationInfo)
+          .sorted(columnIndexCreationInfo.isSorted())
+          .onHeap(segmentCreationSpec.isOnHeap())
+          .build();
+      // Initialize forward index creator
+      ChunkCompressionType chunkCompressionType =
+          dictEnabledColumn ? null : getColumnCompressionType(segmentCreationSpec, fieldSpec);
+      _forwardIndexCreatorMap.put(columnName, _indexCreatorProvider.newForwardIndexCreator(
+          context.forForwardIndex(chunkCompressionType, segmentCreationSpec.getColumnProperties())));
+
+      // Initialize inverted index creator; skip creating inverted index if sorted
+      if (invertedIndexColumns.contains(columnName) && !columnIndexCreationInfo.isSorted()) {
+        _invertedIndexCreatorMap.put(columnName,
+            _indexCreatorProvider.newInvertedIndexCreator(context.forInvertedIndex()));
+      }
       if (dictEnabledColumn) {
         // Create dictionary-encoded index
-
         // Initialize dictionary creator
         SegmentDictionaryCreator dictionaryCreator =
-            new SegmentDictionaryCreator(indexCreationInfo.getSortedUniqueElementsArray(), fieldSpec, _indexDir,
-                indexCreationInfo.isUseVarLengthDictionary());
+            new SegmentDictionaryCreator(columnIndexCreationInfo.getSortedUniqueElementsArray(), fieldSpec, _indexDir,
+                columnIndexCreationInfo.isUseVarLengthDictionary());
         _dictionaryCreatorMap.put(columnName, dictionaryCreator);
-
         // Create dictionary
         try {
           dictionaryCreator.build();
         } catch (Exception e) {
           LOGGER.error("Error building dictionary for field: {}, cardinality: {}, number of bytes per entry: {}",
-              fieldSpec.getName(), indexCreationInfo.getDistinctValueCount(), dictionaryCreator.getNumBytesPerEntry());
+              fieldSpec.getName(), columnIndexCreationInfo.getDistinctValueCount(),
+              dictionaryCreator.getNumBytesPerEntry());
           throw e;
-        }
-
-        // Initialize forward index creator
-        int cardinality = indexCreationInfo.getDistinctValueCount();
-        if (fieldSpec.isSingleValueField()) {
-          if (indexCreationInfo.isSorted()) {
-            _forwardIndexCreatorMap.put(columnName,
-                new SingleValueSortedForwardIndexCreator(_indexDir, columnName, cardinality));
-          } else {
-            _forwardIndexCreatorMap.put(columnName,
-                new SingleValueUnsortedForwardIndexCreator(_indexDir, columnName, cardinality, _totalDocs));
-          }
-        } else {
-          _forwardIndexCreatorMap.put(columnName,
-              new MultiValueUnsortedForwardIndexCreator(_indexDir, columnName, cardinality, _totalDocs,
-                  indexCreationInfo.getTotalNumberOfEntries()));
-        }
-
-        // Initialize inverted index creator; skip creating inverted index if sorted
-        if (invertedIndexColumns.contains(columnName) && !indexCreationInfo.isSorted()) {
-          if (segmentCreationSpec.isOnHeap()) {
-            _invertedIndexCreatorMap.put(columnName,
-                new OnHeapBitmapInvertedIndexCreator(_indexDir, columnName, cardinality));
-          } else {
-            _invertedIndexCreatorMap.put(columnName,
-                new OffHeapBitmapInvertedIndexCreator(_indexDir, fieldSpec, cardinality, _totalDocs,
-                    indexCreationInfo.getTotalNumberOfEntries()));
-          }
-        }
-      } else {
-        // Create raw index
-        Preconditions.checkState(!invertedIndexColumns.contains(columnName),
-            "Cannot create inverted index for raw index column: %s", columnName);
-
-        ChunkCompressionType compressionType = getColumnCompressionType(segmentCreationSpec, fieldSpec);
-
-        // Initialize forward index creator
-        boolean deriveNumDocsPerChunk =
-            shouldDeriveNumDocsPerChunk(columnName, segmentCreationSpec.getColumnProperties());
-        int writerVersion = rawIndexWriterVersion(columnName, segmentCreationSpec.getColumnProperties());
-        if (fieldSpec.isSingleValueField()) {
-          _forwardIndexCreatorMap.put(columnName,
-              getRawIndexCreatorForSVColumn(_indexDir, compressionType, columnName, storedType, _totalDocs,
-                  indexCreationInfo.getLengthOfLongestEntry(), deriveNumDocsPerChunk, writerVersion));
-        } else {
-          _forwardIndexCreatorMap.put(columnName,
-              getRawIndexCreatorForMVColumn(_indexDir, compressionType, columnName, storedType, _totalDocs,
-                  indexCreationInfo.getMaxNumberOfMultiValueElements(), deriveNumDocsPerChunk, writerVersion,
-                  indexCreationInfo.getMaxRowLengthInBytes()));
         }
       }
 
       if (textIndexColumns.contains(columnName)) {
-        // Initialize text index creator
-        Preconditions.checkState(storedType == DataType.STRING,
-            "Text index is currently only supported on STRING type columns");
-        _textIndexCreatorMap.put(columnName,
-            new LuceneTextIndexCreator(columnName, _indexDir, true /* commitOnClose */));
+        _textIndexCreatorMap.put(columnName, _indexCreatorProvider.newTextIndexCreator(context.forTextIndex(true)));
       }
 
       if (fstIndexColumns.contains(columnName)) {
-        Preconditions.checkState(fieldSpec.isSingleValueField(),
-            "FST index is currently only supported on single-value columns");
-        Preconditions.checkState(storedType == DataType.STRING,
-            "FST index is currently only supported on STRING type columns");
-        Preconditions.checkState(dictEnabledColumn,
-            "FST index is currently only supported on dictionary-encoded columns");
-        String[] sortedValues = (String[]) indexCreationInfo.getSortedUniqueElementsArray();
-        TextIndexCreator textIndexCreator;
-        if (_config.getFSTIndexType() == FSTType.NATIVE) {
-          textIndexCreator = new NativeFSTIndexCreator(_indexDir, columnName, sortedValues);
-        } else {
-          textIndexCreator = new LuceneFSTIndexCreator(_indexDir, columnName, sortedValues);
-        }
-
-        _fstIndexCreatorMap.put(columnName, textIndexCreator);
+        _fstIndexCreatorMap.put(columnName, _indexCreatorProvider.newTextIndexCreator(
+            context.forFSTIndex(_config.getFSTIndexType(),
+                (String[]) columnIndexCreationInfo.getSortedUniqueElementsArray())));
       }
 
       if (jsonIndexColumns.contains(columnName)) {
-        Preconditions.checkState(fieldSpec.isSingleValueField(),
-            "Json index is currently only supported on single-value columns");
-        Preconditions.checkState(storedType == DataType.STRING,
-            "Json index is currently only supported on STRING columns");
-        JsonIndexCreator jsonIndexCreator =
-            segmentCreationSpec.isOnHeap() ? new OnHeapJsonIndexCreator(_indexDir, columnName)
-                : new OffHeapJsonIndexCreator(_indexDir, columnName);
-        _jsonIndexCreatorMap.put(columnName, jsonIndexCreator);
+        _jsonIndexCreatorMap.put(columnName, _indexCreatorProvider.newJsonIndexCreator(context.forJsonIndex()));
       }
 
       H3IndexConfig h3IndexConfig = h3IndexConfigs.get(columnName);
       if (h3IndexConfig != null) {
-        Preconditions.checkState(fieldSpec.isSingleValueField(),
-            "H3 index is currently only supported on single-value columns");
-        Preconditions.checkState(storedType == DataType.BYTES, "H3 index is currently only supported on BYTES columns");
-        H3IndexResolution resolution = h3IndexConfig.getResolution();
-        GeoSpatialIndexCreator h3IndexCreator =
-            segmentCreationSpec.isOnHeap() ? new OnHeapH3IndexCreator(_indexDir, columnName, resolution)
-                : new OffHeapH3IndexCreator(_indexDir, columnName, resolution);
-        _h3IndexCreatorMap.put(columnName, h3IndexCreator);
+        _h3IndexCreatorMap.put(columnName,
+            _indexCreatorProvider.newGeoSpatialIndexCreator(context.forGeospatialIndex(h3IndexConfig)));
       }
 
       _nullHandlingEnabled = _config.isNullHandlingEnabled();
@@ -306,54 +235,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         // Initialize Null value vector map
         _nullValueVectorCreatorMap.put(columnName, new NullValueVectorCreator(_indexDir, columnName));
       }
-    }
-  }
-
-  public static boolean shouldDeriveNumDocsPerChunk(String columnName,
-      Map<String, Map<String, String>> columnProperties) {
-    if (columnProperties != null) {
-      Map<String, String> properties = columnProperties.get(columnName);
-      return properties != null && Boolean.parseBoolean(
-          properties.get(FieldConfig.DERIVE_NUM_DOCS_PER_CHUNK_RAW_INDEX_KEY));
-    }
-    return false;
-  }
-
-  public static int rawIndexWriterVersion(String columnName, Map<String, Map<String, String>> columnProperties) {
-    if (columnProperties != null && columnProperties.get(columnName) != null) {
-      Map<String, String> properties = columnProperties.get(columnName);
-      String version = properties.get(FieldConfig.RAW_INDEX_WRITER_VERSION);
-      if (version == null) {
-        return BaseChunkSVForwardIndexWriter.DEFAULT_VERSION;
-      }
-      return Integer.parseInt(version);
-    }
-    return BaseChunkSVForwardIndexWriter.DEFAULT_VERSION;
-  }
-
-  /**
-   * Helper method that returns compression type to use based on segment creation spec and field type.
-   * <ul>
-   *   <li> Returns compression type from segment creation spec, if specified there.</li>
-   *   <li> Else, returns PASS_THROUGH for metrics, and SNAPPY for dimensions. This is because metrics are likely
-   *        to be spread in different chunks after applying predicates. Same could be true for dimensions, but in that
-   *        case, clients are expected to explicitly specify the appropriate compression type in the spec. </li>
-   * </ul>
-   * @param segmentCreationSpec Segment creation spec
-   * @param fieldSpec Field spec for the column
-   * @return Compression type to use
-   */
-  private ChunkCompressionType getColumnCompressionType(SegmentGeneratorConfig segmentCreationSpec,
-      FieldSpec fieldSpec) {
-    ChunkCompressionType compressionType = segmentCreationSpec.getRawIndexCompressionType().get(fieldSpec.getName());
-    if (compressionType == null) {
-      if (fieldSpec.getFieldType() == FieldType.METRIC) {
-        return ChunkCompressionType.PASS_THROUGH;
-      } else {
-        return ChunkCompressionType.LZ4;
-      }
-    } else {
-      return compressionType;
     }
   }
 
@@ -380,6 +261,32 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       return false;
     }
     return info.isCreateDictionary();
+  }
+
+  /**
+   * Helper method that returns compression type to use based on segment creation spec and field type.
+   * <ul>
+   *   <li> Returns compression type from segment creation spec, if specified there.</li>
+   *   <li> Else, returns PASS_THROUGH for metrics, and SNAPPY for dimensions. This is because metrics are likely
+   *        to be spread in different chunks after applying predicates. Same could be true for dimensions, but in that
+   *        case, clients are expected to explicitly specify the appropriate compression type in the spec. </li>
+   * </ul>
+   * @param segmentCreationSpec Segment creation spec
+   * @param fieldSpec Field spec for the column
+   * @return Compression type to use
+   */
+  private ChunkCompressionType getColumnCompressionType(SegmentGeneratorConfig segmentCreationSpec,
+      FieldSpec fieldSpec) {
+    ChunkCompressionType compressionType = segmentCreationSpec.getRawIndexCompressionType().get(fieldSpec.getName());
+    if (compressionType == null) {
+      if (fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC) {
+        return ChunkCompressionType.PASS_THROUGH;
+      } else {
+        return ChunkCompressionType.LZ4;
+      }
+    } else {
+      return compressionType;
+    }
   }
 
   @Override
@@ -793,71 +700,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   public static void removeColumnMetadataInfo(PropertiesConfiguration properties, String column) {
     properties.subset(COLUMN_PROPS_KEY_PREFIX + column).clear();
-  }
-
-  /**
-   * Helper method to build the raw index creator for the column.
-   * Assumes that column to be indexed is single valued.
-   *
-   * @param file Output index file
-   * @param column Column name
-   * @param totalDocs Total number of documents to index
-   * @param lengthOfLongestEntry Length of longest entry
-   * @param deriveNumDocsPerChunk true if varbyte writer should auto-derive the number of rows per chunk
-   * @param writerVersion version to use for the raw index writer
-   * @return raw index creator
-   */
-  public static ForwardIndexCreator getRawIndexCreatorForSVColumn(File file, ChunkCompressionType compressionType,
-      String column, DataType dataType, int totalDocs, int lengthOfLongestEntry, boolean deriveNumDocsPerChunk,
-      int writerVersion)
-      throws IOException {
-    switch (dataType.getStoredType()) {
-      case INT:
-      case LONG:
-      case FLOAT:
-      case DOUBLE:
-        return new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs, dataType,
-            writerVersion);
-      case STRING:
-      case BYTES:
-        return new SingleValueVarByteRawIndexCreator(file, compressionType, column, totalDocs, dataType,
-            lengthOfLongestEntry, deriveNumDocsPerChunk, writerVersion);
-      default:
-        throw new UnsupportedOperationException("Data type not supported for raw indexing: " + dataType);
-    }
-  }
-
-  /**
-   * Helper method to build the raw index creator for the column.
-   * Assumes that column to be indexed is single valued.
-   *
-   * @param file Output index file
-   * @param column Column name
-   * @param totalDocs Total number of documents to index
-   * @param deriveNumDocsPerChunk true if varbyte writer should auto-derive the number of rows
-   *     per chunk
-   * @param writerVersion version to use for the raw index writer
-   * @param maxRowLengthInBytes the length of the longest row in bytes
-   * @return raw index creator
-   */
-  public static ForwardIndexCreator getRawIndexCreatorForMVColumn(File file, ChunkCompressionType compressionType,
-      String column, DataType dataType, final int totalDocs, int maxNumberOfMultiValueElements,
-      boolean deriveNumDocsPerChunk, int writerVersion, int maxRowLengthInBytes)
-      throws IOException {
-    switch (dataType.getStoredType()) {
-      case INT:
-      case LONG:
-      case FLOAT:
-      case DOUBLE:
-        return new MultiValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs, dataType,
-            maxNumberOfMultiValueElements, deriveNumDocsPerChunk, writerVersion);
-      case STRING:
-      case BYTES:
-        return new MultiValueVarByteRawIndexCreator(file, compressionType, column, totalDocs, dataType, writerVersion,
-            maxRowLengthInBytes, maxNumberOfMultiValueElements);
-      default:
-        throw new UnsupportedOperationException("Data type not supported for raw indexing: " + dataType);
-    }
   }
 
   @Override

@@ -47,6 +47,10 @@ public class InstanceResponseBlock implements Block {
     }
   }
 
+  public InstanceResponseBlock(DataTable dataTable) {
+    _instanceResponseDataTable = dataTable;
+  }
+
   public DataTable getInstanceResponseDataTable() {
     return _instanceResponseDataTable;
   }

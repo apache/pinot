@@ -56,6 +56,15 @@ public class TarGzCompressionUtils {
    */
   public static void createTarGzFile(File inputFile, File outputFile)
       throws IOException {
+    createTarGzFile(new File[]{inputFile}, outputFile);
+  }
+
+  /**
+   * Creates a tar.gz file from a list of input file/directories to the output file. The output file must have
+   * ".tar.gz" as the file extension.
+   */
+  public static void createTarGzFile(File[] inputFiles, File outputFile)
+      throws IOException {
     Preconditions.checkArgument(outputFile.getName().endsWith(TAR_GZ_FILE_EXTENSION),
         "Output file: %s does not have '.tar.gz' file extension", outputFile);
     try (OutputStream fileOut = Files.newOutputStream(outputFile.toPath());
@@ -64,7 +73,10 @@ public class TarGzCompressionUtils {
         TarArchiveOutputStream tarGzOut = new TarArchiveOutputStream(gzipOut)) {
       tarGzOut.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_STAR);
       tarGzOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
-      addFileToTarGz(tarGzOut, inputFile, "");
+
+      for (File inputFile : inputFiles) {
+        addFileToTarGz(tarGzOut, inputFile, "");
+      }
     }
   }
 
@@ -112,6 +124,10 @@ public class TarGzCompressionUtils {
   public static List<File> untar(InputStream inputStream, File outputDir)
       throws IOException {
     String outputDirCanonicalPath = outputDir.getCanonicalPath();
+    // Prevent partial path traversal
+    if (!outputDirCanonicalPath.endsWith(File.separator)) {
+      outputDirCanonicalPath += File.separator;
+    }
     List<File> untarredFiles = new ArrayList<>();
     try (InputStream bufferedIn = new BufferedInputStream(inputStream);
         InputStream gzipIn = new GzipCompressorInputStream(bufferedIn);
@@ -134,7 +150,13 @@ public class TarGzCompressionUtils {
           }
         } else {
           File parentFile = outputFile.getParentFile();
-          if (!parentFile.getCanonicalPath().startsWith(outputDirCanonicalPath)) {
+          String parentFileCanonicalPath = parentFile.getCanonicalPath();
+
+          // Ensure parentFile's canonical path is separator terminated, since outputDirCanonicalPath is.
+          if (!parentFileCanonicalPath.endsWith(File.separator)) {
+            parentFileCanonicalPath += File.separator;
+          }
+          if (!parentFileCanonicalPath.startsWith(outputDirCanonicalPath)) {
             throw new IOException(String
                 .format("Trying to create directory: %s outside of the output directory: %s", parentFile, outputDir));
           }

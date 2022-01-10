@@ -58,6 +58,6 @@ public class BoundedFCFSScheduler extends PriorityScheduler {
 
   @Override
   public String name() {
-    return "BoundedFCFSScheduler";
+    return "BoundedFCFS";
   }
 }

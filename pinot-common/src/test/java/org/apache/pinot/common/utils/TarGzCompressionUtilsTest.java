@@ -82,6 +82,57 @@ public class TarGzCompressionUtilsTest {
   }
 
   @Test
+  public void testDirectories()
+      throws IOException {
+    String dirToTarName1 = "dir1";
+    String dirToTarName2 = "dir2";
+    File dir1 = new File(DATA_DIR, dirToTarName1);
+    File dir2 = new File(DATA_DIR, dirToTarName2);
+
+    File[] dirsToTar = new File[] {dir1, dir2};
+
+    String fileName1 = "data1";
+    String fileContent1 = "fileContent1";
+    String fileName2 = "data2";
+    String fileContent2 = "fileContent2";
+    FileUtils.write(new File(dir1, fileName1), fileContent1);
+    FileUtils.write(new File(dir2, fileName2), fileContent2);
+
+    String outputTarName = "output_tar" + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION;
+    File tarGzFile = new File(TAR_DIR, outputTarName);
+    TarGzCompressionUtils.createTarGzFile(dirsToTar, tarGzFile);
+
+    List<File> untarredFiles = TarGzCompressionUtils.untar(tarGzFile, UNTAR_DIR);
+    assertEquals(untarredFiles.size(), 4);
+
+    /*
+    untarredFiles ends up being a list as follows:
+    /dir1/
+    /dir1/data1
+    /dir2/
+    /dir2/data2
+
+    To fetch the 2 directories we want for the following assertions, we expect them at indexes 0 and 2.
+     */
+    File untarredFileDir1 = untarredFiles.get(0);
+    File untarredFileDir2 = untarredFiles.get(2);
+
+    assertEquals(untarredFileDir1, new File(UNTAR_DIR, dirToTarName1));
+    assertEquals(untarredFileDir2, new File(UNTAR_DIR, dirToTarName2));
+
+    File[] filesDir1 = untarredFileDir1.listFiles();
+    assertNotNull(filesDir1);
+    assertEquals(filesDir1.length, 1);
+    assertEquals(FileUtils.readFileToString(new File(untarredFileDir1, fileName1)), fileContent1);
+
+
+    File[] filesDir2 = untarredFileDir2.listFiles();
+    assertNotNull(filesDir2);
+    assertEquals(filesDir2.length, 1);
+    assertEquals(FileUtils.readFileToString(new File(untarredFileDir2, fileName2)), fileContent2);
+  }
+
+  @Test
   public void testDirectory()
       throws IOException {
     String dirName = "dir";

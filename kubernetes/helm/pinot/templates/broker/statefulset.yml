@@ -88,7 +88,7 @@ spec:
             path: {{ .Values.broker.probes.endpoint }}
             port: {{ .Values.broker.service.port }}
         {{- end }}
-        {{- if .Values.broker.probes.livenessEnabled }}
+        {{- if .Values.broker.probes.readinessEnabled }}
         readinessProbe:
           initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
           periodSeconds: {{ .Values.probes.periodSeconds }}

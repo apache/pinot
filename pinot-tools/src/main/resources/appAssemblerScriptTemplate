@@ -109,35 +109,53 @@ fi
 
 # Set $PLUGINS_CLASSPATH for plugin jars to be put into classpath.
 # $PLUGINS_DIR and $PLUGINS_INCLUDE are used if $PLUGINS_CLASSPATH is not set.
-# $PLUGINS_DIR is the root directory of plugins directory, default to '"$BASEDIR"/plugins' if not set.
+# $PLUGINS_DIR is semi-colon separated list of plugin directories, default to '"$BASEDIR"/plugins' if not set.
 # $PLUGINS_INCLUDE is semi-colon separated plugins name, e.g. pinot-avro;pinot-batch-ingestion-standalone. Default is not set, which means load all the plugin jars.
+# If the same plugin is found in multiple directories, it will only be picked up from the first directory it was found. The directories in $PLUGINS_DIR are traversed by their order.
 if [ -z "$PLUGINS_CLASSPATH" ] ; then
   if [ -z "$PLUGINS_DIR" ] ; then
     PLUGINS_DIR="$BASEDIR"/plugins
-  fi
-  if [ -d "$PLUGINS_DIR" ] ; then
-    if [ -n "$PLUGINS_INCLUDE" ] ; then
-      export IFS=";"
-      for PLUGIN_JAR in $PLUGINS_INCLUDE; do
-          PLUGIN_JAR_PATH=$(find "$PLUGINS_DIR" -path \*/"$PLUGIN_JAR"/"$PLUGIN_JAR"-\*.jar)
-          if [ -n "$PLUGINS_CLASSPATH" ] ; then
-            PLUGINS_CLASSPATH=$PLUGINS_CLASSPATH:$PLUGIN_JAR_PATH
-          else
-            PLUGINS_CLASSPATH=$PLUGIN_JAR_PATH
-          fi
-      done
-      unset IFS
-    else
-      PLUGIN_JARS=$(find "$PLUGINS_DIR" -name \*.jar)
-      for PLUGIN_JAR in $PLUGIN_JARS ; do
-        if [ -n "$PLUGINS_CLASSPATH" ] ; then
-          PLUGINS_CLASSPATH=$PLUGINS_CLASSPATH:$PLUGIN_JAR
-        else
-          PLUGINS_CLASSPATH=$PLUGIN_JAR
-        fi
-      done
+  else
+    if [[ "$PLUGINS_DIR" = *,* ]]
+    then
+        echo "\$PLUGINS_DIR should use ; as the delimiter"
+        exit 1
     fi
   fi
+
+  export IFS=';'
+  for DIR in $PLUGINS_DIR; do
+    if [ -d "$DIR" ] ; then
+      unset IFS
+      if [ -n "$PLUGINS_INCLUDE" ] ; then
+        if [[ "$PLUGINS_INCLUDE" = *,* ]]
+        then
+            echo "\$PLUGINS_INCLUDE should use ; as the delimiter"
+            exit 1
+        fi
+        export IFS=';'
+        for PLUGIN_JAR in $PLUGINS_INCLUDE; do
+            PLUGIN_JAR_PATH=$(find "$DIR" -path \*/"$PLUGIN_JAR"/"$PLUGIN_JAR"-\*.jar)
+            if [ -n "$PLUGINS_CLASSPATH" ] ; then
+              PLUGINS_CLASSPATH=$PLUGINS_CLASSPATH:$PLUGIN_JAR_PATH
+            else
+              PLUGINS_CLASSPATH=$PLUGIN_JAR_PATH
+            fi
+        done
+        unset IFS
+      else
+        PLUGIN_JARS=$(find "$DIR" -name \*.jar)
+        for PLUGIN_JAR in $PLUGIN_JARS ; do
+          if [ -n "$PLUGINS_CLASSPATH" ] ; then
+            PLUGINS_CLASSPATH=$PLUGINS_CLASSPATH:$PLUGIN_JAR
+          else
+            PLUGINS_CLASSPATH=$PLUGIN_JAR
+          fi
+        done
+      fi
+    fi
+  done
+  unset IFS
 fi
 
 if [ -n "$PLUGINS_CLASSPATH" ] ; then

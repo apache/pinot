@@ -149,7 +149,6 @@ public class ComplexTypeTransformer implements RecordTransformer {
     }
   }
 
-  @Nullable
   @Override
   public GenericRow transform(GenericRow record) {
     flattenMap(record, new ArrayList<>(record.getFieldToValueMap().keySet()));

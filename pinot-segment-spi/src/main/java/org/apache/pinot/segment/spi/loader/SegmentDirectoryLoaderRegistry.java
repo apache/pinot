@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.segment.spi.loader;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import org.reflections.Reflections;
 import org.reflections.scanners.ResourcesScanner;
 import org.reflections.scanners.SubTypesScanner;
@@ -37,11 +37,15 @@ import org.slf4j.LoggerFactory;
  */
 public class SegmentDirectoryLoaderRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentDirectoryLoaderRegistry.class);
-
   public static final String DEFAULT_SEGMENT_DIRECTORY_LOADER_NAME = "default";
-  private static final Map<String, SegmentDirectoryLoader> SEGMENT_DIRECTORY_LOADER_MAP = new HashMap<>();
+  private static final Map<String, SegmentDirectoryLoader> SEGMENT_DIRECTORY_LOADER_MAP = new ConcurrentHashMap<>();
+
+  private SegmentDirectoryLoaderRegistry() {
+  }
 
   static {
+    long startTime = System.currentTimeMillis();
+
     Reflections reflections = new Reflections(
         new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot.segment"))
             .filterInputsBy(new FilterBuilder.Include(".*\\.loader\\..*"))
@@ -66,11 +70,10 @@ public class SegmentDirectoryLoaderRegistry {
         }
       }
     });
-    LOGGER.info("Initialized {} with {} segmentDirectoryLoaders: {}", SegmentDirectoryLoaderRegistry.class.getName(),
-        SEGMENT_DIRECTORY_LOADER_MAP.size(), SEGMENT_DIRECTORY_LOADER_MAP.keySet());
-  }
 
-  private SegmentDirectoryLoaderRegistry() {
+    LOGGER.info("Initialized SegmentDirectoryLoaderRegistry with {} segmentDirectoryLoaders: {} in {} ms",
+        SEGMENT_DIRECTORY_LOADER_MAP.size(), SEGMENT_DIRECTORY_LOADER_MAP.keySet(),
+        (System.currentTimeMillis() - startTime));
   }
 
   /**

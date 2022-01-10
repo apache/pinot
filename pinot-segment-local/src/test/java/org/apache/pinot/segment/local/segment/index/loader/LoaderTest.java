@@ -62,6 +62,8 @@ import org.testng.annotations.Test;
 import org.testng.collections.Lists;
 
 import static org.apache.pinot.segment.spi.V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class LoaderTest {
@@ -142,6 +144,31 @@ public class LoaderTest {
     Assert.assertTrue(v3TempDir.isDirectory());
     testConversion();
     Assert.assertFalse(v3TempDir.exists());
+  }
+
+  @Test
+  public void testIfNeedConvertSegmentFormat()
+      throws Exception {
+    constructV1Segment();
+
+    // The newly generated segment is consistent with table config and schema, thus
+    // in follow checks, whether it needs reprocess or not depends on segment format.
+    SegmentDirectory segmentDir = _localSegmentDirectoryLoader.load(_indexDir.toURI(),
+        new SegmentDirectoryLoaderContext(null, null, null, _pinotConfiguration));
+
+    // The segmentVersionToLoad is null, not leading to reprocess.
+    assertFalse(ImmutableSegmentLoader.needPreprocess(segmentDir, new IndexLoadingConfig(), null));
+
+    // The segmentVersionToLoad is v1, not leading to reprocess.
+    assertFalse(ImmutableSegmentLoader.needPreprocess(segmentDir, _v1IndexLoadingConfig, null));
+
+    // The segmentVersionToLoad is v3, leading to reprocess.
+    assertTrue(ImmutableSegmentLoader.needPreprocess(segmentDir, _v3IndexLoadingConfig, null));
+
+    // The segment is in v3 format now, not leading to reprocess.
+    ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig);
+    segmentDir.reloadMetadata();
+    assertFalse(ImmutableSegmentLoader.needPreprocess(segmentDir, _v3IndexLoadingConfig, null));
   }
 
   private void testConversion()
