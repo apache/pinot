@@ -34,8 +34,7 @@ import java.util.Set;
  */
 public class MutableState implements State {
 
-  // State's Id
-  protected int id = -1;
+  protected char label;
 
   // Is terminal
   protected boolean isTerminal;
@@ -60,21 +59,19 @@ public class MutableState implements State {
     Collections.sort(arcs, cmp);
   }
 
-  /**
-   * Get the state's id
-   */
-  @Override
-  public int getId() {
-    return id;
-  }
-
-  public void setId(int id) {
-    this.id = id;
-  }
-
   @Override
   public boolean isTerminal() {
     return isTerminal;
+  }
+
+  @Override
+  public char getLabel() {
+    return label;
+  }
+
+  @Override
+  public void setLabel(char label) {
+    this.label = label;
   }
 
   public void setIsTerminal(boolean isTerminal) {
@@ -108,7 +105,7 @@ public class MutableState implements State {
 
   @Override
   public String toString() {
-    return "(" + id +  ")";
+    return "(" + label +  ")";
   }
 
   /* friend methods to let the fst maintain state's state */
@@ -138,7 +135,7 @@ public class MutableState implements State {
 
   @Override
   public int hashCode() {
-    int result = id;
+    int result = label;
     long temp = 0;
     result = 31 * result * ((int) (temp ^ (temp >>> 32)));
     result = 31 * result + (arcs != null ? arcs.hashCode() : 0);

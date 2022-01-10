@@ -34,6 +34,11 @@ public interface MutableFST {
   State getStartState();
 
   /**
+   * Set the start state
+   */
+  void setStartState(MutableState mutableState);
+
+  /**
    * The total number of states in the FST
    * @return
    */

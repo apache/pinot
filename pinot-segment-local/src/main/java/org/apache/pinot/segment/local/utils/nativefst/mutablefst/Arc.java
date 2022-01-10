@@ -21,7 +21,7 @@ package org.apache.pinot.segment.local.utils.nativefst.mutablefst;
  */
 public interface Arc {
 
-  String getOutputSymbol();
+  int getOutputSymbol();
 
   /**
    * Get the reference to the next state in the FST; note that you get call `getNextState().getId()` to get the

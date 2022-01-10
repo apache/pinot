@@ -106,7 +106,7 @@ public class FstUtils {
         return false;
       }
     }
-    if (thisMutableFST.getStartState() != null ? (thisMutableFST.getStartState().getId() != thatMutableFST.getStartState().getId()) : thatMutableFST.getStartState() != null) {
+    if (thisMutableFST.getStartState() != null ? (thisMutableFST.getStartState().getLabel() != thatMutableFST.getStartState().getLabel()) : thatMutableFST.getStartState() != null) {
       reporter.report("fst.startstate", thisMutableFST.getStartState(), thatMutableFST.getStartState());
       return false;
     }
@@ -141,7 +141,7 @@ public class FstUtils {
     Arc thisArc = (Arc) thisArcObj;
     Arc thatArc = (Arc) thatArcObj;
 
-    if (thisArc.getNextState().getId() != thatArc.getNextState().getId()) {
+    if (thisArc.getNextState().getLabel() != thatArc.getNextState().getLabel()) {
         return false;
     }
 
@@ -171,8 +171,8 @@ public class FstUtils {
     State thisState = (State) thisStateObj;
     State thatState = (State) thatStateObj;
 
-    if (thisState.getId() != thatState.getId()) {
-      reporter.report("state.id", thisState.getId(), thatState.getId());
+    if (thisState.getLabel() != thatState.getLabel()) {
+      reporter.report("state.id", thisState.getLabel(), thatState.getLabel());
       return false;
     }
 

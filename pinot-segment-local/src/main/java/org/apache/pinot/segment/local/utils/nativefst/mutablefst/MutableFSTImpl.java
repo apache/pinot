@@ -43,37 +43,6 @@ public class MutableFSTImpl implements MutableFST {
     return copy;
   }
 
-  /**
-   * Make a deep copy of the given FST. The symbol tables are "effectively deep copied" meaning that they will
-   * take advantage of any immutable tables (using the UnionSymbolTable) to avoid doing a large deep copy.
-   * @param mutableFSTImpl
-   * @return
-   */
-  public static MutableFSTImpl copyFrom(MutableFSTImpl mutableFSTImpl) {
-    MutableFSTImpl copy = emptyWithCopyOfSymbols(mutableFSTImpl);
-    // build up states
-    for (int i = 0; i < mutableFSTImpl.getStateCount(); i++) {
-      State source = mutableFSTImpl.getState(i);
-      MutableState target = new MutableState();
-      copy.setState(i, target);
-    }
-    // build arcs now that we have target state refs
-    for (int i = 0; i < mutableFSTImpl.getStateCount(); i++) {
-      State source = mutableFSTImpl.getState(i);
-      MutableState target = copy.getState(i);
-      for (int j = 0; j < source.getArcCount(); j++) {
-        Arc sarc = source.getArc(j);
-        MutableState nextTargetState = copy.getState(sarc.getNextState().getId());
-        MutableArc
-            tarc = new MutableArc(sarc.getOutputSymbol(), nextTargetState);
-        target.addArc(tarc);
-      }
-    }
-    MutableState newStart = copy.getState(mutableFSTImpl.getStartState().getId());
-    copy.setStart(newStart);
-    return copy;
-  }
-
   private final ArrayList<MutableState> states;
   private MutableState start;
   private WriteableSymbolTable outputSymbols;
@@ -129,12 +98,13 @@ public class MutableFSTImpl implements MutableFST {
    *
    * @param start the initial state
    */
-  public MutableState setStart(MutableState start) {
-    checkArgument(start.getId() >= 0, "must set id before setting start");
-    throwIfSymbolTableMissingId(start.getId());
+  @Override
+  public void setStartState(MutableState start) {
+    if (this.start != null) {
+      throw new IllegalStateException("Cannot override a start state");
+    }
 
     this.start = start;
-    return start;
   }
 
   public MutableState newStartState() {
@@ -144,7 +114,7 @@ public class MutableFSTImpl implements MutableFST {
   public MutableState newStartState(@Nullable String startStateSymbol) {
     checkArgument(start == null, "cant add more than one start state");
     MutableState newStart = newState(startStateSymbol);
-    setStart(newStart);
+    setStartState(newStart);
     return newStart;
   }
 
@@ -181,13 +151,12 @@ public class MutableFSTImpl implements MutableFST {
   }
 
   public MutableState addState(MutableState state, @Nullable String newStateSymbol) {
-    checkArgument(state.getId() == -1, "trying to add a state that already has id");
+
     this.states.add(state);
-    state.id = states.size() - 1;
     if (stateSymbols != null) {
       Preconditions.checkNotNull(newStateSymbol, "if using symbol table for states everything must have "
                                                  + "a symbol");
-      stateSymbols.put(newStateSymbol, state.id);
+      stateSymbols.put(newStateSymbol, -1);
     } else {
       Preconditions.checkState(newStateSymbol == null, "cant pass state name if not using symbol table");
     }
@@ -195,8 +164,6 @@ public class MutableFSTImpl implements MutableFST {
   }
 
   public MutableState setState(int id, MutableState state) {
-    checkArgument(state.getId() == -1, "trying to add a state that already has id");
-    state.setId(id);
     throwIfSymbolTableMissingId(id);
     // they provided the id so index properly
     if (id >= this.states.size()) {
@@ -235,7 +202,7 @@ public class MutableFSTImpl implements MutableFST {
    * @param endStateSymbol
    * @return
    */
-  public MutableArc addArc(String startStateSymbol, String outSymbol, String endStateSymbol) {
+  public MutableArc addArc(String startStateSymbol, int outSymbol, String endStateSymbol) {
     Preconditions.checkNotNull(stateSymbols, "cant use this without state symbols; call useStateSymbols()");
     return addArc(
         getOrNewState(startStateSymbol),
@@ -244,9 +211,7 @@ public class MutableFSTImpl implements MutableFST {
     );
   }
 
-  public MutableArc addArc(MutableState startState, String outputSymbol, MutableState endState) {
-    checkArgument(this.states.get(startState.getId()) == startState, "cant pass state that doesnt exist in fst");
-    checkArgument(this.states.get(endState.getId()) == endState, "cant pass end state that doesnt exist in fst");
+  public MutableArc addArc(MutableState startState, int outputSymbol, MutableState endState) {
     MutableArc newArc = new MutableArc(outputSymbol,
                                         endState);
     startState.addArc(newArc);
@@ -285,75 +250,6 @@ public class MutableFSTImpl implements MutableFST {
     return sb.toString();
   }
 
-  /**
-   * Deletes the given states and remaps the existing state ids
-   */
-  public void deleteStates(Collection<MutableState> statesToDelete) {
-    if (statesToDelete.isEmpty()) {
-      return;
-    }
-    for (MutableState state : statesToDelete) {
-      deleteState(state);
-    }
-    remapStateIds();
-  }
-
-  /**
-   * Deletes a state;
-   *
-   * @param state the state to delete
-   */
-  private void deleteState(MutableState state) {
-    if (state.getId() == this.start.getId()) {
-      throw new IllegalArgumentException("Cannot delete start state.");
-    }
-    // we're going to "compact" all of the nulls out and remap state ids at the end
-    this.states.set(state.getId(), null);
-    if (isUsingStateSymbols()) {
-      stateSymbols.remove(state.getId());
-    }
-
-    // this state won't be incoming to any of its arc's targets anymore
-    for (MutableArc mutableArc : state.getArcs()) {
-      mutableArc.getNextState().removeIncomingState(state);
-    }
-
-    // delete arc's with nextstate equal to stateid
-    for (MutableState inState : state.getIncomingStates()) {
-      Iterator<MutableArc> iter = inState.getArcs().iterator();
-      while (iter.hasNext()) {
-        MutableArc arc = iter.next();
-        if (arc.getNextState() == state) {
-          iter.remove();
-        }
-      }
-    }
-  }
-
-  private void remapStateIds() {
-    // clear all of the nulls out
-
-    compactNulls(states);
-    int numStates = states.size();
-    ArrayList<IndexPair> toRemap = null;
-    if (isUsingStateSymbols()) {
-      toRemap = Lists.newArrayList();
-    }
-    for (int i = 0; i < numStates; i++) {
-      MutableState mutableState = states.get(i);
-      if (mutableState.id != i) {
-        if (isUsingStateSymbols()) {
-          toRemap.add(new IndexPair(mutableState.getId(), i));
-        }
-        mutableState.id = i;
-      }
-    }
-    if (isUsingStateSymbols()) {
-      stateSymbols.remapAll(toRemap);
-      stateSymbols.trimIds();
-    }
-  }
-
   static <T> void compactNulls(ArrayList<T> list) {
     int nextGood = 0;
     for (int i = 0; i < list.size(); i++) {
@@ -368,14 +264,6 @@ public class MutableFSTImpl implements MutableFST {
     // trim the end
     while (list.size() > nextGood) {
       list.remove(list.size() - 1);
-    }
-  }
-
-  public void throwIfAnyNullStates() {
-    for (int i = 0; i < states.size(); i++) {
-      if (states.get(i) == null) {
-        throw new IllegalStateException("Cannot have a null state in an FST. State " + i);
-      }
     }
   }
 

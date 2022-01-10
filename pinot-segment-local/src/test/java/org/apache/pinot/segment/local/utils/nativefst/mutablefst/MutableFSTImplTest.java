@@ -42,11 +42,11 @@ public class MutableFSTImplTest {
     assertEquals(4, fst.getOutputSymbols().size());
 
     MutableState stateA = fst.getState(2);
-    assertEquals("_A", fst.getStateSymbols().invert().keyForId(stateA.getId()));
+    assertEquals("_A", fst.getStateSymbols().invert().keyForId(stateA.getLabel()));
     assertEquals(1, stateA.getArcCount());
     MutableArc arc = stateA.getArc(0);
 
-    assertEquals(fst.getState("_B").getId(), arc.getNextState().getId());
+    assertEquals(fst.getState("_B").getLabel(), arc.getNextState().getLabel());
     assertTrue(arc.hashCode() != 0);
     assertTrue(StringUtils.isNotBlank(arc.toString()));
   }
@@ -59,10 +59,10 @@ public class MutableFSTImplTest {
     // creating a few symbols by hand, others will get created automatically
     fst.newState("_B");
 
-    fst.addArc("<start>", "a", "_A");
-    fst.addArc("_A", "b", "_B");
-    fst.addArc("_B", "c", "_C");
-    fst.addArc("_B", "d", "_D");
+    fst.addArc("<start>", 1, "_A");
+    fst.addArc("_A", 2, "_B");
+    fst.addArc("_B", 3, "_C");
+    fst.addArc("_B", 4, "_D");
 
     return fst;
   }
@@ -70,74 +70,85 @@ public class MutableFSTImplTest {
   private MutableFSTImpl createStateSymbolFst2() {
     MutableFSTImpl fst = new MutableFSTImpl();
 
-    fst.newStartState("<start>");
+    //fst.newStartState("<start>");
+
+    addPaths(fst, "age", 1);
+
 
     // creating a few symbols by hand, others will get created automatically
-    fst.newState("_B");
+    /*fst.newState("_B");
 
-    fst.addArc("<start>", "a", "_A");
-    fst.addArc("<start>", "b", "_B");
-    fst.addArc("_A", "g", "_C");
-    fst.addArc("_B", "a", "_D");
-    fst.addArc("_D", "t", "_E");
-    fst.addArc("_C", "e", "_F");
+    fst.addArc("<start>", -1, "a");
+    fst.addArc("<start>", -1, "b");
+    fst.addArc("a", -1, "g");
+    fst.addArc("g", -1, "e");
+    fst.addArc("b", -1, "a");
+    fst.addArc("", "e", "_F");
+
+    MutableState mutableState = new MutableState();
+
+    mutableState.addArc(new MutableArc());
 
     fst.getState("_F").setIsTerminal(true);
-    fst.getState("_E").setIsTerminal(true);
+    fst.getState("_E").setIsTerminal(true);*/
 
     return fst;
+  }
+
+  private void addPaths(MutableFST mutableFST, String word, int outputSymbol) {
+   MutableState state = (MutableState) mutableFST.getStartState();
+
+    for (int i = 0; i < word.length(); i++) {
+      MutableState nextState = new MutableState();
+
+      nextState.setLabel(word.charAt(i));
+
+      int currentOutputSymbol = -1;
+
+      if (i == word.length() - 1) {
+        currentOutputSymbol = outputSymbol;
+      }
+
+      if (state != null) {
+        MutableArc mutableArc = new MutableArc(currentOutputSymbol, nextState);
+        state.addArc(mutableArc);
+      } else {
+        mutableFST.setStartState(nextState);
+      }
+
+      state = nextState;
+    }
+
+    state.setIsTerminal(true);
+  }
+
+  private boolean matchWord(MutableFST mutableFST, String word) {
+    return matchWordInternal((MutableState) mutableFST.getStartState(), word, 0);
+  }
+
+  private boolean matchWordInternal(MutableState mutableState, String word, int currentPos) {
+    if (mutableState.getLabel() == word.charAt(currentPos)) {
+      if (mutableState.isTerminal() && currentPos == word.length() - 1) {
+        return true;
+      }
+
+      List<MutableArc> arcs = mutableState.getArcs();
+
+      for (MutableArc arc : arcs) {
+        if (matchWordInternal(arc.getNextState(), word, currentPos + 1)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   @Test
   public void testTraversalFoo() {
     MutableFSTImpl fst = createStateSymbolFst2();
 
-   /* assertEquals(5, fst.getStateCount());
-    assertEquals(1, fst.getState(0).getArcCount()); // start
-    assertEquals(2, fst.getState(1).getArcCount()); // _B
-    assertEquals(1, fst.getState(2).getArcCount()); // _A
-    assertEquals(0, fst.getState(3).getArcCount()); // _C
-    assertEquals(0, fst.getState(4).getArcCount()); // _D*/
-
-    List<MutableArc> arcs = fst.getStartState().getArcs();
-
-    //int pos = fst.lookupOutputSymbol("b");
-
-    for (MutableArc arc : arcs) {
-      if (arc.getOutputSymbol().matches("b")) {
-        MutableState state = arc.getNextState();
-        arcs = state.getArcs();
-
-        for (MutableArc arc1 : arcs) {
-          if (arc1.getOutputSymbol().matches("a")) {
-            state = arc1.getNextState();
-            arcs = state.getArcs();
-
-            for (MutableArc arc2 : arcs) {
-              if (arc2.getOutputSymbol().matches("t")) {
-                state = arc2.getNextState();
-
-                if (state.isTerminal()) {
-                  System.out.println("DONE");
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-
-    //assertEquals(4, fst.getOutputSymbols().size());
-
-
-
-    MutableState stateA = fst.getState(2);
-    assertEquals("_A", fst.getStateSymbols().invert().keyForId(stateA.getId()));
-    assertEquals(1, stateA.getArcCount());
-    MutableArc arc = stateA.getArc(0);
-
-    assertEquals(fst.getState("_B").getId(), arc.getNextState().getId());
-    assertTrue(arc.hashCode() != 0);
-    assertTrue(StringUtils.isNotBlank(arc.toString()));
+    assertTrue(matchWord(fst, "age"));
+    assertTrue(matchWord(fst, "bat") == false);
   }
 }

@@ -24,7 +24,7 @@ import org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils.FstUtils;
  */
 public class MutableArc implements Arc {
 
-  private String outputSymbol;
+  private int outputSymbol;
   private MutableState nextState;
 
   /**
@@ -32,13 +32,13 @@ public class MutableArc implements Arc {
    *
    * @param nextState the arc's next state
    */
-  public MutableArc(String outputSymbol, MutableState nextState) {
+  public MutableArc(int outputSymbol, MutableState nextState) {
     this.outputSymbol = outputSymbol;
     this.nextState = nextState;
   }
 
   @Override
-  public String getOutputSymbol() {
+  public int getOutputSymbol() {
     return outputSymbol;
   }
 
@@ -68,7 +68,7 @@ public class MutableArc implements Arc {
   public int hashCode() {
     int result = 1;
 
-    result = 31 * result + (nextState != null ? nextState.getId() : 0);
+    result = 31 * result + (nextState != null ? nextState.getLabel() : 0);
     return result;
   }
 

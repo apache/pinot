@@ -26,16 +26,19 @@ import java.util.List;
 public interface State {
 
   /**
-   * The id for this state; ids are internal and can change through transformations. If you need some stable labeling
-   * of states then use state labels (i.e. a state symbol table)
-   * @return
-   */
-  int getId();
-
-  /**
    * Is the state the last state for a path?
    */
   boolean isTerminal();
+
+  /**
+   * Get the label of the state
+   */
+  char getLabel();
+
+  /**
+   * Set the label of the state
+   */
+  void setLabel(char label);
 
   /**
    * The outgoing arc count in this state (including self-loops)
