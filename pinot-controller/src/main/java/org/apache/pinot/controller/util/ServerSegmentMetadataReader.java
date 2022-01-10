@@ -173,14 +173,7 @@ public class ServerSegmentMetadataReader {
       String endpoint) {
     try {
       tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8.name());
-      String paramsStr = "";
-      if (columns != null) {
-        List<String> params = new ArrayList<>(columns.size());
-        for (String column : columns) {
-          params.add(String.format("columns=%s", column));
-        }
-        paramsStr = String.join("&", params);
-      }
+      String paramsStr = generateColumnsParam(columns);
       return String.format("%s/tables/%s/metadata?%s", endpoint, tableNameWithType, paramsStr);
     } catch (UnsupportedEncodingException e) {
       throw new RuntimeException(e.getCause());
@@ -192,17 +185,23 @@ public class ServerSegmentMetadataReader {
     try {
       tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8.name());
       segmentName = URLEncoder.encode(segmentName, StandardCharsets.UTF_8.name());
-      String paramsStr = "";
-      if (columns != null) {
-        List<String> params = new ArrayList<>(columns.size());
-        for (String column : columns) {
-          params.add(String.format("columns=%s", column));
-        }
-        paramsStr = String.join("&", params);
-      }
+      String paramsStr = generateColumnsParam(columns);
       return String.format("%s/tables/%s/segments/%s/metadata?%s", endpoint, tableNameWithType, segmentName, paramsStr);
     } catch (UnsupportedEncodingException e) {
       throw new RuntimeException(e.getCause());
     }
+  }
+
+  private String generateColumnsParam(List<String> columns) {
+    String paramsStr = "";
+    if (columns == null || columns.isEmpty()) {
+      return paramsStr;
+    }
+    List<String> params = new ArrayList<>(columns.size());
+    for (String column : columns) {
+      params.add(String.format("columns=%s", column));
+    }
+    paramsStr = String.join("&", params);
+    return paramsStr;
   }
 }
