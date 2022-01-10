@@ -12,8 +12,7 @@ import static org.testng.AssertJUnit.assertTrue;
 
 public class MutableFSTImplTest {
   @Test
-  public void shouldCompactNulls1()
-      throws Exception {
+  public void shouldCompactNulls1() {
     List<Integer> listGood = Lists.newArrayList(1, 2, 3, 4, 5, 6, 7, 8, 9);
     List<Integer> listBad = Lists.newArrayList(null, 1, 2, null, 3, 4, null, 5, 6, null, 7, 8, 9, null);
     MutableFSTImpl.compactNulls((ArrayList) listBad);
@@ -21,8 +20,7 @@ public class MutableFSTImplTest {
   }
 
   @Test
-  public void shouldCompactNulls2()
-      throws Exception {
+  public void shouldCompactNulls2() {
     ArrayList<Integer> listBad = (ArrayList) Lists.newArrayList(1);
     MutableFSTImpl.compactNulls(listBad);
     assertEquals(Lists.newArrayList(1), listBad);
@@ -70,27 +68,7 @@ public class MutableFSTImplTest {
   private MutableFSTImpl createStateSymbolFst2() {
     MutableFSTImpl fst = new MutableFSTImpl();
 
-    //fst.newStartState("<start>");
-
     addPaths(fst, "age", 1);
-
-
-    // creating a few symbols by hand, others will get created automatically
-    /*fst.newState("_B");
-
-    fst.addArc("<start>", -1, "a");
-    fst.addArc("<start>", -1, "b");
-    fst.addArc("a", -1, "g");
-    fst.addArc("g", -1, "e");
-    fst.addArc("b", -1, "a");
-    fst.addArc("", "e", "_F");
-
-    MutableState mutableState = new MutableState();
-
-    mutableState.addArc(new MutableArc());
-
-    fst.getState("_F").setIsTerminal(true);
-    fst.getState("_E").setIsTerminal(true);*/
 
     return fst;
   }
