@@ -91,7 +91,7 @@ public class BaseTableDataManagerTest {
   public void testReloadSegmentNewData()
       throws Exception {
     BaseTableDataManager tmgr = makeTestableManager();
-    File tempRootDir = tmgr.getSegmentDataDir("test-new-data");
+    File tempRootDir = tmgr.getTmpSegmentDataDir("test-new-data");
 
     // Create an empty segment and compress it to tar.gz as the one in deep store.
     // All input and intermediate files are put in the tempRootDir.
@@ -124,7 +124,7 @@ public class BaseTableDataManagerTest {
   public void testReloadSegmentLocalCopy()
       throws Exception {
     BaseTableDataManager tmgr = makeTestableManager();
-    File tempRootDir = tmgr.getSegmentDataDir("test-local-copy");
+    File tempRootDir = tmgr.getTmpSegmentDataDir("test-local-copy");
 
     // Create an empty segment and compress it to tar.gz as the one in deep store.
     // All input and intermediate files are put in the tempRootDir.
@@ -157,7 +157,7 @@ public class BaseTableDataManagerTest {
   public void testReloadSegmentForceDownload()
       throws Exception {
     BaseTableDataManager tmgr = makeTestableManager();
-    File tempRootDir = tmgr.getSegmentDataDir("test-force-download");
+    File tempRootDir = tmgr.getTmpSegmentDataDir("test-force-download");
 
     // Create an empty segment and compress it to tar.gz as the one in deep store.
     // All input and intermediate files are put in the tempRootDir.
@@ -190,7 +190,7 @@ public class BaseTableDataManagerTest {
   public void testAddOrReplaceSegmentNewData()
       throws Exception {
     BaseTableDataManager tmgr = makeTestableManager();
-    File tempRootDir = tmgr.getSegmentDataDir("test-new-data");
+    File tempRootDir = tmgr.getTmpSegmentDataDir("test-new-data");
 
     // Create an empty segment and compress it to tar.gz as the one in deep store.
     // All input and intermediate files are put in the tempRootDir.
@@ -255,7 +255,7 @@ public class BaseTableDataManagerTest {
   public void testAddOrReplaceSegmentNotRecovered()
       throws Exception {
     BaseTableDataManager tmgr = makeTestableManager();
-    File tempRootDir = tmgr.getSegmentDataDir("test-force-download");
+    File tempRootDir = tmgr.getTmpSegmentDataDir("test-force-download");
 
     // Create an empty segment and compress it to tar.gz as the one in deep store.
     // All input and intermediate files are put in the tempRootDir.
@@ -291,7 +291,7 @@ public class BaseTableDataManagerTest {
     when(zkmd.getDownloadUrl()).thenReturn("file://" + tempInput.getAbsolutePath());
 
     BaseTableDataManager tmgr = makeTestableManager();
-    File tempRootDir = tmgr.getSegmentDataDir("test-download-decrypt");
+    File tempRootDir = tmgr.getTmpSegmentDataDir("test-download-decrypt");
 
     File tarFile = tmgr.downloadAndDecrypt("seg01", zkmd, tempRootDir);
     assertEquals(FileUtils.readFileToString(tarFile), "this is from somewhere remote");
@@ -301,8 +301,9 @@ public class BaseTableDataManagerTest {
     assertEquals(FileUtils.readFileToString(tarFile), "this is from somewhere remote");
 
     FakePinotCrypter fakeCrypter = (FakePinotCrypter) PinotCrypterFactory.create("fakePinotCrypter");
-    assertTrue(fakeCrypter._origFile.getAbsolutePath().endsWith("__table01__/test-download-decrypt/seg01.tar.gz.enc"));
-    assertTrue(fakeCrypter._decFile.getAbsolutePath().endsWith("__table01__/test-download-decrypt/seg01.tar.gz"));
+    assertTrue(
+        fakeCrypter._origFile.getAbsolutePath().endsWith("__table01__/tmp/test-download-decrypt/seg01.tar.gz.enc"));
+    assertTrue(fakeCrypter._decFile.getAbsolutePath().endsWith("__table01__/tmp/test-download-decrypt/seg01.tar.gz"));
 
     try {
       // Set maxRetry to 0 to cause retry failure immediately.
@@ -320,7 +321,7 @@ public class BaseTableDataManagerTest {
   public void testUntarAndMoveSegment()
       throws IOException {
     BaseTableDataManager tmgr = makeTestableManager();
-    File tempRootDir = tmgr.getSegmentDataDir("test-untar-move");
+    File tempRootDir = tmgr.getTmpSegmentDataDir("test-untar-move");
 
     // All input and intermediate files are put in the tempRootDir.
     File tempTar = new File(tempRootDir, "seg01" + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
