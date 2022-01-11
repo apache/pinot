@@ -23,7 +23,7 @@ import org.apache.pinot.spi.data.Schema;
 
 
 /**
- * An interface for the provider of pinot configs
+ * An interface for the provider of pinot table configs and schema
  */
 public interface PinotConfigProvider {
 
