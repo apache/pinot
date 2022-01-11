@@ -119,24 +119,10 @@ public class BaseTableDataManagerTest {
   @Test
   public void testReloadSegmentUseLocalCopy()
       throws Exception {
-<<<<<<< HEAD
-    BaseTableDataManager tmgr = makeTestableManager();
-    File tempRootDir = tmgr.getTmpSegmentDataDir("test-new-data");
-
-    // Create an empty segment and compress it to tar.gz as the one in deep store.
-    // All input and intermediate files are put in the tempRootDir.
-    File tempTar = new File(tempRootDir, "seg01" + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-    File tempInputDir = new File(tempRootDir, "seg01_input");
-    FileUtils
-        .write(new File(tempInputDir, "metadata.properties"), "segment.total.docs=0\nsegment.name=seg01\nk=remove");
-    TarGzCompressionUtils.createTarGzFile(tempInputDir, tempTar);
-    FileUtils.deleteQuietly(tempInputDir);
-=======
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     String segName = "seg01";
     File localSegDir = createSegment(tableConfig, segName, SegmentVersion.v1, 5);
     String segCrc = getCRC(localSegDir, SegmentVersion.v1);
->>>>>>> extend SegmentDirectoryLoader interface and refactor BaseTableDataManager so that it
 
     // Same CRCs so load the local segment directory directly.
     SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
@@ -163,24 +149,10 @@ public class BaseTableDataManagerTest {
   @Test
   public void testReloadSegmentConvertVersion()
       throws Exception {
-<<<<<<< HEAD
-    BaseTableDataManager tmgr = makeTestableManager();
-    File tempRootDir = tmgr.getTmpSegmentDataDir("test-local-copy");
-
-    // Create an empty segment and compress it to tar.gz as the one in deep store.
-    // All input and intermediate files are put in the tempRootDir.
-    File tempTar = new File(tempRootDir, "seg01" + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-    File tempInputDir = new File(tempRootDir, "seg01_input");
-    FileUtils
-        .write(new File(tempInputDir, "metadata.properties"), "segment.total.docs=0\nsegment.name=seg01\nk=remote");
-    TarGzCompressionUtils.createTarGzFile(tempInputDir, tempTar);
-    FileUtils.deleteQuietly(tempInputDir);
-=======
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     String segName = "seg01";
     File localSegDir = createSegment(tableConfig, segName, SegmentVersion.v1, 5);
     String segCrc = getCRC(localSegDir, SegmentVersion.v1);
->>>>>>> extend SegmentDirectoryLoader interface and refactor BaseTableDataManager so that it
 
     // Same CRCs so load the local segment directory directly.
     SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
@@ -203,20 +175,6 @@ public class BaseTableDataManagerTest {
   @Test
   public void testReloadSegmentAddIndex()
       throws Exception {
-<<<<<<< HEAD
-    BaseTableDataManager tmgr = makeTestableManager();
-    File tempRootDir = tmgr.getTmpSegmentDataDir("test-force-download");
-
-    // Create an empty segment and compress it to tar.gz as the one in deep store.
-    // All input and intermediate files are put in the tempRootDir.
-    File tempTar = new File(tempRootDir, "seg01" + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-    File tempInputDir = new File(tempRootDir, "seg01_input");
-    FileUtils
-        .write(new File(tempInputDir, "metadata.properties"), "segment.total.docs=0\nsegment.name=seg01\nk=remote");
-    TarGzCompressionUtils.createTarGzFile(tempInputDir, tempTar);
-    FileUtils.deleteQuietly(tempInputDir);
-
-=======
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     String segName = "seg01";
     File localSegDir = createSegment(tableConfig, segName, SegmentVersion.v3, 5);
@@ -225,7 +183,6 @@ public class BaseTableDataManagerTest {
     assertFalse(hasInvertedIndex(localSegDir, LONG_COLUMN, SegmentVersion.v3));
 
     // Same CRCs so load the local segment directory directly.
->>>>>>> extend SegmentDirectoryLoader interface and refactor BaseTableDataManager so that it
     SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
     when(zkmd.getCrc()).thenReturn(Long.valueOf(segCrc));
     SegmentMetadata llmd = mock(SegmentMetadata.class);
@@ -279,22 +236,9 @@ public class BaseTableDataManagerTest {
   @Test
   public void testAddOrReplaceSegmentNewData()
       throws Exception {
-<<<<<<< HEAD
-    BaseTableDataManager tmgr = makeTestableManager();
-    File tempRootDir = tmgr.getTmpSegmentDataDir("test-new-data");
-
-    // Create an empty segment and compress it to tar.gz as the one in deep store.
-    // All input and intermediate files are put in the tempRootDir.
-    File tempTar = new File(tempRootDir, "seg01" + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-    File tempInputDir = new File(tempRootDir, "seg01_input");
-    FileUtils.write(new File(tempInputDir, "metadata.properties"), "segment.total.docs=0\nsegment.name=seg01");
-    TarGzCompressionUtils.createTarGzFile(tempInputDir, tempTar);
-    FileUtils.deleteQuietly(tempInputDir);
-=======
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     String segName = "seg01";
     SegmentZKMetadata zkmd = createRawSegment(tableConfig, segName, SegmentVersion.v3, 5);
->>>>>>> extend SegmentDirectoryLoader interface and refactor BaseTableDataManager so that it
 
     // Mock the case where segment is loaded but its CRC is different from
     // the one in zk, thus raw segment is downloaded and loaded.
@@ -358,15 +302,10 @@ public class BaseTableDataManagerTest {
   @Test
   public void testAddOrReplaceSegmentUseBackupCopy()
       throws Exception {
-<<<<<<< HEAD
-    BaseTableDataManager tmgr = makeTestableManager();
-    File tempRootDir = tmgr.getTmpSegmentDataDir("test-force-download");
-=======
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     String segName = "seg01";
     File localSegDir = createSegment(tableConfig, segName, SegmentVersion.v3, 5);
     String segCrc = getCRC(localSegDir, SegmentVersion.v3);
->>>>>>> extend SegmentDirectoryLoader interface and refactor BaseTableDataManager so that it
 
     // Make local and remote CRC same to skip downloading raw segment.
     SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
@@ -490,13 +429,8 @@ public class BaseTableDataManagerTest {
     SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
     when(zkmd.getDownloadUrl()).thenReturn("file://" + tempInput.getAbsolutePath());
 
-<<<<<<< HEAD
-    BaseTableDataManager tmgr = makeTestableManager();
-    File tempRootDir = tmgr.getTmpSegmentDataDir("test-download-decrypt");
-=======
     BaseTableDataManager tmgr = createTableManager();
-    File tempRootDir = tmgr.getSegmentDataDir("test-download-decrypt");
->>>>>>> extend SegmentDirectoryLoader interface and refactor BaseTableDataManager so that it
+    File tempRootDir = tmgr.getTmpSegmentDataDir("test-download-decrypt");
 
     File tarFile = tmgr.downloadAndDecrypt("seg01", zkmd, tempRootDir);
     assertEquals(FileUtils.readFileToString(tarFile), "this is from somewhere remote");
@@ -506,15 +440,9 @@ public class BaseTableDataManagerTest {
     assertEquals(FileUtils.readFileToString(tarFile), "this is from somewhere remote");
 
     FakePinotCrypter fakeCrypter = (FakePinotCrypter) PinotCrypterFactory.create("fakePinotCrypter");
-<<<<<<< HEAD
-    assertTrue(
-        fakeCrypter._origFile.getAbsolutePath().endsWith("__table01__/tmp/test-download-decrypt/seg01.tar.gz.enc"));
-    assertTrue(fakeCrypter._decFile.getAbsolutePath().endsWith("__table01__/tmp/test-download-decrypt/seg01.tar.gz"));
-=======
-    String parentDir = TABLE_NAME + "/test-download-decrypt/";
+    String parentDir = TABLE_NAME + "/tmp/test-download-decrypt/";
     assertTrue(fakeCrypter._origFile.getAbsolutePath().endsWith(parentDir + "seg01.tar.gz.enc"));
     assertTrue(fakeCrypter._decFile.getAbsolutePath().endsWith(parentDir + "seg01.tar.gz"));
->>>>>>> extend SegmentDirectoryLoader interface and refactor BaseTableDataManager so that it
 
     try {
       // Set maxRetry to 0 to cause retry failure immediately.
@@ -531,13 +459,8 @@ public class BaseTableDataManagerTest {
   @Test
   public void testUntarAndMoveSegment()
       throws IOException {
-<<<<<<< HEAD
-    BaseTableDataManager tmgr = makeTestableManager();
-    File tempRootDir = tmgr.getTmpSegmentDataDir("test-untar-move");
-=======
     BaseTableDataManager tmgr = createTableManager();
-    File tempRootDir = tmgr.getSegmentDataDir("test-untar-move");
->>>>>>> extend SegmentDirectoryLoader interface and refactor BaseTableDataManager so that it
+    File tempRootDir = tmgr.getTmpSegmentDataDir("test-untar-move");
 
     // All input and intermediate files are put in the tempRootDir.
     File tempTar = new File(tempRootDir, "seg01" + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
