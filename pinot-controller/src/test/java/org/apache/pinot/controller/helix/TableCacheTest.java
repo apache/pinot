@@ -63,10 +63,6 @@ public class TableCacheTest {
   public void testTableCache()
       throws Exception {
     TableCache tableCache = new TableCache(ControllerTestUtils.getPropertyStore(), true);
-    TestSchemaChangeListener schemaChangeListener = new TestSchemaChangeListener();
-    tableCache.registerSchemaChangeListener(schemaChangeListener);
-    TestTableConfigChangeListener tableConfigChangeListener = new TestTableConfigChangeListener();
-    tableCache.registerTableConfigChangeListener(tableConfigChangeListener);
 
     assertNull(tableCache.getSchema(SCHEMA_NAME));
     assertNull(tableCache.getColumnNameMap(SCHEMA_NAME));
@@ -74,8 +70,6 @@ public class TableCacheTest {
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
     assertNull(tableCache.getTableConfig(OFFLINE_TABLE_NAME));
     assertNull(tableCache.getActualTableName(RAW_TABLE_NAME));
-    Assert.assertNull(schemaChangeListener._schemaList);
-    Assert.assertNull(tableConfigChangeListener._tableConfigList);
 
     // Add a schema
     Schema schema =
@@ -102,10 +96,11 @@ public class TableCacheTest {
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
     // Case-insensitive table name are handled based on the table config instead of the schema
     assertNull(tableCache.getActualTableName(RAW_TABLE_NAME));
-    Assert.assertNotNull(schemaChangeListener._schemaList);
-    Assert.assertEquals(schemaChangeListener._schemaList.size(), 1,
-        "Size mismatch. _schemaList: " + schemaChangeListener._schemaList);
-    Assert.assertEquals(schemaChangeListener._schemaList.get(0).getSchemaName(), SCHEMA_NAME);
+    TestSchemaChangeListener schemaChangeListener = new TestSchemaChangeListener();
+    List<Schema> schemas = tableCache.registerSchemaChangeListener(schemaChangeListener);
+    Assert.assertNotNull(schemas);
+    Assert.assertEquals(schemas.size(), 1);
+    Assert.assertEquals(schemas.get(0).getSchemaName(), SCHEMA_NAME);
 
     // Add a table config
     TableConfig tableConfig =
@@ -123,9 +118,11 @@ public class TableCacheTest {
     assertEquals(tableCache.getColumnNameMap(SCHEMA_NAME), expectedColumnMap);
     assertEquals(tableCache.getSchema(RAW_TABLE_NAME), expectedSchema);
     assertEquals(tableCache.getColumnNameMap(RAW_TABLE_NAME), expectedColumnMap);
-    Assert.assertNotNull(tableConfigChangeListener._tableConfigList);
-    Assert.assertEquals(tableConfigChangeListener._tableConfigList.size(), 1);
-    Assert.assertEquals(tableConfigChangeListener._tableConfigList.get(0).getTableName(), OFFLINE_TABLE_NAME);
+    TestTableConfigChangeListener tableConfigChangeListener = new TestTableConfigChangeListener();
+    List<TableConfig> tableConfigs = tableCache.registerTableConfigChangeListener(tableConfigChangeListener);
+    Assert.assertNotNull(tableConfigs);
+    Assert.assertEquals(tableConfigs.size(), 1);
+    Assert.assertEquals(tableConfigs.get(0).getTableName(), OFFLINE_TABLE_NAME);
 
     // Update the schema
     schema.addField(new DimensionFieldSpec("newColumn", DataType.LONG, true));

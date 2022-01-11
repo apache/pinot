@@ -159,8 +159,9 @@ public class TableCache implements PinotConfigProvider {
   }
 
   @Override
-  public void registerTableConfigChangeListener(TableConfigChangeListener tableConfigChangeListener) {
+  public List<TableConfig> registerTableConfigChangeListener(TableConfigChangeListener tableConfigChangeListener) {
     _tableConfigChangeListeners.add(tableConfigChangeListener);
+    return Lists.newArrayList(_tableConfigMap.values());
   }
 
   /**
@@ -175,8 +176,9 @@ public class TableCache implements PinotConfigProvider {
   }
 
   @Override
-  public void registerSchemaChangeListener(SchemaChangeListener schemaChangeListener) {
+  public List<Schema> registerSchemaChangeListener(SchemaChangeListener schemaChangeListener) {
     _schemaChangeListeners.add(schemaChangeListener);
+    return _schemaInfoMap.values().stream().map(s -> s._schema).collect(Collectors.toList());
   }
 
   private void addTableConfigs(List<String> paths) {

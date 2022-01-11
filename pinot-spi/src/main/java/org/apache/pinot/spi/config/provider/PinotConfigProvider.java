@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.config.provider;
 
+import java.util.List;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
@@ -35,8 +36,9 @@ public interface PinotConfigProvider {
   /**
    * Registers the {@link TableConfigChangeListener} and notifies it whenever any changes (addition, update, removal)
    * to any of the table configs are detected
+   * @return current list of tables
    */
-  void registerTableConfigChangeListener(TableConfigChangeListener tableConfigChangeListener);
+  List<TableConfig> registerTableConfigChangeListener(TableConfigChangeListener tableConfigChangeListener);
 
   /**
    * Gets the schema
@@ -46,6 +48,7 @@ public interface PinotConfigProvider {
   /**
    * Registers the {@link SchemaChangeListener} and notifies it whenever any changes  (addition, update, removal) to
    * schemas are detected
+   * @return current list of schemas
    */
-  void registerSchemaChangeListener(SchemaChangeListener schemaChangeListener);
+  List<Schema> registerSchemaChangeListener(SchemaChangeListener schemaChangeListener);
 }
