@@ -819,6 +819,38 @@ public class FileUploadDownloadClient implements Closeable {
    * @param inputStream Segment file input stream
    * @param headers Optional http headers
    * @param parameters Optional query parameters
+   * @param tableName Table name with or without type suffix
+   * @param tableType Table type
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public SimpleHttpResponse uploadSegment(URI uri, String segmentName, InputStream inputStream,
+      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, String tableName, TableType tableType)
+      throws IOException, HttpErrorStatusException {
+    // Add table name and type request parameters
+    NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, tableName);
+    NameValuePair tableTypeValuePair = new BasicNameValuePair(QueryParameters.TABLE_TYPE, tableType.name());
+    if (parameters == null) {
+      parameters = Arrays.asList(tableNameValuePair, tableTypeValuePair);
+    } else {
+      parameters.add(tableNameValuePair);
+      parameters.add(tableTypeValuePair);
+    }
+    return sendRequest(
+        getUploadSegmentRequest(uri, segmentName, inputStream, headers, parameters, DEFAULT_SOCKET_TIMEOUT_MS));
+  }
+
+  /**
+   * Upload segment with segment file input stream.
+   *
+   * Note: table name has to be set as a parameter.
+   *
+   * @param uri URI
+   * @param segmentName Segment name
+   * @param inputStream Segment file input stream
+   * @param headers Optional http headers
+   * @param parameters Optional query parameters
    * @param socketTimeoutMs Socket timeout in milliseconds
    * @return Response
    * @throws IOException
