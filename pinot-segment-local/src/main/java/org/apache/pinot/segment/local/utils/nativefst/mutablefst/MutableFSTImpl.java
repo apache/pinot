@@ -20,10 +20,10 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
+import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils.FstUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils.MutableFSTUtils;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -69,6 +69,7 @@ public class MutableFSTImpl implements MutableFST {
     this.outputSymbols = outputSymbols;
 
     this.stateSymbols = new MutableSymbolTable();
+    this.start = new MutableState(true);
   }
 
   @Nullable
@@ -250,6 +251,81 @@ public class MutableFSTImpl implements MutableFST {
     return sb.toString();
   }
 
+  @Override
+  public void addPath(String word, int outputSymbol) {
+    MutableState state = getStartState();
+
+    if (state == null) {
+      throw new IllegalStateException("Start state cannot be null");
+    }
+
+    List<MutableArc> arcs = state.getArcs();
+
+    boolean isFound = false;
+
+    for (MutableArc arc : arcs) {
+      if (arc.getNextState().getLabel() == word.charAt(0)) {
+        state = arc.getNextState();
+        isFound = true;
+        break;
+      }
+    }
+
+    int foundPos = -1;
+
+    if (isFound) {
+      Pair<MutableState, Integer> pair = findPointOfDiversion(state, word, 0);
+
+      if (pair == null) {
+        // Word already exists
+        return;
+      }
+
+      foundPos = pair.getRight();
+      state = pair.getLeft();
+    }
+
+    for (int i = foundPos + 1; i < word.length(); i++) {
+      MutableState nextState = new MutableState();
+
+      nextState.setLabel(word.charAt(i));
+
+      int currentOutputSymbol = -1;
+
+      if (i == word.length() - 1) {
+        currentOutputSymbol = outputSymbol;
+      }
+
+      MutableArc mutableArc = new MutableArc(currentOutputSymbol, nextState);
+      state.addArc(mutableArc);
+
+      state = nextState;
+    }
+
+    state.setIsTerminal(true);
+  }
+
+  private Pair<MutableState, Integer> findPointOfDiversion(MutableState mutableState,
+      String word, int currentPos) {
+    if (currentPos == word.length() - 1) {
+      return null;
+    }
+
+    if (mutableState.getLabel() != word.charAt(currentPos)) {
+      throw new IllegalStateException("Current state needs to be part of word path");
+    }
+
+    List<MutableArc> arcs = mutableState.getArcs();
+
+    for (MutableArc arc : arcs) {
+      if (arc.getNextState().getLabel() == word.charAt(currentPos + 1)) {
+        return findPointOfDiversion(arc.getNextState(), word, currentPos + 1);
+      }
+    }
+
+    return Pair.of(mutableState, currentPos);
+  }
+
   static <T> void compactNulls(ArrayList<T> list) {
     int nextGood = 0;
     for (int i = 0; i < list.size(); i++) {
@@ -276,7 +352,7 @@ public class MutableFSTImpl implements MutableFST {
 
   @Override
   public boolean equals(Object o) {
-    return FstUtils.fstEquals(this, o);
+    return MutableFSTUtils.fstEquals(this, o);
   }
 
   @Override

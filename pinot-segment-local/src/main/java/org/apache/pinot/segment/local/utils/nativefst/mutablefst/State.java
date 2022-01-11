@@ -31,6 +31,11 @@ public interface State {
   boolean isTerminal();
 
   /**
+   * Is the state the start state for a FST?
+   */
+  boolean isStartState();
+
+  /**
    * Get the label of the state
    */
   char getLabel();

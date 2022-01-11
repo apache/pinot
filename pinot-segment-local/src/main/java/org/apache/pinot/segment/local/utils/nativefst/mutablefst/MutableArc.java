@@ -16,7 +16,7 @@
 
 package org.apache.pinot.segment.local.utils.nativefst.mutablefst;
 
-import org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils.FstUtils;
+import org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils.MutableFSTUtils;
 
 
 /**
@@ -61,7 +61,7 @@ public class MutableArc implements Arc {
 
   @Override
   public boolean equals(Object obj) {
-    return FstUtils.arcEquals(this, obj);
+    return MutableFSTUtils.arcEquals(this, obj);
   }
 
   @Override

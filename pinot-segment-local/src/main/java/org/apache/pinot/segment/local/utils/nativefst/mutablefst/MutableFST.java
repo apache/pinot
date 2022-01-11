@@ -25,8 +25,6 @@ import javax.annotation.Nullable;
  */
 public interface MutableFST {
 
-  String EPS = "<eps>";
-
   /**
    * The start state in the FST; there must be exactly one
    * @return
@@ -64,6 +62,11 @@ public interface MutableFST {
    * @return
    */
   SymbolTable getOutputSymbols();
+
+  /**
+   * Add a path to the FST
+   */
+  void addPath(String word, int outputSymbol);
 
   /**
    * Return the symbol table for the state symbols or null if state symbols are not being used

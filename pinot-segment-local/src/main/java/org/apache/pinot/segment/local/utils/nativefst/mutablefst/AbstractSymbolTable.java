@@ -17,16 +17,13 @@
 package org.apache.pinot.segment.local.utils.nativefst.mutablefst;
 
 
-import com.carrotsearch.hppc.cursors.IntCursor;
 import com.carrotsearch.hppc.cursors.ObjectCursor;
-import com.carrotsearch.hppc.cursors.ObjectIntCursor;
 import com.google.common.base.Function;
-import com.google.common.collect.Iterables;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
-import org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils.FstUtils;
+import org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils.MutableFSTUtils;
 
 
 /**
@@ -125,7 +122,7 @@ public abstract class AbstractSymbolTable implements SymbolTable {
 
   @Override
   public boolean equals(Object o) {
-    return FstUtils.symbolTableEquals(this, o);
+    return MutableFSTUtils.symbolTableEquals(this, o);
   }
 
   @Override

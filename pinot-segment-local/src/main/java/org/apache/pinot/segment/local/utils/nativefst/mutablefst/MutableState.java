@@ -18,7 +18,7 @@ package org.apache.pinot.segment.local.utils.nativefst.mutablefst;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils.FstUtils;
+import org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils.MutableFSTUtils;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -39,6 +39,9 @@ public class MutableState implements State {
   // Is terminal
   protected boolean isTerminal;
 
+  // Is first state
+  protected boolean isStartState;
+
   // Outgoing arcs
   private final ArrayList<MutableArc> arcs;
 
@@ -52,6 +55,11 @@ public class MutableState implements State {
     arcs = Lists.newArrayList();
   }
 
+  public MutableState(boolean isStartState) {
+    this.isStartState = isStartState;
+    arcs = Lists.newArrayList();
+  }
+
   /**
    * Shorts the arc's ArrayList based on the provided Comparator
    */
@@ -62,6 +70,11 @@ public class MutableState implements State {
   @Override
   public boolean isTerminal() {
     return isTerminal;
+  }
+
+  @Override
+  public boolean isStartState() {
+    return isStartState;
   }
 
   @Override
@@ -130,7 +143,7 @@ public class MutableState implements State {
 
   @Override
   public boolean equals(Object o) {
-    return FstUtils.stateEquals(this, o);
+    return MutableFSTUtils.stateEquals(this, o);
   }
 
   @Override

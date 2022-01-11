@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import org.apache.pinot.segment.local.utils.nativefst.FST;
+
 import org.apache.pinot.segment.local.utils.nativefst.automaton.Automaton;
 import org.apache.pinot.segment.local.utils.nativefst.automaton.CharacterRunAutomaton;
 import org.apache.pinot.segment.local.utils.nativefst.automaton.RegExp;
@@ -29,8 +29,8 @@ public class RealTimeRegexpMatcher {
     _automaton = new RegExp(_regexQuery).toAutomaton();
   }
 
-  public static void regexMatch(String regexQuery, FST fst, IntConsumer dest) {
-    RegexpMatcher matcher = new RegexpMatcher(regexQuery, fst, dest);
+  public static void regexMatch(String regexQuery, MutableFST fst, IntConsumer dest) {
+    RealTimeRegexpMatcher matcher = new RealTimeRegexpMatcher(regexQuery, fst, dest);
     matcher.regexMatchOnFST();
   }
 
@@ -93,29 +93,15 @@ public class RealTimeRegexpMatcher {
             queue.add(new Path(t._to, arc.getNextState(), arc, path._pathState));
           }
         } else {
-          if (path._node != null && path._node.isTerminal()) {
-            continue;
-          }
+          MutableState node = path._node;
+          List<MutableArc> arcs = path._node.getArcs();
 
-          MutableState node;
-          MutableArc arc;
-
-          if (path._fstArc == null) {
-            // First (dummy) arc, get the actual arc
-            arc = path._node.getArc(0);
-          } else {
-            node = path._fstArc.getNextState();
-            arc = node.getArc(0);
-          }
-
-          while (arc != 0) {
-            byte label = _fst.getArcLabel(arc);
+          for (MutableArc arc : arcs) {
+            char label = node.getLabel();
 
             if (label >= min && label <= max) {
-              queue.add(new Path(t._to, _fst.getEndNode(arc), arc, path._pathState));
+              queue.add(new Path(t._to, arc.getNextState(), arc, path._pathState));
             }
-
-            arc = _fst.isArcLast(arc) ? 0 : _fst.getNextArc(arc);
           }
         }
       }
@@ -151,7 +137,7 @@ public class RealTimeRegexpMatcher {
 
       _pathState = pathState;
 
-      _pathState.add((char) _fst.getArcLabel(fstArc));
+      _pathState.add(node.getLabel());
     }
   }
 }

@@ -21,6 +21,9 @@ import org.apache.pinot.segment.local.utils.nativefst.mutablefst.Arc;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.MutableFST;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.State;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.SymbolTable;
+import org.apache.pinot.segment.local.utils.nativefst.utils.RealTimeRegexpMatcher;
+import org.roaringbitmap.RoaringBitmapWriter;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,9 +31,9 @@ import org.slf4j.LoggerFactory;
 /**
  * @author Atri Sharma
  */
-public class FstUtils {
+public class MutableFSTUtils {
 
-  private static final Logger log = LoggerFactory.getLogger(FstUtils.class);
+  private static final Logger log = LoggerFactory.getLogger(MutableFSTUtils.class);
 
   public interface EqualsReporter {
     void report(String msg, Object a, Object b);
@@ -101,7 +104,7 @@ public class FstUtils {
     for (int i = 0; i < thisMutableFST.getStateCount(); i++) {
       State thisState = thisMutableFST.getState(i);
       State thatState = thatMutableFST.getState(i);
-      if (!FstUtils.stateEquals(thisState, thatState, epsilon, reporter)) {
+      if (!MutableFSTUtils.stateEquals(thisState, thatState, epsilon, reporter)) {
         reporter.report("fst.state", thisState, thatState);
         return false;
       }
@@ -111,11 +114,11 @@ public class FstUtils {
       return false;
     }
 
-    if (thisMutableFST.getStateSymbols() != null ? !FstUtils.symbolTableEquals(thisMutableFST.getStateSymbols(), thatMutableFST.getStateSymbols(), reporter) : thatMutableFST.getStateSymbols() != null) {
+    if (thisMutableFST.getStateSymbols() != null ? !MutableFSTUtils.symbolTableEquals(thisMutableFST.getStateSymbols(), thatMutableFST.getStateSymbols(), reporter) : thatMutableFST.getStateSymbols() != null) {
       reporter.report("fst.stateSymbols", thisMutableFST.getStateSymbols(), thatMutableFST.getStateSymbols());
       return false;
     }
-    if (!(thisMutableFST.getOutputSymbols() != null ? FstUtils.symbolTableEquals(thisMutableFST.getOutputSymbols(), thatMutableFST.getOutputSymbols(), reporter) :
+    if (!(thisMutableFST.getOutputSymbols() != null ? MutableFSTUtils.symbolTableEquals(thisMutableFST.getOutputSymbols(), thatMutableFST.getOutputSymbols(), reporter) :
         thatMutableFST.getOutputSymbols() == null)) {
       reporter.report("fst.outSymbols", thisMutableFST.getOutputSymbols(), thatMutableFST.getOutputSymbols());
       return false;
@@ -230,5 +233,15 @@ public class FstUtils {
       return false;
     }
     return true;
+  }
+
+  /**
+   * Return number of matches for given regex for realtime FST
+   */
+  public static long regexQueryNrHitsForRealTimeFST(String regex, MutableFST fst) {
+    RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
+    RealTimeRegexpMatcher.regexMatch(regex, fst, writer::add);
+
+    return writer.get().getCardinality();
   }
 }
