@@ -163,17 +163,22 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
   @Test
   public void testSegmentAssignment()
       throws Exception {
+    System.out.println("test starts");
     IdealState idealState = HelixHelper.getTableIdealState(_helixManager, TABLE_NAME_WITH_TYPE);
+    System.out.println(getCurrentCountStarResult() + "," + getCountStarResult());
     Assert.assertEquals(getCurrentCountStarResult(), getCountStarResult());
     verifyTableIdealStates(idealState);
     // Wait 3 seconds to let the realtime validation thread to run.
     Thread.sleep(3000);
     // Verify the result again.
+    System.out.println("after sleep: " + getCurrentCountStarResult() + "," + getCountStarResult());
     Assert.assertEquals(getCurrentCountStarResult(), getCountStarResult());
     verifyTableIdealStates(idealState);
 
     // Restart the servers and check every segment is not in ERROR state.
+    System.out.println("restarting");
     restartServers(NUM_SERVERS);
+    System.out.println("restarted");
     verifyTableIdealStates(idealState);
     ExternalView ev =
         HelixHelper.getExternalViewForResource(_helixAdmin, this.getHelixClusterName(), TABLE_NAME_WITH_TYPE);
@@ -182,11 +187,12 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
     for (String segment : segments) {
       Map<String, String> stateMap = ev.getStateMap(segment);
       Assert.assertTrue(stateMap.size() > 0);
-      for (Map.Entry<String, String> server2state: stateMap.entrySet()) {
+      for (Map.Entry<String, String> server2state : stateMap.entrySet()) {
         Assert.assertFalse("ERROR".equals(server2state.getValue()));
       }
     }
-    // Verify the result again.
+    // Verify the result again - check on this assertion.
+    System.out.println("last check: " + getCurrentCountStarResult() + "," + getCountStarResult());
     Assert.assertEquals(getCurrentCountStarResult(), getCountStarResult());
   }
 
