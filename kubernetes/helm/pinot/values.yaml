@@ -106,6 +106,16 @@ controller:
     port: 9000
     annotations: {}
 
+  ingress:
+    v1beta1:
+      enabled: false
+      annotations: { }
+      tls: { }
+      path: /
+      hosts: [ ]
+    v1:
+      enabled: false
+
   resources: {}
 
   nodeSelector: {}
@@ -182,6 +192,16 @@ broker:
     port: 8099
     # For example, in private GKE cluster, you might add cloud.google.com/load-balancer-type: Internal
     annotations: {}
+
+  ingress:
+    v1beta1:
+      enabled: false
+      annotations: {}
+      tls: {}
+      path: /
+      hosts: []
+    v1:
+      enabled: false
 
   resources: {}
 
