@@ -344,7 +344,7 @@ public class PinotLLCRealtimeSegmentManager {
     _helixResourceManager.deleteSegments(realtimeTableName, segmentsToRemove);
   }
 
-  // TODO: Consider using TableCache to read the table config
+  // TODO: Consider using DefaultPinotConfigProvider to read the table config
   @VisibleForTesting
   public TableConfig getTableConfig(String realtimeTableName) {
     TableConfig tableConfig;

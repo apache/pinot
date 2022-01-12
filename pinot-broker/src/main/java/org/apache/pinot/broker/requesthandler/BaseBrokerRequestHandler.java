@@ -48,7 +48,7 @@ import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.broker.routing.RoutingTable;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
-import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.config.provider.DefaultPinotConfigProvider;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.metrics.BrokerGauge;
@@ -111,7 +111,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final RoutingManager _routingManager;
   protected final AccessControlFactory _accessControlFactory;
   protected final QueryQuotaManager _queryQuotaManager;
-  protected final TableCache _tableCache;
+  protected final DefaultPinotConfigProvider _defaultPinotConfigProvider;
   protected final BrokerMetrics _brokerMetrics;
 
   protected final AtomicLong _requestIdGenerator = new AtomicLong();
@@ -132,13 +132,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private final boolean _enableDistinctCountBitmapOverride;
 
   public BaseBrokerRequestHandler(PinotConfiguration config, RoutingManager routingManager,
-      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      BrokerMetrics brokerMetrics) {
+      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager,
+      DefaultPinotConfigProvider defaultPinotConfigProvider, BrokerMetrics brokerMetrics) {
     _config = config;
     _routingManager = routingManager;
     _accessControlFactory = accessControlFactory;
     _queryQuotaManager = queryQuotaManager;
-    _tableCache = tableCache;
+    _defaultPinotConfigProvider = defaultPinotConfigProvider;
     _brokerMetrics = brokerMetrics;
 
     _defaultHllLog2m = _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
@@ -252,8 +252,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestStatistics.setTableName(rawTableName);
 
     try {
-      boolean isCaseInsensitive = _tableCache.isCaseInsensitive();
-      Map<String, String> columnNameMap = _tableCache.getColumnNameMap(rawTableName);
+      boolean isCaseInsensitive = _defaultPinotConfigProvider.isCaseInsensitive();
+      Map<String, String> columnNameMap = _defaultPinotConfigProvider.getColumnNameMap(rawTableName);
       if (columnNameMap != null) {
         updateColumnNames(rawTableName, pinotQuery, isCaseInsensitive, columnNameMap);
       }
@@ -275,7 +275,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (_enableQueryLimitOverride) {
       handleQueryLimitOverride(pinotQuery, _queryResponseLimit);
     }
-    handleSegmentPartitionedDistinctCountOverride(pinotQuery, getSegmentPartitionedColumns(_tableCache, tableName));
+    handleSegmentPartitionedDistinctCountOverride(pinotQuery,
+        getSegmentPartitionedColumns(_defaultPinotConfigProvider, tableName));
     if (_enableDistinctCountBitmapOverride) {
       handleDistinctCountBitmapOverride(pinotQuery);
     }
@@ -322,8 +323,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     if ((offlineTableName == null) && (realtimeTableName == null)) {
       // No table matches the request
-      if (_tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName)) == null
-          && _tableCache.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)) == null) {
+      if (_defaultPinotConfigProvider.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName)) == null
+          && _defaultPinotConfigProvider.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName))
+          == null) {
         LOGGER.info("Table not found for request {}: {}", requestId, query);
         requestStatistics.setErrorCode(QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE);
         return BrokerResponseNative.TABLE_DOES_NOT_EXIST;
@@ -360,29 +362,29 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // Prepare OFFLINE and REALTIME requests
     BrokerRequest offlineBrokerRequest = null;
     BrokerRequest realtimeBrokerRequest = null;
-    Schema schema = _tableCache.getSchema(rawTableName);
+    Schema schema = _defaultPinotConfigProvider.getSchema(rawTableName);
     if (offlineTableName != null && realtimeTableName != null) {
       // Hybrid
       offlineBrokerRequest = getOfflineBrokerRequest(brokerRequest);
-      _queryOptimizer.optimize(offlineBrokerRequest.getPinotQuery(), _tableCache.getTableConfig(offlineTableName),
-          schema);
+      _queryOptimizer.optimize(offlineBrokerRequest.getPinotQuery(),
+          _defaultPinotConfigProvider.getTableConfig(offlineTableName), schema);
       realtimeBrokerRequest = getRealtimeBrokerRequest(brokerRequest);
-      _queryOptimizer.optimize(realtimeBrokerRequest.getPinotQuery(), _tableCache.getTableConfig(realtimeTableName),
-          schema);
+      _queryOptimizer.optimize(realtimeBrokerRequest.getPinotQuery(),
+          _defaultPinotConfigProvider.getTableConfig(realtimeTableName), schema);
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.HYBRID);
       requestStatistics.setOfflineServerTenant(getServerTenant(offlineTableName));
       requestStatistics.setRealtimeServerTenant(getServerTenant(realtimeTableName));
     } else if (offlineTableName != null) {
       // OFFLINE only
       setTableName(brokerRequest, offlineTableName);
-      _queryOptimizer.optimize(pinotQuery, _tableCache.getTableConfig(offlineTableName), schema);
+      _queryOptimizer.optimize(pinotQuery, _defaultPinotConfigProvider.getTableConfig(offlineTableName), schema);
       offlineBrokerRequest = brokerRequest;
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.OFFLINE);
       requestStatistics.setOfflineServerTenant(getServerTenant(offlineTableName));
     } else {
       // REALTIME only
       setTableName(brokerRequest, realtimeTableName);
-      _queryOptimizer.optimize(pinotQuery, _tableCache.getTableConfig(realtimeTableName), schema);
+      _queryOptimizer.optimize(pinotQuery, _defaultPinotConfigProvider.getTableConfig(realtimeTableName), schema);
       realtimeBrokerRequest = brokerRequest;
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.REALTIME);
       requestStatistics.setRealtimeServerTenant(getServerTenant(realtimeTableName));
@@ -610,7 +612,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   private String getServerTenant(String tableNameWithType) {
-    TableConfig tableConfig = _tableCache.getTableConfig(tableNameWithType);
+    TableConfig tableConfig = _defaultPinotConfigProvider.getTableConfig(tableNameWithType);
     if (tableConfig == null) {
       LOGGER.debug("Table config is not available for table {}", tableNameWithType);
       return "unknownTenant";
@@ -664,7 +666,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (_enableQueryLimitOverride) {
       handleQueryLimitOverride(brokerRequest, _queryResponseLimit);
     }
-    handleSegmentPartitionedDistinctCountOverride(brokerRequest, getSegmentPartitionedColumns(_tableCache, tableName));
+    handleSegmentPartitionedDistinctCountOverride(brokerRequest,
+        getSegmentPartitionedColumns(_defaultPinotConfigProvider, tableName));
     if (_enableDistinctCountBitmapOverride) {
       handleDistinctCountBitmapOverride(brokerRequest);
     }
@@ -711,8 +714,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     if ((offlineTableName == null) && (realtimeTableName == null)) {
       // No table matches the request
-      if (_tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName)) == null
-          && _tableCache.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)) == null) {
+      if (_defaultPinotConfigProvider.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName)) == null
+          && _defaultPinotConfigProvider.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName))
+          == null) {
         LOGGER.info("Table not found for request {}: {}", requestId, query);
         requestStatistics.setErrorCode(QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE);
         return BrokerResponseNative.TABLE_DOES_NOT_EXIST;
@@ -749,7 +753,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // Prepare OFFLINE and REALTIME requests
     BrokerRequest offlineBrokerRequest = null;
     BrokerRequest realtimeBrokerRequest = null;
-    Schema schema = _tableCache.getSchema(rawTableName);
+    Schema schema = _defaultPinotConfigProvider.getSchema(rawTableName);
     if (offlineTableName != null && realtimeTableName != null) {
       // Hybrid
       offlineBrokerRequest = getOfflineBrokerRequest(brokerRequest);
@@ -1025,9 +1029,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * [table_name].
    */
   private String getActualTableName(String tableName) {
-    // Use TableCache to handle case-insensitive table name
-    if (_tableCache.isCaseInsensitive()) {
-      String actualTableName = _tableCache.getActualTableName(tableName);
+    // Use DefaultPinotConfigProvider to handle case-insensitive table name
+    if (_defaultPinotConfigProvider.isCaseInsensitive()) {
+      String actualTableName = _defaultPinotConfigProvider.getActualTableName(tableName);
       if (actualTableName != null) {
         return actualTableName;
       }
@@ -1035,7 +1039,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // Check if table is in the format of [database_name].[table_name]
       String[] tableNameSplits = StringUtils.split(tableName, ".", 2);
       if (tableNameSplits.length == 2) {
-        actualTableName = _tableCache.getActualTableName(tableNameSplits[1]);
+        actualTableName = _defaultPinotConfigProvider.getActualTableName(tableNameSplits[1]);
         if (actualTableName != null) {
           return actualTableName;
         }
@@ -1075,15 +1079,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Retrieve segment partitioned columns for a table.
    * For a hybrid table, a segment partitioned column has to be the intersection of both offline and realtime tables.
    *
-   * @param tableCache
+   * @param defaultPinotConfigProvider
    * @param tableName
    * @return segment partitioned columns belong to both offline and realtime tables.
    */
-  private static Set<String> getSegmentPartitionedColumns(TableCache tableCache, String tableName) {
+  private static Set<String> getSegmentPartitionedColumns(DefaultPinotConfigProvider defaultPinotConfigProvider,
+      String tableName) {
     final TableConfig offlineTableConfig =
-        tableCache.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+        defaultPinotConfigProvider.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
     final TableConfig realtimeTableConfig =
-        tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+        defaultPinotConfigProvider.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(tableName));
     if (offlineTableConfig == null) {
       return getSegmentPartitionedColumns(realtimeTableConfig);
     }
@@ -1493,7 +1498,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   @Deprecated
   private void updateColumnNames(String rawTableName, BrokerRequest brokerRequest) {
     Map<String, String> columnNameMap =
-        _tableCache.isCaseInsensitive() ? _tableCache.getColumnNameMap(rawTableName) : null;
+        _defaultPinotConfigProvider.isCaseInsensitive() ? _defaultPinotConfigProvider.getColumnNameMap(rawTableName)
+            : null;
 
     if (brokerRequest.getFilterSubQueryMap() != null) {
       Collection<FilterQuery> values = brokerRequest.getFilterSubQueryMap().getFilterQueryMap().values();
@@ -1560,7 +1566,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     TransformExpressionTree.ExpressionType expressionType = expression.getExpressionType();
     if (expressionType == TransformExpressionTree.ExpressionType.IDENTIFIER) {
       expression.setValue(getActualColumnName(rawTableName, expression.getValue(), columnNameMap, null,
-          _tableCache.isCaseInsensitive()));
+          _defaultPinotConfigProvider.isCaseInsensitive()));
     } else if (expressionType == TransformExpressionTree.ExpressionType.FUNCTION) {
       for (TransformExpressionTree child : expression.getChildren()) {
         fixColumnName(rawTableName, child, columnNameMap);

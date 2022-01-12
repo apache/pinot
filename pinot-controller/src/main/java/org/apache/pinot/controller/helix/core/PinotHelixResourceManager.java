@@ -72,7 +72,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
-import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.config.provider.DefaultPinotConfigProvider;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
 import org.apache.pinot.common.exception.SchemaBackwardIncompatibleException;
@@ -174,7 +174,7 @@ public class PinotHelixResourceManager {
   private Builder _keyBuilder;
   private SegmentDeletionManager _segmentDeletionManager;
   private PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
-  private TableCache _tableCache;
+  private DefaultPinotConfigProvider _defaultPinotConfigProvider;
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, boolean allowHLCTables) {
@@ -245,14 +245,15 @@ public class PinotHelixResourceManager {
     _segmentDeletionManager = new SegmentDeletionManager(_dataDir, _helixAdmin, _helixClusterName, _propertyStore);
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
 
-    // Initialize TableCache
+    // Initialize DefaultPinotConfigProvider
     HelixConfigScope helixConfigScope =
         new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(_helixClusterName).build();
     Map<String, String> configs = _helixAdmin.getConfig(helixConfigScope,
         Arrays.asList(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY));
-    boolean caseInsensitive = Boolean.parseBoolean(configs.get(Helix.ENABLE_CASE_INSENSITIVE_KEY)) || Boolean
-        .parseBoolean(configs.get(Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY));
-    _tableCache = new TableCache(_propertyStore, caseInsensitive);
+    boolean caseInsensitive =
+        Boolean.parseBoolean(configs.get(Helix.ENABLE_CASE_INSENSITIVE_KEY)) || Boolean.parseBoolean(
+            configs.get(Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY));
+    _defaultPinotConfigProvider = new DefaultPinotConfigProvider(_propertyStore, caseInsensitive);
   }
 
   /**
@@ -554,8 +555,8 @@ public class PinotHelixResourceManager {
    * @return tableName actually defined in Pinot (matches case) and exists ,else, return the input value
    */
   public String getActualTableName(String tableName) {
-    if (_tableCache.isCaseInsensitive()) {
-      String actualTableName = _tableCache.getActualTableName(tableName);
+    if (_defaultPinotConfigProvider.isCaseInsensitive()) {
+      String actualTableName = _defaultPinotConfigProvider.getActualTableName(tableName);
       return actualTableName != null ? actualTableName : tableName;
     } else {
       return tableName;
@@ -569,7 +570,7 @@ public class PinotHelixResourceManager {
    * @return crypter class name
    */
   public String getCrypterClassNameFromTableConfig(String tableNameWithType) {
-    TableConfig tableConfig = _tableCache.getTableConfig(tableNameWithType);
+    TableConfig tableConfig = _defaultPinotConfigProvider.getTableConfig(tableNameWithType);
     Preconditions.checkNotNull(tableConfig, "Table config is not available for table '%s'", tableNameWithType);
     return tableConfig.getValidationConfig().getCrypterClassName();
   }
