@@ -28,6 +28,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -831,12 +832,9 @@ public class FileUploadDownloadClient implements Closeable {
     // Add table name and type request parameters
     NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, tableName);
     NameValuePair tableTypeValuePair = new BasicNameValuePair(QueryParameters.TABLE_TYPE, tableType.name());
-    if (parameters == null) {
-      parameters = Arrays.asList(tableNameValuePair, tableTypeValuePair);
-    } else {
-      parameters.add(tableNameValuePair);
-      parameters.add(tableTypeValuePair);
-    }
+    parameters = parameters == null ? new ArrayList<>() : new ArrayList<>(parameters);
+    parameters.add(tableNameValuePair);
+    parameters.add(tableTypeValuePair);
     return sendRequest(
         getUploadSegmentRequest(uri, segmentName, inputStream, headers, parameters, DEFAULT_SOCKET_TIMEOUT_MS));
   }
