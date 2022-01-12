@@ -90,9 +90,7 @@ public class SegmentPushUtils implements Serializable {
   public static void pushSegments(SegmentGenerationJobSpec spec, PinotFS fileSystem, List<String> tarFilePaths)
       throws RetriableOperationException, AttemptsExceededException {
     String tableName = spec.getTableSpec().getTableName();
-    TableType tableType =
-        SegmentGenerationUtils.getTableConfig(spec.getTableSpec().getTableConfigURI(), spec.getAuthToken())
-            .getTableType();
+    TableType tableType = tableName.endsWith("_" + TableType.REALTIME.name()) ? TableType.REALTIME : TableType.OFFLINE;
     boolean cleanUpOutputDir = spec.isCleanUpOutputDir();
     LOGGER.info("Start pushing segments: {}... to locations: {} for table {}",
         Arrays.toString(tarFilePaths.subList(0, Math.min(5, tarFilePaths.size())).toArray()),
