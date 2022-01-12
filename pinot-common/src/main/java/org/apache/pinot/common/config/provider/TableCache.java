@@ -23,7 +23,6 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -65,8 +64,8 @@ public class TableCache implements PinotConfigProvider {
   private static final String LOWER_CASE_OFFLINE_TABLE_SUFFIX = "_offline";
   private static final String LOWER_CASE_REALTIME_TABLE_SUFFIX = "_realtime";
 
-  private final Set<TableConfigChangeListener> _tableConfigChangeListeners = new HashSet<>();
-  private final Set<SchemaChangeListener> _schemaChangeListeners = new HashSet<>();
+  private final Set<TableConfigChangeListener> _tableConfigChangeListeners = ConcurrentHashMap.newKeySet();
+  private final Set<SchemaChangeListener> _schemaChangeListeners = ConcurrentHashMap.newKeySet();
 
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final boolean _caseInsensitive;
@@ -160,8 +159,10 @@ public class TableCache implements PinotConfigProvider {
 
   @Override
   public List<TableConfig> registerTableConfigChangeListener(TableConfigChangeListener tableConfigChangeListener) {
-    _tableConfigChangeListeners.add(tableConfigChangeListener);
-    return Lists.newArrayList(_tableConfigMap.values());
+    synchronized (_zkTableConfigChangeListener) {
+      _tableConfigChangeListeners.add(tableConfigChangeListener);
+      return Lists.newArrayList(_tableConfigMap.values());
+    }
   }
 
   /**
@@ -177,8 +178,10 @@ public class TableCache implements PinotConfigProvider {
 
   @Override
   public List<Schema> registerSchemaChangeListener(SchemaChangeListener schemaChangeListener) {
-    _schemaChangeListeners.add(schemaChangeListener);
-    return _schemaInfoMap.values().stream().map(s -> s._schema).collect(Collectors.toList());
+    synchronized (_zkSchemaChangeListener) {
+      _schemaChangeListeners.add(schemaChangeListener);
+      return _schemaInfoMap.values().stream().map(s -> s._schema).collect(Collectors.toList());
+    }
   }
 
   private void addTableConfigs(List<String> paths) {
