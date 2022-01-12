@@ -309,12 +309,16 @@ public abstract class BaseTableDataManager implements TableDataManager {
         indexDir = downloadSegment(segmentName, zkMetadata);
       } else {
         LOGGER.info("Reload existing segment: {} of table: {}", segmentName, _tableNameWithType);
+        // The indexDir is empty after calling createBackup, as it's renamed to a backup directory.
+        // The SegmentDirectory should initialize accordingly. Like for SegmentLocalFSDirectory, it
+        // doesn't load anything from an empty indexDir, but gets the info to complete the copyTo.
         try (SegmentDirectory segmentDirectory = initSegmentDirectory(segmentName, indexLoadingConfig)) {
           segmentDirectory.copyTo(indexDir);
         }
       }
 
-      // Load from index directory and replace the old segment in memory.
+      // Load from indexDir and replace the old segment in memory. What's inside indexDir
+      // may come from SegmentDirectory.copyTo() or the segment downloaded from deep store.
       ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema);
       addSegment(segment);
 
