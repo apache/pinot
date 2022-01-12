@@ -1162,7 +1162,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
     if (_currentOffset.compareTo(endOffset) != 0) {
       // Timeout?
-      _segmentLogger.error("Could not consume up to {} (current offset {})", endOffset, _currentOffset);
+      _segmentLogger.warn("Could not consume up to {} (current offset {})", endOffset, _currentOffset);
       return false;
     }
 
