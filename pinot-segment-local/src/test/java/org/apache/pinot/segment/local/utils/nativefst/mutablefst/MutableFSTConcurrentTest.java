@@ -93,12 +93,12 @@ public class MutableFSTConcurrentTest {
 
     assertEquals(_resultSet.size(), words.size());
 
-    assert(_resultSet.contains("ab"));
-    assert(_resultSet.contains("abba"));
-    assert(_resultSet.contains("aba"));
-    assert(_resultSet.contains("bab"));
-    assert(_resultSet.contains("cdd"));
-    assert(_resultSet.contains("efg"));
+    assert (_resultSet.contains("ab"));
+    assert (_resultSet.contains("abba"));
+    assert (_resultSet.contains("aba"));
+    assert (_resultSet.contains("bab"));
+    assert (_resultSet.contains("cdd"));
+    assert (_resultSet.contains("efg"));
   }
 
   private void performReads(MutableFST fst, List<String> words, int count,

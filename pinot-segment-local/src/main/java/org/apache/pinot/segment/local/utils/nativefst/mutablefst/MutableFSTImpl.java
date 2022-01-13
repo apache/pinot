@@ -35,10 +35,10 @@ import org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils.MutableFS
  * Concurrently writing and reading to/from a mutable FST is supported.
  */
 public class MutableFSTImpl implements MutableFST {
-  private MutableState start;
+  private MutableState _start;
 
   public MutableFSTImpl() {
-    this.start = new MutableState(true);
+    this._start = new MutableState(true);
   }
 
   /**
@@ -46,7 +46,7 @@ public class MutableFSTImpl implements MutableFST {
    */
   @Override
   public MutableState getStartState() {
-    return start;
+    return _start;
   }
 
   /**
@@ -56,11 +56,11 @@ public class MutableFSTImpl implements MutableFST {
    */
   @Override
   public void setStartState(MutableState start) {
-    if (this.start != null) {
+    if (this._start != null) {
       throw new IllegalStateException("Cannot override a start state");
     }
 
-    this.start = start;
+    this._start = start;
   }
 
   public MutableState newStartState() {
@@ -77,7 +77,7 @@ public class MutableFSTImpl implements MutableFST {
 
   @Override
   public void throwIfInvalid() {
-    Preconditions.checkNotNull(start, "must have a start state");
+    Preconditions.checkNotNull(_start, "must have a start state");
   }
 
   @Override
@@ -175,8 +175,8 @@ public class MutableFSTImpl implements MutableFST {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("Fst(start=").append(start).append(")");
-    List<MutableArc> arcs = start.getArcs();
+    sb.append("Fst(start=").append(_start).append(")");
+    List<MutableArc> arcs = _start.getArcs();
 
     for (MutableArc arc : arcs) {
       sb.append("  ").append(arc.toString()).append("\n");
@@ -192,7 +192,7 @@ public class MutableFSTImpl implements MutableFST {
   @Override
   public int hashCode() {
     int result = 0;
-    result = 31 * result + (start != null ? start.hashCode() : 0);
+    result = 31 * result + (_start != null ? _start.hashCode() : 0);
     return result;
   }
 }

@@ -27,8 +27,8 @@ import org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils.MutableFS
  */
 public class MutableArc {
 
-  private int outputSymbol;
-  private MutableState nextState;
+  private int _outputSymbol;
+  private MutableState _nextState;
 
   /**
    * Arc Constructor
@@ -36,19 +36,19 @@ public class MutableArc {
    * @param nextState the arc's next state
    */
   public MutableArc(int outputSymbol, MutableState nextState) {
-    this.outputSymbol = outputSymbol;
-    this.nextState = nextState;
+    this._outputSymbol = outputSymbol;
+    this._nextState = nextState;
   }
 
   public int getOutputSymbol() {
-    return outputSymbol;
+    return _outputSymbol;
   }
 
   /**
    * Get the next state
    */
   public MutableState getNextState() {
-    return nextState;
+    return _nextState;
   }
 
   @Override
@@ -60,13 +60,13 @@ public class MutableArc {
   public int hashCode() {
     int result = 1;
 
-    result = 31 * result + (nextState != null ? nextState.getLabel() : 0);
+    result = 31 * result + (_nextState != null ? _nextState.getLabel() : 0);
     return result;
   }
 
   @Override
   public String toString() {
-    return "(" + nextState.toString()
+    return "(" + _nextState.toString()
            + ")";
   }
 }

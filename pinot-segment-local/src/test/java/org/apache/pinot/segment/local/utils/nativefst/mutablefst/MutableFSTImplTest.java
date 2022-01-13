@@ -151,15 +151,15 @@ public class MutableFSTImplTest {
 
   @Test
   public void testRegex2() {
-    Assert.assertEquals(regexQueryNrHitsForRealTimeFST(".[aeiou]c.*",_fst), 1);
+    Assert.assertEquals(regexQueryNrHitsForRealTimeFST(".[aeiou]c.*", _fst), 1);
     Assert.assertEquals(regexQueryNrHitsForRealTimeFST("q.[aeiou]c.", _fst), 1);
   }
 
   @Test
   public void testCharacterClasses() {
     Assert.assertEquals(regexQueryNrHitsForRealTimeFST("\\d*", _fst), 1);
-    Assert.assertEquals(regexQueryNrHitsForRealTimeFST("\\d{6}",_fst), 1);
-    Assert.assertEquals(regexQueryNrHitsForRealTimeFST("[a\\d]{6}",_fst), 1);
+    Assert.assertEquals(regexQueryNrHitsForRealTimeFST("\\d{6}", _fst), 1);
+    Assert.assertEquals(regexQueryNrHitsForRealTimeFST("[a\\d]{6}", _fst), 1);
     Assert.assertEquals(regexQueryNrHitsForRealTimeFST("\\d{2,7}", _fst), 1);
     Assert.assertEquals(regexQueryNrHitsForRealTimeFST("\\d{4}", _fst), 0);
   }
