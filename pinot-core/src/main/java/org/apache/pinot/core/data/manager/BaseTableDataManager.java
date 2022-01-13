@@ -484,6 +484,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
     FileUtils.deleteDirectory(segmentTempDir);
   }
 
+  /**
+   * Try to load the segment potentially still existing on the server.
+   *
+   * @return true if the segment still exists on server, its CRC is still same with the
+   * one in SegmentZKMetadata and is loaded into memory successfully; false if it doesn't
+   * exist on the server, its CRC has changed, or it fails to be loaded.
+   */
   private boolean tryLoadExistingSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
       SegmentZKMetadata zkMetadata) {
     // Try to recover the segment from potential segment reloading failure.

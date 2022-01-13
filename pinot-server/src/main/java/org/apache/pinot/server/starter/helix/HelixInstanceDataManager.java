@@ -308,7 +308,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   /**
    * Try to reload a mutable segment.
-   * @return true if the segment is mutable; false if the segment is immutable.
+   * @return true if the segment is mutable and loaded; false if the segment is immutable.
    */
   @VisibleForTesting
   boolean reloadMutableSegment(String tableNameWithType, String segmentName,
