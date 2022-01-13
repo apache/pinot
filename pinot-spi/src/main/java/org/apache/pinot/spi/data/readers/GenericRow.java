@@ -27,6 +27,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -69,7 +71,7 @@ public class GenericRow implements Serializable {
    */
   public static final String SKIP_RECORD_KEY = "$SKIP_RECORD_KEY$";
 
-  private final Map<String, Object> _fieldToValueMap = new HashMap<>();
+  private final Map<String, Object> _fieldToValueMap = new LinkedHashMap<>();
   private final Set<String> _nullValueFields = new HashSet<>();
 
   /**
@@ -79,6 +81,14 @@ public class GenericRow implements Serializable {
   public void init(GenericRow row) {
     _fieldToValueMap.putAll(row._fieldToValueMap);
     _nullValueFields.addAll(row._nullValueFields);
+  }
+
+  /**
+   * Iterate over the contents of the row
+   * @return
+   */
+  public Iterator<Map.Entry<String, Object>> iterator() {
+    return _fieldToValueMap.entrySet().iterator();
   }
 
   /**

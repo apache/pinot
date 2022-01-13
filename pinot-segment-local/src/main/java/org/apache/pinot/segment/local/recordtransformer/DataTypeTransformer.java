@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -31,6 +32,7 @@ import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.Pair;
 
 
 /**
@@ -40,33 +42,47 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  */
 @SuppressWarnings("rawtypes")
 public class DataTypeTransformer implements RecordTransformer {
-  private final Map<String, PinotDataType> _dataTypes = new HashMap<>();
+  private final Map<String, PinotDataType> _dataTypes;
+  private final Pair[] _mapping;
 
-  public DataTypeTransformer(Schema schema) {
-    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+  public DataTypeTransformer(Collection<FieldSpec> fieldSpecs) {
+    _dataTypes = new HashMap<>(fieldSpecs.size());
+    for (FieldSpec fieldSpec : fieldSpecs) {
       if (!fieldSpec.isVirtualColumn()) {
         _dataTypes.put(fieldSpec.getName(), PinotDataType.getPinotDataTypeForIngestion(fieldSpec));
       }
     }
+    _mapping = new Pair[fieldSpecs.size()];
+  }
+
+  public DataTypeTransformer(Schema schema) {
+    this(schema.getAllFieldSpecs());
   }
 
   @Override
   public GenericRow transform(GenericRow record) {
-    for (Map.Entry<String, PinotDataType> entry : _dataTypes.entrySet()) {
-      String column = entry.getKey();
+    Iterator<Map.Entry<String, Object>> recordIterator = record.iterator();
+    int i = 0;
+    while (recordIterator.hasNext() && i < _mapping.length) {
+      Map.Entry<String, Object> columnValue = recordIterator.next();
       try {
-        Object value = record.getValue(column);
-        if (value == null) {
+        String column = columnValue.getKey();
+        PinotDataType dest = getPinotDataType(i, column);
+        if (dest == null) {
+          columnValue.setValue(null);
           continue;
         }
-        PinotDataType dest = entry.getValue();
+        i++;
+        Object value = columnValue.getValue();
+        if (value == null) {
+          columnValue.setValue(null);
+          continue;
+        }
         value = standardize(column, value, dest.isSingleValue());
-        // NOTE: The standardized value could be null for empty Collection/Map/Object[].
         if (value == null) {
-          record.putValue(column, null);
+          columnValue.setValue(null);
           continue;
         }
-
         // Convert data type if necessary
         PinotDataType source;
         if (value instanceof Object[]) {
@@ -90,12 +106,34 @@ public class DataTypeTransformer implements RecordTransformer {
         value = dest.convert(value, source);
         value = dest.toInternal(value);
 
-        record.putValue(column, value);
+        columnValue.setValue(value);
       } catch (Exception e) {
-        throw new RuntimeException("Caught exception while transforming data type for column: " + column, e);
+        throw new RuntimeException("Caught exception while transforming data type for column: " + columnValue.getKey(),
+            e);
       }
     }
     return record;
+  }
+
+  @SuppressWarnings("unchecked")
+  private PinotDataType getPinotDataType(int index, String column) {
+    // try to memoize the iteration order of the input
+    Pair<String, PinotDataType> pair = (Pair<String, PinotDataType>) _mapping[index];
+    if (pair == null) {
+      return createMapping(index, column);
+    }
+    if (pair.getFirst().equals(column)) {
+      return pair.getSecond();
+    }
+    return createMapping(index, column);
+  }
+
+  private PinotDataType createMapping(int index, String column) {
+    PinotDataType dataType = _dataTypes.get(column);
+    if (dataType != null) {
+      _mapping[index] = new Pair<>(column, dataType);
+    }
+    return dataType;
   }
 
   /**
@@ -109,9 +147,6 @@ public class DataTypeTransformer implements RecordTransformer {
   @VisibleForTesting
   @Nullable
   static Object standardize(String column, @Nullable Object value, boolean isSingleValue) {
-    if (value == null) {
-      return null;
-    }
     if (value instanceof Collection) {
       return standardizeCollection(column, (Collection) value, isSingleValue);
     }
