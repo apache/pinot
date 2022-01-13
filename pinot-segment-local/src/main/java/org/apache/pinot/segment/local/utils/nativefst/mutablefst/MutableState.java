@@ -58,7 +58,7 @@ public class MutableState {
   }
 
   public MutableState(boolean isStartState) {
-    this._isStartState = isStartState;
+    _isStartState = isStartState;
     _arcs = Lists.newArrayList();
   }
 
@@ -75,18 +75,18 @@ public class MutableState {
   }
 
   public void setLabel(char label) {
-    this._label = label;
+    _label = label;
   }
 
   public void setIsTerminal(boolean isTerminal) {
-    this._isTerminal = isTerminal;
+    _isTerminal = isTerminal;
   }
 
   /**
    * Get the number of outgoing arcs
    */
   public int getArcCount() {
-    return this._arcs.size();
+    return _arcs.size();
   }
 
   /**
@@ -96,12 +96,11 @@ public class MutableState {
    * @return the arc
    */
   public MutableArc getArc(int index) {
-    return this._arcs.get(index);
+    return _arcs.get(index);
   }
-
-
+  g
   public List<MutableArc> getArcs() {
-    return this._arcs;
+    return _arcs;
   }
 
   @Override
@@ -111,7 +110,7 @@ public class MutableState {
 
   // adds an arc but should only be used by MutableFst
   void addArc(MutableArc arc) {
-      this._arcs.add(arc);
+      _arcs.add(arc);
     }
 
   void addIncomingState(MutableState inState) {
@@ -119,15 +118,15 @@ public class MutableState {
       return;
     }
 
-    this._incomingStates.add(inState);
+    _incomingStates.add(inState);
   }
 
   void removeIncomingState(MutableState inState) {
-    this._incomingStates.remove(inState);
+    _incomingStates.remove(inState);
   }
 
   public Iterable<MutableState> getIncomingStates() {
-    return this._incomingStates;
+    return _incomingStates;
   }
 
   @Override

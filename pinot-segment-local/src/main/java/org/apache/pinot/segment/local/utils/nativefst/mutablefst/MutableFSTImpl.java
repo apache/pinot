@@ -38,7 +38,7 @@ public class MutableFSTImpl implements MutableFST {
   private MutableState _start;
 
   public MutableFSTImpl() {
-    this._start = new MutableState(true);
+    _start = new MutableState(true);
   }
 
   /**
@@ -56,11 +56,11 @@ public class MutableFSTImpl implements MutableFST {
    */
   @Override
   public void setStartState(MutableState start) {
-    if (this._start != null) {
+    if (_start != null) {
       throw new IllegalStateException("Cannot override a start state");
     }
 
-    this._start = start;
+    _start = start;
   }
 
   public MutableState newStartState() {

@@ -36,8 +36,8 @@ public class MutableArc {
    * @param nextState the arc's next state
    */
   public MutableArc(int outputSymbol, MutableState nextState) {
-    this._outputSymbol = outputSymbol;
-    this._nextState = nextState;
+    _outputSymbol = outputSymbol;
+    _nextState = nextState;
   }
 
   public int getOutputSymbol() {
