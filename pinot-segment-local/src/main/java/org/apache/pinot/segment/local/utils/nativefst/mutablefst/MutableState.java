@@ -98,7 +98,7 @@ public class MutableState {
   public MutableArc getArc(int index) {
     return _arcs.get(index);
   }
-  g
+  
   public List<MutableArc> getArcs() {
     return _arcs;
   }
