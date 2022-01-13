@@ -75,7 +75,7 @@ public class StWithinFunction extends BaseTransformFunction {
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
     if (_results == null) {
-      _results = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _results = new int[projectionBlock.getNumDocs()];
     }
     byte[][] firstValues = _firstArgument.transformToBytesValuesSV(projectionBlock);
     byte[][] secondValues = _secondArgument.transformToBytesValuesSV(projectionBlock);
