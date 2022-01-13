@@ -21,8 +21,25 @@ package org.apache.pinot.segment.local.utils.nativefst.mutablefst;
 
 
 /**
- * Client interface for an FST abstracting either the mutable or immutable FST
- * @author Atri Sharma
+ * A mutable FST represents a FST which can have arbitrary inputs added to it at
+ * any given point of time. Unlike a normal FST which is build once read many, mutable
+ * FST can be concurrently written to and read from. Mutable FST provides real time search
+ * i.e. search will see words as they are added without needing a flush.
+ *
+ * Unlike a normal FST, mutable FST does not require the entire input beforehand nor
+ * does it require the input to be sorted. Single word additions work well with
+ * mutable FST.
+ *
+ * The reason as to why normal FST and mutable FST have different interfaces is because
+ * normal i.e. immutable FST is optimized for storage and represents arcs, nodes and labels
+ * by offsets. Thus, all operations are done in integer offsets.
+ *
+ * Unlike a normal FST, mutable FST has all components mutable i.e. arc and node. Thus, a
+ * mutable FST operates on different data structures and follows a slightly different
+ * interface.
+ *
+ * However, functionality wise, the interfaces for immutable FST and mutable FST are
+ * identical with no difference.
  */
 public interface MutableFST {
 

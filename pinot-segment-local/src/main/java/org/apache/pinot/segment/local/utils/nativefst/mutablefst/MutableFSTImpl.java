@@ -28,8 +28,11 @@ import org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils.MutableFS
 
 
 /**
- * A mutable finite state transducer implementation that allows you to build WFSTs via the API.
- * This is not thread safe; convert to an ImmutableFst if you need to share across threads.
+ * A mutable finite state transducer implementation that allows you to build mutable via the API.
+ * This is not thread safe; convert to an ImmutableFst if you need to share across multiple writer
+ * threads.
+ *
+ * Concurrently writing and reading to/from a mutable FST is supported.
  */
 public class MutableFSTImpl implements MutableFST {
   private MutableState start;
