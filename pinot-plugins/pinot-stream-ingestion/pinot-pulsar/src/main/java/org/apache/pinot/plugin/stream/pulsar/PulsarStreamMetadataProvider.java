@@ -22,16 +22,16 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
-import org.apache.pulsar.client.api.Message;
+import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.PulsarClientException;
-import org.apache.pulsar.client.api.Reader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,8 +39,7 @@ import org.slf4j.LoggerFactory;
 /**
  * A {@link StreamMetadataProvider} implementation for the Pulsar stream
  */
-public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnectionHandler
-    implements StreamMetadataProvider {
+public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnectionHandler implements StreamMetadataProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarStreamMetadataProvider.class);
 
   private final StreamConfig _streamConfig;
@@ -80,16 +79,15 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
     Preconditions.checkNotNull(offsetCriteria);
     try {
       MessageId offset = null;
+      Consumer consumer =
+          _pulsarClient.newConsumer().topic(_topic)
+              .subscriptionInitialPosition(_config.getInitialSubscriberPosition())
+              .subscriptionName("Pinot_" + UUID.randomUUID()).subscribe();
+
       if (offsetCriteria.isLargest()) {
-        _reader.seek(MessageId.latest);
-        if (_reader.hasMessageAvailable()) {
-          offset = _reader.readNext().getMessageId();
-        }
+        offset = consumer.getLastMessageId();
       } else if (offsetCriteria.isSmallest()) {
-        _reader.seek(MessageId.earliest);
-        if (_reader.hasMessageAvailable()) {
-          offset = _reader.readNext().getMessageId();
-        }
+        offset = consumer.receive().getMessageId();
       } else {
         throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria);
       }
@@ -124,18 +122,21 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
 
         for (int p = newPartitionStartIndex; p < partitionedTopicNameList.size(); p++) {
 
-          Reader reader =
-              _pulsarClient.newReader().topic(getPartitionedTopicName(p)).startMessageId(_config.getInitialMessageId())
-                  .create();
+          Consumer consumer = _pulsarClient.newConsumer().topic(getPartitionedTopicName(p))
+              .subscriptionInitialPosition(_config.getInitialSubscriberPosition())
+              .subscriptionName("Pinot_" + UUID.randomUUID()).subscribe();
 
-          if (reader.hasMessageAvailable()) {
-            Message message = reader.readNext();
+          if (!consumer.hasReachedEndOfTopic()) {
             newPartitionGroupMetadataList.add(
-                new PartitionGroupMetadata(p, new MessageIdStreamOffset(message.getMessageId())));
+                new PartitionGroupMetadata(p, new MessageIdStreamOffset(consumer.receive().getMessageId())));
+          } else {
+            newPartitionGroupMetadataList.add(
+                new PartitionGroupMetadata(p, new MessageIdStreamOffset(consumer.getLastMessageId())));
           }
         }
       }
     } catch (Exception e) {
+      LOGGER.warn("Error encountered while calculating pulsar partition group metadata: " + e.getMessage(), e);
       // No partition found
     }
 
