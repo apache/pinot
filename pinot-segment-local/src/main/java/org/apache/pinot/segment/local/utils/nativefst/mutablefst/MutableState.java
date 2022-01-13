@@ -98,14 +98,14 @@ public class MutableState {
   public MutableArc getArc(int index) {
     return _arcs.get(index);
   }
-  
+
   public List<MutableArc> getArcs() {
     return _arcs;
   }
 
   @Override
   public String toString() {
-    return "(" + _label +  ")";
+    return "(" + _label + ")";
   }
 
   // adds an arc but should only be used by MutableFst
