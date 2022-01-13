@@ -21,8 +21,7 @@ import com.google.common.collect.Sets;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils.MutableFSTUtils;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
+
 import java.util.List;
 import java.util.Set;
 
@@ -32,7 +31,7 @@ import java.util.Set;
  *
  * Holds its outgoing {@link MutableArc} objects in an ArrayList allowing additions/deletions
  */
-public class MutableState implements State {
+public class MutableState {
 
   protected char label;
 
@@ -60,29 +59,18 @@ public class MutableState implements State {
     arcs = Lists.newArrayList();
   }
 
-  /**
-   * Shorts the arc's ArrayList based on the provided Comparator
-   */
-  public void arcSort(Comparator<Arc> cmp) {
-    Collections.sort(arcs, cmp);
-  }
-
-  @Override
   public boolean isTerminal() {
     return isTerminal;
   }
 
-  @Override
   public boolean isStartState() {
     return isStartState;
   }
 
-  @Override
   public char getLabel() {
     return label;
   }
 
-  @Override
   public void setLabel(char label) {
     this.label = label;
   }
@@ -94,7 +82,6 @@ public class MutableState implements State {
   /**
    * Get the number of outgoing arcs
    */
-  @Override
   public int getArcCount() {
     return this.arcs.size();
   }
@@ -105,13 +92,11 @@ public class MutableState implements State {
    * @param index the arc's index
    * @return the arc
    */
-  @Override
   public MutableArc getArc(int index) {
     return this.arcs.get(index);
   }
 
 
-  @Override
   public List<MutableArc> getArcs() {
     return this.arcs;
   }
