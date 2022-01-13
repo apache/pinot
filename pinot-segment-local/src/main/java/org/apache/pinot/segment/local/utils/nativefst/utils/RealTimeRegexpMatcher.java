@@ -93,12 +93,10 @@ public class RealTimeRegexpMatcher {
             queue.add(new Path(t._to, arc.getNextState(), arc, path._pathState));
           }
         } else {
-          MutableState node = path._node;
           List<MutableArc> arcs = path._node.getArcs();
 
           for (MutableArc arc : arcs) {
-            char label = node.getLabel();
-
+            char label = arc.getNextState().getLabel();
             if (label >= min && label <= max) {
               queue.add(new Path(t._to, arc.getNextState(), arc, path._pathState));
             }
