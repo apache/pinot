@@ -37,52 +37,12 @@ public interface MutableFST {
   void setStartState(MutableState mutableState);
 
   /**
-   * The total number of states in the FST
-   * @return
+   * throws an exception if the FST is constructed in an invalid state
    */
-  int getStateCount();
-
-  /**
-   * Get the FST state and the ith index
-   * @param index
-   * @return
-   */
-  State getState(int index);
-
-  /**
-   * Get the FST state corresponding to the given state label or throws an IllegalArgumentException if state labels
-   * are not being used in this FST
-   * @param name
-   * @return
-   */
-  State getState(String name);
-
-  /**
-   * Return the symbol table for the output symbols
-   * @return
-   */
-  SymbolTable getOutputSymbols();
+  void throwIfInvalid();
 
   /**
    * Add a path to the FST
    */
   void addPath(String word, int outputSymbol);
-
-  /**
-   * Return the symbol table for the state symbols or null if state symbols are not being used
-   * @return
-   */
-  @Nullable
-  SymbolTable getStateSymbols();
-
-  /**
-   * Returns true if this FST is using state symbols; iff this is true then `getStateSymbols() != null`
-   * @return
-   */
-  boolean isUsingStateSymbols();
-
-  /**
-   * throws an exception if the FST is constructed in an invalid state
-   */
-  void throwIfInvalid();
 }

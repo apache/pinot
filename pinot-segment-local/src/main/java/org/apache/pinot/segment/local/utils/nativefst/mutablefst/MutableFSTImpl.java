@@ -32,58 +32,10 @@ import static com.google.common.base.Preconditions.checkArgument;
  * This is not thread safe; convert to an ImmutableFst if you need to share across threads.
  */
 public class MutableFSTImpl implements MutableFST {
-
-  public static MutableFSTImpl emptyWithCopyOfSymbols(MutableFSTImpl mutableFSTImpl) {
-    MutableFSTImpl copy = new MutableFSTImpl(mutableFSTImpl.states, mutableFSTImpl.outputSymbols);
-
-    if (mutableFSTImpl.isUsingStateSymbols()) {
-      copy.useStateSymbols(new MutableSymbolTable(mutableFSTImpl.getStateSymbols()));
-    }
-
-    return copy;
-  }
-
-  private final ArrayList<MutableState> states;
   private MutableState start;
-  private WriteableSymbolTable outputSymbols;
-  private MutableSymbolTable stateSymbols;
 
   public MutableFSTImpl() {
-    this(new MutableSymbolTable());
-  }
-
-  /**
-   * Constructs a new MutableFst with the given mutable symbol table; NOTE that these
-   * symbol tables are being GIVEN to own by this MutableFst (transfer of ownership); tables should
-   * not be SHARED by FSTs so if you want to make copies -- then do it yourself or set the tables
-   * after construction via one of the applicable methods
-   * @param outputSymbolsToOwn
-   */
-  public MutableFSTImpl(WriteableSymbolTable outputSymbolsToOwn) {
-    this(Lists.newArrayList(), outputSymbolsToOwn);
-  }
-
-  protected MutableFSTImpl(ArrayList<MutableState> states,
-                       WriteableSymbolTable outputSymbols) {
-    this.states = states;
-    this.outputSymbols = outputSymbols;
-
-    this.stateSymbols = new MutableSymbolTable();
     this.start = new MutableState(true);
-  }
-
-  @Nullable
-  @Override
-  public WriteableSymbolTable getStateSymbols() {
-    return stateSymbols;
-  }
-
-  /**
-   * This sets a state symbols table; this takes ownership of this so don't share symbol
-   * tables
-   */
-  public void useStateSymbols(MutableSymbolTable stateSymbolsToOwn) {
-    this.stateSymbols = stateSymbolsToOwn;
   }
 
   /**
@@ -109,107 +61,7 @@ public class MutableFSTImpl implements MutableFST {
   }
 
   public MutableState newStartState() {
-    return newStartState(null);
-  }
-
-  public MutableState newStartState(@Nullable String startStateSymbol) {
-    checkArgument(start == null, "cant add more than one start state");
-    MutableState newStart = newState(startStateSymbol);
-    setStartState(newStart);
-    return newStart;
-  }
-
-  /**
-   * Get the number of states in the fst
-   */
-  @Override
-  public int getStateCount() {
-    return this.states.size();
-  }
-
-  @Override
-  public MutableState getState(int index) {
-    return states.get(index);
-  }
-
-  @Override
-  public MutableState getState(String name) {
-    Preconditions.checkState(stateSymbols != null, "cant ask by name if not using state symbols");
-    return getState(stateSymbols.get(name));
-  }
-
-  /**
-   * Adds a state to the fst
-   *
-   * @param state the state to be added
-   */
-  public MutableState addState(MutableState state) {
-    return addState(state, null);
-  }
-
-  public int lookupOutputSymbol(String symbol) {
-    return outputSymbols.get(symbol);
-  }
-
-  public MutableState addState(MutableState state, @Nullable String newStateSymbol) {
-
-    this.states.add(state);
-    if (stateSymbols != null) {
-      Preconditions.checkNotNull(newStateSymbol, "if using symbol table for states everything must have "
-                                                 + "a symbol");
-      stateSymbols.put(newStateSymbol, -1);
-    } else {
-      Preconditions.checkState(newStateSymbol == null, "cant pass state name if not using symbol table");
-    }
-    return state;
-  }
-
-  public MutableState setState(int id, MutableState state) {
-    throwIfSymbolTableMissingId(id);
-    // they provided the id so index properly
-    if (id >= this.states.size()) {
-      this.states.ensureCapacity(id + 1);
-      for (int i = states.size(); i <= id; i++) {
-        this.states.add(null);
-      }
-    }
-    Preconditions.checkState(this.states.get(id) == null, "cant write two states with ", id);
-    this.states.set(id, state);
-    return state;
-  }
-
-  public MutableState newState() {
-    return newState(null);
-  }
-
-  public MutableState newState(@Nullable String newStateSymbol) {
-    MutableState s = new MutableState();
-    return addState(s, newStateSymbol);
-  }
-
-  public MutableState getOrNewState(String stateSymbol) {
-    Preconditions.checkNotNull(stateSymbols, "cant use this without state symbols");
-    if (stateSymbols.contains(stateSymbol)) {
-      return getState(stateSymbol);
-    }
-    return newState(stateSymbol);
-  }
-
-  /**
-   * Adds a new arc in the FST between startStateSymbol and endStateSymbol with inSymbol and outSymbol
-   * and edge weight; if the state symbols or in/out symbols dont exist then they will be added
-   * @param startStateSymbol
-   * @param outSymbol
-   * @param endStateSymbol
-   * @return
-   */
-  public MutableArc addArc(String startStateSymbol, int outSymbol, String endStateSymbol) {
-    Preconditions.checkNotNull(stateSymbols, "cant use this without state symbols; call useStateSymbols()");
-    return addArc(
-        getOrNewState(startStateSymbol),
-        outSymbol,
-        getOrNewState(endStateSymbol)
-    );
+    return newStartState();
   }
 
   public MutableArc addArc(MutableState startState, int outputSymbol, MutableState endState) {
@@ -221,16 +73,6 @@ public class MutableFSTImpl implements MutableFST {
   }
 
   @Override
-  public WriteableSymbolTable getOutputSymbols() {
-    return outputSymbols;
-  }
-
-  @Override
-  public boolean isUsingStateSymbols() {
-    return stateSymbols != null;
-  }
-
-  @Override
   public void throwIfInvalid() {
     Preconditions.checkNotNull(start, "must have a start state");
   }
@@ -238,15 +80,11 @@ public class MutableFSTImpl implements MutableFST {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("Fst(start=").append(start).append(", osyms=").append(
-        outputSymbols);
-    for (State s : states) {
-      sb.append("  ").append(s).append("\n");
-      int numArcs = s.getArcCount();
-      for (int j = 0; j < numArcs; j++) {
-        Arc a = s.getArc(j);
-        sb.append("    ").append(a).append("\n");
-      }
+    sb.append("Fst(start=").append(start).append(")");
+    List<MutableArc> arcs = start.getArcs();
+
+    for (MutableArc arc : arcs) {
+      sb.append("  ").append(arc.toString()).append("\n");
     }
     return sb.toString();
   }
@@ -343,13 +181,6 @@ public class MutableFSTImpl implements MutableFST {
     }
   }
 
-  private void throwIfSymbolTableMissingId(int id) {
-    if (stateSymbols != null && !stateSymbols.invert().containsKey(id)) {
-      throw new IllegalArgumentException("If you're using a state symbol table then every state "
-                                         + "must be in the state symbol table");
-    }
-  }
-
   @Override
   public boolean equals(Object o) {
     return MutableFSTUtils.fstEquals(this, o);
@@ -358,9 +189,7 @@ public class MutableFSTImpl implements MutableFST {
   @Override
   public int hashCode() {
     int result = 0;
-    result = 31 * result + (states != null ? states.hashCode() : 0);
     result = 31 * result + (start != null ? start.hashCode() : 0);
-    result = 31 * result + (outputSymbols != null ? outputSymbols.hashCode() : 0);
     return result;
   }
 }

@@ -74,7 +74,7 @@ public class MutableArc implements Arc {
 
   @Override
   public String toString() {
-    return "(" + nextState
+    return "(" + nextState.toString()
            + ")";
   }
 }

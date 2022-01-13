@@ -47,45 +47,6 @@ public class MutableFSTImplTest {
     assertEquals(Lists.newArrayList(1), listBad);
   }
 
-  @Test
-  public void shouldCreateWithStateSymbols() {
-    MutableFSTImpl fst = createStateSymbolFst();
-
-    assertEquals(5, fst.getStateCount());
-    assertEquals(1, fst.getState(0).getArcCount()); // start
-    assertEquals(2, fst.getState(1).getArcCount()); // _B
-    assertEquals(1, fst.getState(2).getArcCount()); // _A
-    assertEquals(0, fst.getState(3).getArcCount()); // _C
-    assertEquals(0, fst.getState(4).getArcCount()); // _D
-
-    assertEquals(4, fst.getOutputSymbols().size());
-
-    MutableState stateA = fst.getState(2);
-    assertEquals("_A", fst.getStateSymbols().invert().keyForId(stateA.getLabel()));
-    assertEquals(1, stateA.getArcCount());
-    MutableArc arc = stateA.getArc(0);
-
-    assertEquals(fst.getState("_B").getLabel(), arc.getNextState().getLabel());
-    assertTrue(arc.hashCode() != 0);
-    assertTrue(StringUtils.isNotBlank(arc.toString()));
-  }
-
-  private MutableFSTImpl createStateSymbolFst() {
-    MutableFSTImpl fst = new MutableFSTImpl();
-
-    fst.newStartState("<start>");
-
-    // creating a few symbols by hand, others will get created automatically
-    fst.newState("_B");
-
-    fst.addArc("<start>", 1, "_A");
-    fst.addArc("_A", 2, "_B");
-    fst.addArc("_B", 3, "_C");
-    fst.addArc("_B", 4, "_D");
-
-    return fst;
-  }
-
 
   @Test
   public void testRegexMatcherPrefix() {

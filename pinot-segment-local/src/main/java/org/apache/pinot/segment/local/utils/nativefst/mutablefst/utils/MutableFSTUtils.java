@@ -97,32 +97,11 @@ public class MutableFSTUtils {
     MutableFST thatMutableFST = (MutableFST) thatFstObj;
 
 
-    if (thisMutableFST.getStateCount() != thatMutableFST.getStateCount()) {
-      reporter.report("fst.statecount", thisMutableFST.getStateCount(), thatMutableFST.getStateCount());
-      return false;
-    }
-    for (int i = 0; i < thisMutableFST.getStateCount(); i++) {
-      State thisState = thisMutableFST.getState(i);
-      State thatState = thatMutableFST.getState(i);
-      if (!MutableFSTUtils.stateEquals(thisState, thatState, epsilon, reporter)) {
-        reporter.report("fst.state", thisState, thatState);
-        return false;
-      }
-    }
     if (thisMutableFST.getStartState() != null ? (thisMutableFST.getStartState().getLabel() != thatMutableFST.getStartState().getLabel()) : thatMutableFST.getStartState() != null) {
       reporter.report("fst.startstate", thisMutableFST.getStartState(), thatMutableFST.getStartState());
       return false;
     }
 
-    if (thisMutableFST.getStateSymbols() != null ? !MutableFSTUtils.symbolTableEquals(thisMutableFST.getStateSymbols(), thatMutableFST.getStateSymbols(), reporter) : thatMutableFST.getStateSymbols() != null) {
-      reporter.report("fst.stateSymbols", thisMutableFST.getStateSymbols(), thatMutableFST.getStateSymbols());
-      return false;
-    }
-    if (!(thisMutableFST.getOutputSymbols() != null ? MutableFSTUtils.symbolTableEquals(thisMutableFST.getOutputSymbols(), thatMutableFST.getOutputSymbols(), reporter) :
-        thatMutableFST.getOutputSymbols() == null)) {
-      reporter.report("fst.outSymbols", thisMutableFST.getOutputSymbols(), thatMutableFST.getOutputSymbols());
-      return false;
-    }
     return true;
   }
 
