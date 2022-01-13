@@ -26,7 +26,8 @@ public class StringUtil {
   private StringUtil() {
   }
 
-  private static final char NULL_CHARACTER = '\0';
+  // prefer string to character because String.indexOf(String) is a fast intrinsic on all JDK versions
+  private static final String NULL_CHARACTER = "\0";
 
   /**
    * Joins the given keys with the separator.
@@ -47,18 +48,10 @@ public class StringUtil {
    * @return Modified value, or value itself if not modified
    */
   public static String sanitizeStringValue(String value, int maxLength) {
-    char[] chars = value.toCharArray();
-    int length = chars.length;
-    int limit = Math.min(length, maxLength);
-    for (int i = 0; i < limit; i++) {
-      if (chars[i] == NULL_CHARACTER) {
-        return new String(chars, 0, i);
-      }
+    int index = value.indexOf(NULL_CHARACTER);
+    if (index < 0) {
+      return value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
-    if (limit < length) {
-      return new String(chars, 0, limit);
-    } else {
-      return value;
-    }
+    return value.substring(0, Math.min(index, maxLength));
   }
 }
