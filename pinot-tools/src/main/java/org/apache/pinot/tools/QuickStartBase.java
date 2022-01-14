@@ -25,9 +25,15 @@ import org.apache.commons.io.FileUtils;
 
 public abstract class QuickStartBase {
   protected File _tmpDir = FileUtils.getTempDirectory();
+  protected String _zkAddress;
 
   public QuickStartBase setTmpDir(String tmpDir) {
     _tmpDir = new File(tmpDir);
+    return this;
+  }
+
+  public QuickStartBase setZkAddress(String zkAddress) {
+    _zkAddress = zkAddress;
     return this;
   }
 
