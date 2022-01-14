@@ -31,7 +31,6 @@ import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
-import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
 public class JoinQuickStart extends QuickStartBase {
@@ -43,7 +42,7 @@ public class JoinQuickStart extends QuickStartBase {
 
   public void execute()
       throws Exception {
-    File quickstartTmpDir = new File(_tmpDir, String.valueOf(System.currentTimeMillis()));
+    File quickstartTmpDir = new File(_dataDir, String.valueOf(System.currentTimeMillis()));
 
     // Baseball stat table
     File baseBallStatsBaseDir = new File(quickstartTmpDir, "baseballStats");
@@ -81,7 +80,7 @@ public class JoinQuickStart extends QuickStartBase {
 
     File tempDir = new File(quickstartTmpDir, "tmp");
     FileUtils.forceMkdir(tempDir);
-    QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request, dimTableRequest), 1, 1, 3, tempDir);
+    QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request, dimTableRequest), 1, 1, 3, 0, tempDir);
 
     printStatus(Quickstart.Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
     runner.startAll();
@@ -97,9 +96,7 @@ public class JoinQuickStart extends QuickStartBase {
     printStatus(Quickstart.Color.CYAN, "***** Bootstrap baseballStats table *****");
     runner.bootstrapTable();
 
-    printStatus(Quickstart.Color.CYAN,
-        "***** Waiting for 5 seconds for the server to fetch the assigned segment *****");
-    Thread.sleep(5000);
+    waitForBootstrapToComplete(null);
 
     printStatus(Quickstart.Color.YELLOW, "***** Offline quickstart setup complete *****");
 

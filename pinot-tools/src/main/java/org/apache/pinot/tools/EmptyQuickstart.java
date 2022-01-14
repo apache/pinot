@@ -33,20 +33,6 @@ public class EmptyQuickstart extends QuickStartBase {
     return Arrays.asList("EMPTY", "DEFAULT");
   }
 
-  public enum Color {
-    RESET("\u001B[0m"), GREEN("\u001B[32m"), YELLOW("\u001B[33m"), CYAN("\u001B[36m");
-
-    private String _code;
-
-    Color(String code) {
-      _code = code;
-    }
-  }
-
-  public int getNumMinions() {
-    return 0;
-  }
-
   public String getAuthToken() {
     return null;
   }
@@ -55,41 +41,31 @@ public class EmptyQuickstart extends QuickStartBase {
     return null;
   }
 
-  protected void waitForBootstrapToComplete(QuickstartRunner runner)
-      throws Exception {
-    printStatus(Color.CYAN, "***** Waiting for 5 seconds for the server to fetch the assigned segment *****");
-    Thread.sleep(5000);
-  }
-
-  public static void printStatus(Color color, String message) {
-    System.out.println(color._code + message + Color.RESET._code);
-  }
-
   public void execute()
       throws Exception {
-    File quickstartTmpDir = new File(_tmpDir.getAbsolutePath());
+    File quickstartTmpDir = new File(_dataDir.getAbsolutePath());
     File dataDir = new File(quickstartTmpDir, "rawdata");
     if (!dataDir.mkdirs()) {
-      printStatus(Color.YELLOW, "***** Bootstrapping data from existing directory *****");
+      printStatus(Quickstart.Color.YELLOW, "***** Bootstrapping data from existing directory *****");
     } else {
-      printStatus(Color.YELLOW, "***** Creating new data directory for fresh installation *****");
+      printStatus(Quickstart.Color.YELLOW, "***** Creating new data directory for fresh installation *****");
     }
 
     QuickstartRunner runner =
-        new QuickstartRunner(new ArrayList<>(), 1, 1, 1,
-            getNumMinions(), dataDir, true, getAuthToken(), getConfigOverrides(), _zkAddress, false);
+        new QuickstartRunner(new ArrayList<>(), 1, 1, 1, 0,
+            dataDir, true, getAuthToken(), getConfigOverrides(), _zkExternalAddress, false);
 
-    if (_zkAddress != null) {
-      printStatus(Color.CYAN, "***** Starting controller, broker and server *****");
+    if (_zkExternalAddress != null) {
+      printStatus(Quickstart.Color.CYAN, "***** Starting controller, broker and server *****");
     } else {
-      printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
+      printStatus(Quickstart.Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
     }
 
     runner.startAll();
 
     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
       try {
-        printStatus(Color.GREEN, "***** Shutting down empty quick start *****");
+        printStatus(Quickstart.Color.GREEN, "***** Shutting down empty quick start *****");
         runner.stop();
       } catch (Exception e) {
         e.printStackTrace();
@@ -98,8 +74,9 @@ public class EmptyQuickstart extends QuickStartBase {
 
     waitForBootstrapToComplete(runner);
 
-    printStatus(Color.YELLOW, "***** Empty quickstart setup complete *****");
-    printStatus(Color.GREEN, "You can always go to http://localhost:9000 to play around in the query console");
+    printStatus(Quickstart.Color.YELLOW, "***** Empty quickstart setup complete *****");
+    printStatus(Quickstart.Color.GREEN,
+        "You can always go to http://localhost:9000 to play around in the query console");
   }
 
   public static void main(String[] args)
