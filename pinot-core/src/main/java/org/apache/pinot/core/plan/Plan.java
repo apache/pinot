@@ -28,8 +28,9 @@ import org.apache.pinot.spi.annotations.InterfaceAudience;
 @InterfaceAudience.Private
 public interface Plan {
 
-  /**
-   * Execute the query plan and get the instance response.
-   */
+  /** Get plan node */
+  PlanNode getPlanNode();
+
+  /** Execute the query plan and get the instance response. */
   DataTable execute();
 }

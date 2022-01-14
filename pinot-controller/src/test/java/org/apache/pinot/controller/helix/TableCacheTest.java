@@ -20,9 +20,12 @@ package org.apache.pinot.controller.helix;
 
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.utils.helix.TableCache;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.controller.ControllerTestUtils;
+import org.apache.pinot.spi.config.provider.SchemaChangeListener;
+import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -32,6 +35,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -92,6 +96,11 @@ public class TableCacheTest {
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
     // Case-insensitive table name are handled based on the table config instead of the schema
     assertNull(tableCache.getActualTableName(RAW_TABLE_NAME));
+    TestSchemaChangeListener schemaChangeListener = new TestSchemaChangeListener();
+    List<Schema> schemas = tableCache.registerSchemaChangeListener(schemaChangeListener);
+    Assert.assertNotNull(schemas);
+    Assert.assertEquals(schemas.size(), 1);
+    Assert.assertEquals(schemas.get(0).getSchemaName(), SCHEMA_NAME);
 
     // Add a table config
     TableConfig tableConfig =
@@ -109,6 +118,11 @@ public class TableCacheTest {
     assertEquals(tableCache.getColumnNameMap(SCHEMA_NAME), expectedColumnMap);
     assertEquals(tableCache.getSchema(RAW_TABLE_NAME), expectedSchema);
     assertEquals(tableCache.getColumnNameMap(RAW_TABLE_NAME), expectedColumnMap);
+    TestTableConfigChangeListener tableConfigChangeListener = new TestTableConfigChangeListener();
+    List<TableConfig> tableConfigs = tableCache.registerTableConfigChangeListener(tableConfigChangeListener);
+    Assert.assertNotNull(tableConfigs);
+    Assert.assertEquals(tableConfigs.size(), 1);
+    Assert.assertEquals(tableConfigs.get(0).getTableName(), OFFLINE_TABLE_NAME);
 
     // Update the schema
     schema.addField(new DimensionFieldSpec("newColumn", DataType.LONG, true));
@@ -124,6 +138,9 @@ public class TableCacheTest {
     assertEquals(tableCache.getColumnNameMap(SCHEMA_NAME), expectedColumnMap);
     assertEquals(tableCache.getSchema(RAW_TABLE_NAME), expectedSchema);
     assertEquals(tableCache.getColumnNameMap(RAW_TABLE_NAME), expectedColumnMap);
+    Assert.assertNotNull(schemaChangeListener._schemaList);
+    Assert.assertEquals(schemaChangeListener._schemaList.size(), 1);
+    Assert.assertEquals(schemaChangeListener._schemaList.get(0).getSchemaName(), SCHEMA_NAME);
 
     // Update the table config and drop the schema name
     tableConfig.getValidationConfig().setSchemaName(null);
@@ -142,6 +159,9 @@ public class TableCacheTest {
     assertEquals(tableCache.getColumnNameMap(SCHEMA_NAME), expectedColumnMap);
     assertNull(tableCache.getSchema(RAW_TABLE_NAME));
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
+    Assert.assertNotNull(tableConfigChangeListener._tableConfigList);
+    Assert.assertEquals(tableConfigChangeListener._tableConfigList.size(), 1);
+    Assert.assertEquals(tableConfigChangeListener._tableConfigList.get(0).getTableName(), OFFLINE_TABLE_NAME);
 
     // Remove the table config
     ControllerTestUtils.getHelixResourceManager().deleteOfflineTable(RAW_TABLE_NAME);
@@ -154,6 +174,9 @@ public class TableCacheTest {
     assertEquals(tableCache.getColumnNameMap(SCHEMA_NAME), expectedColumnMap);
     assertNull(tableCache.getSchema(RAW_TABLE_NAME));
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
+    Assert.assertNotNull(schemaChangeListener._schemaList);
+    Assert.assertEquals(schemaChangeListener._schemaList.size(), 1);
+    Assert.assertEquals(tableConfigChangeListener._tableConfigList.size(), 0);
 
     // Remove the schema
     ControllerTestUtils.getHelixResourceManager().deleteSchema(schema);
@@ -164,6 +187,26 @@ public class TableCacheTest {
     assertNull(tableCache.getColumnNameMap(SCHEMA_NAME));
     assertNull(tableCache.getSchema(RAW_TABLE_NAME));
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
+    Assert.assertEquals(schemaChangeListener._schemaList.size(), 0);
+    Assert.assertEquals(tableConfigChangeListener._tableConfigList.size(), 0);
+  }
+
+  private static class TestTableConfigChangeListener implements TableConfigChangeListener {
+    private List<TableConfig> _tableConfigList;
+
+    @Override
+    public void onChange(List<TableConfig> tableConfigList) {
+      _tableConfigList = tableConfigList;
+    }
+  }
+
+  private static class TestSchemaChangeListener implements SchemaChangeListener {
+    private List<Schema> _schemaList;
+
+    @Override
+    public void onChange(List<Schema> schemaList) {
+      _schemaList = schemaList;
+    }
   }
 
   @AfterClass

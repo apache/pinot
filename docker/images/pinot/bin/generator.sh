@@ -131,7 +131,7 @@ fi
 
 echo "Generating data for ${TEMPLATE_NAME} in ${DATA_DIR}"
 ${ADMIN_PATH} GenerateData \
--numFiles 1 -numRecords $NUM_RECORDS -format csv \
+-numFiles 1 -numRecords $NUM_RECORDS -format CSV \
 -schemaFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json" \
 -schemaAnnotationFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_generator.json" \
 -outDir "$DATA_DIR"
@@ -144,7 +144,7 @@ fi
 
 echo "Creating segment for ${TEMPLATE_NAME} in ${SEGMENT_DIR}"
 ${ADMIN_PATH} CreateSegment \
--format csv \
+-format CSV \
 -tableConfigFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_config.json" \
 -schemaFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json" \
 -dataDir "${DATA_DIR}" \

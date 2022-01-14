@@ -59,7 +59,7 @@ import org.slf4j.LoggerFactory;
  */
 public class RetentionManager extends ControllerPeriodicTask<Void> {
   public static final long OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(5L);
-
+  private static final long REPLACED_SEGMENTS_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(1L); // 1 day
   public static final long LINEAGE_ENTRY_CLEANUP_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(1L); // 1 day
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
 
@@ -80,13 +80,20 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
   @Override
   protected void processTable(String tableNameWithType) {
+    // Fetch table config
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    if (tableConfig == null) {
+      LOGGER.error("Failed to get table config for table: {}", tableNameWithType);
+      return;
+    }
+
     // Manage normal table retention except segment lineage cleanup.
     // The reason of separating the logic is that REFRESH only table will be skipped in the first part,
     // whereas the segment lineage cleanup needs to be handled.
-    manageRetentionForTable(tableNameWithType);
+    manageRetentionForTable(tableConfig);
 
     // Delete segments based on segment lineage and clean up segment lineage metadata.
-    manageSegmentLineageCleanupForTable(tableNameWithType);
+    manageSegmentLineageCleanupForTable(tableConfig);
   }
 
   @Override
@@ -95,15 +102,9 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     _pinotHelixResourceManager.getSegmentDeletionManager().removeAgedDeletedSegments(_deletedSegmentsRetentionInDays);
   }
 
-  private void manageRetentionForTable(String tableNameWithType) {
+  private void manageRetentionForTable(TableConfig tableConfig) {
+    String tableNameWithType = tableConfig.getTableName();
     LOGGER.info("Start managing retention for table: {}", tableNameWithType);
-
-    // Build retention strategy from table config
-    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-    if (tableConfig == null) {
-      LOGGER.error("Failed to get table config for table: {}", tableNameWithType);
-      return;
-    }
 
     // For offline tables, ensure that the segmentPushType is APPEND.
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
@@ -197,7 +198,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     }
   }
 
-  private void manageSegmentLineageCleanupForTable(String tableNameWithType) {
+  private void manageSegmentLineageCleanupForTable(TableConfig tableConfig) {
+    String tableNameWithType = tableConfig.getTableName();
     try {
       DEFAULT_RETRY_POLICY.attempt(() -> {
         // Fetch segment lineage
@@ -214,7 +216,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         // 1. The original segments can be deleted once the merged segments are successfully uploaded
         // 2. The zombie lineage entry & merged segments should be deleted if the segment replacement failed in
         //    the middle
-        Set<String> segmentsForTable = new HashSet<>(_pinotHelixResourceManager.getSegmentsFor(tableNameWithType));
+        Set<String> segmentsForTable =
+            new HashSet<>(_pinotHelixResourceManager.getSegmentsFor(tableNameWithType, false));
         List<String> segmentsToDelete = new ArrayList<>();
         for (String lineageEntryId : segmentLineage.getLineageEntryIds()) {
           LineageEntry lineageEntry = segmentLineage.getLineageEntry(lineageEntryId);
@@ -226,8 +229,11 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
               // the lineage entry
               segmentLineage.deleteLineageEntry(lineageEntryId);
             } else {
-              // If the lineage state is 'COMPLETED', it is safe to delete all segments from 'segmentsFrom'
-              segmentsToDelete.addAll(sourceSegments);
+              // If the lineage state is 'COMPLETED' and we already preserved the original segments for the required
+              // retention, it is safe to delete all segments from 'segmentsFrom'
+              if (shouldDeleteReplacedSegments(tableConfig, lineageEntry)) {
+                segmentsToDelete.addAll(sourceSegments);
+              }
             }
           } else if (lineageEntry.getState() == LineageEntryState.REVERTED || (
               lineageEntry.getState() == LineageEntryState.IN_PROGRESS && lineageEntry.getTimestamp()
@@ -269,5 +275,27 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       throw new RuntimeException(errorMsg, e);
     }
     LOGGER.info("Segment lineage metadata clean-up is successfully processed for table: {}", tableNameWithType);
+  }
+
+  /**
+   * Helper function to decide whether we should delete segmentsFrom (replaced segments) given a lineage entry.
+   *
+   * The replaced segments are safe to delete if the following conditions are all satisfied
+   * 1) Table is "APPEND"
+   * 2) It has been more than 24 hours since the lineage entry became "COMPLETED" state.
+   *
+   * @param tableConfig a table config
+   * @param lineageEntry lineage entry
+   * @return True if we can safely delete the replaced segments. False otherwise.
+   */
+  private boolean shouldDeleteReplacedSegments(TableConfig tableConfig, LineageEntry lineageEntry) {
+    // TODO: Currently, we preserve the replaced segments for 1 day for REFRESH tables only. Once we support
+    // data rollback for APPEND tables, we should remove this check.
+    String batchSegmentIngestionType = IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig);
+    if (!batchSegmentIngestionType.equalsIgnoreCase("REFRESH")
+        || lineageEntry.getTimestamp() < System.currentTimeMillis() - REPLACED_SEGMENTS_RETENTION_IN_MILLIS) {
+      return true;
+    }
+    return false;
   }
 }

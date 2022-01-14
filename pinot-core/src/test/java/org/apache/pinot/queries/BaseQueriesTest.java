@@ -33,6 +33,7 @@ import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.plan.maker.PlanMaker;
+import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -209,7 +210,11 @@ public abstract class BaseQueriesTest {
     // Server side.
     queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     Plan plan = planMaker.makeInstancePlan(getIndexSegments(), queryContext, EXECUTOR_SERVICE);
-    DataTable instanceResponse = plan.execute();
+
+    BrokerRequest brokerRequest = queryContext.getBrokerRequest();
+    DataTable instanceResponse =
+        brokerRequest != null && brokerRequest.getPinotQuery() != null && brokerRequest.getPinotQuery().isExplain()
+            ? ServerQueryExecutorV1Impl.processExplainPlanQueries(plan) : plan.execute();
 
     // Broker side.
     Map<String, Object> properties = new HashMap<>();

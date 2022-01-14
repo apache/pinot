@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
-import javax.annotation.Nonnull;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
@@ -39,6 +38,8 @@ import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.services.kinesis.model.Shard;
 
 
@@ -51,6 +52,7 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
   private final StreamConsumerFactory _kinesisStreamConsumerFactory;
   private final String _clientId;
   private final int _fetchTimeoutMs;
+  private static final Logger LOGGER = LoggerFactory.getLogger(KinesisStreamMetadataProvider.class);
 
   public KinesisStreamMetadataProvider(String clientId, StreamConfig streamConfig) {
     KinesisConfig kinesisConfig = new KinesisConfig(streamConfig);
@@ -74,7 +76,7 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
   }
 
   @Override
-  public long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis) {
+  public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
     throw new UnsupportedOperationException();
   }
 
@@ -108,9 +110,11 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
       Shard shard = shardIdToShardMap.get(shardId);
       if (shard == null) { // Shard has expired
         shardsEnded.add(shardId);
+        String lastConsumedSequenceID = kinesisStartCheckpoint.getShardToStartSequenceMap().get(shardId);
+        LOGGER.warn("Kinesis shard with id: " + shardId
+            + " has expired. Data has been consumed from the shard till sequence number: " + lastConsumedSequenceID
+            + ". There can be potential data loss.");
         continue;
-        // FIXME: Here we assume that we were done consuming the shard before it expired.
-        //  Handle edge case where consumer lags behind, resulting in shard to expire before it is all consumed
       }
 
       StreamPartitionMsgOffset newStartOffset;
@@ -146,8 +150,8 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
       // 1. Root shards - Parent shardId will be null. Will find this case when creating new table.
       // 2. Parent expired - Parent shardId will not be part of shardIdToShard map
       // 3. Parent reached EOL and completely consumed.
-      if (parentShardId == null || !shardIdToShardMap.containsKey(parentShardId) || shardsEnded
-          .contains(parentShardId)) {
+      if (parentShardId == null || !shardIdToShardMap.containsKey(parentShardId) || shardsEnded.contains(
+          parentShardId)) {
         Map<String, String> shardToSequenceNumberMap = new HashMap<>();
         shardToSequenceNumberMap.put(newShardId, newShard.sequenceNumberRange().startingSequenceNumber());
         newStartOffset = new KinesisPartitionGroupOffset(shardToSequenceNumberMap);
@@ -186,6 +190,5 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
 
   @Override
   public void close() {
-
   }
 }

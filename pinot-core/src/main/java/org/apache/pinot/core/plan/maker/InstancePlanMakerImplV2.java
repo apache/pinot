@@ -41,6 +41,7 @@ import org.apache.pinot.core.plan.InstanceResponsePlanNode;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.plan.SelectionPlanNode;
+import org.apache.pinot.core.plan.StreamingInstanceResponsePlanNode;
 import org.apache.pinot.core.plan.StreamingSelectionPlanNode;
 import org.apache.pinot.core.query.config.QueryExecutorConfig;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -254,15 +255,26 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       planNodes.add(makeStreamingSegmentPlanNode(indexSegment, queryContext));
     }
     CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, executorService, streamObserver);
-    return new GlobalPlanImplV0(new InstanceResponsePlanNode(combinePlanNode, indexSegments, Collections.emptyList()));
+    if (QueryContextUtils.isSelectionOnlyQuery(queryContext)) {
+      // selection-only is streamed in StreamingSelectionPlanNode --> here only metadata block is returned.
+      return new GlobalPlanImplV0(new InstanceResponsePlanNode(
+          combinePlanNode, indexSegments, Collections.emptyList()));
+    } else {
+      // non-selection-only requires a StreamingInstanceResponsePlanNode to stream data block back and metadata block
+      // as final return.
+      return new GlobalPlanImplV0(new StreamingInstanceResponsePlanNode(
+          combinePlanNode, indexSegments, Collections.emptyList(), streamObserver));
+    }
   }
 
   @Override
   public PlanNode makeStreamingSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
-    if (!QueryContextUtils.isSelectionQuery(queryContext)) {
-      throw new UnsupportedOperationException("Only selection queries are supported");
+    if (!QueryContextUtils.isSelectionOnlyQuery(queryContext)) {
+      // non-selection-only query goes through normal SegmentPlan.
+      // it will be stream back via StreamingInstanceResponsePlanNode
+      return makeSegmentPlanNode(indexSegment, queryContext);
     } else {
-      // Selection query
+      // Selection-only query can be directly stream back
       return new StreamingSelectionPlanNode(indexSegment, queryContext);
     }
   }

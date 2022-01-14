@@ -217,6 +217,11 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_GROUPBY_TRIM_THRESHOLD = "pinot.broker.groupby.trim.threshold";
     public static final int DEFAULT_BROKER_GROUPBY_TRIM_THRESHOLD = 1_000_000;
 
+    public static final String BROKER_REQUEST_HANDLER_TYPE = "pinot.broker.request.handler.type";
+    public static final String NETTY_BROKER_REQUEST_HANDLER_TYPE = "netty";
+    public static final String GRPC_BROKER_REQUEST_HANDLER_TYPE = "grpc";
+    public static final String DEFAULT_BROKER_REQUEST_HANDLER_TYPE = NETTY_BROKER_REQUEST_HANDLER_TYPE;
+
     public static final String BROKER_TLS_PREFIX = "pinot.broker.tls";
     public static final String BROKER_NETTYTLS_ENABLED = "pinot.broker.nettytls.enabled";
 
@@ -494,10 +499,12 @@ public class CommonConstants {
       public static final String FLUSH_THRESHOLD_SIZE = "segment.flush.threshold.size";
       public static final String FLUSH_THRESHOLD_TIME = "segment.flush.threshold.time";
 
+      // Deprecated, but kept for backward-compatibility of reading old segments' ZK metadata
       @Deprecated
       public static final String DOWNLOAD_URL = "segment.realtime.download.url";
     }
 
+    // Deprecated, but kept for backward-compatibility of reading old segments' ZK metadata
     @Deprecated
     public static class Offline {
       public static final String DOWNLOAD_URL = "segment.offline.download.url";
@@ -526,23 +533,12 @@ public class CommonConstants {
      */
     public static final String SEGMENT_UPLOAD_START_TIME = "segment.upload.start.time";
 
-    @Deprecated
-    public static final String SEGMENT_NAME = "segment.name";
-    @Deprecated
-    public static final String TABLE_NAME = "segment.table.name";
-    @Deprecated
-    public static final String SEGMENT_TYPE = "segment.type";
-
     public static final String SEGMENT_BACKUP_DIR_SUFFIX = ".segment.bak";
     public static final String SEGMENT_TEMP_DIR_SUFFIX = ".segment.tmp";
 
     public static final String LOCAL_SEGMENT_SCHEME = "file";
     public static final String PEER_SEGMENT_DOWNLOAD_SCHEME = "peer://";
     public static final String METADATA_URI_FOR_PEER_DOWNLOAD = "";
-
-    public enum SegmentType {
-      OFFLINE, REALTIME
-    }
 
     public static class AssignmentStrategy {
       public static final String BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY = "BalanceNumSegmentAssignmentStrategy";
@@ -564,6 +560,7 @@ public class CommonConstants {
         public static final String ENABLE_TRACE = "enableTrace";
         public static final String ENABLE_STREAMING = "enableStreaming";
         public static final String PAYLOAD_TYPE = "payloadType";
+        public static final String EXPLAIN = "explain";
       }
 
       public static class PayloadType {

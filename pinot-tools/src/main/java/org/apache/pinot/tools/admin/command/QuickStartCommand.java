@@ -89,7 +89,7 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
     Set<Class<? extends QuickStartBase>> quickStarts = allQuickStarts();
     for (Class<? extends QuickStartBase> quickStart : quickStarts) {
       QuickStartBase quickStartBase = quickStart.getDeclaredConstructor().newInstance();
-      if (quickStartBase.types().contains(type)) {
+      if (quickStartBase.types().contains(type.toUpperCase())) {
         return quickStartBase;
       }
     }

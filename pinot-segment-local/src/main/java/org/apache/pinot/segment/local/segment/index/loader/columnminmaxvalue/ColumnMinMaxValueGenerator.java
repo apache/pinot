@@ -51,15 +51,30 @@ public class ColumnMinMaxValueGenerator {
   public ColumnMinMaxValueGenerator(SegmentMetadataImpl segmentMetadata, SegmentDirectory.Writer segmentWriter,
       ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode) {
     _segmentMetadata = segmentMetadata;
-    _segmentProperties = SegmentMetadataImpl.getPropertiesConfiguration(_segmentMetadata.getIndexDir());
     _segmentWriter = segmentWriter;
+    _segmentProperties = segmentMetadata.getPropertiesConfiguration();
     _columnMinMaxValueGeneratorMode = columnMinMaxValueGeneratorMode;
+  }
+
+  public boolean needAddColumnMinMaxValue() {
+    for (String column : getColumnsToAddMinMaxValue()) {
+      if (needAddColumnMinMaxValueForColumn(column)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   public void addColumnMinMaxValue()
       throws Exception {
     Preconditions.checkState(_columnMinMaxValueGeneratorMode != ColumnMinMaxValueGeneratorMode.NONE);
+    for (String column : getColumnsToAddMinMaxValue()) {
+      addColumnMinMaxValueForColumn(column);
+    }
+    saveMetadata();
+  }
 
+  private Set<String> getColumnsToAddMinMaxValue() {
     Schema schema = _segmentMetadata.getSchema();
     Set<String> columnsToAddMinMaxValue = new HashSet<>(schema.getPhysicalColumnNames());
 
@@ -77,10 +92,13 @@ public class ColumnMinMaxValueGenerator {
       default:
         break;
     }
-    for (String column : columnsToAddMinMaxValue) {
-      addColumnMinMaxValueForColumn(column);
-    }
-    saveMetadata();
+    return columnsToAddMinMaxValue;
+  }
+
+  private boolean needAddColumnMinMaxValueForColumn(String columnName) {
+    ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(columnName);
+    return columnMetadata.hasDictionary() && columnMetadata.getMinValue() == null
+        && columnMetadata.getMaxValue() == null;
   }
 
   private void addColumnMinMaxValueForColumn(String columnName)

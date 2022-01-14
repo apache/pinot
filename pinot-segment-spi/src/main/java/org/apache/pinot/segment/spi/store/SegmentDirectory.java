@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.store;
 
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
@@ -141,6 +142,14 @@ public abstract class SegmentDirectory implements Closeable {
   }
 
   /**
+   * Copy segment directory to a local directory.
+   * @param dest the destination directory
+   */
+  public void copyTo(File dest)
+      throws Exception {
+  }
+
+  /**
    * Reader for columnar index buffers from segment directory
    */
   public abstract class Reader implements Closeable {
@@ -156,6 +165,10 @@ public abstract class SegmentDirectory implements Closeable {
         throws IOException;
 
     public abstract boolean hasIndexFor(String column, ColumnIndexType type);
+
+    public SegmentDirectory toSegmentDirectory() {
+      return SegmentDirectory.this;
+    }
 
     public abstract String toString();
   }
@@ -191,10 +204,6 @@ public abstract class SegmentDirectory implements Closeable {
 
     public abstract void save()
         throws IOException;
-
-    public SegmentDirectory toSegmentDirectory() {
-      return SegmentDirectory.this;
-    }
 
     public abstract String toString();
   }

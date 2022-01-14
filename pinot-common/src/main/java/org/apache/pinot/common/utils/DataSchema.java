@@ -48,6 +48,12 @@ public class DataSchema {
   private final ColumnDataType[] _columnDataTypes;
   private ColumnDataType[] _storedColumnDataTypes;
 
+  /** Used by both Broker and Server to generate results for EXPLAIN PLAN queries. */
+  public static final DataSchema EXPLAIN_RESULT_SCHEMA =
+      new DataSchema(new String[]{"Operator", "Operator_Id", "Parent_Id"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
+              DataSchema.ColumnDataType.INT});
+
   @JsonCreator
   public DataSchema(@JsonProperty("columnNames") String[] columnNames,
       @JsonProperty("columnDataTypes") ColumnDataType[] columnDataTypes) {

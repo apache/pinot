@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import java.util.Collections;
+import java.util.List;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.EmptyFilterBlock;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 
@@ -30,6 +33,8 @@ public final class EmptyFilterOperator extends BaseFilterOperator {
   }
 
   private static final String OPERATOR_NAME = "EmptyFilterOperator";
+  private static final String EXPLAIN_NAME = "FILTER_EMPTY";
+
   private static final EmptyFilterOperator INSTANCE = new EmptyFilterOperator();
 
   public static EmptyFilterOperator getInstance() {
@@ -49,5 +54,15 @@ public final class EmptyFilterOperator extends BaseFilterOperator {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
+  }
+
+  @Override
+  public String toExplainString() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return Collections.emptyList();
   }
 }

@@ -20,8 +20,10 @@ package org.apache.pinot.segment.local.utils;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
@@ -42,6 +44,15 @@ import org.apache.pinot.spi.data.TimeGranularitySpec;
  */
 public class SchemaUtils {
   private SchemaUtils() {
+  }
+
+  // checker to ensure simple date format matches lexicographic ordering.
+  private static final Map<Character, Integer> DATETIME_PATTERN_ORDERING = new HashMap<>();
+  static {
+    char[] patternOrdering = new char[]{'y', 'M', 'd', 'H', 'm', 's', 'S'};
+    for (int i = 0; i < patternOrdering.length; i++) {
+      DATETIME_PATTERN_ORDERING.put(patternOrdering[i], i);
+    }
   }
 
   public static final String MAP_KEY_COLUMN_SUFFIX = "__KEYS";
@@ -165,7 +176,33 @@ public class SchemaUtils {
    */
   private static void validateDateTimeFieldSpec(FieldSpec fieldSpec) {
     DateTimeFieldSpec dateTimeFieldSpec = (DateTimeFieldSpec) fieldSpec;
-    DateTimeFormatSpec.validateFormat(dateTimeFieldSpec.getFormat());
+    validateDateTimeFormat(dateTimeFieldSpec.getFormat());
     DateTimeGranularitySpec.validateGranularity(dateTimeFieldSpec.getGranularity());
+  }
+
+  private static void validateDateTimeFormat(String format) {
+    DateTimeFormatSpec dateTimeFormatSpec;
+    try {
+      dateTimeFormatSpec = new DateTimeFormatSpec(format);
+    } catch (Exception e) {
+      throw new IllegalStateException(String.format("invalid datetime format: %s", format), e);
+    }
+    // validate the format is correct.
+    String sdfPattern = dateTimeFormatSpec.getSDFPattern();
+    if (sdfPattern != null) {
+      // must be in "yyyy MM dd HH mm ss SSS" to make sure it is sorted by both lexicographical and datetime order.
+      int[] maxIndexes = new int[]{-1, -1, -1, -1, -1, -1, -1, -1};
+      for (int idx = 0; idx < sdfPattern.length(); idx++) {
+        int charIndex = DATETIME_PATTERN_ORDERING.getOrDefault(sdfPattern.charAt(idx), 7);
+        maxIndexes[charIndex] = idx;
+      }
+      // last index doesn't need to be checked.
+      for (int idx = 0; idx < maxIndexes.length - 2; idx++) {
+        Preconditions.checkState(maxIndexes[idx] <= maxIndexes[idx + 1] || maxIndexes[idx + 1] == -1,
+            String.format("SIMPLE_DATE_FORMAT pattern %s has to be sorted by both lexicographical and datetime order",
+                sdfPattern));
+        maxIndexes[idx + 1] = Math.max(maxIndexes[idx + 1], maxIndexes[idx]);
+      }
+    }
   }
 }

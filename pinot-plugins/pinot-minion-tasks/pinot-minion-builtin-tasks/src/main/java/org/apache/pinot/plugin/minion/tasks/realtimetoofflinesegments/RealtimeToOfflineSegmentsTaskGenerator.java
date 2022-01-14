@@ -119,9 +119,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
       Map<String, TaskState> incompleteTasks =
           TaskGeneratorUtils.getIncompleteTasks(taskType, realtimeTableName, _clusterInfoAccessor);
       if (!incompleteTasks.isEmpty()) {
-        LOGGER
-            .warn("Found incomplete tasks: {} for same table: {}. Skipping task generation.", incompleteTasks.keySet(),
-                realtimeTableName);
+        LOGGER.warn("Found incomplete tasks: {} for same table: {}. Skipping task generation.",
+            incompleteTasks.keySet(), realtimeTableName);
         continue;
       }
 
@@ -132,16 +131,15 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
       getCompletedSegmentsInfo(realtimeTableName, completedSegmentsZKMetadata, partitionToLatestCompletedSegmentName,
           allPartitions);
       if (completedSegmentsZKMetadata.isEmpty()) {
-        LOGGER
-            .info("No realtime-completed segments found for table: {}, skipping task generation: {}", realtimeTableName,
-                taskType);
+        LOGGER.info("No realtime-completed segments found for table: {}, skipping task generation: {}",
+            realtimeTableName, taskType);
         continue;
       }
       allPartitions.removeAll(partitionToLatestCompletedSegmentName.keySet());
       if (!allPartitions.isEmpty()) {
-        LOGGER
-            .info("Partitions: {} have no completed segments. Table: {} is not ready for {}. Skipping task generation.",
-                allPartitions, realtimeTableName, taskType);
+        LOGGER.info(
+            "Partitions: {} have no completed segments. Table: {} is not ready for {}. Skipping task generation.",
+            allPartitions, realtimeTableName, taskType);
         continue;
       }
 
@@ -163,47 +161,53 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
       long windowStartMs = getWatermarkMs(realtimeTableName, completedSegmentsZKMetadata, bucketMs);
       long windowEndMs = windowStartMs + bucketMs;
 
-      // Check that execution window is older than bufferTime
-      if (windowEndMs > System.currentTimeMillis() - bufferMs) {
-        LOGGER.info(
-            "Window with start: {} and end: {} is not older than buffer time: {} configured as {} ago. Skipping task "
-                + "generation: {}",
-            windowStartMs, windowEndMs, bufferMs, bufferTimePeriod, taskType);
-        continue;
-      }
-
       // Find all COMPLETED segments with data overlapping execution window: windowStart (inclusive) to windowEnd
       // (exclusive)
       List<String> segmentNames = new ArrayList<>();
       List<String> downloadURLs = new ArrayList<>();
       Set<String> lastCompletedSegmentPerPartition = new HashSet<>(partitionToLatestCompletedSegmentName.values());
       boolean skipGenerate = false;
-      for (SegmentZKMetadata segmentZKMetadata : completedSegmentsZKMetadata) {
-        String segmentName = segmentZKMetadata.getSegmentName();
-        long segmentStartTimeMs = segmentZKMetadata.getStartTimeMs();
-        long segmentEndTimeMs = segmentZKMetadata.getEndTimeMs();
-
-        // Check overlap with window
-        if (windowStartMs <= segmentEndTimeMs && segmentStartTimeMs < windowEndMs) {
-          // If last completed segment is being used, make sure that segment crosses over end of window.
-          // In the absence of this check, CONSUMING segments could contain some portion of the window. That data
-          // would be skipped forever.
-          if (lastCompletedSegmentPerPartition.contains(segmentName) && segmentEndTimeMs < windowEndMs) {
-            LOGGER.info(
-                "Window data overflows into CONSUMING segments for partition of segment: {}. Skipping task "
-                    + "generation: {}",
-                segmentName, taskType);
-            skipGenerate = true;
-            break;
-          }
-          segmentNames.add(segmentName);
-          downloadURLs.add(segmentZKMetadata.getDownloadUrl());
+      while (true) {
+        // Check that execution window is older than bufferTime
+        if (windowEndMs > System.currentTimeMillis() - bufferMs) {
+          LOGGER.info(
+              "Window with start: {} and end: {} is not older than buffer time: {} configured as {} ago. Skipping task "
+                  + "generation: {}", windowStartMs, windowEndMs, bufferMs, bufferTimePeriod, taskType);
+          skipGenerate = true;
+          break;
         }
+
+        for (SegmentZKMetadata segmentZKMetadata : completedSegmentsZKMetadata) {
+          String segmentName = segmentZKMetadata.getSegmentName();
+          long segmentStartTimeMs = segmentZKMetadata.getStartTimeMs();
+          long segmentEndTimeMs = segmentZKMetadata.getEndTimeMs();
+
+          // Check overlap with window
+          if (windowStartMs <= segmentEndTimeMs && segmentStartTimeMs < windowEndMs) {
+            // If last completed segment is being used, make sure that segment crosses over end of window.
+            // In the absence of this check, CONSUMING segments could contain some portion of the window. That data
+            // would be skipped forever.
+            if (lastCompletedSegmentPerPartition.contains(segmentName) && segmentEndTimeMs < windowEndMs) {
+              LOGGER.info("Window data overflows into CONSUMING segments for partition of segment: {}. Skipping task "
+                  + "generation: {}", segmentName, taskType);
+              skipGenerate = true;
+              break;
+            }
+            segmentNames.add(segmentName);
+            downloadURLs.add(segmentZKMetadata.getDownloadUrl());
+          }
+        }
+        if (skipGenerate || !segmentNames.isEmpty()) {
+          break;
+        }
+
+        LOGGER.info("Found no eligible segments for task: {} with window [{} - {}), moving to the next time bucket",
+            taskType, windowStartMs, windowEndMs);
+        windowStartMs = windowEndMs;
+        windowEndMs += bucketMs;
       }
 
-      if (segmentNames.isEmpty() || skipGenerate) {
-        LOGGER.info("Found no eligible segments for task: {} with window [{} - {}). Skipping task generation", taskType,
-            windowStartMs, windowEndMs);
+      if (skipGenerate) {
         continue;
       }
 
@@ -264,8 +268,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
 
       if (segmentZKMetadata.getStatus().equals(Segment.Realtime.Status.DONE)) {
         completedSegmentsZKMetadata.add(segmentZKMetadata);
-        latestLLCSegmentNameMap
-            .compute(llcSegmentName.getPartitionGroupId(), (partitionGroupId, latestLLCSegmentName) -> {
+        latestLLCSegmentNameMap.compute(llcSegmentName.getPartitionGroupId(),
+            (partitionGroupId, latestLLCSegmentName) -> {
               if (latestLLCSegmentName == null) {
                 return llcSegmentName;
               } else {
@@ -291,11 +295,12 @@ public class RealtimeToOfflineSegmentsTaskGenerator implements PinotTaskGenerato
    */
   private long getWatermarkMs(String realtimeTableName, List<SegmentZKMetadata> completedSegmentsZKMetadata,
       long bucketMs) {
-    ZNRecord realtimeToOfflineZNRecord = _clusterInfoAccessor
-        .getMinionTaskMetadataZNRecord(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, realtimeTableName);
+    ZNRecord realtimeToOfflineZNRecord =
+        _clusterInfoAccessor.getMinionTaskMetadataZNRecord(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE,
+            realtimeTableName);
     RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
-        realtimeToOfflineZNRecord != null ? RealtimeToOfflineSegmentsTaskMetadata
-            .fromZNRecord(realtimeToOfflineZNRecord) : null;
+        realtimeToOfflineZNRecord != null ? RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(
+            realtimeToOfflineZNRecord) : null;
 
     if (realtimeToOfflineSegmentsTaskMetadata == null) {
       // No ZNode exists. Cold-start.

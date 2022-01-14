@@ -21,7 +21,6 @@ package org.apache.pinot.core.query.scheduler.resources;
 import com.google.common.base.Preconditions;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Semaphore;
-import javax.annotation.Nonnull;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,10 +41,10 @@ public class BoundedAccountingExecutor extends QueryExecutorService {
 
   private final Executor _delegateExecutor;
   private final int _bounds;
-  private Semaphore _semaphore;
+  private final Semaphore _semaphore;
   private final SchedulerGroupAccountant _accountant;
 
-  public BoundedAccountingExecutor(@Nonnull Executor s, int bounds, @Nonnull SchedulerGroupAccountant accountant) {
+  public BoundedAccountingExecutor(Executor s, int bounds, SchedulerGroupAccountant accountant) {
     Preconditions.checkNotNull(s);
     Preconditions.checkNotNull(accountant);
     Preconditions.checkArgument(bounds > 0);

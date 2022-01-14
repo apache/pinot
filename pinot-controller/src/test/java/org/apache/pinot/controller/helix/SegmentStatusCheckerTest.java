@@ -203,19 +203,16 @@ public class SegmentStatusCheckerTest {
     externalView.setState("myTable_1", "pinot2", "ONLINE");
 
     ZNRecord znrecord = new ZNRecord("myTable_0");
-    znrecord.setSimpleField(CommonConstants.Segment.SEGMENT_NAME, "myTable_0");
-    znrecord.setSimpleField(CommonConstants.Segment.TABLE_NAME, "myTable_OFFLINE");
     znrecord.setSimpleField(CommonConstants.Segment.INDEX_VERSION, "v1");
-    znrecord.setEnumField(CommonConstants.Segment.SEGMENT_TYPE, CommonConstants.Segment.SegmentType.OFFLINE);
     znrecord.setLongField(CommonConstants.Segment.START_TIME, 1000);
     znrecord.setLongField(CommonConstants.Segment.END_TIME, 2000);
     znrecord.setSimpleField(CommonConstants.Segment.TIME_UNIT, TimeUnit.HOURS.toString());
     znrecord.setLongField(CommonConstants.Segment.TOTAL_DOCS, 10000);
     znrecord.setLongField(CommonConstants.Segment.CRC, 1234);
     znrecord.setLongField(CommonConstants.Segment.CREATION_TIME, 3000);
-    znrecord.setSimpleField(CommonConstants.Segment.Offline.DOWNLOAD_URL, "http://localhost:8000/myTable_0");
-    znrecord.setLongField(CommonConstants.Segment.Offline.PUSH_TIME, System.currentTimeMillis());
-    znrecord.setLongField(CommonConstants.Segment.Offline.REFRESH_TIME, System.currentTimeMillis());
+    znrecord.setSimpleField(CommonConstants.Segment.DOWNLOAD_URL, "http://localhost:8000/myTable_0");
+    znrecord.setLongField(CommonConstants.Segment.PUSH_TIME, System.currentTimeMillis());
+    znrecord.setLongField(CommonConstants.Segment.REFRESH_TIME, System.currentTimeMillis());
 
     ZkHelixPropertyStore<ZNRecord> propertyStore;
     {
@@ -351,19 +348,16 @@ public class SegmentStatusCheckerTest {
     externalView.setState("myTable_1", "pinot2", "ONLINE");
 
     ZNRecord znrecord = new ZNRecord("myTable_0");
-    znrecord.setSimpleField(CommonConstants.Segment.SEGMENT_NAME, "myTable_0");
-    znrecord.setSimpleField(CommonConstants.Segment.TABLE_NAME, "myTable_OFFLINE");
     znrecord.setSimpleField(CommonConstants.Segment.INDEX_VERSION, "v1");
-    znrecord.setEnumField(CommonConstants.Segment.SEGMENT_TYPE, CommonConstants.Segment.SegmentType.OFFLINE);
     znrecord.setLongField(CommonConstants.Segment.START_TIME, 1000);
     znrecord.setLongField(CommonConstants.Segment.END_TIME, 2000);
     znrecord.setSimpleField(CommonConstants.Segment.TIME_UNIT, TimeUnit.HOURS.toString());
     znrecord.setLongField(CommonConstants.Segment.TOTAL_DOCS, 10000);
     znrecord.setLongField(CommonConstants.Segment.CRC, 1234);
     znrecord.setLongField(CommonConstants.Segment.CREATION_TIME, 3000);
-    znrecord.setSimpleField(CommonConstants.Segment.Offline.DOWNLOAD_URL, "http://localhost:8000/myTable_0");
-    znrecord.setLongField(CommonConstants.Segment.Offline.PUSH_TIME, System.currentTimeMillis());
-    znrecord.setLongField(CommonConstants.Segment.Offline.REFRESH_TIME, System.currentTimeMillis());
+    znrecord.setSimpleField(CommonConstants.Segment.DOWNLOAD_URL, "http://localhost:8000/myTable_0");
+    znrecord.setLongField(CommonConstants.Segment.PUSH_TIME, System.currentTimeMillis());
+    znrecord.setLongField(CommonConstants.Segment.REFRESH_TIME, System.currentTimeMillis());
 
     {
       _helixResourceManager = mock(PinotHelixResourceManager.class);

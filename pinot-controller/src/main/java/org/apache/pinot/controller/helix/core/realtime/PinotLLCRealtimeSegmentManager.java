@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
@@ -94,7 +93,6 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.SegmentType;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -156,7 +154,6 @@ public class PinotLLCRealtimeSegmentManager {
   private final MetadataEventNotifierFactory _metadataEventNotifierFactory;
   private final int _numIdealStateUpdateLocks;
   private final Lock[] _idealStateUpdateLocks;
-  private final TableConfigCache _tableConfigCache;
   private final FlushThresholdUpdateManager _flushThresholdUpdateManager;
   private final boolean _isDeepStoreLLCSegmentUploadRetryEnabled;
 
@@ -180,7 +177,6 @@ public class PinotLLCRealtimeSegmentManager {
     for (int i = 0; i < _numIdealStateUpdateLocks; i++) {
       _idealStateUpdateLocks[i] = new ReentrantLock();
     }
-    _tableConfigCache = new TableConfigCache(_propertyStore);
     _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
     _isDeepStoreLLCSegmentUploadRetryEnabled = controllerConf.isDeepStoreRetryUploadLLCSegmentEnabled();
     if (_isDeepStoreLLCSegmentUploadRetryEnabled) {
@@ -212,6 +208,11 @@ public class PinotLLCRealtimeSegmentManager {
     // From all segment names in the ideal state, find unique partition group ids and their latest segment
     Map<Integer, LLCSegmentName> partitionGroupIdToLatestSegment = new HashMap<>();
     for (String segment : idealState.getRecord().getMapFields().keySet()) {
+      // With Pinot upsert table allowing uploads of segments, the segment name of an upsert table segment may not
+      // conform to LLCSegment format. We can skip such segments because they are NOT the consuming segments.
+      if (!LLCSegmentName.isLowLevelConsumerSegmentName(segment)) {
+        continue;
+      }
       LLCSegmentName llcSegmentName = new LLCSegmentName(segment);
       int partitionGroupId = llcSegmentName.getPartitionGroupId();
       partitionGroupIdToLatestSegment.compute(partitionGroupId, (k, latestSegment) -> {
@@ -343,16 +344,20 @@ public class PinotLLCRealtimeSegmentManager {
     _helixResourceManager.deleteSegments(realtimeTableName, segmentsToRemove);
   }
 
+  // TODO: Consider using TableCache to read the table config
   @VisibleForTesting
   public TableConfig getTableConfig(String realtimeTableName) {
+    TableConfig tableConfig;
     try {
-      return _tableConfigCache.getTableConfig(realtimeTableName);
-    } catch (ExecutionException e) {
+      tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, realtimeTableName);
+    } catch (Exception e) {
       _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_ZOOKEEPER_FETCH_FAILURES, 1L);
-      throw new IllegalStateException(
-          "Caught exception while loading table config from property store to cache for table: " + realtimeTableName,
-          e);
+      throw e;
     }
+    if (tableConfig == null) {
+      throw new IllegalStateException("Failed to find table config for table: " + realtimeTableName);
+    }
+    return tableConfig;
   }
 
   @VisibleForTesting
@@ -672,8 +677,6 @@ public class PinotLLCRealtimeSegmentManager {
             segmentName, startOffset, creationTimeMs);
 
     SegmentZKMetadata newSegmentZKMetadata = new SegmentZKMetadata(segmentName);
-    newSegmentZKMetadata.setTableName(realtimeTableName);
-    newSegmentZKMetadata.setSegmentType(SegmentType.REALTIME);
     newSegmentZKMetadata.setCreationTime(creationTimeMs);
     newSegmentZKMetadata.setStartOffset(startOffset);
     // Leave maxOffset as null.

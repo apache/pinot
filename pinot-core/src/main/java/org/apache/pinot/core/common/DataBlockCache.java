@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.segment.spi.evaluator.TransformEvaluator;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.EqualityUtils;
 
@@ -121,6 +122,17 @@ public class DataBlockCache {
   }
 
   /**
+   * Get the int values for a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param buffer values to fill
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, int[] buffer) {
+    _dataFetcher.fetchIntValues(column, evaluator, _docIds, _length, buffer);
+  }
+
+  /**
    * Get the long values for a single-valued column.
    *
    * @param column Column name
@@ -137,6 +149,17 @@ public class DataBlockCache {
       _dataFetcher.fetchLongValues(column, _docIds, _length, longValues);
     }
     return longValues;
+  }
+
+  /**
+   * Get the long values for a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param buffer values to fill
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, long[] buffer) {
+    _dataFetcher.fetchLongValues(column, evaluator, _docIds, _length, buffer);
   }
 
   /**
@@ -159,6 +182,17 @@ public class DataBlockCache {
   }
 
   /**
+   * Get the float values for a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param buffer values to fill
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, float[] buffer) {
+    _dataFetcher.fetchFloatValues(column, evaluator, _docIds, _length, buffer);
+  }
+
+  /**
    * Get the double values for a single-valued column.
    *
    * @param column Column name
@@ -178,6 +212,17 @@ public class DataBlockCache {
   }
 
   /**
+   * Get the double values for a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param buffer values to fill
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, double[] buffer) {
+    _dataFetcher.fetchDoubleValues(column, evaluator, _docIds, _length, buffer);
+  }
+
+  /**
    * Get the string values for a single-valued column.
    *
    * @param column Column name
@@ -194,6 +239,17 @@ public class DataBlockCache {
       _dataFetcher.fetchStringValues(column, _docIds, _length, stringValues);
     }
     return stringValues;
+  }
+
+  /**
+   * Get the string values for a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param buffer values to fill
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, String[] buffer) {
+    _dataFetcher.fetchStringValues(column, evaluator, _docIds, _length, buffer);
   }
 
   /**
@@ -258,6 +314,17 @@ public class DataBlockCache {
   }
 
   /**
+   * Get the int[][] values for a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param buffer values to fill
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, int[][] buffer) {
+    _dataFetcher.fetchIntValues(column, evaluator, _docIds, _length, buffer);
+  }
+
+  /**
    * Get the long values for a multi-valued column.
    *
    * @param column Column name
@@ -274,6 +341,17 @@ public class DataBlockCache {
       _dataFetcher.fetchLongValues(column, _docIds, _length, longValues);
     }
     return longValues;
+  }
+
+  /**
+   * Get the long[][] values for a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param buffer values to fill
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, long[][] buffer) {
+    _dataFetcher.fetchLongValues(column, evaluator, _docIds, _length, buffer);
   }
 
   /**
@@ -296,6 +374,17 @@ public class DataBlockCache {
   }
 
   /**
+   * Get the float[][] values for a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param buffer values to fill
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, float[][] buffer) {
+    _dataFetcher.fetchFloatValues(column, evaluator, _docIds, _length, buffer);
+  }
+
+  /**
    * Get the double values for a multi-valued column.
    *
    * @param column Column name
@@ -315,6 +404,17 @@ public class DataBlockCache {
   }
 
   /**
+   * Get the double[][] values for a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param buffer values to fill
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, double[][] buffer) {
+    _dataFetcher.fetchDoubleValues(column, evaluator, _docIds, _length, buffer);
+  }
+
+  /**
    * Get the string values for a multi-valued column.
    *
    * @param column Column name
@@ -331,6 +431,17 @@ public class DataBlockCache {
       _dataFetcher.fetchStringValues(column, _docIds, _length, stringValues);
     }
     return stringValues;
+  }
+
+  /**
+   * Get the String[][] values for a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param buffer values to fill
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, String[][] buffer) {
+    _dataFetcher.fetchStringValues(column, evaluator, _docIds, _length, buffer);
   }
 
   /**

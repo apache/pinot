@@ -30,19 +30,23 @@ public class PinotServiceManagerStatusCallback implements ServiceStatus.ServiceS
 
   @Override
   public ServiceStatus.Status getServiceStatus() {
+    if (_pinotServiceManager.isShuttingDown()) {
+      return ServiceStatus.Status.SHUTTING_DOWN;
+    }
     if (_pinotServiceManager.isStarted()) {
       return ServiceStatus.Status.GOOD;
-    } else {
-      return ServiceStatus.Status.STARTING;
     }
+    return ServiceStatus.Status.STARTING;
   }
 
   @Override
   public String getStatusDescription() {
+    if (_pinotServiceManager.isShuttingDown()) {
+      return ServiceStatus.STATUS_DESCRIPTION_SHUTTING_DOWN;
+    }
     if (_pinotServiceManager.isStarted()) {
       return ServiceStatus.STATUS_DESCRIPTION_STARTED;
-    } else {
-      return ServiceStatus.STATUS_DESCRIPTION_INIT;
     }
+    return ServiceStatus.STATUS_DESCRIPTION_INIT;
   }
 }

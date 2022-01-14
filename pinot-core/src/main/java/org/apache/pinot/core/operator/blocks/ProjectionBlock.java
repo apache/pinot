@@ -27,6 +27,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.evaluator.TransformEvaluator;
 
 
 /**
@@ -68,5 +69,115 @@ public class ProjectionBlock implements Block {
   @Override
   public BlockMetadata getMetadata() {
     throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Pushes a {@see TransformEvaluator} which will produce an int value down
+   * to be evaluated against the column. This is an unstable API.
+   * @param column column to evaluate against
+   * @param evaluator the evaluator which produces values from the storage in the column
+   * @param buffer the buffer to write outputs into
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, int[] buffer) {
+    _dataBlockCache.fillValues(column, evaluator, buffer);
+  }
+
+  /**
+   * Pushes a {@see TransformEvaluator} which will produce a long value down
+   * to be evaluated against the column. This is an unstable API.
+   * @param column column to evaluate against
+   * @param evaluator the evaluator which produces values from the storage in the column
+   * @param buffer the buffer to write outputs into
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, long[] buffer) {
+    _dataBlockCache.fillValues(column, evaluator, buffer);
+  }
+
+  /**
+   * Pushes a {@see TransformEvaluator} which will produce a float value down
+   * to be evaluated against the column. This is an unstable API.
+   * @param column column to evaluate against
+   * @param evaluator the evaluator which produces values from the storage in the column
+   * @param buffer the buffer to write outputs into
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, float[] buffer) {
+    _dataBlockCache.fillValues(column, evaluator, buffer);
+  }
+
+  /**
+   * Pushes a {@see TransformEvaluator} which will produce a double value down
+   * to be evaluated against the column. This is an unstable API.
+   * @param column column to evaluate against
+   * @param evaluator the evaluator which produces values from the storage in the column
+   * @param buffer the buffer to write outputs into
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, double[] buffer) {
+    _dataBlockCache.fillValues(column, evaluator, buffer);
+  }
+
+  /**
+   * Pushes a {@see TransformEvaluator} which will produce a String value down
+   * to be evaluated against the column. This is an unstable API.
+   * @param column column to evaluate against
+   * @param evaluator the evaluator which produces values from the storage in the column
+   * @param buffer the buffer to write outputs into
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, String[] buffer) {
+    _dataBlockCache.fillValues(column, evaluator, buffer);
+  }
+
+  /**
+   * Pushes a {@see TransformEvaluator} which will produce an int[] array value down
+   * to be evaluated against the column. This is an unstable API.
+   * @param column column to evaluate against
+   * @param evaluator the evaluator which produces values from the storage in the column
+   * @param buffer the buffer to write outputs into
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, int[][] buffer) {
+    _dataBlockCache.fillValues(column, evaluator, buffer);
+  }
+
+  /**
+   * Pushes a {@see TransformEvaluator} which will produce a long[] value down
+   * to be evaluated against the column. This is an unstable API.
+   * @param column column to evaluate against
+   * @param evaluator the evaluator which produces values from the storage in the column
+   * @param buffer the buffer to write outputs into
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, long[][] buffer) {
+    _dataBlockCache.fillValues(column, evaluator, buffer);
+  }
+
+  /**
+   * Pushes a {@see TransformEvaluator} which will produce a float[] value down
+   * to be evaluated against the column. This is an unstable API.
+   * @param column column to evaluate against
+   * @param evaluator the evaluator which produces values from the storage in the column
+   * @param buffer the buffer to write outputs into
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, float[][] buffer) {
+    _dataBlockCache.fillValues(column, evaluator, buffer);
+  }
+
+  /**
+   * Pushes a {@see TransformEvaluator} which will produce a double[] value down
+   * to be evaluated against the column. This is an unstable API.
+   * @param column column to evaluate against
+   * @param evaluator the evaluator which produces values from the storage in the column
+   * @param buffer the buffer to write outputs into
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, double[][] buffer) {
+    _dataBlockCache.fillValues(column, evaluator, buffer);
+  }
+
+  /**
+   * Pushes a {@see TransformEvaluator} which will produce a String[] value down
+   * to be evaluated against the column. This is an unstable API.
+   * @param column column to evaluate against
+   * @param evaluator the evaluator which produces values from the storage in the column
+   * @param buffer the buffer to write outputs into
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, String[][] buffer) {
+    _dataBlockCache.fillValues(column, evaluator, buffer);
   }
 }

@@ -29,6 +29,7 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
+import org.apache.pinot.core.util.SegmentRefreshSemaphore;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -93,9 +94,11 @@ public interface InstanceDataManager {
       throws Exception;
 
   /**
-   * Reloads all segments in a table.
+   * Reloads all segments of a table.
+   * @param segmentRefreshSemaphore semaphore to control concurrent segment reloads/refresh
    */
-  void reloadAllSegments(String tableNameWithType, boolean forceDownload)
+  void reloadAllSegments(String tableNameWithType, boolean forceDownload,
+      SegmentRefreshSemaphore segmentRefreshSemaphore)
       throws Exception;
 
   /**

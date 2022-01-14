@@ -75,7 +75,7 @@ public class FileUploadDownloadClientTest {
       if (uploadType == FileUploadType.JSON) {
         InputStream bodyStream = httpExchange.getRequestBody();
         downloadUri = JsonUtils.stringToJsonNode(IOUtils.toString(bodyStream, "UTF-8"))
-            .get(CommonConstants.Segment.Offline.DOWNLOAD_URL).asText();
+            .get(CommonConstants.Segment.DOWNLOAD_URL).asText();
       } else if (uploadType == FileUploadType.URI) {
         downloadUri = requestHeaders.getFirst(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
         String crypter = requestHeaders.getFirst(FileUploadDownloadClient.CustomHeaders.CRYPTER);
@@ -117,7 +117,7 @@ public class FileUploadDownloadClientTest {
   public void testSendFileWithJson()
       throws Exception {
     ObjectNode segmentJson = JsonUtils.newObjectNode();
-    segmentJson.put(CommonConstants.Segment.Offline.DOWNLOAD_URL, TEST_URI);
+    segmentJson.put(CommonConstants.Segment.DOWNLOAD_URL, TEST_URI);
     String jsonString = segmentJson.toString();
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       SimpleHttpResponse response = fileUploadDownloadClient

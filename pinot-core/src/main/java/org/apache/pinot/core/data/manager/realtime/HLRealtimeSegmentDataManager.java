@@ -57,7 +57,6 @@ import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
 import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.SegmentType;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -378,8 +377,6 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           try {
             _segmentLogger.info("Marking current segment as completed in Helix");
             SegmentZKMetadata metadataToOverwrite = new SegmentZKMetadata(segmentZKMetadata.getSegmentName());
-            metadataToOverwrite.setTableName(_tableNameWithType);
-            metadataToOverwrite.setSegmentType(SegmentType.OFFLINE);
             metadataToOverwrite.setStatus(Status.DONE);
             metadataToOverwrite.setStartTime(segStartTime);
             metadataToOverwrite.setEndTime(segEndTime);

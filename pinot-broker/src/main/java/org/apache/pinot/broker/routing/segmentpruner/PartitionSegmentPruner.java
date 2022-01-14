@@ -71,7 +71,7 @@ public class PartitionSegmentPruner implements SegmentPruner {
   }
 
   @Override
-  public void init(ExternalView externalView, IdealState idealState, Set<String> onlineSegments) {
+  public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
     // Bulk load partition info for all online segments
     int numSegments = onlineSegments.size();
     List<String> segments = new ArrayList<>(numSegments);
@@ -80,7 +80,7 @@ public class PartitionSegmentPruner implements SegmentPruner {
       segments.add(segment);
       segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
     }
-    List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT);
+    List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
     for (int i = 0; i < numSegments; i++) {
       String segment = segments.get(i);
       PartitionInfo partitionInfo = extractPartitionInfoFromSegmentZKMetadataZNRecord(segment, znRecords.get(i));
@@ -125,13 +125,12 @@ public class PartitionSegmentPruner implements SegmentPruner {
       return INVALID_PARTITION_INFO;
     }
 
-    return new PartitionInfo(PartitionFunctionFactory
-        .getPartitionFunction(columnPartitionMetadata.getFunctionName(), columnPartitionMetadata.getNumPartitions()),
-        columnPartitionMetadata.getPartitions());
+    return new PartitionInfo(PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata.getFunctionName(),
+        columnPartitionMetadata.getNumPartitions()), columnPartitionMetadata.getPartitions());
   }
 
   @Override
-  public synchronized void onExternalViewChange(ExternalView externalView, IdealState idealState,
+  public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments) {
     // NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
     //       ones. The refreshed segment ZK metadata change won't be picked up.
@@ -223,8 +222,8 @@ public class PartitionSegmentPruner implements SegmentPruner {
         if (identifier != null && identifier.getName().equals(_partitionColumn)) {
           int numOperands = operands.size();
           for (int i = 1; i < numOperands; i++) {
-            if (partitionInfo._partitions.contains(partitionInfo._partitionFunction
-                .getPartition(operands.get(i).getLiteral().getFieldValue().toString()))) {
+            if (partitionInfo._partitions.contains(partitionInfo._partitionFunction.getPartition(
+                operands.get(i).getLiteral().getFieldValue().toString()))) {
               return true;
             }
           }

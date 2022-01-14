@@ -69,6 +69,7 @@ import {
   authenticateUser,
   getSegmentDebugInfo
 } from '../requests';
+import { baseApi } from './axios-config';
 import Utils from './Utils';
 const JSONbig = require('json-bigint')({'storeAsString': true})
 
@@ -185,7 +186,7 @@ const getClusterConfigJSON = () => {
 // Expected Output: {columns: [], records: []}
 const getQueryTablesList = ({bothType = false}) => {
   const promiseArr = bothType ? [getQueryTables('realtime'), getQueryTables('offline')] : [getQueryTables()];
-  
+
   return Promise.all(promiseArr).then((results) => {
     const responseObj = {
       columns: ['Tables'],
@@ -227,57 +228,60 @@ const getQueryResults = (params, url, checkedOptions) => {
     let queryResponse = null;
     queryResponse = getAsObject(data);
 
-    // if sql api throws error, handle here
-    if(typeof queryResponse === 'string'){
-      return {error: queryResponse};
-    } else if(queryResponse.exceptions.length){
-      return {error: JSON.stringify(queryResponse.exceptions, null, 2)};
-    }
-
+    let errorStr = '';
     let dataArray = [];
     let columnList = [];
-    if (checkedOptions.querySyntaxPQL === true) {
-      if (queryResponse) {
-        if (queryResponse.selectionResults) {
-          // Selection query
-          columnList = queryResponse.selectionResults.columns;
-          dataArray = queryResponse.selectionResults.results;
-        } else if (!queryResponse.aggregationResults[0]?.groupByResult) {
-          // Simple aggregation query
-          columnList = _.map(
-            queryResponse.aggregationResults,
-            (aggregationResult) => {
-              return { title: aggregationResult.function };
-            }
-          );
+    // if sql api throws error, handle here
+    if(typeof queryResponse === 'string'){
+      errorStr = queryResponse;
+    } else if (queryResponse && queryResponse.exceptions && queryResponse.exceptions.length) {
+      errorStr = JSON.stringify(queryResponse.exceptions, null, 2);
+    } else
+    {
+      if (checkedOptions.querySyntaxPQL === true)
+      {
+        if (queryResponse)
+        {
+          if (queryResponse.selectionResults)
+          {
+            // Selection query
+            columnList = queryResponse.selectionResults.columns;
+            dataArray = queryResponse.selectionResults.results;
+          }
+          else if (!queryResponse.aggregationResults[0]?.groupByResult)
+          {
+            // Simple aggregation query
+            columnList = _.map(queryResponse.aggregationResults, (aggregationResult) => {
+              return {title: aggregationResult.function};
+            });
 
-          dataArray.push(
-            _.map(queryResponse.aggregationResults, (aggregationResult) => {
+            dataArray.push(_.map(queryResponse.aggregationResults, (aggregationResult) => {
               return aggregationResult.value;
-            })
-          );
-        } else if (queryResponse.aggregationResults[0]?.groupByResult) {
-          // Aggregation group by query
-          // TODO - Revisit
-          const columns = queryResponse.aggregationResults[0].groupByColumns;
-          columns.push(queryResponse.aggregationResults[0].function);
-          columnList = _.map(columns, (columnName) => {
-            return columnName;
-          });
+            }));
+          }
+          else if (queryResponse.aggregationResults[0]?.groupByResult)
+          {
+            // Aggregation group by query
+            // TODO - Revisit
+            const columns = queryResponse.aggregationResults[0].groupByColumns;
+            columns.push(queryResponse.aggregationResults[0].function);
+            columnList = _.map(columns, (columnName) => {
+              return columnName;
+            });
 
-          dataArray = _.map(
-            queryResponse.aggregationResults[0].groupByResult,
-            (aggregationGroup) => {
+            dataArray = _.map(queryResponse.aggregationResults[0].groupByResult, (aggregationGroup) => {
               const row = aggregationGroup.group;
               row.push(aggregationGroup.value);
               return row;
-            }
-          );
+            });
+          }
         }
       }
-    } else if (queryResponse.resultTable?.dataSchema?.columnNames?.length) {
-      columnList = queryResponse.resultTable.dataSchema.columnNames;
-      dataArray = queryResponse.resultTable.rows;
+      else if (queryResponse.resultTable?.dataSchema?.columnNames?.length)
+      {
+        columnList = queryResponse.resultTable.dataSchema.columnNames;
+        dataArray = queryResponse.resultTable.rows;
+      }
     }
 
     const columnStats = ['timeUsedMs',
@@ -295,9 +299,17 @@ const getQueryResults = (params, url, checkedOptions) => {
       'partialResponse',
       'minConsumingFreshnessTimeMs',
       'offlineThreadCpuTimeNs',
-      'realtimeThreadCpuTimeNs'];
+      'realtimeThreadCpuTimeNs',
+      'offlineSystemActivitiesCpuTimeNs',
+      'realtimeSystemActivitiesCpuTimeNs',
+      'offlineResponseSerializationCpuTimeNs',
+      'realtimeResponseSerializationCpuTimeNs',
+      'offlineTotalCpuTimeNs',
+      'realtimeTotalCpuTimeNs'
+    ];
 
     return {
+      error: errorStr,
       result: {
         columns: columnList,
         records: dataArray,
@@ -308,7 +320,10 @@ const getQueryResults = (params, url, checkedOptions) => {
           queryResponse.numSegmentsQueried, queryResponse.numSegmentsProcessed, queryResponse.numSegmentsMatched, queryResponse.numConsumingSegmentsQueried,
           queryResponse.numEntriesScannedInFilter, queryResponse.numEntriesScannedPostFilter, queryResponse.numGroupsLimitReached,
           queryResponse.partialResponse ? queryResponse.partialResponse : '-', queryResponse.minConsumingFreshnessTimeMs,
-          queryResponse.offlineThreadCpuTimeNs, queryResponse.realtimeThreadCpuTimeNs]]
+          queryResponse.offlineThreadCpuTimeNs, queryResponse.realtimeThreadCpuTimeNs,
+          queryResponse.offlineSystemActivitiesCpuTimeNs, queryResponse.realtimeSystemActivitiesCpuTimeNs,
+          queryResponse.offlineResponseSerializationCpuTimeNs, queryResponse.realtimeResponseSerializationCpuTimeNs,
+          queryResponse.offlineTotalCpuTimeNs, queryResponse.realtimeTotalCpuTimeNs]]
       },
       data: queryResponse,
     };
@@ -476,15 +491,17 @@ const getSegmentStatus = (idealSegment, externalViewSegment) => {
     return 'Good';
   }
   let goodCount = 0;
-  const totalCount = Object.keys(externalViewSegment).length;
+  // There is a possibility that the segment is in ideal state but not in external view
+  // making external view segment as null.
+  const totalCount = externalViewSegment ? Object.keys(externalViewSegment).length : 0;
   Object.keys(idealSegment).map((replicaName)=>{
     const idealReplicaState = idealSegment[replicaName];
-    const externalReplicaState = externalViewSegment[replicaName];
+    const externalReplicaState = externalViewSegment ? externalViewSegment[replicaName] : '';
     if(idealReplicaState === externalReplicaState || (externalReplicaState === 'CONSUMING')){
       goodCount += 1;
     }
   });
-  if(goodCount === 0){
+  if(goodCount === 0 || totalCount === 0){
     return 'Bad';
   } else if(goodCount === totalCount){
     return  'Good';
@@ -799,10 +816,28 @@ const getAuthInfo = () => {
   });
 };
 
+const getWellKnownOpenIdConfiguration = (issuer) => {
+  return baseApi
+    .get(`${issuer}/.well-known/openid-configuration`)
+    .then((response) => {
+      return response.data;
+    });
+};
+
 const verifyAuth = (authToken) => {
   return authenticateUser(authToken).then((response)=>{
     return response.data;
   });
+};
+
+const getAccessTokenFromHashParams = () => {
+  let accessToken = '';
+  const urlSearchParams = new URLSearchParams(location.hash.substr(1));
+  if (urlSearchParams.has('access_token')) {
+    accessToken = urlSearchParams.get('access_token') as string;
+  }
+
+  return accessToken;
 };
 
 export default {
@@ -855,5 +890,7 @@ export default {
   getAllSchemaDetails,
   getTableState,
   getAuthInfo,
-  verifyAuth
+  getWellKnownOpenIdConfiguration,
+  verifyAuth,
+  getAccessTokenFromHashParams
 };

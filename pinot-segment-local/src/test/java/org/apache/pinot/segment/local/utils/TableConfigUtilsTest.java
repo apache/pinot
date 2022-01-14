@@ -1191,7 +1191,10 @@ public class TableConfigUtilsTest {
   @Test
   public void testTaskConfig() {
     Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+            .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+            .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
             .build();
     Map<String, String> realtimeToOfflineTaskConfig =
         ImmutableMap.of("schedule", "0 */10 * ? * * *", "bucketTimePeriod", "6h", "bufferTimePeriod", "5d", "mergeType",
@@ -1218,7 +1221,8 @@ public class TableConfigUtilsTest {
     }
 
     // invalid Upsert config with RealtimeToOfflineTask
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null)).setTaskConfig(new TableTaskConfig(
             ImmutableMap.of("RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig,
                 "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig))).build();
@@ -1226,8 +1230,10 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateTaskConfigs(tableConfig, schema);
       Assert.fail();
     } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("RealtimeToOfflineTask doesn't support upsert ingestion mode"));
+      Assert.assertTrue(e.getMessage().contains("RealtimeToOfflineTask doesn't support upsert table"));
     }
+    // validate that TASK config will be skipped with skip string.
+    TableConfigUtils.validate(tableConfig, schema, "TASK,UPSERT");
 
     // invalid period
     HashMap<String, String> invalidPeriodConfig = new HashMap<>(realtimeToOfflineTaskConfig);

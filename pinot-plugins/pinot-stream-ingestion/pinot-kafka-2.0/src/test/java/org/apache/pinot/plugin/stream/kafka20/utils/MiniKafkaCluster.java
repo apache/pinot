@@ -79,13 +79,11 @@ public final class MiniKafkaCluster implements Closeable {
     props.put("port", Integer.toString(port));
     props.put("log.dir", new File(TEMP_DIR, "log").getPath());
     props.put("zookeeper.connect", _zkServer.getZkAddress());
-    props.put("replica.socket.timeout.ms", "1500");
-    props.put("controller.socket.timeout.ms", "1500");
+    props.put("zookeeper.session.timeout.ms", "30000");
     props.put("controlled.shutdown.enable", "true");
     props.put("delete.topic.enable", "true");
     props.put("auto.create.topics.enable", "true");
     props.put("offsets.topic.replication.factor", "1");
-    props.put("controlled.shutdown.retry.backoff.ms", "100");
     props.put("log.cleaner.dedupe.buffer.size", "2097152");
     return props;
   }

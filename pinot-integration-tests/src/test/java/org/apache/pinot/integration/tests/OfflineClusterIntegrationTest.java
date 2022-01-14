@@ -32,9 +32,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
@@ -46,17 +44,9 @@ import org.apache.http.message.BasicNameValuePair;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.proto.Server;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
-import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
-import org.apache.pinot.common.utils.grpc.GrpcRequestBuilder;
-import org.apache.pinot.core.common.datatable.DataTableFactory;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -133,9 +123,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final String NUM_ROWS_KEY = "numRows";
   private static final String COLUMN_LENGTH_MAP_KEY = "columnLengthMap";
   private static final String COLUMN_CARDINALITY_MAP_KEY = "columnCardinalityMap";
+  private static final String MAX_NUM_MULTI_VALUES_MAP_KEY = "maxNumMultiValuesMap";
   // TODO: This might lead to flaky test, as this disk size is not deterministic
   //       as it depends on the iteration order of a HashSet.
-  private static final int DISK_SIZE_IN_BYTES = 20442320;
+  private static final int DISK_SIZE_IN_BYTES = 20796000;
   private static final int NUM_ROWS = 115545;
 
   private final List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbacks =
@@ -201,7 +192,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   protected void startServers() {
     // Enable gRPC server
     PinotConfiguration serverConfig = getDefaultServerConfiguration();
-    serverConfig.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_GRPC_SERVER, true);
     startServer(serverConfig);
   }
 
@@ -1816,61 +1806,21 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testGrpcQueryServer()
+  public void testExplainPlanQuery()
       throws Exception {
-    GrpcQueryClient queryClient = new GrpcQueryClient("localhost", CommonConstants.Server.DEFAULT_GRPC_PORT);
-    String sql = "SELECT * FROM mytable_OFFLINE LIMIT 1000000";
-    BrokerRequest brokerRequest = new Pql2Compiler().compileToBrokerRequest(sql);
-    List<String> segments = _helixResourceManager.getSegmentsFor("mytable_OFFLINE");
+    String query = "EXPLAIN PLAN FOR SELECT count(*) AS count, Carrier AS name FROM mytable GROUP BY name ORDER BY 1";
+    String response = postSqlQuery(query, _brokerBaseApiUrl).get("resultTable").toString();
 
-    GrpcRequestBuilder requestBuilder = new GrpcRequestBuilder().setSegments(segments);
-    testNonStreamingRequest(queryClient.submit(requestBuilder.setSql(sql).build()));
-    testNonStreamingRequest(queryClient.submit(requestBuilder.setBrokerRequest(brokerRequest).build()));
+    // Replace string "docs:[0-9]+" with "docs:*" so that test doesn't fail when number of documents change. This is
+    // needed because both OfflineClusterIntegrationTest and MultiNodesOfflineClusterIntegrationTest run this test
+    // case with different number of documents in the segment.
+    response = response.replaceAll("docs:[0-9]+", "docs:*");
 
-    requestBuilder.setEnableStreaming(true);
-    testStreamingRequest(queryClient.submit(requestBuilder.setSql(sql).build()));
-    testStreamingRequest(queryClient.submit(requestBuilder.setBrokerRequest(brokerRequest).build()));
-  }
-
-  private void testNonStreamingRequest(Iterator<Server.ServerResponse> nonStreamingResponses)
-      throws Exception {
-    int expectedNumDocs = (int) getCountStarResult();
-    assertTrue(nonStreamingResponses.hasNext());
-    Server.ServerResponse nonStreamingResponse = nonStreamingResponses.next();
-    assertEquals(nonStreamingResponse.getMetadataMap().get(CommonConstants.Query.Response.MetadataKeys.RESPONSE_TYPE),
-        CommonConstants.Query.Response.ResponseType.NON_STREAMING);
-    DataTable dataTable = DataTableFactory.getDataTable(nonStreamingResponse.getPayload().asReadOnlyByteBuffer());
-    assertNotNull(dataTable.getDataSchema());
-    assertEquals(dataTable.getNumberOfRows(), expectedNumDocs);
-    Map<String, String> metadata = dataTable.getMetadata();
-    assertEquals(metadata.get(MetadataKey.NUM_DOCS_SCANNED.getName()), Integer.toString(expectedNumDocs));
-  }
-
-  private void testStreamingRequest(Iterator<Server.ServerResponse> streamingResponses)
-      throws Exception {
-    int expectedNumDocs = (int) getCountStarResult();
-    int numTotalDocs = 0;
-    while (streamingResponses.hasNext()) {
-      Server.ServerResponse streamingResponse = streamingResponses.next();
-      DataTable dataTable = DataTableFactory.getDataTable(streamingResponse.getPayload().asReadOnlyByteBuffer());
-      String responseType =
-          streamingResponse.getMetadataMap().get(CommonConstants.Query.Response.MetadataKeys.RESPONSE_TYPE);
-      if (responseType.equals(CommonConstants.Query.Response.ResponseType.DATA)) {
-        // verify the returned data table metadata only contains "threadCpuTimeNs".
-        Map<String, String> metadata = dataTable.getMetadata();
-        assertTrue(metadata.size() == 1 && metadata.containsKey(MetadataKey.THREAD_CPU_TIME_NS.getName()));
-        assertNotNull(dataTable.getDataSchema());
-        numTotalDocs += dataTable.getNumberOfRows();
-      } else {
-        assertEquals(responseType, CommonConstants.Query.Response.ResponseType.METADATA);
-        assertFalse(streamingResponses.hasNext());
-        assertEquals(numTotalDocs, expectedNumDocs);
-        assertNull(dataTable.getDataSchema());
-        assertEquals(dataTable.getNumberOfRows(), 0);
-        Map<String, String> metadata = dataTable.getMetadata();
-        assertEquals(metadata.get(MetadataKey.NUM_DOCS_SCANNED.getName()), Integer.toString(expectedNumDocs));
-      }
-    }
+    assertEquals(response, "{\"dataSchema\":{\"columnNames\":[\"Operator\",\"Operator_Id\",\"Parent_Id\"],"
+        + "\"columnDataTypes\":[\"STRING\",\"INT\",\"INT\"]},\"rows\":[[\"BROKER_REDUCE(sort:[count(*) ASC],limit:10)"
+        + "\",0,-1],[\"COMBINE_GROUPBY_ORDERBY\",1,0],[\"AGGREGATE_GROUPBY_ORDERBY(groupKeys:Carrier, "
+        + "aggregations:count(*))\",2,1],[\"TRANSFORM_PASSTHROUGH(Carrier)\",3,2],[\"PROJECT(Carrier)\",4,3],"
+        + "[\"FILTER_MATCH_ENTIRE_SEGMENT(docs:*)\",5,4]]}");
   }
 
   @Test
@@ -1883,44 +1833,68 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testAggregateMetadataAPI()
       throws IOException {
-    JsonNode oneColumnResponse = JsonUtils.stringToJsonNode(
-        sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=DestCityMarketID"));
-    assertEquals(oneColumnResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
-    assertEquals(oneColumnResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
-    assertEquals(oneColumnResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
-    assertEquals(oneColumnResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 1);
-    assertEquals(oneColumnResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 1);
+    JsonNode oneSVColumnResponse = JsonUtils
+        .stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=DestCityMarketID"));
+    // DestCityMarketID is a SV column
+    validateMetadataResponse(oneSVColumnResponse, 1, 0);
 
-    JsonNode threeColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl
+    JsonNode oneMVColumnResponse = JsonUtils
+        .stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=DivLongestGTimes"));
+    // DivLongestGTimes is a MV column
+    validateMetadataResponse(oneMVColumnResponse, 1, 1);
+
+    JsonNode threeSVColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl
         + "/tables/mytable/metadata?columns=DivActualElapsedTime&columns=CRSElapsedTime&columns=OriginStateName"));
-    assertEquals(threeColumnsResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
-    assertEquals(threeColumnsResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
-    assertEquals(threeColumnsResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
-    assertEquals(threeColumnsResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 3);
-    assertEquals(threeColumnsResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 3);
+    validateMetadataResponse(threeSVColumnsResponse, 3, 0);
+
+    JsonNode threeSVColumnsWholeEncodedResponse = JsonUtils.stringToJsonNode(sendGetRequest(
+        _controllerBaseApiUrl + "/tables/mytable/metadata?columns="
+            + "DivActualElapsedTime%26columns%3DCRSElapsedTime%26columns%3DOriginStateName"));
+    validateMetadataResponse(threeSVColumnsWholeEncodedResponse, 3, 0);
+
+    JsonNode threeMVColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl
+        + "/tables/mytable/metadata?columns=DivLongestGTimes&columns=DivWheelsOns&columns=DivAirports"));
+    validateMetadataResponse(threeMVColumnsResponse, 3, 3);
+
+    JsonNode threeMVColumnsWholeEncodedResponse = JsonUtils.stringToJsonNode(sendGetRequest(
+        _controllerBaseApiUrl + "/tables/mytable/metadata?columns="
+            + "DivLongestGTimes%26columns%3DDivWheelsOns%26columns%3DDivAirports"));
+    validateMetadataResponse(threeMVColumnsWholeEncodedResponse, 3, 3);
 
     JsonNode zeroColumnResponse =
         JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata"));
-    assertEquals(zeroColumnResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
-    assertEquals(zeroColumnResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
-    assertEquals(zeroColumnResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
-    assertEquals(zeroColumnResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 0);
-    assertEquals(zeroColumnResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 0);
+    validateMetadataResponse(zeroColumnResponse, 0, 0);
 
-    JsonNode allColumnResponse =
+    JsonNode starColumnResponse =
         JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=*"));
-    assertEquals(allColumnResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
-    assertEquals(allColumnResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
-    assertEquals(allColumnResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
-    assertEquals(allColumnResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 82);
-    assertEquals(allColumnResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 82);
+    validateMetadataResponse(starColumnResponse, 82, 9);
 
-    allColumnResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        _controllerBaseApiUrl + "/tables/mytable/metadata?columns=CRSElapsedTime&columns=*&columns=OriginStateName"));
-    assertEquals(allColumnResponse.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
-    assertEquals(allColumnResponse.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
-    assertEquals(allColumnResponse.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
-    assertEquals(allColumnResponse.get(COLUMN_LENGTH_MAP_KEY).size(), 82);
-    assertEquals(allColumnResponse.get(COLUMN_CARDINALITY_MAP_KEY).size(), 82);
+    JsonNode starEncodedColumnResponse =
+        JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=%2A"));
+    validateMetadataResponse(starEncodedColumnResponse, 82, 9);
+
+    JsonNode starWithExtraColumnResponse = JsonUtils.stringToJsonNode(sendGetRequest(
+        _controllerBaseApiUrl + "/tables/mytable/metadata?columns="
+            + "CRSElapsedTime&columns=*&columns=OriginStateName"));
+    validateMetadataResponse(starWithExtraColumnResponse, 82, 9);
+
+    JsonNode starWithExtraEncodedColumnResponse = JsonUtils.stringToJsonNode(sendGetRequest(
+        _controllerBaseApiUrl + "/tables/mytable/metadata?columns="
+            + "CRSElapsedTime&columns=%2A&columns=OriginStateName"));
+    validateMetadataResponse(starWithExtraEncodedColumnResponse, 82, 9);
+
+    JsonNode starWithExtraColumnWholeEncodedResponse = JsonUtils.stringToJsonNode(sendGetRequest(
+        _controllerBaseApiUrl + "/tables/mytable/metadata?columns="
+            + "CRSElapsedTime%26columns%3D%2A%26columns%3DOriginStateName"));
+    validateMetadataResponse(starWithExtraColumnWholeEncodedResponse, 82, 9);
+  }
+
+  private void validateMetadataResponse(JsonNode response, int numTotalColumn, int numMVColumn) {
+    assertEquals(response.get(DISK_SIZE_IN_BYTES_KEY).asInt(), DISK_SIZE_IN_BYTES);
+    assertEquals(response.get(NUM_SEGMENTS_KEY).asInt(), NUM_SEGMENTS);
+    assertEquals(response.get(NUM_ROWS_KEY).asInt(), NUM_ROWS);
+    assertEquals(response.get(COLUMN_LENGTH_MAP_KEY).size(), numTotalColumn);
+    assertEquals(response.get(COLUMN_CARDINALITY_MAP_KEY).size(), numTotalColumn);
+    assertEquals(response.get(MAX_NUM_MULTI_VALUES_MAP_KEY).size(), numMVColumn);
   }
 }

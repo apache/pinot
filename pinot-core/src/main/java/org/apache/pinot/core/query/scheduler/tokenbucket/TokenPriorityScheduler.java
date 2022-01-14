@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.scheduler.tokenbucket;
 
 import java.util.concurrent.atomic.LongAccumulator;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.scheduler.MultiLevelPriorityQueue;
@@ -42,8 +41,8 @@ public class TokenPriorityScheduler extends PriorityScheduler {
   public static final String TOKEN_LIFETIME_MS_KEY = "token_lifetime_ms";
   private static final int DEFAULT_TOKEN_LIFETIME_MS = 100;
 
-  public static TokenPriorityScheduler create(@Nonnull PinotConfiguration config, @Nonnull QueryExecutor queryExecutor,
-      @Nonnull ServerMetrics metrics, @Nonnull LongAccumulator latestQueryTime) {
+  public static TokenPriorityScheduler create(PinotConfiguration config, QueryExecutor queryExecutor,
+      ServerMetrics metrics, LongAccumulator latestQueryTime) {
     final ResourceManager rm = new PolicyBasedResourceManager(config);
     final SchedulerGroupFactory groupFactory = new SchedulerGroupFactory() {
       @Override
@@ -62,9 +61,9 @@ public class TokenPriorityScheduler extends PriorityScheduler {
     return new TokenPriorityScheduler(config, rm, queryExecutor, queue, metrics, latestQueryTime);
   }
 
-  private TokenPriorityScheduler(@Nonnull PinotConfiguration config, @Nonnull ResourceManager resourceManager,
-      @Nonnull QueryExecutor queryExecutor, @Nonnull MultiLevelPriorityQueue queue, @Nonnull ServerMetrics metrics,
-      @Nonnull LongAccumulator latestQueryTime) {
+  private TokenPriorityScheduler(PinotConfiguration config, ResourceManager resourceManager,
+      QueryExecutor queryExecutor, MultiLevelPriorityQueue queue, ServerMetrics metrics,
+      LongAccumulator latestQueryTime) {
     super(config, resourceManager, queryExecutor, queue, metrics, latestQueryTime);
   }
 

@@ -31,7 +31,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
-import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.DefaultIndexCreatorProvider;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -314,7 +314,7 @@ public class DictionaryToRawIndexConverter {
     int numDocs = segment.getSegmentMetadata().getTotalDocs();
     int lengthOfLongestEntry = (storedType == DataType.STRING) ? getLengthOfLongestEntry(dictionary) : -1;
 
-    try (ForwardIndexCreator rawIndexCreator = SegmentColumnarIndexCreator
+    try (ForwardIndexCreator rawIndexCreator = DefaultIndexCreatorProvider
         .getRawIndexCreatorForSVColumn(newSegment, compressionType, column, storedType, numDocs, lengthOfLongestEntry,
             false, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
         ForwardIndexReaderContext readerContext = reader.createContext()) {

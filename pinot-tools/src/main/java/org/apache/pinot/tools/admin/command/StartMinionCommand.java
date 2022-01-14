@@ -68,6 +68,30 @@ public class StartMinionCommand extends AbstractBaseAdminCommand implements Comm
     return _help;
   }
 
+  public String getMinionHost() {
+    return _minionHost;
+  }
+
+  public int getMinionPort() {
+    return _minionPort;
+  }
+
+  public String getZkAddress() {
+    return _zkAddress;
+  }
+
+  public String getClusterName() {
+    return _clusterName;
+  }
+
+  public String getConfigFileName() {
+    return _configFileName;
+  }
+
+  public Map<String, Object> getConfigOverrides() {
+    return _configOverrides;
+  }
+
   @Override
   public String getName() {
     return "StartMinion";
@@ -111,7 +135,7 @@ public class StartMinionCommand extends AbstractBaseAdminCommand implements Comm
     }
   }
 
-  private Map<String, Object> getMinionConf()
+  protected Map<String, Object> getMinionConf()
       throws ConfigurationException, SocketException, UnknownHostException {
     Map<String, Object> properties = new HashMap<>();
     if (_configFileName != null) {

@@ -26,10 +26,12 @@ import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.evaluator.json.JsonPathEvaluator;
+import org.apache.pinot.segment.spi.evaluator.json.JsonPathEvaluators;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -58,7 +60,8 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   private TransformFunction _jsonFieldTransformFunction;
   private String _jsonPathString;
   private JsonPath _jsonPath;
-  private Object _defaultValue = null;
+  private Object _defaultValue;
+  private JsonPathEvaluator _jsonPathEvaluator;
   private TransformResultMetadata _resultMetadata;
 
   @Override
@@ -83,7 +86,6 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     }
     _jsonFieldTransformFunction = firstArgument;
     _jsonPathString = ((LiteralTransformFunction) arguments.get(1)).getLiteral();
-    _jsonPath = JsonPath.compile(_jsonPathString);
     String resultsType = ((LiteralTransformFunction) arguments.get(2)).getLiteral().toUpperCase();
     boolean isSingleValue = !resultsType.endsWith("_ARRAY");
     try {
@@ -93,6 +95,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
         _defaultValue = dataType.convert(((LiteralTransformFunction) arguments.get(3)).getLiteral());
       }
       _resultMetadata = new TransformResultMetadata(dataType, isSingleValue, false);
+      _jsonPathEvaluator = JsonPathEvaluators.create(_jsonPathString, _defaultValue);
     } catch (Exception e) {
       throw new IllegalStateException(String.format(
           "Unsupported results type: %s for jsonExtractScalar function. Supported types are: "
@@ -108,10 +111,22 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int numDocs = projectionBlock.getNumDocs();
+    if (_intValuesSV == null || _intValuesSV.length < numDocs) {
+      _intValuesSV = new int[numDocs];
     }
+    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
+      ((PushDownTransformFunction) _jsonFieldTransformFunction)
+          .transformToIntValuesSV(projectionBlock, _jsonPathEvaluator, _intValuesSV);
+      return _intValuesSV;
+    }
+    // operating on the output of another transform so can't pass the evaluation down to the storage
+    return transformTransformedValuesToIntValuesSV(projectionBlock);
+  }
 
+  private int[] transformTransformedValuesToIntValuesSV(ProjectionBlock projectionBlock) {
+    // operating on the output of another transform so can't pass the evaluation down to the storage
+    ensureJsonPathCompiled();
     String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     int numDocs = projectionBlock.getNumDocs();
     for (int i = 0; i < numDocs; i++) {
@@ -139,10 +154,21 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    if (_longValuesSV == null) {
-      _longValuesSV = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int numDocs = projectionBlock.getNumDocs();
+    if (_longValuesSV == null || _longValuesSV.length < numDocs) {
+      _longValuesSV = new long[numDocs];
     }
+    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
+      ((PushDownTransformFunction) _jsonFieldTransformFunction)
+          .transformToLongValuesSV(projectionBlock, _jsonPathEvaluator, _longValuesSV);
+      return _longValuesSV;
+    }
+    return transformTransformedValuesToLongValuesSV(projectionBlock);
+  }
 
+  private long[] transformTransformedValuesToLongValuesSV(ProjectionBlock projectionBlock) {
+    // operating on the output of another transform so can't pass the evaluation down to the storage
+    ensureJsonPathCompiled();
     String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     int numDocs = projectionBlock.getNumDocs();
     for (int i = 0; i < numDocs; i++) {
@@ -171,10 +197,21 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
-    if (_floatValuesSV == null) {
-      _floatValuesSV = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int numDocs = projectionBlock.getNumDocs();
+    if (_floatValuesSV == null || _floatValuesSV.length < numDocs) {
+      _floatValuesSV = new float[numDocs];
     }
+    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
+      ((PushDownTransformFunction) _jsonFieldTransformFunction)
+          .transformToFloatValuesSV(projectionBlock, _jsonPathEvaluator, _floatValuesSV);
+      return _floatValuesSV;
+    }
+    return transformTransformedValuesToFloatValuesSV(projectionBlock);
+  }
 
+  private float[] transformTransformedValuesToFloatValuesSV(ProjectionBlock projectionBlock) {
+    // operating on the output of another transform so can't pass the evaluation down to the storage
+    ensureJsonPathCompiled();
     String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     int numDocs = projectionBlock.getNumDocs();
     for (int i = 0; i < numDocs; i++) {
@@ -202,10 +239,21 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int numDocs = projectionBlock.getNumDocs();
+    if (_doubleValuesSV == null || _doubleValuesSV.length < numDocs) {
+      _doubleValuesSV = new double[numDocs];
     }
+    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
+      ((PushDownTransformFunction) _jsonFieldTransformFunction)
+          .transformToDoubleValuesSV(projectionBlock, _jsonPathEvaluator, _doubleValuesSV);
+      return _doubleValuesSV;
+    }
+    return transformTransformedValuesToDoubleValuesSV(projectionBlock);
+  }
 
+  private double[] transformTransformedValuesToDoubleValuesSV(ProjectionBlock projectionBlock) {
+    // operating on the output of another transform so can't pass the evaluation down to the storage
+    ensureJsonPathCompiled();
     String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     int numDocs = projectionBlock.getNumDocs();
     for (int i = 0; i < numDocs; i++) {
@@ -233,10 +281,21 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    if (_stringValuesSV == null) {
-      _stringValuesSV = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int numDocs = projectionBlock.getNumDocs();
+    if (_stringValuesSV == null || _stringValuesSV.length < numDocs) {
+      _stringValuesSV = new String[numDocs];
     }
+    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
+      ((PushDownTransformFunction) _jsonFieldTransformFunction)
+          .transformToStringValuesSV(projectionBlock, _jsonPathEvaluator, _stringValuesSV);
+      return _stringValuesSV;
+    }
+    return transformTransformedValuesToStringValuesSV(projectionBlock);
+  }
 
+  private String[] transformTransformedValuesToStringValuesSV(ProjectionBlock projectionBlock) {
+    // operating on the output of another transform so can't pass the evaluation down to the storage
+    ensureJsonPathCompiled();
     String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     int numDocs = projectionBlock.getNumDocs();
     for (int i = 0; i < numDocs; i++) {
@@ -264,10 +323,22 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
-    if (_intValuesMV == null) {
-      _intValuesMV = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    int numDocs = projectionBlock.getNumDocs();
+    if (_intValuesMV == null || _intValuesMV.length < numDocs) {
+      _intValuesMV = new int[numDocs][];
+    }
+    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
+      ((PushDownTransformFunction) _jsonFieldTransformFunction)
+          .transformToIntValuesMV(projectionBlock, _jsonPathEvaluator, _intValuesMV);
+      return _intValuesMV;
     }
 
+    return transformTransformedValuesToIntValuesMV(projectionBlock);
+  }
+
+  private int[][] transformTransformedValuesToIntValuesMV(ProjectionBlock projectionBlock) {
+    // operating on the output of another transform so can't pass the evaluation down to the storage
+    ensureJsonPathCompiled();
     String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     int numDocs = projectionBlock.getNumDocs();
     for (int i = 0; i < numDocs; i++) {
@@ -292,10 +363,22 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
-    if (_longValuesMV == null) {
-      _longValuesMV = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    int numDocs = projectionBlock.getNumDocs();
+    if (_longValuesMV == null || _longValuesMV.length < numDocs) {
+      _longValuesMV = new long[numDocs][];
+    }
+    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
+      ((PushDownTransformFunction) _jsonFieldTransformFunction)
+          .transformToLongValuesMV(projectionBlock, _jsonPathEvaluator, _longValuesMV);
+      return _longValuesMV;
     }
 
+    return transformTransformedValuesToLongValuesMV(projectionBlock);
+  }
+
+  private long[][] transformTransformedValuesToLongValuesMV(ProjectionBlock projectionBlock) {
+    // operating on the output of another transform so can't pass the evaluation down to the storage
+    ensureJsonPathCompiled();
     String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
@@ -320,10 +403,22 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
-    if (_floatValuesMV == null) {
-      _floatValuesMV = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    int numDocs = projectionBlock.getNumDocs();
+    if (_floatValuesMV == null || _floatValuesMV.length < numDocs) {
+      _floatValuesMV = new float[numDocs][];
+    }
+    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
+      ((PushDownTransformFunction) _jsonFieldTransformFunction)
+          .transformToFloatValuesMV(projectionBlock, _jsonPathEvaluator, _floatValuesMV);
+      return _floatValuesMV;
     }
 
+    return transformTransformedValuesToFloatValuesMV(projectionBlock);
+  }
+
+  private float[][] transformTransformedValuesToFloatValuesMV(ProjectionBlock projectionBlock) {
+    // operating on the output of another transform so can't pass the evaluation down to the storage
+    ensureJsonPathCompiled();
     String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
@@ -348,8 +443,30 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
-    if (_doubleValuesMV == null) {
-      _doubleValuesMV = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    int numDocs = projectionBlock.getNumDocs();
+    if (_doubleValuesMV == null || _doubleValuesMV.length < numDocs) {
+      _doubleValuesMV = new double[numDocs][];
+    }
+    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
+      ((PushDownTransformFunction) _jsonFieldTransformFunction)
+          .transformToDoubleValuesMV(projectionBlock, _jsonPathEvaluator, _doubleValuesMV);
+      return _doubleValuesMV;
+    }
+
+    return transformTransformedToDoubleValuesMV(projectionBlock);
+  }
+
+  private double[][] transformTransformedToDoubleValuesMV(ProjectionBlock projectionBlock) {
+    // operating on the output of another transform so can't pass the evaluation down to the storage
+    ensureJsonPathCompiled();
+    int numDocs = projectionBlock.getNumDocs();
+    if (_doubleValuesMV == null || _doubleValuesMV.length < numDocs) {
+      _doubleValuesMV = new double[numDocs][];
+    }
+    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
+      ((PushDownTransformFunction) _jsonFieldTransformFunction)
+          .transformToDoubleValuesMV(projectionBlock, _jsonPathEvaluator, _doubleValuesMV);
+      return _doubleValuesMV;
     }
 
     String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
@@ -376,10 +493,22 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
-    if (_stringValuesMV == null) {
-      _stringValuesMV = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    int numDocs = projectionBlock.getNumDocs();
+    if (_stringValuesMV == null || _stringValuesMV.length < numDocs) {
+      _stringValuesMV = new String[numDocs][];
+    }
+    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
+      ((PushDownTransformFunction) _jsonFieldTransformFunction)
+          .transformToStringValuesMV(projectionBlock, _jsonPathEvaluator, _stringValuesMV);
+      return _stringValuesMV;
     }
 
+    return transformTransformedValuesToStringValuesMV(projectionBlock);
+  }
+
+  private String[][] transformTransformedValuesToStringValuesMV(ProjectionBlock projectionBlock) {
+    // operating on the output of another transform so can't pass the evaluation down to the storage
+    ensureJsonPathCompiled();
     String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
@@ -400,5 +529,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       _stringValuesMV[i] = values;
     }
     return _stringValuesMV;
+  }
+
+  private void ensureJsonPathCompiled() {
+    if (_jsonPath == null) {
+      _jsonPath = JsonPathCache.INSTANCE.getOrCompute(_jsonPathString);
+    }
   }
 }

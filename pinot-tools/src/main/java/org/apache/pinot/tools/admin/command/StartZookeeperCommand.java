@@ -72,12 +72,12 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
     return "Start the Zookeeper process at the specified port.";
   }
 
-  StartZookeeperCommand setPort(int port) {
+  public StartZookeeperCommand setPort(int port) {
     _zkPort = port;
     return this;
   }
 
-  StartZookeeperCommand setDataDir(String dataDir) {
+  public StartZookeeperCommand setDataDir(String dataDir) {
     _dataDir = dataDir;
     return this;
   }

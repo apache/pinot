@@ -54,7 +54,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.SegmentType;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.Pair;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -247,8 +246,6 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
           // No, add it
           // Create the realtime segment metadata
           SegmentZKMetadata segmentMetadataToAdd = new SegmentZKMetadata(segmentId);
-          segmentMetadataToAdd.setTableName(resourceName);
-          segmentMetadataToAdd.setSegmentType(SegmentType.REALTIME);
           segmentMetadataToAdd.setStatus(Status.IN_PROGRESS);
 
           // Add the new metadata to the property store

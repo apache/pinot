@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.executor;
 
 import com.google.common.base.Preconditions;
 import io.grpc.stub.StreamObserver;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -37,8 +38,10 @@ import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
@@ -142,9 +145,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     long querySchedulingTimeMs = System.currentTimeMillis() - queryArrivalTimeMs;
     if (querySchedulingTimeMs >= queryTimeoutMs) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS, 1);
-      String errorMessage =
-          String.format("Query scheduling took %dms (longer than query timeout of %dms)", querySchedulingTimeMs,
-              queryTimeoutMs);
+      String errorMessage = String
+          .format("Query scheduling took %dms (longer than query timeout of %dms) on server: %s", querySchedulingTimeMs,
+              queryTimeoutMs, _instanceDataManager.getInstanceId());
       DataTable dataTable = DataTableBuilder.getEmptyDataTable();
       dataTable.addException(QueryException.getException(QueryException.QUERY_SCHEDULING_TIMEOUT_ERROR, errorMessage));
       LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
@@ -153,7 +156,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
     if (tableDataManager == null) {
-      String errorMessage = "Failed to find table: " + tableNameWithType;
+      String errorMessage = String
+          .format("Failed to find table: %s on server: %s", tableNameWithType, _instanceDataManager.getInstanceId());
       DataTable dataTable = DataTableBuilder.getEmptyDataTable();
       dataTable.addException(QueryException.getException(QueryException.SERVER_TABLE_MISSING_ERROR, errorMessage));
       LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
@@ -196,7 +200,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     DataTable dataTable = null;
     try {
       dataTable = processQuery(indexSegments, queryContext, timerContext, executorService, responseObserver,
-          queryRequest.isEnableStreaming());
+          queryRequest.isEnableStreaming(), queryRequest.isExplain());
     } catch (Exception e) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
 
@@ -258,7 +262,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   private DataTable processQuery(List<IndexSegment> indexSegments, QueryContext queryContext, TimerContext timerContext,
       ExecutorService executorService, @Nullable StreamObserver<Server.ServerResponse> responseObserver,
-      boolean enableStreaming)
+      boolean enableStreaming, boolean isExplain)
       throws Exception {
     handleSubquery(queryContext, indexSegments, timerContext, executorService);
 
@@ -275,8 +279,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     LOGGER.debug("Matched {} segments after pruning", numSelectedSegments);
     if (numSelectedSegments == 0) {
       // Only return metadata for streaming query
-      DataTable dataTable =
-          enableStreaming ? DataTableBuilder.getEmptyDataTable() : DataTableUtils.buildEmptyDataTable(queryContext);
+      DataTable dataTable = DataTableUtils.buildEmptyDataTable(queryContext);
       Map<String, String> metadata = dataTable.getMetadata();
       metadata.put(MetadataKey.TOTAL_DOCS.getName(), String.valueOf(numTotalDocs));
       metadata.put(MetadataKey.NUM_DOCS_SCANNED.getName(), "0");
@@ -293,13 +296,51 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       planBuildTimer.stopAndRecord();
 
       TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
-      DataTable dataTable = queryPlan.execute();
+      DataTable dataTable = isExplain ? processExplainPlanQueries(queryPlan) : queryPlan.execute();
       planExecTimer.stopAndRecord();
 
       // Update the total docs in the metadata based on the un-pruned segments
       dataTable.getMetadata().put(MetadataKey.TOTAL_DOCS.getName(), Long.toString(numTotalDocs));
 
       return dataTable;
+    }
+  }
+
+  /** @return EXPLAIN PLAN query result {@link DataTable}. */
+  public static DataTable processExplainPlanQueries(Plan queryPlan) {
+    DataTableBuilder dataTableBuilder = new DataTableBuilder(DataSchema.EXPLAIN_RESULT_SCHEMA);
+    Operator root = queryPlan.getPlanNode().run().getChildOperators().get(0);
+    int[] idArray = {1};
+
+    try {
+      addOperatorToTable(dataTableBuilder, root, idArray, 0);
+    } catch (IOException ioe) {
+      LOGGER.error("Unable to create EXPLAIN PLAN result table.", ioe);
+    }
+    return dataTableBuilder.build();
+  }
+
+  /** Create EXPLAIN query result {@link DataTable} by recursively stepping through the {@link Operator} tree. */
+  public static void addOperatorToTable(DataTableBuilder dataTableBuilder, Operator node, int[] globalId,
+      int parentId) throws IOException {
+    if (node == null) {
+      return;
+    }
+
+    String explainString = node.toExplainString();
+    if (explainString != null) {
+      // Only those operators that return a non-null description will be added to the EXPLAIN PLAN output.
+      dataTableBuilder.startRow();
+      dataTableBuilder.setColumn(0, explainString);
+      dataTableBuilder.setColumn(1, globalId[0]);
+      dataTableBuilder.setColumn(2, parentId);
+      dataTableBuilder.finishRow();
+      parentId = globalId[0]++;
+    }
+
+    List<Operator> children = node.getChildOperators();
+    for (Operator child : children) {
+      addOperatorToTable(dataTableBuilder, child, globalId, parentId);
     }
   }
 
@@ -365,7 +406,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           subqueryExpression.getLiteral());
       // Execute the subquery
       subquery.setEndTimeMs(endTimeMs);
-      DataTable dataTable = processQuery(indexSegments, subquery, timerContext, executorService, null, false);
+      DataTable dataTable = processQuery(indexSegments, subquery, timerContext, executorService, null,
+          false, false);
       IdSet idSet = dataTable.getObject(0, 0);
       String serializedIdSet = idSet.toBase64String();
       // Rewrite the expression

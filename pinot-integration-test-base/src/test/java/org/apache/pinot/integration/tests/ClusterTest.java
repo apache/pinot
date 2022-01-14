@@ -28,6 +28,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -100,15 +101,20 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void startBroker(int port, String zkStr)
       throws Exception {
-    startBrokers(1, port, zkStr);
+    startBrokers(1, port, zkStr, Collections.emptyMap());
   }
 
   protected void startBrokers(int numBrokers)
       throws Exception {
-    startBrokers(numBrokers, DEFAULT_BROKER_PORT, getZkUrl());
+    startBrokers(numBrokers, DEFAULT_BROKER_PORT, getZkUrl(), Collections.emptyMap());
   }
 
   protected void startBrokers(int numBrokers, int basePort, String zkStr)
+      throws Exception {
+    startBrokers(numBrokers, basePort, zkStr, Collections.emptyMap());
+  }
+
+  protected void startBrokers(int numBrokers, int basePort, String zkStr, Map<String, Object> extraProperties)
       throws Exception {
     _brokerStarters = new ArrayList<>(numBrokers);
     _brokerPorts = new ArrayList<>();
@@ -121,6 +127,7 @@ public abstract class ClusterTest extends ControllerTest {
       _brokerPorts.add(port);
       properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, port);
       properties.put(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
+      properties.putAll(extraProperties);
       PinotConfiguration configuration = new PinotConfiguration(properties);
       overrideBrokerConf(configuration);
 
@@ -185,12 +192,15 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   protected void startServer(PinotConfiguration configuration) {
-    startServers(1, configuration, Server.DEFAULT_ADMIN_API_PORT, Helix.DEFAULT_SERVER_NETTY_PORT, getZkUrl());
+    startServers(1, configuration);
   }
 
   protected void startServers(int numServers) {
-    startServers(numServers, getDefaultServerConfiguration(), Server.DEFAULT_ADMIN_API_PORT,
-        Helix.DEFAULT_SERVER_NETTY_PORT, getZkUrl());
+    startServers(numServers, getDefaultServerConfiguration());
+  }
+
+  protected void startServers(int numServers, PinotConfiguration configuration) {
+    startServers(numServers, configuration, Server.DEFAULT_ADMIN_API_PORT, Helix.DEFAULT_SERVER_NETTY_PORT, getZkUrl());
   }
 
   protected void startServers(int numServers, int baseAdminApiPort, int baseNettyPort, String zkStr) {
@@ -199,6 +209,11 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void startServers(int numServers, PinotConfiguration configuration, int baseAdminApiPort, int baseNettyPort,
       String zkStr) {
+    startServers(numServers, configuration, baseAdminApiPort, baseNettyPort, Server.DEFAULT_GRPC_PORT, zkStr);
+  }
+
+  protected void startServers(int numServers, PinotConfiguration configuration, int baseAdminApiPort, int baseNettyPort,
+      int baseGrpcPort, String zkStr) {
     FileUtils.deleteQuietly(new File(Server.DEFAULT_INSTANCE_BASE_DIR));
     _serverStarters = new ArrayList<>(numServers);
     overrideServerConf(configuration);
@@ -210,6 +225,10 @@ public abstract class ClusterTest extends ControllerTest {
         configuration
             .setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, baseAdminApiPort - i);
+        configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, baseNettyPort + i);
+        if (configuration.getProperty(Server.CONFIG_OF_ENABLE_GRPC_SERVER, false)) {
+          configuration.setProperty(Server.CONFIG_OF_GRPC_PORT, baseGrpcPort + i);
+        }
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, baseNettyPort + i);
         // Thread time measurement is disabled by default, enable it in integration tests.
         // TODO: this can be removed when we eventually enable thread time measurement by default.
@@ -296,6 +315,52 @@ public abstract class ClusterTest extends ControllerTest {
     }
     FileUtils.deleteQuietly(new File(Server.DEFAULT_INSTANCE_BASE_DIR));
     _serverStarters = null;
+  }
+
+  protected void restartServers(int numServers)
+      throws InterruptedException {
+    assertNotNull(_serverStarters, "Servers are not started");
+    for (HelixServerStarter helixServerStarter : _serverStarters) {
+      try {
+        helixServerStarter.stop();
+      } catch (Exception e) {
+        LOGGER.error("Encountered exception while stopping server {}", e.getMessage());
+      }
+    }
+    _serverStarters = null;
+
+    _serverStarters = new ArrayList<>(numServers);
+    String zkStr = getZkUrl();
+    int baseAdminApiPort = Server.DEFAULT_ADMIN_API_PORT;
+    int baseNettyPort = Helix.DEFAULT_SERVER_NETTY_PORT;
+    int baseGrpcPort = Server.DEFAULT_GRPC_PORT;
+    PinotConfiguration configuration = getDefaultServerConfiguration();
+    overrideServerConf(configuration);
+    try {
+      for (int i = 0; i < numServers; i++) {
+        configuration.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
+        configuration.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkStr);
+        configuration.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR + "-" + i);
+        configuration
+            .setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
+        configuration.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, baseAdminApiPort - i);
+        configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, baseNettyPort + i);
+        if (configuration.getProperty(Server.CONFIG_OF_ENABLE_GRPC_SERVER, false)) {
+          configuration.setProperty(Server.CONFIG_OF_GRPC_PORT, baseGrpcPort + i);
+        }
+        configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, baseNettyPort + i);
+        // Thread time measurement is disabled by default, enable it in integration tests.
+        // TODO: this can be removed when we eventually enable thread time measurement by default.
+        configuration.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+        HelixServerStarter helixServerStarter = new HelixServerStarter();
+        helixServerStarter.init(configuration);
+        helixServerStarter.start();
+        _serverStarters.add(helixServerStarter);
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+
   }
 
   protected void stopMinion() {

@@ -26,6 +26,7 @@ import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
@@ -75,7 +76,7 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
               + "function");
     }
     _jsonFieldTransformFunction = firstArgument;
-    _jsonPath = JsonPath.compile(((LiteralTransformFunction) arguments.get(1)).getLiteral());
+    _jsonPath = JsonPathCache.INSTANCE.getOrCompute(((LiteralTransformFunction) arguments.get(1)).getLiteral());
   }
 
   @Override

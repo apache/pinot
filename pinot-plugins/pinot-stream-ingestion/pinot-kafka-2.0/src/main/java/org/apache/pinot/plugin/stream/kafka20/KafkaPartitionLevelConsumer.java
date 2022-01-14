@@ -18,14 +18,13 @@
  */
 package org.apache.pinot.plugin.stream.kafka20;
 
-import com.google.common.collect.Iterables;
-import java.io.IOException;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.common.utils.Bytes;
+import org.apache.pinot.plugin.stream.kafka.MessageAndOffset;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
@@ -37,6 +36,7 @@ import org.slf4j.LoggerFactory;
 
 public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHandler
     implements PartitionLevelConsumer {
+
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionLevelConsumer.class);
 
   public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
@@ -44,35 +44,37 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
   }
 
   @Override
-  public MessageBatch fetchMessages(StreamPartitionMsgOffset startMsgOffset, StreamPartitionMsgOffset endMsgOffset,
-      int timeoutMillis)
-      throws TimeoutException {
+  public MessageBatch<byte[]> fetchMessages(StreamPartitionMsgOffset startMsgOffset,
+      StreamPartitionMsgOffset endMsgOffset, int timeoutMillis) {
     final long startOffset = ((LongMsgOffset) startMsgOffset).getOffset();
     final long endOffset = endMsgOffset == null ? Long.MAX_VALUE : ((LongMsgOffset) endMsgOffset).getOffset();
     return fetchMessages(startOffset, endOffset, timeoutMillis);
   }
 
-  public MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis)
-      throws TimeoutException {
+  public MessageBatch<byte[]> fetchMessages(long startOffset, long endOffset, int timeoutMillis) {
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("poll consumer: {}, startOffset: {}, endOffset:{} timeout: {}ms", _topicPartition, startOffset,
+          endOffset, timeoutMillis);
+    }
     _consumer.seek(_topicPartition, startOffset);
     ConsumerRecords<String, Bytes> consumerRecords = _consumer.poll(Duration.ofMillis(timeoutMillis));
-    final Iterable<ConsumerRecord<String, Bytes>> messageAndOffsetIterable =
-        buildOffsetFilteringIterable(consumerRecords.records(_topicPartition), startOffset, endOffset);
-    return new KafkaMessageBatch(messageAndOffsetIterable);
-  }
-
-  private Iterable<ConsumerRecord<String, Bytes>> buildOffsetFilteringIterable(
-      final List<ConsumerRecord<String, Bytes>> messageAndOffsets, final long startOffset, final long endOffset) {
-    return Iterables.filter(messageAndOffsets, input -> {
-      // Filter messages that are either null or have an offset ∉ [startOffset, endOffset]
-      return input != null && input.value() != null && input.offset() >= startOffset && (endOffset > input.offset()
-          || endOffset == -1);
-    });
-  }
-
-  @Override
-  public void close()
-      throws IOException {
-    super.close();
+    List<ConsumerRecord<String, Bytes>> messageAndOffsets = consumerRecords.records(_topicPartition);
+    List<MessageAndOffset> filtered = new ArrayList<>(messageAndOffsets.size());
+    long lastOffset = startOffset;
+    for (ConsumerRecord<String, Bytes> messageAndOffset : messageAndOffsets) {
+      Bytes message = messageAndOffset.value();
+      long offset = messageAndOffset.offset();
+      if (offset >= startOffset & (endOffset > offset | endOffset == -1)) {
+        if (message != null) {
+          filtered.add(new MessageAndOffset(message.get(), offset));
+        } else if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("tombstone message at offset {}", offset);
+        }
+        lastOffset = offset;
+      } else if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("filter message at offset {} (outside of offset range {} {})", offset, startOffset, endOffset);
+      }
+    }
+    return new KafkaMessageBatch(messageAndOffsets.size(), lastOffset, filtered);
   }
 }

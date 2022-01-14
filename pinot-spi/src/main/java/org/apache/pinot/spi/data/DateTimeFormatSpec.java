@@ -60,7 +60,7 @@ public class DateTimeFormatSpec {
       _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION],
           formatTokens[FORMAT_PATTERN_POSITION]);
     } else {
-      _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION], null);
+      _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION]);
     }
     if (_patternSpec.getTimeFormat() == TimeFormat.TIMESTAMP) {
       // TIMESTAMP type stores millis since epoch
@@ -81,7 +81,7 @@ public class DateTimeFormatSpec {
 
     _size = columnSize;
     _unitSpec = new DateTimeFormatUnitSpec(columnUnit);
-    _patternSpec = new DateTimeFormatPatternSpec(columnTimeFormat, null);
+    _patternSpec = new DateTimeFormatPatternSpec(columnTimeFormat);
   }
 
   /**

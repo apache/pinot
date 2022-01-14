@@ -30,6 +30,7 @@ import java.util.Map;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.ProcessingException;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -43,7 +44,10 @@ import org.apache.pinot.spi.utils.JsonUtils;
     "selectionResults", "aggregationResults", "resultTable", "exceptions", "numServersQueried", "numServersResponded",
     "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numDocsScanned",
     "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numGroupsLimitReached", "totalDocs", "timeUsedMs",
-    "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "segmentStatistics", "traceInfo"
+    "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
+    "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
+    "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs", "segmentStatistics",
+    "traceInfo"
 })
 public class BrokerResponseNative implements BrokerResponse {
   public static final BrokerResponseNative EMPTY_RESULT = BrokerResponseNative.empty();
@@ -51,6 +55,7 @@ public class BrokerResponseNative implements BrokerResponse {
       new BrokerResponseNative(QueryException.BROKER_RESOURCE_MISSING_ERROR);
   public static final BrokerResponseNative TABLE_DOES_NOT_EXIST =
       new BrokerResponseNative(QueryException.TABLE_DOES_NOT_EXIST_ERROR);
+  public static final BrokerResponseNative BROKER_ONLY_EXPLAIN_PLAN_OUTPUT = getBrokerResponseExplainPlanOutput();
 
   private int _numServersQueried = 0;
   private int _numServersResponded = 0;
@@ -70,12 +75,16 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _timeUsedMs = 0L;
   private long _offlineThreadCpuTimeNs = 0L;
   private long _realtimeThreadCpuTimeNs = 0L;
+  private long _offlineSystemActivitiesCpuTimeNs = 0L;
+  private long _realtimeSystemActivitiesCpuTimeNs = 0L;
+  private long _offlineResponseSerializationCpuTimeNs = 0L;
+  private long _realtimeResponseSerializationCpuTimeNs = 0L;
+  private long _offlineTotalCpuTimeNs = 0L;
+  private long _realtimeTotalCpuTimeNs = 0L;
   private int _numRowsResultSet = 0;
-
   private SelectionResults _selectionResults;
   private List<AggregationResult> _aggregationResults;
   private ResultTable _resultTable;
-
   private Map<String, String> _traceInfo = new HashMap<>();
   private List<QueryProcessingException> _processingExceptions = new ArrayList<>();
   private List<String> _segmentStatistics = new ArrayList<>();
@@ -93,11 +102,121 @@ public class BrokerResponseNative implements BrokerResponse {
     }
   }
 
+  /** Generate EXPLAIN PLAN output when queries are evaluated by Broker without going to the Server. */
+  private static BrokerResponseNative getBrokerResponseExplainPlanOutput() {
+    BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(new Object[]{"BROKER_EVALUATE", 0, -1});
+    brokerResponse.setResultTable(new ResultTable(DataSchema.EXPLAIN_RESULT_SCHEMA, rows));
+    return brokerResponse;
+  }
+
   /**
    * Get a new empty {@link BrokerResponseNative}.
    */
   public static BrokerResponseNative empty() {
     return new BrokerResponseNative();
+  }
+
+  public static BrokerResponseNative fromJsonString(String jsonString)
+      throws IOException {
+    return JsonUtils.stringToObject(jsonString, BrokerResponseNative.class);
+  }
+
+  @JsonProperty("offlineSystemActivitiesCpuTimeNs")
+  @Override
+  public long getOfflineSystemActivitiesCpuTimeNs() {
+    return _offlineSystemActivitiesCpuTimeNs;
+  }
+
+  @JsonProperty("offlineSystemActivitiesCpuTimeNs")
+  @Override
+  public void setOfflineSystemActivitiesCpuTimeNs(long offlineSystemActivitiesCpuTimeNs) {
+    _offlineSystemActivitiesCpuTimeNs = offlineSystemActivitiesCpuTimeNs;
+  }
+
+  @JsonProperty("realtimeSystemActivitiesCpuTimeNs")
+  @Override
+  public long getRealtimeSystemActivitiesCpuTimeNs() {
+    return _realtimeSystemActivitiesCpuTimeNs;
+  }
+
+  @JsonProperty("realtimeSystemActivitiesCpuTimeNs")
+  @Override
+  public void setRealtimeSystemActivitiesCpuTimeNs(long realtimeSystemActivitiesCpuTimeNs) {
+    _realtimeSystemActivitiesCpuTimeNs = realtimeSystemActivitiesCpuTimeNs;
+  }
+
+  @JsonProperty("offlineThreadCpuTimeNs")
+  @Override
+  public long getOfflineThreadCpuTimeNs() {
+    return _offlineThreadCpuTimeNs;
+  }
+
+  @JsonProperty("offlineThreadCpuTimeNs")
+  @Override
+  public void setOfflineThreadCpuTimeNs(long timeUsedMs) {
+    _offlineThreadCpuTimeNs = timeUsedMs;
+  }
+
+  @JsonProperty("realtimeThreadCpuTimeNs")
+  @Override
+  public long getRealtimeThreadCpuTimeNs() {
+    return _realtimeThreadCpuTimeNs;
+  }
+
+  @JsonProperty("realtimeThreadCpuTimeNs")
+  @Override
+  public void setRealtimeThreadCpuTimeNs(long timeUsedMs) {
+    _realtimeThreadCpuTimeNs = timeUsedMs;
+  }
+
+  @JsonProperty("offlineResponseSerializationCpuTimeNs")
+  @Override
+  public long getOfflineResponseSerializationCpuTimeNs() {
+    return _offlineResponseSerializationCpuTimeNs;
+  }
+
+  @JsonProperty("offlineResponseSerializationCpuTimeNs")
+  @Override
+  public void setOfflineResponseSerializationCpuTimeNs(long offlineResponseSerializationCpuTimeNs) {
+    _offlineResponseSerializationCpuTimeNs = offlineResponseSerializationCpuTimeNs;
+  }
+
+  @JsonProperty("realtimeResponseSerializationCpuTimeNs")
+  @Override
+  public long getRealtimeResponseSerializationCpuTimeNs() {
+    return _realtimeResponseSerializationCpuTimeNs;
+  }
+
+  @JsonProperty("realtimeResponseSerializationCpuTimeNs")
+  @Override
+  public void setRealtimeResponseSerializationCpuTimeNs(long realtimeResponseSerializationCpuTimeNs) {
+    _realtimeResponseSerializationCpuTimeNs = realtimeResponseSerializationCpuTimeNs;
+  }
+
+  @JsonProperty("offlineTotalCpuTimeNs")
+  @Override
+  public long getOfflineTotalCpuTimeNs() {
+    return _offlineTotalCpuTimeNs;
+  }
+
+  @JsonProperty("offlineTotalCpuTimeNs")
+  @Override
+  public void setOfflineTotalCpuTimeNs(long offlineTotalCpuTimeNs) {
+    _offlineTotalCpuTimeNs = offlineTotalCpuTimeNs;
+  }
+
+  @JsonProperty("realtimeTotalCpuTimeNs")
+  @Override
+  public long getRealtimeTotalCpuTimeNs() {
+    return _realtimeTotalCpuTimeNs;
+  }
+
+  @JsonProperty("realtimeTotalCpuTimeNs")
+  @Override
+  public void setRealtimeTotalCpuTimeNs(long realtimeTotalCpuTimeNs) {
+    _realtimeTotalCpuTimeNs = realtimeTotalCpuTimeNs;
   }
 
   @JsonProperty("selectionResults")
@@ -288,40 +407,16 @@ public class BrokerResponseNative implements BrokerResponse {
     _timeUsedMs = timeUsedMs;
   }
 
-  @JsonProperty("offlineThreadCpuTimeNs")
-  @Override
-  public long getOfflineThreadCpuTimeNs() {
-    return _offlineThreadCpuTimeNs;
-  }
-
   @JsonProperty("numRowsResultSet")
   @Override
   public int getNumRowsResultSet() {
     return _numRowsResultSet;
   }
 
-  @JsonProperty("offlineThreadCpuTimeNs")
-  @Override
-  public void setOfflineThreadCpuTimeNs(long timeUsedMs) {
-    _offlineThreadCpuTimeNs = timeUsedMs;
-  }
-
   @JsonProperty("numRowsResultSet")
   @Override
   public void setNumRowsResultSet(int numRowsResultSet) {
     _numRowsResultSet = numRowsResultSet;
-  }
-
-  @JsonProperty("realtimeThreadCpuTimeNs")
-  @Override
-  public long getRealtimeThreadCpuTimeNs() {
-    return _realtimeThreadCpuTimeNs;
-  }
-
-  @JsonProperty("realtimeThreadCpuTimeNs")
-  @Override
-  public void setRealtimeThreadCpuTimeNs(long timeUsedMs) {
-    _realtimeThreadCpuTimeNs = timeUsedMs;
   }
 
   @JsonProperty("segmentStatistics")
@@ -348,11 +443,6 @@ public class BrokerResponseNative implements BrokerResponse {
   public String toJsonString()
       throws IOException {
     return JsonUtils.objectToString(this);
-  }
-
-  public static BrokerResponseNative fromJsonString(String jsonString)
-      throws IOException {
-    return JsonUtils.stringToObject(jsonString, BrokerResponseNative.class);
   }
 
   @JsonIgnore

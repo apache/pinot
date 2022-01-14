@@ -103,6 +103,162 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    */
 
   /**
+   * Fills the values
+   * @param docIds Array containing the document ids to read
+   * @param length Number of values to read
+   * @param values Values to fill
+   * @param context Reader context
+   */
+  default void readValuesSV(int[] docIds, int length, int[] values, T context) {
+    switch (getValueType()) {
+      case INT:
+        for (int i = 0; i < length; i++) {
+          values[i] = getInt(docIds[i], context);
+        }
+        break;
+      case LONG:
+        for (int i = 0; i < length; i++) {
+          values[i] = (int) getLong(docIds[i], context);
+        }
+        break;
+      case FLOAT:
+        for (int i = 0; i < length; i++) {
+          values[i] = (int) getFloat(docIds[i], context);
+        }
+        break;
+      case DOUBLE:
+        for (int i = 0; i < length; i++) {
+          values[i] = (int) getDouble(docIds[i], context);
+        }
+        break;
+      case STRING:
+        for (int i = 0; i < length; i++) {
+          values[i] = Integer.parseInt(getString(docIds[i], context));
+        }
+        break;
+      default:
+        throw new IllegalArgumentException();
+    }
+  }
+
+  /**
+   * Fills the values
+   * @param docIds Array containing the document ids to read
+   * @param length Number of values to read
+   * @param values Values to fill
+   * @param context Reader context
+   */
+  default void readValuesSV(int[] docIds, int length, long[] values, T context) {
+    switch (getValueType()) {
+      case INT:
+        for (int i = 0; i < length; i++) {
+          values[i] = getInt(docIds[i], context);
+        }
+        break;
+      case LONG:
+        for (int i = 0; i < length; i++) {
+          values[i] = getLong(docIds[i], context);
+        }
+        break;
+      case FLOAT:
+        for (int i = 0; i < length; i++) {
+          values[i] = (long) getFloat(docIds[i], context);
+        }
+        break;
+      case DOUBLE:
+        for (int i = 0; i < length; i++) {
+          values[i] = (long) getDouble(docIds[i], context);
+        }
+        break;
+      case STRING:
+        for (int i = 0; i < length; i++) {
+          values[i] = Long.parseLong(getString(docIds[i], context));
+        }
+        break;
+      default:
+        throw new IllegalArgumentException();
+    }
+  }
+
+  /**
+   * Fills the values
+   * @param docIds Array containing the document ids to read
+   * @param length Number of values to read
+   * @param values Values to fill
+   * @param context Reader context
+   */
+  default void readValuesSV(int[] docIds, int length, float[] values, T context) {
+    switch (getValueType()) {
+      case INT:
+        for (int i = 0; i < length; i++) {
+          values[i] = getInt(docIds[i], context);
+        }
+        break;
+      case LONG:
+        for (int i = 0; i < length; i++) {
+          values[i] = getLong(docIds[i], context);
+        }
+        break;
+      case FLOAT:
+        for (int i = 0; i < length; i++) {
+          values[i] = getFloat(docIds[i], context);
+        }
+        break;
+      case DOUBLE:
+        for (int i = 0; i < length; i++) {
+          values[i] = (float) getDouble(docIds[i], context);
+        }
+        break;
+      case STRING:
+        for (int i = 0; i < length; i++) {
+          values[i] = Float.parseFloat(getString(docIds[i], context));
+        }
+        break;
+      default:
+        throw new IllegalArgumentException();
+    }
+  }
+
+  /**
+   * Fills the values
+   * @param docIds Array containing the document ids to read
+   * @param length Number of values to read
+   * @param values Values to fill
+   * @param context Reader context
+   */
+  default void readValuesSV(int[] docIds, int length, double[] values, T context) {
+    switch (getValueType()) {
+      case INT:
+        for (int i = 0; i < length; i++) {
+          values[i] = getInt(docIds[i], context);
+        }
+        break;
+      case LONG:
+        for (int i = 0; i < length; i++) {
+          values[i] = getLong(docIds[i], context);
+        }
+        break;
+      case FLOAT:
+        for (int i = 0; i < length; i++) {
+          values[i] = getFloat(docIds[i], context);
+        }
+        break;
+      case DOUBLE:
+        for (int i = 0; i < length; i++) {
+          values[i] = getDouble(docIds[i], context);
+        }
+        break;
+      case STRING:
+        for (int i = 0; i < length; i++) {
+          values[i] = Double.parseDouble(getString(docIds[i], context));
+        }
+        break;
+      default:
+        throw new IllegalArgumentException();
+    }
+  }
+
+  /**
    * Reads the INT value at the given document id.
    *
    * @param docId Document id

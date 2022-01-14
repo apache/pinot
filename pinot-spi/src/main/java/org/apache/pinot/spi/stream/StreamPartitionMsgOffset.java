@@ -40,7 +40,7 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
  * versions of the stream implementation
  */
 @InterfaceStability.Evolving
-public interface StreamPartitionMsgOffset extends Comparable {
+public interface StreamPartitionMsgOffset extends Comparable<StreamPartitionMsgOffset> {
 
   /**
    *  A serialized representation of the offset object as a String.

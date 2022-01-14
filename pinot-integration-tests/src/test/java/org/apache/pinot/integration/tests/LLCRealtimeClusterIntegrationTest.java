@@ -64,6 +64,11 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   private final long _startTime = System.currentTimeMillis();
 
   @Override
+  protected boolean injectTombstones() {
+    return true;
+  }
+
+  @Override
   protected boolean useLlc() {
     return true;
   }

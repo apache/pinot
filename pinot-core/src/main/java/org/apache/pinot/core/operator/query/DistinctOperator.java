@@ -19,6 +19,8 @@
 package org.apache.pinot.core.operator.query;
 
 import java.util.Collections;
+import java.util.List;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -37,6 +39,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
  */
 public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "DistinctOperator";
+  private static final String EXPLAIN_NAME = "DISTINCT";
 
   private final IndexSegment _indexSegment;
   private final DistinctAggregationFunction _distinctAggregationFunction;
@@ -74,6 +77,10 @@ public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
   }
 
   @Override
+  public List<Operator> getChildOperators() {
+    return Collections.singletonList(_transformOperator);
+  }
+
   public IndexSegment getIndexSegment() {
     return _indexSegment;
   }
@@ -85,5 +92,18 @@ public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
         numTotalDocs);
+  }
+
+  @Override
+  public String toExplainString() {
+   String[] keys = _distinctAggregationFunction.getColumns();
+    StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(keyColumns:");
+    if (keys.length > 0) {
+      stringBuilder.append(keys[0]);
+      for (int i = 1; i < keys.length; i++) {
+        stringBuilder.append(", ").append(keys[i]);
+      }
+    }
+    return stringBuilder.append(')').toString();
   }
 }

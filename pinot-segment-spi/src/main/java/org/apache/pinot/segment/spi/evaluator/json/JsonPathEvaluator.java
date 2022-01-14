@@ -16,8 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.index.creator;
+package org.apache.pinot.segment.spi.evaluator.json;
 
-public enum TextIndexType {
-  NONE, LUCENE, LUCENE_FST
+import org.apache.pinot.segment.spi.evaluator.TransformEvaluator;
+
+/**
+ * Introduce an empty interface to allow it to be extended without
+ * affecting {@see TransformEvaluator}.
+ *
+ * This is an evolving SPI and subject to change.
+ */
+public interface JsonPathEvaluator extends TransformEvaluator {
 }

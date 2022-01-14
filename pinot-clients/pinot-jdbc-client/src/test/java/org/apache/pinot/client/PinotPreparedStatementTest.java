@@ -23,6 +23,7 @@ import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.util.Properties;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.client.utils.DateTimeUtils;
 import org.testng.Assert;
@@ -41,7 +42,8 @@ public class PinotPreparedStatementTest {
   public void testSetAndClearValues()
       throws Exception {
     PinotConnection connection =
-        new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
+        new PinotConnection(new Properties(), "dummy", _dummyPinotClientTransport, "dummy",
+            _dummyPinotControllerTransport);
     PreparedStatement preparedStatement = connection.prepareStatement(QUERY);
 
     preparedStatement.setString(1, "foo");

@@ -88,7 +88,6 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
         @Override
         public void runJob() {
           ThreadTimer executionThreadTimer = new ThreadTimer();
-          executionThreadTimer.start();
 
           // Register the task to the phaser
           // NOTE: If the phaser is terminated (returning negative value) when trying to register the task, that means
@@ -103,14 +102,14 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
             // Early-terminated by interruption (canceled by the main thread)
           } catch (Exception e) {
             // Caught exception, skip processing the remaining segments
-            LOGGER.error("Caught exception while processing query: {}", _queryContext, e);
+            LOGGER.error("Caught exception while processing query: " + _queryContext, e);
             onException(e);
           } finally {
             onFinish();
             phaser.arriveAndDeregister();
           }
 
-          _totalWorkerThreadCpuTimeNs.getAndAdd(executionThreadTimer.stopAndGetThreadTimeNs());
+          _totalWorkerThreadCpuTimeNs.getAndAdd(executionThreadTimer.getThreadTimeNs());
         }
       });
     }
@@ -235,4 +234,9 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
    */
   protected abstract void mergeResultsBlocks(IntermediateResultsBlock mergedBlock,
       IntermediateResultsBlock blockToMerge);
+
+  @Override
+  public List<Operator> getChildOperators() {
+    return _operators;
+  }
 }

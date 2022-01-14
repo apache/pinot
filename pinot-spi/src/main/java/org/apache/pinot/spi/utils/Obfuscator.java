@@ -58,7 +58,8 @@ import java.util.stream.Stream;
 public final class Obfuscator {
   private static final String DEFAULT_MASKED_VALUE = "*****";
   private static final List<Pattern> DEFAULT_PATTERNS =
-      Stream.of("(?i).*secret$", "(?i).*password$", "(?i).*token$").map(Pattern::compile).collect(Collectors.toList());
+      Stream.of("(?i).*secret$", "(?i).*secret[\\s_-]*key$", "(?i).*password$", "(?i).*keytab$", "(?i).*token$")
+          .map(Pattern::compile).collect(Collectors.toList());
 
   private final String _maskedValue;
   private final List<Pattern> _patterns;
@@ -93,7 +94,8 @@ public final class Obfuscator {
   public JsonNode toJson(Object object) {
     // NOTE: jayway json path 2.4.0 seems to have issues with '@.name' so we'll do this manually
     // as determined by a cursory and purely subjective investigation by alex
-    // "$..[?(@.name =~ /password$/i || @.name =~ /secret$/i || @.name =~ /token$/i)]"
+    // "$..[?(@.name =~ /password$/i || @.name =~ /secret$/i || @.name =~ /secret[\\s_-]*key$/i || @.name =~ /keytab$/i
+    //     || @.name =~ /token$/i)]"
 
     try {
       JsonNode node;
