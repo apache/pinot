@@ -30,7 +30,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * @deprecated Use {@link DateTimeFieldSpec} instead.
  * This should only be used in 1) tests 2) wherever required for backward compatible handling of schemas with
  * TimeFieldSpec
- * https://github.com/apache/incubator-pinot/issues/2756
+ * https://github.com/apache/pinot/issues/2756
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @SuppressWarnings("unused")
