@@ -44,7 +44,7 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
   private String _tmpDir;
 
   @CommandLine.Option(names = {"-zkAddress", "-zkUrl", "-zkExternalAddress"}, required = false,
-      description = "URL for an external Zookeeper instance instead using a default embedded instance")
+      description = "URL for an external Zookeeper instance instead of using the default embedded instance")
   private String _zkExternalAddress;
 
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false,
