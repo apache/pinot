@@ -27,6 +27,7 @@ import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.util.GapfillUtils;
 
 
 @SuppressWarnings("rawtypes")
@@ -38,7 +39,7 @@ public class QueryContextUtils {
    * Returns {@code true} if the given query is a selection query, {@code false} otherwise.
    */
   public static boolean isSelectionQuery(QueryContext query) {
-    return query.getAggregationFunctions() == null;
+    return query.getAggregationFunctions() == null && !GapfillUtils.isPreAggregateGapfill(query);
   }
 
   /**
@@ -47,16 +48,19 @@ public class QueryContextUtils {
    * Selection-only query at this moment means selection query without order-by.
    */
   public static boolean isSelectionOnlyQuery(QueryContext query) {
-    return query.getAggregationFunctions() == null && query.getOrderByExpressions() == null;
+    return query.getAggregationFunctions() == null
+        && query.getOrderByExpressions() == null
+        && !GapfillUtils.isPreAggregateGapfill(query);
   }
 
   /**
-   * Returns {@code true} if the given query is an aggregation query, {@code false} otherwise.
+   * Returns {@code trgue} if the given query is an agregation query, {@code false} otherwise.
    */
   public static boolean isAggregationQuery(QueryContext query) {
     AggregationFunction[] aggregationFunctions = query.getAggregationFunctions();
-    return aggregationFunctions != null && (aggregationFunctions.length != 1
-        || !(aggregationFunctions[0] instanceof DistinctAggregationFunction));
+    return !GapfillUtils.isPreAggregateGapfill(query)
+        && (aggregationFunctions != null
+        && (aggregationFunctions.length != 1 || !(aggregationFunctions[0] instanceof DistinctAggregationFunction)));
   }
 
   /**
