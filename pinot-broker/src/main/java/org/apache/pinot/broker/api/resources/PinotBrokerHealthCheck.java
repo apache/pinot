@@ -61,7 +61,9 @@ public class PinotBrokerHealthCheck {
       return "OK";
     }
     _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_BAD_CALLS, 1);
-    throw new WebApplicationException(String.format("Pinot broker status is %s", status),
-        Response.Status.SERVICE_UNAVAILABLE);
+    String errMessage = String.format("Pinot broker status is %s", status);
+    Response response =
+        Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build();
+    throw new WebApplicationException(errMessage, response);
   }
 }
