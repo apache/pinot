@@ -184,7 +184,8 @@ public class Quickstart extends QuickStartBase {
 
     QuickstartTableRequest request = new QuickstartTableRequest(baseDir.getAbsolutePath());
     QuickstartRunner runner =
-        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 0, dataDir, true, getAuthToken(),
+        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1,
+            getNumMinions(), dataDir, true, getAuthToken(),
             getConfigOverrides(), null, true);
 
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
