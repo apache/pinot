@@ -47,7 +47,11 @@ public class DefaultSegmentDirectoryLoader implements SegmentDirectoryLoader {
   public SegmentDirectory load(URI indexDir, SegmentDirectoryLoaderContext segmentLoaderContext)
       throws Exception {
     PinotConfiguration segmentDirectoryConfigs = segmentLoaderContext.getSegmentDirectoryConfigs();
-    return new SegmentLocalFSDirectory(new File(indexDir),
+    File directory = new File(indexDir);
+    if (!directory.exists()) {
+      return new SegmentLocalFSDirectory(directory);
+    }
+    return new SegmentLocalFSDirectory(directory,
         ReadMode.valueOf(segmentDirectoryConfigs.getProperty(IndexLoadingConfig.READ_MODE_KEY)));
   }
 }
