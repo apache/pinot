@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -30,6 +31,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -117,6 +119,26 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     // Create tenants
     createBrokerTenant(TENANT_NAME, 1);
     createServerTenant(TENANT_NAME, 1, 1);
+  }
+
+  @Test
+  public void testSegmentMetadataApi()
+      throws Exception {
+    {
+      String jsonOutputStr = sendGetRequest(
+          _controllerRequestURLBuilder.forSegmentMetadata(getTableName()));
+      JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
+      Assert.assertEquals(tableSegmentsMetadata.size(), 8);
+
+      JsonNode segmentMetadataFromAllEndpoint = tableSegmentsMetadata.elements().next();
+      String segmentName = URLEncoder.encode(segmentMetadataFromAllEndpoint.get("segmentName").asText(),
+          StandardCharsets.UTF_8);
+      jsonOutputStr = sendGetRequest(
+          _controllerRequestURLBuilder.forSegmentMetadata(getTableName(), segmentName));
+      JsonNode segmentMetadataFromDirectEndpoint = JsonUtils.stringToJsonNode(jsonOutputStr);
+      Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
+          segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
+    }
   }
 
   @Test
