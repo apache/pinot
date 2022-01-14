@@ -57,8 +57,15 @@ public class BrokerRequestToQueryContextConverter {
   }
 
   private static QueryContext convertSQL(BrokerRequest brokerRequest) {
-    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
+    QueryContext queryContext = convertSQL(brokerRequest.getPinotQuery(), brokerRequest);
+    if (brokerRequest.getPinotQuery().getDataSource().getPreAggregateGapfillQuery() != null) {
+      queryContext.setPreAggregateGapFillQueryContext(
+          convertSQL(brokerRequest.getPinotQuery().getDataSource().getPreAggregateGapfillQuery(), brokerRequest));
+    }
+    return queryContext;
+  }
 
+  private static QueryContext convertSQL(PinotQuery pinotQuery, BrokerRequest brokerRequest) {
     // SELECT
     List<ExpressionContext> selectExpressions;
     List<Expression> selectList = pinotQuery.getSelectList();
