@@ -29,8 +29,7 @@ import org.apache.pinot.common.data.Segment;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
-import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
+import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -43,15 +42,8 @@ import org.slf4j.LoggerFactory;
 
 
 @TaskGenerator
-public class ConvertToRawIndexTaskGenerator implements PinotTaskGenerator {
+public class ConvertToRawIndexTaskGenerator extends BaseTaskGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(ConvertToRawIndexTaskGenerator.class);
-
-  private ClusterInfoAccessor _clusterInfoAccessor;
-
-  @Override
-  public void init(ClusterInfoAccessor clusterInfoAccessor) {
-    _clusterInfoAccessor = clusterInfoAccessor;
-  }
 
   @Override
   public String getTaskType() {
