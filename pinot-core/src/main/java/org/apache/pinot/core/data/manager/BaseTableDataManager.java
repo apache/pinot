@@ -489,7 +489,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
    *
    * @return true if the segment still exists on server, its CRC is still same with the
    * one in SegmentZKMetadata and is loaded into memory successfully; false if it doesn't
-   * exist on the server, its CRC has changed, or it fails to be loaded.
+   * exist on the server, its CRC has changed, or it fails to be loaded. SegmentDirectory
+   * object may be created when trying to load the segment, but it's closed if the method
+   * returns false; otherwise it's opened and to be referred by ImmutableSegment object.
    */
   private boolean tryLoadExistingSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
       SegmentZKMetadata zkMetadata) {
