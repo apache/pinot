@@ -54,8 +54,8 @@ public class MutableSegmentImplUpsertTest {
     URL schemaResourceUrl = this.getClass().getClassLoader().getResource(SCHEMA_FILE_PATH);
     URL dataResourceUrl = this.getClass().getClassLoader().getResource(DATA_FILE_PATH);
     _schema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
-    _tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable").setUpsertConfig(
-        new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null, hashFunction)).build();
+    _tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null, hashFunction)).build();
     _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
     File jsonFile = new File(dataResourceUrl.getFile());
     _partitionUpsertMetadataManager =
@@ -63,9 +63,8 @@ public class MutableSegmentImplUpsertTest {
             .getOrCreatePartitionManager(0);
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
-            false, true,
-            new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null, hashFunction),
-            "secondsSinceEpoch", _partitionUpsertMetadataManager);
+            false, true, new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null, hashFunction), "secondsSinceEpoch",
+            _partitionUpsertMetadataManager);
     GenericRow reuse = new GenericRow();
     try (RecordReader recordReader = RecordReaderFactory
         .getRecordReader(FileFormat.JSON, jsonFile, _schema.getColumnNames(), null)) {

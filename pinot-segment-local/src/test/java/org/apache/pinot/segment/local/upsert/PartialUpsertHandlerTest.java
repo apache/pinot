@@ -94,8 +94,7 @@ public class PartialUpsertHandlerTest {
     HelixManager helixManager = Mockito.mock(HelixManager.class);
 
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("field1", FieldSpec.DataType.LONG)
-        .addMetric("field2", FieldSpec.DataType.LONG)
+        .addSingleValueDimension("field1", FieldSpec.DataType.LONG).addMetric("field2", FieldSpec.DataType.LONG)
         .setPrimaryKeyColumns(Arrays.asList("pk")).build();
 
     String realtimeTableName = "testTable_REALTIME";
