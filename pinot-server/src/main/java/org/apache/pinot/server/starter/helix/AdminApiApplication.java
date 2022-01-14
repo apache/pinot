@@ -115,7 +115,7 @@ public class AdminApiApplication extends ResourceConfig {
     BeanConfig beanConfig = new BeanConfig();
     beanConfig.setTitle("Pinot Server API");
     beanConfig.setDescription("APIs for accessing Pinot server information");
-    beanConfig.setContact("https://github.com/apache/incubator-pinot");
+    beanConfig.setContact("https://github.com/apache/pinot");
     beanConfig.setVersion("1.0");
     beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
     beanConfig.setBasePath("/");
