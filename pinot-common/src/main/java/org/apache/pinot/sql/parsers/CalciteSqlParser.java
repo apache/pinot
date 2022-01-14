@@ -117,28 +117,12 @@ public class CalciteSqlParser {
     return sql;
   }
 
-  private static SqlNode parse(String sql) {
-    SqlParser sqlParser = SqlParser.create(sql, PARSER_CONFIG);
-    try {
-      return sqlParser.parseQuery();
-    } catch (SqlParseException e) {
-      throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
-    }
-  }
-
-  public static PinotQuery compileToPinotQueryWithSubquery(String sql)
-      throws SqlCompilationException {
-    return compileToPinotQuery(sql, true);
-  }
-
   public static PinotQuery compileToPinotQuery(String sql)
       throws SqlCompilationException {
-    return compileToPinotQuery(sql, false);
-  }
+    // Remove the comments from the query
+    sql = removeComments(sql);
 
-  private static PinotQuery compileToPinotQuery(String sql, boolean enablePreAggregateGapfillQuery)
-      throws SqlCompilationException {
-    // Removes the terminating semicolon if any
+    // Remove the terminating semicolon from the query
     sql = removeTerminatingSemicolon(sql);
 
     // Extract OPTION statements from sql as Calcite Parser doesn't parse it.
@@ -146,18 +130,8 @@ public class CalciteSqlParser {
     if (!options.isEmpty()) {
       sql = removeOptionsFromSql(sql);
     }
-
-    SqlNode sqlNode = parse(sql);
-
     // Compile Sql without OPTION statements.
-    PinotQuery pinotQuery = compileSqlNodeToPinotQuery(sqlNode);
-
-    if (enablePreAggregateGapfillQuery) {
-      SqlNode fromNode = getSelectNode(sqlNode).getFrom();
-      if (fromNode != null && (fromNode instanceof SqlSelect || fromNode instanceof SqlOrderBy)) {
-        pinotQuery.getDataSource().setPreAggregateGapfillQuery(compileSqlNodeToPinotQuery(fromNode));
-      }
-    }
+    PinotQuery pinotQuery = compileCalciteSqlToPinotQuery(sql);
 
     // Set Option statements to PinotQuery.
     setOptions(pinotQuery, options);
@@ -347,7 +321,21 @@ public class CalciteSqlParser {
     pinotQuery.setQueryOptions(options);
   }
 
-  private static SqlSelect getSelectNode(SqlNode sqlNode) {
+  private static PinotQuery compileCalciteSqlToPinotQuery(String sql) {
+    SqlParser sqlParser = SqlParser.create(sql, PARSER_CONFIG);
+    SqlNode sqlNode;
+    try {
+      sqlNode = sqlParser.parseQuery();
+    } catch (SqlParseException e) {
+      throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
+    }
+
+    PinotQuery pinotQuery = new PinotQuery();
+    if (sqlNode instanceof SqlExplain) {
+      // Extract sql node for the query
+      sqlNode = ((SqlExplain) sqlNode).getExplicandum();
+      pinotQuery.setExplain(true);
+    }
     SqlSelect selectNode;
     if (sqlNode instanceof SqlOrderBy) {
       // Store order-by info into the select sql node
@@ -359,18 +347,6 @@ public class CalciteSqlParser {
     } else {
       selectNode = (SqlSelect) sqlNode;
     }
-    return selectNode;
-  }
-
-  private static PinotQuery compileSqlNodeToPinotQuery(SqlNode sqlNode) {
-    PinotQuery pinotQuery = new PinotQuery();
-    if (sqlNode instanceof SqlExplain) {
-      // Extract sql node for the query
-      sqlNode = ((SqlExplain) sqlNode).getExplicandum();
-      pinotQuery.setExplain(true);
-    }
-
-    SqlSelect selectNode = getSelectNode(sqlNode);
 
     // SELECT
     if (selectNode.getModifierNode(SqlSelectKeyword.DISTINCT) != null) {

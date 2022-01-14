@@ -27,10 +27,6 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.postaggregation.PostAggregationFunction;
-import org.apache.pinot.core.query.reduce.filter.ColumnValueExtractor;
-import org.apache.pinot.core.query.reduce.filter.LiteralValueExtractor;
-import org.apache.pinot.core.query.reduce.filter.ValueExtractor;
-import org.apache.pinot.core.query.reduce.filter.ValueExtractorFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GapfillUtils;
 
@@ -39,7 +35,7 @@ import org.apache.pinot.core.util.GapfillUtils;
  * The {@code PostAggregationHandler} handles the post-aggregation calculation as well as the column re-ordering for the
  * aggregation result.
  */
-public class PostAggregationHandler implements ValueExtractorFactory {
+public class PostAggregationHandler {
   private final Map<FunctionContext, Integer> _aggregationFunctionIndexMap;
   private final int _numGroupByExpressions;
   private final Map<ExpressionContext, Integer> _groupByExpressionIndexMap;
@@ -102,7 +98,6 @@ public class PostAggregationHandler implements ValueExtractorFactory {
   /**
    * Returns a ValueExtractor based on the given expression.
    */
-  @Override
   public ValueExtractor getValueExtractor(ExpressionContext expression) {
     expression = GapfillUtils.stripGapfill(expression);
     if (expression.getType() == ExpressionContext.Type.LITERAL) {
@@ -113,7 +108,7 @@ public class PostAggregationHandler implements ValueExtractorFactory {
       Integer groupByExpressionIndex = _groupByExpressionIndexMap.get(expression);
       if (groupByExpressionIndex != null) {
         // Group-by expression
-        return new ColumnValueExtractor(groupByExpressionIndex, _dataSchema);
+        return new ColumnValueExtractor(groupByExpressionIndex);
       }
     }
     FunctionContext function = expression.getFunction();
@@ -121,10 +116,83 @@ public class PostAggregationHandler implements ValueExtractorFactory {
         .checkState(function != null, "Failed to find SELECT expression: %s in the GROUP-BY clause", expression);
     if (function.getType() == FunctionContext.Type.AGGREGATION) {
       // Aggregation function
-      return new ColumnValueExtractor(_aggregationFunctionIndexMap.get(function) + _numGroupByExpressions, _dataSchema);
+      return new ColumnValueExtractor(_aggregationFunctionIndexMap.get(function) + _numGroupByExpressions);
     } else {
       // Post-aggregation function
       return new PostAggregationValueExtractor(function);
+    }
+  }
+
+  /**
+   * Value extractor for the post-aggregation function.
+   */
+  public interface ValueExtractor {
+
+    /**
+     * Returns the column name for the value extracted.
+     */
+    String getColumnName();
+
+    /**
+     * Returns the ColumnDataType of the value extracted.
+     */
+    ColumnDataType getColumnDataType();
+
+    /**
+     * Extracts the value from the given row.
+     */
+    Object extract(Object[] row);
+  }
+
+  /**
+   * Value extractor for a literal.
+   */
+  private static class LiteralValueExtractor implements ValueExtractor {
+    final String _literal;
+
+    LiteralValueExtractor(String literal) {
+      _literal = literal;
+    }
+
+    @Override
+    public String getColumnName() {
+      return '\'' + _literal + '\'';
+    }
+
+    @Override
+    public ColumnDataType getColumnDataType() {
+      return ColumnDataType.STRING;
+    }
+
+    @Override
+    public Object extract(Object[] row) {
+      return _literal;
+    }
+  }
+
+  /**
+   * Value extractor for a non-post-aggregation column (group-by expression or aggregation).
+   */
+  private class ColumnValueExtractor implements ValueExtractor {
+    final int _index;
+
+    ColumnValueExtractor(int index) {
+      _index = index;
+    }
+
+    @Override
+    public String getColumnName() {
+      return _dataSchema.getColumnName(_index);
+    }
+
+    @Override
+    public ColumnDataType getColumnDataType() {
+      return _dataSchema.getColumnDataType(_index);
+    }
+
+    @Override
+    public Object extract(Object[] row) {
+      return row[_index];
     }
   }
 

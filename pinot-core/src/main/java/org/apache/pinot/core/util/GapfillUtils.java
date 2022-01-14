@@ -31,9 +31,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
  */
 public class GapfillUtils {
   private static final String POST_AGGREGATE_GAP_FILL = "postaggregategapfill";
-  private static final String PRE_AGGREGATE_GAP_FILL = "preaggregategapfill";
   private static final String FILL = "fill";
-  private static final String TIME_SERIES_ON = "timeSeriesOn";
 
   private GapfillUtils() {
   }
@@ -73,15 +71,7 @@ public class GapfillUtils {
       return false;
     }
 
-    return FILL.equalsIgnoreCase(canonicalizeFunctionName(expressionContext.getFunction().getFunctionName()));
-  }
-
-  public static boolean isTimeSeriesOn(ExpressionContext expressionContext) {
-    if (expressionContext.getType() != ExpressionContext.Type.FUNCTION) {
-      return false;
-    }
-
-    return TIME_SERIES_ON.equalsIgnoreCase(canonicalizeFunctionName(expressionContext.getFunction().getFunctionName()));
+    return FILL.equals(canonicalizeFunctionName(expressionContext.getFunction().getFunctionName()));
   }
 
   static public enum FillType {
@@ -128,27 +118,5 @@ public class GapfillUtils {
 
   private static String canonicalizeFunctionName(String functionName) {
     return StringUtils.remove(functionName, '_').toLowerCase();
-  }
-
-  public static boolean isPreAggregateGapfill(ExpressionContext expressionContext) {
-    if (expressionContext.getType() != ExpressionContext.Type.FUNCTION) {
-      return false;
-    }
-
-    return PRE_AGGREGATE_GAP_FILL.equals(canonicalizeFunctionName(expressionContext.getFunction().getFunctionName()));
-  }
-
-  public static boolean isPreAggregateGapfill(QueryContext queryContext) {
-    if (queryContext.getPreAggregateGapFillQueryContext() == null) {
-      return false;
-    }
-
-    for (ExpressionContext expressionContext
-        : queryContext.getPreAggregateGapFillQueryContext().getSelectExpressions()) {
-      if (isPreAggregateGapfill(expressionContext)) {
-        return true;
-      }
-    }
-    return false;
   }
 }

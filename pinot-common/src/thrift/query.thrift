@@ -20,7 +20,6 @@ namespace java org.apache.pinot.common.request
 
 struct DataSource {
   1: optional string tableName;
-  2: optional PinotQuery preAggregateGapfillQuery;
 }
 
 struct PinotQuery {
