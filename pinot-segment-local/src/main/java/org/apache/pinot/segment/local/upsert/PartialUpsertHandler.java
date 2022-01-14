@@ -50,7 +50,7 @@ public class PartialUpsertHandler {
   private boolean _allSegmentsLoaded;
 
   public PartialUpsertHandler(HelixManager helixManager, String tableNameWithType, Schema schema,
-      Map<String, UpsertConfig.Strategy> partialUpsertStrategies, UpsertConfig.Strategy globalUpsertStrategy) {
+      Map<String, UpsertConfig.Strategy> partialUpsertStrategies, UpsertConfig.Strategy defaultPartialUpsertStrategy) {
     _helixManager = helixManager;
     _tableNameWithType = tableNameWithType;
     for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
@@ -60,13 +60,13 @@ public class PartialUpsertHandler {
     if (schema != null) {
       for (String dimensionName : schema.getDimensionNames()) {
         if (!schema.getPrimaryKeyColumns().contains(dimensionName) && !_column2Mergers.containsKey(dimensionName)) {
-          _column2Mergers.put(dimensionName, PartialUpsertMergerFactory.getMerger(globalUpsertStrategy));
+          _column2Mergers.put(dimensionName, PartialUpsertMergerFactory.getMerger(defaultPartialUpsertStrategy));
         }
       }
 
       for (String metricName : schema.getMetricNames()) {
         if (!schema.getPrimaryKeyColumns().contains(metricName) && !_column2Mergers.containsKey(metricName)) {
-          _column2Mergers.put(metricName, PartialUpsertMergerFactory.getMerger(globalUpsertStrategy));
+          _column2Mergers.put(metricName, PartialUpsertMergerFactory.getMerger(defaultPartialUpsertStrategy));
         }
       }
     }

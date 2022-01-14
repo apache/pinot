@@ -67,7 +67,7 @@ public class PartialUpsertHandlerTest {
 
     // newRecord is default null value, while previousRecord is not.
     // field1 should not be incremented since the newRecord is null.
-    // special case: field2 should be overrided by null value because we didn't enabled global strategy.
+    // special case: field2 should be overrided by null value because we didn't enabled default partial upsert strategy.
     previousRecord.clear();
     incomingRecord.clear();
     previousRecord.putValue("field1", 1);
@@ -90,7 +90,7 @@ public class PartialUpsertHandlerTest {
   }
 
   @Test
-  public void testMergeWithGlobalStrategy() {
+  public void testMergeWithDefaultPartialUpsertStrategy() {
     HelixManager helixManager = Mockito.mock(HelixManager.class);
 
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
@@ -119,7 +119,7 @@ public class PartialUpsertHandlerTest {
 
     // newRecord is default null value, while previousRecord is not.
     // field1 should not be incremented since the newRecord is null.
-    // field2 should not be overrided by null value since we have global strategy.
+    // field2 should not be overrided by null value since we have default partial upsert strategy.
     previousRecord.clear();
     incomingRecord.clear();
     previousRecord.putValue("field1", 8);

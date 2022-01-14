@@ -53,8 +53,8 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Partial update strategies.")
   private final Map<String, Strategy> _partialUpsertStrategies;
 
-  @JsonPropertyDescription("global upsert strategy")
-  private final Strategy _globalUpsertStrategy;
+  @JsonPropertyDescription("default upsert strategy for partial mode")
+  private final Strategy _defaultPartialUpsertStrategy;
 
   @JsonPropertyDescription("Column for upsert comparison, default to time column")
   private final String _comparisonColumn;
@@ -62,7 +62,7 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonCreator
   public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode,
       @JsonProperty("partialUpsertStrategies") @Nullable Map<String, Strategy> partialUpsertStrategies,
-      @JsonProperty("globalUpsertStrategy") @Nullable Strategy globalUpsertStrategy,
+      @JsonProperty("defaultPartialUpsertStrategy") @Nullable Strategy defaultPartialUpsertStrategy,
       @JsonProperty("comparisonColumn") @Nullable String comparisonColumn,
       @JsonProperty("hashFunction") @Nullable HashFunction hashFunction) {
     Preconditions.checkArgument(mode != null, "Upsert mode must be configured");
@@ -70,10 +70,10 @@ public class UpsertConfig extends BaseJsonConfig {
 
     if (mode == Mode.PARTIAL) {
       _partialUpsertStrategies = partialUpsertStrategies != null ? partialUpsertStrategies : new HashMap<>();
-      _globalUpsertStrategy = globalUpsertStrategy != null ? globalUpsertStrategy : Strategy.OVERWRITE;
+      _defaultPartialUpsertStrategy = defaultPartialUpsertStrategy != null ? defaultPartialUpsertStrategy : Strategy.OVERWRITE;
     } else {
       _partialUpsertStrategies = null;
-      _globalUpsertStrategy = null;
+      _defaultPartialUpsertStrategy = null;
     }
 
     _comparisonColumn = comparisonColumn;
@@ -93,8 +93,8 @@ public class UpsertConfig extends BaseJsonConfig {
     return _partialUpsertStrategies;
   }
 
-  public Strategy getGlobalUpsertStrategy() {
-    return _globalUpsertStrategy;
+  public Strategy getDefaultPartialUpsertStrategy() {
+    return _defaultPartialUpsertStrategy;
   }
 
   public String getComparisonColumn() {
