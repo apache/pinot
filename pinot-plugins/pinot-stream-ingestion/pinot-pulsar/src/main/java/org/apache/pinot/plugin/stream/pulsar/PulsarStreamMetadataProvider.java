@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
@@ -30,6 +32,7 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pulsar.client.api.Consumer;
+import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.slf4j.Logger;
@@ -39,7 +42,8 @@ import org.slf4j.LoggerFactory;
 /**
  * A {@link StreamMetadataProvider} implementation for the Pulsar stream
  */
-public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnectionHandler implements StreamMetadataProvider {
+public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnectionHandler
+    implements StreamMetadataProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarStreamMetadataProvider.class);
 
   private final StreamConfig _streamConfig;
@@ -126,18 +130,25 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
               .subscriptionInitialPosition(_config.getInitialSubscriberPosition())
               .subscriptionName("Pinot_" + UUID.randomUUID()).subscribe();
 
-          if (!consumer.hasReachedEndOfTopic()) {
+
+          Message message = consumer.receive(3, TimeUnit.SECONDS);
+          if (message != null) {
             newPartitionGroupMetadataList.add(
-                new PartitionGroupMetadata(p, new MessageIdStreamOffset(consumer.receive().getMessageId())));
+                new PartitionGroupMetadata(p, new MessageIdStreamOffset(message.getMessageId())));
           } else {
+            MessageId lastMessageId;
+            try {
+              lastMessageId = (MessageId) consumer.getLastMessageIdAsync().get(3, TimeUnit.SECONDS);
+            } catch (TimeoutException t) {
+              lastMessageId = MessageId.latest;
+            }
             newPartitionGroupMetadataList.add(
-                new PartitionGroupMetadata(p, new MessageIdStreamOffset(consumer.getLastMessageId())));
+                new PartitionGroupMetadata(p, new MessageIdStreamOffset(lastMessageId)));
           }
         }
       }
     } catch (Exception e) {
       LOGGER.warn("Error encountered while calculating pulsar partition group metadata: " + e.getMessage(), e);
-      // No partition found
     }
 
     return newPartitionGroupMetadataList;
