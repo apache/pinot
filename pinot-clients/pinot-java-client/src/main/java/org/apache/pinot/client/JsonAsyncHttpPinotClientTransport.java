@@ -54,8 +54,8 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   private final Map<String, String> _headers;
   private final String _scheme;
 
-  private static final long BROKER_READ_TIMEOUT = 1200000L;
-  private static final int BROKER_CONNECT_TIMEOUT = 2000;
+  private static final long BROKER_READ_TIMEOUT_MS = 60000L;
+  private static final int BROKER_CONNECT_TIMEOUT_MS = 2000;
 
   private final AsyncHttpClient _httpClient;
 
@@ -75,8 +75,8 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
       builder.setSslContext(new JdkSslContext(sslContext, true, ClientAuth.OPTIONAL));
     }
 
-    builder.setReadTimeout((int) BROKER_READ_TIMEOUT)
-        .setConnectTimeout(BROKER_CONNECT_TIMEOUT);
+    builder.setReadTimeout((int) BROKER_READ_TIMEOUT_MS)
+        .setConnectTimeout(BROKER_CONNECT_TIMEOUT_MS);
     _httpClient = Dsl.asyncHttpClient(builder.build());
   }
 
@@ -97,7 +97,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   public BrokerResponse executeQuery(String brokerAddress, String query)
     throws PinotClientException {
     try {
-      return executeQueryAsync(brokerAddress, query).get(BROKER_READ_TIMEOUT, TimeUnit.MILLISECONDS);
+      return executeQueryAsync(brokerAddress, query).get(BROKER_READ_TIMEOUT_MS, TimeUnit.MILLISECONDS);
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
@@ -142,7 +142,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   public BrokerResponse executeQuery(String brokerAddress, Request request)
       throws PinotClientException {
     try {
-      return executeQueryAsync(brokerAddress, request).get(BROKER_READ_TIMEOUT, TimeUnit.MILLISECONDS);
+      return executeQueryAsync(brokerAddress, request).get(BROKER_READ_TIMEOUT_MS, TimeUnit.MILLISECONDS);
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
@@ -196,7 +196,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
     @Override
     public BrokerResponse get()
         throws ExecutionException {
-      return get(BROKER_READ_TIMEOUT, TimeUnit.MILLISECONDS);
+      return get(BROKER_READ_TIMEOUT_MS, TimeUnit.MILLISECONDS);
     }
 
     @Override

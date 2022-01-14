@@ -110,7 +110,7 @@ public abstract class AbstractBaseStatement implements Statement {
   @Override
   public void setFetchSize(int rows)
       throws SQLException {
-
+    throw new SQLFeatureNotSupportedException();
   }
 
   @Override

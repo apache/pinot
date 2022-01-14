@@ -229,7 +229,7 @@ public abstract class AbstractBaseResultSet implements ResultSet {
   @Override
   public void setFetchSize(int rows)
       throws SQLException {
-
+    throw new SQLFeatureNotSupportedException();
   }
 
   @Override
