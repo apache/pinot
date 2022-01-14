@@ -26,7 +26,6 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.LiteralTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.apache.pinot.segment.spi.datasource.DataSource;
