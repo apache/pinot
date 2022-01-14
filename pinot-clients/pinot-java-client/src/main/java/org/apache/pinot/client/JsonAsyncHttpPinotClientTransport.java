@@ -123,7 +123,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   public BrokerResponse executeQuery(String brokerAddress, Request request)
       throws PinotClientException {
     try {
-      return executeQueryAsync(brokerAddress, request).get(600000L, TimeUnit.MILLISECONDS);
+      return executeQueryAsync(brokerAddress, request).get(BROKER_READ_TIMEOUT, TimeUnit.MILLISECONDS);
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
