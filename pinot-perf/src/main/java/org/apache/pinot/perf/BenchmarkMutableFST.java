@@ -25,10 +25,8 @@ import java.util.Objects;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.MutableFST;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RealTimeRegexpMatcher;
-
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
