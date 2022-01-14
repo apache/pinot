@@ -73,7 +73,7 @@ public class UpsertConfig extends BaseJsonConfig {
       _globalUpsertStrategy = globalUpsertStrategy != null ? globalUpsertStrategy : Strategy.OVERWRITE;
     } else {
       _partialUpsertStrategies = null;
-      _globalUpsertStrategy = Strategy.OVERWRITE;
+      _globalUpsertStrategy = null;
     }
 
     _comparisonColumn = comparisonColumn;

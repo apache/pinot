@@ -249,7 +249,7 @@ public class TableConfigSerDeTest {
     {
       // with upsert config
       UpsertConfig upsertConfig =
-          new UpsertConfig(UpsertConfig.Mode.FULL, null, UpsertConfig.Strategy.OVERWRITE, "comparison",
+          new UpsertConfig(UpsertConfig.Mode.FULL, null, null, "comparison",
               UpsertConfig.HashFunction.NONE);
 
       TableConfig tableConfig = tableConfigBuilder.setUpsertConfig(upsertConfig).build();
