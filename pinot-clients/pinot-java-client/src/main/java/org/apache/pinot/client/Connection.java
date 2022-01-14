@@ -236,7 +236,7 @@ public class Connection {
     public ResultSetGroup get()
         throws InterruptedException, ExecutionException {
       try {
-        return get(200000L, TimeUnit.NANOSECONDS);
+        return get(60000L, TimeUnit.MILLISECONDS);
       } catch (TimeoutException e) {
         throw new ExecutionException(e);
       }
