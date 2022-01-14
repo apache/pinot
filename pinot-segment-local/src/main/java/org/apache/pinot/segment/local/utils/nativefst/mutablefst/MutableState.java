@@ -21,12 +21,10 @@ package org.apache.pinot.segment.local.utils.nativefst.mutablefst;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils.MutableFSTUtils;
-
 import java.util.ArrayList;
-
 import java.util.List;
 import java.util.Set;
+import org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils.MutableFSTUtils;
 
 
 /**

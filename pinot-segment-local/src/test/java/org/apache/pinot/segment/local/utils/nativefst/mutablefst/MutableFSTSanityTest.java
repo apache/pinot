@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.utils.nativefst.mutablefst;
 
 import java.io.BufferedReader;
-
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
@@ -28,7 +27,6 @@ import java.util.Objects;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.pinot.segment.local.utils.fst.RegexpMatcher;
-
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.BeforeClass;

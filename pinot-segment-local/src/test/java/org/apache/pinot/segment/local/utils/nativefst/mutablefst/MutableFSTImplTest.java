@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.utils.nativefst.mutablefst;
 
 import java.util.ArrayList;
 import java.util.List;
-
 import org.apache.pinot.segment.local.utils.nativefst.utils.RealTimeRegexpMatcher;
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;

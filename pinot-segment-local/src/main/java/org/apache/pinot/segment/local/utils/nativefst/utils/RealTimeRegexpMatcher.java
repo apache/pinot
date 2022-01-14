@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-
 import org.apache.pinot.segment.local.utils.nativefst.automaton.Automaton;
 import org.apache.pinot.segment.local.utils.nativefst.automaton.CharacterRunAutomaton;
 import org.apache.pinot.segment.local.utils.nativefst.automaton.RegExp;
@@ -80,7 +79,7 @@ public class RealTimeRegexpMatcher {
     }
 
     // Automaton start state and FST start node is added to the queue.
-    queue.add(new Path(_automaton.getInitialState(), (MutableState) _fst.getStartState(), null, new ArrayList<>()));
+    queue.add(new Path(_automaton.getInitialState(), _fst.getStartState(), null, new ArrayList<>()));
 
     Set<State> acceptStates = _automaton.getAcceptStates();
     while (queue.size() != 0) {

@@ -20,7 +20,6 @@
 package org.apache.pinot.segment.local.utils.nativefst.mutablefst;
 
 import com.google.common.base.Preconditions;
-
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
