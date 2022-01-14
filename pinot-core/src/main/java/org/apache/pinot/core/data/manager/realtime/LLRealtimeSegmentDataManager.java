@@ -310,12 +310,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           return true;
         } else if (_numRowsIndexed >= _segmentMaxRowCount) {
           _segmentLogger.info("Stopping consumption due to row limit nRows={} numRowsIndexed={}, numRowsConsumed={}",
-              _numRowsIndexed, _numRowsConsumed, _segmentMaxRowCount);
+              _segmentMaxRowCount, _numRowsIndexed, _numRowsConsumed);
           _stopReason = SegmentCompletionProtocol.REASON_ROW_LIMIT;
           return true;
         } else if (_endOfPartitionGroup) {
           _segmentLogger.info("Stopping consumption due to end of partitionGroup reached nRows={} numRowsIndexed={}, "
-              + "numRowsConsumed={}", _numRowsIndexed, _numRowsConsumed, _segmentMaxRowCount);
+              + "numRowsConsumed={}", _segmentMaxRowCount, _numRowsIndexed, _numRowsConsumed);
           _stopReason = SegmentCompletionProtocol.REASON_END_OF_PARTITION_GROUP;
           return true;
         }
@@ -1162,7 +1162,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
     if (_currentOffset.compareTo(endOffset) != 0) {
       // Timeout?
-      _segmentLogger.error("Could not consume up to {} (current offset {})", endOffset, _currentOffset);
+      _segmentLogger.warn("Could not consume up to {} (current offset {})", endOffset, _currentOffset);
       return false;
     }
 

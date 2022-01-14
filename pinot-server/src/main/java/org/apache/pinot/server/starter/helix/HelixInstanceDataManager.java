@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -54,6 +55,8 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -271,22 +274,18 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
     File indexDir = segmentMetadata.getIndexDir();
     if (indexDir == null) {
-      if (!_instanceDataManagerConfig.shouldReloadConsumingSegment()) {
-        LOGGER.info("Skip reloading REALTIME consuming segment: {} in table: {}", segmentName, tableNameWithType);
+      SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+      if (segmentDataManager == null) {
         return;
       }
-      Preconditions.checkState(schema != null, "Failed to find schema for table: {}", tableNameWithType);
-      LOGGER.info("Try reloading REALTIME consuming segment: {} in table: {}", segmentName, tableNameWithType);
-      SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
-      if (segmentDataManager != null) {
-        try {
-          MutableSegmentImpl mutableSegment = (MutableSegmentImpl) segmentDataManager.getSegment();
-          mutableSegment.addExtraColumns(schema);
-        } finally {
-          tableDataManager.releaseSegment(segmentDataManager);
+      try {
+        if (reloadMutableSegment(tableNameWithType, segmentName, segmentDataManager, schema)) {
+          // A mutable segment has been found and reloaded.
+          return;
         }
+      } finally {
+        tableDataManager.releaseSegment(segmentDataManager);
       }
-      return;
     }
 
     SegmentZKMetadata zkMetadata =
@@ -305,6 +304,30 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     } finally {
       segmentLock.unlock();
     }
+  }
+
+  /**
+   * Try to reload a mutable segment.
+   * @return true if the segment is mutable and loaded; false if the segment is immutable.
+   */
+  @VisibleForTesting
+  boolean reloadMutableSegment(String tableNameWithType, String segmentName,
+      SegmentDataManager segmentDataManager, @Nullable Schema schema) {
+    IndexSegment segment = segmentDataManager.getSegment();
+    if (segment instanceof ImmutableSegment) {
+      LOGGER.info("Found an immutable segment: {} in table: {}", segmentName, tableNameWithType);
+      return false;
+    }
+    // Found a mutable/consuming segment from REALTIME table.
+    if (!_instanceDataManagerConfig.shouldReloadConsumingSegment()) {
+      LOGGER.info("Skip reloading REALTIME consuming segment: {} in table: {}", segmentName, tableNameWithType);
+      return true;
+    }
+    LOGGER.info("Reloading REALTIME consuming segment: {} in table: {}", segmentName, tableNameWithType);
+    Preconditions.checkState(schema != null, "Failed to find schema for table: {}", tableNameWithType);
+    MutableSegmentImpl mutableSegment = (MutableSegmentImpl) segment;
+    mutableSegment.addExtraColumns(schema);
+    return true;
   }
 
   @Override

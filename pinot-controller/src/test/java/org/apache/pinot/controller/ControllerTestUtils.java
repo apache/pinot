@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.PutMethod;
@@ -233,8 +234,9 @@ public abstract class ControllerTestUtils {
 
   public static void addFakeBrokerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant)
       throws Exception {
-    HelixManager helixManager = HelixManagerFactory
-        .getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT, _zookeeperInstance.getZkUrl());
+    HelixManager helixManager =
+        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
+            _zookeeperInstance.getZkUrl());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeBrokerResourceOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
             FakeBrokerResourceOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
@@ -333,8 +335,9 @@ public abstract class ControllerTestUtils {
   protected static void addFakeServerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant,
       int adminPort)
       throws Exception {
-    HelixManager helixManager = HelixManagerFactory
-        .getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT, _zookeeperInstance.getZkUrl());
+    HelixManager helixManager =
+        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
+            _zookeeperInstance.getZkUrl());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeSegmentOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
             FakeSegmentOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
@@ -346,9 +349,8 @@ public abstract class ControllerTestUtils {
     } else {
       helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, UNTAGGED_SERVER_INSTANCE);
     }
-    HelixConfigScope configScope =
-        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT, getHelixClusterName())
-            .forParticipant(instanceId).build();
+    HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT,
+        getHelixClusterName()).forParticipant(instanceId).build();
     helixAdmin.setConfig(configScope, Collections.singletonMap(ADMIN_PORT_KEY, Integer.toString(adminPort)));
     FAKE_INSTANCE_HELIX_MANAGERS.add(helixManager);
   }
@@ -794,6 +796,14 @@ public abstract class ControllerTestUtils {
     for (String table : tables) {
       getHelixResourceManager().deleteOfflineTable(table);
       getHelixResourceManager().deleteRealtimeTable(table);
+    }
+
+    // Delete all schemas.
+    List<String> schemaNames = getHelixResourceManager().getSchemaNames();
+    if (CollectionUtils.isNotEmpty(schemaNames)) {
+      for (String schemaName : schemaNames) {
+        getHelixResourceManager().deleteSchema(getHelixResourceManager().getSchema(schemaName));
+      }
     }
 
     // Delete broker tenants except default tenant

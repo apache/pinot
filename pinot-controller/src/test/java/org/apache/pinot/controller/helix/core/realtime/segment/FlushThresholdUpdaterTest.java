@@ -258,7 +258,7 @@ public class FlushThresholdUpdaterTest {
         committingSegmentZKMetadata, 1, Collections.emptyList());
     sizeThreshold = newSegmentZKMetadata.getSizeThresholdToFlushSegment();
     assertEquals(sizeThreshold,
-        (int) (numRowsConsumed * SegmentSizeBasedFlushThresholdUpdater.ROWS_MULTIPLIER_WHEN_TIME_THRESHOLD_HIT));
+        (int) (numRowsConsumed * SegmentFlushThresholdComputer.ROWS_MULTIPLIER_WHEN_TIME_THRESHOLD_HIT));
 
     // Second segment hits the rows threshold
     numRowsConsumed = sizeThreshold;
@@ -267,7 +267,7 @@ public class FlushThresholdUpdaterTest {
     flushThresholdUpdater.updateFlushThreshold(streamConfig, newSegmentZKMetadata, committingSegmentDescriptor,
         committingSegmentZKMetadata, 1, Collections.emptyList());
     assertNotEquals(newSegmentZKMetadata.getSizeThresholdToFlushSegment(),
-        (int) (numRowsConsumed * SegmentSizeBasedFlushThresholdUpdater.ROWS_MULTIPLIER_WHEN_TIME_THRESHOLD_HIT));
+        (int) (numRowsConsumed * SegmentFlushThresholdComputer.ROWS_MULTIPLIER_WHEN_TIME_THRESHOLD_HIT));
   }
 
   @Test
@@ -290,7 +290,7 @@ public class FlushThresholdUpdaterTest {
     flushThresholdUpdater.updateFlushThreshold(streamConfig, newSegmentZKMetadata, committingSegmentDescriptor,
         committingSegmentZKMetadata, 1, Collections.emptyList());
     sizeThreshold = newSegmentZKMetadata.getSizeThresholdToFlushSegment();
-    assertEquals(sizeThreshold, SegmentSizeBasedFlushThresholdUpdater.MINIMUM_NUM_ROWS_THRESHOLD);
+    assertEquals(sizeThreshold, SegmentFlushThresholdComputer.MINIMUM_NUM_ROWS_THRESHOLD);
 
     // Next segment only consumed 20 rows, so size threshold should still be 10_000
     numRowsConsumed = 20;
@@ -299,7 +299,7 @@ public class FlushThresholdUpdaterTest {
     flushThresholdUpdater.updateFlushThreshold(streamConfig, newSegmentZKMetadata, committingSegmentDescriptor,
         committingSegmentZKMetadata, 1, Collections.emptyList());
     sizeThreshold = newSegmentZKMetadata.getSizeThresholdToFlushSegment();
-    assertEquals(sizeThreshold, SegmentSizeBasedFlushThresholdUpdater.MINIMUM_NUM_ROWS_THRESHOLD);
+    assertEquals(sizeThreshold, SegmentFlushThresholdComputer.MINIMUM_NUM_ROWS_THRESHOLD);
   }
 
   @Test
@@ -410,7 +410,7 @@ public class FlushThresholdUpdaterTest {
         committingSegmentZKMetadata, 1, Collections.emptyList());
     sizeThreshold = newSegmentZKMetadata.getSizeThresholdToFlushSegment();
     assertEquals(sizeThreshold,
-        (long) (numRowsConsumed * SegmentSizeBasedFlushThresholdUpdater.ROWS_MULTIPLIER_WHEN_TIME_THRESHOLD_HIT));
+        (long) (numRowsConsumed * SegmentFlushThresholdComputer.ROWS_MULTIPLIER_WHEN_TIME_THRESHOLD_HIT));
 
     // Still not hit the row threshold within 90% of the time threshold, produce a segment the same size of the previous
     // one, but reduce the time threshold by half, and should get a lower row threshold
