@@ -130,15 +130,14 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
               .subscriptionInitialPosition(_config.getInitialSubscriberPosition())
               .subscriptionName("Pinot_" + UUID.randomUUID()).subscribe();
 
-          //TODO: Make timeout values configurable
-          Message message = consumer.receive(3, TimeUnit.SECONDS);
+          Message message = consumer.receive(timeoutMillis, TimeUnit.MILLISECONDS);
           if (message != null) {
             newPartitionGroupMetadataList.add(
                 new PartitionGroupMetadata(p, new MessageIdStreamOffset(message.getMessageId())));
           } else {
             MessageId lastMessageId;
             try {
-              lastMessageId = (MessageId) consumer.getLastMessageIdAsync().get(3, TimeUnit.SECONDS);
+              lastMessageId = (MessageId) consumer.getLastMessageIdAsync().get(timeoutMillis, TimeUnit.MILLISECONDS);
             } catch (TimeoutException t) {
               lastMessageId = MessageId.latest;
             }
