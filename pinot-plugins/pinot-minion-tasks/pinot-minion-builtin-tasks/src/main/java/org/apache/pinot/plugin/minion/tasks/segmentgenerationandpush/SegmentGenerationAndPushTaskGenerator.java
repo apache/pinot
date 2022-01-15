@@ -32,12 +32,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
-import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
-import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
+import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
@@ -89,36 +87,14 @@ import org.slf4j.LoggerFactory;
  *
  */
 @TaskGenerator
-public class SegmentGenerationAndPushTaskGenerator implements PinotTaskGenerator {
+public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGenerationAndPushTaskGenerator.class);
   private static final BatchConfigProperties.SegmentPushType DEFAULT_SEGMENT_PUSH_TYPE =
       BatchConfigProperties.SegmentPushType.TAR;
 
-  private ClusterInfoAccessor _clusterInfoAccessor;
-
-  @Override
-  public void init(ClusterInfoAccessor clusterInfoAccessor) {
-    _clusterInfoAccessor = clusterInfoAccessor;
-  }
-
   @Override
   public String getTaskType() {
     return MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE;
-  }
-
-  @Override
-  public int getNumConcurrentTasksPerInstance() {
-    String numConcurrentTasksPerInstanceStr = _clusterInfoAccessor
-        .getClusterConfig(MinionConstants.SegmentGenerationAndPushTask.CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE);
-    if (numConcurrentTasksPerInstanceStr != null) {
-      try {
-        return Integer.parseInt(numConcurrentTasksPerInstanceStr);
-      } catch (Exception e) {
-        LOGGER.error("Failed to parse cluster config: {}",
-            MinionConstants.SegmentGenerationAndPushTask.CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE, e);
-      }
-    }
-    return JobConfig.DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE;
   }
 
   @Override
