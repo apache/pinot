@@ -25,6 +25,7 @@ import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
+import org.apache.pulsar.client.impl.BatchMessageIdImpl;
 import org.apache.pulsar.client.impl.MessageIdImpl;
 import org.apache.pulsar.client.internal.DefaultImplementation;
 
@@ -75,9 +76,16 @@ public class PulsarMessageBatch implements MessageBatch<byte[]> {
   @Override
   public StreamPartitionMsgOffset getNextStreamPartitionMsgOffsetAtIndex(int index) {
     MessageIdImpl currentMessageId = MessageIdImpl.convertToMessageIdImpl(_messageList.get(index).getMessageId());
-    MessageId nextMessageId = DefaultImplementation
-        .newMessageId(currentMessageId.getLedgerId(), currentMessageId.getEntryId() + 1,
-            currentMessageId.getPartitionIndex());
+    MessageId nextMessageId;
+    if (currentMessageId instanceof BatchMessageIdImpl) {
+      nextMessageId = new BatchMessageIdImpl(currentMessageId.getLedgerId(), currentMessageId.getEntryId() + 1,
+          currentMessageId.getPartitionIndex(), ((BatchMessageIdImpl) currentMessageId).getBatchIndex(),
+          ((BatchMessageIdImpl) currentMessageId).getBatchSize(), ((BatchMessageIdImpl) currentMessageId).getAcker());
+    } else {
+      nextMessageId =
+          DefaultImplementation.newMessageId(currentMessageId.getLedgerId(), currentMessageId.getEntryId() + 1,
+              currentMessageId.getPartitionIndex());
+    }
     return new MessageIdStreamOffset(nextMessageId);
   }
 
