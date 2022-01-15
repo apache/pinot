@@ -35,6 +35,7 @@ import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.PulsarClientException;
+import org.apache.pulsar.client.util.ConsumerName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -128,7 +129,7 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
 
           Consumer consumer = _pulsarClient.newConsumer().topic(getPartitionedTopicName(p))
               .subscriptionInitialPosition(_config.getInitialSubscriberPosition())
-              .subscriptionName("Pinot_" + UUID.randomUUID()).subscribe();
+              .subscriptionName(ConsumerName.generateRandomName()).subscribe();
 
           Message message = consumer.receive(timeoutMillis, TimeUnit.MILLISECONDS);
           if (message != null) {
