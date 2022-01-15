@@ -153,9 +153,12 @@ public class CalciteSqlParser {
     PinotQuery pinotQuery = compileSqlNodeToPinotQuery(sqlNode);
 
     if (enablePreAggregateGapfillQuery) {
-      SqlNode fromNode = getSelectNode(sqlNode).getFrom();
-      if (fromNode != null && (fromNode instanceof SqlSelect || fromNode instanceof SqlOrderBy)) {
-        pinotQuery.getDataSource().setPreAggregateGapfillQuery(compileSqlNodeToPinotQuery(fromNode));
+      SqlSelect sqlSelect = getSelectNode(sqlNode);
+      if (sqlSelect != null) {
+        SqlNode fromNode = sqlSelect.getFrom();
+        if (fromNode != null && (fromNode instanceof SqlSelect || fromNode instanceof SqlOrderBy)) {
+          pinotQuery.getDataSource().setPreAggregateGapfillQuery(compileSqlNodeToPinotQuery(fromNode));
+        }
       }
     }
 
@@ -355,7 +358,7 @@ public class CalciteSqlParser {
   }
 
   private static SqlSelect getSelectNode(SqlNode sqlNode) {
-    SqlSelect selectNode;
+    SqlSelect selectNode = null;
     if (sqlNode instanceof SqlOrderBy) {
       // Store order-by info into the select sql node
       SqlOrderBy orderByNode = (SqlOrderBy) sqlNode;
@@ -363,7 +366,7 @@ public class CalciteSqlParser {
       selectNode.setOrderBy(orderByNode.orderList);
       selectNode.setFetch(orderByNode.fetch);
       selectNode.setOffset(orderByNode.offset);
-    } else {
+    } else if (sqlNode instanceof SqlSelect) {
       selectNode = (SqlSelect) sqlNode;
     }
     return selectNode;
