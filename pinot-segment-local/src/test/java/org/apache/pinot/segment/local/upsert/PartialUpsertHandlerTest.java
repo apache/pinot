@@ -39,11 +39,17 @@ public class PartialUpsertHandlerTest {
   @Test
   public void testMerge() {
     HelixManager helixManager = Mockito.mock(HelixManager.class);
+
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("field1", FieldSpec.DataType.LONG)
+        .addDateTime("secondsSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
+        .setPrimaryKeyColumns(Arrays.asList("pk")).build();
+
     String realtimeTableName = "testTable_REALTIME";
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
     partialUpsertStrategies.put("field1", UpsertConfig.Strategy.INCREMENT);
     PartialUpsertHandler handler =
-        new PartialUpsertHandler(helixManager, realtimeTableName, null, partialUpsertStrategies,
+        new PartialUpsertHandler(helixManager, realtimeTableName, schema, partialUpsertStrategies,
             UpsertConfig.Strategy.OVERWRITE, null);
 
     // both records are null.
@@ -95,6 +101,7 @@ public class PartialUpsertHandlerTest {
 
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
         .addSingleValueDimension("field1", FieldSpec.DataType.LONG).addMetric("field2", FieldSpec.DataType.LONG)
+        .addDateTime("secondsSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
         .setPrimaryKeyColumns(Arrays.asList("pk")).build();
 
     String realtimeTableName = "testTable_REALTIME";
