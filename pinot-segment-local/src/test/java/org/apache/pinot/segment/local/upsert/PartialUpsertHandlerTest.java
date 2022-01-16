@@ -44,7 +44,7 @@ public class PartialUpsertHandlerTest {
     partialUpsertStrategies.put("field1", UpsertConfig.Strategy.INCREMENT);
     PartialUpsertHandler handler =
         new PartialUpsertHandler(helixManager, realtimeTableName, null, partialUpsertStrategies,
-            UpsertConfig.Strategy.OVERWRITE);
+            UpsertConfig.Strategy.OVERWRITE, null);
 
     // both records are null.
     GenericRow previousRecord = new GenericRow();
@@ -102,7 +102,7 @@ public class PartialUpsertHandlerTest {
     partialUpsertStrategies.put("field1", UpsertConfig.Strategy.INCREMENT);
     PartialUpsertHandler handler =
         new PartialUpsertHandler(helixManager, realtimeTableName, schema, partialUpsertStrategies,
-            UpsertConfig.Strategy.OVERWRITE);
+            UpsertConfig.Strategy.OVERWRITE, null);
 
     // previousRecord is null default value, while newRecord is not.
     GenericRow previousRecord = new GenericRow();
