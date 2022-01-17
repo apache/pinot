@@ -48,23 +48,11 @@ public class PreAggGapFillSelectionPlanNode implements PlanNode {
   public Operator<IntermediateResultsBlock> run() {
     int limit = _queryContext.getLimit();
 
-    ExpressionContext gapFillSelection = null;
-    for (ExpressionContext expressionContext : _queryContext.getSelectExpressions()) {
-      if (GapfillUtils.isPreAggregateGapfill(expressionContext)) {
-        gapFillSelection = expressionContext;
-        break;
-      }
-    }
+    ExpressionContext gapFillSelection = GapfillUtils.getPreAggregateGapfillExpressionContext(_queryContext);
+    Preconditions.checkArgument(gapFillSelection != null, "PreAggregate Gapfill Expression is expected.");
 
-    List<ExpressionContext> args = gapFillSelection.getFunction().getArguments();
-    ExpressionContext timeSeriesOn = null;
-    for (int i = 5; i < args.size(); i++) {
-      if (GapfillUtils.isTimeSeriesOn(args.get(i))) {
-        Preconditions.checkArgument(timeSeriesOn == null, "Duplicate TimeSeriesOn expressions are specified.");
-        timeSeriesOn = args.get(i);
-        break;
-      }
-    }
+    ExpressionContext timeSeriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);
+    Preconditions.checkArgument(timeSeriesOn != null, "TimeSeriesOn Expression is expected.");
 
     String timeCol = timeSeriesOn.getFunction().getArguments().get(0).getIdentifier();
 
