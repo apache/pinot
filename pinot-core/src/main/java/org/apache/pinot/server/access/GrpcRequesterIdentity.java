@@ -18,28 +18,26 @@
  */
 package org.apache.pinot.server.access;
 
-import io.netty.channel.ChannelHandlerContext;
-import org.apache.pinot.spi.annotations.InterfaceAudience;
-import org.apache.pinot.spi.annotations.InterfaceStability;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
+import java.util.Map;
 
 
-@InterfaceAudience.Public
-@InterfaceStability.Stable
-public interface AccessControl {
+/**
+ * Identity container for GRPC requests with (optional) authorization metadata
+ */
+public class GrpcRequesterIdentity extends RequesterIdentity {
+  private Multimap<String, String> _metaData;
 
-  /**
-   *
-   * @param channelHandlerContext netty tls context
-   * @return Whether the client has access to query server
-   */
-  boolean isAuthorizedChannel(ChannelHandlerContext channelHandlerContext);
+  public GrpcRequesterIdentity(Map<String, String> metadataMap) {
+    _metaData = Multimaps.forMap(metadataMap);
+  }
 
-  /**
-   * Return whether the client has data access to the given table.
-   *
-   * @param requesterIdentity Request identity
-   * @param tableName Name of the table to be accessed
-   * @return Whether the client has data access to the table
-   */
-  boolean hasDataAccess(RequesterIdentity requesterIdentity, String tableName);
+  public Multimap<String, String> getGrpcMetadata() {
+    return _metaData;
+  }
+
+  public void setGrpcMetadata(Multimap<String, String> metaData) {
+    _metaData = metaData;
+  }
 }

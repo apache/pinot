@@ -53,4 +53,14 @@ public class BasicAuthPrincipal {
   public boolean hasPermission(String permission) {
     return _permissions.isEmpty() || _permissions.contains(permission.toLowerCase());
   }
+
+  @Override
+  public String toString() {
+    return "BasicAuthPrincipal{"
+        + "_name='" + _name + '\''
+        + ", _token='" + _token + '\''
+        + ", _tables=" + _tables
+        + ", _permissions=" + _permissions
+        + '}';
+  }
 }

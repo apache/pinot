@@ -403,6 +403,7 @@ public class CommonConstants {
     public static final String ACCESS_CONTROL_FACTORY_CLASS = "pinot.server.admin.access.control.factory.class";
     public static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
         "org.apache.pinot.server.access.AllowAllAccessFactory";
+    public static final String PREFIX_OF_CONFIG_OF_ACCESS_CONTROL = "pinot.server.admin.access.control";
 
     public static final String CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT =
         "pinot.server.instance.enableThreadCpuTimeMeasurement";
