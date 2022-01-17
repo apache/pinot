@@ -66,7 +66,6 @@ public class MutableArc {
 
   @Override
   public String toString() {
-    return "(" + _nextState.toString()
-           + ")";
+    return "(" + _nextState.toString() + ")";
   }
 }

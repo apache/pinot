@@ -27,6 +27,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.MutableFST;
+import org.apache.pinot.segment.local.utils.nativefst.mutablefst.MutableFSTImpl;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RealTimeRegexpMatcher;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -44,6 +45,8 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
+
+import static org.apache.pinot.segment.local.utils.fst.FSTBuilder.buildFST;
 
 
 @BenchmarkMode(Mode.AverageTime)
@@ -63,6 +66,8 @@ public class BenchmarkMutableFST {
   public void setUp()
       throws IOException {
     SortedMap<String, Integer> input = new TreeMap<>();
+
+    _mutableFST = new MutableFSTImpl();
     try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(
         Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("data/words.txt"))))) {
       String currentWord;
@@ -73,11 +78,11 @@ public class BenchmarkMutableFST {
       }
     }
 
-    _fst = org.apache.pinot.segment.local.utils.fst.FSTBuilder.buildFST(input);
+    _fst = buildFST(input);
   }
 
   @Benchmark
-  public MutableRoaringBitmap testMutableRegex(Blackhole blackhole) {
+  public MutableRoaringBitmap testMutableRegex() {
     RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
     RealTimeRegexpMatcher.regexMatch(_regex, _mutableFST, writer::add);
 
@@ -85,7 +90,7 @@ public class BenchmarkMutableFST {
   }
 
   @Benchmark
-  public List testLuceneRegex(Blackhole blackhole)
+  public List testLuceneRegex()
       throws IOException {
     return org.apache.pinot.segment.local.utils.fst.RegexpMatcher.regexMatch(_regex, _fst);
   }
