@@ -94,9 +94,7 @@ public class QueryContext {
   private AggregationFunction[] _aggregationFunctions;
 
   private boolean _hasFilteredAggregations;
-  // TODO: Use Pair<FunctionContext, FilterContext> as key to support filtered aggregations in order-by and post
-  //       aggregation
-  private Map<Pair<FunctionContext, FilterContext>, Integer> _filteredAgggregationsIndexMap;
+  private Map<Pair<FunctionContext, FilterContext>, Integer> _filteredAggregationsIndexMap;
   private Map<FunctionContext, Integer> _aggregationFunctionIndexMap;
   private Set<String> _columns;
 
@@ -268,8 +266,8 @@ public class QueryContext {
    * @return
    */
   @Nullable
-  public Map<Pair<FunctionContext, FilterContext>, Integer> getFilteredAgggregationsIndexMap() {
-    return _filteredAgggregationsIndexMap;
+  public Map<Pair<FunctionContext, FilterContext>, Integer> getFilteredAggregationsIndexMap() {
+    return _filteredAggregationsIndexMap;
   }
 
   /**
@@ -548,7 +546,7 @@ public class QueryContext {
       if (!aggregationFunctions.isEmpty()) {
         queryContext._aggregationFunctions = aggregationFunctions.toArray(new AggregationFunction[0]);
         queryContext._aggregationFunctionIndexMap = aggregationFunctionIndexMap;
-        queryContext._filteredAgggregationsIndexMap = filterExpressionIndexMap;
+        queryContext._filteredAggregationsIndexMap = filterExpressionIndexMap;
       }
     }
 

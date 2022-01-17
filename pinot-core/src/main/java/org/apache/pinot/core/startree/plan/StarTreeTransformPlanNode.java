@@ -26,7 +26,6 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.startree.CompositePredicateEvaluator;
@@ -41,7 +40,7 @@ public class StarTreeTransformPlanNode implements PlanNode {
   public StarTreeTransformPlanNode(StarTreeV2 starTreeV2,
       AggregationFunctionColumnPair[] aggregationFunctionColumnPairs, @Nullable ExpressionContext[] groupByExpressions,
       Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap,
-      @Nullable BaseFilterOperator filterOperator, @Nullable Map<String, String> debugOptions) {
+      @Nullable Map<String, String> debugOptions) {
     Set<String> projectionColumns = new HashSet<>();
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
       projectionColumns.add(aggregationFunctionColumnPair.toColumnName());
@@ -61,7 +60,7 @@ public class StarTreeTransformPlanNode implements PlanNode {
 
     _starTreeProjectionPlanNode =
         new StarTreeProjectionPlanNode(starTreeV2, projectionColumns, predicateEvaluatorsMap, groupByColumns,
-            debugOptions, filterOperator);
+            debugOptions);
   }
 
   @Override

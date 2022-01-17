@@ -24,6 +24,7 @@ import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
+import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.DistinctOperator;
 import org.apache.pinot.core.operator.query.FilteredAggregationOperator;
 import org.apache.pinot.core.query.distinct.DistinctTable;
@@ -47,6 +48,30 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   // ARRAY_MAP_BASED
   private static final String VERY_LARGE_GROUP_BY =
       " GROUP BY column1, column3, column6, column7, column9, column11, column12, column17, column18";
+
+  @Test
+  public void testAggregationOnly() {
+    String query = "SELECT" + AGGREGATION + " FROM testTable";
+
+    // Test query without filter.
+    AggregationOperator aggregationOperator = getOperatorForPqlQuery(query);
+    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils
+        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 30000L, 0L, 120000L, 30000L);
+    QueriesTestUtils
+        .testInnerSegmentAggregationResult(resultsBlock.getAggregationResult(), 30000L, 32317185437847L, 2147419555,
+            1689277, 28175373944314L, 30000L);
+
+    // Test query with filter.
+    aggregationOperator = getOperatorForPqlQueryWithFilter(query);
+    resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils
+        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 6129L, 84134L, 24516L,
+            30000L);
+    QueriesTestUtils
+        .testInnerSegmentAggregationResult(resultsBlock.getAggregationResult(), 6129L, 6875947596072L, 999813884,
+            1980174, 4699510391301L, 6129L);
+  }
 
   @Test
   public void testFilteredAggregations() {

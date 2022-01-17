@@ -82,8 +82,8 @@ public class FilteredAggregationOperator extends BaseOperator<IntermediateResult
         numDocsScanned += transformBlock.getNumDocs();
       }
       List<Object> filteredResult = aggregationExecutor.getResult();
-      int numFilteredAggregations = aggregationFunctions.length;
-      for (int i = 0; i < numFilteredAggregations; i++) {
+
+      for (int i = 0; i < aggregationFunctions.length; i++) {
         result[resultIndexMap.get(aggregationFunctions[i])] = filteredResult.get(i);
       }
       _numDocsScanned += numDocsScanned;

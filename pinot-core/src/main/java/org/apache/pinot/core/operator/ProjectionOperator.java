@@ -63,7 +63,7 @@ public class ProjectionOperator extends BaseOperator<ProjectionBlock> {
       return null;
     } else {
       _dataBlockCache.initNewBlock(docIdSetBlock.getDocIdSet(), docIdSetBlock.getSearchableLength());
-      return new ProjectionBlock(_dataSourceMap, _dataBlockCache, docIdSetBlock);
+      return new ProjectionBlock(_dataSourceMap, _dataBlockCache);
     }
   }
 

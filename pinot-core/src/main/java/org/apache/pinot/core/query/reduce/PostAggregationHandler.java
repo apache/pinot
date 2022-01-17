@@ -49,7 +49,7 @@ public class PostAggregationHandler {
 
   public PostAggregationHandler(QueryContext queryContext, DataSchema dataSchema) {
     _aggregationFunctionIndexMap = queryContext.getAggregationFunctionIndexMap();
-    _filteredAggregationsIndexMap = queryContext.getFilteredAgggregationsIndexMap();
+    _filteredAggregationsIndexMap = queryContext.getFilteredAggregationsIndexMap();
     assert _aggregationFunctionIndexMap != null;
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     if (groupByExpressions != null) {

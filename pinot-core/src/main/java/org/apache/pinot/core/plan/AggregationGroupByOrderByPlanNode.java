@@ -77,7 +77,7 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
                 groupByExpressions, predicateEvaluatorsMap.keySet())) {
               TransformOperator transformOperator =
                   new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, groupByExpressions,
-                      predicateEvaluatorsMap, null, _queryContext.getDebugOptions()).run();
+                      predicateEvaluatorsMap, _queryContext.getDebugOptions()).run();
               return new AggregationGroupByOrderByOperator(aggregationFunctions, groupByExpressions, transformOperator,
                   numTotalDocs, _queryContext, true);
             }

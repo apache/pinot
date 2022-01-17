@@ -155,7 +155,7 @@ public class AggregationPlanNode implements PlanNode {
         ExpressionContext currentFilterExpression = filterableAggregationFunction
             .getAssociatedExpressionContext();
 
-        if (expressionContextToAggFuncsMap.containsKey(currentFilterExpression)) {
+        if (expressionContextToAggFuncsMap.get(currentFilterExpression) != null) {
           expressionContextToAggFuncsMap.get(currentFilterExpression).getLeft().add(aggregationFunction);
           continue;
         }
@@ -275,7 +275,7 @@ public class AggregationPlanNode implements PlanNode {
 
               TransformOperator transformOperator = new StarTreeTransformPlanNode(starTreeV2,
                   aggregationFunctionColumnPairs, null,
-                      predicateEvaluatorsMap, null, _queryContext.getDebugOptions()).run();
+                      predicateEvaluatorsMap, _queryContext.getDebugOptions()).run();
               AggregationOperator aggregationOperator = new AggregationOperator(aggregationFunctions,
                   transformOperator, numTotalDocs, true);
 
