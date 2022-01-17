@@ -20,8 +20,11 @@
 package org.apache.pinot.segment.local.utils.nativefst.mutablefst;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Queue;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils.MutableFSTUtils;
 
@@ -55,10 +58,7 @@ public class MutableFSTImpl implements MutableFST {
    */
   @Override
   public void setStartState(MutableState start) {
-    if (_start != null) {
-      throw new IllegalStateException("Cannot override a start state");
-    }
-
+    Preconditions.checkState(_start != null, "Cannot override a start state");
     _start = start;
   }
 
@@ -102,7 +102,7 @@ public class MutableFSTImpl implements MutableFST {
     int foundPos = -1;
 
     if (isFound) {
-      Pair<MutableState, Integer> pair = findPointOfDiversion(state, word, 0);
+      Pair<MutableState, Integer> pair = findPointOfDiversion(state, word);
 
       if (pair == null) {
         // Word already exists
@@ -134,41 +134,40 @@ public class MutableFSTImpl implements MutableFST {
   }
 
   private Pair<MutableState, Integer> findPointOfDiversion(MutableState mutableState,
-      String word, int currentPos) {
-    if (currentPos == word.length() - 1) {
-      return null;
-    }
+      String word) {
+    Queue<Pair<MutableState, Integer>> queue = new ArrayDeque<>();
+    MutableState currentState = mutableState;
+    int pos = 0;
 
-    if (mutableState.getLabel() != word.charAt(currentPos)) {
-      throw new IllegalStateException("Current state needs to be part of word path");
-    }
+    queue.add(Pair.of(mutableState, 0));
 
-    List<MutableArc> arcs = mutableState.getArcs();
+    while (!queue.isEmpty()) {
+      Pair<MutableState, Integer> pair = queue.remove();
+      currentState = pair.getLeft();
+      pos = pair.getRight();
 
-    for (MutableArc arc : arcs) {
-      if (arc.getNextState().getLabel() == word.charAt(currentPos + 1)) {
-        return findPointOfDiversion(arc.getNextState(), word, currentPos + 1);
+      if (pos == word.length() - 1) {
+        return null;
+      }
+
+      if (currentState.getLabel() != word.charAt(pos)) {
+        throw new IllegalStateException("Current state needs to be part of word path");
+      }
+
+      List<MutableArc> arcs = currentState.getArcs();
+
+      for (MutableArc arc : arcs) {
+        if (arc.getNextState().getLabel() == word.charAt(pos + 1)) {
+          queue.add(Pair.of(arc.getNextState(), pos + 1));
+        }
       }
     }
 
-    return Pair.of(mutableState, currentPos);
+    return Pair.of(currentState, pos);
   }
 
   static <T> void compactNulls(ArrayList<T> list) {
-    int nextGood = 0;
-    for (int i = 0; i < list.size(); i++) {
-      T ss = list.get(i);
-      if (ss != null) {
-        if (i != nextGood) {
-          list.set(nextGood, ss);
-        }
-        nextGood += 1;
-      }
-    }
-    // trim the end
-    while (list.size() > nextGood) {
-      list.remove(list.size() - 1);
-    }
+    list.removeIf(Objects::isNull);
   }
 
   @Override

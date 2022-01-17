@@ -37,72 +37,40 @@ public class MutableFSTUtils {
     if (thisFstObj == thatFstObj) {
       return true;
     }
-    if (thisFstObj == null || thatFstObj == null) {
-      return false;
+
+    if (thisFstObj instanceof MutableFST && thatFstObj instanceof MutableFST) {
+      MutableFST thisFST = (MutableFST) thisFstObj;
+      MutableFST thatFST = (MutableFST) thatFstObj;
+      return thisFST.getStartState().getLabel() == thatFST.getStartState().getLabel()
+          && thisFST.getStartState().getArcs().size() == thatFST.getStartState().getArcs().size();
     }
-    if (!MutableFST.class.isAssignableFrom(thisFstObj.getClass())
-        || !MutableFST.class.isAssignableFrom(thatFstObj.getClass())) {
-      return false;
-    }
-
-    MutableFST thisMutableFST = (MutableFST) thisFstObj;
-    MutableFST thatMutableFST = (MutableFST) thatFstObj;
-
-
-    if (thisMutableFST.getStartState() != null ? (thisMutableFST.getStartState().getLabel()
-        != thatMutableFST.getStartState().getLabel()) : thatMutableFST.getStartState() != null) {
-      return false;
-    }
-
-    return true;
+    return false;
   }
 
   public static boolean arcEquals(Object thisArcObj, Object thatArcObj) {
     if (thisArcObj == thatArcObj) {
       return true;
     }
-    if (thisArcObj == null || thatArcObj == null) {
-      return false;
-    }
-    if (!MutableArc.class.isAssignableFrom(thisArcObj.getClass())
-        || !MutableArc.class.isAssignableFrom(thatArcObj.getClass())) {
-      return false;
-    }
-    MutableArc thisArc = (MutableArc) thisArcObj;
-    MutableArc thatArc = (MutableArc) thatArcObj;
 
-    if (thisArc.getNextState().getLabel() != thatArc.getNextState().getLabel()) {
-        return false;
+    if (thisArcObj instanceof MutableArc && thatArcObj instanceof MutableArc) {
+      MutableArc thisArc = (MutableArc) thisArcObj;
+      MutableArc thatArc = (MutableArc) thatArcObj;
+      return thisArc.getNextState().getLabel() == thatArc.getNextState().getLabel()
+          && thisArc.getNextState().getArcs().size() == thatArc.getNextState().getArcs().size();
     }
-
-    return true;
+    return false;
   }
 
-  public static boolean stateEquals(
-      Object thisStateObj, Object thatStateObj) {
+  public static boolean stateEquals(Object thisStateObj, Object thatStateObj) {
     if (thisStateObj == thatStateObj) {
       return true;
     }
-    if (thisStateObj == null || thatStateObj == null) {
-      return false;
+    if (thisStateObj instanceof MutableState && thatStateObj instanceof MutableState) {
+      MutableState thisState = (MutableState) thisStateObj;
+      MutableState thatState = (MutableState) thatStateObj;
+      return thisState.getLabel() == thatState.getLabel() && thisState.getArcs().size() == thatState.getArcs().size();
     }
-    if (!MutableState.class.isAssignableFrom(thisStateObj.getClass())
-        || !MutableState.class.isAssignableFrom(thatStateObj.getClass())) {
-      return false;
-    }
-
-    MutableState thisState = (MutableState) thisStateObj;
-    MutableState thatState = (MutableState) thatStateObj;
-
-    if (thisState.getLabel() != thatState.getLabel()) {
-      return false;
-    }
-
-    if (thisState.getArcs().size() != thatState.getArcs().size()) {
-      return false;
-    }
-
-    return true;
+    return false;
   }
 
   /**

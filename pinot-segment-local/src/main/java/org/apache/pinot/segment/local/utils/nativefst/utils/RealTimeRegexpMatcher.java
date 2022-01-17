@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.utils.nativefst.utils;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import org.apache.pinot.segment.local.utils.nativefst.automaton.Automaton;
@@ -82,7 +81,7 @@ public class RealTimeRegexpMatcher {
     queue.add(new Path(_automaton.getInitialState(), _fst.getStartState(), null, new ArrayList<>()));
 
     Set<State> acceptStates = _automaton.getAcceptStates();
-    while (queue.size() != 0) {
+    while (!queue.isEmpty()) {
       final Path path = queue.remove(queue.size() - 1);
 
       // If automaton is in accept state and the fstNode is final (i.e. end node) then add the entry to endNodes which
@@ -95,11 +94,8 @@ public class RealTimeRegexpMatcher {
       }
 
       Set<Transition> stateTransitions = path._state.getTransitionSet();
-      Iterator<Transition> iterator = stateTransitions.iterator();
 
-      while (iterator.hasNext()) {
-        Transition t = iterator.next();
-
+      for (Transition t : stateTransitions) {
         final int min = t._min;
         final int max = t._max;
 
