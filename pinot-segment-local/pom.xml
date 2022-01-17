@@ -115,11 +115,6 @@
       <groupId>org.quartz-scheduler</groupId>
       <artifactId>quartz</artifactId>
     </dependency>
-    <dependency>
-      <groupId>com.carrotsearch</groupId>
-      <artifactId>hppc</artifactId>
-      <version>0.9.1</version>
-    </dependency>
 
     <!-- Test dependencies -->
     <dependency>
