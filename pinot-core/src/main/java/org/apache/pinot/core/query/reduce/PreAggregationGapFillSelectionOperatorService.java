@@ -117,13 +117,8 @@ public class PreAggregationGapFillSelectionOperatorService {
 
     _queryContext = queryContext;
     _preAggregateGapFillQueryContext = queryContext.getPreAggregateGapFillQueryContext();
-    ExpressionContext gapFillSelection = null;
-    for (ExpressionContext expressionContext : _preAggregateGapFillQueryContext.getSelectExpressions()) {
-      if (GapfillUtils.isPreAggregateGapfill(expressionContext)) {
-        gapFillSelection = expressionContext;
-        break;
-      }
-    }
+    ExpressionContext gapFillSelection =
+        GapfillUtils.getPreAggregateGapfillExpressionContext(_preAggregateGapFillQueryContext);
 
     List<ExpressionContext> args = gapFillSelection.getFunction().getArguments();
     Preconditions.checkArgument(
@@ -146,17 +141,8 @@ public class PreAggregationGapFillSelectionOperatorService {
     _endMs = truncate(_dateTimeFormatter.fromFormatToMillis(end));
     _timeBucketSize = _dateTimeGranularity.granularityToMillis();
 
-    ExpressionContext timeseriesOn = null;
-    _fillExpressions = new HashMap<>();
-    for (int i = 5; i < args.size(); i++) {
-      if (GapfillUtils.isFill(args.get(i))) {
-        ExpressionContext fillExpression = args.get(i);
-        _fillExpressions.put(fillExpression.getFunction().getArguments().get(0).getIdentifier(), fillExpression);
-      } else if (GapfillUtils.isTimeSeriesOn(args.get(i))) {
-        Preconditions.checkArgument(timeseriesOn == null, "Duplicate TimeSeriesOn expressions are specified.");
-        timeseriesOn = args.get(i);
-      }
-    }
+    ExpressionContext timeseriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);
+    _fillExpressions = GapfillUtils.getFillExpressions(gapFillSelection);
 
     _previousByGroupKey = new HashMap<>();
     _groupByKeyIndexes = new ArrayList<>();
@@ -173,6 +159,7 @@ public class PreAggregationGapFillSelectionOperatorService {
     Preconditions.checkArgument(timeseriesOn != null, "The TimeSeriesOn expressions should be specified.");
     _numOfGroupByKeys = timeseriesOn.getFunction().getArguments().size() - 1;
     List<ExpressionContext> timeSeries = timeseriesOn.getFunction().getArguments();
+    // The first one argument of timeSeries is time column. The left ones are defining entity.
     for (int i = 1; i < timeSeries.size(); i++) {
       int index = indexes.get(timeSeries.get(i).getIdentifier());
       _isGroupBySelections[index] = true;
@@ -287,10 +274,10 @@ public class PreAggregationGapFillSelectionOperatorService {
       String formattedTime = _dateTimeFormatter.fromMillisToFormat(time);
       Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
       blockValSetMap.put(ExpressionContext.forIdentifier(_dataSchema.getColumnName(0)),
-          new BlockValSetImpl(_dataSchema.getColumnDataType(0), bucketedRows, 0));
+          new ColumnDataToBlockValSetConverter(_dataSchema.getColumnDataType(0), bucketedRows, 0));
       for (int i = 2; i < _dataSchema.getColumnNames().length - 1; i++) {
         blockValSetMap.put(ExpressionContext.forIdentifier(_dataSchema.getColumnName(i)),
-            new BlockValSetImpl(_dataSchema.getColumnDataType(i), bucketedRows, i));
+            new ColumnDataToBlockValSetConverter(_dataSchema.getColumnDataType(i), bucketedRows, i));
       }
 
       for (int i = 0; i < _queryContext.getSelectExpressions().size(); i++) {

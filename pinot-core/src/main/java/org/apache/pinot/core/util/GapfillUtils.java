@@ -19,6 +19,9 @@
 package org.apache.pinot.core.util;
 
 import java.io.Serializable;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -34,6 +37,7 @@ public class GapfillUtils {
   private static final String PRE_AGGREGATE_GAP_FILL = "preaggregategapfill";
   private static final String FILL = "fill";
   private static final String TIME_SERIES_ON = "timeSeriesOn";
+  private static final int STARTING_INDEX_OF_OPTIONAL_ARGS_FOR_PRE_AGGREGATE_GAP_FILL = 5;
 
   private GapfillUtils() {
   }
@@ -150,5 +154,36 @@ public class GapfillUtils {
       }
     }
     return false;
+  }
+
+  public static ExpressionContext getPreAggregateGapfillExpressionContext(QueryContext queryContext) {
+    for (ExpressionContext expressionContext : queryContext.getSelectExpressions()) {
+      if (GapfillUtils.isPreAggregateGapfill(expressionContext)) {
+        return expressionContext;
+      }
+    }
+    return null;
+  }
+
+  public static ExpressionContext getTimeSeriesOnExpressionContext(ExpressionContext gapFillSelection) {
+    List<ExpressionContext> args = gapFillSelection.getFunction().getArguments();
+    for (int i = STARTING_INDEX_OF_OPTIONAL_ARGS_FOR_PRE_AGGREGATE_GAP_FILL; i < args.size(); i++) {
+      if (GapfillUtils.isTimeSeriesOn(args.get(i))) {
+        return args.get(i);
+      }
+    }
+    return null;
+  }
+
+  public static Map<String, ExpressionContext> getFillExpressions(ExpressionContext gapFillSelection) {
+    Map<String, ExpressionContext> fillExpressions = new HashMap<>();
+    List<ExpressionContext> args = gapFillSelection.getFunction().getArguments();
+    for (int i = STARTING_INDEX_OF_OPTIONAL_ARGS_FOR_PRE_AGGREGATE_GAP_FILL; i < args.size(); i++) {
+      if (GapfillUtils.isFill(args.get(i))) {
+        ExpressionContext fillExpression = args.get(i);
+        fillExpressions.put(fillExpression.getFunction().getArguments().get(0).getIdentifier(), fillExpression);
+      }
+    }
+    return fillExpressions;
   }
 }
