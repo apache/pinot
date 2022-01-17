@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.segment.local.utils.nativefst.utils;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Queue;
 import java.util.Set;
 import org.apache.pinot.segment.local.utils.nativefst.automaton.Automaton;
 import org.apache.pinot.segment.local.utils.nativefst.automaton.CharacterRunAutomaton;
@@ -71,7 +73,7 @@ public class RealTimeRegexpMatcher {
    *       nodes.
    */
   public void regexMatchOnFST() {
-    final List<Path> queue = new ArrayList<>();
+    final Queue<Path> queue = new ArrayDeque();
 
     if (_automaton.getNumberOfStates() == 0) {
       return;
@@ -82,7 +84,7 @@ public class RealTimeRegexpMatcher {
 
     Set<State> acceptStates = _automaton.getAcceptStates();
     while (!queue.isEmpty()) {
-      final Path path = queue.remove(queue.size() - 1);
+      final Path path = queue.remove();
 
       // If automaton is in accept state and the fstNode is final (i.e. end node) then add the entry to endNodes which
       // contains the result set.

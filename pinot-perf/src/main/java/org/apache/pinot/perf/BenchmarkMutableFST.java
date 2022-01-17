@@ -21,6 +21,7 @@ package org.apache.pinot.perf;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.List;
 import java.util.Objects;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -76,16 +77,17 @@ public class BenchmarkMutableFST {
   }
 
   @Benchmark
-  public void testMutableRegex(Blackhole blackhole) {
+  public MutableRoaringBitmap testMutableRegex(Blackhole blackhole) {
     RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
     RealTimeRegexpMatcher.regexMatch(_regex, _mutableFST, writer::add);
-    blackhole.consume(writer.get());
+
+    return writer.get();
   }
 
   @Benchmark
-  public void testLuceneRegex(Blackhole blackhole)
+  public List testLuceneRegex(Blackhole blackhole)
       throws IOException {
-    blackhole.consume(org.apache.pinot.segment.local.utils.fst.RegexpMatcher.regexMatch(_regex, _fst));
+    return org.apache.pinot.segment.local.utils.fst.RegexpMatcher.regexMatch(_regex, _fst);
   }
 
   public static void main(String[] args)
