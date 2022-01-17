@@ -94,12 +94,12 @@ public class MutableFSTConcurrentTest {
 
     assertEquals(_resultSet.size(), words.size());
 
-    assertTrue ("ab not found in result set", _resultSet.contains("ab"));
-    assertTrue ("abba not found in result set", _resultSet.contains("abba"));
-    assertTrue ("aba not found in result set", _resultSet.contains("aba"));
-    assertTrue ("bab not found in result set", _resultSet.contains("bab"));
-    assertTrue ("cdd not found in result set", _resultSet.contains("cdd"));
-    assertTrue ("efg not found in result set", _resultSet.contains("efg"));
+    assertTrue("ab not found in result set", _resultSet.contains("ab"));
+    assertTrue("abba not found in result set", _resultSet.contains("abba"));
+    assertTrue("aba not found in result set", _resultSet.contains("aba"));
+    assertTrue("bab not found in result set", _resultSet.contains("bab"));
+    assertTrue("cdd not found in result set", _resultSet.contains("cdd"));
+    assertTrue("efg not found in result set", _resultSet.contains("efg"));
   }
 
   private void performReads(MutableFST fst, List<String> words, int count,
