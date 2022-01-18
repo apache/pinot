@@ -37,6 +37,8 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.FilterableAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.testng.annotations.Test;
@@ -646,5 +648,26 @@ public class BrokerRequestToQueryContextConverterTest {
       }
       assertNull(sqlReader.readLine());
     }
+  }
+
+  @Test
+  public void testFilteredAggregations() {
+    String query = "SELECT COUNT(*) FILTER(WHERE foo > 5), COUNT(*) FILTER(WHERE foo < 6) FROM testTable"
+        + " WHERE bar > 0";
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
+    AggregationFunction[] aggregationFunctions =
+        queryContext.getAggregationFunctions();
+    assertNotNull(aggregationFunctions);
+    assertEquals(aggregationFunctions.length, 2);
+    assertTrue(aggregationFunctions[0] instanceof FilterableAggregationFunction);
+    assertTrue(((FilterableAggregationFunction) aggregationFunctions[0])
+        .getFilterContext().toString().matches("foo > '5'"));
+    assertTrue(((FilterableAggregationFunction) aggregationFunctions[0])
+        .getInnerAggregationFunction() instanceof CountAggregationFunction);
+    assertTrue(aggregationFunctions[1] instanceof FilterableAggregationFunction);
+    assertTrue(((FilterableAggregationFunction) aggregationFunctions[1])
+        .getInnerAggregationFunction() instanceof CountAggregationFunction);
+    assertTrue(((FilterableAggregationFunction) aggregationFunctions[1])
+        .getFilterContext().toString().matches("foo < '6'"));
   }
 }

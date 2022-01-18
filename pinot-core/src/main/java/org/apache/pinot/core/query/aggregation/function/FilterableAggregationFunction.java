@@ -136,4 +136,8 @@ public class FilterableAggregationFunction implements
   public FilterContext getFilterContext() {
     return _filterContext;
   }
+
+  public AggregationFunction getInnerAggregationFunction() {
+    return _innerAggregationFunction;
+  }
 }

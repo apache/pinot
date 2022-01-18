@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.queries.BaseQueriesTest;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -165,13 +166,13 @@ public class BenchmarkFilteredAggregations extends BaseQueriesTest {
   }
 
   @Benchmark
-  public void testFilteredAggregations(Blackhole blackhole) {
-    blackhole.consume(getBrokerResponseForSqlQuery(_filteredQuery));
+  public BrokerResponseNative testFilteredAggregations() {
+    return getBrokerResponseForSqlQuery(_filteredQuery);
   }
 
   @Benchmark
-  public void testNonFilteredAggregations(Blackhole blackhole) {
-    blackhole.consume(getBrokerResponseForSqlQuery(_nonFilteredQuery));
+  public BrokerResponseNative testNonFilteredAggregations(Blackhole blackhole) {
+    return getBrokerResponseForSqlQuery(_nonFilteredQuery);
   }
 
   public static void main(String[] args)
