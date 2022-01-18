@@ -166,7 +166,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       if (isPartialUpsertEnabled()) {
         partialUpsertHandler = new PartialUpsertHandler(_helixManager, _tableNameWithType, schema,
             upsertConfig.getPartialUpsertStrategies(), upsertConfig.getDefaultPartialUpsertStrategy(),
-            upsertConfig.getComparisonColumn());
+            tableConfig.getValidationConfig().getTimeColumnName(), upsertConfig.getComparisonColumn());
       }
       UpsertConfig.HashFunction hashFunction = upsertConfig.getHashFunction();
       _tableUpsertMetadataManager =

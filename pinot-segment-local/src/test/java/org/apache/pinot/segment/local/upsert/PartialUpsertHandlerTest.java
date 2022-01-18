@@ -42,7 +42,7 @@ public class PartialUpsertHandlerTest {
 
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
         .addSingleValueDimension("field1", FieldSpec.DataType.LONG)
-        .addDateTime("secondsSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
+        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
         .setPrimaryKeyColumns(Arrays.asList("pk")).build();
 
     String realtimeTableName = "testTable_REALTIME";
@@ -50,7 +50,7 @@ public class PartialUpsertHandlerTest {
     partialUpsertStrategies.put("field1", UpsertConfig.Strategy.INCREMENT);
     PartialUpsertHandler handler =
         new PartialUpsertHandler(helixManager, realtimeTableName, schema, partialUpsertStrategies,
-            UpsertConfig.Strategy.OVERWRITE, null);
+            UpsertConfig.Strategy.OVERWRITE, "hoursSinceEpoch", null);
 
     // both records are null.
     GenericRow previousRecord = new GenericRow();
@@ -101,7 +101,7 @@ public class PartialUpsertHandlerTest {
 
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
         .addSingleValueDimension("field1", FieldSpec.DataType.LONG).addMetric("field2", FieldSpec.DataType.LONG)
-        .addDateTime("secondsSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
+        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
         .setPrimaryKeyColumns(Arrays.asList("pk")).build();
 
     String realtimeTableName = "testTable_REALTIME";
@@ -109,7 +109,7 @@ public class PartialUpsertHandlerTest {
     partialUpsertStrategies.put("field1", UpsertConfig.Strategy.INCREMENT);
     PartialUpsertHandler handler =
         new PartialUpsertHandler(helixManager, realtimeTableName, schema, partialUpsertStrategies,
-            UpsertConfig.Strategy.OVERWRITE, null);
+            UpsertConfig.Strategy.OVERWRITE, "hoursSinceEpoch", null);
 
     // previousRecord is null default value, while newRecord is not.
     GenericRow previousRecord = new GenericRow();
