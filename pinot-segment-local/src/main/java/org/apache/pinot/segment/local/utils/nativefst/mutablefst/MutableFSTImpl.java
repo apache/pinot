@@ -67,8 +67,7 @@ public class MutableFSTImpl implements MutableFST {
   }
 
   public MutableArc addArc(MutableState startState, int outputSymbol, MutableState endState) {
-    MutableArc newArc = new MutableArc(outputSymbol,
-                                        endState);
+    MutableArc newArc = new MutableArc(outputSymbol, endState);
     startState.addArc(newArc);
     endState.addIncomingState(startState);
     return newArc;
@@ -86,11 +85,8 @@ public class MutableFSTImpl implements MutableFST {
     if (state == null) {
       throw new IllegalStateException("Start state cannot be null");
     }
-
     List<MutableArc> arcs = state.getArcs();
-
     boolean isFound = false;
-
     for (MutableArc arc : arcs) {
       if (arc.getNextState().getLabel() == word.charAt(0)) {
         state = arc.getNextState();
@@ -98,38 +94,29 @@ public class MutableFSTImpl implements MutableFST {
         break;
       }
     }
-
     int foundPos = -1;
-
     if (isFound) {
       Pair<MutableState, Integer> pair = findPointOfDiversion(state, word);
-
       if (pair == null) {
         // Word already exists
         return;
       }
-
       foundPos = pair.getRight();
       state = pair.getLeft();
     }
-
     for (int i = foundPos + 1; i < word.length(); i++) {
       MutableState nextState = new MutableState();
-
       nextState.setLabel(word.charAt(i));
 
       int currentOutputSymbol = -1;
-
       if (i == word.length() - 1) {
         currentOutputSymbol = outputSymbol;
       }
 
       MutableArc mutableArc = new MutableArc(currentOutputSymbol, nextState);
       state.addArc(mutableArc);
-
       state = nextState;
     }
-
     state.setIsTerminal(true);
   }
 
@@ -138,24 +125,18 @@ public class MutableFSTImpl implements MutableFST {
     Queue<Pair<MutableState, Integer>> queue = new ArrayDeque<>();
     MutableState currentState = mutableState;
     int pos = 0;
-
     queue.add(Pair.of(mutableState, 0));
-
     while (!queue.isEmpty()) {
       Pair<MutableState, Integer> pair = queue.remove();
       currentState = pair.getLeft();
       pos = pair.getRight();
-
       if (pos == word.length() - 1) {
         return null;
       }
-
       if (currentState.getLabel() != word.charAt(pos)) {
         throw new IllegalStateException("Current state needs to be part of word path");
       }
-
       List<MutableArc> arcs = currentState.getArcs();
-
       for (MutableArc arc : arcs) {
         if (arc.getNextState().getLabel() == word.charAt(pos + 1)) {
           queue.add(Pair.of(arc.getNextState(), pos + 1));
@@ -175,7 +156,6 @@ public class MutableFSTImpl implements MutableFST {
     StringBuilder sb = new StringBuilder();
     sb.append("Fst(start=").append(_start).append(")");
     List<MutableArc> arcs = _start.getArcs();
-
     for (MutableArc arc : arcs) {
       sb.append("  ").append(arc.toString()).append("\n");
     }

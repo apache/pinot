@@ -115,7 +115,6 @@ public class MutableState {
     if (inState == this) {
       return;
     }
-
     _incomingStates.add(inState);
   }
 

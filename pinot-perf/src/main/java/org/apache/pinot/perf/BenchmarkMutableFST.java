@@ -40,13 +40,10 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
-import org.openjdk.jmh.infra.Blackhole;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
-
-import static org.apache.pinot.segment.local.utils.fst.FSTBuilder.buildFST;
 
 
 @BenchmarkMode(Mode.AverageTime)
@@ -78,7 +75,7 @@ public class BenchmarkMutableFST {
       }
     }
 
-    _fst = buildFST(input);
+    _fst = org.apache.pinot.segment.local.utils.fst.FSTBuilder.buildFST(input);
   }
 
   @Benchmark

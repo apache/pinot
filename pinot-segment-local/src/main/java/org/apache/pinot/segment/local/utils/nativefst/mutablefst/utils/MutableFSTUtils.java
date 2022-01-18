@@ -37,7 +37,6 @@ public class MutableFSTUtils {
     if (thisFstObj == thatFstObj) {
       return true;
     }
-
     if (thisFstObj instanceof MutableFST && thatFstObj instanceof MutableFST) {
       MutableFST thisFST = (MutableFST) thisFstObj;
       MutableFST thatFST = (MutableFST) thatFstObj;
@@ -51,7 +50,6 @@ public class MutableFSTUtils {
     if (thisArcObj == thatArcObj) {
       return true;
     }
-
     if (thisArcObj instanceof MutableArc && thatArcObj instanceof MutableArc) {
       MutableArc thisArc = (MutableArc) thisArcObj;
       MutableArc thatArc = (MutableArc) thatArcObj;
@@ -79,7 +77,6 @@ public class MutableFSTUtils {
   public static long regexQueryNrHitsForRealTimeFST(String regex, MutableFST fst) {
     RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
     RealTimeRegexpMatcher.regexMatch(regex, fst, writer::add);
-
     return writer.get().getCardinality();
   }
 }

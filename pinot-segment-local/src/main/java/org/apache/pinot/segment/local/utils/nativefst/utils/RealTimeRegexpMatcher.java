@@ -43,7 +43,6 @@ public class RealTimeRegexpMatcher {
     _regexQuery = regexQuery;
     _fst = fst;
     _dest = dest;
-
     _automaton = new RegExp(_regexQuery).toAutomaton();
   }
 
@@ -123,13 +122,11 @@ public class RealTimeRegexpMatcher {
 
   private MutableArc getArcForLabel(MutableState mutableState, char label) {
     List<MutableArc> arcs = mutableState.getArcs();
-
     for (MutableArc arc : arcs) {
       if (arc.getNextState().getLabel() == label) {
         return arc;
       }
     }
-
     return null;
   }
 

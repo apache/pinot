@@ -59,7 +59,6 @@ public class MutableArc {
   @Override
   public int hashCode() {
     int result = 1;
-
     result = 31 * result + (_nextState != null ? _nextState.getLabel() : 0);
     return result;
   }
