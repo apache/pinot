@@ -34,14 +34,15 @@ import java.util.Properties;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.net.ssl.SSLContext;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.PinotControllerTransportFactory;
 import org.apache.pinot.client.utils.DriverUtils;
 import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.slf4j.LoggerFactory;
-
 
 public class PinotDriver implements Driver {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(PinotDriver.class);
@@ -50,6 +51,12 @@ public class PinotDriver implements Driver {
   public static final String DEFAULT_TENANT = "DefaultTenant";
   public static final String INFO_SCHEME = "scheme";
   public static final String INFO_HEADERS = "headers";
+
+  // Used for authorization
+  public static final String USER_PROPERTY = "user";
+  public static final String PASSWORD_PROPERTY = "password";
+  public static final String AUTH_HEADER = "Authorization";
+
   private SSLContext _sslContext = null;
 
   public PinotDriver() { }
@@ -83,9 +90,18 @@ public class PinotDriver implements Driver {
 
       Map<String, String> headers =
           info.entrySet().stream().filter(entry -> entry.getKey().toString().startsWith(INFO_HEADERS + ".")).map(
-                  entry -> Pair
-                      .of(entry.getKey().toString().substring(INFO_HEADERS.length() + 1), entry.getValue().toString()))
-              .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+              entry -> Pair.of(entry.getKey().toString().substring(INFO_HEADERS.length() + 1),
+                  entry.getValue().toString())).collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+
+      if (info.contains(USER_PROPERTY) && !headers.containsKey(AUTH_HEADER)) {
+        String username = info.getProperty(USER_PROPERTY);
+        String password = info.getProperty(PASSWORD_PROPERTY, "");
+        if (StringUtils.isEmpty(password)) {
+          throw new SQLException("Empty username or password provided.");
+        }
+        String authToken = BasicAuthUtils.toBasicAuthToken(username, password);
+        headers.put(AUTH_HEADER, authToken);
+      }
 
       if (!headers.isEmpty()) {
         factory.setHeaders(headers);
