@@ -828,6 +828,10 @@ public class MutableSegmentImpl implements MutableSegment {
   public void destroy() {
     _logger.info("Trying to close RealtimeSegmentImpl : {}", _segmentName);
 
+    if (isUpsertEnabled() && _partitionUpsertMetadataManager != null) {
+      _partitionUpsertMetadataManager.removeSegment(this);
+    }
+
     // Gather statistics for off-heap mode
     if (_offHeap) {
       if (_numDocsIndexed > 0) {
