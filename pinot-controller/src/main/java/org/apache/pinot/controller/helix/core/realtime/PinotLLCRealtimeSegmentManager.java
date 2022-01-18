@@ -1257,7 +1257,7 @@ public class PinotLLCRealtimeSegmentManager {
    * Sets up a new partition group.
    * <p>Persists the ZK metadata for the first CONSUMING segment, and returns the segment name.
    */
-  private String setupNewPartitionGroup(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
+  private synchronized String setupNewPartitionGroup(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
       PartitionGroupMetadata partitionGroupMetadata, long creationTimeMs, InstancePartitions instancePartitions,
       int numPartitionGroups, int numReplicas, List<PartitionGroupMetadata> partitionGroupMetadataList,
       boolean isLiveTable) {
