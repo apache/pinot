@@ -22,7 +22,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.core.auth.BasicAuthUtils;
+import org.apache.pinot.common.utils.AuthUtils;
 import org.apache.pinot.spi.plugin.PluginManager;
 
 
@@ -34,7 +34,7 @@ public class AuthQuickstart extends Quickstart {
 
   @Override
   public String getAuthToken() {
-    return BasicAuthUtils.toBasicAuthToken("admin", "verysecret");
+    return AuthUtils.toBase64AuthToken("admin", "verysecret");
   }
 
   @Override

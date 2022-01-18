@@ -28,6 +28,7 @@ import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.utils.AuthUtils;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -85,7 +86,7 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
 
       Collection<String> tokens = identity.getHttpHeaders().get(HEADER_AUTHORIZATION);
       Optional<BasicAuthPrincipal> principalOpt =
-          tokens.stream().map(BasicAuthUtils::normalizeBase64Token).map(_token2principal::get).filter(Objects::nonNull)
+          tokens.stream().map(AuthUtils::normalizeBase64Token).map(_token2principal::get).filter(Objects::nonNull)
               .findFirst();
 
       if (!principalOpt.isPresent()) {

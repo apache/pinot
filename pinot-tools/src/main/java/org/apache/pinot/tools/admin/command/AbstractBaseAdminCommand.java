@@ -36,7 +36,7 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
 import org.apache.pinot.common.utils.http.HttpClient;
-import org.apache.pinot.core.auth.BasicAuthUtils;
+import org.apache.pinot.common.utils.AuthUtils;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
 
@@ -150,7 +150,7 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
     }
 
     if (StringUtils.isNotBlank(user)) {
-      return BasicAuthUtils.toBasicAuthToken(user, password);
+      return AuthUtils.toBase64AuthToken(user, password);
     }
 
     return null;

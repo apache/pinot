@@ -25,6 +25,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.pinot.common.utils.AuthUtils;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -100,7 +101,7 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
         return Optional.empty();
       }
 
-      return authHeaders.stream().map(BasicAuthUtils::normalizeBase64Token).map(_token2principal::get)
+      return authHeaders.stream().map(AuthUtils::normalizeBase64Token).map(_token2principal::get)
           .filter(Objects::nonNull).findFirst();
     }
 

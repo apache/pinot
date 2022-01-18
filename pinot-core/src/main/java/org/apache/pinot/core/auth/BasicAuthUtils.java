@@ -20,13 +20,12 @@ package org.apache.pinot.core.auth;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.utils.AuthUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -74,7 +73,7 @@ public final class BasicAuthUtils {
       Set<String> tables = extractSet(configuration, String.format("%s.%s.%s", prefix, name, TABLES));
       Set<String> permissions = extractSet(configuration, String.format("%s.%s.%s", prefix, name, PERMISSIONS));
 
-      return new BasicAuthPrincipal(name, toBasicAuthToken(name, password), tables, permissions);
+      return new BasicAuthPrincipal(name, AuthUtils.toBase64AuthToken(name, password), tables, permissions);
     }).collect(Collectors.toList());
   }
 
@@ -84,35 +83,5 @@ public final class BasicAuthUtils {
       return Arrays.stream(input.split(",")).map(String::trim).collect(Collectors.toSet());
     }
     return Collections.emptySet();
-  }
-
-  /**
-   * Convert a pair of name and password into a http header-compliant base64 encoded token
-   *
-   * @param name user name
-   * @param password password
-   * @return base64 encoded basic auth token
-   */
-  @Nullable
-  public static String toBasicAuthToken(String name, String password) {
-    if (StringUtils.isBlank(name)) {
-      return null;
-    }
-    String identifier = String.format("%s:%s", name, password);
-    return normalizeBase64Token(String.format("Basic %s", Base64.getEncoder().encodeToString(identifier.getBytes())));
-  }
-
-  /**
-   * Normalize a base64 encoded auth token by stripping redundant padding (spaces, '=')
-   *
-   * @param token base64 encoded auth token
-   * @return normalized auth token
-   */
-  @Nullable
-  public static String normalizeBase64Token(String token) {
-    if (token == null) {
-      return null;
-    }
-    return StringUtils.remove(token.trim(), '=');
   }
 }
