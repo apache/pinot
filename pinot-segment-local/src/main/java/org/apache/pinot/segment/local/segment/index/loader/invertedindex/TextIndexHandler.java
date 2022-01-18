@@ -93,8 +93,24 @@ public class TextIndexHandler implements IndexHandler {
 
   @Override
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
+    String segmentName = _segmentMetadata.getName();
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.TEXT_INDEX);
-    return !existingColumns.equals(_columnsToAddIdx);
+    // Check if any existing index need to be removed.
+    for (String column : existingColumns) {
+      if (!_columnsToAddIdx.remove(column)) {
+        LOGGER.debug("Need to remove existing text index from segment: {}, column: {}", segmentName, column);
+        return true;
+      }
+    }
+    // Check if any new index need to be added.
+    for (String column : _columnsToAddIdx) {
+      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+      if (columnMetadata != null) {
+        LOGGER.debug("Need to create new text index for segment: {}, column: {}", segmentName, column);
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override

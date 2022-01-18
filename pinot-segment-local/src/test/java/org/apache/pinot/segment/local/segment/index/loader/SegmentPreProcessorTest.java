@@ -31,6 +31,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
@@ -1115,6 +1116,18 @@ public class SegmentPreProcessorTest {
       assertFalse(processor.needProcess());
     }
 
+    // No preprocessing needed if required to add certain index on non-existing, sorted or non-dictionary column.
+    for (Consumer<IndexLoadingConfig> prepFunc : createConfigPrepFunctionNeedNoops()) {
+      IndexLoadingConfig config = new IndexLoadingConfig();
+      prepFunc.accept(config);
+      try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
+          .load(_indexDir.toURI(), new SegmentDirectoryLoaderContext(null, null, null, _configuration));
+          SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, config,
+              _newColumnsSchemaWithH3Json)) {
+        assertFalse(processor.needProcess());
+      }
+    }
+
     // Require to add different types of indices. Add one new index a time
     // to test the index handlers separately.
     IndexLoadingConfig config = new IndexLoadingConfig();
@@ -1196,6 +1209,38 @@ public class SegmentPreProcessorTest {
         () -> config
             .setH3IndexConfigs(ImmutableMap.of("newH3Col", new H3IndexConfig(ImmutableMap.of("resolutions", "5")))),
         () -> config.setJsonIndexColumns(new HashSet<>(Collections.singletonList("newJsonCol")))
+    );
+  }
+
+  private static List<Consumer<IndexLoadingConfig>> createConfigPrepFunctionNeedNoops() {
+    return Arrays.asList(
+        // daysSinceEpoch is a sorted column, thus inverted index and range index skip it.
+        (IndexLoadingConfig config) -> config
+            .setInvertedIndexColumns(new HashSet<>(Collections.singletonList("daysSinceEpoch"))),
+        (IndexLoadingConfig config) -> config
+            .setRangeIndexColumns(new HashSet<>(Collections.singletonList("daysSinceEpoch"))),
+        // column4 is unsorted non-dictionary encoded column, so inverted index and bloom filter skip it.
+        // In fact, the validation logic when updating index configs already blocks this to happen.
+        (IndexLoadingConfig config) -> config
+            .setInvertedIndexColumns(new HashSet<>(Collections.singletonList("column4"))),
+        (IndexLoadingConfig config) -> config
+            .setBloomFilterConfigs(ImmutableMap.of("column4", new BloomFilterConfig(0.1, 1024, true))),
+        // No index is added on non-existing columns.
+        // The validation logic when updating index configs already blocks this to happen.
+        (IndexLoadingConfig config) -> config
+            .setInvertedIndexColumns(new HashSet<>(Collections.singletonList("newColumnX"))),
+        (IndexLoadingConfig config) -> config
+            .setRangeIndexColumns(new HashSet<>(Collections.singletonList("newColumnX"))),
+        (IndexLoadingConfig config) -> config
+            .setTextIndexColumns(new HashSet<>(Collections.singletonList("newColumnX"))),
+        (IndexLoadingConfig config) -> config
+            .setFSTIndexColumns(new HashSet<>(Collections.singletonList("newColumnX"))),
+        (IndexLoadingConfig config) -> config
+            .setBloomFilterConfigs(ImmutableMap.of("newColumnX", new BloomFilterConfig(0.1, 1024, true))),
+        (IndexLoadingConfig config) -> config
+            .setH3IndexConfigs(ImmutableMap.of("newColumnX", new H3IndexConfig(ImmutableMap.of("resolutions", "5")))),
+        (IndexLoadingConfig config) -> config
+            .setJsonIndexColumns(new HashSet<>(Collections.singletonList("newColumnX")))
     );
   }
 }

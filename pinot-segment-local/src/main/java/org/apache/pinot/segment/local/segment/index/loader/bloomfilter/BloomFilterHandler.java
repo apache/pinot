@@ -65,9 +65,25 @@ public class BloomFilterHandler implements IndexHandler {
 
   @Override
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
+    String segmentName = _segmentMetadata.getName();
     Set<String> columnsToAddBF = new HashSet<>(_bloomFilterConfigs.keySet());
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.BLOOM_FILTER);
-    return !existingColumns.equals(columnsToAddBF);
+    // Check if any existing bloomfilter need to be removed.
+    for (String column : existingColumns) {
+      if (!columnsToAddBF.remove(column)) {
+        LOGGER.debug("Need to remove existing bloom filter from segment: {}, column: {}", segmentName, column);
+        return true;
+      }
+    }
+    // Check if any new bloomfilter need to be added.
+    for (String column : columnsToAddBF) {
+      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+      if (columnMetadata != null && columnMetadata.hasDictionary()) {
+        LOGGER.debug("Need to create new bloom filter for segment: {}, column: {}", segmentName, column);
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override

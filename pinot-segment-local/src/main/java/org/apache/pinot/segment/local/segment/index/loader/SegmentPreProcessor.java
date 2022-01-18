@@ -143,6 +143,7 @@ public class SegmentPreProcessor implements AutoCloseable {
         DefaultColumnHandler defaultColumnHandler = DefaultColumnHandlerFactory
             .getDefaultColumnHandler(null, _segmentMetadata, _indexLoadingConfig, _schema, null);
         if (defaultColumnHandler.needUpdateDefaultColumns()) {
+          LOGGER.debug("Found default columns need updates");
           return true;
         }
       }
@@ -150,15 +151,18 @@ public class SegmentPreProcessor implements AutoCloseable {
       for (ColumnIndexType type : ColumnIndexType.values()) {
         if (IndexHandlerFactory.getIndexHandler(type, _segmentMetadata, _indexLoadingConfig)
             .needUpdateIndices(segmentReader)) {
+          LOGGER.debug("Found index type: {} needs updates", type);
           return true;
         }
       }
       // Check if there is need to create/modify/remove star-trees.
       if (needProcessStarTrees()) {
+        LOGGER.debug("Found startree index needs updates");
         return true;
       }
       // Check if there is need to update column min max value.
       if (needUpdateColumnMinMaxValue()) {
+        LOGGER.debug("Found min max values need updates");
         return true;
       }
     }

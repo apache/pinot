@@ -62,9 +62,25 @@ public class H3IndexHandler implements IndexHandler {
 
   @Override
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
+    String segmentName = _segmentMetadata.getName();
     Set<String> columnsToAddIdx = new HashSet<>(_h3Configs.keySet());
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.H3_INDEX);
-    return !existingColumns.equals(columnsToAddIdx);
+    // Check if any existing index need to be removed.
+    for (String column : existingColumns) {
+      if (!columnsToAddIdx.remove(column)) {
+        LOGGER.debug("Need to remove existing H3 index from segment: {}, column: {}", segmentName, column);
+        return true;
+      }
+    }
+    // Check if any new index need to be added.
+    for (String column : columnsToAddIdx) {
+      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+      if (columnMetadata != null) {
+        LOGGER.debug("Need to create new H3 index for segment: {}, column: {}", segmentName, column);
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override
