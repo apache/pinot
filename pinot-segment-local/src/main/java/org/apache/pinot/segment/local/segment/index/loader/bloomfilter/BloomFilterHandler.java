@@ -71,15 +71,15 @@ public class BloomFilterHandler implements IndexHandler {
     // Check if any existing bloomfilter need to be removed.
     for (String column : existingColumns) {
       if (!columnsToAddBF.remove(column)) {
-        LOGGER.debug("Need to remove existing bloom filter from segment: {}, column: {}", segmentName, column);
+        LOGGER.info("Need to remove existing bloom filter from segment: {}, column: {}", segmentName, column);
         return true;
       }
     }
     // Check if any new bloomfilter need to be added.
     for (String column : columnsToAddBF) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
-      if (columnMetadata != null && columnMetadata.hasDictionary()) {
-        LOGGER.debug("Need to create new bloom filter for segment: {}, column: {}", segmentName, column);
+      if (shouldCreateBloomFilter(columnMetadata)) {
+        LOGGER.info("Need to create new bloom filter for segment: {}, column: {}", segmentName, column);
         return true;
       }
     }
@@ -102,13 +102,15 @@ public class BloomFilterHandler implements IndexHandler {
     }
     for (String column : columnsToAddBF) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
-      if (columnMetadata != null) {
-        if (columnMetadata.hasDictionary()) {
-          createBloomFilterForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
-        }
-        // TODO: Support raw index
+      if (shouldCreateBloomFilter(columnMetadata)) {
+        createBloomFilterForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
       }
     }
+  }
+
+  private boolean shouldCreateBloomFilter(ColumnMetadata columnMetadata) {
+    // TODO: Support raw index
+    return columnMetadata != null && columnMetadata.hasDictionary();
   }
 
   private void createBloomFilterForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,

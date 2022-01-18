@@ -98,15 +98,15 @@ public class TextIndexHandler implements IndexHandler {
     // Check if any existing index need to be removed.
     for (String column : existingColumns) {
       if (!_columnsToAddIdx.remove(column)) {
-        LOGGER.debug("Need to remove existing text index from segment: {}, column: {}", segmentName, column);
+        LOGGER.info("Need to remove existing text index from segment: {}, column: {}", segmentName, column);
         return true;
       }
     }
     // Check if any new index need to be added.
     for (String column : _columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
-      if (columnMetadata != null) {
-        LOGGER.debug("Need to create new text index for segment: {}, column: {}", segmentName, column);
+      if (shouldCreateTextIndex(columnMetadata)) {
+        LOGGER.info("Need to create new text index for segment: {}, column: {}", segmentName, column);
         return true;
       }
     }
@@ -128,11 +128,19 @@ public class TextIndexHandler implements IndexHandler {
     }
     for (String column : _columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
-      if (columnMetadata != null) {
-        checkUnsupportedOperationsForTextIndex(columnMetadata);
+      if (shouldCreateTextIndex(columnMetadata)) {
         createTextIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
       }
     }
+  }
+
+  private boolean shouldCreateTextIndex(ColumnMetadata columnMetadata) {
+    if (columnMetadata != null) {
+      // Fail fast upon unsupported operations.
+      checkUnsupportedOperationsForTextIndex(columnMetadata);
+      return true;
+    }
+    return false;
   }
 
   /**

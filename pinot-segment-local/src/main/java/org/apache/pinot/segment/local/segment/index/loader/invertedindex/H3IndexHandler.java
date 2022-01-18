@@ -68,15 +68,15 @@ public class H3IndexHandler implements IndexHandler {
     // Check if any existing index need to be removed.
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
-        LOGGER.debug("Need to remove existing H3 index from segment: {}, column: {}", segmentName, column);
+        LOGGER.info("Need to remove existing H3 index from segment: {}, column: {}", segmentName, column);
         return true;
       }
     }
     // Check if any new index need to be added.
     for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
-      if (columnMetadata != null) {
-        LOGGER.debug("Need to create new H3 index for segment: {}, column: {}", segmentName, column);
+      if (shouldCreateH3Index(columnMetadata)) {
+        LOGGER.info("Need to create new H3 index for segment: {}, column: {}", segmentName, column);
         return true;
       }
     }
@@ -99,10 +99,14 @@ public class H3IndexHandler implements IndexHandler {
     }
     for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
-      if (columnMetadata != null) {
+      if (shouldCreateH3Index(columnMetadata)) {
         createH3IndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
       }
     }
+  }
+
+  private boolean shouldCreateH3Index(ColumnMetadata columnMetadata) {
+    return columnMetadata != null;
   }
 
   private void createH3IndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,

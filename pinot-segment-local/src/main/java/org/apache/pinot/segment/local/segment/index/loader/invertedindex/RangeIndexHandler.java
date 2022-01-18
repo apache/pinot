@@ -63,16 +63,15 @@ public class RangeIndexHandler implements IndexHandler {
     // Check if any existing index need to be removed.
     for (String column : existingColumns) {
       if (!_columnsToAddIdx.remove(column)) {
-        LOGGER.debug("Need to remove existing range index from segment: {}, column: {}", segmentName, column);
+        LOGGER.info("Need to remove existing range index from segment: {}, column: {}", segmentName, column);
         return true;
       }
     }
     // Check if any new index need to be added.
     for (String column : _columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
-      // Only create range index on dictionary-encoded unsorted columns
-      if (columnMetadata != null && !columnMetadata.isSorted()) {
-        LOGGER.debug("Need to create new range index for segment: {}, column: {}", segmentName, column);
+      if (shouldCreateRangeIndex(columnMetadata)) {
+        LOGGER.info("Need to create new range index for segment: {}, column: {}", segmentName, column);
         return true;
       }
     }
@@ -94,11 +93,15 @@ public class RangeIndexHandler implements IndexHandler {
     }
     for (String column : _columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
-      // Only create range index on dictionary-encoded unsorted columns
-      if (columnMetadata != null && !columnMetadata.isSorted()) {
+      if (shouldCreateRangeIndex(columnMetadata)) {
         createRangeIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
       }
     }
+  }
+
+  private boolean shouldCreateRangeIndex(ColumnMetadata columnMetadata) {
+    // Only create range index on unsorted columns
+    return columnMetadata != null && !columnMetadata.isSorted();
   }
 
   private void createRangeIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,

@@ -62,16 +62,15 @@ public class InvertedIndexHandler implements IndexHandler {
     // Check if any existing index need to be removed.
     for (String column : existingColumns) {
       if (!_columnsToAddIdx.remove(column)) {
-        LOGGER.debug("Need to remove existing inverted index from segment: {}, column: {}", segmentName, column);
+        LOGGER.info("Need to remove existing inverted index from segment: {}, column: {}", segmentName, column);
         return true;
       }
     }
     // Check if any new index need to be added.
     for (String column : _columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
-      // Only create inverted index on dictionary-encoded unsorted columns.
-      if (columnMetadata != null && !columnMetadata.isSorted() && columnMetadata.hasDictionary()) {
-        LOGGER.debug("Need to create new inverted index for segment: {}, column: {}", segmentName, column);
+      if (shouldCreateInvertedIndex(columnMetadata)) {
+        LOGGER.info("Need to create new inverted index for segment: {}, column: {}", segmentName, column);
         return true;
       }
     }
@@ -94,11 +93,15 @@ public class InvertedIndexHandler implements IndexHandler {
     }
     for (String column : _columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
-      // Only create inverted index on dictionary-encoded unsorted columns.
-      if (columnMetadata != null && !columnMetadata.isSorted() && columnMetadata.hasDictionary()) {
+      if (shouldCreateInvertedIndex(columnMetadata)) {
         createInvertedIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
       }
     }
+  }
+
+  private boolean shouldCreateInvertedIndex(ColumnMetadata columnMetadata) {
+    // Only create inverted index on dictionary-encoded unsorted columns.
+    return columnMetadata != null && !columnMetadata.isSorted() && columnMetadata.hasDictionary();
   }
 
   private void createInvertedIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
