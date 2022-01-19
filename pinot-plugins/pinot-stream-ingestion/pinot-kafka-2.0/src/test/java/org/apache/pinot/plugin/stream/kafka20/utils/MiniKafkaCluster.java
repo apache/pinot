@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.Collections;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import kafka.server.KafkaConfig;
 import kafka.server.KafkaServer;
@@ -33,12 +34,10 @@ import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.utils.Time;
 import scala.Option;
-import scala.collection.JavaConverters;
-import scala.collection.Seq;
 
 
 public final class MiniKafkaCluster implements Closeable {
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "MiniKafkaCluster");
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "MiniKafkaCluster-" + UUID.randomUUID());
 
   private final EmbeddedZooKeeper _zkServer;
   private final KafkaServer _kafkaServer;
@@ -51,8 +50,7 @@ public final class MiniKafkaCluster implements Closeable {
     _zkServer = new EmbeddedZooKeeper();
     int kafkaServerPort = getAvailablePort();
     KafkaConfig kafkaBrokerConfig = new KafkaConfig(createBrokerConfig(brokerId, kafkaServerPort));
-    Seq seq = JavaConverters.collectionAsScalaIterableConverter(Collections.emptyList()).asScala().toSeq();
-    _kafkaServer = new KafkaServer(kafkaBrokerConfig, Time.SYSTEM, Option.empty(), seq);
+    _kafkaServer = new KafkaServer(kafkaBrokerConfig, Time.SYSTEM, Option.empty(), false);
     _kafkaServerAddress = "localhost:" + kafkaServerPort;
     Properties kafkaClientConfig = new Properties();
     kafkaClientConfig.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, _kafkaServerAddress);
