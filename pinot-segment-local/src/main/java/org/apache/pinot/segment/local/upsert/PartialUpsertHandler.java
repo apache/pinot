@@ -52,8 +52,7 @@ public class PartialUpsertHandler {
 
   public PartialUpsertHandler(HelixManager helixManager, String tableNameWithType, Schema schema,
       Map<String, UpsertConfig.Strategy> partialUpsertStrategies, UpsertConfig.Strategy defaultPartialUpsertStrategy,
-      String mainTimeColumn,
-      @Nullable String comparisonColumn) {
+      String comparisonColumn) {
     _helixManager = helixManager;
     _tableNameWithType = tableNameWithType;
     for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
@@ -62,16 +61,9 @@ public class PartialUpsertHandler {
     // For all physical columns (including date time columns) except for primary key columns and comparison column.
     // If no comparison column is configured, use main time column as the comparison time.
     for (String columnName : schema.getPhysicalColumnNames()) {
-      if (!schema.getPrimaryKeyColumns().contains(columnName) && !_column2Mergers.containsKey(columnName)) {
-        if (comparisonColumn != null) {
-          if (!comparisonColumn.equals(columnName)) {
-            _column2Mergers.put(columnName, PartialUpsertMergerFactory.getMerger(defaultPartialUpsertStrategy));
-          }
-        } else {
-          if (!mainTimeColumn.equals(columnName)) {
-            _column2Mergers.put(columnName, PartialUpsertMergerFactory.getMerger(defaultPartialUpsertStrategy));
-          }
-        }
+      if (!schema.getPrimaryKeyColumns().contains(columnName) && !_column2Mergers.containsKey(columnName)
+          && !comparisonColumn.equals(columnName)) {
+        _column2Mergers.put(columnName, PartialUpsertMergerFactory.getMerger(defaultPartialUpsertStrategy));
       }
     }
   }
