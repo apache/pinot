@@ -21,12 +21,16 @@ package org.apache.pinot.integration.tests;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -70,6 +74,14 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     startController();
     startBroker();
     startServer();
+    startMinion();
+
+    // Set task timeout in cluster config
+    PinotHelixResourceManager helixResourceManager = _controllerStarter.getHelixResourceManager();
+    helixResourceManager.getHelixAdmin().setConfig(
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(
+            helixResourceManager.getHelixClusterName()).build(),
+        Collections.singletonMap(TASK_TYPE + MinionConstants.TIMEOUT_MS_KEY_SUFFIX, Long.toString(600_000L)));
 
     // Add 3 offline tables, where 2 of them have TestTask enabled
     TableTaskConfig taskConfig = new TableTaskConfig(Collections.singletonMap(TASK_TYPE, Collections.emptyMap()));
@@ -81,8 +93,13 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
 
     _helixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
     _taskManager = _controllerStarter.getTaskManager();
+  }
 
-    startMinion();
+  @Test
+  public void testTaskTimeout() {
+    PinotTaskGenerator taskGenerator = _taskManager.getTaskGeneratorRegistry().getTaskGenerator(TASK_TYPE);
+    assertNotNull(taskGenerator);
+    assertEquals(taskGenerator.getTaskTimeoutMs(), 600_000L);
   }
 
   private void verifyTaskCount(String task, int errors, int waiting, int running, int total) {
