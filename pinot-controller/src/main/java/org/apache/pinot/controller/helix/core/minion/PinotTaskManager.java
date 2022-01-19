@@ -345,13 +345,6 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   }
 
   /**
-   * Returns the task generator registry.
-   */
-  public TaskGeneratorRegistry getTaskGeneratorRegistry() {
-    return _taskGeneratorRegistry;
-  }
-
-  /**
    * Registers a task generator.
    * <p>This method can be used to plug in custom task generators.
    */
