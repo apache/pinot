@@ -188,12 +188,9 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     query = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 1234 AND INT_COL < 22000)"
         + "FROM MyTable";
 
-    nonFilterQuery = "SELECT SUM("
-        + "CASE "
-        + "WHEN (INT_COL > 1234 AND INT_COL < 22000) THEN INT_COL "
-        + "ELSE 0 "
-        + "END) AS total_sum "
-        + "FROM MyTable";
+    nonFilterQuery = "SELECT SUM(CASE "
+        + "WHEN (INT_COL > 1234 AND INT_COL < 22000) THEN INT_COL ELSE 0 "
+        + "END) AS total_sum FROM MyTable";
 
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
 
@@ -245,99 +242,63 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
 
     query =
-        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL % 10 = 0),"
-            + "SUM(NO_INDEX_COL),"
-            + "MAX(INT_COL) "
+        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL % 10 = 0),SUM(NO_INDEX_COL),MAX(INT_COL) "
             + "FROM MyTable";
 
     nonFilterQuery =
-        "SELECT SUM("
-            + "CASE "
-            + "WHEN (INT_COL % 10 = 0) THEN INT_COL "
-            + "ELSE 0 "
-            + "END) AS total_sum,"
-            + "SUM(NO_INDEX_COL),"
-            + "MAX(INT_COL)"
+        "SELECT SUM(CASE WHEN (INT_COL % 10 = 0) THEN INT_COL ELSE 0 END) AS total_sum,SUM(NO_INDEX_COL),"
+            + "MAX(INT_COL) FROM MyTable";
+
+    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
+
+    query =
+        "SELECT AVG(INT_COL) FILTER(WHERE NO_INDEX_COL > -1) FROM MyTable";
+    nonFilterQuery =
+        "SELECT AVG(NO_INDEX_COL) FROM MyTable";
+
+    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
+
+    query =
+        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL % 10 = 0),MAX(NO_INDEX_COL) FROM MyTable";
+
+    nonFilterQuery =
+        "SELECT SUM(CASE WHEN (INT_COL % 10 = 0) THEN INT_COL ELSE 0 END) AS total_sum,MAX(NO_INDEX_COL)"
             + "FROM MyTable";
 
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
 
     query =
-        "SELECT AVG(INT_COL) FILTER(WHERE NO_INDEX_COL > -1)"
-            + "FROM MyTable";
-    nonFilterQuery =
-        "SELECT AVG(NO_INDEX_COL)"
-            + "FROM MyTable";
-
-    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
-
-    query =
-        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL % 10 = 0),"
-            + "MAX(NO_INDEX_COL)"
-            + "FROM MyTable";
-
-    nonFilterQuery =
-        "SELECT SUM("
-            + "CASE "
-            + "WHEN (INT_COL % 10 = 0) THEN INT_COL "
-            + "ELSE 0 "
-            + "END) AS total_sum,"
-            + "MAX(NO_INDEX_COL)"
-            + "FROM MyTable";
-
-    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
-
-    query =
-        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL % 10 = 0),"
-            + "MAX(NO_INDEX_COL)"
+        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL % 10 = 0),MAX(NO_INDEX_COL)"
             + "FROM MyTable WHERE NO_INDEX_COL > 5";
     nonFilterQuery =
-        "SELECT SUM("
-            + "CASE "
-            + "WHEN (INT_COL % 10 = 0) THEN INT_COL "
-            + "ELSE 0 "
-            + "END) AS total_sum,"
-            + "MAX(NO_INDEX_COL)"
+        "SELECT SUM(CASE WHEN (INT_COL % 10 = 0) THEN INT_COL ELSE 0 END) AS total_sum,MAX(NO_INDEX_COL)"
             + "FROM MyTable WHERE NO_INDEX_COL > 5";
 
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
 
     query =
-        "SELECT MAX(INT_COL) FILTER(WHERE INT_COL < 100) "
-            + "FROM MyTable";
+        "SELECT MAX(INT_COL) FILTER(WHERE INT_COL < 100) FROM MyTable";
 
     nonFilterQuery =
-        "SELECT MAX("
-            + "CASE "
-            + "WHEN (INT_COL < 100) THEN INT_COL "
-            + "ELSE 0 "
-            + "END) AS total_max "
+        "SELECT MAX(CASE WHEN (INT_COL < 100) THEN INT_COL ELSE 0 END) AS total_max FROM MyTable";
+
+    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
+
+    query =
+        "SELECT MIN(NO_INDEX_COL) FILTER(WHERE INT_COL < 100) FROM MyTable";
+
+    nonFilterQuery =
+        "SELECT MIN(CASE WHEN (INT_COL < 100) THEN NO_INDEX_COL ELSE 0 END) AS total_min "
             + "FROM MyTable";
 
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
 
     query =
-        "SELECT MIN(NO_INDEX_COL) FILTER(WHERE INT_COL < 100) "
+        "SELECT MIN(NO_INDEX_COL) FILTER(WHERE INT_COL > 29990),MAX(INT_COL) FILTER(WHERE INT_COL > 29990)"
             + "FROM MyTable";
 
     nonFilterQuery =
-        "SELECT MIN("
-            + "CASE "
-            + "WHEN (INT_COL < 100) THEN NO_INDEX_COL "
-            + "ELSE 0 "
-            + "END) AS total_min "
-            + "FROM MyTable";
-
-    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
-
-    query =
-        "SELECT MIN(NO_INDEX_COL) FILTER(WHERE INT_COL > 29990),"
-            + "MAX(INT_COL) FILTER(WHERE INT_COL > 29990)"
-            + "FROM MyTable";
-
-    nonFilterQuery =
-        "SELECT MIN(NO_INDEX_COL), MAX(INT_COL) FROM MyTable "
-            + "WHERE INT_COL > 29990";
+        "SELECT MIN(NO_INDEX_COL), MAX(INT_COL) FROM MyTable WHERE INT_COL > 29990";
 
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
   }
@@ -348,41 +309,19 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
         + "SUM(INT_COL) FILTER(WHERE INT_COL < 4)"
         + "FROM MyTable WHERE INT_COL > 2";
 
-    String nonFilterQuery = "SELECT SUM("
-        + "CASE "
-        + "WHEN (INT_COL > 3) THEN INT_COL "
-        + "ELSE 0 "
-        + "END) AS total_sum,"
-        + "SUM("
-        + "CASE "
-        + "WHEN (INT_COL < 4) THEN INT_COL "
-        + "ELSE 0 "
-        + "END) AS total_sum2 "
+    String nonFilterQuery = "SELECT SUM(CASE WHEN (INT_COL > 3) THEN INT_COL ELSE 0 "
+        + "END) AS total_sum,SUM(CASE WHEN (INT_COL < 4) THEN INT_COL ELSE 0 END) AS total_sum2 "
         + "FROM MyTable WHERE INT_COL > 2";
 
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
 
-    query = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 12345),"
-        + "SUM(INT_COL) FILTER(WHERE INT_COL < 59999),"
-        + "MIN(INT_COL) FILTER(WHERE INT_COL > 5000) "
-        + "FROM MyTable WHERE INT_COL > 1000";
+    query = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 12345),SUM(INT_COL) FILTER(WHERE INT_COL < 59999),"
+        + "MIN(INT_COL) FILTER(WHERE INT_COL > 5000) FROM MyTable WHERE INT_COL > 1000";
 
-    nonFilterQuery = "SELECT SUM("
-        + "CASE "
-        + "WHEN (INT_COL > 12345) THEN INT_COL "
-        + "ELSE 0 "
-        + "END) AS total_sum,"
-        + "SUM("
-        + "CASE "
-        + "WHEN (INT_COL < 59999) THEN INT_COL "
-        + "ELSE 0 "
-        + "END) AS total_sum2,"
-        + "MIN("
-        + "CASE "
-        + "WHEN (INT_COL > 5000) THEN INT_COL "
-        + "ELSE 9999999 "
-        + "END) AS total_min "
-        + "FROM MyTable WHERE INT_COL > 1000";
+    nonFilterQuery = "SELECT SUM( CASE WHEN (INT_COL > 12345) THEN INT_COL ELSE 0 "
+        + "END) AS total_sum,SUM(CASE WHEN (INT_COL < 59999) THEN INT_COL ELSE 0 "
+        + "END) AS total_sum2,MIN(CASE WHEN (INT_COL > 5000) THEN INT_COL "
+        + "ELSE 9999999 END) AS total_min FROM MyTable WHERE INT_COL > 1000";
 
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
 
@@ -391,22 +330,10 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
         + "MIN(INT_COL) FILTER(WHERE INT_COL > 5000) "
         + "FROM MyTable WHERE INT_COL > 1000";
 
-    nonFilterQuery = "SELECT SUM("
-        + "CASE "
-        + "WHEN (INT_COL > 12345) THEN INT_COL "
-        + "ELSE 0 "
-        + "END) AS total_sum,"
-        + "SUM("
-        + "CASE "
-        + "WHEN (INT_COL < 59999) THEN NO_INDEX_COL "
-        + "ELSE 0 "
-        + "END) AS total_sum2,"
-        + "MIN("
-        + "CASE "
-        + "WHEN (INT_COL > 5000) THEN INT_COL "
-        + "ELSE 9999999 "
-        + "END) AS total_min "
-        + "FROM MyTable WHERE INT_COL > 1000";
+    nonFilterQuery = "SELECT SUM(CASE WHEN (INT_COL > 12345) THEN INT_COL "
+        + "ELSE 0 END) AS total_sum,SUM(CASE WHEN (INT_COL < 59999) THEN NO_INDEX_COL "
+        + "ELSE 0 END) AS total_sum2,MIN(CASE WHEN (INT_COL > 5000) THEN INT_COL "
+        + "ELSE 9999999 END) AS total_min FROM MyTable WHERE INT_COL > 1000";
 
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
 
@@ -415,22 +342,10 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
         + "MIN(INT_COL) FILTER(WHERE INT_COL > 5000) "
         + "FROM MyTable WHERE INT_COL < 28000 AND NO_INDEX_COL > 3000 ";
 
-    nonFilterQuery = "SELECT SUM("
-        + "CASE "
-        + "WHEN (INT_COL > 12345) THEN INT_COL "
-        + "ELSE 0 "
-        + "END) AS total_sum,"
-        + "SUM("
-        + "CASE "
-        + "WHEN (INT_COL < 59999) THEN NO_INDEX_COL "
-        + "ELSE 0 "
-        + "END) AS total_sum2,"
-        + "MIN("
-        + "CASE "
-        + "WHEN (INT_COL > 5000) THEN INT_COL "
-        + "ELSE 9999999 "
-        + "END) AS total_min "
-        + "FROM MyTable WHERE INT_COL < 28000 AND NO_INDEX_COL > 3000";
+    nonFilterQuery = "SELECT SUM(CASE WHEN (INT_COL > 12345) THEN INT_COL ELSE 0 "
+        + "END) AS total_sum,SUM(CASE WHEN (INT_COL < 59999) THEN NO_INDEX_COL "
+        + "ELSE 0 END) AS total_sum2,MIN(CASE WHEN (INT_COL > 5000) THEN INT_COL "
+        + "ELSE 9999999 END) AS total_min FROM MyTable WHERE INT_COL < 28000 AND NO_INDEX_COL > 3000";
 
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
 
@@ -440,21 +355,10 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
         + "FROM MyTable WHERE INT_COL < 28000 AND NO_INDEX_COL > 3000 ";
 
     nonFilterQuery = "SELECT SUM("
-        + "CASE "
-        + "WHEN (ABS(INT_COL) > 12345) THEN INT_COL "
-        + "ELSE 0 "
-        + "END) AS total_sum,"
-        + "SUM("
-        + "CASE "
-        + "WHEN (LN(INT_COL) < 59999) THEN NO_INDEX_COL "
-        + "ELSE 0 "
-        + "END) AS total_sum2,"
-        + "MIN("
-        + "CASE "
-        + "WHEN (INT_COL > 5000) THEN INT_COL "
-        + "ELSE 9999999 "
-        + "END) AS total_min "
-        + "FROM MyTable WHERE INT_COL < 28000 AND NO_INDEX_COL > 3000";
+        + "CASE WHEN (ABS(INT_COL) > 12345) THEN INT_COL ELSE 0 "
+        + "END) AS total_sum,SUM(CASE WHEN (LN(INT_COL) < 59999) THEN NO_INDEX_COL "
+        + "ELSE 0 END) AS total_sum2,MIN(CASE WHEN (INT_COL > 5000) THEN INT_COL "
+        + "ELSE 9999999 END) AS total_min FROM MyTable WHERE INT_COL < 28000 AND NO_INDEX_COL > 3000";
 
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
 
@@ -462,17 +366,9 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
         + "MIN(INT_COL) FILTER(WHERE INT_COL > 5000) "
         + "FROM MyTable WHERE INT_COL < 28000 AND NO_INDEX_COL > 3000 ";
 
-    nonFilterQuery = "SELECT SUM("
-        + "CASE "
-        + "WHEN (MOD(INT_COL, STATIC_INT_COL) = 0) THEN INT_COL "
-        + "ELSE 0 "
-        + "END) AS total_sum,"
-        + "MIN("
-        + "CASE "
-        + "WHEN (INT_COL > 5000) THEN INT_COL "
-        + "ELSE 9999999 "
-        + "END) AS total_min "
-        + "FROM MyTable WHERE INT_COL < 28000 AND NO_INDEX_COL > 3000";
+    nonFilterQuery = "SELECT SUM(CASE WHEN (MOD(INT_COL, STATIC_INT_COL) = 0) THEN INT_COL "
+        + "ELSE 0 END) AS total_sum,MIN(CASE WHEN (INT_COL > 5000) THEN INT_COL "
+        + "ELSE 9999999 END) AS total_min FROM MyTable WHERE INT_COL < 28000 AND NO_INDEX_COL > 3000";
 
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
 
@@ -480,17 +376,9 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
         + "MAX(INT_COL) FILTER(WHERE INT_COL > 123 AND INT_COL < 25000) "
         + "FROM MyTable WHERE NO_INDEX_COL > 5 AND NO_INDEX_COL < 29999";
 
-    nonFilterQuery = "SELECT SUM("
-        + "CASE "
-        + "WHEN (INT_COL > 123 AND INT_COL < 25000) THEN INT_COL "
-        + "ELSE 0 "
-        + "END) AS total_sum,"
-        + "MAX("
-        + "CASE "
-        + "WHEN (INT_COL > 123 AND INT_COL < 25000) THEN INT_COL "
-        + "ELSE 0 "
-        + "END) AS total_avg "
-        + "FROM MyTable WHERE NO_INDEX_COL > 5 AND NO_INDEX_COL < 29999";
+    nonFilterQuery = "SELECT SUM(CASE WHEN (INT_COL > 123 AND INT_COL < 25000) THEN INT_COL "
+        + "ELSE 0 END) AS total_sum,MAX(CASE WHEN (INT_COL > 123 AND INT_COL < 25000) THEN INT_COL "
+        + "ELSE 0 END) AS total_avg FROM MyTable WHERE NO_INDEX_COL > 5 AND NO_INDEX_COL < 29999";
 
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
   }
@@ -505,6 +393,21 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     String nonFilterQuery =
         "SELECT MIN(NO_INDEX_COL), MAX(INT_COL) FROM MyTable "
             + "WHERE INT_COL > 29990";
+
+    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
+
+    query =
+        "SELECT MIN(NO_INDEX_COL) FILTER(WHERE INT_COL > 29990),"
+            + "MAX(INT_COL) FILTER(WHERE INT_COL > 29990),"
+            + "SUM(INT_COL) FILTER(WHERE NO_INDEX_COL < 5000),"
+            + "MAX(NO_INDEX_COL) FILTER(WHERE NO_INDEX_COL < 5000) "
+            + "FROM MyTable";
+
+    nonFilterQuery = "SELECT MIN(CASE WHEN (INT_COL > 29990) THEN NO_INDEX_COL ELSE 99999 "
+        + "END) AS total_min,MAX(CASE WHEN (INT_COL > 29990) THEN INT_COL ELSE 0 "
+        + "END) AS total_max,SUM(CASE WHEN (NO_INDEX_COL < 5000) THEN INT_COL "
+        + "ELSE 0 END) AS total_sum,MAX(CASE WHEN (NO_INDEX_COL < 5000) THEN NO_INDEX_COL "
+        + "ELSE 0 END) AS total_count FROM MyTable";
 
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
   }
