@@ -58,9 +58,9 @@ public class BrokerRequestToQueryContextConverter {
 
   private static QueryContext convertSQL(BrokerRequest brokerRequest) {
     QueryContext queryContext = convertSQL(brokerRequest.getPinotQuery(), brokerRequest);
-    if (brokerRequest.getPinotQuery().getDataSource().getPreAggregateGapfillQuery() != null) {
-      queryContext.setPreAggregateGapFillQueryContext(
-          convertSQL(brokerRequest.getPinotQuery().getDataSource().getPreAggregateGapfillQuery(), brokerRequest));
+    if (brokerRequest.getPinotQuery().getDataSource().getSubquery() != null) {
+      queryContext.setSubQueryContext(
+          convertSQL(brokerRequest.getPinotQuery().getDataSource().getSubquery(), brokerRequest));
     }
     return queryContext;
   }

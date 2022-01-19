@@ -41,7 +41,7 @@ public class PreAggGapFillSelectionPlanNode implements PlanNode {
 
   public PreAggGapFillSelectionPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
     _indexSegment = indexSegment;
-    _queryContext = queryContext.getPreAggregateGapFillQueryContext();
+    _queryContext = queryContext.getSubQueryContext();
   }
 
   @Override
