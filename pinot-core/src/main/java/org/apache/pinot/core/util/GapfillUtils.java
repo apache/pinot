@@ -143,12 +143,12 @@ public class GapfillUtils {
   }
 
   public static boolean isPreAggregateGapfill(QueryContext queryContext) {
-    if (queryContext.getPreAggregateGapFillQueryContext() == null) {
+    if (queryContext.getSubQueryContext() == null) {
       return false;
     }
 
     for (ExpressionContext expressionContext
-        : queryContext.getPreAggregateGapFillQueryContext().getSelectExpressions()) {
+        : queryContext.getSubQueryContext().getSelectExpressions()) {
       if (isPreAggregateGapfill(expressionContext)) {
         return true;
       }

@@ -85,7 +85,7 @@ public class QueryContext {
   // Keep the BrokerRequest to make incremental changes
   // TODO: Remove it once the whole query engine is using the QueryContext
   private final BrokerRequest _brokerRequest;
-  private QueryContext _preAggregateGapFillQueryContext;
+  private QueryContext _subqueryContext;
 
   private final Function<Class<?>, Map<?, ?>> _sharedValues = MemoizedClassAssociation.of(ConcurrentHashMap::new);
 
@@ -191,12 +191,12 @@ public class QueryContext {
   }
 
 
-  public void setPreAggregateGapFillQueryContext(QueryContext preAggregateGapFillQueryContext) {
-    _preAggregateGapFillQueryContext = preAggregateGapFillQueryContext;
+  public void setSubQueryContext(QueryContext subqueryContext) {
+    _subqueryContext = subqueryContext;
   }
 
-  public QueryContext getPreAggregateGapFillQueryContext() {
-    return _preAggregateGapFillQueryContext;
+  public QueryContext getSubQueryContext() {
+    return _subqueryContext;
   }
 
   /**

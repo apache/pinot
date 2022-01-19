@@ -110,13 +110,13 @@ public class PreAggregationGapFillSelectionOperatorService {
     _columns = Arrays.asList(dataSchema.getColumnNames());
     _dataSchema = dataSchema;
     _limitForAggregatedResult = queryContext.getLimit();
-    _limitForGapfilledResult = queryContext.getPreAggregateGapFillQueryContext().getLimit();
+    _limitForGapfilledResult = queryContext.getSubQueryContext().getLimit();
     _rows = new PriorityQueue<>(Math.min(_limitForAggregatedResult,
         SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
         getTypeCompatibleComparator());
 
     _queryContext = queryContext;
-    _preAggregateGapFillQueryContext = queryContext.getPreAggregateGapFillQueryContext();
+    _preAggregateGapFillQueryContext = queryContext.getSubQueryContext();
     ExpressionContext gapFillSelection =
         GapfillUtils.getPreAggregateGapfillExpressionContext(_preAggregateGapFillQueryContext);
 

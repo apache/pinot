@@ -117,27 +117,11 @@ public class CalciteSqlParser {
     return sql;
   }
 
-  private static SqlNode parse(String sql) {
-    SqlParser sqlParser = SqlParser.create(sql, PARSER_CONFIG);
-    try {
-      return sqlParser.parseQuery();
-    } catch (SqlParseException e) {
-      throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
-    }
-  }
-
-  public static PinotQuery compileToPinotQueryWithSubquery(String sql)
-      throws SqlCompilationException {
-    return compileToPinotQuery(sql, true);
-  }
-
   public static PinotQuery compileToPinotQuery(String sql)
       throws SqlCompilationException {
-    return compileToPinotQuery(sql, false);
-  }
+    // Remove the comments from the query
+    sql = removeComments(sql);
 
-  private static PinotQuery compileToPinotQuery(String sql, boolean enablePreAggregateGapfillQuery)
-      throws SqlCompilationException {
     // Removes the terminating semicolon if any
     sql = removeTerminatingSemicolon(sql);
 
@@ -147,18 +131,22 @@ public class CalciteSqlParser {
       sql = removeOptionsFromSql(sql);
     }
 
-    SqlNode sqlNode = parse(sql);
+    SqlParser sqlParser = SqlParser.create(sql, PARSER_CONFIG);
+    SqlNode sqlNode = null;
+    try {
+      sqlNode = sqlParser.parseQuery();
+    } catch (SqlParseException e) {
+      throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
+    }
 
     // Compile Sql without OPTION statements.
     PinotQuery pinotQuery = compileSqlNodeToPinotQuery(sqlNode);
 
-    if (enablePreAggregateGapfillQuery) {
-      SqlSelect sqlSelect = getSelectNode(sqlNode);
-      if (sqlSelect != null) {
-        SqlNode fromNode = sqlSelect.getFrom();
-        if (fromNode != null && (fromNode instanceof SqlSelect || fromNode instanceof SqlOrderBy)) {
-          pinotQuery.getDataSource().setPreAggregateGapfillQuery(compileSqlNodeToPinotQuery(fromNode));
-        }
+    SqlSelect sqlSelect = getSelectNode(sqlNode);
+    if (sqlSelect != null) {
+      SqlNode fromNode = sqlSelect.getFrom();
+      if (fromNode != null && (fromNode instanceof SqlSelect || fromNode instanceof SqlOrderBy)) {
+        pinotQuery.getDataSource().setSubquery(compileSqlNodeToPinotQuery(fromNode));
       }
     }
 
