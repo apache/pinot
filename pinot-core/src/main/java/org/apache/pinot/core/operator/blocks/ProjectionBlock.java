@@ -53,7 +53,7 @@ public class ProjectionBlock implements Block {
 
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
-    return null;
+    throw new UnsupportedOperationException();
   }
 
   @Override

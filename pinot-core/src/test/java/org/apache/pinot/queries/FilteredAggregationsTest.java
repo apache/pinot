@@ -495,6 +495,20 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
   }
 
+  @Test
+  public void testMultipleAggregationsOnSameFilter() {
+    String query =
+        "SELECT MIN(NO_INDEX_COL) FILTER(WHERE INT_COL > 29990),"
+            + "MAX(INT_COL) FILTER(WHERE INT_COL > 29990)"
+            + "FROM MyTable";
+
+    String nonFilterQuery =
+        "SELECT MIN(NO_INDEX_COL), MAX(INT_COL) FROM MyTable "
+            + "WHERE INT_COL > 29990";
+
+    testInterSegmentAggregationQueryHelper(query, nonFilterQuery);
+  }
+
   @Test(expectedExceptions = IllegalStateException.class)
   public void testGroupBySupport() {
     String query =

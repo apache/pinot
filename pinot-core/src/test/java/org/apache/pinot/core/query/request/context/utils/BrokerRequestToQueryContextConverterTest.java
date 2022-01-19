@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -38,7 +39,6 @@ import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.FilterableAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.testng.annotations.Test;
@@ -655,19 +655,12 @@ public class BrokerRequestToQueryContextConverterTest {
     String query = "SELECT COUNT(*) FILTER(WHERE foo > 5), COUNT(*) FILTER(WHERE foo < 6) FROM testTable"
         + " WHERE bar > 0";
     QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
-    AggregationFunction[] aggregationFunctions =
-        queryContext.getAggregationFunctions();
+    List<Pair<FilterContext, AggregationFunction>> aggregationFunctions = queryContext.getAggregationsWithFilters();
     assertNotNull(aggregationFunctions);
-    assertEquals(aggregationFunctions.length, 2);
-    assertTrue(aggregationFunctions[0] instanceof FilterableAggregationFunction);
-    assertTrue(((FilterableAggregationFunction) aggregationFunctions[0])
-        .getFilterContext().toString().matches("foo > '5'"));
-    assertTrue(((FilterableAggregationFunction) aggregationFunctions[0])
-        .getInnerAggregationFunction() instanceof CountAggregationFunction);
-    assertTrue(aggregationFunctions[1] instanceof FilterableAggregationFunction);
-    assertTrue(((FilterableAggregationFunction) aggregationFunctions[1])
-        .getInnerAggregationFunction() instanceof CountAggregationFunction);
-    assertTrue(((FilterableAggregationFunction) aggregationFunctions[1])
-        .getFilterContext().toString().matches("foo < '6'"));
+    assertEquals(aggregationFunctions.size(), 2);
+    assertTrue(aggregationFunctions.get(0).getLeft().toString().matches("foo > '5'"));
+    assertTrue(aggregationFunctions.get(0).getRight() instanceof CountAggregationFunction);
+    assertTrue(aggregationFunctions.get(1).getLeft().toString().matches("foo < '6'"));
+    assertTrue(aggregationFunctions.get(1).getRight() instanceof CountAggregationFunction);
   }
 }
