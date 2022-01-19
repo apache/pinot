@@ -122,7 +122,7 @@ public class CalciteSqlParser {
     // Remove the comments from the query
     sql = removeComments(sql);
 
-    // Removes the terminating semicolon if any
+    // Remove the terminating semicolon from the query
     sql = removeTerminatingSemicolon(sql);
 
     // Extract OPTION statements from sql as Calcite Parser doesn't parse it.
@@ -132,7 +132,7 @@ public class CalciteSqlParser {
     }
 
     SqlParser sqlParser = SqlParser.create(sql, PARSER_CONFIG);
-    SqlNode sqlNode = null;
+    SqlNode sqlNode;
     try {
       sqlNode = sqlParser.parseQuery();
     } catch (SqlParseException e) {
