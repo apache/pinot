@@ -31,7 +31,6 @@ import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
-import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
 public class JsonIndexQuickStart extends QuickStartBase {
@@ -43,7 +42,7 @@ public class JsonIndexQuickStart extends QuickStartBase {
 
   public void execute()
       throws Exception {
-    File quickstartTmpDir = new File(_tmpDir, String.valueOf(System.currentTimeMillis()));
+    File quickstartTmpDir = new File(_dataDir, String.valueOf(System.currentTimeMillis()));
     File baseDir = new File(quickstartTmpDir, "githubEvents");
     File dataDir = new File(quickstartTmpDir, "rawdata");
     Preconditions.checkState(dataDir.mkdirs());
@@ -64,7 +63,7 @@ public class JsonIndexQuickStart extends QuickStartBase {
     FileUtils.copyURLToFile(resource, ingestionJobSpecFile);
 
     QuickstartTableRequest request = new QuickstartTableRequest(baseDir.getAbsolutePath());
-    final QuickstartRunner runner = new QuickstartRunner(Collections.singletonList(request), 1, 1, 1, dataDir);
+    final QuickstartRunner runner = new QuickstartRunner(Collections.singletonList(request), 1, 1, 1, 0, dataDir);
 
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
     runner.startAll();
@@ -80,8 +79,7 @@ public class JsonIndexQuickStart extends QuickStartBase {
     printStatus(Color.CYAN, "***** Bootstrap githubEvents table *****");
     runner.bootstrapTable();
 
-    printStatus(Color.CYAN, "***** Waiting for 5 seconds for the server to fetch the assigned segment *****");
-    Thread.sleep(5000);
+    waitForBootstrapToComplete(null);
 
     printStatus(Color.YELLOW, "***** Offline json-index quickstart setup complete *****");
 
