@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.mockito.Mockito;
 import org.testng.annotations.Test;
@@ -36,10 +39,18 @@ public class PartialUpsertHandlerTest {
   @Test
   public void testMerge() {
     HelixManager helixManager = Mockito.mock(HelixManager.class);
+
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("field1", FieldSpec.DataType.LONG)
+        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
+        .setPrimaryKeyColumns(Arrays.asList("pk")).build();
+
     String realtimeTableName = "testTable_REALTIME";
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
     partialUpsertStrategies.put("field1", UpsertConfig.Strategy.INCREMENT);
-    PartialUpsertHandler handler = new PartialUpsertHandler(helixManager, realtimeTableName, partialUpsertStrategies);
+    PartialUpsertHandler handler =
+        new PartialUpsertHandler(helixManager, realtimeTableName, schema, partialUpsertStrategies,
+            UpsertConfig.Strategy.OVERWRITE, "hoursSinceEpoch");
 
     // both records are null.
     GenericRow previousRecord = new GenericRow();
@@ -61,13 +72,18 @@ public class PartialUpsertHandlerTest {
     assertEquals(newRecord.getValue("field1"), 2);
 
     // newRecord is default null value, while previousRecord is not.
+    // field1 should not be incremented since the newRecord is null.
+    // special case: field2 should be overrided by null value because we didn't enabled default partial upsert strategy.
     previousRecord.clear();
     incomingRecord.clear();
     previousRecord.putValue("field1", 1);
+    previousRecord.putValue("field2", 2);
     incomingRecord.putDefaultNullValue("field1", 2);
+    incomingRecord.putDefaultNullValue("field2", 0);
     newRecord = handler.merge(previousRecord, incomingRecord);
     assertFalse(newRecord.isNullValue("field1"));
     assertEquals(newRecord.getValue("field1"), 1);
+    assertTrue(newRecord.isNullValue("field2"));
 
     // neither of records is null.
     previousRecord.clear();
@@ -77,5 +93,58 @@ public class PartialUpsertHandlerTest {
     newRecord = handler.merge(previousRecord, incomingRecord);
     assertFalse(newRecord.isNullValue("field1"));
     assertEquals(newRecord.getValue("field1"), 3);
+  }
+
+  @Test
+  public void testMergeWithDefaultPartialUpsertStrategy() {
+    HelixManager helixManager = Mockito.mock(HelixManager.class);
+
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("field1", FieldSpec.DataType.LONG).addMetric("field2", FieldSpec.DataType.LONG)
+        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
+        .setPrimaryKeyColumns(Arrays.asList("pk")).build();
+
+    String realtimeTableName = "testTable_REALTIME";
+    Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
+    partialUpsertStrategies.put("field1", UpsertConfig.Strategy.INCREMENT);
+    PartialUpsertHandler handler =
+        new PartialUpsertHandler(helixManager, realtimeTableName, schema, partialUpsertStrategies,
+            UpsertConfig.Strategy.OVERWRITE, "hoursSinceEpoch");
+
+    // previousRecord is null default value, while newRecord is not.
+    GenericRow previousRecord = new GenericRow();
+    GenericRow incomingRecord = new GenericRow();
+    previousRecord.putDefaultNullValue("field1", 1);
+    previousRecord.putDefaultNullValue("field2", 2);
+    incomingRecord.putValue("field1", 2);
+    incomingRecord.putValue("field2", 1);
+    GenericRow newRecord = handler.merge(previousRecord, incomingRecord);
+    assertFalse(newRecord.isNullValue("field1"));
+    assertEquals(newRecord.getValue("field1"), 2);
+    assertEquals(newRecord.getValue("field2"), 1);
+
+    // newRecord is default null value, while previousRecord is not.
+    // field1 should not be incremented since the newRecord is null.
+    // field2 should not be overrided by null value since we have default partial upsert strategy.
+    previousRecord.clear();
+    incomingRecord.clear();
+    previousRecord.putValue("field1", 8);
+    previousRecord.putValue("field2", 8);
+    incomingRecord.putDefaultNullValue("field1", 1);
+    incomingRecord.putDefaultNullValue("field2", 0);
+    newRecord = handler.merge(previousRecord, incomingRecord);
+    assertEquals(newRecord.getValue("field1"), 8);
+    assertEquals(newRecord.getValue("field2"), 8);
+
+    // neither of records is null.
+    previousRecord.clear();
+    incomingRecord.clear();
+    previousRecord.putValue("field1", 1);
+    previousRecord.putValue("field2", 100);
+    incomingRecord.putValue("field1", 2);
+    incomingRecord.putValue("field2", 1000);
+    newRecord = handler.merge(previousRecord, incomingRecord);
+    assertEquals(newRecord.getValue("field1"), 3);
+    assertEquals(newRecord.getValue("field2"), 1000);
   }
 }
