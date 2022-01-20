@@ -663,7 +663,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               break;
             case COMMIT:
               _state = State.COMMITTING;
-              _currentOffset = _partitionGroupConsumer.commit(_currentOffset);
+              _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
               long buildTimeSeconds = response.getBuildTimeSeconds();
               buildSegmentForCommit(buildTimeSeconds * 1000L);
               if (_segmentBuildDescriptor == null) {
