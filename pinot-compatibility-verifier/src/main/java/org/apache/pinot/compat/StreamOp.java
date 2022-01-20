@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.compat.tests;
+package org.apache.pinot.compat;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -39,7 +39,6 @@ import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.controller.helix.ControllerTest;
-import org.apache.pinot.integration.tests.ClusterTest;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -270,7 +269,7 @@ public class StreamOp extends BaseOp {
   private long fetchExistingTotalDocs(String tableName)
       throws Exception {
     String query = "SELECT count(*) FROM " + tableName;
-    JsonNode response = ClusterTest.postSqlQuery(query, ClusterDescriptor.getInstance().getBrokerUrl());
+    JsonNode response = Utils.postSqlQuery(query, ClusterDescriptor.getInstance().getBrokerUrl());
     if (response == null) {
       String errorMsg = String.format("Failed to query Table: %s", tableName);
       LOGGER.error(errorMsg);

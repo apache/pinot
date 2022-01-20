@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.compat.tests;
+package org.apache.pinot.compat;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -29,11 +29,11 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.SqlResultComparator;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.controller.helix.ControllerTest;
-import org.apache.pinot.integration.tests.ClusterTest;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
@@ -191,8 +191,8 @@ public class SegmentOp extends BaseOp {
     }
 
     Schema schema = JsonUtils.fileToObject(new File(getAbsoluteFileName(_schemaFileName)), Schema.class);
-    RecordReaderConfig recordReaderConfig = RecordReaderFactory
-        .getRecordReaderConfig(DEFAULT_FILE_FORMAT, getAbsoluteFileName(_recordReaderConfigFileName));
+    RecordReaderConfig recordReaderConfig = RecordReaderFactory.getRecordReaderConfig(DEFAULT_FILE_FORMAT,
+        getAbsoluteFileName(_recordReaderConfigFileName));
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setInputFilePath(localReplacedInputDataFilePath);
@@ -263,18 +263,18 @@ public class SegmentOp extends BaseOp {
       throws Exception {
     String query = "SELECT count(*) FROM " + _tableName;
     ClusterDescriptor clusterDescriptor = ClusterDescriptor.getInstance();
-    JsonNode result = ClusterTest.postSqlQuery(query, clusterDescriptor.getBrokerUrl());
+    JsonNode result = Utils.postSqlQuery(query, clusterDescriptor.getBrokerUrl());
     long startTime = System.currentTimeMillis();
     while (SqlResultComparator.isEmpty(result)) {
       if ((System.currentTimeMillis() - startTime) > DEFAULT_MAX_SLEEP_TIME_MS) {
-        LOGGER
-            .error("Upload segment verification failed, routing table has not been updated after max wait time {} ms.",
-                DEFAULT_MAX_SLEEP_TIME_MS);
+        LOGGER.error(
+            "Upload segment verification failed, routing table has not been updated after max wait time {} ms.",
+            DEFAULT_MAX_SLEEP_TIME_MS);
         return false;
       }
       LOGGER.warn("Routing table has not been updated yet, will retry after {} ms.", DEFAULT_SLEEP_INTERVAL_MS);
       Thread.sleep(DEFAULT_SLEEP_INTERVAL_MS);
-      result = ClusterTest.postSqlQuery(query, clusterDescriptor.getBrokerUrl());
+      result = Utils.postSqlQuery(query, clusterDescriptor.getBrokerUrl());
     }
     LOGGER.info("Routing table has been updated.");
     return true;
