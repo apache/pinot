@@ -164,7 +164,7 @@
     TODO: figure out a way to inject kafka dependency instead of explicitly setting the kafka module dependency -->
     <kafka.version>2.0</kafka.version>
     <protobuf.version>3.12.0</protobuf.version>
-    <grpc.version>1.30.0</grpc.version>
+    <grpc.version>1.41.0</grpc.version>
 
     <!-- Checkstyle violation prop.-->
     <checkstyle.violation.severity>warning</checkstyle.violation.severity>
