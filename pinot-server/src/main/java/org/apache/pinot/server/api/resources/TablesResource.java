@@ -70,6 +70,8 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
+import org.apache.pinot.server.access.HttpRequesterIdentity;
+import org.apache.pinot.server.access.RequesterIdentity;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -343,7 +345,8 @@ public class TablesResource {
     boolean hasDataAccess;
     try {
       AccessControl accessControl = _accessControlFactory.create();
-      hasDataAccess = accessControl.hasDataAccess(httpHeaders, tableNameWithType);
+      RequesterIdentity httpRequestIdentity = new HttpRequesterIdentity(httpHeaders);
+      hasDataAccess = accessControl.hasDataAccess(httpRequestIdentity, tableNameWithType);
     } catch (Exception e) {
       throw new WebApplicationException("Caught exception while validating access to table: " + tableNameWithType,
           Response.Status.INTERNAL_SERVER_ERROR);

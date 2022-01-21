@@ -19,7 +19,6 @@
 package org.apache.pinot.server.access;
 
 import io.netty.channel.ChannelHandlerContext;
-import javax.ws.rs.core.HttpHeaders;
 
 
 public class AllowAllAccessFactory implements AccessControlFactory {
@@ -30,7 +29,7 @@ public class AllowAllAccessFactory implements AccessControlFactory {
     }
 
     @Override
-    public boolean hasDataAccess(HttpHeaders httpHeaders, String tableName) {
+    public boolean hasDataAccess(RequesterIdentity requesterIdentity, String tableName) {
       return true;
     }
   };

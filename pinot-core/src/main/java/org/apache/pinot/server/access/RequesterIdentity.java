@@ -18,28 +18,5 @@
  */
 package org.apache.pinot.server.access;
 
-import io.netty.channel.ChannelHandlerContext;
-import org.apache.pinot.spi.annotations.InterfaceAudience;
-import org.apache.pinot.spi.annotations.InterfaceStability;
-
-
-@InterfaceAudience.Public
-@InterfaceStability.Stable
-public interface AccessControl {
-
-  /**
-   *
-   * @param channelHandlerContext netty tls context
-   * @return Whether the client has access to query server
-   */
-  boolean isAuthorizedChannel(ChannelHandlerContext channelHandlerContext);
-
-  /**
-   * Return whether the client has data access to the given table.
-   *
-   * @param requesterIdentity Request identity
-   * @param tableName Name of the table to be accessed
-   * @return Whether the client has data access to the table
-   */
-  boolean hasDataAccess(RequesterIdentity requesterIdentity, String tableName);
+public abstract class RequesterIdentity {
 }

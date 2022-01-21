@@ -35,6 +35,8 @@ import org.apache.pinot.core.operator.streaming.StreamingResponseUtils;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.server.access.AccessControl;
+import org.apache.pinot.server.access.GrpcRequesterIdentity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,11 +50,14 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
   private final Server _server;
   private final ExecutorService _executorService =
       Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
+  private final AccessControl _accessControl;
 
-  public GrpcQueryServer(int port, QueryExecutor queryExecutor, ServerMetrics serverMetrics) {
+  public GrpcQueryServer(int port, QueryExecutor queryExecutor, ServerMetrics serverMetrics,
+      AccessControl accessControl) {
     _queryExecutor = queryExecutor;
     _serverMetrics = serverMetrics;
     _server = ServerBuilder.forPort(port).addService(this).build();
+    _accessControl = accessControl;
     LOGGER.info("Initialized GrpcQueryServer on port: {} with numWorkerThreads: {}", port,
         ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
   }
@@ -86,6 +91,20 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
       _serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
       responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Bad request").withCause(e).asException());
       return;
+    }
+
+    // Table level access control
+    GrpcRequesterIdentity requestIdentity = new GrpcRequesterIdentity(request.getMetadataMap());
+    if (!_accessControl.hasDataAccess(requestIdentity, queryRequest.getTableNameWithType())) {
+      Exception unsupportedOperationException = new UnsupportedOperationException(
+          String.format("No access to table %s while processing request %d: %s from broker: %s",
+              queryRequest.getTableNameWithType(), queryRequest.getRequestId(),
+              queryRequest.getQueryContext(), queryRequest.getBrokerId()));
+      final String exceptionMsg = String.format("Table not found: %s", queryRequest.getTableNameWithType());
+      LOGGER.error(exceptionMsg, unsupportedOperationException);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.NO_TABLE_ACCESS, 1);
+      responseObserver.onError(
+          Status.NOT_FOUND.withDescription(exceptionMsg).withCause(unsupportedOperationException).asException());
     }
 
     // Process the query
