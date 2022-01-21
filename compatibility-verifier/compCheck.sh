@@ -225,24 +225,13 @@ function stopServices() {
 # Setup the path and classpath prefix for compatibility tester executable
 function setupCompatTester() {
   COMPAT_TESTER="$(dirname $0)/../${COMPAT_TESTER_PATH}"
-  local pinotIntegTestsRelDir="$(dirname $0)/../pinot-integration-tests/target"
-  local pinotIntegTestsAbsDir=$( (
-    cd ${pinotIntegTestsRelDir}
+  local pinotCompatibilityVerifierRelDir="$(dirname $0)/../pinot-compatibility-verifier/target"
+  local pinotCompatibilityVerifierAbsDir=$( (
+    cd ${pinotCompatibilityVerifierRelDir}
     pwd
   ))
-  JAR_LIST=$(ls ${pinotIntegTestsAbsDir}/pinot-integration-tests-*-tests.jar)
+  JAR_LIST="$(ls ${pinotCompatibilityVerifierAbsDir}/pinot-compatibility-verifier-*.jar)"
   CLASSPATH_PREFIX="$(echo $JAR_LIST | tr ' ' :)"
-  # Adding pinot-integration-test-base JAR
-  # TODO remove this condition once released.
-  local pinotIntegTestBaseRelDir="$(dirname $0)/../pinot-integration-test-base/target"
-  if [[ -d "$pinotIntegTestBaseRelDir" ]]; then
-    local pinotIntegTestBaseAbsDir=$( (
-      cd ${pinotIntegTestBaseRelDir}
-      pwd
-    ))
-    JAR_LIST="$(ls ${pinotIntegTestBaseAbsDir}/pinot-integration-test-base-*.jar)"
-    CLASSPATH_PREFIX="$CLASSPATH_PREFIX:$(echo $JAR_LIST | tr ' ' :)"
-  fi
   echo "CLASSPATH_PREFIX is set as: $CLASSPATH_PREFIX"
   export CLASSPATH_PREFIX
 }
@@ -320,7 +309,7 @@ if [ -z "$workingDir" -o -z "$testSuiteDir" ]; then
   exit 1
 fi
 
-COMPAT_TESTER_PATH="pinot-integration-tests/target/pinot-integration-tests-pkg/bin/pinot-compat-test-runner.sh"
+COMPAT_TESTER_PATH="pinot-compatibility-verifier/target/pinot-compatibility-verifier-pkg/bin/pinot-compat-test-runner.sh"
 
 BROKER_CONF=${testSuiteDir}/config/BrokerConfig.properties
 CONTROLLER_CONF=${testSuiteDir}/config/ControllerConfig.properties
