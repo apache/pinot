@@ -53,6 +53,7 @@
     "customConfigs": {}
   },
   "routing": {
+    "segmentPrunerTypes": ["partition"],
     "instanceSelectorType": "strictReplicaGroup"
   },
   "upsertConfig": {
