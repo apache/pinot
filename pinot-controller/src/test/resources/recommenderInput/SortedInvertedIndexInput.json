@@ -71,6 +71,15 @@
         "dataType": "DOUBLE",
         "cardinality":4,
         "numValuesPerEntry":1.00000001
+      },
+      {
+        "name": "ja",
+        "dataType": "BOOLEAN"
+      },
+      {
+        "name": "jb",
+        "dataType": "BOOLEAN",
+        "numValuesPerEntry": 3
       }
     ],
     "metricFieldSpecs": [
