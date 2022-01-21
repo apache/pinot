@@ -22,11 +22,13 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Collections;
+import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.stream.TransientConsumerException;
 
 
 public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHandler
@@ -42,23 +44,32 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
 
   @Override
   public int fetchPartitionCount(long timeoutMillis) {
-    return _consumer.partitionsFor(_topic, Duration.ofMillis(timeoutMillis)).size();
+    try {
+      return _consumer.partitionsFor(_topic, Duration.ofMillis(timeoutMillis)).size();
+    } catch (TimeoutException e) {
+      throw new TransientConsumerException(e);
+    }
   }
 
   @Override
   public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
     Preconditions.checkNotNull(offsetCriteria);
     long offset;
-    if (offsetCriteria.isLargest()) {
-      offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
-          .get(_topicPartition);
-    } else if (offsetCriteria.isSmallest()) {
-      offset = _consumer.beginningOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
-          .get(_topicPartition);
-    } else {
-      throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria);
+    try {
+      if (offsetCriteria.isLargest()) {
+        offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+            .get(_topicPartition);
+      } else if (offsetCriteria.isSmallest()) {
+        offset =
+            _consumer.beginningOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+                .get(_topicPartition);
+      } else {
+        throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria);
+      }
+      return new LongMsgOffset(offset);
+    } catch (TimeoutException e) {
+      throw new TransientConsumerException(e);
     }
-    return new LongMsgOffset(offset);
   }
 
   @Override

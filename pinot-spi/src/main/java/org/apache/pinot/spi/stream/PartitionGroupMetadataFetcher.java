@@ -74,7 +74,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
       }
       return Boolean.TRUE;
     } catch (TransientConsumerException e) {
-      LOGGER.warn("Could not get partition count for topic {}", _topicName, e);
+      LOGGER.warn("Transient Exception: Could not get partition count for topic {}", _topicName, e);
       _exception = e;
       return Boolean.FALSE;
     } catch (Exception e) {
