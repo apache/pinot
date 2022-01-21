@@ -1465,8 +1465,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (_partitionGroupConsumer != null) {
       closePartitionGroupConsumer();
     }
-    _segmentLogger.info("Creating new stream consumer {} for partition group {} , reason: {}", _clientId,
-        _partitionGroupConsumptionStatus.getPartitionGroupId(), reason);
+    _segmentLogger.info("Creating new stream consumer for topic partition {} , reason: {}", _clientId, reason);
     _partitionGroupConsumer =
         _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
     _partitionGroupConsumer.start(_partitionGroupConsumptionStatus.getStartOffset());

@@ -62,10 +62,12 @@ public interface PartitionGroupConsumer extends Closeable {
   /**
    * Checkpoints the consumption state of the stream partition group in the source
    *
-   * This is useful in systems that require preserving consumption state on the source in order to resume or replay
-   * consumption of data.
-   * The offset returned will be used for offset comparisons and persisted to the ZK segment metadata. Hence, the
-   * returned value should be same or equivalent (in comparison) to the lastOffset provided in the input.
+   * This is useful in streaming systems that require preserving consumption state on the source in order to resume or
+   * replay consumption of data. The consumer implementation is responsible for managing this state.
+   *
+   * The offset returned will be used for offset comparisons within the local server (say, for catching up) and also,
+   * persisted to the ZK segment metadata. Hence, the returned value should be same or equivalent to the lastOffset
+   * provided as input (that is, compareTo of the input and returned offset should be 0).
    *
    * @param lastOffset checkpoint the stream at this offset (exclusive)
    * @return Returns the offset that should be used as the next upcoming offset for the stream partition group
