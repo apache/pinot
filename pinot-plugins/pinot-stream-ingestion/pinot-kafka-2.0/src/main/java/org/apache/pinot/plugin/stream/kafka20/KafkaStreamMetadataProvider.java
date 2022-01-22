@@ -61,38 +61,44 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
     Preconditions.checkNotNull(offsetCriteria);
     long offset;
-    if (offsetCriteria.isLargest()) {
-      offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
-          .get(_topicPartition);
-    } else if (offsetCriteria.isSmallest()) {
-      offset = _consumer.beginningOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
-          .get(_topicPartition);
-    } else if (offsetCriteria.isPeriod()) {
-      String offsetString = offsetCriteria.getOffsetString();
-      Long periodToMillis = TimeUtils.convertPeriodToMillis(offsetString);
-      TopicPartition tp = new TopicPartition(_topic, _partition);
-      _offsetsForTimes.put(tp, System.currentTimeMillis() - periodToMillis);
-      if (_consumer.offsetsForTimes(_offsetsForTimes).get(tp) == null) {
+    try {
+      if (offsetCriteria.isLargest()) {
         offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
             .get(_topicPartition);
+      } else if (offsetCriteria.isSmallest()) {
+        offset =
+            _consumer.beginningOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+                .get(_topicPartition);
+      } else if (offsetCriteria.isPeriod()) {
+        String offsetString = offsetCriteria.getOffsetString();
+        Long periodToMillis = TimeUtils.convertPeriodToMillis(offsetString);
+        TopicPartition tp = new TopicPartition(_topic, _partition);
+        _offsetsForTimes.put(tp, System.currentTimeMillis() - periodToMillis);
+        if (_consumer.offsetsForTimes(_offsetsForTimes).get(tp) == null) {
+          offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+              .get(_topicPartition);
+        } else {
+          offset = _consumer.offsetsForTimes(_offsetsForTimes).get(tp).offset();
+        }
+      } else if (offsetCriteria.isTimestamp()) {
+        String offsetString = offsetCriteria.getOffsetString();
+        Long timestampToMillis = TimeUtils.convertDateTimeStringToMillis(offsetString);
+        TopicPartition tp = new TopicPartition(_topic, _partition);
+        _offsetsForTimes.put(tp, timestampToMillis);
+        if (_consumer.offsetsForTimes(_offsetsForTimes).get(tp) == null) {
+          offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+              .get(_topicPartition);
+        } else {
+          offset = _consumer.offsetsForTimes(_offsetsForTimes).get(tp).offset();
+        }
       } else {
-        offset = _consumer.offsetsForTimes(_offsetsForTimes).get(tp).offset();
+        throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria);
       }
-    } else if (offsetCriteria.isTimestamp()) {
-      String offsetString = offsetCriteria.getOffsetString();
-      Long timestampToMillis = TimeUtils.convertDateTimeStringToMillis(offsetString);
-      TopicPartition tp = new TopicPartition(_topic, _partition);
-      _offsetsForTimes.put(tp, timestampToMillis);
-      if (_consumer.offsetsForTimes(_offsetsForTimes).get(tp) == null) {
-        offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
-            .get(_topicPartition);
-      } else {
-        offset = _consumer.offsetsForTimes(_offsetsForTimes).get(tp).offset();
-      }
-    } else {
-      throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria);
+      return new LongMsgOffset(offset);
     }
-    return new LongMsgOffset(offset);
+    catch (TimeoutException e) {
+      throw new TransientConsumerException(e);
+    }
   }
 
   @Override
