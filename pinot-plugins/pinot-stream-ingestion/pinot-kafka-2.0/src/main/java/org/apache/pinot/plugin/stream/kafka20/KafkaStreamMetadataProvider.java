@@ -95,8 +95,7 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
         throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria);
       }
       return new LongMsgOffset(offset);
-    }
-    catch (TimeoutException e) {
+    } catch (TimeoutException e) {
       throw new TransientConsumerException(e);
     }
   }
