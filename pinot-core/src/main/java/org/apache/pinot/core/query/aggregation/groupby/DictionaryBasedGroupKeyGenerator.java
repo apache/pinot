@@ -257,19 +257,52 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
     @Override
     public void processSingleValue(int numDocs, int[] outGroupIds) {
-      if (_numGroupByExpressions == 1) {
-        processSingleValue(numDocs, _singleValueDictIds[0], outGroupIds);
-      } else {
-        processSingleValueGeneric(numDocs, outGroupIds);
+      switch (_numGroupByExpressions) {
+        case 1:
+          processSingleValue(numDocs, _singleValueDictIds[0], outGroupIds);
+          return;
+        case 2:
+          processSingleValue(numDocs, _singleValueDictIds[0], _singleValueDictIds[1], outGroupIds);
+          return;
+        case 3:
+          processSingleValue(numDocs, _singleValueDictIds[0], _singleValueDictIds[1], _singleValueDictIds[2],
+              outGroupIds);
+          return;
+        default:
       }
+      processSingleValueGeneric(numDocs, outGroupIds);
     }
 
     private void processSingleValue(int numDocs, int[] dictIds, int[] outGroupIds) {
       System.arraycopy(dictIds, 0, outGroupIds, 0, numDocs);
-      for (int i = 0; i < numDocs && _numKeys < _globalGroupIdUpperBound; i++) {
-        if (!_flags[outGroupIds[i]]) {
-          _numKeys++;
-          _flags[outGroupIds[i]] = true;
+      markGroups(numDocs, outGroupIds);
+    }
+
+    private void processSingleValue(int numDocs, int[] dictIds0, int[] dictIds1, int[] outGroupIds) {
+      for (int i = 0; i < numDocs; i++) {
+        outGroupIds[i] = dictIds1[i] * _cardinalities[0] + dictIds0[i];
+      }
+      markGroups(numDocs, outGroupIds);
+    }
+
+    private void processSingleValue(int numDocs, int[] dictIds0, int[] dictIds1, int[] dictIds2, int[] outGroupIds) {
+      int cardinality = _cardinalities[0] * _cardinalities[1];
+      for (int i = 0; i < numDocs; i++) {
+        outGroupIds[i] = dictIds2[i] * cardinality + dictIds1[i] * _cardinalities[0] + dictIds0[i];
+      }
+      markGroups(numDocs, outGroupIds);
+    }
+
+    private void markGroups(int numDocs, int[] groupIds) {
+      if (_numKeys < _globalGroupIdUpperBound) {
+        for (int i = 0; i < numDocs; i++) {
+          if (!_flags[groupIds[i]]) {
+            _numKeys++;
+            _flags[groupIds[i]] = true;
+            if (_numKeys == _globalGroupIdUpperBound) {
+              return;
+            }
+          }
         }
       }
     }

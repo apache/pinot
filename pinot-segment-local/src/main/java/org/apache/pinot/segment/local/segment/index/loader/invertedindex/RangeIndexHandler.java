@@ -58,8 +58,24 @@ public class RangeIndexHandler implements IndexHandler {
 
   @Override
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
+    String segmentName = _segmentMetadata.getName();
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.RANGE_INDEX);
-    return !existingColumns.equals(_columnsToAddIdx);
+    // Check if any existing index need to be removed.
+    for (String column : existingColumns) {
+      if (!_columnsToAddIdx.remove(column)) {
+        LOGGER.info("Need to remove existing range index from segment: {}, column: {}", segmentName, column);
+        return true;
+      }
+    }
+    // Check if any new index need to be added.
+    for (String column : _columnsToAddIdx) {
+      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+      if (shouldCreateRangeIndex(columnMetadata)) {
+        LOGGER.info("Need to create new range index for segment: {}, column: {}", segmentName, column);
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override
@@ -77,11 +93,15 @@ public class RangeIndexHandler implements IndexHandler {
     }
     for (String column : _columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
-      // Only create range index on dictionary-encoded unsorted columns
-      if (columnMetadata != null && !columnMetadata.isSorted()) {
+      if (shouldCreateRangeIndex(columnMetadata)) {
         createRangeIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
       }
     }
+  }
+
+  private boolean shouldCreateRangeIndex(ColumnMetadata columnMetadata) {
+    // Only create range index on unsorted columns
+    return columnMetadata != null && !columnMetadata.isSorted();
   }
 
   private void createRangeIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,

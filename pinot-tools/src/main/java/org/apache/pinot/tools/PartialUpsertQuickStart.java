@@ -66,7 +66,7 @@ public class PartialUpsertQuickStart {
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
     QuickstartTableRequest request = new QuickstartTableRequest(bootstrapTableDir.getAbsolutePath());
-    final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, dataDir);
+    final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 0, dataDir);
 
     printStatus(Color.CYAN, "***** Starting Kafka *****");
     final ZkStarter.ZookeeperInstance zookeeperInstance = ZkStarter.startLocalZkServer();

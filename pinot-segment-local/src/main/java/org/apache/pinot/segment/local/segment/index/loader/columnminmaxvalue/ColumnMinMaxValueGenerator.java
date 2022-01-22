@@ -51,8 +51,8 @@ public class ColumnMinMaxValueGenerator {
   public ColumnMinMaxValueGenerator(SegmentMetadataImpl segmentMetadata, SegmentDirectory.Writer segmentWriter,
       ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode) {
     _segmentMetadata = segmentMetadata;
-    _segmentProperties = SegmentMetadataImpl.getPropertiesConfiguration(_segmentMetadata.getIndexDir());
     _segmentWriter = segmentWriter;
+    _segmentProperties = segmentMetadata.getPropertiesConfiguration();
     _columnMinMaxValueGeneratorMode = columnMinMaxValueGeneratorMode;
   }
 

@@ -25,12 +25,14 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.spi.stream.TransientConsumerException;
 
 
 public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHandler
@@ -48,7 +50,11 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
 
   @Override
   public int fetchPartitionCount(long timeoutMillis) {
-    return _consumer.partitionsFor(_topic, Duration.ofMillis(timeoutMillis)).size();
+    try {
+      return _consumer.partitionsFor(_topic, Duration.ofMillis(timeoutMillis)).size();
+    } catch (TimeoutException e) {
+      throw new TransientConsumerException(e);
+    }
   }
 
   @Override

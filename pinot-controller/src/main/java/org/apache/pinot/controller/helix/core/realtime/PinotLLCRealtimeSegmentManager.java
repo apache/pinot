@@ -208,6 +208,11 @@ public class PinotLLCRealtimeSegmentManager {
     // From all segment names in the ideal state, find unique partition group ids and their latest segment
     Map<Integer, LLCSegmentName> partitionGroupIdToLatestSegment = new HashMap<>();
     for (String segment : idealState.getRecord().getMapFields().keySet()) {
+      // With Pinot upsert table allowing uploads of segments, the segment name of an upsert table segment may not
+      // conform to LLCSegment format. We can skip such segments because they are NOT the consuming segments.
+      if (!LLCSegmentName.isLowLevelConsumerSegmentName(segment)) {
+        continue;
+      }
       LLCSegmentName llcSegmentName = new LLCSegmentName(segment);
       int partitionGroupId = llcSegmentName.getPartitionGroupId();
       partitionGroupIdToLatestSegment.compute(partitionGroupId, (k, latestSegment) -> {

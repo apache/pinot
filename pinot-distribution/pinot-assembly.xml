@@ -84,7 +84,7 @@
         ${pinot.root}/pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-hadoop/target/pinot-batch-ingestion-hadoop-${project.version}-shaded.jar
       </source>
       <destName>
-        plugins/pinot-batch-ingestion/pinot-batch-ingestion-hadoop/pinot-batch-ingestion-hadoop-${project.version}-shaded.jar
+        plugins-external/pinot-batch-ingestion/pinot-batch-ingestion-hadoop/pinot-batch-ingestion-hadoop-${project.version}-shaded.jar
       </destName>
     </file>
     <file>
@@ -92,7 +92,7 @@
         ${pinot.root}/pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-spark/target/pinot-batch-ingestion-spark-${project.version}-shaded.jar
       </source>
       <destName>
-        plugins/pinot-batch-ingestion/pinot-batch-ingestion-spark/pinot-batch-ingestion-spark-${project.version}-shaded.jar
+        plugins-external/pinot-batch-ingestion/pinot-batch-ingestion-spark/pinot-batch-ingestion-spark-${project.version}-shaded.jar
       </destName>
     </file>
     <!-- End Include Pinot Batch Ingestion Plugins-->

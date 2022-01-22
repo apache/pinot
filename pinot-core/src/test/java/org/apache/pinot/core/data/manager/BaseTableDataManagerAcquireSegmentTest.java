@@ -29,6 +29,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
@@ -40,6 +41,7 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeMethod;
@@ -79,7 +81,8 @@ public class BaseTableDataManagerAcquireSegmentTest {
   @BeforeSuite
   public void setUp()
       throws Exception {
-    _tmpDir = File.createTempFile("OfflineTableDataManagerTest", null);
+    _tmpDir = new File(FileUtils.getTempDirectory(), "OfflineTableDataManagerTest");
+    TestUtils.ensureDirectoriesExistAndEmpty(_tmpDir);
     _tmpDir.deleteOnExit();
 
     long seed = System.currentTimeMillis();

@@ -84,8 +84,8 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
   @Override
   public void fetchSegmentToLocal(List<URI> uris, File dest)
       throws Exception {
-    if (uris == null) {
-      throw new IllegalArgumentException("The input uri list is empty");
+    if (uris == null || uris.isEmpty()) {
+      throw new IllegalArgumentException("The input uri list is null or empty");
     }
     Random r = new Random();
     RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {

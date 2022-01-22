@@ -36,7 +36,6 @@ import org.apache.pinot.tools.streams.MeetupRsvpJsonStream;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 
 import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
-import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
 public class UpsertJsonQuickStart extends QuickStartBase {
@@ -57,7 +56,7 @@ public class UpsertJsonQuickStart extends QuickStartBase {
 
   public void execute()
       throws Exception {
-    File quickstartTmpDir = new File(_tmpDir, String.valueOf(System.currentTimeMillis()));
+    File quickstartTmpDir = new File(_dataDir, String.valueOf(System.currentTimeMillis()));
     File baseDir = new File(quickstartTmpDir, "meetupRsvp");
     File dataDir = new File(baseDir, "data");
     Preconditions.checkState(dataDir.mkdirs());
@@ -74,7 +73,7 @@ public class UpsertJsonQuickStart extends QuickStartBase {
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
     QuickstartTableRequest request = new QuickstartTableRequest(baseDir.getAbsolutePath());
-    QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, dataDir);
+    QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 0, dataDir);
 
     printStatus(Color.CYAN, "***** Starting Kafka *****");
     ZkStarter.ZookeeperInstance zookeeperInstance = ZkStarter.startLocalZkServer();

@@ -27,6 +27,7 @@ public class PartialUpsertMergerFactory {
 
   private static final AppendMerger APPEND_MERGER = new AppendMerger();
   private static final IncrementMerger INCREMENT_MERGER = new IncrementMerger();
+  private static final IgnoreMerger IGNORE_MERGER = new IgnoreMerger();
   private static final OverwriteMerger OVERWRITE_MERGER = new OverwriteMerger();
   private static final UnionMerger UNION_MERGER = new UnionMerger();
 
@@ -36,6 +37,8 @@ public class PartialUpsertMergerFactory {
         return APPEND_MERGER;
       case INCREMENT:
         return INCREMENT_MERGER;
+      case IGNORE:
+        return IGNORE_MERGER;
       case OVERWRITE:
         return OVERWRITE_MERGER;
       case UNION:

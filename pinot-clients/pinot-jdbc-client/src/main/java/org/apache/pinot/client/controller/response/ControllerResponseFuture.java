@@ -18,11 +18,12 @@
  */
 package org.apache.pinot.client.controller.response;
 
-import com.ning.http.client.Response;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.client.PinotClientException;
+import org.asynchttpclient.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,7 +75,7 @@ abstract class ControllerResponseFuture<T> implements Future<T> {
         throw new PinotClientException("Pinot returned HTTP status " + httpResponse.getStatusCode() + ", expected 200");
       }
 
-      String responseBody = httpResponse.getResponseBody("UTF-8");
+      String responseBody = httpResponse.getResponseBody(StandardCharsets.UTF_8);
 
       return responseBody;
     } catch (Exception e) {

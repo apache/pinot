@@ -31,11 +31,13 @@
   </parent>
 
   <artifactId>pinot-kafka-2.0</artifactId>
-  <name>Pinot Kafka 2.0</name>
+  <name>Pinot Kafka 2.x</name>
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <kafka.lib.version>2.0.0</kafka.lib.version>
+    <kafka.lib.version>2.8.1</kafka.lib.version>
+    <scala.compat.version>2.13</scala.compat.version>
+    <scala.version>2.13.3</scala.version>
     <phase.prop>package</phase.prop>
   </properties>
 
@@ -66,13 +68,17 @@
       </exclusions>
     </dependency>
     <dependency>
+      <groupId>com.101tec</groupId>
+      <artifactId>zkclient</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.scala-lang</groupId>
       <artifactId>scala-library</artifactId>
-      <version>2.11.11</version>
+      <version>${scala.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.kafka</groupId>
-      <artifactId>kafka_2.11</artifactId>
+      <artifactId>kafka_${scala.compat.version}</artifactId>
       <version>${kafka.lib.version}</version>
       <exclusions>
         <exclusion>

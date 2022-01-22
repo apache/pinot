@@ -120,6 +120,26 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   }
 
   @Test
+  public void testSegmentMetadataApi()
+      throws Exception {
+    {
+      String jsonOutputStr = sendGetRequest(
+          _controllerRequestURLBuilder.forSegmentMetadata(getTableName()));
+      JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
+      Assert.assertEquals(tableSegmentsMetadata.size(), 8);
+
+      JsonNode segmentMetadataFromAllEndpoint = tableSegmentsMetadata.elements().next();
+      String segmentName = URLEncoder.encode(segmentMetadataFromAllEndpoint.get("segmentName").asText(),
+          "UTF-8");
+      jsonOutputStr = sendGetRequest(
+          _controllerRequestURLBuilder.forSegmentMetadata(getTableName(), segmentName));
+      JsonNode segmentMetadataFromDirectEndpoint = JsonUtils.stringToJsonNode(jsonOutputStr);
+      Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
+          segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
+    }
+  }
+
+  @Test
   public void testSegmentListApi()
       throws Exception {
     {

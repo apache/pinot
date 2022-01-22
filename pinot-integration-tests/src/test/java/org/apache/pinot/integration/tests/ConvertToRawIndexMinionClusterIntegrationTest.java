@@ -19,6 +19,7 @@
 package org.apache.pinot.integration.tests;
 
 import java.io.File;
+import java.io.FilenameFilter;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -99,7 +100,14 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
     File tableDataDir = testDataDir;
 
     // Check that all columns have dictionary
-    File[] indexDirs = tableDataDir.listFiles();
+    // Skip the tmp directory since these are only temporary segments
+    FilenameFilter nonTmpFileFilter = new FilenameFilter() {
+      @Override
+      public boolean accept(File dir, String name) {
+        return !name.equals("tmp");
+      }
+    };
+    File[] indexDirs = tableDataDir.listFiles(nonTmpFileFilter);
     Assert.assertNotNull(indexDirs);
     for (File indexDir : indexDirs) {
       SegmentMetadata segmentMetadata = new SegmentMetadataImpl(indexDir);
@@ -138,7 +146,7 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
       }
 
       // Check segment metadata
-      File[] indexDirs1 = tableDataDir.listFiles();
+      File[] indexDirs1 = tableDataDir.listFiles(nonTmpFileFilter);
       Assert.assertNotNull(indexDirs1);
       for (File indexDir : indexDirs1) {
         SegmentMetadata segmentMetadata;

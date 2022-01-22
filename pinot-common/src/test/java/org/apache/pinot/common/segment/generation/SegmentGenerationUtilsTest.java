@@ -78,7 +78,7 @@ public class SegmentGenerationUtilsTest {
   }
 
   // Don't lose authority portion of inputDirURI when creating output files
-  // https://github.com/apache/incubator-pinot/issues/6355
+  // https://github.com/apache/pinot/issues/6355
 
   @Test
   public void testGetFileURI()

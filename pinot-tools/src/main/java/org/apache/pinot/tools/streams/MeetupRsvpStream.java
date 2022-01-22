@@ -40,6 +40,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class MeetupRsvpStream {
   protected static final Logger LOGGER = LoggerFactory.getLogger(MeetupRsvpStream.class);
+  private static final String DEFAULT_TOPIC_NAME = "meetupRSVPEvents";
+  protected String _topicName = DEFAULT_TOPIC_NAME;
 
   protected final boolean _partitionByKey;
   protected final StreamDataProducer _producer;
@@ -61,6 +63,12 @@ public class MeetupRsvpStream {
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
     properties.put("request.required.acks", "1");
     _producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
+  }
+
+  public MeetupRsvpStream(boolean partitionByKey, StreamDataProducer producer, String topicName) {
+    _partitionByKey = partitionByKey;
+    _producer = producer;
+    _topicName = topicName;
   }
 
   public void run()
@@ -117,10 +125,10 @@ public class MeetupRsvpStream {
 
         if (_keepPublishing) {
           if (_partitionByKey) {
-            _producer.produce("meetupRSVPEvents", eventId.getBytes(UTF_8),
+            _producer.produce(_topicName, eventId.getBytes(UTF_8),
                 extractedJson.toString().getBytes(UTF_8));
           } else {
-            _producer.produce("meetupRSVPEvents", extractedJson.toString().getBytes(UTF_8));
+            _producer.produce(_topicName, extractedJson.toString().getBytes(UTF_8));
           }
         }
       } catch (Exception e) {

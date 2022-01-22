@@ -16,30 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.compat.tests;
+package org.apache.pinot.spi.config.provider;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
+import org.apache.pinot.spi.config.table.TableConfig;
 
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class CompatTestOperation {
-  private List<BaseOp> _operations;
-  private String _description;
+/**
+ * Interface for a listener on table config changes
+ */
+public interface TableConfigChangeListener {
 
-  public List<BaseOp> getOperations() {
-    return _operations;
-  }
-
-  public void setOperations(List<BaseOp> operations) {
-    _operations = operations;
-  }
-
-  public void setDescription(String description) {
-    _description = description;
-  }
-
-  public String getDescription() {
-    return _description;
-  }
+  /**
+   * The callback to be invoked on tableConfig changes
+   * @param tableConfigList the entire list of tableConfigs in the cluster
+   */
+  void onChange(List<TableConfig> tableConfigList);
 }

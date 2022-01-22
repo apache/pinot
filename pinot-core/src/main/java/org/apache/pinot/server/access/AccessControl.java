@@ -19,7 +19,6 @@
 package org.apache.pinot.server.access;
 
 import io.netty.channel.ChannelHandlerContext;
-import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
@@ -38,9 +37,9 @@ public interface AccessControl {
   /**
    * Return whether the client has data access to the given table.
    *
-   * @param httpHeaders Http headers
+   * @param requesterIdentity Request identity
    * @param tableName Name of the table to be accessed
    * @return Whether the client has data access to the table
    */
-  boolean hasDataAccess(HttpHeaders httpHeaders, String tableName);
+  boolean hasDataAccess(RequesterIdentity requesterIdentity, String tableName);
 }

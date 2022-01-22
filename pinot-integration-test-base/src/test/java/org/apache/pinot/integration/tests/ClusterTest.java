@@ -317,6 +317,52 @@ public abstract class ClusterTest extends ControllerTest {
     _serverStarters = null;
   }
 
+  protected void restartServers(int numServers)
+      throws InterruptedException {
+    assertNotNull(_serverStarters, "Servers are not started");
+    for (HelixServerStarter helixServerStarter : _serverStarters) {
+      try {
+        helixServerStarter.stop();
+      } catch (Exception e) {
+        LOGGER.error("Encountered exception while stopping server {}", e.getMessage());
+      }
+    }
+    _serverStarters = null;
+
+    _serverStarters = new ArrayList<>(numServers);
+    String zkStr = getZkUrl();
+    int baseAdminApiPort = Server.DEFAULT_ADMIN_API_PORT;
+    int baseNettyPort = Helix.DEFAULT_SERVER_NETTY_PORT;
+    int baseGrpcPort = Server.DEFAULT_GRPC_PORT;
+    PinotConfiguration configuration = getDefaultServerConfiguration();
+    overrideServerConf(configuration);
+    try {
+      for (int i = 0; i < numServers; i++) {
+        configuration.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
+        configuration.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkStr);
+        configuration.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR + "-" + i);
+        configuration
+            .setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
+        configuration.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, baseAdminApiPort - i);
+        configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, baseNettyPort + i);
+        if (configuration.getProperty(Server.CONFIG_OF_ENABLE_GRPC_SERVER, false)) {
+          configuration.setProperty(Server.CONFIG_OF_GRPC_PORT, baseGrpcPort + i);
+        }
+        configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, baseNettyPort + i);
+        // Thread time measurement is disabled by default, enable it in integration tests.
+        // TODO: this can be removed when we eventually enable thread time measurement by default.
+        configuration.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+        HelixServerStarter helixServerStarter = new HelixServerStarter();
+        helixServerStarter.init(configuration);
+        helixServerStarter.start();
+        _serverStarters.add(helixServerStarter);
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+
+  }
+
   protected void stopMinion() {
     assertNotNull(_minionStarter, "Minion is not started");
     try {

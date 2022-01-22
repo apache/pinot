@@ -186,10 +186,6 @@ rules:
   name: "pinot_broker_brokerResponsesWithNumGroupsLimitReached_$2"
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.requestConnectionTimeouts\"><>(\\w+)"
-  name: "pinot_broker_requestConnectionTimeouts_$2"
-  labels:
-    table: "$1"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.queryQuotaExceeded\"><>(\\w+)"
   name: "pinot_broker_queryQuotaExceeded_$2"
   labels:

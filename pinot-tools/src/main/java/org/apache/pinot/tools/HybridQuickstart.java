@@ -41,7 +41,6 @@ import org.apache.pinot.tools.streams.AirlineDataStream;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 
 import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
-import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
 public class HybridQuickstart extends QuickStartBase {
@@ -110,12 +109,13 @@ public class HybridQuickstart extends QuickStartBase {
 
   public void execute()
       throws Exception {
-    File quickstartTmpDir = new File(_tmpDir, String.valueOf(System.currentTimeMillis()));
+    File quickstartTmpDir = new File(_dataDir, String.valueOf(System.currentTimeMillis()));
     File baseDir = new File(quickstartTmpDir, "airlineStats");
     File dataDir = new File(baseDir, "data");
     Preconditions.checkState(dataDir.mkdirs());
     QuickstartTableRequest bootstrapTableRequest = prepareTableRequest(baseDir);
-    final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(bootstrapTableRequest), 1, 1, 1, dataDir);
+    final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(bootstrapTableRequest),
+        1, 1, 1, 0, dataDir);
     printStatus(Color.YELLOW, "***** Starting Kafka  *****");
     startKafka();
     printStatus(Color.YELLOW, "***** Starting airline data stream and publishing to Kafka *****");

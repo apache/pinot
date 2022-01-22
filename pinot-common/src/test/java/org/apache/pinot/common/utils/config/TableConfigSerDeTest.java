@@ -228,10 +228,8 @@ public class TableConfigSerDeTest {
       Map<String, String> properties = new HashMap<>();
       properties.put("foo", "bar");
       properties.put("foobar", "potato");
-      List<FieldConfig> fieldConfigList = Arrays.asList(
-          new FieldConfig("column1", FieldConfig.EncodingType.DICTIONARY, Lists.newArrayList(
-              FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.RANGE), null,
-              properties),
+      List<FieldConfig> fieldConfigList = Arrays.asList(new FieldConfig("column1", FieldConfig.EncodingType.DICTIONARY,
+              Lists.newArrayList(FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.RANGE), null, properties),
           new FieldConfig("column2", null, Collections.emptyList(), null, null),
           new FieldConfig("column3", FieldConfig.EncodingType.RAW, Collections.emptyList(),
               FieldConfig.CompressionCodec.SNAPPY, null));
@@ -251,7 +249,8 @@ public class TableConfigSerDeTest {
     {
       // with upsert config
       UpsertConfig upsertConfig =
-          new UpsertConfig(UpsertConfig.Mode.FULL, null, "comparison", UpsertConfig.HashFunction.NONE);
+          new UpsertConfig(UpsertConfig.Mode.FULL, null, null, "comparison",
+              UpsertConfig.HashFunction.NONE);
 
       TableConfig tableConfig = tableConfigBuilder.setUpsertConfig(upsertConfig).build();
 

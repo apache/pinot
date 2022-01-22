@@ -164,8 +164,13 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
       PartialUpsertHandler partialUpsertHandler = null;
       if (isPartialUpsertEnabled()) {
-        partialUpsertHandler =
-            new PartialUpsertHandler(_helixManager, _tableNameWithType, upsertConfig.getPartialUpsertStrategies());
+        String comparisonColumn = upsertConfig.getComparisonColumn();
+        if (comparisonColumn == null) {
+          comparisonColumn = tableConfig.getValidationConfig().getTimeColumnName();
+        }
+        partialUpsertHandler = new PartialUpsertHandler(_helixManager, _tableNameWithType, schema,
+            upsertConfig.getPartialUpsertStrategies(), upsertConfig.getDefaultPartialUpsertStrategy(),
+            comparisonColumn);
       }
       UpsertConfig.HashFunction hashFunction = upsertConfig.getHashFunction();
       _tableUpsertMetadataManager =
@@ -288,7 +293,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     boolean isLLCSegment = SegmentName.isLowLevelConsumerSegmentName(segmentName);
     if (segmentDir.exists()) {
       // Segment already exists on disk
-      if (segmentZKMetadata.getStatus() == Status.DONE) {
+      if (segmentZKMetadata.getStatus() == Status.DONE || segmentZKMetadata.getStatus() == Status.UPLOADED) {
         // Metadata has been committed, load the local segment
         try {
           addSegment(ImmutableSegmentLoader.load(segmentDir, indexLoadingConfig, schema));
@@ -465,9 +470,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    */
   private void untarAndMoveSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, File segmentTarFile)
       throws IOException {
-    // TODO: This could leave temporary directories in _indexDir if JVM shuts down before the temporary directory is
-    //       deleted. Consider cleaning up all temporary directories when starting the server.
-    File tempSegmentDir = new File(_indexDir, "tmp-" + segmentName + "." + System.currentTimeMillis());
+    // This could leave temporary directories in _indexDir if JVM shuts down before the temp directory is deleted.
+    // This is fine since the temporary directories are deleted when the table data manager calls init.
+    File tempSegmentDir = getTmpSegmentDataDir("tmp-" + segmentName + "." + System.currentTimeMillis());
     try {
       File tempIndexDir = TarGzCompressionUtils.untar(segmentTarFile, tempSegmentDir).get(0);
       _logger.info("Uncompressed file {} into tmp dir {}", segmentTarFile, tempSegmentDir);

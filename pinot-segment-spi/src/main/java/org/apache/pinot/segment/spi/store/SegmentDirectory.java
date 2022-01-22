@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.store;
 
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
@@ -138,6 +139,14 @@ public abstract class SegmentDirectory implements Closeable {
    * @param fetchContext context for this segment's fetch
    */
   public void release(FetchContext fetchContext) {
+  }
+
+  /**
+   * Copy segment directory to a local directory.
+   * @param dest the destination directory
+   */
+  public void copyTo(File dest)
+      throws Exception {
   }
 
   /**
