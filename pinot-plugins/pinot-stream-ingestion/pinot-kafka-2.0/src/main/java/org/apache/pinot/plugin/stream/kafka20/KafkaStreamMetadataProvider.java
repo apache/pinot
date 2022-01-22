@@ -22,15 +22,21 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.utils.TimeUtils;
 
 
 public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHandler
     implements StreamMetadataProvider {
+
+  private static Map<TopicPartition, Long> _offsetsForTimes = new HashMap<>();
 
   public KafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig) {
     this(clientId, streamConfig, Integer.MIN_VALUE);
@@ -55,6 +61,28 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     } else if (offsetCriteria.isSmallest()) {
       offset = _consumer.beginningOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
           .get(_topicPartition);
+    } else if (offsetCriteria.isPeriod()) {
+      String offsetString = offsetCriteria.getOffsetString();
+      Long periodToMillis = TimeUtils.convertPeriodToMillis(offsetString);
+      TopicPartition tp = new TopicPartition(_topic, _partition);
+      _offsetsForTimes.put(tp, System.currentTimeMillis() - periodToMillis);
+      if (_consumer.offsetsForTimes(_offsetsForTimes).get(tp) == null) {
+        offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+            .get(_topicPartition);
+      } else {
+        offset = _consumer.offsetsForTimes(_offsetsForTimes).get(tp).offset();
+      }
+    } else if (offsetCriteria.isTimestamp()) {
+      String offsetString = offsetCriteria.getOffsetString();
+      Long timestampToMillis = TimeUtils.convertDateTimeStringToMillis(offsetString);
+      TopicPartition tp = new TopicPartition(_topic, _partition);
+      _offsetsForTimes.put(tp, timestampToMillis);
+      if (_consumer.offsetsForTimes(_offsetsForTimes).get(tp) == null) {
+        offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+            .get(_topicPartition);
+      } else {
+        offset = _consumer.offsetsForTimes(_offsetsForTimes).get(tp).offset();
+      }
     } else {
       throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria);
     }

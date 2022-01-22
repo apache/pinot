@@ -21,12 +21,16 @@ package org.apache.pinot.spi.stream;
 import com.google.common.base.Preconditions;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Defines and builds the offset criteria for consumption from a stream
  */
 public class OffsetCriteria {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(OffsetCriteria.class);
 
   public static final OffsetCriteria SMALLEST_OFFSET_CRITERIA =
       new OffsetCriteria.OffsetCriteriaBuilder().withOffsetSmallest();
@@ -47,6 +51,9 @@ public class OffsetCriteria {
 
     // Consumes from the time as provided in the period string
     PERIOD,
+
+    // Consumes from the timestamp specified
+    TIMESTAMP,
 
     // Consumes from the custom offset criteria */
     CUSTOM
@@ -89,6 +96,14 @@ public class OffsetCriteria {
    */
   public boolean isPeriod() {
     return _offsetType != null && _offsetType.equals(OffsetType.PERIOD);
+  }
+
+  /**
+   * True if the offset criteria is defined as a timestamp format string
+   * @return
+   */
+  public boolean isTimestamp() {
+    return _offsetType != null && _offsetType.equals(OffsetType.TIMESTAMP);
   }
 
   /**
@@ -168,24 +183,30 @@ public class OffsetCriteria {
      */
     public OffsetCriteria withOffsetString(String offsetString) {
       Preconditions.checkNotNull(offsetString, "Must provide offset string");
+      _offsetCriteria.setOffsetString(offsetString);
 
       if (offsetString.equalsIgnoreCase(OffsetType.SMALLEST.toString())) {
         _offsetCriteria.setOffsetType(OffsetType.SMALLEST);
       } else if (offsetString.equalsIgnoreCase(OffsetType.LARGEST.toString())) {
         _offsetCriteria.setOffsetType(OffsetType.LARGEST);
       } else {
-        try {
-          Long periodToMillis = TimeUtils.convertPeriodToMillis(offsetString);
-          if (periodToMillis >= 0) {
-            _offsetCriteria.setOffsetType(OffsetType.PERIOD);
+        Long periodToMillis = TimeUtils.convertPeriodToMillis(offsetString);
+        if (periodToMillis >= 0) {
+          _offsetCriteria.setOffsetType(OffsetType.PERIOD);
+          return _offsetCriteria;
+        } else {
+          LOGGER.error("Invalid time spec: '" + offsetString + "' (Valid examples: '3h', '4h30m')");
+          Long timestampToMillis = TimeUtils.convertDateTimeStringToMillis(offsetString);
+          if (timestampToMillis >= 0) {
+            _offsetCriteria.setOffsetType(OffsetType.TIMESTAMP);
+            return _offsetCriteria;
           } else {
-            _offsetCriteria.setOffsetType(OffsetType.CUSTOM);
+            LOGGER.error("Invalid time spec: '" + offsetString + "' Valid timestamp format: "
+                + TimeUtils.DATE_TIME_FORMAT);
           }
-        } catch (Exception e) {
-          _offsetCriteria.setOffsetType(OffsetType.CUSTOM);
         }
+        _offsetCriteria.setOffsetType(OffsetType.CUSTOM);
       }
-      _offsetCriteria.setOffsetString(offsetString);
       return _offsetCriteria;
     }
   }

@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.spi.utils;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.joda.time.DateTime;
@@ -140,6 +143,8 @@ public class TimeUtils {
     return VALID_MAX_TIME_MILLIS;
   }
 
+  private static final Long ERROR_FLAG = -1L;
+
   private static final PeriodFormatter PERIOD_FORMATTER =
       new PeriodFormatterBuilder().appendDays().appendSuffix("d").appendHours().appendSuffix("h").appendMinutes()
           .appendSuffix("m").appendSeconds().appendSuffix("s").toFormatter();
@@ -160,8 +165,7 @@ public class TimeUtils {
         Period p = PERIOD_FORMATTER.parsePeriod(timeStr);
         millis = p.toStandardDuration().getStandardSeconds() * 1000L;
       } catch (IllegalArgumentException e) {
-        // rethrowing with more contextual information
-        throw new IllegalArgumentException("Invalid time spec '" + timeStr + "' (Valid examples: '3h', '4h30m')", e);
+        return ERROR_FLAG;
       }
     }
     return millis;
@@ -193,5 +197,21 @@ public class TimeUtils {
     } catch (Exception e) {
       return false;
     }
+  }
+
+  public static final String DATE_TIME_FORMAT = "yyyy-MM-dd'T'HH:mm:ss.SSSZ";
+
+  public static Long convertDateTimeStringToMillis(String timeStr) {
+    Long millis = 0L;
+    SimpleDateFormat f = new SimpleDateFormat(DATE_TIME_FORMAT);
+    if (timeStr != null) {
+      try {
+        Date d = f.parse(timeStr);
+        millis = d.getTime();
+      } catch (ParseException e) {
+        return ERROR_FLAG;
+      }
+    }
+    return millis;
   }
 }
