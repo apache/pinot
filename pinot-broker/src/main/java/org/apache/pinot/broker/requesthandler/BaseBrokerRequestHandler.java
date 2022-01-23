@@ -98,6 +98,8 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.util.stream.Collectors.toSet;
+
 
 @SuppressWarnings("UnstableApiUsage")
 @ThreadSafe
@@ -1470,7 +1472,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
       //if query has a '*' selection along with other columns
       if (selectStarExpr != null && pinotQuery.getSelectList().size() > 1) {
-        expandStarExpressionToActualColumns(pinotQuery, columnNameMap, selectStarExpr);
+        expandStarExpressionToActualColumns(pinotQuery, columnNameMap, aliasMap, selectStarExpr);
       }
       Expression filterExpression = pinotQuery.getFilterExpression();
       if (filterExpression != null) {
@@ -1498,16 +1500,22 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   private static void expandStarExpressionToActualColumns(PinotQuery pinotQuery, Map<String, String> columnNameMap,
-      Expression selectStarExpr) {
+      Map<String, String> aliasMap, Expression selectStarExpr) {
     //select query has * along with other columns in select list, then expand * to all columns
-    List<Expression> selections = pinotQuery.getSelectList();
+    List<Expression> originalSelections = pinotQuery.getSelectList();
+    Set<String> originallySelectedColumnNames =
+        originalSelections.stream().filter(Expression::isSetIdentifier).map(a -> a.getIdentifier().getName())
+            .collect(toSet());
     List<Expression> newSelections = new ArrayList<>();
-    for (Expression selection : selections) {
+    for (Expression selection : originalSelections) {
       if (selection.equals(selectStarExpr)) {
         //expand '*' to actual columns, exclude default virtual columns
-        for (String value : columnNameMap.values()) {
-          if (isNotDefaultVirtualColumn(value)) {
-            Expression identifierExpression = RequestUtils.createIdentifierExpression(value);
+        for (String tableCol : columnNameMap.values()) {
+          //we exclude default virtual columns and those columns that are already a part of original
+          // originalSelections (to
+          // dedup columns that are selected multiple times)
+          if (isNotDefaultVirtualColumn(tableCol) && !originallySelectedColumnNames.contains(tableCol)) {
+            Expression identifierExpression = RequestUtils.createIdentifierExpression(tableCol);
             newSelections.add(identifierExpression);
           }
         }
@@ -1519,8 +1527,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   private static boolean isNotDefaultVirtualColumn(String value) {
-    return !value.equals(CommonConstants.Segment.BuiltInVirtualColumn.DOCID) &&
-        !value.equals(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME) && !value.equals(
+    return !isDefaultVirtualColumn(value);
+  }
+
+  private static boolean isDefaultVirtualColumn(String value) {
+    return value.equals(CommonConstants.Segment.BuiltInVirtualColumn.DOCID) ||
+        value.equals(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME) || value.equals(
         CommonConstants.Segment.BuiltInVirtualColumn.HOSTNAME);
   }
 
