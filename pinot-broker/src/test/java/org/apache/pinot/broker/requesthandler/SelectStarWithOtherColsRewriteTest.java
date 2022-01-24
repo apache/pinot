@@ -95,10 +95,10 @@ public class SelectStarWithOtherColsRewriteTest {
     BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
     List<Expression> newSelections = pinotQuery.getSelectList();
     int playerIdCount = 0, homeRunsCount = 0;
-    for(Expression expression : newSelections) {
+    for (Expression expression : newSelections) {
       if (expression.getIdentifier().getName().equals("playerID")) {
         playerIdCount++;
-      } else if(expression.getIdentifier().getName().equals("homeRuns")) {
+      } else if (expression.getIdentifier().getName().equals("homeRuns")) {
         homeRunsCount++;
       }
     }
@@ -165,7 +165,8 @@ public class SelectStarWithOtherColsRewriteTest {
     List<Expression> newSelections = pinotQuery.getSelectList();
     Assert.assertTrue(newSelections.get(0).isSetFunctionCall());
     Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperator(), "AS");
-    Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "playerID");
+    Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "playerID");
     Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "pid");
     Assert.assertEquals(newSelections.get(1).getIdentifier().getName(), "homeRuns");
     Assert.assertEquals(newSelections.get(2).getIdentifier().getName(), "playerStint");
@@ -214,24 +215,30 @@ public class SelectStarWithOtherColsRewriteTest {
 
   @Test
   public void testAll() {
-    String sql = "SELECT abs(homeRuns),sqrt(groundedIntoDoublePlays),*,$segmentName,$hostName,playerStint as pstint,playerID  FROM baseballStats";
+    String sql =
+        "SELECT abs(homeRuns),sqrt(groundedIntoDoublePlays),*,$segmentName,$hostName,playerStint as pstint,playerID  "
+            + "FROM baseballStats";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
     List<Expression> newSelections = pinotQuery.getSelectList();
     Assert.assertTrue(newSelections.get(0).isSetFunctionCall());
     Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperator(), "ABS");
-    Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "homeRuns");
+    Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "homeRuns");
     Assert.assertTrue(newSelections.get(1).isSetFunctionCall());
     Assert.assertEquals(newSelections.get(1).getFunctionCall().getOperator(), "SQRT");
-    Assert.assertEquals(newSelections.get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "groundedIntoDoublePlays");
+    Assert.assertEquals(newSelections.get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "groundedIntoDoublePlays");
     Assert.assertEquals(newSelections.get(2).getIdentifier().getName(), "homeRuns");
     Assert.assertEquals(newSelections.get(3).getIdentifier().getName(), "playerStint");
     Assert.assertEquals(newSelections.get(4).getIdentifier().getName(), "groundedIntoDoublePlays");
     Assert.assertEquals(newSelections.get(5).getIdentifier().getName(), "$segmentName");
     Assert.assertEquals(newSelections.get(6).getIdentifier().getName(), "$hostName");
     Assert.assertEquals(newSelections.get(7).getFunctionCall().getOperator(), "AS");
-    Assert.assertEquals(newSelections.get(7).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "playerStint");
-    Assert.assertEquals(newSelections.get(7).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "pstint");
+    Assert.assertEquals(newSelections.get(7).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "playerStint");
+    Assert.assertEquals(newSelections.get(7).getFunctionCall().getOperands().get(1).getIdentifier().getName(),
+        "pstint");
     Assert.assertEquals(newSelections.get(8).getIdentifier().getName(), "playerID");
   }
 }

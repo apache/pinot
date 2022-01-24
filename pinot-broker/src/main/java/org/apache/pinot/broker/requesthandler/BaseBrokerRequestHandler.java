@@ -1528,8 +1528,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   private static boolean isDefaultVirtualColumn(String value) {
-    return value.equals(CommonConstants.Segment.BuiltInVirtualColumn.DOCID) ||
-        value.equals(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME) || value.equals(
+    return value.equals(CommonConstants.Segment.BuiltInVirtualColumn.DOCID) || value.equals(
+        CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME) || value.equals(
         CommonConstants.Segment.BuiltInVirtualColumn.HOSTNAME);
   }
 
