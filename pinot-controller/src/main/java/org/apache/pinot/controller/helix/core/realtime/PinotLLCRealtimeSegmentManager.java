@@ -943,6 +943,12 @@ public class PinotLLCRealtimeSegmentManager {
       int partitionId = newLLCSegmentName.getPartitionGroupId();
       int seqNum = newLLCSegmentName.getSequenceNumber();
       for (String segmentNameStr : instanceStatesMap.keySet()) {
+        if (!LLCSegmentName.isLowLevelConsumerSegmentName(segmentNameStr)) {
+          // skip the segment name if the name is not in low-level consumer format
+          // such segment name can appear for uploaded segment
+          LOGGER.debug("Skip segment name {} not in low-level consumer format", segmentNameStr);
+          continue;
+        }
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentNameStr);
         if (llcSegmentName.getPartitionGroupId() == partitionId && llcSegmentName.getSequenceNumber() == seqNum) {
           String errorMsg =
