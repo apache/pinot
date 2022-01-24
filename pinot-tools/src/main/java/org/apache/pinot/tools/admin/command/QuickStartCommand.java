@@ -47,6 +47,10 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
       description = "URL for an external Zookeeper instance instead of using the default embedded instance")
   private String _zkExternalAddress;
 
+  @CommandLine.Option(names = {"-configFile", "-configFilePath"}, required = false,
+      description = "Config file path to override default pinot configs")
+  private String _configFilePath;
+
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false,
       description = "Print this message.")
   private boolean _help = false;
@@ -128,6 +132,10 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
 
     if (_zkExternalAddress != null) {
       quickstart.setZkExternalAddress(_zkExternalAddress);
+    }
+
+    if (_configFilePath != null) {
+      quickstart.setConfigFilePath(_configFilePath);
     }
 
     quickstart.execute();

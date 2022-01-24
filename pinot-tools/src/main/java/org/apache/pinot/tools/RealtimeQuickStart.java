@@ -73,7 +73,8 @@ public class RealtimeQuickStart extends QuickStartBase {
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
     QuickstartTableRequest request = new QuickstartTableRequest(baseDir.getAbsolutePath());
-    final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 0, dataDir);
+    final QuickstartRunner runner =
+        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 0, dataDir, getConfigOverrides());
 
     printStatus(Color.CYAN, "***** Starting Kafka *****");
     final ZkStarter.ZookeeperInstance zookeeperInstance = ZkStarter.startLocalZkServer();

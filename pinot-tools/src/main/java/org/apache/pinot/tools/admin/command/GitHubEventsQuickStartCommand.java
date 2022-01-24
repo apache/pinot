@@ -68,7 +68,7 @@ public class GitHubEventsQuickStartCommand extends AbstractBaseAdminCommand impl
   public boolean execute()
       throws Exception {
     PluginManager.get().init();
-    new GitHubEventsQuickstart().execute(_personalAccessToken);
+    new GitHubEventsQuickstart().setPersonalAccessToken(_personalAccessToken).execute();
     return true;
   }
 }

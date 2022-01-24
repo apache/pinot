@@ -22,7 +22,6 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
@@ -34,10 +33,6 @@ public class EmptyQuickstart extends QuickStartBase {
   }
 
   public String getAuthToken() {
-    return null;
-  }
-
-  public Map<String, Object> getConfigOverrides() {
     return null;
   }
 
