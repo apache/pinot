@@ -44,6 +44,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.slf4j.LoggerFactory;
 
+
 public class PinotDriver implements Driver {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(PinotDriver.class);
   private static final String URI_SCHEME = "pinot";
@@ -66,6 +67,24 @@ public class PinotDriver implements Driver {
     _sslContext = sslContext;
   }
 
+  /**
+   * Created connection to Pinot Controller from provided properties.
+   * The following properties can be provided -
+   * tenant - Specify the tenant for which this connection is being created. If not provided, DefaultTenant is used.
+   *        The connection cannot handle queries for tables which are not present in the specified tenant.
+   * headers.Authorization - base64 token to query pinot. This is required in case Auth is enabled on pinot cluster.
+   * user - Name of the user for which auth is enabled.
+   * password - Password associated with the user for which auth is enabled.
+   *
+   * You can also specify username and password in the URL, e.g. jdbc:pinot://localhost:9000?user=Foo&password=Bar
+   * If username and password are specified at multiple places, the precedence takes place in the following order
+   * (header.Authorization property) > (user and password specified in properties) > (username and password in URL)
+   * @param url  jdbc connection url containing pinot controller machine host:port.
+   *             example - jdbc:pinot://localhost:9000
+   * @param info properties required for creating connection
+   * @return
+   * @throws SQLException
+   */
   @Override
   public Connection connect(String url, Properties info)
       throws SQLException {
@@ -88,20 +107,9 @@ public class PinotDriver implements Driver {
         }
       }
 
-      Map<String, String> headers =
-          info.entrySet().stream().filter(entry -> entry.getKey().toString().startsWith(INFO_HEADERS + ".")).map(
-              entry -> Pair.of(entry.getKey().toString().substring(INFO_HEADERS.length() + 1),
-                  entry.getValue().toString())).collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+      Map<String, String> headers = getHeadersFromProperties(info);
 
-      if (info.contains(USER_PROPERTY) && !headers.containsKey(AUTH_HEADER)) {
-        String username = info.getProperty(USER_PROPERTY);
-        String password = info.getProperty(PASSWORD_PROPERTY, "");
-        if (StringUtils.isEmpty(password)) {
-          throw new SQLException("Empty username or password provided.");
-        }
-        String authToken = BasicAuthUtils.toBasicAuthToken(username, password);
-        headers.put(AUTH_HEADER, authToken);
-      }
+      handleAuth(url, info, headers);
 
       if (!headers.isEmpty()) {
         factory.setHeaders(headers);
@@ -116,6 +124,46 @@ public class PinotDriver implements Driver {
     } catch (Exception e) {
       throw new SQLException(String.format("Failed to connect to url : %s", url), e);
     }
+  }
+
+  private void handleAuth(String url, Properties info, Map<String, String> headers)
+      throws SQLException {
+    handleAuthFromProperties(info, headers);
+
+    handleAuthFromURLParams(url, headers);
+  }
+
+  private void handleAuthFromURLParams(String url, Map<String, String> headers)
+      throws SQLException {
+    Map<String, String> urlParams = DriverUtils.getURLParams(url);
+    if (urlParams.containsKey(USER_PROPERTY) && !headers.containsKey(AUTH_HEADER)) {
+      String username = urlParams.get(USER_PROPERTY);
+      String password = urlParams.getOrDefault(PASSWORD_PROPERTY, "");
+      if (StringUtils.isEmpty(password)) {
+        throw new SQLException("Empty username or password provided.");
+      }
+      String authToken = BasicAuthUtils.toBasicAuthToken(username, password);
+      headers.put(AUTH_HEADER, authToken);
+    }
+  }
+
+  private void handleAuthFromProperties(Properties info, Map<String, String> headers)
+      throws SQLException {
+    if (info.contains(USER_PROPERTY) && !headers.containsKey(AUTH_HEADER)) {
+      String username = info.getProperty(USER_PROPERTY);
+      String password = info.getProperty(PASSWORD_PROPERTY, "");
+      if (StringUtils.isEmpty(password)) {
+        throw new SQLException("Empty username or password provided.");
+      }
+      String authToken = BasicAuthUtils.toBasicAuthToken(username, password);
+      headers.put(AUTH_HEADER, authToken);
+    }
+  }
+
+  private Map<String, String> getHeadersFromProperties(Properties info) {
+    return info.entrySet().stream().filter(entry -> entry.getKey().toString().startsWith(INFO_HEADERS + ".")).map(
+            entry -> Pair.of(entry.getKey().toString().substring(INFO_HEADERS.length() + 1), entry.getValue().toString()))
+        .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
   }
 
   @Override

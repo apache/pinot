@@ -20,9 +20,11 @@ package org.apache.pinot.client.utils;
 
 import java.math.BigDecimal;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Properties;
 import java.util.regex.Matcher;
@@ -32,6 +34,11 @@ import org.apache.commons.configuration.MapConfiguration;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.utils.URLEncodedUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,6 +95,21 @@ public class DriverUtils {
     URI uri = URI.create(url);
     String controllerUrl = String.format("%s:%d", uri.getHost(), uri.getPort());
     return controllerUrl;
+  }
+
+  public static Map<String, String> getURLParams(String url) {
+    if (url.toLowerCase().startsWith("jdbc:")) {
+      url = url.substring(5);
+    }
+    URI uri = URI.create(url);
+    List<NameValuePair> params = URLEncodedUtils.parse(uri, StandardCharsets.UTF_8);
+
+    Map<String, String> paramsMap = new HashMap<>();
+    for(NameValuePair param: params) {
+      paramsMap.put(param.getName(), param.getValue());
+    }
+
+    return paramsMap;
   }
 
   public static Integer getSQLDataType(String columnDataType) {
