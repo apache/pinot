@@ -20,7 +20,6 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.google.common.collect.ImmutableMap;
-import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.Expression;
@@ -36,6 +35,7 @@ public class SelectStarWithOtherColsRewriteTest {
   private static final Map<String, String> COL_MAP;
 
   static {
+    //build table schema
     ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
     builder.put("homeRuns", "homeRuns");
     builder.put("playerStint", "playerStint");
@@ -48,7 +48,31 @@ public class SelectStarWithOtherColsRewriteTest {
   }
 
   @Test
-  public void testHappyCase() {
+  public void testHappyCase1() {
+    String sql = "SELECT homeRuns, playerStint FROM baseballStats";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
+    List<Expression> newSelections = pinotQuery.getSelectList();
+    Assert.assertEquals(newSelections.size(), 2, "More selections than requested");
+    Assert.assertEquals(newSelections.get(1).getIdentifier().getName(), "homeRuns");
+    Assert.assertEquals(newSelections.get(2).getIdentifier().getName(), "playerStint");
+  }
+
+  @Test
+  public void testHappyCase2() {
+    String sql = "SELECT * FROM baseballStats";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
+    List<Expression> newSelections = pinotQuery.getSelectList();
+    Assert.assertEquals(newSelections.size(), 4, "More selections than requested");
+    Assert.assertEquals(newSelections.get(1).getIdentifier().getName(), "homeRuns");
+    Assert.assertEquals(newSelections.get(2).getIdentifier().getName(), "playerStint");
+    Assert.assertEquals(newSelections.get(3).getIdentifier().getName(), "groundedIntoDoublePlays");
+    Assert.assertEquals(newSelections.get(4).getIdentifier().getName(), "playerID");
+  }
+
+  @Test
+  public void testStarWithVirtualColumns() {
     String sql = "SELECT $segmentName,*,$hostName FROM baseballStats";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
@@ -87,8 +111,6 @@ public class SelectStarWithOtherColsRewriteTest {
    */
   @Test
   public void testSelectionOrder() {
-//    SELECT playerID,intentionalWalks,* FROM baseballStats order by numberOfGames desc -> problemetic query, col:
-//    runs does not have any values in any of the rows
     String sql = "SELECT playerID,*,homeRuns FROM baseballStats";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
@@ -151,6 +173,9 @@ public class SelectStarWithOtherColsRewriteTest {
     Assert.assertEquals(newSelections.get(4).getIdentifier().getName(), "playerID");
   }
 
+  /**
+   * When a function is applied to a column, then that col is returned along with the original column
+   */
   @Test
   public void testFunctionsOnCols() {
     String sql = "SELECT sqrt(homeRuns),* FROM baseballStats";
@@ -169,7 +194,7 @@ public class SelectStarWithOtherColsRewriteTest {
   }
 
   /**
-   * When multiple unqualified * are present, all are expanded
+   * When 'n' no. of unqualified * are present, then each column is returned 'n' times.
    */
   @Test
   public void testMultipleUnqualifiedStars() {
