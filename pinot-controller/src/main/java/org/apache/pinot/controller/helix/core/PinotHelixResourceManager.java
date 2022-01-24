@@ -72,6 +72,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
 import org.apache.pinot.common.exception.SchemaBackwardIncompatibleException;
@@ -96,7 +97,6 @@ import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
-import org.apache.pinot.common.utils.helix.TableCache;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
@@ -2594,7 +2594,7 @@ public class PinotHelixResourceManager {
               // TODO: Handle the case when realtime segments are in OFFLINE state because there're some problem with
               //  realtime segment consumption,
               //  and realtime segment will mark itself as OFFLINE in ideal state.
-              //  Issue: https://github.com/apache/incubator-pinot/issues/4653
+              //  Issue: https://github.com/apache/pinot/issues/4653
               if ((enableInstance && !offlineState.equals(state)) || (!enableInstance && offlineState.equals(state))) {
                 toggleSucceeded = false;
                 break;
@@ -2783,6 +2783,10 @@ public class PinotHelixResourceManager {
 
     try {
       DEFAULT_RETRY_POLICY.attempt(() -> {
+        // Fetch table config
+        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+        Preconditions.checkNotNull(tableConfig, "Table config is not available for table '%s'", tableNameWithType);
+
         // Fetch the segment lineage metadata
         ZNRecord segmentLineageZNRecord =
             SegmentLineageAccessHelper.getSegmentLineageZNRecord(_propertyStore, tableNameWithType);
@@ -2794,7 +2798,6 @@ public class PinotHelixResourceManager {
           segmentLineage = SegmentLineage.fromZNRecord(segmentLineageZNRecord);
           expectedVersion = segmentLineageZNRecord.getVersion();
         }
-
         // Check that the segment lineage entry id doesn't exists in the segment lineage
         Preconditions.checkArgument(segmentLineage.getLineageEntry(segmentLineageEntryId) == null,
             String.format("SegmentLineageEntryId (%s) already exists in the segment lineage.", segmentLineageEntryId));
@@ -2811,15 +2814,46 @@ public class PinotHelixResourceManager {
 
           // By here, the lineage entry is either 'IN_PROGRESS' or 'COMPLETED'.
 
-          // When 'forceCleanup' is enabled, we need to proactively revert the lineage entry when we find the lineage
-          // entry with the same 'segmentFrom' values.
-          if (forceCleanup && lineageEntry.getState() == LineageEntryState.IN_PROGRESS && CollectionUtils
+          // When 'forceCleanup' is enabled, we need to proactively clean up at the following cases:
+          // 1. Revert the lineage entry when we find the lineage entry with the same 'segmentFrom' values. This is
+          //    used to un-block the segment replacement protocol if the previous attempt failed in the middle.
+          // 2. Proactively delete the oldest data snapshot to make sure that we only keep at most 2 data snapshots
+          //    at any time in case of REFRESH use case.
+          if (forceCleanup) {
+            if (lineageEntry.getState() == LineageEntryState.IN_PROGRESS && CollectionUtils
               .isEqualCollection(segmentsFrom, lineageEntry.getSegmentsFrom())) {
-            // Update segment lineage entry to 'REVERTED'
-            updateSegmentLineageEntryToReverted(tableNameWithType, segmentLineage, entryId, lineageEntry);
+              LOGGER.info(
+                  "Detected the incomplete lineage entry with the same 'segmentsFrom'. Reverting the lineage "
+                      + "entry to unblock the new segment protocol. tableNameWithType={}, entryId={}, segmentsFrom={}, "
+                      + "segmentsTo={}", tableNameWithType, entryId, lineageEntry.getSegmentsFrom(),
+                  lineageEntry.getSegmentsTo());
 
-            // Add segments for proactive clean-up.
-            segmentsToCleanUp.addAll(lineageEntry.getSegmentsTo());
+              // Update segment lineage entry to 'REVERTED'
+              updateSegmentLineageEntryToReverted(tableNameWithType, segmentLineage, entryId, lineageEntry);
+
+              // Add segments for proactive clean-up.
+              segmentsToCleanUp.addAll(lineageEntry.getSegmentsTo());
+            } else if (lineageEntry.getState() == LineageEntryState.COMPLETED && IngestionConfigUtils
+                .getBatchSegmentIngestionType(tableConfig).equalsIgnoreCase("REFRESH") && CollectionUtils
+                .isEqualCollection(segmentsFrom, lineageEntry.getSegmentsTo())) {
+              // This part of code assumes that we only allow at most 2 data snapshots at a time by proactively
+              // deleting the older snapshots (for REFRESH tables).
+              //
+              // e.g. (Seg_0, Seg_1, Seg_2) -> (Seg_3, Seg_4, Seg_5)  // previous lineage
+              //      (Seg_3, Seg_4, Seg_5) -> (Seg_6, Seg_7, Seg_8)  // current lineage to be updated
+              // -> proactively delete (Seg_0, Seg_1, Seg_2) since we want to keep 2 data snapshots
+              //    (Seg_3, Seg_4, Seg_5), (Seg_6, Seg_7, Seg_8) only to avoid the disk space waste.
+              //
+              // TODO: make the number of allowed snapshots configurable to allow users to keep at most N snapshots
+              //       of data. We need to traverse the lineage by N steps instead of 2 steps. We can build the reverse
+              //       hash map (segmentsTo -> segmentsFrom) and traverse up to N times before deleting.
+              //
+              LOGGER.info(
+                  "Proactively deleting the replaced segments for REFRESH table to avoid the excessive disk waste. "
+                      + "tableNameWithType={}, segmentsToCleanUp={}", tableNameWithType,
+                  lineageEntry.getSegmentsFrom());
+              segmentsToCleanUp.addAll(lineageEntry.getSegmentsFrom());
+            }
           } else {
             // Check that any segment from 'segmentsFrom' does not appear twice.
             Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsFrom(), segmentsFrom), String
@@ -2844,6 +2878,7 @@ public class PinotHelixResourceManager {
           // Trigger the proactive segment clean up if needed. Once the lineage is updated in the property store, it
           // is safe to physically delete segments.
           if (!segmentsToCleanUp.isEmpty()) {
+            LOGGER.info("Cleaning up the segments while startReplaceSegments: {}", segmentsToCleanUp);
             deleteSegments(tableNameWithType, segmentsToCleanUp);
           }
           return true;
@@ -2899,10 +2934,12 @@ public class PinotHelixResourceManager {
 
         // NO-OPS if the entry is already 'COMPLETED' or 'REVERTED'
         if (lineageEntry.getState() != LineageEntryState.IN_PROGRESS) {
-          LOGGER.warn("Lineage entry state is not 'IN_PROGRESS'. Cannot update to 'COMPLETED'. (tableNameWithType={}, "
-                  + "segmentLineageEntryId={}, state={})", tableNameWithType, segmentLineageEntryId,
-              lineageEntry.getState());
-          return true;
+          String errorMsg = String.format(
+              "The target lineage entry state is not 'IN_PROGRESS'. Cannot update to 'COMPLETED' state. "
+                  + "(tableNameWithType=%s, segmentLineageEntryId=%s, state=%s)", tableNameWithType,
+              segmentLineageEntryId, lineageEntry.getState());
+          LOGGER.error(errorMsg);
+          throw new RuntimeException(errorMsg);
         }
 
         // Check that all the segments from 'segmentsTo' exist in the table

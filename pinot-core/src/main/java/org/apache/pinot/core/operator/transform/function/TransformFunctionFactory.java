@@ -44,6 +44,7 @@ import org.apache.pinot.core.geospatial.transform.function.StGeomFromWKBFunction
 import org.apache.pinot.core.geospatial.transform.function.StGeometryTypeFunction;
 import org.apache.pinot.core.geospatial.transform.function.StPointFunction;
 import org.apache.pinot.core.geospatial.transform.function.StPolygonFunction;
+import org.apache.pinot.core.geospatial.transform.function.StWithinFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.AbsTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.CeilTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.ExpTransformFunction;
@@ -157,6 +158,7 @@ public class TransformFunctionFactory {
           // geo relationship
           put(canonicalize(TransformFunctionType.ST_CONTAINS.getName().toLowerCase()), StContainsFunction.class);
           put(canonicalize(TransformFunctionType.ST_EQUALS.getName().toLowerCase()), StEqualsFunction.class);
+          put(canonicalize(TransformFunctionType.ST_WITHIN.getName().toLowerCase()), StWithinFunction.class);
 
           // geo indexing
           put(canonicalize(TransformFunctionType.GEOTOH3.getName().toLowerCase()), GeoToH3Function.class);

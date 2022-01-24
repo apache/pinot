@@ -42,6 +42,13 @@ public class PartialUpsertMergerTest {
   }
 
   @Test
+  public void testIgnoreMergers() {
+    IgnoreMerger ignoreMerger = new IgnoreMerger();
+    assertEquals(null, ignoreMerger.merge(null, 3));
+    assertEquals(3, ignoreMerger.merge(3, null));
+  }
+
+  @Test
   public void testOverwriteMergers() {
     OverwriteMerger overwriteMerger = new OverwriteMerger();
     assertEquals("newValue", overwriteMerger.merge("oldValue", "newValue"));

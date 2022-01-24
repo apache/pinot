@@ -70,6 +70,8 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
+import org.apache.pinot.server.access.HttpRequesterIdentity;
+import org.apache.pinot.server.access.RequesterIdentity;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -184,6 +186,7 @@ public class TablesResource {
     long totalNumRows = 0;
     Map<String, Double> columnLengthMap = new HashMap<>();
     Map<String, Double> columnCardinalityMap = new HashMap<>();
+    Map<String, Double> maxNumMultiValuesMap = new HashMap<>();
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         if (segmentDataManager instanceof ImmutableSegmentDataManager) {
@@ -202,7 +205,7 @@ public class TablesResource {
           }
           for (String column : columnSet) {
             ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataMap().get(column);
-            int columnLength;
+            int columnLength = 0;
             DataType storedDataType = columnMetadata.getDataType().getStoredType();
             if (storedDataType.isFixedWidth()) {
               // For type of fixed width: INT, LONG, FLOAT, DOUBLE, BOOLEAN (stored as INT), TIMESTAMP (stored as LONG),
@@ -210,21 +213,26 @@ public class TablesResource {
               columnLength = storedDataType.size();
             } else if (columnMetadata.hasDictionary()) {
               // For type of variable width (String, Bytes), if it's stored using dictionary encoding, set the
-              // columnLength as the max
-              // length in dictionary.
+              // columnLength as the max length in dictionary.
               columnLength = columnMetadata.getColumnMaxLength();
             } else if (storedDataType == DataType.STRING || storedDataType == DataType.BYTES) {
               // For type of variable width (String, Bytes), if it's stored using raw bytes, set the columnLength as
-              // the length
-              // of the max value.
-              columnLength = ((String) columnMetadata.getMaxValue()).getBytes(StandardCharsets.UTF_8).length;
+              // the length of the max value.
+              if (columnMetadata.getMaxValue() != null) {
+                String maxValueString = (String) columnMetadata.getMaxValue();
+                columnLength = maxValueString.getBytes(StandardCharsets.UTF_8).length;
+              }
             } else {
               // For type of STRUCT, MAP, LIST, set the columnLength as DEFAULT_MAX_LENGTH (512).
               columnLength = FieldSpec.DEFAULT_MAX_LENGTH;
             }
-            int columnCardinality = segmentMetadata.getColumnMetadataMap().get(column).getCardinality();
+            int columnCardinality = columnMetadata.getCardinality();
             columnLengthMap.merge(column, (double) columnLength, Double::sum);
             columnCardinalityMap.merge(column, (double) columnCardinality, Double::sum);
+            if (!columnMetadata.isSingleValue()) {
+              int maxNumMultiValues = columnMetadata.getMaxNumberOfMultiValues();
+              maxNumMultiValuesMap.merge(column, (double) maxNumMultiValues, Double::sum);
+            }
           }
         }
       }
@@ -239,7 +247,7 @@ public class TablesResource {
 
     TableMetadataInfo tableMetadataInfo =
         new TableMetadataInfo(tableDataManager.getTableName(), totalSegmentSizeBytes, segmentDataManagers.size(),
-            totalNumRows, columnLengthMap, columnCardinalityMap);
+            totalNumRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap);
     return ResourceUtils.convertToJsonString(tableMetadataInfo);
   }
 
@@ -337,7 +345,8 @@ public class TablesResource {
     boolean hasDataAccess;
     try {
       AccessControl accessControl = _accessControlFactory.create();
-      hasDataAccess = accessControl.hasDataAccess(httpHeaders, tableNameWithType);
+      RequesterIdentity httpRequestIdentity = new HttpRequesterIdentity(httpHeaders);
+      hasDataAccess = accessControl.hasDataAccess(httpRequestIdentity, tableNameWithType);
     } catch (Exception e) {
       throw new WebApplicationException("Caught exception while validating access to table: " + tableNameWithType,
           Response.Status.INTERNAL_SERVER_ERROR);

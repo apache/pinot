@@ -43,6 +43,10 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
       description = "Temp Directory to host quickstart data")
   private String _tmpDir;
 
+  @CommandLine.Option(names = {"-zkAddress", "-zkUrl", "-zkExternalAddress"}, required = false,
+      description = "URL for an external Zookeeper instance instead of using the default embedded instance")
+  private String _zkExternalAddress;
+
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false,
       description = "Print this message.")
   private boolean _help = false;
@@ -68,6 +72,14 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
 
   public void setTmpDir(String tmpDir) {
     _tmpDir = tmpDir;
+  }
+
+  public String getZkExternalAddress() {
+    return _zkExternalAddress;
+  }
+
+  public void setZkExternalAddress(String zkExternalAddress) {
+    _zkExternalAddress = zkExternalAddress;
   }
 
   @Override
@@ -111,8 +123,13 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
     QuickStartBase quickstart = selectQuickStart(_type);
 
     if (_tmpDir != null) {
-      quickstart.setTmpDir(_tmpDir);
+      quickstart.setDataDir(_tmpDir);
     }
+
+    if (_zkExternalAddress != null) {
+      quickstart.setZkExternalAddress(_zkExternalAddress);
+    }
+
     quickstart.execute();
     return true;
   }

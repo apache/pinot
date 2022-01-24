@@ -425,35 +425,7 @@ public class DataFetcher {
         _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
         _dictionary.readIntValues(dictIdBuffer, length, valueBuffer);
       } else {
-        switch (_reader.getValueType()) {
-          case INT:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = _reader.getInt(docIds[i], readerContext);
-            }
-            break;
-          case LONG:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = (int) _reader.getLong(docIds[i], readerContext);
-            }
-            break;
-          case FLOAT:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = (int) _reader.getFloat(docIds[i], readerContext);
-            }
-            break;
-          case DOUBLE:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = (int) _reader.getDouble(docIds[i], readerContext);
-            }
-            break;
-          case STRING:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = Integer.parseInt(_reader.getString(docIds[i], readerContext));
-            }
-            break;
-          default:
-            throw new IllegalStateException();
-        }
+        _reader.readValuesSV(docIds, length, valueBuffer, readerContext);
       }
     }
 
@@ -469,35 +441,7 @@ public class DataFetcher {
         _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
         _dictionary.readLongValues(dictIdBuffer, length, valueBuffer);
       } else {
-        switch (_reader.getValueType()) {
-          case INT:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = _reader.getInt(docIds[i], readerContext);
-            }
-            break;
-          case LONG:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = _reader.getLong(docIds[i], readerContext);
-            }
-            break;
-          case FLOAT:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = (long) _reader.getFloat(docIds[i], readerContext);
-            }
-            break;
-          case DOUBLE:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = (long) _reader.getDouble(docIds[i], readerContext);
-            }
-            break;
-          case STRING:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = Long.parseLong(_reader.getString(docIds[i], readerContext));
-            }
-            break;
-          default:
-            throw new IllegalStateException();
-        }
+        _reader.readValuesSV(docIds, length, valueBuffer, readerContext);
       }
     }
 
@@ -513,35 +457,7 @@ public class DataFetcher {
         _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
         _dictionary.readFloatValues(dictIdBuffer, length, valueBuffer);
       } else {
-        switch (_reader.getValueType()) {
-          case INT:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = _reader.getInt(docIds[i], readerContext);
-            }
-            break;
-          case LONG:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = _reader.getLong(docIds[i], readerContext);
-            }
-            break;
-          case FLOAT:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = _reader.getFloat(docIds[i], readerContext);
-            }
-            break;
-          case DOUBLE:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = (float) _reader.getDouble(docIds[i], readerContext);
-            }
-            break;
-          case STRING:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = Float.parseFloat(_reader.getString(docIds[i], readerContext));
-            }
-            break;
-          default:
-            throw new IllegalStateException();
-        }
+        _reader.readValuesSV(docIds, length, valueBuffer, readerContext);
       }
     }
 
@@ -557,35 +473,7 @@ public class DataFetcher {
         _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
         _dictionary.readDoubleValues(dictIdBuffer, length, valueBuffer);
       } else {
-        switch (_reader.getValueType()) {
-          case INT:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = _reader.getInt(docIds[i], readerContext);
-            }
-            break;
-          case LONG:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = _reader.getLong(docIds[i], readerContext);
-            }
-            break;
-          case FLOAT:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = _reader.getFloat(docIds[i], readerContext);
-            }
-            break;
-          case DOUBLE:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = _reader.getDouble(docIds[i], readerContext);
-            }
-            break;
-          case STRING:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = Double.parseDouble(_reader.getString(docIds[i], readerContext));
-            }
-            break;
-          default:
-            throw new IllegalStateException();
-        }
+        _reader.readValuesSV(docIds, length, valueBuffer, readerContext);
       }
     }
 

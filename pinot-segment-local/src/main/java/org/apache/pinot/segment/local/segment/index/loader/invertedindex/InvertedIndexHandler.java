@@ -56,9 +56,25 @@ public class InvertedIndexHandler implements IndexHandler {
 
   @Override
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
+    String segmentName = _segmentMetadata.getName();
     Set<String> existingColumns =
         segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.INVERTED_INDEX);
-    return !existingColumns.equals(_columnsToAddIdx);
+    // Check if any existing index need to be removed.
+    for (String column : existingColumns) {
+      if (!_columnsToAddIdx.remove(column)) {
+        LOGGER.info("Need to remove existing inverted index from segment: {}, column: {}", segmentName, column);
+        return true;
+      }
+    }
+    // Check if any new index need to be added.
+    for (String column : _columnsToAddIdx) {
+      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+      if (shouldCreateInvertedIndex(columnMetadata)) {
+        LOGGER.info("Need to create new inverted index for segment: {}, column: {}", segmentName, column);
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override
@@ -77,11 +93,15 @@ public class InvertedIndexHandler implements IndexHandler {
     }
     for (String column : _columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
-      // Only create inverted index on dictionary-encoded unsorted columns.
-      if (columnMetadata != null && !columnMetadata.isSorted() && columnMetadata.hasDictionary()) {
+      if (shouldCreateInvertedIndex(columnMetadata)) {
         createInvertedIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
       }
     }
+  }
+
+  private boolean shouldCreateInvertedIndex(ColumnMetadata columnMetadata) {
+    // Only create inverted index on dictionary-encoded unsorted columns.
+    return columnMetadata != null && !columnMetadata.isSorted() && columnMetadata.hasDictionary();
   }
 
   private void createInvertedIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,

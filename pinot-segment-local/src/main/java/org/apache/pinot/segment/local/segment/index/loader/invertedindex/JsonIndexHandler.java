@@ -59,8 +59,24 @@ public class JsonIndexHandler implements IndexHandler {
 
   @Override
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
+    String segmentName = _segmentMetadata.getName();
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.JSON_INDEX);
-    return !existingColumns.equals(_columnsToAddIdx);
+    // Check if any existing index need to be removed.
+    for (String column : existingColumns) {
+      if (!_columnsToAddIdx.remove(column)) {
+        LOGGER.info("Need to remove existing json index from segment: {}, column: {}", segmentName, column);
+        return true;
+      }
+    }
+    // Check if any new index need to be added.
+    for (String column : _columnsToAddIdx) {
+      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+      if (shouldCreateJsonIndex(columnMetadata)) {
+        LOGGER.info("Need to create new json index for segment: {}, column: {}", segmentName, column);
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override
@@ -78,10 +94,14 @@ public class JsonIndexHandler implements IndexHandler {
     }
     for (String column : _columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
-      if (columnMetadata != null) {
+      if (shouldCreateJsonIndex(columnMetadata)) {
         createJsonIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
       }
     }
+  }
+
+  private boolean shouldCreateJsonIndex(ColumnMetadata columnMetadata) {
+    return columnMetadata != null;
   }
 
   private void createJsonIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,

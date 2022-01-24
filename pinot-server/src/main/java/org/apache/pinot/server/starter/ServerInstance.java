@@ -36,6 +36,7 @@ import org.apache.pinot.core.transport.QueryServer;
 import org.apache.pinot.core.transport.TlsConfig;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.core.util.TlsUtils;
+import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -60,7 +61,7 @@ public class ServerInstance {
   private final QueryServer _nettyQueryServer;
   private final QueryServer _nettyTlsQueryServer;
   private final GrpcQueryServer _grpcQueryServer;
-  private final AccessControlFactory _accessControlFactory;
+  private final AccessControl _accessControl;
 
   private boolean _started = false;
 
@@ -95,7 +96,9 @@ public class ServerInstance {
 
     TlsConfig tlsConfig =
         TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_TLS_PREFIX);
-    _accessControlFactory = accessControlFactory;
+    accessControlFactory.init(
+        serverConf.getPinotConfig().subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_ACCESS_CONTROL));
+    _accessControl = accessControlFactory.create();
 
     if (serverConf.isNettyServerEnabled()) {
       int nettyPort = serverConf.getNettyPort();
@@ -109,7 +112,7 @@ public class ServerInstance {
       int nettySecPort = serverConf.getNettyTlsPort();
       LOGGER.info("Initializing TLS-secured Netty query server on port: {}", nettySecPort);
       _nettyTlsQueryServer = new QueryServer(nettySecPort, _queryScheduler, _serverMetrics, tlsConfig,
-          _accessControlFactory);
+          _accessControl);
     } else {
       _nettyTlsQueryServer = null;
     }
@@ -121,7 +124,7 @@ public class ServerInstance {
 
       int grpcPort = serverConf.getGrpcPort();
       LOGGER.info("Initializing gRPC query server on port: {}", grpcPort);
-      _grpcQueryServer = new GrpcQueryServer(grpcPort, _queryExecutor, _serverMetrics);
+      _grpcQueryServer = new GrpcQueryServer(grpcPort, _queryExecutor, _serverMetrics, _accessControl);
     } else {
       _grpcQueryServer = null;
     }

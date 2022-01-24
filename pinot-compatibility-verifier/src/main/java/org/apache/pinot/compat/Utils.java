@@ -16,14 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.compat.tests;
+package org.apache.pinot.compat;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class Utils {
@@ -41,9 +45,18 @@ public class Utils {
   public static void replaceContent(File originalDataFile, File replacedDataFile, String original, String replaced)
       throws IOException {
     Stream<String> lines = Files.lines(originalDataFile.toPath());
-    List<String> replacedContent = lines.map(line -> line.replaceAll(original, replaced)).
-        collect(Collectors.toList());
+    List<String> replacedContent = lines.map(line -> line.replaceAll(original, replaced)).collect(Collectors.toList());
     Files.write(replacedDataFile.toPath(), replacedContent);
     lines.close();
+  }
+
+  public static JsonNode postSqlQuery(String query, String brokerBaseApiUrl)
+      throws Exception {
+    ObjectNode payload = JsonUtils.newObjectNode();
+    payload.put("sql", query);
+    payload.put("queryOptions", "groupByMode=sql;responseFormat=sql");
+
+    return JsonUtils.stringToJsonNode(
+        ControllerTest.sendPostRequest(brokerBaseApiUrl + "/query/sql", payload.toString()));
   }
 }
