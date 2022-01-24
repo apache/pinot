@@ -94,7 +94,8 @@ public class SelectStarWithOtherColsRewriteTest {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
     List<Expression> newSelections = pinotQuery.getSelectList();
-    int playerIdCount = 0, homeRunsCount = 0;
+    int playerIdCount = 0;
+    int homeRunsCount = 0;
     for (Expression expression : newSelections) {
       if (expression.getIdentifier().getName().equals("playerID")) {
         playerIdCount++;
