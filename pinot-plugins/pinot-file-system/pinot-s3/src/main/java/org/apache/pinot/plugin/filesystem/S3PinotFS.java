@@ -36,7 +36,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.BasePinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -70,7 +70,7 @@ import software.amazon.awssdk.services.s3.model.ServerSideEncryption;
 /**
  * Implementation of PinotFS for AWS S3 file system
  */
-public class S3PinotFS extends PinotFS {
+public class S3PinotFS extends BasePinotFS {
   public static final String ACCESS_KEY = "accessKey";
   public static final String SECRET_KEY = "secretKey";
   public static final String REGION = "region";

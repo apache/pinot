@@ -38,7 +38,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  * Implementation of PinotFS for a local filesystem. Methods in this class may throw a SecurityException at runtime
  * if access to the file is denied.
  */
-public class LocalPinotFS extends PinotFS {
+public class LocalPinotFS extends BasePinotFS {
 
   @Override
   public void init(PinotConfiguration configuration) {
