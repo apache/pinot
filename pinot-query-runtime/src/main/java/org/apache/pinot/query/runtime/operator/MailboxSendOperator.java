@@ -28,7 +28,9 @@ import org.slf4j.LoggerFactory;
 public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxSendOperator.class);
   private static final Set<RelDistribution.Type> SUPPORTED_EXCHANGE_TYPE = Set.of(
-      RelDistribution.Type.RANDOM_DISTRIBUTED, RelDistribution.Type.BROADCAST_DISTRIBUTED
+      RelDistribution.Type.SINGLETON,
+      RelDistribution.Type.RANDOM_DISTRIBUTED,
+      RelDistribution.Type.BROADCAST_DISTRIBUTED
   );
 
   private final List<ServerInstance> _receivingStageInstances;

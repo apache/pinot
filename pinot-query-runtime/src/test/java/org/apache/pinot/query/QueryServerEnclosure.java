@@ -123,16 +123,16 @@ public class QueryServerEnclosure {
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
       GenericRow row = new GenericRow();
-      row.putValue("c1", STRING_FIELD_LIST[i % STRING_FIELD_LIST.length]);
-      row.putValue("c2", STRING_FIELD_LIST[(i + 2) % STRING_FIELD_LIST.length]);
-      row.putValue("c3", INT_FIELD_LIST[i % INT_FIELD_LIST.length]);
-      row.putValue("t", System.currentTimeMillis());
+      row.putValue("col1", STRING_FIELD_LIST[i % STRING_FIELD_LIST.length]);
+      row.putValue("col2", STRING_FIELD_LIST[(i + 2) % STRING_FIELD_LIST.length]);
+      row.putValue("col3", INT_FIELD_LIST[i % INT_FIELD_LIST.length]);
+      row.putValue("ts", System.currentTimeMillis());
       rows.add(row);
     }
 
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setTimeColumnName("t").build();
-    Schema schema = QueryEnvironmentTestUtils.SCHEMA;
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setTimeColumnName("ts").build();
+    Schema schema = QueryEnvironmentTestUtils.SCHEMA_BUILDER.setSchemaName(tableName).build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(indexDir.getPath());
     config.setTableName(tableName);

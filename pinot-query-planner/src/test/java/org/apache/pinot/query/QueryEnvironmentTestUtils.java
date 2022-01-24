@@ -32,25 +32,27 @@ import static org.mockito.Mockito.when;
  * we can run a simple query planning, produce stages / metadata for other components to test.
  */
 public class QueryEnvironmentTestUtils {
-  public static Schema SCHEMA;
+  public static Schema.SchemaBuilder SCHEMA_BUILDER;
   public static Map<String, List<String>> SERVER1_SEGMENTS =
-      ImmutableMap.of("a", Lists.newArrayList("a1", "a2"), "b", Lists.newArrayList("b1"));
+      ImmutableMap.of("a", Lists.newArrayList("a1", "a2"), "b", Lists.newArrayList("b1"),
+          "c", Lists.newArrayList("c1"));
   public static Map<String, List<String>> SERVER2_SEGMENTS =
-      ImmutableMap.of("a", Lists.newArrayList("a3"));
+      ImmutableMap.of("a", Lists.newArrayList("a3"), "c", Lists.newArrayList("c2", "c3"));
 
   static {
-    SCHEMA =
-        new Schema.SchemaBuilder().setSchemaName("a")
-            .addSingleValueDimension("c1", FieldSpec.DataType.STRING, "")
-            .addSingleValueDimension("c2", FieldSpec.DataType.STRING, "")
-            .addDateTime("t", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
-            .addMetric("c3", FieldSpec.DataType.INT, 0).build();
+    SCHEMA_BUILDER =
+        new Schema.SchemaBuilder()
+            .addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
+            .addSingleValueDimension("col2", FieldSpec.DataType.STRING, "")
+            .addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
+            .addMetric("col3", FieldSpec.DataType.INT, 0);
   }
 
   public static TableCache mockTableCache() {
     TableCache mock = mock(TableCache.class);
-    when(mock.getSchema("a")).thenReturn(SCHEMA);
-    when(mock.getSchema("b")).thenReturn(SCHEMA);
+    when(mock.getSchema("a")).thenReturn(SCHEMA_BUILDER.setSchemaName("a").build());
+    when(mock.getSchema("b")).thenReturn(SCHEMA_BUILDER.setSchemaName("b").build());
+    when(mock.getSchema("c")).thenReturn(SCHEMA_BUILDER.setSchemaName("c").build());
     return mock;
   }
 
@@ -74,8 +76,12 @@ public class QueryEnvironmentTestUtils {
         host2, SERVER2_SEGMENTS.get("a")));
     RoutingTable rtB = mock(RoutingTable.class);
     when(rtB.getServerInstanceToSegmentsMap()).thenReturn(ImmutableMap.of(host1, SERVER1_SEGMENTS.get("b")));
+    RoutingTable rtC = mock(RoutingTable.class);
+    when(rtC.getServerInstanceToSegmentsMap()).thenReturn(ImmutableMap.of(host1, SERVER1_SEGMENTS.get("c"),
+        host2, SERVER2_SEGMENTS.get("c")));
     when(mock.getRoutingTable("a")).thenReturn(rtA);
     when(mock.getRoutingTable("b")).thenReturn(rtB);
+    when(mock.getRoutingTable("c")).thenReturn(rtC);
     when(mock.getEnabledServerInstanceMap()).thenReturn(ImmutableMap.of(server1, host1, server2, host2));
     return mock;
   }

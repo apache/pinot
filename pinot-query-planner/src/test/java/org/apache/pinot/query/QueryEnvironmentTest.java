@@ -42,15 +42,15 @@ public class QueryEnvironmentTest {
 
   @Test
   public void testSqlStrings() throws Exception {
-    testQueryParsing("SELECT * FROM a JOIN b ON a.c1 = b.c2 WHERE a.c3 >= 0",
-        "SELECT *\n" + "FROM `a`\n" + "INNER JOIN `b` ON `a`.`c1` = `b`.`c2`\n" + "WHERE `a`.`c3` >= 0");
+    testQueryParsing("SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0",
+        "SELECT *\n" + "FROM `a`\n" + "INNER JOIN `b` ON `a`.`col1` = `b`.`col2`\n" + "WHERE `a`.`col3` >= 0");
   }
 
   @Test
   public void testQueryToStages()
       throws Exception {
     PlannerContext plannerContext = new PlannerContext();
-    String query = "SELECT * FROM a JOIN b ON a.c1 = b.c2 WHERE a.c3 >= 0";
+    String query = "SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0";
     QueryPlan queryPlan = _queryEnvironment.sqlQuery(query);
     Assert.assertEquals(queryPlan.getQueryStageMap().size(), 4);
     Assert.assertEquals(queryPlan.getStageMetadataMap().size(), 4);
@@ -80,7 +80,7 @@ public class QueryEnvironmentTest {
   public void testQueryToRel()
       throws Exception {
     PlannerContext plannerContext = new PlannerContext();
-    String query = "SELECT * FROM a JOIN b ON a.c1 = b.c2 WHERE a.c3 >= 0";
+    String query = "SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0";
     SqlNode parsed = _queryEnvironment.parse(query, plannerContext);
     SqlNode validated = _queryEnvironment.validate(parsed);
     RelRoot relRoot = _queryEnvironment.toRelation(validated, plannerContext);

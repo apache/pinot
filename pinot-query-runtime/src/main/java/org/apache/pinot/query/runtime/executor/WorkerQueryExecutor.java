@@ -59,6 +59,7 @@ public class WorkerQueryExecutor {
     LOGGER.info("Worker query executor shut down");
   }
 
+  // TODO: split this execution from PhysicalPlanner
   public void processQuery(WorkerQueryRequest queryRequest, Map<String, String> requestMetadataMap,
       ExecutorService executorService) {
     String requestId = requestMetadataMap.get("RequestId");
@@ -76,6 +77,7 @@ public class WorkerQueryExecutor {
     });
   }
 
+  // TODO: split this PhysicalPlanner into a separate module
   private BaseOperator<DataTableBlock> getOperator(String requestId, StageNode stageNode,
       Map<String, StageMetadata> metadataMap) {
     // TODO: optimize this into a framework. (physical planner)

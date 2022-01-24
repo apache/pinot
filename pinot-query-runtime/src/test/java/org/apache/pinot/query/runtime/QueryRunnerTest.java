@@ -39,6 +39,8 @@ public class QueryRunnerTest {
   private static final File INDEX_DIR_S1_A = new File(FileUtils.getTempDirectory(), "QueryRunnerTest_server1_tableA");
   private static final File INDEX_DIR_S1_B = new File(FileUtils.getTempDirectory(), "QueryRunnerTest_server1_tableB");
   private static final File INDEX_DIR_S2_A = new File(FileUtils.getTempDirectory(), "QueryRunnerTest_server2_tableA");
+  private static final File INDEX_DIR_S1_C = new File(FileUtils.getTempDirectory(), "QueryRunnerTest_server1_tableC");
+  private static final File INDEX_DIR_S2_C = new File(FileUtils.getTempDirectory(), "QueryRunnerTest_server2_tableC");
 
   private QueryEnvironment _queryEnvironment;
   private int _reducerGrpcPort;
@@ -47,10 +49,12 @@ public class QueryRunnerTest {
 
   @BeforeClass
   public void setUp() throws Exception {
-    QueryServerEnclosure server1 = new QueryServerEnclosure(Lists.newArrayList("a", "b"),
-        ImmutableMap.of("a", INDEX_DIR_S1_A, "b", INDEX_DIR_S1_B), QueryEnvironmentTestUtils.SERVER1_SEGMENTS);
+    QueryServerEnclosure server1 = new QueryServerEnclosure(Lists.newArrayList("a", "b", "c"),
+        ImmutableMap.of("a", INDEX_DIR_S1_A, "b", INDEX_DIR_S1_B, "c", INDEX_DIR_S1_C),
+        QueryEnvironmentTestUtils.SERVER1_SEGMENTS);
     QueryServerEnclosure server2 =
-        new QueryServerEnclosure(Lists.newArrayList("a"), ImmutableMap.of("a", INDEX_DIR_S2_A),
+        new QueryServerEnclosure(Lists.newArrayList("a", "c"),
+            ImmutableMap.of("a", INDEX_DIR_S2_A, "c", INDEX_DIR_S2_C),
             QueryEnvironmentTestUtils.SERVER2_SEGMENTS);
 
     _reducerGrpcPort = QueryEnvironmentTestUtils.getAvailablePort();
@@ -139,7 +143,7 @@ public class QueryRunnerTest {
   @Test
   public void testJoin()
       throws Exception {
-    QueryPlan queryPlan = _queryEnvironment.sqlQuery("SELECT * FROM a JOIN b on a.c1 = b.c2");
+    QueryPlan queryPlan = _queryEnvironment.sqlQuery("SELECT * FROM a JOIN b on a.col1 = b.col2");
     Map<String, String> requestMetadataMap = ImmutableMap.of("RequestId", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
     MailboxReceiveOperator mailboxReceiveOperator = null;
     for (String stageId : queryPlan.getStageMetadataMap().keySet()) {
@@ -176,8 +180,60 @@ public class QueryRunnerTest {
 
     // Assert that each of the 5 categories from left table is joined with right table.
     // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
-    // thus the final JOIN result will be 5 x (3 x 1).
+    // thus the final JOIN result will be 15 x 1 = 15.
     Assert.assertEquals(rowCount, 15);
+
+    // assert that the next block is null (e.g. finished receiving).
+    dataTableBlock = mailboxReceiveOperator.nextBlock();
+    Assert.assertTrue(DataTableBlockUtils.isEndOfStream(dataTableBlock));
+  }
+
+  @Test
+  public void testMultipleJoin()
+      throws Exception {
+    QueryPlan queryPlan = _queryEnvironment.sqlQuery("SELECT * FROM a JOIN b ON a.col1 = b.col2 "
+        + "JOIN c ON a.col3 = c.col3");
+    Map<String, String> requestMetadataMap = ImmutableMap.of("RequestId", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
+    MailboxReceiveOperator mailboxReceiveOperator = null;
+    for (String stageId : queryPlan.getStageMetadataMap().keySet()) {
+      if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
+        MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(stageId);
+        mailboxReceiveOperator = createReduceStageOperator(
+            queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
+            requestMetadataMap.get("RequestId"), reduceNode.getSenderStageId(), _reducerGrpcPort);
+      } else {
+        for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
+          WorkerQueryRequest workerQueryRequest = QueryDispatcher.constructStageQueryRequest(queryPlan, stageId, serverInstance);
+          _servers.get(serverInstance).processQuery(workerQueryRequest, requestMetadataMap);
+        }
+      }
+    }
+    Preconditions.checkNotNull(mailboxReceiveOperator);
+
+    int count = 0;
+    int rowCount = 0;
+    List<Object[]> resultRows = new ArrayList<>();
+    DataTableBlock dataTableBlock;
+    while (count < 2) { // we have 2 servers sending data.
+      dataTableBlock = mailboxReceiveOperator.nextBlock();
+      if (dataTableBlock.getDataTable() != null) {
+        DataTable dataTable = dataTableBlock.getDataTable();
+        int numRows = dataTable.getNumberOfRows();
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          resultRows.add(extractRowFromDataTable(dataTable, rowId));
+        }
+        rowCount += numRows;
+      }
+      count++;
+    }
+
+    // Assert that each of the 5 categories from left table is joined with right table.
+    // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
+    // thus the final JOIN result will be 15 x 1 = 15.
+    // Next join with table C which has (5 on server1 and 10 on server2), since data is identical. each of the row of
+    // the A JOIN B will have identical value of col3 as table C.col3 has. Since the values are cycling between
+    // (1, 2, 42, 1, 2). we will have 6 1s, 6 2s, and 3 42s, total result count will be 36 + 36 + 9 = 81
+    Assert.assertEquals(rowCount, 81);
 
     // assert that the next block is null (e.g. finished receiving).
     dataTableBlock = mailboxReceiveOperator.nextBlock();

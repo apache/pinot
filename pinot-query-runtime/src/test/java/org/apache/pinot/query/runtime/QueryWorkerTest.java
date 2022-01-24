@@ -54,7 +54,7 @@ public class QueryWorkerTest {
   @Test
   public void testWorkerAcceptsWorkerRequestCorrect()
       throws Exception {
-    QueryPlan queryPlan = _queryEnvironment.sqlQuery("SELECT * FROM a JOIN b ON a.c1 = b.c2");
+    QueryPlan queryPlan = _queryEnvironment.sqlQuery("SELECT * FROM a JOIN b ON a.col1 = b.col2");
 
     String singleServerStage = QueryEnvironmentTestUtils.getTestStageByServerCount(queryPlan, 1);
 
