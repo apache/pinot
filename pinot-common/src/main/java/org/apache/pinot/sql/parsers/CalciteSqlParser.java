@@ -146,42 +146,34 @@ public class CalciteSqlParser {
 
   private static void validateGroupByClause(PinotQuery pinotQuery)
       throws SqlCompilationException {
-    if (pinotQuery.getGroupByList() == null) {
-      if (containsAggregateAndColsInSelectClause(pinotQuery)) {
-        throw new SqlCompilationException("Columns and Aggregate functions can't co-exist without GROUP BY clause");
-      }
-      return;
-    }
-    // Sanity check group by query: All non-aggregate expression in selection list should be also included in group
-    // by list.
-    Set<Expression> groupByExprs = new HashSet<>(pinotQuery.getGroupByList());
+    boolean hasGroupByClause = pinotQuery.getGroupByList() != null;
+    Set<Expression> groupByExprs = hasGroupByClause ? new HashSet<>(pinotQuery.getGroupByList()) : null;
+    int aggregateExprCount = 0;
     for (Expression selectExpression : pinotQuery.getSelectList()) {
-      if (!isAggregateExpression(selectExpression) && expressionOutsideGroupByList(selectExpression, groupByExprs)) {
-        throw new SqlCompilationException(
+      if (isAggregateExpression(selectExpression)) {
+        aggregateExprCount++;
+      } else if (hasGroupByClause && expressionOutsideGroupByList(selectExpression, groupByExprs)) {
+          throw new SqlCompilationException(
             "'" + RequestUtils.prettyPrint(selectExpression) + "' should appear in GROUP BY clause.");
       }
     }
+
+    // block mixture of aggregate and non-aggregate expression when group by is absent
+    int nonAggregateExprCount = pinotQuery.getSelectListSize() - aggregateExprCount;
+    if (!hasGroupByClause && aggregateExprCount > 0 && nonAggregateExprCount > 0) {
+      throw new SqlCompilationException("Columns and Aggregate functions can't co-exist without GROUP BY clause");
+    }
     // Sanity check on group by clause shouldn't contain aggregate expression.
-    for (Expression groupByExpression : pinotQuery.getGroupByList()) {
-      if (isAggregateExpression(groupByExpression)) {
-        throw new SqlCompilationException("Aggregate expression '" + RequestUtils.prettyPrint(groupByExpression)
-            + "' is not allowed in GROUP BY clause.");
+    if (hasGroupByClause) {
+      for (Expression groupByExpression : pinotQuery.getGroupByList()) {
+        if (isAggregateExpression(groupByExpression)) {
+          throw new SqlCompilationException("Aggregate expression '" + RequestUtils.prettyPrint(groupByExpression)
+              + "' is not allowed in GROUP BY clause.");
+        }
       }
     }
   }
 
-  private static boolean containsAggregateAndColsInSelectClause(PinotQuery pinotQuery) {
-    int aggregateExprCount = 0;
-    int identifierExprCount = 0;
-    for (Expression expr : pinotQuery.getSelectList()) {
-      if (isAggregateExpression(expr)) {
-        aggregateExprCount++;
-      } else if (expressionContainsColumn(expr)) {
-        identifierExprCount++;
-      }
-    }
-    return identifierExprCount > 0 && aggregateExprCount > 0;
-  }
   /*
    * Validate DISTINCT queries:
    * - No GROUP-BY clause
@@ -271,25 +263,6 @@ public class CalciteSqlParser {
     return false;
   }
 
-  public static boolean expressionContainsColumn(Expression expression) {
-    if (expression.getType() == ExpressionType.IDENTIFIER) {
-      return true;
-    } else if (expression.getType() == ExpressionType.LITERAL) {
-      return false;
-    } else if (isAsFunction(expression)) {
-      return expressionContainsColumn(expression.getFunctionCall().getOperands().get(0));
-    } else {
-      Function functionCall = expression.getFunctionCall();
-      if (functionCall.getOperandsSize() > 0) {
-        for (Expression operand : functionCall.getOperands()) {
-          if (expressionContainsColumn(operand)) {
-            return true;
-          }
-        }
-      }
-      return false;
-    }
-  }
   public static boolean isAsFunction(Expression expression) {
     return expression.getFunctionCall() != null && expression.getFunctionCall().getOperator().equalsIgnoreCase("AS");
   }
