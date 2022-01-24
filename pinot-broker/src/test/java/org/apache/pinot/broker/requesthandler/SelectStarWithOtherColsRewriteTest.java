@@ -54,8 +54,8 @@ public class SelectStarWithOtherColsRewriteTest {
     BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
     List<Expression> newSelections = pinotQuery.getSelectList();
     Assert.assertEquals(newSelections.size(), 2, "More selections than requested");
-    Assert.assertEquals(newSelections.get(1).getIdentifier().getName(), "homeRuns");
-    Assert.assertEquals(newSelections.get(2).getIdentifier().getName(), "playerStint");
+    Assert.assertEquals(newSelections.get(0).getIdentifier().getName(), "homeRuns");
+    Assert.assertEquals(newSelections.get(1).getIdentifier().getName(), "playerStint");
   }
 
   @Test
@@ -64,11 +64,8 @@ public class SelectStarWithOtherColsRewriteTest {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
     List<Expression> newSelections = pinotQuery.getSelectList();
-    Assert.assertEquals(newSelections.size(), 4, "More selections than requested");
-    Assert.assertEquals(newSelections.get(1).getIdentifier().getName(), "homeRuns");
-    Assert.assertEquals(newSelections.get(2).getIdentifier().getName(), "playerStint");
-    Assert.assertEquals(newSelections.get(3).getIdentifier().getName(), "groundedIntoDoublePlays");
-    Assert.assertEquals(newSelections.get(4).getIdentifier().getName(), "playerID");
+    Assert.assertEquals(newSelections.size(), 1, "More selections than requested");
+    Assert.assertEquals(newSelections.get(0).getIdentifier().getName(), "*");
   }
 
   @Test
