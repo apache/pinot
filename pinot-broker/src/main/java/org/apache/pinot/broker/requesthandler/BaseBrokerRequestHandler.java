@@ -1501,9 +1501,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static void expandStarExpressionToActualColumns(PinotQuery pinotQuery, Map<String, String> columnNameMap,
       Expression selectStarExpr) {
     List<Expression> originalSelections = pinotQuery.getSelectList();
-    Set<String> originallySelectedColumnNames =
-        originalSelections.stream().filter(Expression::isSetIdentifier).map(a -> a.getIdentifier().getName())
-            .collect(Collectors.toSet());
+    // Avoid using stream apis in query path because we have found that it has poorer performance compared to
+    // regular apis.
+    Set<String> originallySelectedColumnNames = new HashSet<>();
+    for (Expression originalSelection : originalSelections) {
+      if (originalSelection.isSetIdentifier()) {
+        originallySelectedColumnNames.add(originalSelection.getIdentifier().getName());
+      }
+    }
     List<Expression> newSelections = new ArrayList<>();
     for (Expression selection : originalSelections) {
       if (selection.equals(selectStarExpr)) {
