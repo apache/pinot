@@ -24,14 +24,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
 import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -46,14 +41,13 @@ import org.slf4j.LoggerFactory;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
-public abstract class PinotFS implements Closeable, Serializable {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotFS.class);
+public interface PinotFS extends Closeable, Serializable {
 
   /**
    * Initializes the configurations specific to that filesystem. For instance, any security related parameters can be
    * initialized here and will not be logged.
    */
-  public abstract void init(PinotConfiguration config);
+  void init(PinotConfiguration config);
 
   /**
    * Creates a new directory. If parent directories are not created, it will create them.
@@ -61,7 +55,7 @@ public abstract class PinotFS implements Closeable, Serializable {
    * @return true if mkdir is successful
    * @throws IOException on IO failure
    */
-  public abstract boolean mkdir(URI uri)
+  boolean mkdir(URI uri)
       throws IOException;
 
   /**
@@ -72,7 +66,7 @@ public abstract class PinotFS implements Closeable, Serializable {
    * @return true if delete is successful else false
    * @throws IOException on IO failure, e.g Uri is not present or not valid
    */
-  public abstract boolean delete(URI segmentUri, boolean forceDelete)
+  boolean delete(URI segmentUri, boolean forceDelete)
       throws IOException;
 
   /**
@@ -90,37 +84,13 @@ public abstract class PinotFS implements Closeable, Serializable {
    * @return true if move is successful
    * @throws IOException on IO failure
    */
-  public boolean move(URI srcUri, URI dstUri, boolean overwrite)
-      throws IOException {
-    if (!exists(srcUri)) {
-      LOGGER.warn("Source {} does not exist", srcUri);
-      return false;
-    }
-    if (exists(dstUri)) {
-      if (overwrite) {
-        delete(dstUri, true);
-      } else {
-        // dst file exists, returning
-        LOGGER.warn("Cannot move {} to {}. Destination exists and overwrite flag set to false.", srcUri, dstUri);
-        return false;
-      }
-    } else {
-      // ensures the parent path of dst exists.
-      try {
-        Path parentPath = Paths.get(dstUri.getPath()).getParent();
-        URI parentUri = new URI(dstUri.getScheme(), dstUri.getAuthority(), parentPath.toString(), null, null);
-        mkdir(parentUri);
-      } catch (URISyntaxException e) {
-        throw new IOException(e);
-      }
-    }
-    return doMove(srcUri, dstUri);
-  }
+  boolean move(URI srcUri, URI dstUri, boolean overwrite)
+      throws IOException;
 
   /**
    * Does the actual behavior of move in each FS.
    */
-  public abstract boolean doMove(URI srcUri, URI dstUri)
+  boolean doMove(URI srcUri, URI dstUri)
       throws IOException;
 
   /**
@@ -138,7 +108,7 @@ public abstract class PinotFS implements Closeable, Serializable {
    * @return true if copy is successful
    * @throws IOException on IO failure
    */
-  public abstract boolean copy(URI srcUri, URI dstUri)
+  boolean copy(URI srcUri, URI dstUri)
       throws IOException;
 
   /**
@@ -147,7 +117,7 @@ public abstract class PinotFS implements Closeable, Serializable {
    * @return true if path exists
    * @throws IOException on IO failure
    */
-  public abstract boolean exists(URI fileUri)
+  boolean exists(URI fileUri)
       throws IOException;
 
   /**
@@ -156,7 +126,7 @@ public abstract class PinotFS implements Closeable, Serializable {
    * @return the number of bytes
    * @throws IOException on IO failure, e.g if it's a directory.
    */
-  public abstract long length(URI fileUri)
+  long length(URI fileUri)
       throws IOException;
 
   /**
@@ -168,7 +138,7 @@ public abstract class PinotFS implements Closeable, Serializable {
    * @return an array of strings that contains file paths
    * @throws IOException on IO failure. See specific implementation
    */
-  public abstract String[] listFiles(URI fileUri, boolean recursive)
+  String[] listFiles(URI fileUri, boolean recursive)
       throws IOException;
 
   /**
@@ -177,7 +147,7 @@ public abstract class PinotFS implements Closeable, Serializable {
    * @param dstFile location of destination on local filesystem
    * @throws Exception if srcUri is not valid or not present, or timeout when downloading file to local
    */
-  public abstract void copyToLocalFile(URI srcUri, File dstFile)
+  void copyToLocalFile(URI srcUri, File dstFile)
       throws Exception;
 
   /**
@@ -187,7 +157,7 @@ public abstract class PinotFS implements Closeable, Serializable {
    * @param dstUri location of dst on remote filesystem
    * @throws Exception if fileUri is not valid or not present, or timeout when uploading file from local
    */
-  public abstract void copyFromLocalFile(File srcFile, URI dstUri)
+  void copyFromLocalFile(File srcFile, URI dstUri)
       throws Exception;
 
   /**
@@ -196,7 +166,7 @@ public abstract class PinotFS implements Closeable, Serializable {
    * @return true if uri is a directory, false otherwise.
    * @throws IOException on IO failure, e.g uri is not valid or not present
    */
-  public abstract boolean isDirectory(URI uri)
+  boolean isDirectory(URI uri)
       throws IOException;
 
   /**
@@ -206,7 +176,7 @@ public abstract class PinotFS implements Closeable, Serializable {
    * (00:00:00 GMT, January 1, 1970) or 0L if the file does not exist or if an I/O error occurs
    * @throws IOException if uri is not valid or not present
    */
-  public abstract long lastModified(URI uri)
+  long lastModified(URI uri)
       throws IOException;
 
   /**
@@ -215,7 +185,7 @@ public abstract class PinotFS implements Closeable, Serializable {
    * @param uri location of file or directory
    * @throws IOException if the parent directory doesn't exist
    */
-  public abstract boolean touch(URI uri)
+  boolean touch(URI uri)
       throws IOException;
 
   /**
@@ -227,7 +197,7 @@ public abstract class PinotFS implements Closeable, Serializable {
    * @return a new InputStream
    * @throws IOException on any IO error - missing file, not a file etc
    */
-  public abstract InputStream open(URI uri)
+  InputStream open(URI uri)
       throws IOException;
 
   /**
@@ -235,7 +205,7 @@ public abstract class PinotFS implements Closeable, Serializable {
    * By default, this method does nothing.
    * @throws IOException on IO failure
    */
-  public void close()
+  default void close()
       throws IOException {
   }
 }
