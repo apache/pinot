@@ -19,7 +19,6 @@
 
 package org.apache.pinot.core.data.manager.realtime;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
