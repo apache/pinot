@@ -30,11 +30,6 @@ import org.slf4j.LoggerFactory;
 public abstract class BasePinotFS implements PinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(BasePinotFS.class);
 
-  /**
-   * Moves the file or directory from the src to dst. Does not keep the original file. If the dst has parent directories
-   * that haven't been created, this method will create all the necessary parent directories.
-   * Note: In Pinot we recommend the full paths of both src and dst be specified.
-   */
   @Override
   public boolean move(URI srcUri, URI dstUri, boolean overwrite)
       throws IOException {
