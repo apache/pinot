@@ -36,6 +36,7 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.plugin.stream.kinesis.KinesisConfig;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
@@ -53,12 +54,14 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -856,5 +859,34 @@ public final class TableConfigUtils {
   // enum of all the skip-able validation types.
   public enum ValidationType {
     ALL, TASK, UPSERT
+  }
+
+  /**
+   * Helper method to check is EmptySegmentPruner for a TableConfig.
+   * @param tableConfig Input table config.
+   */
+  public static boolean needsEmptySegmentPruner(TableConfig tableConfig) {
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    if (indexingConfig != null) {
+      Map<String, String> streamConfig = indexingConfig.getStreamConfigs();
+      if (streamConfig != null && KinesisConfig.STREAM_TYPE
+          .equals(streamConfig.get(StreamConfigProperties.STREAM_TYPE))) {
+        return true;
+      }
+    }
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig == null) {
+      return false;
+    }
+    StreamIngestionConfig streamIngestionConfig = ingestionConfig.getStreamIngestionConfig();
+    if (streamIngestionConfig == null) {
+      return false;
+    }
+    for (Map<String, String> config : streamIngestionConfig.getStreamConfigMaps()) {
+      if (config != null && KinesisConfig.STREAM_TYPE.equals(config.get(StreamConfigProperties.STREAM_TYPE))) {
+        return true;
+      }
+    }
+    return false;
   }
 }

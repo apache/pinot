@@ -19,12 +19,12 @@
 package org.apache.pinot.broker.routing.segmentpruner;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -46,15 +46,24 @@ public class SegmentPrunerFactory {
 
   public static List<SegmentPruner> getSegmentPruners(TableConfig tableConfig,
       ZkHelixPropertyStore<ZNRecord> propertyStore) {
-    RoutingConfig routingConfig = tableConfig.getRoutingConfig();
+    List<SegmentPruner> segmentPruners = new ArrayList<>();
+    boolean isKinesisEnabled = TableConfigUtils.needsEmptySegmentPruner(tableConfig);
+    if (isKinesisEnabled) {
+      // Always add EmptySegmentPruner if Kinesis consumer is used.
+      segmentPruners.add(new EmptySegmentPruner(tableConfig, propertyStore));
+    }
 
+    RoutingConfig routingConfig = tableConfig.getRoutingConfig();
     if (routingConfig != null) {
       List<String> segmentPrunerTypes = routingConfig.getSegmentPrunerTypes();
       if (segmentPrunerTypes != null) {
         List<SegmentPruner> configuredSegmentPruners = new ArrayList<>(segmentPrunerTypes.size());
         for (String segmentPrunerType : segmentPrunerTypes) {
           if (RoutingConfig.EMPTY_SEGMENT_PRUNER_TYPE.equalsIgnoreCase(segmentPrunerType)) {
-            configuredSegmentPruners.add(new EmptySegmentPruner(tableConfig, propertyStore));
+            // If Kinesis consumer is used, EmptySegmentPruner is already added, no need to add it again.
+            if (!isKinesisEnabled) {
+              configuredSegmentPruners.add(new EmptySegmentPruner(tableConfig, propertyStore));
+            }
           }
           if (RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE.equalsIgnoreCase(segmentPrunerType)) {
             PartitionSegmentPruner partitionSegmentPruner = getPartitionSegmentPruner(tableConfig, propertyStore);
@@ -62,7 +71,6 @@ public class SegmentPrunerFactory {
               configuredSegmentPruners.add(partitionSegmentPruner);
             }
           }
-
           if (RoutingConfig.TIME_SEGMENT_PRUNER_TYPE.equalsIgnoreCase(segmentPrunerType)) {
             TimeSegmentPruner timeSegmentPruner = getTimeSegmentPruner(tableConfig, propertyStore);
             if (timeSegmentPruner != null) {
@@ -70,25 +78,25 @@ public class SegmentPrunerFactory {
             }
           }
         }
-        // sort all segment pruners so that always prune empty segments first. After that, pruned based on time
-        // range, and followed by partition pruners.
-        sortSegmentPruners(configuredSegmentPruners);
-        return configuredSegmentPruners;
+        // Sort all segment pruners in order of: empty -> time -> partition. We are trying to sort them in a this order
+        // for improving the performance, this order may not be the optimal case -- we need move the pruner that will
+        // potentially prune the most segments to front)
+        segmentPruners.addAll(sortSegmentPruners(configuredSegmentPruners));
       } else {
         // Handle legacy configs for backward-compatibility
         TableType tableType = tableConfig.getTableType();
         String routingTableBuilderName = routingConfig.getRoutingTableBuilderName();
-        if ((tableType == TableType.OFFLINE && LEGACY_PARTITION_AWARE_OFFLINE_ROUTING
-            .equalsIgnoreCase(routingTableBuilderName)) || (tableType == TableType.REALTIME
+        if ((tableType == TableType.OFFLINE && LEGACY_PARTITION_AWARE_OFFLINE_ROUTING.equalsIgnoreCase(
+            routingTableBuilderName)) || (tableType == TableType.REALTIME
             && LEGACY_PARTITION_AWARE_REALTIME_ROUTING.equalsIgnoreCase(routingTableBuilderName))) {
           PartitionSegmentPruner partitionSegmentPruner = getPartitionSegmentPruner(tableConfig, propertyStore);
           if (partitionSegmentPruner != null) {
-            return Collections.singletonList(getPartitionSegmentPruner(tableConfig, propertyStore));
+            segmentPruners.add(getPartitionSegmentPruner(tableConfig, propertyStore));
           }
         }
       }
     }
-    return Collections.emptyList();
+    return segmentPruners;
   }
 
   @Nullable
@@ -132,32 +140,27 @@ public class SegmentPrunerFactory {
     return new TimeSegmentPruner(tableConfig, propertyStore);
   }
 
-  private static void sortSegmentPruners(List<SegmentPruner> pruners) {
+  private static List<SegmentPruner> sortSegmentPruners(List<SegmentPruner> pruners) {
     // If there's multiple pruners, always prune empty segments first. After that, pruned based on time range, and
     // followed by partition pruners.
     // Partition pruner run time is proportional to input # of segments while time range pruner is not,
     // Prune based on time range first will have a smaller input size for partition pruners, so have better performance.
-    int left = 0;
-    int right = pruners.size() - 1;
-    int current = 0;
-    while (current <= right) {
-      SegmentPruner currentPruner = pruners.get(current);
-      // if currentPruner is EmptySegmentPruner, move it to front by swapping with the left pointer
-      if (currentPruner instanceof EmptySegmentPruner) {
-        pruners.set(current, pruners.get(left));
-        pruners.set(left, currentPruner);
-        left++;
+    List<SegmentPruner> sortedPruners = new ArrayList<>();
+    for (SegmentPruner pruner : pruners) {
+      if (pruner instanceof EmptySegmentPruner) {
+        sortedPruners.add(pruner);
       }
-      // if current is PartitionSegmentPruner, move it to end by swapping with right pointer
-      if (currentPruner instanceof PartitionSegmentPruner) {
-        pruners.set(current, pruners.get(right));
-        pruners.set(right, currentPruner);
-        right--;
-        // may have swapped an EmptySegmentPruner/PartitionSegmentPruner from the end of list that requires extra
-        // processing, so decrement the current index to account for it.
-        current--;
-      }
-      current++;
     }
+    for (SegmentPruner pruner : pruners) {
+      if (pruner instanceof TimeSegmentPruner) {
+        sortedPruners.add(pruner);
+      }
+    }
+    for (SegmentPruner pruner : pruners) {
+      if (pruner instanceof PartitionSegmentPruner) {
+        sortedPruners.add(pruner);
+      }
+    }
+    return sortedPruners;
   }
 }
