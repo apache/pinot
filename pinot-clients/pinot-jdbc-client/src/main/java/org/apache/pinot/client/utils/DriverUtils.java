@@ -105,7 +105,7 @@ public class DriverUtils {
     List<NameValuePair> params = URLEncodedUtils.parse(uri, StandardCharsets.UTF_8);
 
     Map<String, String> paramsMap = new HashMap<>();
-    for(NameValuePair param: params) {
+    for (NameValuePair param: params) {
       paramsMap.put(param.getName(), param.getValue());
     }
 
