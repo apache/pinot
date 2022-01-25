@@ -285,17 +285,17 @@ public class SegmentDeletionManagerTest {
     }
 
     public void deleteSegmentsFromPropertyStoreAndLocal(String tableName, Collection<String> segments) {
-      super.deleteSegmentFromPropertyStoreAndLocal(tableName, segments, 0L);
+      super.deleteSegmentFromPropertyStoreAndLocal(tableName, segments, false, 0L);
     }
 
     @Override
-    protected void removeSegmentFromStore(String tableName, String segmentId) {
+    protected void removeSegmentFromStore(String tableName, String segmentId, boolean isInstantDelete) {
       _segmentsRemovedFromStore.add(segmentId);
     }
 
     @Override
     protected void deleteSegmentsWithDelay(final String tableName, final Collection<String> segmentIds,
-        final long deletionDelaySeconds) {
+        final boolean isInstantDeletion, final long deletionDelaySeconds) {
       _segmentsToRetry.addAll(segmentIds);
     }
   }

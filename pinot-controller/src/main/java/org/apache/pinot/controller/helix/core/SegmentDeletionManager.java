@@ -83,21 +83,25 @@ public class SegmentDeletionManager {
   }
 
   public void deleteSegments(final String tableName, final Collection<String> segmentIds) {
-    deleteSegmentsWithDelay(tableName, segmentIds, DEFAULT_DELETION_DELAY_SECONDS);
+    deleteSegments(tableName, segmentIds, false);
+  }
+
+  public void deleteSegments(final String tableName, final Collection<String> segmentIds, boolean isInstantDeletion) {
+    deleteSegmentsWithDelay(tableName, segmentIds, isInstantDeletion, DEFAULT_DELETION_DELAY_SECONDS);
   }
 
   protected void deleteSegmentsWithDelay(final String tableName, final Collection<String> segmentIds,
-      final long deletionDelaySeconds) {
+      final boolean isInstantDeletion, final long deletionDelaySeconds) {
     _executorService.schedule(new Runnable() {
       @Override
       public void run() {
-        deleteSegmentFromPropertyStoreAndLocal(tableName, segmentIds, deletionDelaySeconds);
+        deleteSegmentFromPropertyStoreAndLocal(tableName, segmentIds, isInstantDeletion, deletionDelaySeconds);
       }
     }, deletionDelaySeconds, TimeUnit.SECONDS);
   }
 
   protected synchronized void deleteSegmentFromPropertyStoreAndLocal(String tableName, Collection<String> segmentIds,
-      long deletionDelay) {
+      boolean isInstantDeletion, long deletionDelay) {
     // Check if segment got removed from ExternalView or IdealState
     ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, tableName);
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
@@ -149,7 +153,7 @@ public class SegmentDeletionManager {
       }
       segmentsToDelete.removeAll(propStoreFailedSegs);
 
-      removeSegmentsFromStore(tableName, segmentsToDelete);
+      removeSegmentsFromStore(tableName, segmentsToDelete, isInstantDeletion);
     }
 
     LOGGER.info("Deleted {} segments from table {}:{}", segmentsToDelete.size(), tableName,
@@ -158,47 +162,68 @@ public class SegmentDeletionManager {
     if (!segmentsToRetryLater.isEmpty()) {
       long effectiveDeletionDelay = Math.min(deletionDelay * 2, MAX_DELETION_DELAY_SECONDS);
       LOGGER.info("Postponing deletion of {} segments from table {}", segmentsToRetryLater.size(), tableName);
-      deleteSegmentsWithDelay(tableName, segmentsToRetryLater, effectiveDeletionDelay);
+      deleteSegmentsWithDelay(tableName, segmentsToRetryLater, isInstantDeletion, effectiveDeletionDelay);
       return;
     }
   }
 
   public void removeSegmentsFromStore(String tableNameWithType, List<String> segments) {
+    removeSegmentsFromStore(tableNameWithType, segments, false);
+  }
+
+  public void removeSegmentsFromStore(String tableNameWithType, List<String> segments, boolean isInstantDeletion) {
     for (String segment : segments) {
-      removeSegmentFromStore(tableNameWithType, segment);
+      removeSegmentFromStore(tableNameWithType, segment, isInstantDeletion);
     }
   }
 
-  protected void removeSegmentFromStore(String tableNameWithType, String segmentId) {
+  protected void removeSegmentFromStore(String tableNameWithType, String segmentId, boolean isInstantDeletion) {
     // Ignore HLC segments as they are not stored in Pinot FS
     if (SegmentName.isHighLevelConsumerSegmentName(segmentId)) {
       return;
     }
     if (_dataDir != null) {
-      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-      URI fileToMoveURI = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
-      URI deletedSegmentDestURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS, rawTableName, URIUtils.encode(segmentId));
-      PinotFS pinotFS = PinotFSFactory.create(fileToMoveURI.getScheme());
+      if (isInstantDeletion) {
+        String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+        URI fileToDeleteURI = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
+        PinotFS pinotFS = PinotFSFactory.create(fileToDeleteURI.getScheme());
 
-      try {
-        if (pinotFS.exists(fileToMoveURI)) {
-          // Overwrites the file if it already exists in the target directory.
-          if (pinotFS.move(fileToMoveURI, deletedSegmentDestURI, true)) {
-            // Updates last modified.
-            // Touch is needed here so that removeAgedDeletedSegments() works correctly.
-            pinotFS.touch(deletedSegmentDestURI);
-            LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToMoveURI.toString(),
-                deletedSegmentDestURI.toString());
+        try {
+          if (pinotFS.delete(fileToDeleteURI, false)) {
+            LOGGER.info("Deleted segment {} from {}", segmentId, fileToDeleteURI.toString());
           } else {
-            LOGGER.warn("Failed to move segment {} from {} to {}", segmentId, fileToMoveURI.toString(),
-                deletedSegmentDestURI.toString());
+            LOGGER.warn("Failed to delete segment {} from {}", segmentId, fileToDeleteURI.toString());
           }
-        } else {
-          LOGGER.warn("Failed to find local segment file for segment {}", fileToMoveURI.toString());
+        } catch (IOException e) {
+          LOGGER.warn("Could not delete segment {} from {}", segmentId, fileToDeleteURI.toString(), e);
         }
-      } catch (IOException e) {
-        LOGGER.warn("Could not move segment {} from {} to {}", segmentId, fileToMoveURI.toString(),
-            deletedSegmentDestURI.toString(), e);
+      } else {
+        String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+        URI fileToMoveURI = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
+        URI deletedSegmentDestURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS, rawTableName,
+            URIUtils.encode(segmentId));
+        PinotFS pinotFS = PinotFSFactory.create(fileToMoveURI.getScheme());
+
+        try {
+          if (pinotFS.exists(fileToMoveURI)) {
+            // Overwrites the file if it already exists in the target directory.
+            if (pinotFS.move(fileToMoveURI, deletedSegmentDestURI, true)) {
+              // Updates last modified.
+              // Touch is needed here so that removeAgedDeletedSegments() works correctly.
+              pinotFS.touch(deletedSegmentDestURI);
+              LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToMoveURI.toString(),
+                  deletedSegmentDestURI.toString());
+            } else {
+              LOGGER.warn("Failed to move segment {} from {} to {}", segmentId, fileToMoveURI.toString(),
+                  deletedSegmentDestURI.toString());
+            }
+          } else {
+            LOGGER.warn("Failed to find local segment file for segment {}", fileToMoveURI.toString());
+          }
+        } catch (IOException e) {
+          LOGGER.warn("Could not move segment {} from {} to {}", segmentId, fileToMoveURI.toString(),
+              deletedSegmentDestURI.toString(), e);
+        }
       }
     } else {
       LOGGER.info("dataDir is not configured, won't delete segment {} from disk", segmentId);

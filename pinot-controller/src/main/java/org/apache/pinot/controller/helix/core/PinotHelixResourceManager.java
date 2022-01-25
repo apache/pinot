@@ -686,20 +686,26 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, tableNameWithType);
   }
 
+  public synchronized PinotResourceManagerResponse deleteSegments(String tableNameWithType, List<String> segmentNames) {
+    return deleteSegments(tableNameWithType, segmentNames, false);
+  }
+
   /**
    * Delete a list of segments from ideal state and remove them from the local storage.
    *
    * @param tableNameWithType Table name with type suffix
    * @param segmentNames List of names of segment to be deleted
+   * @param isInstanceDelete Indicate if the deleted segments will be put in retention before deletion.
    * @return Request response
    */
-  public synchronized PinotResourceManagerResponse deleteSegments(String tableNameWithType, List<String> segmentNames) {
+  public synchronized PinotResourceManagerResponse deleteSegments(String tableNameWithType, List<String> segmentNames,
+      boolean isInstanceDelete) {
     try {
       LOGGER.info("Trying to delete segments: {} from table: {} ", segmentNames, tableNameWithType);
       Preconditions.checkArgument(TableNameBuilder.isTableResource(tableNameWithType),
           "Table name: %s is not a valid table name with type suffix", tableNameWithType);
       HelixHelper.removeSegmentsFromIdealState(_helixZkManager, tableNameWithType, segmentNames);
-      _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames);
+      _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames, isInstanceDelete);
       return PinotResourceManagerResponse.success("Segment " + segmentNames + " deleted");
     } catch (final Exception e) {
       LOGGER.error("Caught exception while deleting segment: {} from table: {}", segmentNames, tableNameWithType, e);
