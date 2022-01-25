@@ -572,14 +572,14 @@ public class PinotSegmentRestletResource {
   public SuccessResponse deleteSegment(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @ApiParam(value = "If instant delete without retention") @QueryParam("isInstantDelete") @DefaultValue("false")
-          String isInstantDelete) {
-    boolean isInstantDeletion = !isInstantDelete.equalsIgnoreCase("false");
+      @ApiParam(value = "Whether to delete the segment instantly or move to deleted_segment prefix and let "
+          + "RetentionManager handle the actual file deletion") @QueryParam("instantDelete") @DefaultValue("false")
+          boolean isInstantDelete) {
     segmentName = URIUtils.decode(segmentName);
     TableType tableType = SegmentName.isRealtimeSegmentName(segmentName) ? TableType.REALTIME : TableType.OFFLINE;
     String tableNameWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
-    deleteSegmentsInternal(tableNameWithType, Collections.singletonList(segmentName), isInstantDeletion);
+    deleteSegmentsInternal(tableNameWithType, Collections.singletonList(segmentName), isInstantDelete);
     return new SuccessResponse("Segment deleted");
   }
 
@@ -591,9 +591,9 @@ public class PinotSegmentRestletResource {
   public SuccessResponse deleteAllSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "If instant delete without retention") @QueryParam("isInstantDelete") @DefaultValue("false")
-          String isInstantDelete) {
-    boolean isInstantDeletion = !isInstantDelete.equalsIgnoreCase("false");
+      @ApiParam(value = "Whether to delete the segment instantly or move to deleted_segment prefix and let "
+          + "RetentionManager handle the actual file deletion") @QueryParam("instantDelete") @DefaultValue("false")
+          boolean isInstantDelete) {
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
       throw new ControllerApplicationException(LOGGER, "Table type must not be null", Status.BAD_REQUEST);
@@ -601,7 +601,7 @@ public class PinotSegmentRestletResource {
     String tableNameWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
     deleteSegmentsInternal(tableNameWithType, _pinotHelixResourceManager.getSegmentsFor(tableNameWithType, false),
-        isInstantDeletion);
+        isInstantDelete);
     return new SuccessResponse("All segments of table " + tableNameWithType + " deleted");
   }
 
@@ -614,9 +614,9 @@ public class PinotSegmentRestletResource {
       notes = "Delete the segments in the JSON array payload")
   public SuccessResponse deleteSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "If instant delete without retention") @QueryParam("isInstantDelete") @DefaultValue("false")
-          String isInstantDelete, List<String> segments) {
-    boolean isInstantDeletion = !isInstantDelete.equalsIgnoreCase("false");
+      @ApiParam(value = "Whether to delete the segment instantly or move to deleted_segment prefix and let "
+          + "RetentionManager handle the actual file deletion") @QueryParam("instantDelete") @DefaultValue("false")
+          boolean isInstantDelete, List<String> segments) {
     int numSegments = segments.size();
     if (numSegments == 0) {
       throw new ControllerApplicationException(LOGGER, "Segments must be provided", Status.BAD_REQUEST);
@@ -631,7 +631,7 @@ public class PinotSegmentRestletResource {
     TableType tableType = isRealtimeSegment ? TableType.REALTIME : TableType.OFFLINE;
     String tableNameWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
-    deleteSegmentsInternal(tableNameWithType, segments, isInstantDeletion);
+    deleteSegmentsInternal(tableNameWithType, segments, isInstantDelete);
     if (numSegments <= 5) {
       return new SuccessResponse("Deleted segments: " + segments + " from table: " + tableNameWithType);
     } else {
@@ -639,9 +639,9 @@ public class PinotSegmentRestletResource {
     }
   }
 
-  private void deleteSegmentsInternal(String tableNameWithType, List<String> segments, boolean isInstantDeletion) {
+  private void deleteSegmentsInternal(String tableNameWithType, List<String> segments, boolean isInstantDelete) {
     PinotResourceManagerResponse response = _pinotHelixResourceManager.deleteSegments(tableNameWithType, segments,
-        isInstantDeletion);
+        isInstantDelete);
     if (!response.isSuccessful()) {
       throw new ControllerApplicationException(LOGGER,
           "Failed to delete segments from table: " + tableNameWithType + ", error message: " + response.getMessage(),

@@ -82,16 +82,16 @@ public class SegmentDeletionManager {
     _executorService.shutdownNow();
   }
 
-  public void deleteSegments(final String tableName, final Collection<String> segmentIds) {
+  public void deleteSegments(String tableName, Collection<String> segmentIds) {
     deleteSegments(tableName, segmentIds, false);
   }
 
-  public void deleteSegments(final String tableName, final Collection<String> segmentIds, boolean isInstantDeletion) {
+  public void deleteSegments(String tableName, Collection<String> segmentIds, boolean isInstantDeletion) {
     deleteSegmentsWithDelay(tableName, segmentIds, isInstantDeletion, DEFAULT_DELETION_DELAY_SECONDS);
   }
 
-  protected void deleteSegmentsWithDelay(final String tableName, final Collection<String> segmentIds,
-      final boolean isInstantDeletion, final long deletionDelaySeconds) {
+  protected void deleteSegmentsWithDelay(String tableName, Collection<String> segmentIds,
+      boolean isInstantDeletion, long deletionDelaySeconds) {
     _executorService.schedule(new Runnable() {
       @Override
       public void run() {
@@ -183,11 +183,11 @@ public class SegmentDeletionManager {
       return;
     }
     if (_dataDir != null) {
+      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+      URI fileToDeleteURI = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
+      PinotFS pinotFS = PinotFSFactory.create(fileToDeleteURI.getScheme());
       if (isInstantDeletion) {
-        String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-        URI fileToDeleteURI = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
-        PinotFS pinotFS = PinotFSFactory.create(fileToDeleteURI.getScheme());
-
+        // delete the segment file directly
         try {
           if (pinotFS.delete(fileToDeleteURI, false)) {
             LOGGER.info("Deleted segment {} from {}", segmentId, fileToDeleteURI.toString());
@@ -198,31 +198,28 @@ public class SegmentDeletionManager {
           LOGGER.warn("Could not delete segment {} from {}", segmentId, fileToDeleteURI.toString(), e);
         }
       } else {
-        String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-        URI fileToMoveURI = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
-        URI deletedSegmentDestURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS, rawTableName,
+        // move the segment file to deleted segments first and let retention manager handler the deletion
+        URI deletedSegmentMoveDestURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS, rawTableName,
             URIUtils.encode(segmentId));
-        PinotFS pinotFS = PinotFSFactory.create(fileToMoveURI.getScheme());
-
         try {
-          if (pinotFS.exists(fileToMoveURI)) {
+          if (pinotFS.exists(fileToDeleteURI)) {
             // Overwrites the file if it already exists in the target directory.
-            if (pinotFS.move(fileToMoveURI, deletedSegmentDestURI, true)) {
+            if (pinotFS.move(fileToDeleteURI, deletedSegmentMoveDestURI, true)) {
               // Updates last modified.
               // Touch is needed here so that removeAgedDeletedSegments() works correctly.
-              pinotFS.touch(deletedSegmentDestURI);
-              LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToMoveURI.toString(),
-                  deletedSegmentDestURI.toString());
+              pinotFS.touch(deletedSegmentMoveDestURI);
+              LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToDeleteURI.toString(),
+                  deletedSegmentMoveDestURI.toString());
             } else {
-              LOGGER.warn("Failed to move segment {} from {} to {}", segmentId, fileToMoveURI.toString(),
-                  deletedSegmentDestURI.toString());
+              LOGGER.warn("Failed to move segment {} from {} to {}", segmentId, fileToDeleteURI.toString(),
+                  deletedSegmentMoveDestURI.toString());
             }
           } else {
-            LOGGER.warn("Failed to find local segment file for segment {}", fileToMoveURI.toString());
+            LOGGER.warn("Failed to find local segment file for segment {}", fileToDeleteURI.toString());
           }
         } catch (IOException e) {
-          LOGGER.warn("Could not move segment {} from {} to {}", segmentId, fileToMoveURI.toString(),
-              deletedSegmentDestURI.toString(), e);
+          LOGGER.warn("Could not move segment {} from {} to {}", segmentId, fileToDeleteURI.toString(),
+              deletedSegmentMoveDestURI.toString(), e);
         }
       }
     } else {
