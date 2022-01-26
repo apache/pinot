@@ -1503,13 +1503,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     //expand *
     List<Expression> expandedSelections = new ArrayList<>();
     for (String tableCol : columnNameMap.values()) {
-      Expression identifierExpression = RequestUtils.createIdentifierExpression(tableCol);
+      Expression newSelection = RequestUtils.createIdentifierExpression(tableCol);
       //we exclude default virtual columns and those columns that are already a part of originalSelections to dedup
-      if (tableCol.charAt(0) != '$' && !originalSelections.contains(identifierExpression)) {
-        expandedSelections.add(identifierExpression);
+      if (tableCol.charAt(0) != '$' && !originalSelections.contains(newSelection)) {
+        expandedSelections.add(newSelection);
       }
     }
-    //sort with natural ordering
+    //sort with natural ordering. expandedSelections DOES NOT contain any columns that were requested in the original
+    // query
     expandedSelections.sort(null);
     List<Expression> finalSelections = new ArrayList<>();
     for (Expression selection : originalSelections) {
