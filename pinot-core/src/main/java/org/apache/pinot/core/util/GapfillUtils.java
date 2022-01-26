@@ -34,7 +34,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
  */
 public class GapfillUtils {
   private static final String POST_AGGREGATE_GAP_FILL = "postaggregategapfill";
-  private static final String PRE_AGGREGATE_GAP_FILL = "preaggregategapfill";
+  private static final String GAP_FILL = "gapfill";
   private static final String FILL = "fill";
   private static final String TIME_SERIES_ON = "timeSeriesOn";
   private static final int STARTING_INDEX_OF_OPTIONAL_ARGS_FOR_PRE_AGGREGATE_GAP_FILL = 5;
@@ -139,7 +139,7 @@ public class GapfillUtils {
       return false;
     }
 
-    return PRE_AGGREGATE_GAP_FILL.equals(canonicalizeFunctionName(expressionContext.getFunction().getFunctionName()));
+    return GAP_FILL.equals(canonicalizeFunctionName(expressionContext.getFunction().getFunctionName()));
   }
 
   public static boolean isPreAggregateGapfill(QueryContext queryContext) {
