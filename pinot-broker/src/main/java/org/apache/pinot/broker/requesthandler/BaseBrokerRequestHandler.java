@@ -37,7 +37,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.calcite.sql.SqlKind;
@@ -1501,41 +1500,26 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static void expandStarExpressionToActualColumns(PinotQuery pinotQuery, Map<String, String> columnNameMap,
       Expression selectStarExpr) {
     List<Expression> originalSelections = pinotQuery.getSelectList();
-    // Avoid using stream apis in query path because we have found that it has poorer performance compared to
-    // regular apis.
-    Set<String> originallySelectedColumnNames = new HashSet<>();
-    for (Expression originalSelection : originalSelections) {
-      if (originalSelection.isSetIdentifier()) {
-        originallySelectedColumnNames.add(originalSelection.getIdentifier().getName());
+    //expand *
+    List<Expression> expandedSelections = new ArrayList<>();
+    for (String tableCol : columnNameMap.values()) {
+      Expression identifierExpression = RequestUtils.createIdentifierExpression(tableCol);
+      //we exclude default virtual columns and those columns that are already a part of originalSelections to dedup
+      if (tableCol.charAt(0) != '$' && !originalSelections.contains(identifierExpression)) {
+        expandedSelections.add(identifierExpression);
       }
     }
-    List<Expression> newSelections = new ArrayList<>();
+    //sort with natural ordering
+    expandedSelections.sort(null);
+    List<Expression> finalSelections = new ArrayList<>();
     for (Expression selection : originalSelections) {
       if (selection.equals(selectStarExpr)) {
-        //expand '*' to actual columns, exclude default virtual columns
-        for (String tableCol : columnNameMap.values()) {
-          //we exclude default virtual columns and those columns that are already a part of originalSelections (to
-          // dedup columns that are selected multiple times)
-          if (isNotDefaultVirtualColumn(tableCol) && !originallySelectedColumnNames.contains(tableCol)) {
-            Expression identifierExpression = RequestUtils.createIdentifierExpression(tableCol);
-            newSelections.add(identifierExpression);
-          }
-        }
+        finalSelections.addAll(expandedSelections);
       } else {
-        newSelections.add(selection);
+        finalSelections.add(selection);
       }
     }
-    pinotQuery.setSelectList(newSelections);
-  }
-
-  private static boolean isNotDefaultVirtualColumn(String value) {
-    return !isDefaultVirtualColumn(value);
-  }
-
-  private static boolean isDefaultVirtualColumn(String value) {
-    return value.equals(CommonConstants.Segment.BuiltInVirtualColumn.DOCID) || value.equals(
-        CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME) || value.equals(
-        CommonConstants.Segment.BuiltInVirtualColumn.HOSTNAME);
+    pinotQuery.setSelectList(finalSelections);
   }
 
   /**
