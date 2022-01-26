@@ -21,12 +21,10 @@ package org.apache.pinot.broker.requesthandler;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -72,6 +70,7 @@ public class SelectStarWithOtherColsRewriteTest {
           break;
         case "$hostName":
           throw new RuntimeException("Extra default column returned");
+        default:
       }
     }
     Assert.assertEquals(docIdCnt, 1);
@@ -88,7 +87,7 @@ public class SelectStarWithOtherColsRewriteTest {
     BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
     List<Expression> newSelections = pinotQuery.getSelectList();
     int playerIdCnt = 0;
-    int G_oldCount = 0;
+    int goldCount = 0;
     for (Expression newSelection : newSelections) {
       String colName = newSelection.getIdentifier().getName();
       switch (colName) {
@@ -96,12 +95,13 @@ public class SelectStarWithOtherColsRewriteTest {
           playerIdCnt++;
           break;
         case "G_old":
-          G_oldCount++;
+          goldCount++;
           break;
+        default:
       }
     }
     Assert.assertEquals(playerIdCnt, 1, "playerID does not occur once");
-    Assert.assertEquals(G_oldCount, 1, "G_old occurs does not occur once");
+    Assert.assertEquals(goldCount, 1, "G_old occurs does not occur once");
   }
 
   /**
@@ -181,15 +181,17 @@ public class SelectStarWithOtherColsRewriteTest {
     List<Expression> newSelections = pinotQuery.getSelectList();
     Assert.assertTrue(newSelections.get(0).isSetFunctionCall());
     Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperator(), "ADD");
-    Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "homeRuns");
-    Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "groundedIntoDoublePlays");
+    Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "homeRuns");
+    Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(),
+        "groundedIntoDoublePlays");
     //homeRuns is returned as well
     int homeRunsCnt = 0;
     int groundedIntoDoublePlaysCnt = 0;
     for (Expression selection : newSelections) {
       if (selection.isSetIdentifier() && selection.getIdentifier().getName().equals("homeRuns")) {
         homeRunsCnt++;
-      } else if(selection.isSetIdentifier() && selection.getIdentifier().getName().equals("groundedIntoDoublePlays")) {
+      } else if (selection.isSetIdentifier() && selection.getIdentifier().getName().equals("groundedIntoDoublePlays")) {
         groundedIntoDoublePlaysCnt++;
       }
     }
