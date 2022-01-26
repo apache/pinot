@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -33,6 +34,7 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.DistinctCountAggregationFunction;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -84,51 +86,62 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
               new MinMaxRangePair(toDouble(dictionary.getMinVal()), toDouble(dictionary.getMaxVal())));
           break;
         case DISTINCTCOUNT:
-          switch (dictionary.getValueType()) {
-            case INT:
-              IntOpenHashSet intSet = new IntOpenHashSet(dictionarySize);
-              for (int dictId = 0; dictId < dictionarySize; dictId++) {
-                intSet.add(dictionary.getIntValue(dictId));
-              }
-              aggregationResults.add(intSet);
-              break;
-            case LONG:
-              LongOpenHashSet longSet = new LongOpenHashSet(dictionarySize);
-              for (int dictId = 0; dictId < dictionarySize; dictId++) {
-                longSet.add(dictionary.getLongValue(dictId));
-              }
-              aggregationResults.add(longSet);
-              break;
-            case FLOAT:
-              FloatOpenHashSet floatSet = new FloatOpenHashSet(dictionarySize);
-              for (int dictId = 0; dictId < dictionarySize; dictId++) {
-                floatSet.add(dictionary.getFloatValue(dictId));
-              }
-              aggregationResults.add(floatSet);
-              break;
-            case DOUBLE:
-              DoubleOpenHashSet doubleSet = new DoubleOpenHashSet(dictionarySize);
-              for (int dictId = 0; dictId < dictionarySize; dictId++) {
-                doubleSet.add(dictionary.getDoubleValue(dictId));
-              }
-              aggregationResults.add(doubleSet);
-              break;
-            case STRING:
-              ObjectOpenHashSet<String> stringSet = new ObjectOpenHashSet<>(dictionarySize);
-              for (int dictId = 0; dictId < dictionarySize; dictId++) {
-                stringSet.add(dictionary.getStringValue(dictId));
-              }
-              aggregationResults.add(stringSet);
-              break;
-            case BYTES:
-              ObjectOpenHashSet<ByteArray> bytesSet = new ObjectOpenHashSet<>(dictionarySize);
-              for (int dictId = 0; dictId < dictionarySize; dictId++) {
-                bytesSet.add(new ByteArray(dictionary.getBytesValue(dictId)));
-              }
-              aggregationResults.add(bytesSet);
-              break;
-            default:
-              throw new IllegalStateException();
+          DistinctCountAggregationFunction distinctCountAggregationFunction =
+              (DistinctCountAggregationFunction) aggregationFunction;
+          if (dictionarySize > distinctCountAggregationFunction.getHllConversionThreshold()) {
+            // Store values into a HLL when the dictionary size exceeds the conversion threshold
+            HyperLogLog hll = new HyperLogLog(distinctCountAggregationFunction.getHllLog2m());
+            for (int dictId = 0; dictId < dictionarySize; dictId++) {
+              hll.offer(dictionary.get(dictId));
+            }
+            aggregationResults.add(hll);
+          } else {
+            switch (dictionary.getValueType()) {
+              case INT:
+                IntOpenHashSet intSet = new IntOpenHashSet(dictionarySize);
+                for (int dictId = 0; dictId < dictionarySize; dictId++) {
+                  intSet.add(dictionary.getIntValue(dictId));
+                }
+                aggregationResults.add(intSet);
+                break;
+              case LONG:
+                LongOpenHashSet longSet = new LongOpenHashSet(dictionarySize);
+                for (int dictId = 0; dictId < dictionarySize; dictId++) {
+                  longSet.add(dictionary.getLongValue(dictId));
+                }
+                aggregationResults.add(longSet);
+                break;
+              case FLOAT:
+                FloatOpenHashSet floatSet = new FloatOpenHashSet(dictionarySize);
+                for (int dictId = 0; dictId < dictionarySize; dictId++) {
+                  floatSet.add(dictionary.getFloatValue(dictId));
+                }
+                aggregationResults.add(floatSet);
+                break;
+              case DOUBLE:
+                DoubleOpenHashSet doubleSet = new DoubleOpenHashSet(dictionarySize);
+                for (int dictId = 0; dictId < dictionarySize; dictId++) {
+                  doubleSet.add(dictionary.getDoubleValue(dictId));
+                }
+                aggregationResults.add(doubleSet);
+                break;
+              case STRING:
+                ObjectOpenHashSet<String> stringSet = new ObjectOpenHashSet<>(dictionarySize);
+                for (int dictId = 0; dictId < dictionarySize; dictId++) {
+                  stringSet.add(dictionary.getStringValue(dictId));
+                }
+                aggregationResults.add(stringSet);
+                break;
+              case BYTES:
+                ObjectOpenHashSet<ByteArray> bytesSet = new ObjectOpenHashSet<>(dictionarySize);
+                for (int dictId = 0; dictId < dictionarySize; dictId++) {
+                  bytesSet.add(new ByteArray(dictionary.getBytesValue(dictId)));
+                }
+                aggregationResults.add(bytesSet);
+                break;
+              default:
+                throw new IllegalStateException();
+            }
           }
           break;
         case SEGMENTPARTITIONEDDISTINCTCOUNT:

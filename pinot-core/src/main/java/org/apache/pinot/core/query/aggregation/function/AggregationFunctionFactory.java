@@ -165,13 +165,12 @@ public class AggregationFunctionFactory {
                 throw new IllegalArgumentException("Third argument of lastWithTime Function should be literal."
                     + " The function can be used as lastWithTime(dataColumn, timeColumn, 'dataType')");
               }
-              FieldSpec.DataType fieldDataType
-                  = FieldSpec.DataType.valueOf(dataType.getLiteral().toUpperCase());
+              FieldSpec.DataType fieldDataType = FieldSpec.DataType.valueOf(dataType.getLiteral().toUpperCase());
               switch (fieldDataType) {
                 case BOOLEAN:
                 case INT:
-                  return new LastIntValueWithTimeAggregationFunction(
-                      firstArgument, timeCol, fieldDataType == FieldSpec.DataType.BOOLEAN);
+                  return new LastIntValueWithTimeAggregationFunction(firstArgument, timeCol,
+                      fieldDataType == FieldSpec.DataType.BOOLEAN);
                 case LONG:
                   return new LastLongValueWithTimeAggregationFunction(firstArgument, timeCol);
                 case FLOAT:
@@ -190,7 +189,7 @@ public class AggregationFunctionFactory {
           case MINMAXRANGE:
             return new MinMaxRangeAggregationFunction(firstArgument);
           case DISTINCTCOUNT:
-            return new DistinctCountAggregationFunction(firstArgument);
+            return new DistinctCountAggregationFunction(arguments);
           case DISTINCTCOUNTBITMAP:
             return new DistinctCountBitmapAggregationFunction(firstArgument);
           case SEGMENTPARTITIONEDDISTINCTCOUNT:
@@ -220,7 +219,7 @@ public class AggregationFunctionFactory {
           case MINMAXRANGEMV:
             return new MinMaxRangeMVAggregationFunction(firstArgument);
           case DISTINCTCOUNTMV:
-            return new DistinctCountMVAggregationFunction(firstArgument);
+            return new DistinctCountMVAggregationFunction(arguments);
           case DISTINCTCOUNTBITMAPMV:
             return new DistinctCountBitmapMVAggregationFunction(firstArgument);
           case DISTINCTCOUNTHLLMV:

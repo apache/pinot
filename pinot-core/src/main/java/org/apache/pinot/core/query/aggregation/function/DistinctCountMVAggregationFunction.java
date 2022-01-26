@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -38,8 +40,8 @@ import org.roaringbitmap.RoaringBitmap;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class DistinctCountMVAggregationFunction extends DistinctCountAggregationFunction {
 
-  public DistinctCountMVAggregationFunction(ExpressionContext expression) {
-    super(expression);
+  public DistinctCountMVAggregationFunction(List<ExpressionContext> arguments) {
+    super(arguments);
   }
 
   @Override
@@ -63,7 +65,64 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
       return;
     }
 
-    // For non-dictionary-encoded expression, store values into the value set
+    // For non-dictionary-encoded expression, store values into the value set or HLL
+    if (aggregationResultHolder.getResult() instanceof HyperLogLog) {
+      aggregateIntoHLL(length, aggregationResultHolder, blockValSet);
+    } else {
+      aggregateIntoSet(length, aggregationResultHolder, blockValSet);
+    }
+  }
+
+  private void aggregateIntoHLL(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    HyperLogLog hll = aggregationResultHolder.getResult();
+    switch (storedType) {
+      case INT:
+        int[][] intValues = blockValSet.getIntValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (int value : intValues[i]) {
+            hll.offer(value);
+          }
+        }
+        break;
+      case LONG:
+        long[][] longValues = blockValSet.getLongValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (long value : longValues[i]) {
+            hll.offer(value);
+          }
+        }
+        break;
+      case FLOAT:
+        float[][] floatValues = blockValSet.getFloatValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (float value : floatValues[i]) {
+            hll.offer(value);
+          }
+        }
+        break;
+      case DOUBLE:
+        double[][] doubleValues = blockValSet.getDoubleValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (double value : doubleValues[i]) {
+            hll.offer(value);
+          }
+        }
+        break;
+      case STRING:
+        String[][] stringValues = blockValSet.getStringValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (String value : stringValues[i]) {
+            hll.offer(value);
+          }
+        }
+        break;
+      default:
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_MV aggregation function: " + storedType);
+    }
+  }
+
+  private void aggregateIntoSet(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
     DataType storedType = blockValSet.getValueType().getStoredType();
     Set valueSet = getValueSet(aggregationResultHolder, storedType);
     switch (storedType) {
@@ -116,6 +175,11 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
         break;
       default:
         throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_MV aggregation function: " + storedType);
+    }
+
+    // Convert to HLL if the set size exceeds the threshold
+    if (valueSet.size() > _hllConversionThreshold) {
+      aggregationResultHolder.setValue(convertSetToHLL(valueSet, storedType));
     }
   }
 

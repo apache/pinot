@@ -18,13 +18,19 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -41,10 +47,30 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class DistinctCountAggregationFunction extends BaseSingleInputAggregationFunction<Set, Integer> {
+public class DistinctCountAggregationFunction extends BaseSingleInputAggregationFunction<Object, Integer> {
 
-  public DistinctCountAggregationFunction(ExpressionContext expression) {
-    super(expression);
+  protected final int _hllLog2m;
+  protected final int _hllConversionThreshold;
+
+  public DistinctCountAggregationFunction(List<ExpressionContext> arguments) {
+    super(arguments.get(0));
+
+    if (arguments.size() > 1) {
+      Parameters parameters = new Parameters(arguments.get(1).getLiteral());
+      _hllLog2m = parameters._hllLog2m;
+      _hllConversionThreshold = parameters._hllConversionThreshold;
+    } else {
+      _hllLog2m = Parameters.DEFAULT_HLL_LOG2M;
+      _hllConversionThreshold = Parameters.DEFAULT_HLL_CONVERSION_THRESHOLD;
+    }
+  }
+
+  public int getHllLog2m() {
+    return _hllLog2m;
+  }
+
+  public int getHllConversionThreshold() {
+    return _hllConversionThreshold;
   }
 
   @Override
@@ -75,7 +101,60 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
       return;
     }
 
-    // For non-dictionary-encoded expression, store values into the value set
+    // For non-dictionary-encoded expression, store values into the value set or HLL
+    if (aggregationResultHolder.getResult() instanceof HyperLogLog) {
+      aggregateIntoHLL(length, aggregationResultHolder, blockValSet);
+    } else {
+      aggregateIntoSet(length, aggregationResultHolder, blockValSet);
+    }
+  }
+
+  private void aggregateIntoHLL(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
+    DataType storedType = blockValSet.getValueType().getStoredType();
+    HyperLogLog hll = aggregationResultHolder.getResult();
+    switch (storedType) {
+      case INT:
+        int[] intValues = blockValSet.getIntValuesSV();
+        for (int i = 0; i < length; i++) {
+          hll.offer(intValues[i]);
+        }
+        break;
+      case LONG:
+        long[] longValues = blockValSet.getLongValuesSV();
+        for (int i = 0; i < length; i++) {
+          hll.offer(longValues[i]);
+        }
+        break;
+      case FLOAT:
+        float[] floatValues = blockValSet.getFloatValuesSV();
+        for (int i = 0; i < length; i++) {
+          hll.offer(floatValues[i]);
+        }
+        break;
+      case DOUBLE:
+        double[] doubleValues = blockValSet.getDoubleValuesSV();
+        for (int i = 0; i < length; i++) {
+          hll.offer(doubleValues[i]);
+        }
+        break;
+      case STRING:
+        String[] stringValues = blockValSet.getStringValuesSV();
+        for (int i = 0; i < length; i++) {
+          hll.offer(stringValues[i]);
+        }
+        break;
+      case BYTES:
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          hll.offer(bytesValues[i]);
+        }
+        break;
+      default:
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT aggregation function: " + storedType);
+    }
+  }
+
+  private void aggregateIntoSet(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
     DataType storedType = blockValSet.getValueType().getStoredType();
     Set valueSet = getValueSet(aggregationResultHolder, storedType);
     switch (storedType) {
@@ -125,6 +204,35 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
       default:
         throw new IllegalStateException("Illegal data type for DISTINCT_COUNT aggregation function: " + storedType);
     }
+
+    // Convert to HLL if the set size exceeds the threshold
+    if (valueSet.size() > _hllConversionThreshold) {
+      aggregationResultHolder.setValue(convertSetToHLL(valueSet, storedType));
+    }
+  }
+
+  protected HyperLogLog convertSetToHLL(Set valueSet, DataType storedType) {
+    if (storedType == DataType.BYTES) {
+      return convertByteArraySetToHLL((ObjectSet<ByteArray>) valueSet);
+    } else {
+      return convertNonByteArraySetToHLL(valueSet);
+    }
+  }
+
+  protected HyperLogLog convertByteArraySetToHLL(ObjectSet<ByteArray> valueSet) {
+    HyperLogLog hll = new HyperLogLog(_hllLog2m);
+    for (ByteArray value : valueSet) {
+      hll.offer(value.getBytes());
+    }
+    return hll;
+  }
+
+  protected HyperLogLog convertNonByteArraySetToHLL(Set valueSet) {
+    HyperLogLog hll = new HyperLogLog(_hllLog2m);
+    for (Object value : valueSet) {
+      hll.offer(value);
+    }
+    return hll;
   }
 
   @Override
@@ -166,22 +274,22 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
       case DOUBLE:
         double[] doubleValues = blockValSet.getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
-          ((DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.DOUBLE))
-              .add(doubleValues[i]);
+          ((DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.DOUBLE)).add(
+              doubleValues[i]);
         }
         break;
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
-          ((ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.STRING))
-              .add(stringValues[i]);
+          ((ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.STRING)).add(
+              stringValues[i]);
         }
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         for (int i = 0; i < length; i++) {
-          ((ObjectOpenHashSet<ByteArray>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.BYTES))
-              .add(new ByteArray(bytesValues[i]));
+          ((ObjectOpenHashSet<ByteArray>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.BYTES)).add(
+              new ByteArray(bytesValues[i]));
         }
         break;
       default:
@@ -249,19 +357,24 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
   }
 
   @Override
-  public Set extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
+  public Object extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     Object result = aggregationResultHolder.getResult();
     if (result == null) {
-      // Use empty IntOpenHashSet as a place holder for empty result
+      // Use empty IntOpenHashSet as a placeholder for empty result
       return new IntOpenHashSet();
     }
 
     if (result instanceof DictIdsWrapper) {
       // For dictionary-encoded expression, convert dictionary ids to values
-      return convertToValueSet((DictIdsWrapper) result);
+      DictIdsWrapper dictIdsWrapper = (DictIdsWrapper) result;
+      if (dictIdsWrapper._dictIdBitmap.cardinalityExceeds(_hllConversionThreshold)) {
+        return convertToHLL(dictIdsWrapper);
+      } else {
+        return convertToValueSet(dictIdsWrapper);
+      }
     } else {
       // For non-dictionary-encoded expression, directly return the value set
-      return (Set) result;
+      return result;
     }
   }
 
@@ -283,15 +396,58 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
   }
 
   @Override
-  public Set merge(Set intermediateResult1, Set intermediateResult2) {
-    if (intermediateResult1.isEmpty()) {
-      return intermediateResult2;
+  public Object merge(Object intermediateResult1, Object intermediateResult2) {
+    if (intermediateResult1 instanceof HyperLogLog) {
+      return mergeIntoHLL((HyperLogLog) intermediateResult1, intermediateResult2);
     }
-    if (intermediateResult2.isEmpty()) {
-      return intermediateResult1;
+    if (intermediateResult2 instanceof HyperLogLog) {
+      return mergeIntoHLL((HyperLogLog) intermediateResult2, intermediateResult1);
     }
-    intermediateResult1.addAll(intermediateResult2);
-    return intermediateResult1;
+
+    Set valueSet1 = (Set) intermediateResult1;
+    Set valueSet2 = (Set) intermediateResult2;
+    if (valueSet1.isEmpty()) {
+      return valueSet2;
+    }
+    if (valueSet2.isEmpty()) {
+      return valueSet1;
+    }
+    valueSet1.addAll(valueSet2);
+
+    // Convert to HLL if the set size exceeds the threshold
+    if (valueSet1.size() > _hllConversionThreshold) {
+      if (valueSet1 instanceof ObjectSet && valueSet1.iterator().next() instanceof ByteArray) {
+        return convertByteArraySetToHLL((ObjectSet<ByteArray>) valueSet1);
+      } else {
+        return convertNonByteArraySetToHLL(valueSet1);
+      }
+    } else {
+      return valueSet1;
+    }
+  }
+
+  private HyperLogLog mergeIntoHLL(HyperLogLog hll, Object intermediateResult) {
+    if (intermediateResult instanceof HyperLogLog) {
+      try {
+        hll.addAll((HyperLogLog) intermediateResult);
+      } catch (CardinalityMergeException e) {
+        throw new RuntimeException("Caught exception while merging HyperLogLog", e);
+      }
+    } else {
+      Set valueSet = (Set) intermediateResult;
+      if (!valueSet.isEmpty()) {
+        if (valueSet instanceof ObjectSet && valueSet.iterator().next() instanceof ByteArray) {
+          for (Object value : valueSet) {
+            hll.offer(((ByteArray) value).getBytes());
+          }
+        } else {
+          for (Object value : valueSet) {
+            hll.offer(value);
+          }
+        }
+      }
+    }
+    return hll;
   }
 
   @Override
@@ -305,8 +461,12 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
   }
 
   @Override
-  public Integer extractFinalResult(Set intermediateResult) {
-    return intermediateResult.size();
+  public Integer extractFinalResult(Object intermediateResult) {
+    if (intermediateResult instanceof HyperLogLog) {
+      return (int) ((HyperLogLog) intermediateResult).cardinality();
+    } else {
+      return ((Set) intermediateResult).size();
+    }
   }
 
   /**
@@ -445,7 +605,7 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
   }
 
   /**
-   * Helper method to read dictionary and convert dictionary ids to values for dictionary-encoded expression.
+   * Helper method to read dictionary and convert dictionary ids to a value set for dictionary-encoded expression.
    */
   private static Set convertToValueSet(DictIdsWrapper dictIdsWrapper) {
     Dictionary dictionary = dictIdsWrapper._dictionary;
@@ -495,6 +655,20 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
     }
   }
 
+  /**
+   * Helper method to read dictionary and convert dictionary ids to a HyperLogLog for dictionary-encoded expression.
+   */
+  private HyperLogLog convertToHLL(DictIdsWrapper dictIdsWrapper) {
+    HyperLogLog hyperLogLog = new HyperLogLog(_hllLog2m);
+    Dictionary dictionary = dictIdsWrapper._dictionary;
+    RoaringBitmap dictIdBitmap = dictIdsWrapper._dictIdBitmap;
+    PeekableIntIterator iterator = dictIdBitmap.getIntIterator();
+    while (iterator.hasNext()) {
+      hyperLogLog.offer(dictionary.get(iterator.next()));
+    }
+    return hyperLogLog;
+  }
+
   private static final class DictIdsWrapper {
     final Dictionary _dictionary;
     final RoaringBitmap _dictIdBitmap;
@@ -502,6 +676,49 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
     private DictIdsWrapper(Dictionary dictionary) {
       _dictionary = dictionary;
       _dictIdBitmap = new RoaringBitmap();
+    }
+  }
+
+  /**
+   * Helper class to wrap the parameters.
+   */
+  private static class Parameters {
+    static final char PARAMETER_DELIMITER = ';';
+    static final char PARAMETER_KEY_VALUE_SEPARATOR = '=';
+    static final String HLL_LOG2M_KEY = "HLLLOG2M";
+    static final String HLL_CONVERSION_THRESHOLD_KEY = "HLLCONVERSIONTHRESHOLD";
+
+    // Use 12 by default to get good accuracy for DistinctCount
+    static final int DEFAULT_HLL_LOG2M = 12;
+    // 100K values to trigger HLL conversion by default
+    static final int DEFAULT_HLL_CONVERSION_THRESHOLD = 100_000;
+
+    int _hllLog2m = DEFAULT_HLL_LOG2M;
+    int _hllConversionThreshold = DEFAULT_HLL_CONVERSION_THRESHOLD;
+
+    Parameters(String parametersString) {
+      StringUtils.deleteWhitespace(parametersString);
+      String[] keyValuePairs = StringUtils.split(parametersString, PARAMETER_DELIMITER);
+      for (String keyValuePair : keyValuePairs) {
+        String[] keyAndValue = StringUtils.split(keyValuePair, PARAMETER_KEY_VALUE_SEPARATOR);
+        Preconditions.checkArgument(keyAndValue.length == 2, "Invalid parameter: %s", keyValuePair);
+        String key = keyAndValue[0];
+        String value = keyAndValue[1];
+        switch (key.toUpperCase()) {
+          case HLL_LOG2M_KEY:
+            _hllLog2m = Integer.parseInt(value);
+            break;
+          case HLL_CONVERSION_THRESHOLD_KEY:
+            _hllConversionThreshold = Integer.parseInt(value);
+            // Treat non-positive threshold as unlimited
+            if (_hllConversionThreshold <= 0) {
+              _hllConversionThreshold = Integer.MAX_VALUE;
+            }
+            break;
+          default:
+            throw new IllegalArgumentException("Invalid parameter key: " + key);
+        }
+      }
     }
   }
 }
