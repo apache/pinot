@@ -67,7 +67,7 @@ public class RealtimeConsumptionRateManager {
   }
 
   private ConsumptionRateLimiter createRateLimiter(StreamConfig streamConfig, boolean multiPartitionTopic) {
-    if (streamConfig.getTopicConsumptionRateLimit().isEmpty()) {
+    if (!streamConfig.getTopicConsumptionRateLimit().isPresent()) {
       return NOOP_RATE_LIMITER;
     }
     int partitionCount = 1;
