@@ -183,7 +183,7 @@ public class SegmentDeletionManager {
       if (_defaultDeletedSegmentsRetentionInDays == 0) {
         // delete the segment file instantly if retention is set to zero
         try {
-          if (pinotFS.delete(fileToDeleteURI, false)) {
+          if (pinotFS.delete(fileToDeleteURI, true)) {
             LOGGER.info("Deleted segment {} from {}", segmentId, fileToDeleteURI.toString());
           } else {
             LOGGER.warn("Failed to delete segment {} from {}", segmentId, fileToDeleteURI.toString());
