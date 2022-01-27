@@ -134,7 +134,7 @@ public class GapfillUtils {
     return StringUtils.remove(functionName, '_').toLowerCase();
   }
 
-  public static boolean isPreAggregateGapfill(ExpressionContext expressionContext) {
+  public static boolean isGapfill(ExpressionContext expressionContext) {
     if (expressionContext.getType() != ExpressionContext.Type.FUNCTION) {
       return false;
     }
@@ -142,14 +142,14 @@ public class GapfillUtils {
     return GAP_FILL.equals(canonicalizeFunctionName(expressionContext.getFunction().getFunctionName()));
   }
 
-  public static boolean isPreAggregateGapfill(QueryContext queryContext) {
+  public static boolean isGapfill(QueryContext queryContext) {
     if (queryContext.getSubQueryContext() == null) {
       return false;
     }
 
     for (ExpressionContext expressionContext
         : queryContext.getSubQueryContext().getSelectExpressions()) {
-      if (isPreAggregateGapfill(expressionContext)) {
+      if (isGapfill(expressionContext)) {
         return true;
       }
     }
@@ -158,7 +158,7 @@ public class GapfillUtils {
 
   public static ExpressionContext getPreAggregateGapfillExpressionContext(QueryContext queryContext) {
     for (ExpressionContext expressionContext : queryContext.getSelectExpressions()) {
-      if (GapfillUtils.isPreAggregateGapfill(expressionContext)) {
+      if (GapfillUtils.isGapfill(expressionContext)) {
         return expressionContext;
       }
     }
