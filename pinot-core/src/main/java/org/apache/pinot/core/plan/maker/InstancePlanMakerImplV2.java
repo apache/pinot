@@ -241,7 +241,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       }
     } else if (QueryContextUtils.isSelectionQuery(queryContext)) {
       return new SelectionPlanNode(indexSegment, queryContext);
-    } else if (GapfillUtils.isPreAggregateGapfill(queryContext)) {
+    } else if (GapfillUtils.isGapfill(queryContext)) {
       return new PreAggGapFillSelectionPlanNode(indexSegment, queryContext);
     } else {
       assert QueryContextUtils.isDistinctQuery(queryContext);

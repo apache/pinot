@@ -48,7 +48,7 @@ public final class ResultReducerFactory {
     if (aggregationFunctions == null) {
       // Selection query
       return new SelectionDataTableReducer(queryContext);
-    } else if (GapfillUtils.isPreAggregateGapfill(queryContext)) {
+    } else if (GapfillUtils.isGapfill(queryContext)) {
       return new PreAggregationGapFillDataTableReducer(queryContext);
     } else {
       // Aggregation query
