@@ -34,18 +34,20 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * This class is responsible for creating realtime consumption rate limiters. If rate limiter is used for
- * multi-partition topics, the provided rate in StreamConfig is divided by partition count. This class leverages a
- * cache for storing partition count for different topics as retrieving partition count from Kafka is a bit expensive
- * and also the same count will be used of all partition consumers of the same topic.
+ * This class is responsible for creating realtime consumption rate limiters. The rate limit, specified in
+ * StreamConfig of table config, is for the entire topic. The effective rate limit for each partition is simply the
+ * specified rate limit divided by the partition count.
+ * This class leverages a cache for storing partition count for different topics as retrieving partition count from
+ * stream is a bit expensive and also the same count will be used of all partition consumers of the same topic.
  */
 public class RealtimeConsumptionRateManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeConsumptionRateManager.class);
   private static final RealtimeConsumptionRateManager INSTANCE = new RealtimeConsumptionRateManager();
   private static final int CACHE_ENTRY_EXPIRATION_TIME_IN_MINUTES = 10;
 
+  // stream config object is required for fetching the partition count from the stream
   private final LoadingCache<StreamConfig, Integer> _streamConfigToTopicPartitionCountMap = buildCache();
-  private boolean _isThrottlingAllowed = false;
+  private volatile boolean _isThrottlingAllowed = false;
 
   private RealtimeConsumptionRateManager() {
   }
@@ -58,26 +60,16 @@ public class RealtimeConsumptionRateManager {
     _isThrottlingAllowed = true;
   }
 
-  public ConsumptionRateLimiter createRateLimiterForSinglePartitionTopic(StreamConfig streamConfig) {
-    return createRateLimiter(streamConfig, false);
-  }
-
-  public ConsumptionRateLimiter createRateLimiterForMultiPartitionTopic(StreamConfig streamConfig) {
-    return createRateLimiter(streamConfig, true);
-  }
-
-  private ConsumptionRateLimiter createRateLimiter(StreamConfig streamConfig, boolean multiPartitionTopic) {
+  public ConsumptionRateLimiter createRateLimiter(StreamConfig streamConfig) {
     if (!streamConfig.getTopicConsumptionRateLimit().isPresent()) {
       return NOOP_RATE_LIMITER;
     }
-    int partitionCount = 1;
-    if (multiPartitionTopic) {
-      try {
-        partitionCount = _streamConfigToTopicPartitionCountMap.get(streamConfig);
-      } catch (ExecutionException e) {
-        // Exception here means that for some reason, partition count cannot be retrieved from Kafka broker!
-        throw new RuntimeException(e);
-      }
+    int partitionCount;
+    try {
+      partitionCount = _streamConfigToTopicPartitionCountMap.get(streamConfig);
+    } catch (ExecutionException e) {
+      // Exception here means for some reason, partition count cannot be fetched from stream!
+      throw new RuntimeException(e);
     }
     double topicRateLimit = streamConfig.getTopicConsumptionRateLimit().get();
     double partitionRateLimit = topicRateLimit / partitionCount;
