@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.transport;
 
+import io.netty.handler.ssl.SslProvider;
+import java.security.KeyStore;
 import org.apache.commons.lang3.StringUtils;
 
 
@@ -26,13 +28,28 @@ import org.apache.commons.lang3.StringUtils;
  */
 public class TlsConfig {
   private boolean _clientAuthEnabled;
-  private String _keyStoreType;
+  private String _keyStoreType = KeyStore.getDefaultType();
   private String _keyStorePath;
   private String _keyStorePassword;
-  private String _trustStoreType;
+  private String _trustStoreType = KeyStore.getDefaultType();
   private String _trustStorePath;
   private String _trustStorePassword;
-  private String _sslProvider;
+  private String _sslProvider = SslProvider.JDK.toString();
+
+  public TlsConfig() {
+    // left blank
+  }
+
+  public TlsConfig(TlsConfig tlsConfig) {
+    _clientAuthEnabled = tlsConfig._clientAuthEnabled;
+    _keyStoreType = tlsConfig._keyStoreType;
+    _keyStorePath = tlsConfig._keyStorePath;
+    _keyStorePassword = tlsConfig._keyStorePassword;
+    _trustStoreType = tlsConfig._trustStoreType;
+    _trustStorePath = tlsConfig._trustStorePath;
+    _trustStorePassword = tlsConfig._trustStorePassword;
+    _sslProvider = tlsConfig._sslProvider;
+  }
 
   public boolean isClientAuthEnabled() {
     return _clientAuthEnabled;

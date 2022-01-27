@@ -1,0 +1,354 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.integration.tests;
+
+import java.io.File;
+import java.io.IOException;
+import java.net.URL;
+import java.util.List;
+import java.util.Map;
+import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.http.Header;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.message.BasicHeader;
+import org.apache.http.ssl.SSLContextBuilder;
+import org.apache.pinot.client.Connection;
+import org.apache.pinot.client.ConnectionFactory;
+import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.integration.tests.access.CertBasedTlsChannelAccessControlFactory;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.util.TestUtils;
+import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
+
+import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER;
+import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_TOKEN;
+
+
+public class TlsIntegrationTest extends BaseClusterIntegrationTest {
+  private static final String PASSWORD = "changeit";
+  private static final char[] PASSWORD_CHAR = PASSWORD.toCharArray();
+  private static final Header CLIENT_HEADER = new BasicHeader("Authorization", AUTH_TOKEN);
+
+  private static final int INTERNAL_CONTROLLER_PORT = DEFAULT_CONTROLLER_PORT + 1;
+  private static final int INTERNAL_BROKER_PORT = DEFAULT_BROKER_PORT + 1;
+  private static final String PKCS_12 = "PKCS12";
+  private static final String JKS = "JKS";
+
+  private final URL _tlsStoreEmptyPKCS12 = TlsIntegrationTest.class.getResource("/empty.p12");
+  private final URL _tlsStoreEmptyJKS = TlsIntegrationTest.class.getResource("/empty.jks");
+  private final URL _tlsStorePKCS12 = TlsIntegrationTest.class.getResource("/tlstest.p12");
+  private final URL _tlsStoreJKS = TlsIntegrationTest.class.getResource("/tlstest.jks");
+
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
+
+    // Start Zookeeper
+    startZk();
+    // Start Pinot cluster
+    startKafka();
+    startController();
+    startBrokerHttps();
+    startServerHttps();
+
+    // Unpack the Avro files
+    List<File> avroFiles = unpackAvroData(_tempDir);
+
+    // Create and upload the schema and table config
+    addSchema(createSchema());
+    addTableConfig(createRealtimeTableConfig(avroFiles.get(0)));
+    addTableConfig(createOfflineTableConfig());
+
+    // Push data into Kafka
+    pushAvroIntoKafka(avroFiles);
+    waitForAllDocsLoaded(600_000L);
+
+    System.out.println("hello world!");
+
+    Thread.sleep(600000);
+  }
+
+  @AfterClass(alwaysRun = true)
+  public void tearDown()
+      throws Exception {
+    dropRealtimeTable(getTableName());
+    stopServer();
+    stopBroker();
+    stopController();
+    stopKafka();
+    stopZk();
+    FileUtils.deleteDirectory(_tempDir);
+  }
+
+  @Override
+  public Map<String, Object> getDefaultControllerConfiguration() {
+    Map<String, Object> prop = super.getDefaultControllerConfiguration();
+    prop.put("controller.tls.keystore.path", _tlsStorePKCS12);
+    prop.put("controller.tls.keystore.password", PASSWORD);
+    prop.put("controller.tls.keystore.type", PKCS_12);
+    prop.put("controller.tls.truststore.path", _tlsStorePKCS12);
+    prop.put("controller.tls.truststore.password", PASSWORD);
+    prop.put("controller.tls.truststore.type", PKCS_12);
+
+//    prop.put("controller.access.protocols", "https");
+//    prop.put("controller.access.protocols.https.port", DEFAULT_CONTROLLER_PORT);
+    prop.put("controller.access.protocols", "https,internal");
+    prop.put("controller.access.protocols.https.port", DEFAULT_CONTROLLER_PORT);
+    prop.put("controller.access.protocols.https.tls.keystore.path", _tlsStoreJKS);
+    prop.put("controller.access.protocols.https.tls.keystore.type", JKS);
+    prop.put("controller.access.protocols.https.tls.truststore.path", _tlsStoreJKS);
+    prop.put("controller.access.protocols.https.tls.truststore.type", JKS);
+    prop.put("controller.access.protocols.internal.protocol", "https");
+    prop.put("controller.access.protocols.internal.port", INTERNAL_CONTROLLER_PORT);
+    prop.put("controller.access.protocols.internal.tls.client.auth.enabled", "true");
+
+    prop.put("controller.broker.protocol", "https");
+    prop.put("controller.broker.port.override", INTERNAL_BROKER_PORT);
+
+    // announce external only
+    prop.put("controller.vip.protocol", "https");
+    prop.put("controller.vip.port", DEFAULT_CONTROLLER_PORT);
+
+    prop.remove("controller.port");
+
+    return BasicAuthTestUtils.addControllerConfiguration(prop);
+  }
+
+  @Override
+  protected PinotConfiguration getDefaultBrokerConfiguration() {
+    Map<String, Object> prop = super.getDefaultBrokerConfiguration().toMap();
+    prop.put("pinot.broker.tls.keystore.path", _tlsStorePKCS12);
+    prop.put("pinot.broker.tls.keystore.password", PASSWORD);
+    prop.put("pinot.broker.tls.keystore.type", PKCS_12);
+    prop.put("pinot.broker.tls.truststore.path", _tlsStorePKCS12);
+    prop.put("pinot.broker.tls.truststore.password", PASSWORD);
+    prop.put("pinot.broker.tls.truststore.type", PKCS_12);
+
+//    prop.put("pinot.broker.client.access.protocols", "https");
+//    prop.put("pinot.broker.client.access.protocols.https.port", DEFAULT_BROKER_PORT);
+    prop.put("pinot.broker.client.access.protocols", "https,internal");
+    prop.put("pinot.broker.client.access.protocols.https.port", DEFAULT_BROKER_PORT);
+    prop.put("pinot.broker.client.access.protocols.https.tls.keystore.path", _tlsStoreJKS);
+    prop.put("pinot.broker.client.access.protocols.https.tls.keystore.type", JKS);
+    prop.put("pinot.broker.client.access.protocols.https.tls.truststore.path", _tlsStoreJKS);
+    prop.put("pinot.broker.client.access.protocols.https.tls.truststore.type", JKS);
+    prop.put("pinot.broker.client.access.protocols.internal.protocol", "https");
+    prop.put("pinot.broker.client.access.protocols.internal.port", INTERNAL_BROKER_PORT);
+    prop.put("pinot.broker.client.access.protocols.internal.tls.client.auth.enabled", "true");
+
+    prop.put("pinot.broker.nettytls.enabled", "true");
+
+    return BasicAuthTestUtils.addBrokerConfiguration(prop);
+  }
+
+  @Override
+  protected PinotConfiguration getDefaultServerConfiguration() {
+    Map<String, Object> prop = super.getDefaultServerConfiguration().toMap();
+    prop.put("pinot.server.tls.keystore.path", _tlsStorePKCS12);
+    prop.put("pinot.server.tls.keystore.password", PASSWORD);
+    prop.put("pinot.server.tls.keystore.type", PKCS_12);
+    prop.put("pinot.server.tls.truststore.path", _tlsStorePKCS12);
+    prop.put("pinot.server.tls.truststore.password", PASSWORD);
+    prop.put("pinot.server.tls.truststore.type", PKCS_12);
+    prop.put("pinot.server.tls.client.auth.enabled", "true");
+
+    prop.put("pinot.server.admin.access.control.factory.class",
+        CertBasedTlsChannelAccessControlFactory.class.getName());
+//    prop.put("pinot.server.adminapi.access.protocols", "https");
+//    prop.put("pinot.server.adminapi.access.protocols.https.port", "7443");
+    prop.put("pinot.server.adminapi.access.protocols", "internal");
+    prop.put("pinot.server.adminapi.access.protocols.internal.protocol", "https");
+    prop.put("pinot.server.adminapi.access.protocols.internal.port", "7443");
+    prop.put("pinot.server.netty.enabled", "false");
+    prop.put("pinot.server.nettytls.enabled", "true");
+    prop.put("pinot.server.nettytls.port", "8089");
+    prop.put("pinot.server.segment.uploader.protocol", "https");
+
+    return BasicAuthTestUtils.addServerConfiguration(prop);
+  }
+
+  @Override
+  protected boolean useLlc() {
+    return true;
+  }
+
+  @Override
+  protected void addSchema(Schema schema)
+      throws IOException {
+    PostMethod response =
+        sendMultipartPostRequest(_controllerRequestURLBuilder.forSchemaCreate(), schema.toSingleLineJsonString(),
+            AUTH_HEADER);
+    Assert.assertEquals(response.getStatusCode(), 200);
+  }
+
+  @Override
+  protected void addTableConfig(TableConfig tableConfig)
+      throws IOException {
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString(), AUTH_HEADER);
+  }
+
+  @Override
+  protected Connection getPinotConnection() {
+    if (_pinotConnection == null) {
+      JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
+      factory.setHeaders(AUTH_HEADER);
+      factory.setScheme(CommonConstants.HTTPS_PROTOCOL);
+      factory.setSslContext(FileUploadDownloadClient._defaultSSLContext);
+
+      _pinotConnection =
+          ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(), factory.buildTransport());
+    }
+    return _pinotConnection;
+  }
+
+  @Override
+  protected void dropRealtimeTable(String tableName)
+      throws IOException {
+    sendDeleteRequest(
+        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)),
+        AUTH_HEADER);
+  }
+
+  @Test
+  public void testQueryControllerExternalTrustedServer()
+      throws Exception {
+    try (CloseableHttpClient client = makeClient(JKS, _tlsStoreJKS, _tlsStoreJKS)) {
+      HttpUriRequest request = new HttpGet("https://localhost:" + DEFAULT_CONTROLLER_PORT + "/tables");
+      request.addHeader(CLIENT_HEADER);
+
+      try (CloseableHttpResponse response = client.execute(request)) {
+        Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
+        String output = IOUtils.toString(response.getEntity().getContent());
+        System.out.println(output);
+      }
+    }
+  }
+
+  @Test
+  public void testQueryControllerExternalUntrustedServer()
+      throws Exception {
+    try (CloseableHttpClient client = makeClient(JKS, _tlsStoreJKS, _tlsStoreEmptyJKS)) {
+      HttpUriRequest request = new HttpGet("https://localhost:" + DEFAULT_CONTROLLER_PORT + "/tables");
+      request.addHeader(CLIENT_HEADER);
+
+      try {
+        client.execute(request);
+        Assert.fail("Must not allow connection to untrusted server");
+      } catch (IOException ignore) {
+        // this should fail
+      }
+    }
+  }
+
+  @Test
+  public void testQueryControllerInternalTrustedClient()
+      throws Exception {
+    try (CloseableHttpClient client = makeClient(PKCS_12, _tlsStorePKCS12, _tlsStorePKCS12)) {
+      HttpUriRequest request = new HttpGet("https://localhost:" + INTERNAL_CONTROLLER_PORT + "/tables");
+      request.addHeader(CLIENT_HEADER);
+
+      try (CloseableHttpResponse response = client.execute(request)) {
+        Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
+        String output = IOUtils.toString(response.getEntity().getContent());
+        System.out.println(output);
+      }
+    }
+  }
+
+  @Test
+  public void testQueryControllerInternalUntrustedClient()
+      throws Exception {
+    try (CloseableHttpClient client = makeClient(PKCS_12, _tlsStoreEmptyPKCS12, _tlsStorePKCS12)) {
+      HttpUriRequest request = new HttpGet("https://localhost:" + INTERNAL_CONTROLLER_PORT + "/tables");
+      request.addHeader(CLIENT_HEADER);
+
+      try {
+        client.execute(request);
+        Assert.fail("Must not allow connection from untrusted client");
+      } catch (IOException ignore) {
+        // this should fail
+      }
+    }
+  }
+
+  @Test
+  public void testQueryBrokerExternal()
+      throws Exception {
+    Assert.fail("not implemented yet");
+  }
+
+  @Test
+  public void testQueryBrokerInternal()
+      throws Exception {
+    Assert.fail("not implemented yet");
+  }
+
+  private static CloseableHttpClient makeClient(String keyStoreType, URL keyStoreUrl, URL trustStoreUrl) {
+    try {
+      SSLContextBuilder sslContextBuilder = SSLContextBuilder.create();
+      sslContextBuilder.setKeyStoreType(keyStoreType);
+      sslContextBuilder.loadKeyMaterial(keyStoreUrl, PASSWORD_CHAR, PASSWORD_CHAR);
+      sslContextBuilder.loadTrustMaterial(trustStoreUrl, PASSWORD_CHAR);
+      return HttpClientBuilder.create().setSSLContext(sslContextBuilder.build()).build();
+    } catch (Exception e) {
+      throw new IllegalStateException("Could not create HTTPS client");
+    }
+  }
+
+  /*
+   * Command to generate the tlstest.jks file (generate key pairs for both IPV4 and IPV6 addresses):
+   * ```
+   *  keytool -genkeypair -keystore tlstest.jks -dname "CN=test, OU=Unknown, O=Unknown, L=Unknown, ST=Unknown, \
+   *  C=Unknown" -keypass changeit -storepass changeit -keyalg RSA -alias localhost-ipv4 -ext \
+   *  SAN=dns:localhost,ip:127.0.0.1
+   *
+   *  keytool -genkeypair -keystore tlstest.jks -dname "CN=test, OU=Unknown, O=Unknown, L=Unknown, ST=Unknown, \
+   *  C=Unknown" -keypass changeit -storepass changeit -keyalg RSA -alias localhost-ipv6 -ext \
+   *  SAN=dns:localhost,ip:0:0:0:0:0:0:0:1
+   * ```
+   */
+
+  /*
+   * Command to generate the tlstest.pkcs file (generate key pairs for both IPV4 and IPV6 addresses):
+   * ```
+   *  keytool -genkeypair -storetype JKS -keystore tlstest.p12 -dname "CN=test, OU=Unknown, O=Unknown, \
+   *  L=Unknown, ST=Unknown, C=Unknown" -keypass changeit -storepass changeit -keyalg RSA \
+   *  -alias localhost-ipv4 -ext SAN=dns:localhost,ip:127.0.0.1
+   *
+   *  keytool -genkeypair -storetype JKS -keystore tlstest.p12 -dname "CN=test, OU=Unknown, O=Unknown, \
+   *  L=Unknown, ST=Unknown, C=Unknown" -keypass changeit -storepass changeit -keyalg RSA \
+   *  -alias localhost-ipv6 -ext SAN=dns:localhost,ip:0:0:0:0:0:0:0:1
+   * ```
+   */
+}
