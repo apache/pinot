@@ -60,7 +60,7 @@ public class SegmentDeletionManager {
   private final String _helixClusterName;
   private final HelixAdmin _helixAdmin;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
-  private final int _controllerDefaultDeletedSegmentsRetentionInDays;
+  private final int _defaultDeletedSegmentsRetentionInDays;
 
   public SegmentDeletionManager(String dataDir, HelixAdmin helixAdmin, String helixClusterName,
       ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays) {
@@ -68,7 +68,7 @@ public class SegmentDeletionManager {
     _helixAdmin = helixAdmin;
     _helixClusterName = helixClusterName;
     _propertyStore = propertyStore;
-    _controllerDefaultDeletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
+    _defaultDeletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
 
     _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
       @Override
@@ -167,12 +167,11 @@ public class SegmentDeletionManager {
 
   public void removeSegmentsFromStore(String tableNameWithType, List<String> segments) {
     for (String segment : segments) {
-      removeSegmentFromStore(tableNameWithType, segment, _controllerDefaultDeletedSegmentsRetentionInDays);
+      removeSegmentFromStore(tableNameWithType, segment);
     }
   }
 
-  protected void removeSegmentFromStore(String tableNameWithType, String segmentId,
-      int deletedSegmentsRetentionInDays) {
+  protected void removeSegmentFromStore(String tableNameWithType, String segmentId) {
     // Ignore HLC segments as they are not stored in Pinot FS
     if (SegmentName.isHighLevelConsumerSegmentName(segmentId)) {
       return;
@@ -181,7 +180,7 @@ public class SegmentDeletionManager {
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       URI fileToDeleteURI = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
       PinotFS pinotFS = PinotFSFactory.create(fileToDeleteURI.getScheme());
-      if (deletedSegmentsRetentionInDays == 0) {
+      if (_defaultDeletedSegmentsRetentionInDays == 0) {
         // delete the segment file instantly if retention is set to zero
         try {
           if (pinotFS.delete(fileToDeleteURI, false)) {

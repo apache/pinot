@@ -289,7 +289,7 @@ public class SegmentDeletionManagerTest {
     }
 
     @Override
-    protected void removeSegmentFromStore(String tableName, String segmentId, int deletedSegmentsRetentionInDays) {
+    protected void removeSegmentFromStore(String tableName, String segmentId) {
       _segmentsRemovedFromStore.add(segmentId);
     }
 
