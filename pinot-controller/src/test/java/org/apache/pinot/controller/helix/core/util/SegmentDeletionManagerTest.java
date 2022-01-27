@@ -277,11 +277,11 @@ public class SegmentDeletionManagerTest {
     public Set<String> _segmentsToRetry = new HashSet<>();
 
     FakeDeletionManager(HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore) {
-      super(null, helixAdmin, CLUSTER_NAME, propertyStore);
+      super(null, helixAdmin, CLUSTER_NAME, propertyStore, 0);
     }
 
     FakeDeletionManager(String localDiskDir, HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore) {
-      super(localDiskDir, helixAdmin, CLUSTER_NAME, propertyStore);
+      super(localDiskDir, helixAdmin, CLUSTER_NAME, propertyStore, 0);
     }
 
     public void deleteSegmentsFromPropertyStoreAndLocal(String tableName, Collection<String> segments) {
@@ -289,7 +289,7 @@ public class SegmentDeletionManagerTest {
     }
 
     @Override
-    protected void removeSegmentFromStore(String tableName, String segmentId) {
+    protected void removeSegmentFromStore(String tableName, String segmentId, int deletedSegmentsRetentionInDays) {
       _segmentsRemovedFromStore.add(segmentId);
     }
 
