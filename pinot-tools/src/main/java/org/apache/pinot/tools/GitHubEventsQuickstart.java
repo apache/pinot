@@ -22,6 +22,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.net.URL;
+import java.util.Arrays;
+import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.spi.stream.StreamDataProvider;
@@ -34,7 +36,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
-import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
 /**
@@ -43,10 +44,14 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
  * Creates a realtime table pullRequestMergedEvents
  * Starts the {@link PullRequestMergedEventsStream} to publish pullRequestMergedEvents into the topic
  */
-public class GitHubEventsQuickstart {
+public class GitHubEventsQuickstart extends QuickStartBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(GitHubEventsQuickstart.class);
   private StreamDataServerStartable _kafkaStarter;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
+  private String _personalAccessToken;
+
+  public GitHubEventsQuickstart() {
+  }
 
   private void startKafka() {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
@@ -60,7 +65,7 @@ public class GitHubEventsQuickstart {
     _kafkaStarter.createTopic("pullRequestMergedEvents", KafkaStarterUtils.getTopicCreationProps(2));
   }
 
-  public void execute(String personalAccessToken)
+  private void execute(String personalAccessToken)
       throws Exception {
     final File quickStartDataDir =
         new File(new File("githubEvents-" + System.currentTimeMillis()), "pullRequestMergedEvents");
@@ -84,7 +89,8 @@ public class GitHubEventsQuickstart {
     File tempDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
     Preconditions.checkState(tempDir.mkdirs());
     QuickstartTableRequest request = new QuickstartTableRequest(quickStartDataDir.getAbsolutePath());
-    final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, tempDir);
+    final QuickstartRunner runner =
+        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 0, tempDir, getConfigOverrides());
 
     printStatus(Color.CYAN, "***** Starting Kafka *****");
     startKafka();
@@ -148,5 +154,21 @@ public class GitHubEventsQuickstart {
     printStatus(Color.GREEN, "***************************************************");
 
     printStatus(Color.GREEN, "You can always go to http://localhost:9000 to play around in the query console");
+  }
+
+  @Override
+  public List<String> types() {
+    return Arrays.asList("GITHUB-EVENTS", "GITHUB_EVENTS");
+  }
+
+  @Override
+  public void execute()
+      throws Exception {
+    execute(_personalAccessToken);
+  }
+
+  public GitHubEventsQuickstart setPersonalAccessToken(String personalAccessToken) {
+    _personalAccessToken = personalAccessToken;
+    return this;
   }
 }

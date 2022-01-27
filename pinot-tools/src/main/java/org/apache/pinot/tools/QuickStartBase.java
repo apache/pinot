@@ -18,21 +18,59 @@
  */
 package org.apache.pinot.tools;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.util.List;
+import java.util.Map;
+import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.tools.admin.command.QuickstartRunner;
+import org.apache.pinot.tools.utils.PinotConfigUtils;
 
 
 public abstract class QuickStartBase {
-  protected File _tmpDir = FileUtils.getTempDirectory();
+  protected File _dataDir = FileUtils.getTempDirectory();
+  protected String _zkExternalAddress;
+  protected String _configFilePath;
 
-  public QuickStartBase setTmpDir(String tmpDir) {
-    _tmpDir = new File(tmpDir);
+  public QuickStartBase setDataDir(String dataDir) {
+    _dataDir = new File(dataDir);
+    return this;
+  }
+
+  public QuickStartBase setZkExternalAddress(String zkExternalAddress) {
+    _zkExternalAddress = zkExternalAddress;
+    return this;
+  }
+
+  public QuickStartBase setConfigFilePath(String configFilePath) {
+    _configFilePath = configFilePath;
     return this;
   }
 
   public abstract List<String> types();
 
+  protected void waitForBootstrapToComplete(QuickstartRunner runner)
+      throws Exception {
+    QuickStartBase.printStatus(Quickstart.Color.CYAN,
+        "***** Waiting for 5 seconds for the server to fetch the assigned segment *****");
+    Thread.sleep(5000);
+  }
+
+  public static void printStatus(Quickstart.Color color, String message) {
+    System.out.println(color.getCode() + message + Quickstart.Color.RESET.getCode());
+  }
+
   public abstract void execute()
       throws Exception;
+
+  protected Map<String, Object> getConfigOverrides() {
+    try {
+      return StringUtils.isEmpty(_configFilePath) ? ImmutableMap.of()
+          : PinotConfigUtils.readConfigFromFile(_configFilePath);
+    } catch (ConfigurationException e) {
+      throw new RuntimeException(e);
+    }
+  }
 }

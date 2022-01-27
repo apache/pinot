@@ -34,6 +34,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
+import org.apache.pinot.tools.QuickStartBase;
 import org.apache.pinot.tools.Quickstart;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.slf4j.Logger;
@@ -70,7 +71,7 @@ public class AirlineDataStream {
     _producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
 
     _service = Executors.newFixedThreadPool(1);
-    Quickstart.printStatus(Quickstart.Color.YELLOW,
+    QuickStartBase.printStatus(Quickstart.Color.YELLOW,
         "***** Offine data has max time as 16101, realtime will start consuming from time 16102 and increment time "
             + "every 60 events (which is approximately 60 seconds) *****");
   }

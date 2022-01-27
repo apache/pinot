@@ -26,7 +26,6 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
@@ -44,7 +43,11 @@ public class Quickstart extends QuickStartBase {
   public enum Color {
     RESET("\u001B[0m"), GREEN("\u001B[32m"), YELLOW("\u001B[33m"), CYAN("\u001B[36m");
 
-    private String _code;
+    private final String _code;
+
+    public String getCode() {
+      return _code;
+    }
 
     Color(String code) {
       _code = code;
@@ -61,20 +64,6 @@ public class Quickstart extends QuickStartBase {
 
   public String getAuthToken() {
     return null;
-  }
-
-  public Map<String, Object> getConfigOverrides() {
-    return null;
-  }
-
-  protected void waitForBootstrapToComplete(QuickstartRunner runner)
-      throws Exception {
-    printStatus(Color.CYAN, "***** Waiting for 5 seconds for the server to fetch the assigned segment *****");
-    Thread.sleep(5000);
-  }
-
-  public static void printStatus(Color color, String message) {
-    System.out.println(color._code + message + Color.RESET._code);
   }
 
   public static String prettyPrintResponse(JsonNode response) {
@@ -163,7 +152,7 @@ public class Quickstart extends QuickStartBase {
 
   public void execute()
       throws Exception {
-    File quickstartTmpDir = new File(_tmpDir, String.valueOf(System.currentTimeMillis()));
+    File quickstartTmpDir = new File(_dataDir, String.valueOf(System.currentTimeMillis()));
     File baseDir = new File(quickstartTmpDir, "baseballStats");
     File dataDir = new File(baseDir, "rawdata");
     Preconditions.checkState(dataDir.mkdirs());
@@ -190,8 +179,9 @@ public class Quickstart extends QuickStartBase {
 
     QuickstartTableRequest request = new QuickstartTableRequest(baseDir.getAbsolutePath());
     QuickstartRunner runner =
-        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, getNumMinions(), dataDir, true, getAuthToken(),
-            getConfigOverrides());
+        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1,
+            getNumMinions(), dataDir, true, getAuthToken(),
+            getConfigOverrides(), null, true);
 
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
     runner.startAll();

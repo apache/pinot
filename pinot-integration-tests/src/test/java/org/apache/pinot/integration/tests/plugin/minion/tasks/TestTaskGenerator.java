@@ -23,8 +23,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
-import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
+import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.integration.tests.SimpleMinionClusterIntegrationTest;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
@@ -37,13 +36,7 @@ import static org.testng.Assert.assertEquals;
  * Task generator for {@link SimpleMinionClusterIntegrationTest}.
  */
 @TaskGenerator
-public class TestTaskGenerator implements PinotTaskGenerator {
-  private ClusterInfoAccessor _clusterInfoAccessor;
-
-  @Override
-  public void init(ClusterInfoAccessor clusterInfoAccessor) {
-    _clusterInfoAccessor = clusterInfoAccessor;
-  }
+public class TestTaskGenerator extends BaseTaskGenerator {
 
   @Override
   public String getTaskType() {

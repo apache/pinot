@@ -20,6 +20,7 @@ package org.apache.pinot.tools.admin.command;
 
 import java.lang.reflect.InvocationTargetException;
 import org.apache.pinot.tools.BatchQuickstartWithMinion;
+import org.apache.pinot.tools.EmptyQuickstart;
 import org.apache.pinot.tools.HybridQuickstart;
 import org.apache.pinot.tools.JoinQuickStart;
 import org.apache.pinot.tools.JsonIndexQuickStart;
@@ -58,6 +59,9 @@ public class TestQuickStartCommand {
         Assert.assertEquals(quickStartClassFor("OFFLINE"), Quickstart.class);
         Assert.assertEquals(quickStartClassFor("offline"), Quickstart.class);
         Assert.assertEquals(quickStartClassFor("BATCH"), Quickstart.class);
+
+        Assert.assertEquals(quickStartClassFor("EMPTY"), EmptyQuickstart.class);
+        Assert.assertEquals(quickStartClassFor("DEFAULT"), EmptyQuickstart.class);
 
         Assert.assertEquals(quickStartClassFor("OFFLINE_MINION"), BatchQuickstartWithMinion.class);
         Assert.assertEquals(quickStartClassFor("BATCH_MINION"), BatchQuickstartWithMinion.class);

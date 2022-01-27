@@ -42,7 +42,7 @@ import KeyboardArrowRight from '@material-ui/icons/KeyboardArrowRight';
 import LastPageIcon from '@material-ui/icons/LastPage';
 import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
 import ArrowDropUpIcon from '@material-ui/icons/ArrowDropUp';
-import { NavLink, useHistory } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import Chip from '@material-ui/core/Chip';
 import _ from 'lodash';
 import Utils from '../utils/Utils';
@@ -271,7 +271,6 @@ export default function CustomizedTables({
   accordionToggleObject,
   tooltipData
 }: Props) {
-  const history = useHistory();
   const [finalData, setFinalData] = React.useState(Utils.tableFormat(data));
 
   const [order, setOrder] = React.useState(false);
@@ -511,9 +510,7 @@ export default function CustomizedTables({
                         }
                         return addLinks && !idx ? (
                           <StyledTableCell key={idx}>
-                            <a className={classes.clickable} onClick={()=>{
-                              history.push(`${encodeURI(`${url}${encodeURIComponent(cell)}`)}`)
-                            }}>{cell}</a>
+                            <Link to={`${encodeURI(`${url}${encodeURIComponent(cell)}`)}`}>{cell}</Link>
                           </StyledTableCell>
                         ) : (
                           <StyledTableCell

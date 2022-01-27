@@ -39,7 +39,7 @@ import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.minion.MergeRollupTaskMetadata;
-import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
+import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
 import org.apache.pinot.core.common.MinionConstants;
@@ -99,7 +99,7 @@ import org.slf4j.LoggerFactory;
  *        maxNumRecordsPerTask
  */
 @TaskGenerator
-public class MergeRollupTaskGenerator implements PinotTaskGenerator {
+public class MergeRollupTaskGenerator extends BaseTaskGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MergeRollupTaskGenerator.class);
 
   private static final int DEFAULT_MAX_NUM_RECORDS_PER_TASK = 50_000_000;
@@ -113,17 +113,9 @@ public class MergeRollupTaskGenerator implements PinotTaskGenerator {
   private static final String MERGE_ROLLUP_TASK_DELAY_IN_NUM_BUCKETS = "mergeRollupTaskDelayInNumBuckets";
 
   // tableNameWithType -> mergeLevel -> watermarkMs
-  private Map<String, Map<String, Long>> _mergeRollupWatermarks;
+  private final Map<String, Map<String, Long>> _mergeRollupWatermarks = new HashMap<>();
   // tableNameWithType -> maxValidBucketEndTime
-  private Map<String, Long> _tableMaxValidBucketEndTimeMs;
-  private ClusterInfoAccessor _clusterInfoAccessor;
-
-  @Override
-  public void init(ClusterInfoAccessor clusterInfoAccessor) {
-    _clusterInfoAccessor = clusterInfoAccessor;
-    _mergeRollupWatermarks = new HashMap<>();
-    _tableMaxValidBucketEndTimeMs = new HashMap<>();
-  }
+  private final Map<String, Long> _tableMaxValidBucketEndTimeMs = new HashMap<>();
 
   @Override
   public String getTaskType() {

@@ -55,6 +55,7 @@
     <module>pinot-distribution</module>
     <module>pinot-connectors</module>
     <module>pinot-segment-local</module>
+    <module>pinot-compatibility-verifier</module>
   </modules>
 
   <licenses>
@@ -127,9 +128,7 @@
     <grizzly.version>2.4.4</grizzly.version>
     <swagger.version>1.5.16</swagger.version>
     <hadoop.version>2.7.0</hadoop.version>
-    <spark.version>2.4.0</spark.version>
-    <scala.binary.version>2.11</scala.binary.version>
-    <scala.version>2.11.11</scala.version>
+    <scala.version>2.13.3</scala.version>
     <antlr.version>4.6</antlr.version>
     <jsonpath.version>2.4.0</jsonpath.version>
     <quartz.version>2.3.2</quartz.version>
@@ -165,7 +164,7 @@
     TODO: figure out a way to inject kafka dependency instead of explicitly setting the kafka module dependency -->
     <kafka.version>2.0</kafka.version>
     <protobuf.version>3.12.0</protobuf.version>
-    <grpc.version>1.30.0</grpc.version>
+    <grpc.version>1.41.0</grpc.version>
 
     <!-- Checkstyle violation prop.-->
     <checkstyle.violation.severity>warning</checkstyle.violation.severity>
@@ -919,40 +918,6 @@
         <artifactId>hadoop-mapreduce-client-core</artifactId>
         <version>${hadoop.version}</version>
         <scope>provided</scope>
-      </dependency>
-
-      <!-- Spark -->
-      <dependency>
-        <groupId>org.apache.spark</groupId>
-        <artifactId>spark-core_${scala.binary.version}</artifactId>
-        <version>${spark.version}</version>
-        <scope>provided</scope>
-        <exclusions>
-          <exclusion>
-            <groupId>com.twitter</groupId>
-            <artifactId>chill_2.11</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.twitter</groupId>
-            <artifactId>chill-java</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.apache.curator</groupId>
-            <artifactId>curator-recipes</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>log4j</groupId>
-            <artifactId>log4j</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-log4j12</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
-          </exclusion>
-        </exclusions>
       </dependency>
 
       <!-- Scala -->

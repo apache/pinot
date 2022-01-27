@@ -133,6 +133,38 @@ public class ServiceStatus {
     String getStatusDescription();
   }
 
+  public static class LifecycleServiceStatusCallback implements ServiceStatusCallback {
+
+    private Supplier<Boolean> _isStartingCallable;
+    private Supplier<Boolean> _isShuttingDownCallable;
+
+    public LifecycleServiceStatusCallback(Supplier<Boolean> isStartingCallable,
+        Supplier<Boolean> isShuttingDownCallable) {
+      _isStartingCallable = isStartingCallable;
+      _isShuttingDownCallable = isShuttingDownCallable;
+    }
+
+    @Override
+    public Status getServiceStatus() {
+      if (_isShuttingDownCallable.get()) {
+        return Status.SHUTTING_DOWN;
+      } else if (_isStartingCallable.get()) {
+        return Status.STARTING;
+      }
+      return Status.GOOD;
+    }
+
+    @Override
+    public String getStatusDescription() {
+      if (_isShuttingDownCallable.get()) {
+        return STATUS_DESCRIPTION_SHUTTING_DOWN;
+      } else if (_isStartingCallable.get()) {
+        return STATUS_DESCRIPTION_INIT;
+      }
+      return STATUS_DESCRIPTION_NONE;
+    }
+  }
+
   public static class MultipleCallbackServiceStatusCallback implements ServiceStatusCallback {
     private final List<? extends ServiceStatusCallback> _statusCallbacks;
 

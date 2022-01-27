@@ -46,14 +46,14 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.BasePinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static com.google.common.base.Preconditions.checkState;
 
 
-public class GcsPinotFS extends PinotFS {
+public class GcsPinotFS extends BasePinotFS {
   public static final String PROJECT_ID = "projectId";
   public static final String GCP_KEY = "gcpKey";
 

@@ -35,7 +35,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.BasePinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,7 +43,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Implementation of PinotFS for the Hadoop Filesystem
  */
-public class HadoopPinotFS extends PinotFS {
+public class HadoopPinotFS extends BasePinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(HadoopPinotFS.class);
 
   private static final String PRINCIPAL = "hadoop.kerberos.principle";

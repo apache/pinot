@@ -36,7 +36,6 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.server.access.AccessControl;
-import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.access.AllowAllAccessFactory;
 
 
@@ -63,7 +62,7 @@ public class QueryServer {
    * @param serverMetrics server metrics
    */
   public QueryServer(int port, QueryScheduler queryScheduler, ServerMetrics serverMetrics) {
-    this(port, queryScheduler, serverMetrics, null, new AllowAllAccessFactory());
+    this(port, queryScheduler, serverMetrics, null, new AllowAllAccessFactory().create());
   }
 
   /**
@@ -76,12 +75,12 @@ public class QueryServer {
    * @param accessControlFactory access control factory for netty channel
    */
   public QueryServer(int port, QueryScheduler queryScheduler, ServerMetrics serverMetrics, TlsConfig tlsConfig,
-      AccessControlFactory accessControlFactory) {
+      AccessControl accessControl) {
     _port = port;
     _queryScheduler = queryScheduler;
     _serverMetrics = serverMetrics;
     _tlsConfig = tlsConfig;
-    _accessControl = accessControlFactory.create();
+    _accessControl = accessControl;
   }
 
   public void start() {
