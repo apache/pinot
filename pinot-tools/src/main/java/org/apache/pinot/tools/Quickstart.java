@@ -26,7 +26,6 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
@@ -67,10 +66,6 @@ public class Quickstart extends QuickStartBase {
     return null;
   }
 
-  public Map<String, Object> getConfigOverrides() {
-    return null;
-  }
-
   public static String prettyPrintResponse(JsonNode response) {
     StringBuilder responseBuilder = new StringBuilder();
 
@@ -87,67 +82,6 @@ public class Quickstart extends QuickStartBase {
         JsonNode row = rows.get(i);
         for (int j = 0; j < numColumns; j++) {
           responseBuilder.append(row.get(j).asText()).append(TAB);
-        }
-        responseBuilder.append(NEW_LINE);
-      }
-      return responseBuilder.toString();
-    }
-
-    // Selection query
-    if (response.has("selectionResults")) {
-      JsonNode columns = response.get("selectionResults").get("columns");
-      int numColumns = columns.size();
-      for (int i = 0; i < numColumns; i++) {
-        responseBuilder.append(columns.get(i).asText()).append(TAB);
-      }
-      responseBuilder.append(NEW_LINE);
-      JsonNode rows = response.get("selectionResults").get("results");
-      int numRows = rows.size();
-      for (int i = 0; i < numRows; i++) {
-        JsonNode row = rows.get(i);
-        for (int j = 0; j < numColumns; j++) {
-          responseBuilder.append(row.get(j).asText()).append(TAB);
-        }
-        responseBuilder.append(NEW_LINE);
-      }
-      return responseBuilder.toString();
-    }
-
-    // Aggregation only query
-    if (!response.get("aggregationResults").get(0).has("groupByResult")) {
-      JsonNode aggregationResults = response.get("aggregationResults");
-      int numAggregations = aggregationResults.size();
-      for (int i = 0; i < numAggregations; i++) {
-        responseBuilder.append(aggregationResults.get(i).get("function").asText()).append(TAB);
-      }
-      responseBuilder.append(NEW_LINE);
-      for (int i = 0; i < numAggregations; i++) {
-        responseBuilder.append(aggregationResults.get(i).get("value").asText()).append(TAB);
-      }
-      responseBuilder.append(NEW_LINE);
-      return responseBuilder.toString();
-    }
-
-    // Aggregation group-by query
-    JsonNode groupByResults = response.get("aggregationResults");
-    int numGroupBys = groupByResults.size();
-    for (int i = 0; i < numGroupBys; i++) {
-      JsonNode groupByResult = groupByResults.get(i);
-      responseBuilder.append(groupByResult.get("function").asText()).append(TAB);
-      JsonNode columns = groupByResult.get("groupByColumns");
-      int numColumns = columns.size();
-      for (int j = 0; j < numColumns; j++) {
-        responseBuilder.append(columns.get(j).asText()).append(TAB);
-      }
-      responseBuilder.append(NEW_LINE);
-      JsonNode rows = groupByResult.get("groupByResult");
-      int numRows = rows.size();
-      for (int j = 0; j < numRows; j++) {
-        JsonNode row = rows.get(j);
-        responseBuilder.append(row.get("value").asText()).append(TAB);
-        JsonNode columnValues = row.get("group");
-        for (int k = 0; k < numColumns; k++) {
-          responseBuilder.append(columnValues.get(k).asText()).append(TAB);
         }
         responseBuilder.append(NEW_LINE);
       }

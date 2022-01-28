@@ -31,8 +31,7 @@ import org.apache.avro.generic.GenericData.Record;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.SslConfigs;
 import org.apache.kafka.common.config.types.Password;
-import org.apache.kafka.common.network.Mode;
-import org.apache.kafka.common.security.ssl.SslFactory;
+import org.apache.kafka.common.security.ssl.DefaultSslEngineFactory;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
@@ -77,7 +76,7 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
     }
 
     if (!sslConfigs.isEmpty()) {
-      SslFactory sslFactory = new SslFactory(Mode.CLIENT);
+      DefaultSslEngineFactory sslFactory = new DefaultSslEngineFactory();
       sslFactory.configure(sslConfigs);
       restService.setSslSocketFactory(sslFactory.sslContext().getSocketFactory());
     }

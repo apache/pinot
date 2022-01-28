@@ -9,7 +9,11 @@
     "segmentPushType": "APPEND",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "schemaName": "meetupRsvp",
-    "replicasPerPartition": "1"
+    "replicasPerPartition": "1",
+    "replicaGroupStrategyConfig": {
+      "partitionColumn": "event_id",
+      "numInstancesPerPartition": 1
+    }
   },
   "tenants": {},
   "tableIndexConfig": {
@@ -25,6 +29,14 @@
       "stream.kafka.broker.list": "localhost:19092",
       "realtime.segment.flush.threshold.size": 30,
       "realtime.segment.flush.threshold.rows": 30
+    },
+    "segmentPartitionConfig": {
+      "columnPartitionMap": {
+        "event_id": {
+          "functionName": "Hashcode",
+          "numPartitions": 2
+        }
+      }
     }
   },
   "fieldConfigList": [
@@ -41,6 +53,7 @@
     "customConfigs": {}
   },
   "routing": {
+    "segmentPrunerTypes": ["partition"],
     "instanceSelectorType": "strictReplicaGroup"
   },
   "upsertConfig": {

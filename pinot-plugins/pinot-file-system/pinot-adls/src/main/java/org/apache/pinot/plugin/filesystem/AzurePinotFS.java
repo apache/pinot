@@ -41,7 +41,7 @@ import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.BasePinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +50,7 @@ import org.slf4j.LoggerFactory;
  * Azure implementation for the PinotFS interface. This class will implement using azure-data-lake libraries all
  * the basic FS methods needed within Pinot.
  */
-public class AzurePinotFS extends PinotFS {
+public class AzurePinotFS extends BasePinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(AzurePinotFS.class);
   private static final int BUFFER_SIZE = 4096;
   private ADLStoreClient _adlStoreClient;

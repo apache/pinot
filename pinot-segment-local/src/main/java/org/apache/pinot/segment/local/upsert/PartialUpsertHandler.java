@@ -29,6 +29,7 @@ import org.apache.helix.model.LiveInstance;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMerger;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMergerFactory;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.slf4j.Logger;
@@ -48,12 +49,21 @@ public class PartialUpsertHandler {
   private final String _tableNameWithType;
   private boolean _allSegmentsLoaded;
 
-  public PartialUpsertHandler(HelixManager helixManager, String tableNameWithType,
-      Map<String, UpsertConfig.Strategy> partialUpsertStrategies) {
+  public PartialUpsertHandler(HelixManager helixManager, String tableNameWithType, Schema schema,
+      Map<String, UpsertConfig.Strategy> partialUpsertStrategies, UpsertConfig.Strategy defaultPartialUpsertStrategy,
+      String comparisonColumn) {
     _helixManager = helixManager;
     _tableNameWithType = tableNameWithType;
     for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
       _column2Mergers.put(entry.getKey(), PartialUpsertMergerFactory.getMerger(entry.getValue()));
+    }
+    // For all physical columns (including date time columns) except for primary key columns and comparison column.
+    // If no comparison column is configured, use main time column as the comparison time.
+    for (String columnName : schema.getPhysicalColumnNames()) {
+      if (!schema.getPrimaryKeyColumns().contains(columnName) && !_column2Mergers.containsKey(columnName)
+          && !comparisonColumn.equals(columnName)) {
+        _column2Mergers.put(columnName, PartialUpsertMergerFactory.getMerger(defaultPartialUpsertStrategy));
+      }
     }
   }
 

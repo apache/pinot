@@ -80,7 +80,8 @@ public class JoinQuickStart extends QuickStartBase {
 
     File tempDir = new File(quickstartTmpDir, "tmp");
     FileUtils.forceMkdir(tempDir);
-    QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request, dimTableRequest), 1, 1, 3, 0, tempDir);
+    QuickstartRunner runner =
+        new QuickstartRunner(Lists.newArrayList(request, dimTableRequest), 1, 1, 3, 0, tempDir, getConfigOverrides());
 
     printStatus(Quickstart.Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
     runner.startAll();

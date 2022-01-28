@@ -16,30 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.compat.tests;
+package org.apache.pinot.server.access;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import java.util.List;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
+import java.util.Map;
 
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class CompatTestOperation {
-  private List<BaseOp> _operations;
-  private String _description;
+/**
+ * Identity container for GRPC requests with (optional) authorization metadata
+ */
+public class GrpcRequesterIdentity extends RequesterIdentity {
+  private Multimap<String, String> _metaData;
 
-  public List<BaseOp> getOperations() {
-    return _operations;
+  public GrpcRequesterIdentity(Map<String, String> metadataMap) {
+    _metaData = Multimaps.forMap(metadataMap);
   }
 
-  public void setOperations(List<BaseOp> operations) {
-    _operations = operations;
+  public Multimap<String, String> getGrpcMetadata() {
+    return _metaData;
   }
 
-  public void setDescription(String description) {
-    _description = description;
-  }
-
-  public String getDescription() {
-    return _description;
+  public void setGrpcMetadata(Multimap<String, String> metaData) {
+    _metaData = metaData;
   }
 }

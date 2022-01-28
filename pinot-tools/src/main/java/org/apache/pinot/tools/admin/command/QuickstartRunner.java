@@ -85,9 +85,10 @@ public class QuickstartRunner {
   private boolean _isStopped = false;
 
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
-      int numServers, int numMinions, File tempDir)
+      int numServers, int numMinions, File tempDir, Map<String, Object> configOverrides)
       throws Exception {
-    this(tableRequests, numControllers, numBrokers, numServers, numMinions, tempDir, true, null, null, null, true);
+    this(tableRequests, numControllers, numBrokers, numServers, numMinions, tempDir, true, null, configOverrides, null,
+        true);
   }
 
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,

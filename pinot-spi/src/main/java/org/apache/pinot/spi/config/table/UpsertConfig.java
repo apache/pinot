@@ -53,12 +53,16 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Partial update strategies.")
   private final Map<String, Strategy> _partialUpsertStrategies;
 
+  @JsonPropertyDescription("default upsert strategy for partial mode")
+  private final Strategy _defaultPartialUpsertStrategy;
+
   @JsonPropertyDescription("Column for upsert comparison, default to time column")
   private final String _comparisonColumn;
 
   @JsonCreator
   public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode,
       @JsonProperty("partialUpsertStrategies") @Nullable Map<String, Strategy> partialUpsertStrategies,
+      @JsonProperty("defaultPartialUpsertStrategy") @Nullable Strategy defaultPartialUpsertStrategy,
       @JsonProperty("comparisonColumn") @Nullable String comparisonColumn,
       @JsonProperty("hashFunction") @Nullable HashFunction hashFunction) {
     Preconditions.checkArgument(mode != null, "Upsert mode must be configured");
@@ -66,8 +70,11 @@ public class UpsertConfig extends BaseJsonConfig {
 
     if (mode == Mode.PARTIAL) {
       _partialUpsertStrategies = partialUpsertStrategies != null ? partialUpsertStrategies : new HashMap<>();
+      _defaultPartialUpsertStrategy =
+          defaultPartialUpsertStrategy != null ? defaultPartialUpsertStrategy : Strategy.OVERWRITE;
     } else {
       _partialUpsertStrategies = null;
+      _defaultPartialUpsertStrategy = null;
     }
 
     _comparisonColumn = comparisonColumn;
@@ -85,6 +92,10 @@ public class UpsertConfig extends BaseJsonConfig {
   @Nullable
   public Map<String, Strategy> getPartialUpsertStrategies() {
     return _partialUpsertStrategies;
+  }
+
+  public Strategy getDefaultPartialUpsertStrategy() {
+    return _defaultPartialUpsertStrategy;
   }
 
   public String getComparisonColumn() {

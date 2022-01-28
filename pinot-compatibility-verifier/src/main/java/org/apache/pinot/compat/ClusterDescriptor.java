@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.compat.tests;
+package org.apache.pinot.compat;
 
 // TODO Support https, perhaps based on configuration
 public class ClusterDescriptor {

@@ -2752,6 +2752,11 @@ public class PinotHelixResourceManager {
    * 2. Compute validation on the user inputs
    * 3. Add the new lineage entry to the segment lineage metadata in the property store
    *
+   * If the previous lineage entry is "IN_PROGRESS" while having the same "segmentsFrom", this means that some other job
+   * is attempting to replace the same target segments or some previous attempt failed in the middle. Default behavior
+   * to handle this case is to throw the exception and block the protocol. If "forceCleanup=true", we proactively set
+   * the previous lineage to be "REVERTED" and move forward with the existing replacement attempt.
+   *
    * Update is done with retry logic along with read-modify-write block for achieving atomic update of the lineage
    * metadata.
    *
@@ -2809,6 +2814,10 @@ public class PinotHelixResourceManager {
           // If the lineage entry is in 'REVERTED' state, no need to go through the validation because we can regard
           // the entry as not existing.
           if (lineageEntry.getState() == LineageEntryState.REVERTED) {
+            // When 'forceCleanup' is enabled, proactively clean up 'segmentsTo' since it's safe to do so.
+            if (forceCleanup) {
+              segmentsToCleanUp.addAll(lineageEntry.getSegmentsTo());
+            }
             continue;
           }
 
@@ -3038,10 +3047,8 @@ public class PinotHelixResourceManager {
           // different after updating the lineage entry.
           sendRoutingTableRebuildMessage(tableNameWithType);
 
-          // Invoke the proactive clean-up for segments that we no longer needs in case 'forceRevert' is enabled
-          if (forceRevert) {
-            deleteSegments(tableNameWithType, lineageEntry.getSegmentsTo());
-          }
+          // Invoke the proactive clean-up for segments that we no longer needs
+          deleteSegments(tableNameWithType, lineageEntry.getSegmentsTo());
           return true;
         } else {
           return false;
