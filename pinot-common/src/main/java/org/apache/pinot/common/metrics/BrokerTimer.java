@@ -32,6 +32,8 @@ public enum BrokerTimer implements AbstractMetrics.Timer {
 
   // The latency of sending the request from broker to server
   NETTY_CONNECTION_SEND_REQUEST_LATENCY(false),
+  // The latency of waiting the lock of NETTY channel from broker to server
+  NETTY_LOCK_WAIT_TIME_MS(false),
 
   // aggregated thread cpu time in nanoseconds for query processing from offline servers
   OFFLINE_THREAD_CPU_TIME_NS(false),
