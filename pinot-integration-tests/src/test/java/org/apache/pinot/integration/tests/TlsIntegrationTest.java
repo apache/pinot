@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -43,6 +44,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -59,8 +61,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   private static final char[] PASSWORD_CHAR = PASSWORD.toCharArray();
   private static final Header CLIENT_HEADER = new BasicHeader("Authorization", AUTH_TOKEN);
 
-  private static final int INTERNAL_CONTROLLER_PORT = DEFAULT_CONTROLLER_PORT + 1;
-  private static final int INTERNAL_BROKER_PORT = DEFAULT_BROKER_PORT + 1;
+  private static final int EXTERNAL_CONTROLLER_PORT = DEFAULT_CONTROLLER_PORT + 1;
+  private static final int EXTERNAL_BROKER_PORT = DEFAULT_BROKER_PORT + 1;
   private static final String PKCS_12 = "PKCS12";
   private static final String JKS = "JKS";
 
@@ -93,10 +95,6 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     // Push data into Kafka
     pushAvroIntoKafka(avroFiles);
     waitForAllDocsLoaded(600_000L);
-
-    System.out.println("hello world!");
-
-    Thread.sleep(600000);
   }
 
   @AfterClass(alwaysRun = true)
@@ -121,20 +119,19 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     prop.put("controller.tls.truststore.password", PASSWORD);
     prop.put("controller.tls.truststore.type", PKCS_12);
 
-//    prop.put("controller.access.protocols", "https");
-//    prop.put("controller.access.protocols.https.port", DEFAULT_CONTROLLER_PORT);
-    prop.put("controller.access.protocols", "https,internal");
-    prop.put("controller.access.protocols.https.port", DEFAULT_CONTROLLER_PORT);
-    prop.put("controller.access.protocols.https.tls.keystore.path", _tlsStoreJKS);
-    prop.put("controller.access.protocols.https.tls.keystore.type", JKS);
-    prop.put("controller.access.protocols.https.tls.truststore.path", _tlsStoreJKS);
-    prop.put("controller.access.protocols.https.tls.truststore.type", JKS);
+    // CAUTION: order matters. first listener becomes registered as internal address in zookeeper
+    prop.put("controller.access.protocols", "internal,external");
     prop.put("controller.access.protocols.internal.protocol", "https");
-    prop.put("controller.access.protocols.internal.port", INTERNAL_CONTROLLER_PORT);
+    prop.put("controller.access.protocols.internal.port", DEFAULT_CONTROLLER_PORT);
     prop.put("controller.access.protocols.internal.tls.client.auth.enabled", "true");
+    prop.put("controller.access.protocols.external.protocol", "https");
+    prop.put("controller.access.protocols.external.port", EXTERNAL_CONTROLLER_PORT);
+    prop.put("controller.access.protocols.external.tls.keystore.path", _tlsStoreJKS);
+    prop.put("controller.access.protocols.external.tls.keystore.type", JKS);
+    prop.put("controller.access.protocols.external.tls.truststore.path", _tlsStoreJKS);
+    prop.put("controller.access.protocols.external.tls.truststore.type", JKS);
 
     prop.put("controller.broker.protocol", "https");
-    prop.put("controller.broker.port.override", INTERNAL_BROKER_PORT);
 
     // announce external only
     prop.put("controller.vip.protocol", "https");
@@ -155,17 +152,17 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     prop.put("pinot.broker.tls.truststore.password", PASSWORD);
     prop.put("pinot.broker.tls.truststore.type", PKCS_12);
 
-//    prop.put("pinot.broker.client.access.protocols", "https");
-//    prop.put("pinot.broker.client.access.protocols.https.port", DEFAULT_BROKER_PORT);
-    prop.put("pinot.broker.client.access.protocols", "https,internal");
-    prop.put("pinot.broker.client.access.protocols.https.port", DEFAULT_BROKER_PORT);
-    prop.put("pinot.broker.client.access.protocols.https.tls.keystore.path", _tlsStoreJKS);
-    prop.put("pinot.broker.client.access.protocols.https.tls.keystore.type", JKS);
-    prop.put("pinot.broker.client.access.protocols.https.tls.truststore.path", _tlsStoreJKS);
-    prop.put("pinot.broker.client.access.protocols.https.tls.truststore.type", JKS);
+    // CAUTION: order matters. first listener becomes registered as internal address in zookeeper
+    prop.put("pinot.broker.client.access.protocols", "internal,external");
     prop.put("pinot.broker.client.access.protocols.internal.protocol", "https");
-    prop.put("pinot.broker.client.access.protocols.internal.port", INTERNAL_BROKER_PORT);
+    prop.put("pinot.broker.client.access.protocols.internal.port", DEFAULT_BROKER_PORT);
     prop.put("pinot.broker.client.access.protocols.internal.tls.client.auth.enabled", "true");
+    prop.put("pinot.broker.client.access.protocols.external.protocol", "https");
+    prop.put("pinot.broker.client.access.protocols.external.port", EXTERNAL_BROKER_PORT);
+    prop.put("pinot.broker.client.access.protocols.external.tls.keystore.path", _tlsStoreJKS);
+    prop.put("pinot.broker.client.access.protocols.external.tls.keystore.type", JKS);
+    prop.put("pinot.broker.client.access.protocols.external.tls.truststore.path", _tlsStoreJKS);
+    prop.put("pinot.broker.client.access.protocols.external.tls.truststore.type", JKS);
 
     prop.put("pinot.broker.nettytls.enabled", "true");
 
@@ -185,8 +182,6 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
 
     prop.put("pinot.server.admin.access.control.factory.class",
         CertBasedTlsChannelAccessControlFactory.class.getName());
-//    prop.put("pinot.server.adminapi.access.protocols", "https");
-//    prop.put("pinot.server.adminapi.access.protocols.https.port", "7443");
     prop.put("pinot.server.adminapi.access.protocols", "internal");
     prop.put("pinot.server.adminapi.access.protocols.internal.protocol", "https");
     prop.put("pinot.server.adminapi.access.protocols.internal.port", "7443");
@@ -244,13 +239,14 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   public void testQueryControllerExternalTrustedServer()
       throws Exception {
     try (CloseableHttpClient client = makeClient(JKS, _tlsStoreJKS, _tlsStoreJKS)) {
-      HttpUriRequest request = new HttpGet("https://localhost:" + DEFAULT_CONTROLLER_PORT + "/tables");
+      HttpUriRequest request = new HttpGet("https://localhost:" + EXTERNAL_CONTROLLER_PORT + "/tables");
       request.addHeader(CLIENT_HEADER);
 
       try (CloseableHttpResponse response = client.execute(request)) {
         Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
-        String output = IOUtils.toString(response.getEntity().getContent());
-        System.out.println(output);
+        JsonNode tables = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("tables");
+        Assert.assertEquals(tables.size(), 1);
+        Assert.assertEquals(tables.get(0).textValue(), "mytable");
       }
     }
   }
@@ -259,7 +255,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   public void testQueryControllerExternalUntrustedServer()
       throws Exception {
     try (CloseableHttpClient client = makeClient(JKS, _tlsStoreJKS, _tlsStoreEmptyJKS)) {
-      HttpUriRequest request = new HttpGet("https://localhost:" + DEFAULT_CONTROLLER_PORT + "/tables");
+      HttpUriRequest request = new HttpGet("https://localhost:" + EXTERNAL_CONTROLLER_PORT + "/tables");
       request.addHeader(CLIENT_HEADER);
 
       try {
@@ -275,13 +271,14 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   public void testQueryControllerInternalTrustedClient()
       throws Exception {
     try (CloseableHttpClient client = makeClient(PKCS_12, _tlsStorePKCS12, _tlsStorePKCS12)) {
-      HttpUriRequest request = new HttpGet("https://localhost:" + INTERNAL_CONTROLLER_PORT + "/tables");
+      HttpUriRequest request = new HttpGet("https://localhost:" + DEFAULT_CONTROLLER_PORT + "/tables");
       request.addHeader(CLIENT_HEADER);
 
       try (CloseableHttpResponse response = client.execute(request)) {
         Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
-        String output = IOUtils.toString(response.getEntity().getContent());
-        System.out.println(output);
+        JsonNode tables = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("tables");
+        Assert.assertEquals(tables.size(), 1);
+        Assert.assertEquals(tables.get(0).textValue(), "mytable");
       }
     }
   }
@@ -290,7 +287,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   public void testQueryControllerInternalUntrustedClient()
       throws Exception {
     try (CloseableHttpClient client = makeClient(PKCS_12, _tlsStoreEmptyPKCS12, _tlsStorePKCS12)) {
-      HttpUriRequest request = new HttpGet("https://localhost:" + INTERNAL_CONTROLLER_PORT + "/tables");
+      HttpUriRequest request = new HttpGet("https://localhost:" + DEFAULT_CONTROLLER_PORT + "/tables");
       request.addHeader(CLIENT_HEADER);
 
       try {
@@ -302,18 +299,6 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
-  @Test
-  public void testQueryBrokerExternal()
-      throws Exception {
-    Assert.fail("not implemented yet");
-  }
-
-  @Test
-  public void testQueryBrokerInternal()
-      throws Exception {
-    Assert.fail("not implemented yet");
-  }
-
   private static CloseableHttpClient makeClient(String keyStoreType, URL keyStoreUrl, URL trustStoreUrl) {
     try {
       SSLContextBuilder sslContextBuilder = SSLContextBuilder.create();
@@ -322,18 +307,18 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
       sslContextBuilder.loadTrustMaterial(trustStoreUrl, PASSWORD_CHAR);
       return HttpClientBuilder.create().setSSLContext(sslContextBuilder.build()).build();
     } catch (Exception e) {
-      throw new IllegalStateException("Could not create HTTPS client");
+      throw new IllegalStateException("Could not create HTTPS client", e);
     }
   }
 
   /*
    * Command to generate the tlstest.jks file (generate key pairs for both IPV4 and IPV6 addresses):
    * ```
-   *  keytool -genkeypair -keystore tlstest.jks -dname "CN=test, OU=Unknown, O=Unknown, L=Unknown, ST=Unknown, \
+   *  keytool -genkeypair -keystore tlstest.jks -dname "CN=test-jks, OU=Unknown, O=Unknown, L=Unknown, ST=Unknown, \
    *  C=Unknown" -keypass changeit -storepass changeit -keyalg RSA -alias localhost-ipv4 -ext \
    *  SAN=dns:localhost,ip:127.0.0.1
    *
-   *  keytool -genkeypair -keystore tlstest.jks -dname "CN=test, OU=Unknown, O=Unknown, L=Unknown, ST=Unknown, \
+   *  keytool -genkeypair -keystore tlstest.jks -dname "CN=test-jks, OU=Unknown, O=Unknown, L=Unknown, ST=Unknown, \
    *  C=Unknown" -keypass changeit -storepass changeit -keyalg RSA -alias localhost-ipv6 -ext \
    *  SAN=dns:localhost,ip:0:0:0:0:0:0:0:1
    * ```
@@ -342,11 +327,11 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   /*
    * Command to generate the tlstest.pkcs file (generate key pairs for both IPV4 and IPV6 addresses):
    * ```
-   *  keytool -genkeypair -storetype JKS -keystore tlstest.p12 -dname "CN=test, OU=Unknown, O=Unknown, \
+   *  keytool -genkeypair -storetype JKS -keystore tlstest.p12 -dname "CN=test-p12, OU=Unknown, O=Unknown, \
    *  L=Unknown, ST=Unknown, C=Unknown" -keypass changeit -storepass changeit -keyalg RSA \
    *  -alias localhost-ipv4 -ext SAN=dns:localhost,ip:127.0.0.1
    *
-   *  keytool -genkeypair -storetype JKS -keystore tlstest.p12 -dname "CN=test, OU=Unknown, O=Unknown, \
+   *  keytool -genkeypair -storetype JKS -keystore tlstest.p12 -dname "CN=test-p12, OU=Unknown, O=Unknown, \
    *  L=Unknown, ST=Unknown, C=Unknown" -keypass changeit -storepass changeit -keyalg RSA \
    *  -alias localhost-ipv6 -ext SAN=dns:localhost,ip:0:0:0:0:0:0:0:1
    * ```

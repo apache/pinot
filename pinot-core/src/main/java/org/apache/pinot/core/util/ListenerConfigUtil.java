@@ -179,7 +179,7 @@ public final class ListenerConfigUtil {
 
     return new ListenerConfig(name, getHost(config.getProperty(protocolNamespace + ".host", DEFAULT_HOST)),
         getPort(config.getProperty(protocolNamespace + ".port")), getProtocol(config.getProperty(protocolNamespace + ".protocol"), name),
-        TlsUtils.extractTlsConfig(config, namespace + ".tls", tlsConfig));
+        TlsUtils.extractTlsConfig(config, protocolNamespace + ".tls", tlsConfig));
   }
 
   private static String getHost(String configuredHost) {
@@ -263,7 +263,7 @@ public final class ListenerConfigUtil {
 
   private static File cacheInTempFile(String sourceUrl) {
     try {
-      File tempFile = Files.createTempFile("keystore", "cache").toFile();
+      File tempFile = Files.createTempFile("pinot-keystore-", null).toFile();
       tempFile.deleteOnExit();
 
       try (InputStream is = TlsUtils.makeKeyStoreUrl(sourceUrl).openStream(); OutputStream os = new FileOutputStream(tempFile)) {
