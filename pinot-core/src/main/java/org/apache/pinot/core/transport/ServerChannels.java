@@ -83,12 +83,11 @@ public class ServerChannels {
   }
 
   public void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
-      ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest, long startTimeMs, long timeoutMs)
+      ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest, long timeoutMs)
       throws Exception {
     byte[] requestBytes = _serializer.serialize(instanceRequest);
     _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new)
-        .sendRequestOrTimeOut(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes, startTimeMs,
-            timeoutMs);
+        .sendRequestOrTimeOut(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes, timeoutMs);
   }
 
   public void shutDown() {
@@ -145,12 +144,10 @@ public class ServerChannels {
     }
 
     private void sendRequestOrTimeOut(String rawTableName, AsyncQueryResponse asyncQueryResponse,
-        ServerRoutingInstance serverRoutingInstance, byte[] requestBytes, long startTimeMs, long timeoutMs)
+        ServerRoutingInstance serverRoutingInstance, byte[] requestBytes, long timeoutMs)
         throws Exception {
       _channelLock.lock();
       if (_channelLock.tryLock(timeoutMs, TimeUnit.MILLISECONDS)) {
-        _brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.NETTY_LOCK_WAIT_TIME_MS,
-            System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
         try {
           sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes);
         } finally {

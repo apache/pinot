@@ -112,16 +112,15 @@ public class QueryRouter {
     }
 
     // Create the asynchronous query response with the request map
-    long startTimeMs = System.currentTimeMillis();
     AsyncQueryResponse asyncQueryResponse =
-        new AsyncQueryResponse(this, requestId, requestMap.keySet(), startTimeMs, timeoutMs);
+        new AsyncQueryResponse(this, requestId, requestMap.keySet(), System.currentTimeMillis(), timeoutMs);
     _asyncQueryResponseMap.put(requestId, asyncQueryResponse);
     for (Map.Entry<ServerRoutingInstance, InstanceRequest> entry : requestMap.entrySet()) {
       ServerRoutingInstance serverRoutingInstance = entry.getKey();
       ServerChannels serverChannels = serverRoutingInstance.isTlsEnabled() ? _serverChannelsTls : _serverChannels;
       try {
         serverChannels.sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, entry.getValue(),
-            startTimeMs, timeoutMs);
+            timeoutMs);
         asyncQueryResponse.markRequestSubmitted(serverRoutingInstance);
       } catch (Exception e) {
         LOGGER.error("Caught exception while sending request {} to server: {}, marking query failed", requestId,
