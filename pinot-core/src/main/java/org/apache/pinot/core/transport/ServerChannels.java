@@ -146,7 +146,6 @@ public class ServerChannels {
     private void sendRequestOrTimeOut(String rawTableName, AsyncQueryResponse asyncQueryResponse,
         ServerRoutingInstance serverRoutingInstance, byte[] requestBytes, long timeoutMs)
         throws Exception {
-      _channelLock.lock();
       if (_channelLock.tryLock(timeoutMs, TimeUnit.MILLISECONDS)) {
         try {
           sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes);
