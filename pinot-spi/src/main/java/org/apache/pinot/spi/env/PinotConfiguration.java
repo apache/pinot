@@ -360,6 +360,9 @@ public class PinotConfiguration {
     if (rawProperty instanceof List) {
       return StringUtils.join(((ArrayList) rawProperty).toArray(), ',');
     } else {
+      if (rawProperty == null) {
+        return null;
+      }
       return rawProperty.toString();
     }
   }
