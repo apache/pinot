@@ -180,7 +180,7 @@ public class SegmentDeletionManager {
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       URI fileToDeleteURI = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
       PinotFS pinotFS = PinotFSFactory.create(fileToDeleteURI.getScheme());
-      if (_defaultDeletedSegmentsRetentionInDays == 0) {
+      if (_defaultDeletedSegmentsRetentionInDays <= 0) {
         // delete the segment file instantly if retention is set to zero
         try {
           if (pinotFS.delete(fileToDeleteURI, true)) {
