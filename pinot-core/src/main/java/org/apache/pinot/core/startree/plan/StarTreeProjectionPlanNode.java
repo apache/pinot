@@ -41,7 +41,6 @@ public class StarTreeProjectionPlanNode implements PlanNode {
     for (String projectionColumn : projectionColumns) {
       _dataSourceMap.put(projectionColumn, starTreeV2.getDataSource(projectionColumn));
     }
-
     _starTreeDocIdSetPlanNode =
         new StarTreeDocIdSetPlanNode(starTreeV2, predicateEvaluatorsMap, groupByColumns, debugOptions);
   }

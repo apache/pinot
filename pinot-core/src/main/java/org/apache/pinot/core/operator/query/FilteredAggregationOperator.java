@@ -43,7 +43,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 @SuppressWarnings("rawtypes")
 public class FilteredAggregationOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "FilteredAggregationOperator";
-  private static final String EXPLAIN_NAME = "FILTERED_AGGREGATE";
+  private static final String EXPLAIN_NAME = "AGGREGATE_FILTERED";
 
   private final AggregationFunction[] _aggregationFunctions;
   private final List<Pair<AggregationFunction[], TransformOperator>> _aggFunctionsWithTransformOperator;
