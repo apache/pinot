@@ -26,6 +26,7 @@ import java.util.Objects;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.MutableFST;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.MutableFSTImpl;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RealTimeRegexpMatcher;
@@ -75,7 +76,7 @@ public class BenchmarkMutableFST {
       }
     }
 
-    _fst = org.apache.pinot.segment.local.utils.fst.FSTBuilder.buildFST(input);
+    _fst = FSTBuilder.buildFST(input);
   }
 
   @Benchmark
