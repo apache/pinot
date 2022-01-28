@@ -39,6 +39,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.parsers.QueryCompiler;
+import org.apache.pinot.plugin.stream.kinesis.KinesisConfig;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -48,9 +49,11 @@ import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -203,6 +206,38 @@ public class SegmentPrunerTest extends ControllerTest {
     segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
     assertEquals(segmentPruners.size(), 1);
     assertTrue(segmentPruners.get(0) instanceof TimeSegmentPruner);
+  }
+
+  @Test
+  public void testEnablingEmptySegmentPruner() {
+    TableConfig tableConfig = mock(TableConfig.class);
+    IndexingConfig indexingConfig = mock(IndexingConfig.class);
+    RoutingConfig routingConfig = mock(RoutingConfig.class);
+    StreamIngestionConfig streamIngestionConfig = mock(StreamIngestionConfig.class);
+
+    // When routingConfig is configured with EmptySegmentPruner, EmptySegmentPruner should be returned.
+    when(tableConfig.getRoutingConfig()).thenReturn(routingConfig);
+    when(routingConfig.getSegmentPrunerTypes()).thenReturn(
+        Collections.singletonList(RoutingConfig.EMPTY_SEGMENT_PRUNER_TYPE));
+    List<SegmentPruner> segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+    assertEquals(segmentPruners.size(), 1);
+    assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
+
+    // When indexingConfig is configured with Kinesis streaming, EmptySegmentPruner should be returned.
+    when(indexingConfig.getStreamConfigs()).thenReturn(
+        Collections.singletonMap(StreamConfigProperties.STREAM_TYPE, KinesisConfig.STREAM_TYPE));
+    segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+    assertEquals(segmentPruners.size(), 1);
+    assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
+
+    // When streamIngestionConfig is configured with Kinesis streaming, EmptySegmentPruner should be returned.
+    when(streamIngestionConfig.getStreamConfigMaps()).thenReturn(Collections.singletonList(
+        Collections.singletonMap(StreamConfigProperties.STREAM_TYPE, KinesisConfig.STREAM_TYPE)));
+    when(indexingConfig.getStreamConfigs()).thenReturn(
+        Collections.singletonMap(StreamConfigProperties.STREAM_TYPE, KinesisConfig.STREAM_TYPE));
+    segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+    assertEquals(segmentPruners.size(), 1);
+    assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
   }
 
   @DataProvider

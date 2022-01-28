@@ -866,11 +866,31 @@ public final class TableConfigUtils {
    * @param tableConfig Input table config.
    */
   public static boolean needsEmptySegmentPruner(TableConfig tableConfig) {
+    if (isKinesisConfigured(tableConfig)) {
+      return true;
+    }
+    RoutingConfig routingConfig = tableConfig.getRoutingConfig();
+    if (routingConfig == null) {
+      return false;
+    }
+    List<String> segmentPrunerTypes = routingConfig.getSegmentPrunerTypes();
+    if (segmentPrunerTypes == null || segmentPrunerTypes.isEmpty()) {
+      return false;
+    }
+    for (String segmentPrunerType : segmentPrunerTypes) {
+      if (RoutingConfig.EMPTY_SEGMENT_PRUNER_TYPE.equalsIgnoreCase(segmentPrunerType)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean isKinesisConfigured(TableConfig tableConfig) {
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     if (indexingConfig != null) {
       Map<String, String> streamConfig = indexingConfig.getStreamConfigs();
-      if (streamConfig != null && KinesisConfig.STREAM_TYPE
-          .equals(streamConfig.get(StreamConfigProperties.STREAM_TYPE))) {
+      if (streamConfig != null && KinesisConfig.STREAM_TYPE.equals(
+          streamConfig.get(StreamConfigProperties.STREAM_TYPE))) {
         return true;
       }
     }

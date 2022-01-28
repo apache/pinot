@@ -47,8 +47,8 @@ public class SegmentPrunerFactory {
   public static List<SegmentPruner> getSegmentPruners(TableConfig tableConfig,
       ZkHelixPropertyStore<ZNRecord> propertyStore) {
     List<SegmentPruner> segmentPruners = new ArrayList<>();
-    boolean isKinesisEnabled = TableConfigUtils.needsEmptySegmentPruner(tableConfig);
-    if (isKinesisEnabled) {
+    boolean needsEmptySegment = TableConfigUtils.needsEmptySegmentPruner(tableConfig);
+    if (needsEmptySegment) {
       // Always add EmptySegmentPruner if Kinesis consumer is used.
       segmentPruners.add(new EmptySegmentPruner(tableConfig, propertyStore));
     }
@@ -59,12 +59,6 @@ public class SegmentPrunerFactory {
       if (segmentPrunerTypes != null) {
         List<SegmentPruner> configuredSegmentPruners = new ArrayList<>(segmentPrunerTypes.size());
         for (String segmentPrunerType : segmentPrunerTypes) {
-          if (RoutingConfig.EMPTY_SEGMENT_PRUNER_TYPE.equalsIgnoreCase(segmentPrunerType)) {
-            // If Kinesis consumer is used, EmptySegmentPruner is already added, no need to add it again.
-            if (!isKinesisEnabled) {
-              configuredSegmentPruners.add(new EmptySegmentPruner(tableConfig, propertyStore));
-            }
-          }
           if (RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE.equalsIgnoreCase(segmentPrunerType)) {
             PartitionSegmentPruner partitionSegmentPruner = getPartitionSegmentPruner(tableConfig, propertyStore);
             if (partitionSegmentPruner != null) {
