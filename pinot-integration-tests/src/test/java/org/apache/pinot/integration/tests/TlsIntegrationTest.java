@@ -19,18 +19,22 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import groovy.lang.IntRange;
 import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.URL;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.http.Header;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.message.BasicHeader;
@@ -38,9 +42,13 @@ import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
+import org.apache.pinot.client.Request;
+import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.integration.tests.access.CertBasedTlsChannelAccessControlFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -83,6 +91,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     startController();
     startBrokerHttps();
     startServerHttps();
+    startMinion();
 
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);
@@ -101,6 +110,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   public void tearDown()
       throws Exception {
     dropRealtimeTable(getTableName());
+    stopMinion();
     stopServer();
     stopBroker();
     stopController();
@@ -112,6 +122,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @Override
   public Map<String, Object> getDefaultControllerConfiguration() {
     Map<String, Object> prop = super.getDefaultControllerConfiguration();
+
+    // NOTE: defaults must be suitable for cluster-internal communication
     prop.put("controller.tls.keystore.path", _tlsStorePKCS12);
     prop.put("controller.tls.keystore.password", PASSWORD);
     prop.put("controller.tls.keystore.type", PKCS_12);
@@ -145,6 +157,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @Override
   protected PinotConfiguration getDefaultBrokerConfiguration() {
     Map<String, Object> prop = super.getDefaultBrokerConfiguration().toMap();
+
+    // NOTE: defaults must be suitable for cluster-internal communication
     prop.put("pinot.broker.tls.keystore.path", _tlsStorePKCS12);
     prop.put("pinot.broker.tls.keystore.password", PASSWORD);
     prop.put("pinot.broker.tls.keystore.type", PKCS_12);
@@ -172,6 +186,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @Override
   protected PinotConfiguration getDefaultServerConfiguration() {
     Map<String, Object> prop = super.getDefaultServerConfiguration().toMap();
+
+    // NOTE: defaults must be suitable for cluster-internal communication
     prop.put("pinot.server.tls.keystore.path", _tlsStorePKCS12);
     prop.put("pinot.server.tls.keystore.password", PASSWORD);
     prop.put("pinot.server.tls.keystore.type", PKCS_12);
@@ -191,6 +207,28 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     prop.put("pinot.server.segment.uploader.protocol", "https");
 
     return BasicAuthTestUtils.addServerConfiguration(prop);
+  }
+
+  @Override
+  protected PinotConfiguration getDefaultMinionConfiguration() {
+    Map<String, Object> prop = super.getDefaultMinionConfiguration().toMap();
+    prop.put("pinot.minion.tls.keystore.path", _tlsStorePKCS12);
+    prop.put("pinot.minion.tls.keystore.password", "changeit");
+    prop.put("pinot.server.tls.keystore.type", "PKCS12");
+    prop.put("pinot.minion.tls.truststore.path", _tlsStorePKCS12);
+    prop.put("pinot.minion.tls.truststore.password", "changeit");
+    prop.put("pinot.minion.tls.truststore.type", "PKCS12");
+    prop.put("pinot.minion.tls.client.auth.enabled", "true");
+
+    return BasicAuthTestUtils.addMinionConfiguration(prop);
+  }
+
+  @Override
+  protected TableTaskConfig getTaskConfig() {
+    Map<String, String> prop = new HashMap<>();
+    prop.put("bucketTimePeriod", "30d");
+
+    return new TableTaskConfig(Collections.singletonMap(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, prop));
   }
 
   @Override
@@ -236,13 +274,11 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Test
-  public void testQueryControllerExternalTrustedServer()
+  public void testControllerExternalTrustedServer()
       throws Exception {
     try (CloseableHttpClient client = makeClient(JKS, _tlsStoreJKS, _tlsStoreJKS)) {
-      HttpUriRequest request = new HttpGet("https://localhost:" + EXTERNAL_CONTROLLER_PORT + "/tables");
-      request.addHeader(CLIENT_HEADER);
 
-      try (CloseableHttpResponse response = client.execute(request)) {
+      try (CloseableHttpResponse response = client.execute(makeGetTables(EXTERNAL_CONTROLLER_PORT))) {
         Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
         JsonNode tables = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("tables");
         Assert.assertEquals(tables.size(), 1);
@@ -252,14 +288,11 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Test
-  public void testQueryControllerExternalUntrustedServer()
+  public void testControllerExternalUntrustedServer()
       throws Exception {
     try (CloseableHttpClient client = makeClient(JKS, _tlsStoreJKS, _tlsStoreEmptyJKS)) {
-      HttpUriRequest request = new HttpGet("https://localhost:" + EXTERNAL_CONTROLLER_PORT + "/tables");
-      request.addHeader(CLIENT_HEADER);
-
       try {
-        client.execute(request);
+        client.execute(makeGetTables(EXTERNAL_CONTROLLER_PORT));
         Assert.fail("Must not allow connection to untrusted server");
       } catch (IOException ignore) {
         // this should fail
@@ -268,13 +301,10 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Test
-  public void testQueryControllerInternalTrustedClient()
+  public void testControllerInternalTrustedClient()
       throws Exception {
     try (CloseableHttpClient client = makeClient(PKCS_12, _tlsStorePKCS12, _tlsStorePKCS12)) {
-      HttpUriRequest request = new HttpGet("https://localhost:" + DEFAULT_CONTROLLER_PORT + "/tables");
-      request.addHeader(CLIENT_HEADER);
-
-      try (CloseableHttpResponse response = client.execute(request)) {
+      try (CloseableHttpResponse response = client.execute(makeGetTables(DEFAULT_CONTROLLER_PORT))) {
         Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
         JsonNode tables = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("tables");
         Assert.assertEquals(tables.size(), 1);
@@ -284,18 +314,142 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Test
-  public void testQueryControllerInternalUntrustedClient()
+  public void testControllerInternalUntrustedServer()
+      throws Exception {
+    try (CloseableHttpClient client = makeClient(PKCS_12, _tlsStorePKCS12, _tlsStoreEmptyPKCS12)) {
+      try {
+        client.execute(makeGetTables(DEFAULT_CONTROLLER_PORT));
+        Assert.fail("Must not allow connection to untrusted server");
+      } catch (IOException ignore) {
+        // this should fail
+      }
+    }
+  }
+
+  @Test
+  public void testControllerInternalUntrustedClient()
       throws Exception {
     try (CloseableHttpClient client = makeClient(PKCS_12, _tlsStoreEmptyPKCS12, _tlsStorePKCS12)) {
-      HttpUriRequest request = new HttpGet("https://localhost:" + DEFAULT_CONTROLLER_PORT + "/tables");
-      request.addHeader(CLIENT_HEADER);
-
       try {
-        client.execute(request);
+        client.execute(makeGetTables(DEFAULT_CONTROLLER_PORT));
         Assert.fail("Must not allow connection from untrusted client");
       } catch (IOException ignore) {
         // this should fail
       }
+    }
+  }
+
+  @Test
+  public void testBrokerExternalTrustedServer()
+      throws Exception {
+    try (CloseableHttpClient client = makeClient(JKS, _tlsStoreEmptyJKS, _tlsStoreJKS)) {
+      try (CloseableHttpResponse response = client.execute(makeQueryBroker(EXTERNAL_BROKER_PORT))) {
+        Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
+        JsonNode resultTable = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("resultTable");
+        Assert.assertTrue(resultTable.get("rows").get(0).get(0).longValue() > 100000);
+      }
+    }
+  }
+
+  @Test
+  public void testBrokerExternalUntrustedServer()
+      throws Exception {
+    try (CloseableHttpClient client = makeClient(JKS, _tlsStoreJKS, _tlsStoreEmptyJKS)) {
+      try {
+        client.execute(makeQueryBroker(EXTERNAL_BROKER_PORT));
+        Assert.fail("Must not allow connection to untrusted server");
+      } catch (Exception ignore) {
+        // this should fail
+      }
+    }
+  }
+
+  @Test
+  public void testBrokerInternalTrustedServer()
+      throws Exception {
+    try (CloseableHttpClient client = makeClient(PKCS_12, _tlsStorePKCS12, _tlsStorePKCS12)) {
+      try (CloseableHttpResponse response = client.execute(makeQueryBroker(DEFAULT_BROKER_PORT))) {
+        Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
+        JsonNode resultTable = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("resultTable");
+        Assert.assertTrue(resultTable.get("rows").get(0).get(0).longValue() > 100000);
+      }
+    }
+  }
+
+  @Test
+  public void testBrokerInternalUntrustedServer()
+      throws Exception {
+    try (CloseableHttpClient client = makeClient(PKCS_12, _tlsStorePKCS12, _tlsStoreEmptyJKS)) {
+      try {
+        client.execute(makeQueryBroker(DEFAULT_BROKER_PORT));
+        Assert.fail("Must not allow connection to untrusted server");
+      } catch (Exception ignore) {
+        // this should fail
+      }
+    }
+  }
+
+  @Test
+  public void testBrokerInternalUntrustedClient()
+      throws Exception {
+    try (CloseableHttpClient client = makeClient(PKCS_12, _tlsStoreEmptyPKCS12, _tlsStorePKCS12)) {
+      try {
+        client.execute(makeQueryBroker(DEFAULT_BROKER_PORT));
+        Assert.fail("Must not allow connection from untrusted client");
+      } catch (Exception ignore) {
+        // this should fail
+      }
+    }
+  }
+
+  @Test
+  public void testControllerBrokerQueryForward()
+      throws Exception {
+    try (CloseableHttpClient client = makeClient(JKS, _tlsStoreJKS, _tlsStoreJKS)) {
+      HttpPost request = new HttpPost("https://localhost:" + EXTERNAL_CONTROLLER_PORT + "/sql");
+      request.addHeader(CLIENT_HEADER);
+      request.setEntity(new StringEntity("{\"sql\":\"SELECT count(*) FROM mytable\"}"));
+
+      try (CloseableHttpResponse response = client.execute(request)) {
+        Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
+        JsonNode resultTable = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("resultTable");
+        Assert.assertTrue(resultTable.get("rows").get(0).get(0).longValue() > 100000);
+      }
+    }
+  }
+
+  @Test
+  public void testRealtimeSegmentUploadDownload()
+      throws Exception {
+    final Request query = new Request("sql", "SELECT count(*) FROM " + getTableName());
+
+    ResultSetGroup resultBeforeOffline = getPinotConnection().execute(query);
+    Assert.assertTrue(resultBeforeOffline.getResultSet(0).getLong(0) > 0);
+
+    // schedule offline segment generation
+    Assert.assertNotNull(_controllerStarter.getTaskManager().scheduleTasks());
+
+    // wait for offline segments
+    JsonNode offlineSegments = TestUtils.waitForResult(() -> {
+      JsonNode segmentSets = JsonUtils.stringToJsonNode(
+          sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName()), AUTH_HEADER));
+      JsonNode currentOfflineSegments =
+          new IntRange(0, segmentSets.size()).stream().map(segmentSets::get).filter(s -> s.has("OFFLINE"))
+              .map(s -> s.get("OFFLINE")).findFirst().get();
+      Assert.assertFalse(currentOfflineSegments.isEmpty());
+      return currentOfflineSegments;
+    }, 30000);
+
+    // Verify constant row count
+    ResultSetGroup resultAfterOffline = getPinotConnection().execute(query);
+    Assert.assertEquals(resultBeforeOffline.getResultSet(0).getLong(0), resultAfterOffline.getResultSet(0).getLong(0));
+
+    // download and sanity-check size of offline segment(s)
+    for (int i = 0; i < offlineSegments.size(); i++) {
+      String segment = offlineSegments.get(i).asText();
+      Assert.assertTrue(
+          sendGetRequest(_controllerRequestURLBuilder.forSegmentDownload(getTableName(), segment), AUTH_HEADER).length()
+              > 200000); // download segment
     }
   }
 
@@ -309,6 +463,20 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     } catch (Exception e) {
       throw new IllegalStateException("Could not create HTTPS client", e);
     }
+  }
+
+  private static HttpGet makeGetTables(int port) {
+    HttpGet request = new HttpGet("https://localhost:" + port + "/tables");
+    request.addHeader(CLIENT_HEADER);
+    return request;
+  }
+
+  private static HttpPost makeQueryBroker(int port)
+      throws UnsupportedEncodingException {
+    HttpPost request = new HttpPost("https://localhost:" + port + "/query/sql");
+    request.addHeader(CLIENT_HEADER);
+    request.setEntity(new StringEntity("{\"sql\":\"SELECT count(*) FROM mytable\"}"));
+    return request;
   }
 
   /*
