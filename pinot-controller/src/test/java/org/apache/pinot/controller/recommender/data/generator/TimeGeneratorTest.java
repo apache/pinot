@@ -40,6 +40,11 @@ public class TimeGeneratorTest {
     assertTrue(convertedTime instanceof Long);
     assertEquals(3600L, convertedTime);
 
+    // seconds (timestamp)
+    convertedTime = TimeGenerator.convert(date, TimeUnit.SECONDS, FieldSpec.DataType.TIMESTAMP);
+    assertTrue(convertedTime instanceof Long);
+    assertEquals(3600L, convertedTime);
+
     // minutes
     convertedTime = TimeGenerator.convert(date, TimeUnit.MINUTES, FieldSpec.DataType.INT);
     assertTrue(convertedTime instanceof Integer);

@@ -50,7 +50,7 @@ public class TimeGenerator implements Generator {
   @Override
   public Object next() {
     Object next = _numberGenerator.next();
-    if (_dataType == FieldSpec.DataType.LONG) {
+    if (_dataType == FieldSpec.DataType.LONG || _dataType == FieldSpec.DataType.TIMESTAMP) {
       return ((long) next) + _initialValue.longValue();
     }
     return ((int) next) + _initialValue.intValue();
@@ -59,12 +59,12 @@ public class TimeGenerator implements Generator {
   @VisibleForTesting
   static Number convert(Date date, TimeUnit timeUnit, FieldSpec.DataType dataType) {
     long convertedTime = timeUnit.convert(date.getTime(), TimeUnit.MILLISECONDS);
-    if (dataType == FieldSpec.DataType.LONG) {
+    if (dataType == FieldSpec.DataType.LONG || dataType == FieldSpec.DataType.TIMESTAMP) {
       return convertedTime;
     }
     if (dataType == FieldSpec.DataType.INT) {
       return (int) convertedTime;
     }
-    throw new IllegalArgumentException("Time column can be only INT or LONG: " + dataType);
+    throw new IllegalArgumentException("Time column can be only INT, LONG or TIMESTAMP: " + dataType);
   }
 }
