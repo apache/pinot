@@ -578,6 +578,20 @@ public class BrokerRequestToQueryContextConverterTest {
   }
 
   @Test
+  public void testFilteredAggregations() {
+    String query = "SELECT COUNT(*) FILTER(WHERE foo > 5), COUNT(*) FILTER(WHERE foo < 6) FROM testTable WHERE bar > 0";
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
+    List<Pair<AggregationFunction, FilterContext>> filteredAggregationList =
+        queryContext.getFilteredAggregationFunctions();
+    assertNotNull(filteredAggregationList);
+    assertEquals(filteredAggregationList.size(), 2);
+    assertTrue(filteredAggregationList.get(0).getLeft() instanceof CountAggregationFunction);
+    assertEquals(filteredAggregationList.get(0).getRight().toString(), "foo > '5'");
+    assertTrue(filteredAggregationList.get(1).getLeft() instanceof CountAggregationFunction);
+    assertEquals(filteredAggregationList.get(1).getRight().toString(), "foo < '6'");
+  }
+
+  @Test
   public void testServerQueryBackwardCompatible() {
     // Backward compatible: Select query with LIMIT set only in Select
     // Presto may send a BrokerRequest with LIMIT only set in side brokerRequest.getSelections().getSize()
@@ -648,19 +662,5 @@ public class BrokerRequestToQueryContextConverterTest {
       }
       assertNull(sqlReader.readLine());
     }
-  }
-
-  @Test
-  public void testFilteredAggregations() {
-    String query = "SELECT COUNT(*) FILTER(WHERE foo > 5), COUNT(*) FILTER(WHERE foo < 6) FROM testTable"
-        + " WHERE bar > 0";
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
-    List<Pair<AggregationFunction, FilterContext>> aggregationFunctions = queryContext.getFilteredAggregations();
-    assertNotNull(aggregationFunctions);
-    assertEquals(aggregationFunctions.size(), 2);
-    assertTrue(aggregationFunctions.get(0).getRight().toString().matches("foo > '5'"));
-    assertTrue(aggregationFunctions.get(0).getLeft() instanceof CountAggregationFunction);
-    assertTrue(aggregationFunctions.get(1).getRight().toString().matches("foo < '6'"));
-    assertTrue(aggregationFunctions.get(1).getLeft() instanceof CountAggregationFunction);
   }
 }

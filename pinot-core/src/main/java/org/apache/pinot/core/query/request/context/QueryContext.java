@@ -74,7 +74,6 @@ public class QueryContext {
   private final List<ExpressionContext> _selectExpressions;
   private final List<String> _aliasList;
   private final FilterContext _filter;
-  private final ExpressionContext _filterExpression;
   private final List<ExpressionContext> _groupByExpressions;
   private final FilterContext _havingFilter;
   private final List<OrderByExpressionContext> _orderByExpressions;
@@ -122,12 +121,11 @@ public class QueryContext {
       @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
       @Nullable FilterContext havingFilter, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit,
       int offset, Map<String, String> queryOptions, @Nullable Map<String, String> debugOptions,
-      BrokerRequest brokerRequest, ExpressionContext filterExpression) {
+      BrokerRequest brokerRequest) {
     _tableName = tableName;
     _selectExpressions = selectExpressions;
     _aliasList = Collections.unmodifiableList(aliasList);
     _filter = filter;
-    _filterExpression = filterExpression;
     _groupByExpressions = groupByExpressions;
     _havingFilter = havingFilter;
     _orderByExpressions = orderByExpressions;
@@ -165,14 +163,6 @@ public class QueryContext {
   @Nullable
   public FilterContext getFilter() {
     return _filter;
-  }
-
-  /**
-   * Returns the expression associated with the filter in the WHERE clause
-   */
-  @Nullable
-  public ExpressionContext getFilterExpression() {
-    return _filterExpression;
   }
 
   /**
@@ -379,7 +369,6 @@ public class QueryContext {
     private List<ExpressionContext> _selectExpressions;
     private List<String> _aliasList;
     private FilterContext _filter;
-    private ExpressionContext _filterExpression;
     private List<ExpressionContext> _groupByExpressions;
     private FilterContext _havingFilter;
     private List<OrderByExpressionContext> _orderByExpressions;
@@ -406,11 +395,6 @@ public class QueryContext {
 
     public Builder setFilter(@Nullable FilterContext filter) {
       _filter = filter;
-      return this;
-    }
-
-    public Builder setFilterExpression(@Nullable ExpressionContext filterExpression) {
-      _filterExpression = filterExpression;
       return this;
     }
 
@@ -462,7 +446,7 @@ public class QueryContext {
       }
       QueryContext queryContext =
           new QueryContext(_tableName, _selectExpressions, _aliasList, _filter, _groupByExpressions, _havingFilter,
-              _orderByExpressions, _limit, _offset, _queryOptions, _debugOptions, _brokerRequest, _filterExpression);
+              _orderByExpressions, _limit, _offset, _queryOptions, _debugOptions, _brokerRequest);
 
       // Pre-calculate the aggregation functions and columns for the query
       generateAggregationFunctions(queryContext);

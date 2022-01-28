@@ -146,7 +146,6 @@ public class BrokerRequestToQueryContextConverter {
 
     return new QueryContext.Builder().setTableName(pinotQuery.getDataSource().getTableName())
         .setSelectExpressions(selectExpressions).setAliasList(aliasList).setFilter(filter)
-        .setFilterExpression(filterExpressionContext)
         .setGroupByExpressions(groupByExpressions).setOrderByExpressions(orderByExpressions)
         .setHavingFilter(havingFilter).setLimit(pinotQuery.getLimit()).setOffset(pinotQuery.getOffset())
         .setQueryOptions(pinotQuery.getQueryOptions()).setDebugOptions(pinotQuery.getDebugOptions())
