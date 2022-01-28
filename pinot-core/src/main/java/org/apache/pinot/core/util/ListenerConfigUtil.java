@@ -21,11 +21,9 @@ package org.apache.pinot.core.util;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
-import java.net.URL;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -178,7 +176,8 @@ public final class ListenerConfigUtil {
     String protocolNamespace = namespace + DOT_ACCESS_PROTOCOLS + "." + name;
 
     return new ListenerConfig(name, getHost(config.getProperty(protocolNamespace + ".host", DEFAULT_HOST)),
-        getPort(config.getProperty(protocolNamespace + ".port")), getProtocol(config.getProperty(protocolNamespace + ".protocol"), name),
+        getPort(config.getProperty(protocolNamespace + ".port")),
+        getProtocol(config.getProperty(protocolNamespace + ".protocol"), name),
         TlsUtils.extractTlsConfig(config, protocolNamespace + ".tls", tlsConfig));
   }
 
@@ -193,10 +192,12 @@ public final class ListenerConfigUtil {
   }
 
   private static String getProtocol(String configuredProtocol, String listenerName) {
-    Optional<String> optProtocol = Optional.ofNullable(configuredProtocol).map(String::trim).filter(protocol -> !protocol.isEmpty());
+    Optional<String> optProtocol =
+        Optional.ofNullable(configuredProtocol).map(String::trim).filter(protocol -> !protocol.isEmpty());
     if (optProtocol.isEmpty()) {
-      return Optional.of(listenerName).filter(SUPPORTED_PROTOCOLS::contains)
-          .orElseThrow(() -> new IllegalArgumentException("No protocol set for listener" + listenerName + " and '" + listenerName + "' is not a valid protocol either"));
+      return Optional.of(listenerName).filter(SUPPORTED_PROTOCOLS::contains).orElseThrow(
+          () -> new IllegalArgumentException("No protocol set for listener" + listenerName + " and '" + listenerName
+              + "' is not a valid protocol either"));
     }
     return optProtocol.filter(SUPPORTED_PROTOCOLS::contains)
         .orElseThrow(() -> new IllegalArgumentException(configuredProtocol + " is not a valid protocol"));
@@ -266,7 +267,8 @@ public final class ListenerConfigUtil {
       File tempFile = Files.createTempFile("pinot-keystore-", null).toFile();
       tempFile.deleteOnExit();
 
-      try (InputStream is = TlsUtils.makeKeyStoreUrl(sourceUrl).openStream(); OutputStream os = new FileOutputStream(tempFile)) {
+      try (InputStream is = TlsUtils.makeKeyStoreUrl(sourceUrl).openStream();
+          OutputStream os = new FileOutputStream(tempFile)) {
         IOUtils.copy(is, os);
       }
 

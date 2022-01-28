@@ -88,14 +88,22 @@ public final class TlsUtils {
    */
   public static TlsConfig extractTlsConfig(PinotConfiguration pinotConfig, String namespace, TlsConfig defaultConfig) {
     TlsConfig tlsConfig = new TlsConfig(defaultConfig);
-    tlsConfig.setClientAuthEnabled(pinotConfig.getProperty(key(namespace, CLIENT_AUTH_ENABLED), defaultConfig.isClientAuthEnabled()));
-    tlsConfig.setKeyStoreType(pinotConfig.getProperty(key(namespace, KEYSTORE_TYPE), defaultConfig.getKeyStoreType()));
-    tlsConfig.setKeyStorePath(pinotConfig.getProperty(key(namespace, KEYSTORE_PATH), defaultConfig.getKeyStorePath()));
-    tlsConfig.setKeyStorePassword(pinotConfig.getProperty(key(namespace, KEYSTORE_PASSWORD), defaultConfig.getKeyStorePassword()));
-    tlsConfig.setTrustStoreType(pinotConfig.getProperty(key(namespace, TRUSTSTORE_TYPE), defaultConfig.getTrustStoreType()));
-    tlsConfig.setTrustStorePath(pinotConfig.getProperty(key(namespace, TRUSTSTORE_PATH), defaultConfig.getTrustStorePath()));
-    tlsConfig.setTrustStorePassword(pinotConfig.getProperty(key(namespace, TRUSTSTORE_PASSWORD), defaultConfig.getTrustStorePassword()));
-    tlsConfig.setSslProvider(pinotConfig.getProperty(key(namespace, SSL_PROVIDER), defaultConfig.getSslProvider()));
+    tlsConfig.setClientAuthEnabled(
+        pinotConfig.getProperty(key(namespace, CLIENT_AUTH_ENABLED), defaultConfig.isClientAuthEnabled()));
+    tlsConfig.setKeyStoreType(
+        pinotConfig.getProperty(key(namespace, KEYSTORE_TYPE), defaultConfig.getKeyStoreType()));
+    tlsConfig.setKeyStorePath(
+        pinotConfig.getProperty(key(namespace, KEYSTORE_PATH), defaultConfig.getKeyStorePath()));
+    tlsConfig.setKeyStorePassword(
+        pinotConfig.getProperty(key(namespace, KEYSTORE_PASSWORD), defaultConfig.getKeyStorePassword()));
+    tlsConfig.setTrustStoreType(
+        pinotConfig.getProperty(key(namespace, TRUSTSTORE_TYPE), defaultConfig.getTrustStoreType()));
+    tlsConfig.setTrustStorePath(
+        pinotConfig.getProperty(key(namespace, TRUSTSTORE_PATH), defaultConfig.getTrustStorePath()));
+    tlsConfig.setTrustStorePassword(
+        pinotConfig.getProperty(key(namespace, TRUSTSTORE_PASSWORD), defaultConfig.getTrustStorePassword()));
+    tlsConfig.setSslProvider(
+        pinotConfig.getProperty(key(namespace, SSL_PROVIDER), defaultConfig.getSslProvider()));
 
     return tlsConfig;
   }
@@ -108,8 +116,8 @@ public final class TlsUtils {
    * @return KeyManagerFactory
    */
   public static KeyManagerFactory createKeyManagerFactory(TlsConfig tlsConfig) {
-    return createKeyManagerFactory(tlsConfig.getKeyStorePath(),
-        tlsConfig.getKeyStorePassword(), tlsConfig.getKeyStoreType());
+    return createKeyManagerFactory(tlsConfig.getKeyStorePath(), tlsConfig.getKeyStorePassword(),
+        tlsConfig.getKeyStoreType());
   }
 
   /**
@@ -188,8 +196,8 @@ public final class TlsUtils {
    */
   public static void installDefaultSSLSocketFactory(TlsConfig tlsConfig) {
     installDefaultSSLSocketFactory(tlsConfig.getKeyStoreType(), tlsConfig.getKeyStorePath(),
-        tlsConfig.getKeyStorePassword(), tlsConfig.getTrustStoreType(),
-        tlsConfig.getTrustStorePath(), tlsConfig.getTrustStorePassword());
+        tlsConfig.getKeyStorePassword(), tlsConfig.getTrustStoreType(), tlsConfig.getTrustStorePath(),
+        tlsConfig.getTrustStorePassword());
   }
 
   /**
