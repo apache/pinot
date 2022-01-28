@@ -24,6 +24,7 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.net.URL;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -264,10 +265,15 @@ public final class ListenerConfigUtil {
 
   private static File cacheInTempFile(String sourceUrl) {
     try {
+      URL url = TlsUtils.makeKeyStoreUrl(sourceUrl);
+      if ("file".equals(url.getProtocol())) {
+        return new File(url.getPath());
+      }
+
       File tempFile = Files.createTempFile("pinot-keystore-", null).toFile();
       tempFile.deleteOnExit();
 
-      try (InputStream is = TlsUtils.makeKeyStoreUrl(sourceUrl).openStream();
+      try (InputStream is = url.openStream();
           OutputStream os = new FileOutputStream(tempFile)) {
         IOUtils.copy(is, os);
       }
