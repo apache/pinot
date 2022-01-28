@@ -195,7 +195,7 @@ public final class ListenerConfigUtil {
   private static String getProtocol(String configuredProtocol, String listenerName) {
     Optional<String> optProtocol =
         Optional.ofNullable(configuredProtocol).map(String::trim).filter(protocol -> !protocol.isEmpty());
-    if (optProtocol.isEmpty()) {
+    if (!optProtocol.isPresent()) {
       return Optional.of(listenerName).filter(SUPPORTED_PROTOCOLS::contains).orElseThrow(
           () -> new IllegalArgumentException("No protocol set for listener" + listenerName + " and '" + listenerName
               + "' is not a valid protocol either"));
