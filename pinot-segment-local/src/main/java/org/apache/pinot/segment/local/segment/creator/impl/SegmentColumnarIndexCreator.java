@@ -379,6 +379,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
             case BYTES:
               forwardIndexCreator.putBytes((byte[]) columnValueToIndex);
               break;
+            case JSON:
+              if (columnValueToIndex instanceof String) {
+                forwardIndexCreator.putString((String) columnValueToIndex);
+              } else if (columnValueToIndex instanceof byte[]) {
+                forwardIndexCreator.putBytes((byte[]) columnValueToIndex);
+              } 
+              break;
             default:
               throw new IllegalStateException();
           }

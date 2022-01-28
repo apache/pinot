@@ -24,13 +24,10 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
-import org.apache.pinot.segment.spi.memory.CleanerUtil;
-import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,10 +44,10 @@ public abstract class BaseChunkSVForwardIndexWriter implements Closeable {
   private static final int FILE_HEADER_ENTRY_CHUNK_OFFSET_SIZE_V1V2 = Integer.BYTES;
   private static final int FILE_HEADER_ENTRY_CHUNK_OFFSET_SIZE_V3 = Long.BYTES;
 
-  private final File _file;
-  private final FileChannel _dataChannel;
-  private final ByteBuffer _header;
+  protected final FileChannel _dataFile;
+  protected ByteBuffer _header;
   protected final ByteBuffer _chunkBuffer;
+  protected final ByteBuffer _compressedBuffer;
   protected final ChunkCompressor _chunkCompressor;
 
   protected int _chunkSize;
@@ -68,21 +65,22 @@ public abstract class BaseChunkSVForwardIndexWriter implements Closeable {
    * @param chunkSize Size of chunk
    * @param sizeOfEntry Size of entry (in bytes), max size for variable byte implementation.
    * @param version version of File
+   * @param fixed if the data type is fixed width (required for version validation)
    * @throws IOException if the file isn't found or can't be mapped
    */
   protected BaseChunkSVForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
-      int numDocsPerChunk, int chunkSize, int sizeOfEntry, int version)
+      int numDocsPerChunk, int chunkSize, int sizeOfEntry, int version, boolean fixed)
       throws IOException {
-    Preconditions.checkArgument(version == DEFAULT_VERSION || version == CURRENT_VERSION);
-    _file = file;
-    _headerEntryChunkOffsetSize = getHeaderEntryChunkOffsetSize(version);
-    _dataOffset = headerSize(totalDocs, numDocsPerChunk, _headerEntryChunkOffsetSize);
+    Preconditions.checkArgument(version == DEFAULT_VERSION || version == CURRENT_VERSION
+        || (fixed && version == 4));
     _chunkSize = chunkSize;
     _chunkCompressor = ChunkCompressorFactory.getCompressor(compressionType);
+    _headerEntryChunkOffsetSize = getHeaderEntryChunkOffsetSize(version);
+    _dataOffset = writeHeader(compressionType, totalDocs, numDocsPerChunk, sizeOfEntry, version);
     _chunkBuffer = ByteBuffer.allocateDirect(chunkSize);
-    _dataChannel = new RandomAccessFile(file, "rw").getChannel();
-    _header = _dataChannel.map(FileChannel.MapMode.READ_WRITE, 0, _dataOffset);
-    writeHeader(compressionType, totalDocs, numDocsPerChunk, sizeOfEntry, version);
+    int maxCompressedChunkSize = _chunkCompressor.maxCompressedSize(_chunkSize); // may exceed original chunk size
+    _compressedBuffer = ByteBuffer.allocateDirect(maxCompressedChunkSize);
+    _dataFile = new RandomAccessFile(file, "rw").getChannel();
   }
 
   public static int getHeaderEntryChunkOffsetSize(int version) {
@@ -91,6 +89,7 @@ public abstract class BaseChunkSVForwardIndexWriter implements Closeable {
       case 2:
         return FILE_HEADER_ENTRY_CHUNK_OFFSET_SIZE_V1V2;
       case 3:
+      case 4:
         return FILE_HEADER_ENTRY_CHUNK_OFFSET_SIZE_V3;
       default:
         throw new IllegalStateException("Invalid version: " + version);
@@ -106,13 +105,10 @@ public abstract class BaseChunkSVForwardIndexWriter implements Closeable {
       writeChunk();
     }
 
-    if (CleanerUtil.UNMAP_SUPPORTED) {
-      CleanerUtil.getCleaner().freeBuffer(_header);
-    }
-
-    // we will have overmapped by (maxCompressedSize - actualCompressedSize) for the most recent chunk
-    _dataChannel.truncate(_dataOffset);
-    _dataChannel.close();
+    // Write the header and close the file.
+    _header.flip();
+    _dataFile.write(_header, 0);
+    _dataFile.close();
   }
 
   /**
@@ -123,10 +119,14 @@ public abstract class BaseChunkSVForwardIndexWriter implements Closeable {
    * @param numDocsPerChunk Number of documents per chunk
    * @param sizeOfEntry Size of each entry
    * @param version Version of file
+   * @return Size of header
    */
-  private void writeHeader(ChunkCompressionType compressionType, int totalDocs, int numDocsPerChunk, int sizeOfEntry,
+  private int writeHeader(ChunkCompressionType compressionType, int totalDocs, int numDocsPerChunk, int sizeOfEntry,
       int version) {
     int numChunks = (totalDocs + numDocsPerChunk - 1) / numDocsPerChunk;
+    int headerSize = (7 * Integer.BYTES) + (numChunks * _headerEntryChunkOffsetSize);
+
+    _header = ByteBuffer.allocateDirect(headerSize);
 
     int offset = 0;
     _header.putInt(version);
@@ -154,11 +154,8 @@ public abstract class BaseChunkSVForwardIndexWriter implements Closeable {
       int dataHeaderStart = offset + Integer.BYTES;
       _header.putInt(dataHeaderStart);
     }
-  }
 
-  private static int headerSize(int totalDocs, int numDocsPerChunk, int headerEntryChunkOffsetSize) {
-    int numChunks = (totalDocs + numDocsPerChunk - 1) / numDocsPerChunk;
-    return (7 * Integer.BYTES) + (numChunks * headerEntryChunkOffsetSize);
+    return headerSize;
   }
 
   /**
@@ -172,15 +169,13 @@ public abstract class BaseChunkSVForwardIndexWriter implements Closeable {
    *
    */
   protected void writeChunk() {
-    int sizeWritten;
+    int sizeToWrite;
     _chunkBuffer.flip();
 
-    int maxCompressedSize = _chunkCompressor.maxCompressedSize(_chunkBuffer.limit());
-    // compress directly in to the mapped output rather keep a large buffer to compress into
-    try (PinotDataBuffer compressedBuffer = PinotDataBuffer.mapFile(_file, false, _dataOffset,
-        maxCompressedSize, ByteOrder.BIG_ENDIAN, "forward index chunk")) {
-      ByteBuffer view = compressedBuffer.toDirectByteBuffer(0, maxCompressedSize);
-      sizeWritten = _chunkCompressor.compress(_chunkBuffer, view);
+    try {
+      sizeToWrite = _chunkCompressor.compress(_chunkBuffer, _compressedBuffer);
+      _dataFile.write(_compressedBuffer, _dataOffset);
+      _compressedBuffer.clear();
     } catch (IOException e) {
       LOGGER.error("Exception caught while compressing/writing data chunk", e);
       throw new RuntimeException(e);
@@ -192,7 +187,7 @@ public abstract class BaseChunkSVForwardIndexWriter implements Closeable {
       _header.putLong(_dataOffset);
     }
 
-    _dataOffset += sizeWritten;
+    _dataOffset += sizeToWrite;
 
     _chunkBuffer.clear();
   }

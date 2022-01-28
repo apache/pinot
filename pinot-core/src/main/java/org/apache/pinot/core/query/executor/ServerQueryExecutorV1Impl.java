@@ -77,6 +77,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
   private static final String IN_PARTITIONED_SUBQUERY = "inPartitionedSubquery";
+  private static final DataTable EXPLAIN_PLAN_RESULTS_NO_MATCHING_SEGMENT = getExplainPlanResultsForNoMatchingSegment();
 
   private InstanceDataManager _instanceDataManager;
   private ServerMetrics _serverMetrics;
@@ -145,9 +146,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     long querySchedulingTimeMs = System.currentTimeMillis() - queryArrivalTimeMs;
     if (querySchedulingTimeMs >= queryTimeoutMs) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS, 1);
-      String errorMessage =
-          String.format("Query scheduling took %dms (longer than query timeout of %dms)", querySchedulingTimeMs,
-              queryTimeoutMs);
+      String errorMessage = String
+          .format("Query scheduling took %dms (longer than query timeout of %dms) on server: %s", querySchedulingTimeMs,
+              queryTimeoutMs, _instanceDataManager.getInstanceId());
       DataTable dataTable = DataTableBuilder.getEmptyDataTable();
       dataTable.addException(QueryException.getException(QueryException.QUERY_SCHEDULING_TIMEOUT_ERROR, errorMessage));
       LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
@@ -156,7 +157,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
     if (tableDataManager == null) {
-      String errorMessage = "Failed to find table: " + tableNameWithType;
+      String errorMessage = String
+          .format("Failed to find table: %s on server: %s", tableNameWithType, _instanceDataManager.getInstanceId());
       DataTable dataTable = DataTableBuilder.getEmptyDataTable();
       dataTable.addException(QueryException.getException(QueryException.SERVER_TABLE_MISSING_ERROR, errorMessage));
       LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
@@ -278,6 +280,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     LOGGER.debug("Matched {} segments after pruning", numSelectedSegments);
     if (numSelectedSegments == 0) {
       // Only return metadata for streaming query
+      if (isExplain) {
+        return EXPLAIN_PLAN_RESULTS_NO_MATCHING_SEGMENT;
+      }
+
       DataTable dataTable = DataTableUtils.buildEmptyDataTable(queryContext);
       Map<String, String> metadata = dataTable.getMetadata();
       metadata.put(MetadataKey.TOTAL_DOCS.getName(), String.valueOf(numTotalDocs));
@@ -303,6 +309,21 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
       return dataTable;
     }
+  }
+
+  /** @return EXPLAIN_PLAN query result {@link DataTable} when no segments get selected for query execution.*/
+  private static DataTable getExplainPlanResultsForNoMatchingSegment() {
+    DataTableBuilder dataTableBuilder = new DataTableBuilder(DataSchema.EXPLAIN_RESULT_SCHEMA);
+    try {
+      dataTableBuilder.startRow();
+      dataTableBuilder.setColumn(0, "NO_MATCHING_SEGMENT");
+      dataTableBuilder.setColumn(1, 1);
+      dataTableBuilder.setColumn(2, 0);
+      dataTableBuilder.finishRow();
+    } catch (IOException ioe) {
+      LOGGER.error("Unable to create EXPLAIN PLAN result table.", ioe);
+    }
+    return dataTableBuilder.build();
   }
 
   /** @return EXPLAIN PLAN query result {@link DataTable}. */

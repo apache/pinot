@@ -386,7 +386,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
         .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null)).build();
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null, null)).build();
   }
 
   /**
@@ -473,7 +473,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
     ClusterIntegrationTestUtils
         .pushAvroIntoKafka(avroFiles, "localhost:" + getKafkaPort(), getKafkaTopic(), getMaxNumKafkaMessagesPerBatch(),
-            getKafkaMessageHeader(), getPartitionColumn());
+            getKafkaMessageHeader(), getPartitionColumn(), injectTombstones());
+  }
+
+  protected boolean injectTombstones() {
+    return false;
   }
 
   protected List<File> getAllAvroFiles()

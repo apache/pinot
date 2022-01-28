@@ -21,13 +21,15 @@ package org.apache.pinot.segment.local.segment.index.readers.forward;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.DoubleBuffer;
+import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
+import java.nio.LongBuffer;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
-import org.apache.pinot.segment.spi.memory.CleanerUtil;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
@@ -37,8 +39,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Base implementation for chunk-based single-value raw (non-dictionary-encoded) forward index reader.
  */
-public abstract class BaseChunkSVForwardIndexReader
-    implements ForwardIndexReader<BaseChunkSVForwardIndexReader.ChunkReaderContext> {
+public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReader<ChunkReaderContext> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseChunkSVForwardIndexReader.class);
 
   protected final PinotDataBuffer _dataBuffer;
@@ -114,7 +115,10 @@ public abstract class BaseChunkSVForwardIndexReader
     if (context.getChunkId() == chunkId) {
       return context.getChunkBuffer();
     }
+    return decompressChunk(chunkId, context);
+  }
 
+  protected ByteBuffer decompressChunk(int chunkId, ChunkReaderContext context) {
     int chunkSize;
     long chunkPosition = getChunkPosition(chunkId);
 
@@ -168,49 +172,181 @@ public abstract class BaseChunkSVForwardIndexReader
   }
 
   @Override
+  public void readValuesSV(int[] docIds, int length, int[] values, ChunkReaderContext context) {
+    if (getValueType().isFixedWidth() && !_isCompressed && isContiguousRange(docIds, length)) {
+      switch (getValueType()) {
+        case INT: {
+          int minOffset = docIds[0] * Integer.BYTES;
+          IntBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Integer.BYTES).asIntBuffer();
+          buffer.get(values, 0, length);
+        }
+        break;
+        case LONG: {
+          int minOffset = docIds[0] * Long.BYTES;
+          LongBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Long.BYTES).asLongBuffer();
+          for (int i = 0; i < buffer.limit(); i++) {
+            values[i] = (int) buffer.get(i);
+          }
+        }
+        break;
+        case FLOAT: {
+          int minOffset = docIds[0] * Float.BYTES;
+          FloatBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Float.BYTES).asFloatBuffer();
+          for (int i = 0; i < buffer.limit(); i++) {
+            values[i] = (int) buffer.get(i);
+          }
+        }
+        break;
+        case DOUBLE: {
+          int minOffset = docIds[0] * Double.BYTES;
+          DoubleBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Double.BYTES).asDoubleBuffer();
+          for (int i = 0; i < buffer.limit(); i++) {
+            values[i] = (int) buffer.get(i);
+          }
+        }
+        break;
+        default:
+          throw new IllegalArgumentException();
+      }
+    } else {
+      ForwardIndexReader.super.readValuesSV(docIds, length, values, context);
+    }
+  }
+
+  @Override
+  public void readValuesSV(int[] docIds, int length, long[] values, ChunkReaderContext context) {
+    if (getValueType().isFixedWidth() && !_isCompressed && isContiguousRange(docIds, length)) {
+      switch (getValueType()) {
+        case INT: {
+          int minOffset = docIds[0] * Integer.BYTES;
+          IntBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Integer.BYTES).asIntBuffer();
+          for (int i = 0; i < buffer.limit(); i++) {
+            values[i] = buffer.get(i);
+          }
+        }
+        break;
+        case LONG: {
+          int minOffset = docIds[0] * Long.BYTES;
+          LongBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Long.BYTES).asLongBuffer();
+          buffer.get(values, 0, length);
+        }
+        break;
+        case FLOAT: {
+          int minOffset = docIds[0] * Float.BYTES;
+          FloatBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Float.BYTES).asFloatBuffer();
+          for (int i = 0; i < buffer.limit(); i++) {
+            values[i] = (long) buffer.get(i);
+          }
+        }
+        break;
+        case DOUBLE: {
+          int minOffset = docIds[0] * Double.BYTES;
+          DoubleBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Double.BYTES).asDoubleBuffer();
+          for (int i = 0; i < buffer.limit(); i++) {
+            values[i] = (long) buffer.get(i);
+          }
+        }
+        break;
+        default:
+          throw new IllegalArgumentException();
+      }
+    } else {
+      ForwardIndexReader.super.readValuesSV(docIds, length, values, context);
+    }
+  }
+
+  @Override
+  public void readValuesSV(int[] docIds, int length, float[] values, ChunkReaderContext context) {
+    if (getValueType().isFixedWidth() && !_isCompressed && isContiguousRange(docIds, length)) {
+      switch (getValueType()) {
+        case INT: {
+          int minOffset = docIds[0] * Integer.BYTES;
+          IntBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Integer.BYTES).asIntBuffer();
+          for (int i = 0; i < buffer.limit(); i++) {
+            values[i] = buffer.get(i);
+          }
+        }
+        break;
+        case LONG: {
+          int minOffset = docIds[0] * Long.BYTES;
+          LongBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Long.BYTES).asLongBuffer();
+          for (int i = 0; i < buffer.limit(); i++) {
+            values[i] = buffer.get(i);
+          }
+        }
+        break;
+        case FLOAT: {
+          int minOffset = docIds[0] * Float.BYTES;
+          FloatBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Float.BYTES).asFloatBuffer();
+          buffer.get(values, 0, length);
+        }
+        break;
+        case DOUBLE: {
+          int minOffset = docIds[0] * Double.BYTES;
+          DoubleBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Double.BYTES).asDoubleBuffer();
+          for (int i = 0; i < buffer.limit(); i++) {
+            values[i] = (float) buffer.get(i);
+          }
+        }
+        break;
+        default:
+          throw new IllegalArgumentException();
+      }
+    } else {
+      ForwardIndexReader.super.readValuesSV(docIds, length, values, context);
+    }
+  }
+
+  @Override
+  public void readValuesSV(int[] docIds, int length, double[] values, ChunkReaderContext context) {
+    if (getValueType().isFixedWidth() && !_isCompressed && isContiguousRange(docIds, length)) {
+      switch (getValueType()) {
+        case INT: {
+          int minOffset = docIds[0] * Integer.BYTES;
+          IntBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Integer.BYTES).asIntBuffer();
+          for (int i = 0; i < buffer.limit(); i++) {
+            values[i] = buffer.get(i);
+          }
+        }
+        break;
+        case LONG: {
+          int minOffset = docIds[0] * Long.BYTES;
+          getLong(0, context);
+          LongBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Long.BYTES).asLongBuffer();
+          for (int i = 0; i < buffer.limit(); i++) {
+            values[i] = buffer.get(i);
+          }
+        }
+        break;
+        case FLOAT: {
+          int minOffset = docIds[0] * Float.BYTES;
+          FloatBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Float.BYTES).asFloatBuffer();
+          for (int i = 0; i < buffer.limit(); i++) {
+            values[i] = buffer.get(i);
+          }
+        }
+        break;
+        case DOUBLE: {
+          int minOffset = docIds[0] * Double.BYTES;
+          DoubleBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Double.BYTES).asDoubleBuffer();
+          buffer.get(values, 0, length);
+        }
+        break;
+        default:
+          throw new IllegalArgumentException();
+      }
+    } else {
+      ForwardIndexReader.super.readValuesSV(docIds, length, values, context);
+    }
+  }
+
+  @Override
   public void close() {
     // NOTE: DO NOT close the PinotDataBuffer here because it is tracked by the caller and might be reused later. The
     // caller is responsible of closing the PinotDataBuffer.
   }
 
-  /**
-   * Context for the chunk-based forward index readers.
-   * <p>Information saved in the context can be used by subsequent reads as cache:
-   * <ul>
-   *   <li>
-   *     Chunk Buffer from the previous read. Useful if the subsequent read is from the same buffer, as it avoids extra
-   *     chunk decompression.
-   *   </li>
-   *   <li>Id for the chunk</li>
-   * </ul>
-   */
-  public static class ChunkReaderContext implements ForwardIndexReaderContext {
-    private final ByteBuffer _chunkBuffer;
-    private int _chunkId;
-
-    public ChunkReaderContext(int maxChunkSize) {
-      _chunkBuffer = ByteBuffer.allocateDirect(maxChunkSize);
-      _chunkId = -1;
-    }
-
-    public ByteBuffer getChunkBuffer() {
-      return _chunkBuffer;
-    }
-
-    public int getChunkId() {
-      return _chunkId;
-    }
-
-    public void setChunkId(int chunkId) {
-      _chunkId = chunkId;
-    }
-
-    @Override
-    public void close()
-        throws IOException {
-      if (CleanerUtil.UNMAP_SUPPORTED) {
-        CleanerUtil.getCleaner().freeBuffer(_chunkBuffer);
-      }
-    }
+  private boolean isContiguousRange(int[] docIds, int length) {
+    return docIds[length - 1] - docIds[0] == length - 1;
   }
 }

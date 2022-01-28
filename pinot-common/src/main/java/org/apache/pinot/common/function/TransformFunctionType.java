@@ -93,6 +93,7 @@ public enum TransformFunctionType {
   // Geo relationship
   ST_CONTAINS("ST_Contains"),
   ST_EQUALS("ST_Equals"),
+  ST_WITHIN("ST_Within"),
 
   // Geo indexing
   GEOTOH3("geoToH3");

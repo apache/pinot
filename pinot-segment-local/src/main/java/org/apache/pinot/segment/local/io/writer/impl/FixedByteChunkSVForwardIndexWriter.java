@@ -71,8 +71,9 @@ public class FixedByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexW
   public FixedByteChunkSVForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
       int numDocsPerChunk, int sizeOfEntry, int writerVersion)
       throws IOException {
-    super(file, compressionType, totalDocs, numDocsPerChunk, (sizeOfEntry * numDocsPerChunk), sizeOfEntry,
-        writerVersion);
+    super(file, compressionType, totalDocs, normalizeDocsPerChunk(writerVersion, numDocsPerChunk),
+        (sizeOfEntry * normalizeDocsPerChunk(writerVersion, numDocsPerChunk)), sizeOfEntry,
+        writerVersion, true);
     _chunkDataOffset = 0;
   }
 
@@ -111,5 +112,13 @@ public class FixedByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexW
     if (_chunkDataOffset == _chunkSize) {
       writeChunk();
     }
+  }
+
+  private static int normalizeDocsPerChunk(int version, int numDocsPerChunk) {
+    // V4 uses power of 2 chunk sizes for random access efficiency
+    if (version >= 4 && (numDocsPerChunk & (numDocsPerChunk - 1)) != 0) {
+      return 1 << (32 - Integer.numberOfLeadingZeros(numDocsPerChunk - 1));
+    }
+    return numDocsPerChunk;
   }
 }

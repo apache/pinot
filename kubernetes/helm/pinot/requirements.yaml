@@ -19,6 +19,6 @@
 
 dependencies:
   - name: zookeeper
-    version: 2.1.6
-    repository: https://charts.helm.sh/incubator
+    version: 7.0.0
+    repository: https://charts.bitnami.com/bitnami
     condition: pinot.zookeeper.enabled,zookeeper.enabled

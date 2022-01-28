@@ -30,6 +30,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.http.HttpStatus;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
@@ -170,6 +171,23 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
     // Verify the result again.
     Assert.assertEquals(getCurrentCountStarResult(), getCountStarResult());
     verifyTableIdealStates(idealState);
+
+    // Restart the servers and check every segment is not in ERROR state.
+    restartServers(NUM_SERVERS);
+    verifyTableIdealStates(idealState);
+    ExternalView ev =
+        HelixHelper.getExternalViewForResource(_helixAdmin, this.getHelixClusterName(), TABLE_NAME_WITH_TYPE);
+    Set<String> segments = ev.getPartitionSet();
+    Assert.assertEquals(segments.size(), 5);
+    for (String segment : segments) {
+      Map<String, String> stateMap = ev.getStateMap(segment);
+      Assert.assertTrue(stateMap.size() > 0);
+      for (Map.Entry<String, String> server2state: stateMap.entrySet()) {
+        Assert.assertFalse("ERROR".equals(server2state.getValue()));
+      }
+    }
+    // Verify the result again.
+    Assert.assertEquals(getCurrentCountStarResult(), getCountStarResult());
   }
 
   private void verifyTableIdealStates(IdealState idealState) {

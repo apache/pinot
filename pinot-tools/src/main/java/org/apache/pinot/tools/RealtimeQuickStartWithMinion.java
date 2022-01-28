@@ -25,7 +25,6 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -41,7 +40,6 @@ import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 
 import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
-import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
 /**
@@ -65,14 +63,14 @@ public class RealtimeQuickStartWithMinion extends QuickStartBase {
   }
 
   public Map<String, Object> getConfigOverrides() {
-    Map<String, Object> properties = new HashMap<>();
-    properties.put("controller.task.scheduler.enabled", true);
+    Map<String, Object> properties = super.getConfigOverrides();
+    properties.putIfAbsent("controller.task.scheduler.enabled", true);
     return properties;
   }
 
   public void execute()
       throws Exception {
-    File quickstartTmpDir = new File(_tmpDir, String.valueOf(System.currentTimeMillis()));
+    File quickstartTmpDir = new File(_dataDir, String.valueOf(System.currentTimeMillis()));
     File baseDir = new File(quickstartTmpDir, "githubEvents");
     File dataDir = new File(baseDir, "rawdata");
     Preconditions.checkState(dataDir.mkdirs());
@@ -99,7 +97,8 @@ public class RealtimeQuickStartWithMinion extends QuickStartBase {
 
     QuickstartTableRequest request = new QuickstartTableRequest(baseDir.getAbsolutePath());
     QuickstartRunner runner =
-        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 1, dataDir, true, null, getConfigOverrides());
+        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 1,
+            dataDir, true, null, getConfigOverrides(), null, true);
 
     printStatus(Color.CYAN, "***** Starting Kafka *****");
     final ZkStarter.ZookeeperInstance zookeeperInstance = ZkStarter.startLocalZkServer();

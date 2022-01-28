@@ -22,6 +22,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.net.URL;
+import java.util.Arrays;
+import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -36,13 +38,18 @@ import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
 import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
-public class PartialUpsertQuickStart {
+public class PartialUpsertQuickStart extends QuickStartBase {
   private StreamDataServerStartable _kafkaStarter;
 
   public static void main(String[] args)
       throws Exception {
     PluginManager.get().init();
     new PartialUpsertQuickStart().execute();
+  }
+
+  @Override
+  public List<String> types() {
+    return Arrays.asList("PARTIAL-UPSERT", "PARTIAL_UPSERT");
   }
 
   // Todo: add a quick start demo
@@ -66,7 +73,8 @@ public class PartialUpsertQuickStart {
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
     QuickstartTableRequest request = new QuickstartTableRequest(bootstrapTableDir.getAbsolutePath());
-    final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, dataDir);
+    final QuickstartRunner runner =
+        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 0, dataDir, getConfigOverrides());
 
     printStatus(Color.CYAN, "***** Starting Kafka *****");
     final ZkStarter.ZookeeperInstance zookeeperInstance = ZkStarter.startLocalZkServer();

@@ -123,7 +123,13 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     _indexLoadingConfig = indexLoadingConfig;
     _schema = schema;
     _segmentWriter = segmentWriter;
-    _segmentProperties = SegmentMetadataImpl.getPropertiesConfiguration(indexDir);
+    _segmentProperties = _segmentMetadata.getPropertiesConfiguration();
+  }
+
+  @Override
+  public boolean needUpdateDefaultColumns() {
+    Map<String, DefaultColumnAction> defaultColumnActionMap = computeDefaultColumnActionMap();
+    return !defaultColumnActionMap.isEmpty();
   }
 
   /**

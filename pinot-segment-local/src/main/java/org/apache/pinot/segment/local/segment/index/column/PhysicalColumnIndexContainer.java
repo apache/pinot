@@ -92,7 +92,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       _nullValueVectorReader = null;
     }
 
-    if (loadTextIndex) {
+    if (loadTextIndex && segmentIndexDir != null) {
       Preconditions.checkState(segmentReader.hasIndexFor(columnName, ColumnIndexType.TEXT_INDEX));
       Map<String, Map<String, String>> columnProperties = indexLoadingConfig.getColumnProperties();
       _textIndex = indexReaderProvider.newTextIndexReader(segmentIndexDir, metadata, columnProperties.get(columnName));

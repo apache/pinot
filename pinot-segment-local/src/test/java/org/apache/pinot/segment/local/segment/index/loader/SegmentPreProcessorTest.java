@@ -30,6 +30,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
@@ -49,6 +50,7 @@ import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -783,16 +785,7 @@ public class SegmentPreProcessorTest {
     constructV1Segment();
 
     // Remove min/max value from the metadata
-    PropertiesConfiguration configuration = SegmentMetadataImpl.getPropertiesConfiguration(_indexDir);
-    Iterator<String> keys = configuration.getKeys();
-    while (keys.hasNext()) {
-      String key = keys.next();
-      if (key.endsWith(V1Constants.MetadataKeys.Column.MIN_VALUE) || key.endsWith(
-          V1Constants.MetadataKeys.Column.MAX_VALUE)) {
-        configuration.clearProperty(key);
-      }
-    }
-    configuration.save();
+    removeMinMaxValuesFromMetadataFile(_indexDir);
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
     indexLoadingConfig.setColumnMinMaxValueGeneratorMode(ColumnMinMaxValueGeneratorMode.NONE);
@@ -1079,5 +1072,182 @@ public class SegmentPreProcessorTest {
       processor.process();
     }
     assertEquals(singleFileIndex.length(), initFileSize);
+  }
+
+  @Test
+  public void testV1IfNeedProcess()
+      throws Exception {
+    constructV1Segment();
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
+    assertEquals(segmentMetadata.getVersion(), SegmentVersion.v1);
+
+    testIfNeedProcess();
+  }
+
+  @Test
+  public void testV3IfNeedProcess()
+      throws Exception {
+    constructV3Segment();
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
+    assertEquals(segmentMetadata.getVersion(), SegmentVersion.v3);
+
+    testIfNeedProcess();
+  }
+
+  private void testIfNeedProcess()
+      throws Exception {
+    // There are a few indices initially. Require to remove them with an empty IndexLoadingConfig.
+    try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
+        .load(_indexDir.toURI(), new SegmentDirectoryLoaderContext(null, null, null, _configuration));
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, new IndexLoadingConfig(), null)) {
+      assertTrue(processor.needProcess());
+      processor.process();
+      assertFalse(processor.needProcess());
+    }
+
+    // Require to add some default columns with new schema.
+    try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
+        .load(_indexDir.toURI(), new SegmentDirectoryLoaderContext(null, null, null, _configuration));
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, new IndexLoadingConfig(),
+            _newColumnsSchemaWithH3Json)) {
+      assertTrue(processor.needProcess());
+      processor.process();
+      assertFalse(processor.needProcess());
+    }
+
+    // No preprocessing needed if required to add certain index on non-existing, sorted or non-dictionary column.
+    for (Map.Entry<String, Consumer<IndexLoadingConfig>> entry : createConfigPrepFunctionNeedNoops().entrySet()) {
+      String testCase = entry.getKey();
+      IndexLoadingConfig config = new IndexLoadingConfig();
+      entry.getValue().accept(config);
+      try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
+          .load(_indexDir.toURI(), new SegmentDirectoryLoaderContext(null, null, null, _configuration));
+          SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, config,
+              _newColumnsSchemaWithH3Json)) {
+        assertFalse(processor.needProcess(), testCase);
+      }
+    }
+
+    // Require to add different types of indices. Add one new index a time
+    // to test the index handlers separately.
+    IndexLoadingConfig config = new IndexLoadingConfig();
+    for (Map.Entry<String, Consumer<IndexLoadingConfig>> entry : createConfigPrepFunctions().entrySet()) {
+      String testCase = entry.getKey();
+      entry.getValue().accept(config);
+      try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
+          .load(_indexDir.toURI(), new SegmentDirectoryLoaderContext(null, null, null, _configuration));
+          SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, config,
+              _newColumnsSchemaWithH3Json)) {
+        assertTrue(processor.needProcess(), testCase);
+        processor.process();
+        assertFalse(processor.needProcess(), testCase);
+      }
+    }
+
+    // Require to add startree index.
+    IndexingConfig indexingConfig = new IndexingConfig();
+    indexingConfig.setEnableDynamicStarTreeCreation(true);
+    indexingConfig.setEnableDefaultStarTree(true);
+    _tableConfig.setIndexingConfig(indexingConfig);
+    IndexLoadingConfig configWithStarTreeIndex = new IndexLoadingConfig(null, _tableConfig);
+    createConfigPrepFunctions().forEach((k, v) -> v.accept(configWithStarTreeIndex));
+    try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
+        .load(_indexDir.toURI(), new SegmentDirectoryLoaderContext(null, null, null, _configuration));
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, configWithStarTreeIndex,
+            _newColumnsSchemaWithH3Json)) {
+      assertTrue(processor.needProcess());
+      processor.process();
+      assertFalse(processor.needProcess());
+    }
+
+    // Require to update min and max values.
+    removeMinMaxValuesFromMetadataFile(_indexDir);
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
+    segmentMetadata.getColumnMetadataMap().forEach((k, v) -> {
+      assertNull(v.getMinValue(), "checking column: " + k);
+      assertNull(v.getMaxValue(), "checking column: " + k);
+    });
+    try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
+        .load(_indexDir.toURI(), new SegmentDirectoryLoaderContext(null, null, null, _configuration));
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, configWithStarTreeIndex,
+            _newColumnsSchemaWithH3Json)) {
+      assertTrue(processor.needProcess());
+      processor.process();
+    }
+    segmentMetadata = new SegmentMetadataImpl(_indexDir);
+    segmentMetadata.getColumnMetadataMap().forEach((k, v) -> {
+      if (v.hasDictionary()) {
+        assertNotNull(v.getMinValue(), "checking column: " + k);
+        assertNotNull(v.getMaxValue(), "checking column: " + k);
+      } else {
+        assertNull(v.getMinValue(), "checking column: " + k);
+        assertNull(v.getMaxValue(), "checking column: " + k);
+      }
+    });
+  }
+
+  private static void removeMinMaxValuesFromMetadataFile(File indexDir)
+      throws Exception {
+    PropertiesConfiguration configuration = SegmentMetadataImpl.getPropertiesConfiguration(indexDir);
+    Iterator<String> keys = configuration.getKeys();
+    while (keys.hasNext()) {
+      String key = keys.next();
+      if (key.endsWith(V1Constants.MetadataKeys.Column.MIN_VALUE) || key.endsWith(
+          V1Constants.MetadataKeys.Column.MAX_VALUE)) {
+        configuration.clearProperty(key);
+      }
+    }
+    configuration.save();
+  }
+
+  private static Map<String, Consumer<IndexLoadingConfig>> createConfigPrepFunctions() {
+    Map<String, Consumer<IndexLoadingConfig>> testCases = new HashMap<>();
+    testCases.put("addInvertedIndex", (IndexLoadingConfig config) ->
+        config.setInvertedIndexColumns(new HashSet<>(Collections.singletonList("column3"))));
+    testCases.put("addRangeIndex", (IndexLoadingConfig config) ->
+        config.setRangeIndexColumns(new HashSet<>(Collections.singletonList("column3"))));
+    testCases.put("addTextIndex", (IndexLoadingConfig config) ->
+        config.setTextIndexColumns(new HashSet<>(Collections.singletonList("column3"))));
+    testCases.put("addFSTIndex", (IndexLoadingConfig config) ->
+        config.setFSTIndexColumns(new HashSet<>(Collections.singletonList("column3"))));
+    testCases.put("addBloomFilter", (IndexLoadingConfig config) ->
+        config.setBloomFilterConfigs(ImmutableMap.of("column3", new BloomFilterConfig(0.1, 1024, true))));
+    testCases.put("addH3Index", (IndexLoadingConfig config) ->
+        config.setH3IndexConfigs(ImmutableMap.of("newH3Col", new H3IndexConfig(ImmutableMap.of("resolutions", "5")))));
+    testCases.put("addJsonIndex", (IndexLoadingConfig config) ->
+        config.setJsonIndexColumns(new HashSet<>(Collections.singletonList("newJsonCol"))));
+    return testCases;
+  }
+
+  private static Map<String, Consumer<IndexLoadingConfig>> createConfigPrepFunctionNeedNoops() {
+    Map<String, Consumer<IndexLoadingConfig>> testCases = new HashMap<>();
+    // daysSinceEpoch is a sorted column, thus inverted index and range index skip it.
+    testCases.put("addInvertedIndexOnSortedColumn", (IndexLoadingConfig config) -> config
+        .setInvertedIndexColumns(new HashSet<>(Collections.singletonList("daysSinceEpoch"))));
+    testCases.put("addRangeIndexOnSortedColumn", (IndexLoadingConfig config) -> config
+        .setRangeIndexColumns(new HashSet<>(Collections.singletonList("daysSinceEpoch"))));
+    // column4 is unsorted non-dictionary encoded column, so inverted index and bloom filter skip it.
+    // In fact, the validation logic when updating index configs already blocks this to happen.
+    testCases.put("addInvertedIndexOnNonDictColumn", (IndexLoadingConfig config) -> config
+        .setInvertedIndexColumns(new HashSet<>(Collections.singletonList("column4"))));
+    testCases.put("addBloomFilterOnNonDictColumn", (IndexLoadingConfig config) -> config
+        .setBloomFilterConfigs(ImmutableMap.of("column4", new BloomFilterConfig(0.1, 1024, true))));
+    // No index is added on non-existing columns.
+    // The validation logic when updating index configs already blocks this to happen.
+    testCases.put("addInvertedIndexOnAbsentColumn", (IndexLoadingConfig config) -> config
+        .setInvertedIndexColumns(new HashSet<>(Collections.singletonList("newColumnX"))));
+    testCases.put("addRangeIndexOnAbsentColumn", (IndexLoadingConfig config) -> config
+        .setRangeIndexColumns(new HashSet<>(Collections.singletonList("newColumnX"))));
+    testCases.put("addTextIndexOnAbsentColumn", (IndexLoadingConfig config) -> config
+        .setTextIndexColumns(new HashSet<>(Collections.singletonList("newColumnX"))));
+    testCases.put("addFSTIndexOnAbsentColumn", (IndexLoadingConfig config) -> config
+        .setFSTIndexColumns(new HashSet<>(Collections.singletonList("newColumnX"))));
+    testCases.put("addBloomFilterOnAbsentColumn", (IndexLoadingConfig config) -> config
+        .setBloomFilterConfigs(ImmutableMap.of("newColumnX", new BloomFilterConfig(0.1, 1024, true))));
+    testCases.put("addH3IndexOnAbsentColumn", (IndexLoadingConfig config) -> config
+        .setH3IndexConfigs(ImmutableMap.of("newColumnX", new H3IndexConfig(ImmutableMap.of("resolutions", "5")))));
+    testCases.put("addJsonIndexOnAbsentColumn", (IndexLoadingConfig config) -> config
+        .setJsonIndexColumns(new HashSet<>(Collections.singletonList("newColumnX"))));
+    return testCases;
   }
 }

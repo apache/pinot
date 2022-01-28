@@ -27,7 +27,7 @@ import java.util.function.LongSupplier;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriterV4;
-import org.apache.pinot.segment.local.segment.index.readers.forward.BaseChunkSVForwardIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReaderV4;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -200,7 +200,7 @@ public class BenchmarkRawForwardIndexReader {
     try (PinotDataBuffer buffer = PinotDataBuffer.loadBigEndianFile(state._file);
         VarByteChunkSVForwardIndexReader reader =
             new VarByteChunkSVForwardIndexReader(buffer, FieldSpec.DataType.BYTES);
-        BaseChunkSVForwardIndexReader.ChunkReaderContext context = reader.createContext()) {
+        ChunkReaderContext context = reader.createContext()) {
       for (int i = 0; i < state._records; i++) {
         bh.consume(reader.getBytes(i, context));
       }

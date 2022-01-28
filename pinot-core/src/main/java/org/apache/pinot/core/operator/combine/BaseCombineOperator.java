@@ -102,7 +102,7 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
             // Early-terminated by interruption (canceled by the main thread)
           } catch (Exception e) {
             // Caught exception, skip processing the remaining segments
-            LOGGER.error("Caught exception while processing query: {}", _queryContext, e);
+            LOGGER.error("Caught exception while processing query: " + _queryContext, e);
             onException(e);
           } finally {
             onFinish();

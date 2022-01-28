@@ -47,6 +47,15 @@ public class MinionConstants {
   public static final String INITIAL_RETRY_DELAY_MS_KEY = "initialRetryDelayMs";
   public static final String RETRY_SCALE_FACTOR_KEY = "retryScaleFactor";
 
+  /**
+   * Cluster level configs
+   */
+  public static final String TIMEOUT_MS_KEY_SUFFIX = ".timeoutMs";
+  public static final String NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY_SUFFIX = ".numConcurrentTasksPerInstance";
+
+  /**
+   * Table level configs
+   */
   public static final String TABLE_MAX_NUM_TASKS_KEY = "tableMaxNumTasks";
   public static final String ENABLE_REPLACE_SEGMENTS_KEY = "enableReplaceSegments";
 

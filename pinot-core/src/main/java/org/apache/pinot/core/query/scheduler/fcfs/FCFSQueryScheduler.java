@@ -68,6 +68,6 @@ public class FCFSQueryScheduler extends QueryScheduler {
 
   @Override
   public String name() {
-    return "fcfs";
+    return "FCFS";
   }
 }

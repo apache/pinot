@@ -87,6 +87,7 @@ public class ServerSegmentMetadataReader {
     int failedParses = 0;
     final Map<String, Double> columnLengthMap = new HashMap<>();
     final Map<String, Double> columnCardinalityMap = new HashMap<>();
+    final Map<String, Double> maxNumMultiValuesMap = new HashMap<>();
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
         TableMetadataInfo tableMetadataInfo =
@@ -96,6 +97,7 @@ public class ServerSegmentMetadataReader {
         totalNumSegments += tableMetadataInfo.getNumSegments();
         tableMetadataInfo.getColumnLengthMap().forEach((k, v) -> columnLengthMap.merge(k, v, Double::sum));
         tableMetadataInfo.getColumnCardinalityMap().forEach((k, v) -> columnCardinalityMap.merge(k, v, Double::sum));
+        tableMetadataInfo.getMaxNumMultiValuesMap().forEach((k, v) -> maxNumMultiValuesMap.merge(k, v, Double::sum));
       } catch (IOException e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
@@ -104,17 +106,18 @@ public class ServerSegmentMetadataReader {
     int finalTotalNumSegments = totalNumSegments;
     columnLengthMap.replaceAll((k, v) -> v / finalTotalNumSegments);
     columnCardinalityMap.replaceAll((k, v) -> v / finalTotalNumSegments);
+    maxNumMultiValuesMap.replaceAll((k, v) -> v / finalTotalNumSegments);
 
     // Since table segments may have multiple replicas, divide diskSizeInBytes, numRows and numSegments by numReplica
-    // to avoid double counting, for columnAvgLengthMap and columnAvgCardinalityMap, dividing by numReplica is not
-    // needed since totalNumSegments already contains replicas.
+    // to avoid double counting, for columnAvgLengthMap, columnAvgCardinalityMap and maxNumMultiValuesMap, dividing by
+    // numReplica is not needed since totalNumSegments already contains replicas.
     totalDiskSizeInBytes /= numReplica;
     totalNumSegments /= numReplica;
     totalNumRows /= numReplica;
 
     TableMetadataInfo aggregateTableMetadataInfo =
-        new TableMetadataInfo("", totalDiskSizeInBytes, totalNumSegments, totalNumRows, columnLengthMap,
-            columnCardinalityMap);
+        new TableMetadataInfo(tableNameWithType, totalDiskSizeInBytes, totalNumSegments, totalNumRows, columnLengthMap,
+            columnCardinalityMap, maxNumMultiValuesMap);
     if (failedParses != 0) {
       LOGGER.warn("Failed to parse {} / {} aggregated segment metadata responses from servers.", failedParses,
           serverUrls.size());
@@ -170,14 +173,7 @@ public class ServerSegmentMetadataReader {
       String endpoint) {
     try {
       tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8.name());
-      String paramsStr = "";
-      if (columns != null) {
-        List<String> params = new ArrayList<>(columns.size());
-        for (String column : columns) {
-          params.add(String.format("columns=%s", column));
-        }
-        paramsStr = String.join("&", params);
-      }
+      String paramsStr = generateColumnsParam(columns);
       return String.format("%s/tables/%s/metadata?%s", endpoint, tableNameWithType, paramsStr);
     } catch (UnsupportedEncodingException e) {
       throw new RuntimeException(e.getCause());
@@ -189,17 +185,23 @@ public class ServerSegmentMetadataReader {
     try {
       tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8.name());
       segmentName = URLEncoder.encode(segmentName, StandardCharsets.UTF_8.name());
-      String paramsStr = "";
-      if (columns != null) {
-        List<String> params = new ArrayList<>(columns.size());
-        for (String column : columns) {
-          params.add(String.format("columns=%s", column));
-        }
-        paramsStr = String.join("&", params);
-      }
+      String paramsStr = generateColumnsParam(columns);
       return String.format("%s/tables/%s/segments/%s/metadata?%s", endpoint, tableNameWithType, segmentName, paramsStr);
     } catch (UnsupportedEncodingException e) {
       throw new RuntimeException(e.getCause());
     }
+  }
+
+  private String generateColumnsParam(List<String> columns) {
+    String paramsStr = "";
+    if (columns == null || columns.isEmpty()) {
+      return paramsStr;
+    }
+    List<String> params = new ArrayList<>(columns.size());
+    for (String column : columns) {
+      params.add(String.format("columns=%s", column));
+    }
+    paramsStr = String.join("&", params);
+    return paramsStr;
   }
 }

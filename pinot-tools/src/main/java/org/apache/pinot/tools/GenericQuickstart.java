@@ -22,6 +22,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.net.URL;
+import java.util.Arrays;
+import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.spi.stream.StreamDataProvider;
@@ -33,7 +35,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
-import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
 /**
@@ -48,7 +49,7 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
  *  ingestion_job_spec.json
  *  </code>
  */
-public class GenericQuickstart {
+public class GenericQuickstart extends QuickStartBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(GenericQuickstart.class);
   private final File _schemaFile;
   private final File _tableConfigFile;
@@ -56,6 +57,11 @@ public class GenericQuickstart {
   private final String _tableName;
   private StreamDataServerStartable _kafkaStarter;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
+
+  public GenericQuickstart() {
+    this(GenericQuickstart.class.getClassLoader().getResource("examples/batch/starbucksStores").getPath(),
+        "starbucksStores");
+  }
 
   public GenericQuickstart(String tableDirectoryPath, String tableName) {
     _tableDirectory = new File(tableDirectoryPath);
@@ -80,13 +86,19 @@ public class GenericQuickstart {
     _kafkaStarter.createTopic("pullRequestMergedEvents", KafkaStarterUtils.getTopicCreationProps(2));
   }
 
+  @Override
+  public List<String> types() {
+    return Arrays.asList("GENERIC");
+  }
+
   public void execute()
       throws Exception {
 
     File tempDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
     Preconditions.checkState(tempDir.mkdirs());
     QuickstartTableRequest request = new QuickstartTableRequest(_tableDirectory.getAbsolutePath());
-    final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, tempDir);
+    final QuickstartRunner runner =
+        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 0, tempDir, getConfigOverrides());
 
     printStatus(Color.CYAN, "***** Starting Kafka *****");
     startKafka();

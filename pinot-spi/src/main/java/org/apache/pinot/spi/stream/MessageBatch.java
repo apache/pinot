@@ -31,10 +31,16 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 @InterfaceStability.Stable
 public interface MessageBatch<T> {
   /**
-   *
-   * @return number of messages returned from the stream
+   * @return number of available messages
    */
   int getMessageCount();
+
+  /**
+   * @return number of messages returned from the stream
+   */
+  default int getUnfilteredMessageCount() {
+    return getMessageCount();
+  }
 
   /**
    * Returns the message at a particular index inside a set of messages returned from the stream.
@@ -78,8 +84,15 @@ public interface MessageBatch<T> {
    * @param index
    * @return
    */
-  default StreamPartitionMsgOffset getNextStreamParitionMsgOffsetAtIndex(int index) {
+  default StreamPartitionMsgOffset getNextStreamPartitionMsgOffsetAtIndex(int index) {
     return new LongMsgOffset(getNextStreamMessageOffsetAtIndex(index));
+  }
+
+  /**
+   * @return last offset in the batch
+   */
+  default StreamPartitionMsgOffset getOffsetOfNextBatch() {
+    return getNextStreamPartitionMsgOffsetAtIndex(getMessageCount() - 1);
   }
 
   /**

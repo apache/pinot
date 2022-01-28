@@ -956,7 +956,7 @@ public class MutableSegmentImpl implements MutableSegment {
     int i = 0;
     int[] dictIds = new int[_numKeyColumns]; // dimensions + date time columns + time column.
 
-    // FIXME: this for loop breaks for multi value dimensions. https://github.com/apache/incubator-pinot/issues/3867
+    // FIXME: this for loop breaks for multi value dimensions. https://github.com/apache/pinot/issues/3867
     for (FieldSpec fieldSpec : _physicalDimensionFieldSpecs) {
       dictIds[i++] = _indexContainerMap.get(fieldSpec.getName())._dictId;
     }
@@ -973,7 +973,7 @@ public class MutableSegmentImpl implements MutableSegment {
    *   <li> All dimensions and time are dictionary encoded. This is because an integer array containing dictionary id's
    *        is used as key for dimensions to record Id map. </li>
    *   <li> None of the metrics are dictionary encoded. </li>
-   *   <li> All columns should be single-valued (see https://github.com/apache/incubator-pinot/issues/3867)</li>
+   *   <li> All columns should be single-valued (see https://github.com/apache/pinot/issues/3867)</li>
    * </ul>
    *
    * TODO: Eliminate the requirement on dictionary encoding for dimension and metric columns.

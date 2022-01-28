@@ -58,7 +58,7 @@ public class PinotFSFactoryTest {
     Assert.assertTrue(PinotFSFactory.create("file") instanceof LocalPinotFS);
   }
 
-  public static class TestPinotFS extends PinotFS {
+  public static class TestPinotFS extends BasePinotFS {
     public int _initCalled = 0;
     private PinotConfiguration _configuration;
 

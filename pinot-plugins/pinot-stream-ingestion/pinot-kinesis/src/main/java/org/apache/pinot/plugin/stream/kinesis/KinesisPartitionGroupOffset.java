@@ -77,7 +77,7 @@ public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
   }
 
   @Override
-  public int compareTo(Object o) {
+  public int compareTo(StreamPartitionMsgOffset o) {
     Preconditions.checkNotNull(o);
     KinesisPartitionGroupOffset other = (KinesisPartitionGroupOffset) o;
     Preconditions.checkNotNull(other._shardToStartSequenceMap);

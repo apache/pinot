@@ -31,7 +31,7 @@ import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.BasePinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -89,7 +89,7 @@ public class PinotFSSegmentUploaderTest {
     Assert.assertNull(segmentURI);
   }
 
-  public static class AlwaysSucceedPinotFS extends PinotFS {
+  public static class AlwaysSucceedPinotFS extends BasePinotFS {
 
     @Override
     public void init(PinotConfiguration config) {
