@@ -31,6 +31,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -1469,7 +1470,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         }
       }
       //if query has a '*' selection along with other columns
-      if (selectStarExpr != null && pinotQuery.getSelectList().size() > 1) {
+      if (selectStarExpr != null) {
         expandStarExpressionToActualColumns(pinotQuery, columnNameMap, selectStarExpr);
       }
       Expression filterExpression = pinotQuery.getFilterExpression();
@@ -1500,27 +1501,28 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static void expandStarExpressionToActualColumns(PinotQuery pinotQuery, Map<String, String> columnNameMap,
       Expression selectStarExpr) {
     List<Expression> originalSelections = pinotQuery.getSelectList();
-    //expand *
+    //expand '*'
     List<Expression> expandedSelections = new ArrayList<>();
     for (String tableCol : columnNameMap.values()) {
       Expression newSelection = RequestUtils.createIdentifierExpression(tableCol);
-      //we exclude default virtual columns and those columns that are already a part of originalSelections to dedup
-      if (tableCol.charAt(0) != '$' && !originalSelections.contains(newSelection)) {
+      //we exclude default virtual columns
+      if (tableCol.charAt(0) != '$') {
         expandedSelections.add(newSelection);
       }
     }
-    //sort with natural ordering. expandedSelections DOES NOT contain any columns that were requested in the original
-    // query
+    //sort naturally
     expandedSelections.sort(null);
-    List<Expression> finalSelections = new ArrayList<>();
-    for (Expression selection : originalSelections) {
+    ListIterator<Expression> li = originalSelections.listIterator();
+    while (li.hasNext()) {
+      Expression selection = li.next();
       if (selection.equals(selectStarExpr)) {
-        finalSelections.addAll(expandedSelections);
-      } else {
-        finalSelections.add(selection);
+        //remove '*'
+        li.remove();
+        for (Expression expandedSelection : expandedSelections) {
+          li.add(expandedSelection);
+        }
       }
     }
-    pinotQuery.setSelectList(finalSelections);
   }
 
   /**

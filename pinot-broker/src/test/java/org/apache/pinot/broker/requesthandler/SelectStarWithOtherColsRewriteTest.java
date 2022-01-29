@@ -21,8 +21,10 @@ package org.apache.pinot.broker.requesthandler;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -46,6 +48,24 @@ public class SelectStarWithOtherColsRewriteTest {
     builder.put("$docId", "$docId");
     builder.put("$hostName", "$hostName");
     COL_MAP = builder.build();
+  }
+
+  @Test
+  public void testShouldExpandOnlyStar() {
+    String sql = "SELECT * FROM baseballStats";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
+    List<Expression> newSelections = pinotQuery.getSelectList();
+    Map<String, Integer> countMap = new HashMap<>();
+    for (Expression selection : newSelections) {
+      String col = selection.getIdentifier().getName();
+      countMap.put(col, countMap.getOrDefault(col, 0) + 1);
+    }
+    Assert.assertEquals(countMap.size(), 5, "More new selections than expected");
+    Assert.assertTrue(countMap.keySet().containsAll(COL_MAP.keySet().stream().filter(a -> !a.startsWith("$")).collect(
+        Collectors.toList())), "New selections contain virtual columns");
+    countMap.forEach(
+        (key, value) -> Assert.assertEquals((int) value, 1, key + " has more than one occurrences in new selection"));
   }
 
   /**
@@ -78,7 +98,7 @@ public class SelectStarWithOtherColsRewriteTest {
   }
 
   /**
-   * Already requested columns should be deduped
+   * Columns should not be deduped
    */
   @Test
   public void testShouldDedupColumns() {
@@ -100,8 +120,8 @@ public class SelectStarWithOtherColsRewriteTest {
         default:
       }
     }
-    Assert.assertEquals(playerIdCnt, 1, "playerID does not occur once");
-    Assert.assertEquals(goldCount, 1, "G_old occurs does not occur once");
+    Assert.assertEquals(playerIdCnt, 2, "playerID does not occur once");
+    Assert.assertEquals(goldCount, 2, "G_old occurs does not occur once");
   }
 
   /**
@@ -239,14 +259,15 @@ public class SelectStarWithOtherColsRewriteTest {
     Assert.assertEquals(newSelections.get(2).getIdentifier().getName(), "G_old");
     Assert.assertEquals(newSelections.get(3).getIdentifier().getName(), "groundedIntoDoublePlays");
     Assert.assertEquals(newSelections.get(4).getIdentifier().getName(), "homeRuns");
-    Assert.assertEquals(newSelections.get(5).getIdentifier().getName(), "playerStint");
-    Assert.assertEquals(newSelections.get(6).getIdentifier().getName(), "$segmentName");
-    Assert.assertEquals(newSelections.get(7).getIdentifier().getName(), "$hostName");
-    Assert.assertEquals(newSelections.get(8).getFunctionCall().getOperator(), "AS");
-    Assert.assertEquals(newSelections.get(8).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+    Assert.assertEquals(newSelections.get(5).getIdentifier().getName(), "playerID");
+    Assert.assertEquals(newSelections.get(6).getIdentifier().getName(), "playerStint");
+    Assert.assertEquals(newSelections.get(7).getIdentifier().getName(), "$segmentName");
+    Assert.assertEquals(newSelections.get(8).getIdentifier().getName(), "$hostName");
+    Assert.assertEquals(newSelections.get(9).getFunctionCall().getOperator(), "AS");
+    Assert.assertEquals(newSelections.get(9).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
         "playerStint");
-    Assert.assertEquals(newSelections.get(8).getFunctionCall().getOperands().get(1).getIdentifier().getName(),
+    Assert.assertEquals(newSelections.get(9).getFunctionCall().getOperands().get(1).getIdentifier().getName(),
         "pstint");
-    Assert.assertEquals(newSelections.get(9).getIdentifier().getName(), "playerID");
+    Assert.assertEquals(newSelections.get(10).getIdentifier().getName(), "playerID");
   }
 }
