@@ -31,11 +31,17 @@ import org.apache.pinot.tools.utils.PinotConfigUtils;
 
 public abstract class QuickStartBase {
   protected File _dataDir = FileUtils.getTempDirectory();
+  protected String _bootstrapDataDir;
   protected String _zkExternalAddress;
   protected String _configFilePath;
 
   public QuickStartBase setDataDir(String dataDir) {
     _dataDir = new File(dataDir);
+    return this;
+  }
+
+  public QuickStartBase setBootstrapDataDir(String bootstrapDataDir) {
+    _bootstrapDataDir = bootstrapDataDir;
     return this;
   }
 
