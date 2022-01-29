@@ -24,7 +24,6 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -55,30 +54,6 @@ public class Quickstart extends QuickStartBase {
     Color(String code) {
       _code = code;
     }
-  }
-
-  /**
-   * Assuming that database name is DBNAME, bootstrap path must have the file structure specified below to properly
-   * load the table:
-   *  DBNAME
-   *  ├── ingestionJobSpec.yaml
-   *  ├── rawdata
-   *  │   └── DBNAME_data.csv
-   *  ├── DBNAME_offline_table_config.json
-   *  └── DBNAME_schema.json
-   *
-   * @return bootstrap path if specified by command line argument -bootstrapTableDir; otherwise, null.
-   */
-  public String getBootstrapDataDir() {
-    return _bootstrapDataDir != null ? _bootstrapDataDir : DEFAULT_BOOTSTRAP_DIRECTORY;
-  }
-
-  public String getTableName() {
-    return Paths.get(getBootstrapDataDir()).getFileName().toString();
-  }
-
-  public boolean isUsingDefaultResourceTable() {
-    return _bootstrapDataDir == null;
   }
 
   public int getNumMinions() {
@@ -114,16 +89,16 @@ public class Quickstart extends QuickStartBase {
 
   public void execute()
       throws Exception {
-    String tableName = getTableName();
+    String tableName = getTableName(DEFAULT_BOOTSTRAP_DIRECTORY);
     File quickstartTmpDir = new File(_dataDir, String.valueOf(System.currentTimeMillis()));
     File baseDir = new File(quickstartTmpDir, tableName);
     File dataDir = new File(baseDir, "rawdata");
     Preconditions.checkState(dataDir.mkdirs());
 
-    if (isUsingDefaultResourceTable()) {
-      copyResourceTableToTmpDirectory(getBootstrapDataDir(), tableName, baseDir, dataDir);
+    if (useDefaultBootstrapTableDir()) {
+      copyResourceTableToTmpDirectory(getBootstrapDataDir(DEFAULT_BOOTSTRAP_DIRECTORY), tableName, baseDir, dataDir);
     } else {
-      copyFilesystemTableToTmpDirectory(getBootstrapDataDir(), tableName, baseDir);
+      copyFilesystemTableToTmpDirectory(getBootstrapDataDir(DEFAULT_BOOTSTRAP_DIRECTORY), tableName, baseDir);
     }
 
     QuickstartTableRequest request = new QuickstartTableRequest(baseDir.getAbsolutePath());
@@ -150,7 +125,7 @@ public class Quickstart extends QuickStartBase {
 
     printStatus(Color.YELLOW, "***** Offline quickstart setup complete *****");
 
-    if (isUsingDefaultResourceTable()) {
+    if (useDefaultBootstrapTableDir()) {
       // Quickstart is using the default baseballStats sample table, so run sample queries.
       runSampleQueries(runner);
     }
