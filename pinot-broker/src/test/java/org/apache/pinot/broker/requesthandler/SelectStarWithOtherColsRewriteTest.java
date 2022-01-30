@@ -50,8 +50,11 @@ public class SelectStarWithOtherColsRewriteTest {
     COL_MAP = builder.build();
   }
 
+  /**
+   * When the query contains only '*', it should be expanded into columns.
+   */
   @Test
-  public void testShouldExpandOnlyStar() {
+  public void testShouldExpandWhenOnlyStarIsSelected() {
     String sql = "SELECT * FROM baseballStats";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
@@ -101,7 +104,7 @@ public class SelectStarWithOtherColsRewriteTest {
    * Columns should not be deduped
    */
   @Test
-  public void testShouldDedupColumns() {
+  public void testShouldNotDedupMultipleRequestedColumns() {
     String sql = "SELECT playerID,*,G_old FROM baseballStats";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
