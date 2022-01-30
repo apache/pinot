@@ -39,6 +39,10 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
       description = "Type of quickstart, supported: STREAM/BATCH/HYBRID")
   private String _type;
 
+  @CommandLine.Option(names = {"-bootstrapTableDir"}, required = false,
+      description = "Directory containing table schema, config, and data.")
+  private String _bootstrapTableDir;
+
   @CommandLine.Option(names = {"-tmpDir", "-quickstartDir", "-dataDir"}, required = false,
       description = "Temp Directory to host quickstart data")
   private String _tmpDir;
@@ -76,6 +80,14 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
 
   public void setTmpDir(String tmpDir) {
     _tmpDir = tmpDir;
+  }
+
+  public String getBootstrapDataDir() {
+    return _bootstrapTableDir;
+  }
+
+  public void setBootstrapTableDir(String bootstrapTableDir) {
+    _bootstrapTableDir = bootstrapTableDir;
   }
 
   public String getZkExternalAddress() {
@@ -128,6 +140,10 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
 
     if (_tmpDir != null) {
       quickstart.setDataDir(_tmpDir);
+    }
+
+    if (_bootstrapTableDir != null) {
+      quickstart.setBootstrapDataDir(_bootstrapTableDir);
     }
 
     if (_zkExternalAddress != null) {
