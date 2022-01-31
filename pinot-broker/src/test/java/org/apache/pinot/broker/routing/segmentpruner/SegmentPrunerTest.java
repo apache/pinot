@@ -39,7 +39,6 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.parsers.QueryCompiler;
-import org.apache.pinot.plugin.stream.kinesis.KinesisConfig;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -97,6 +96,10 @@ public class SegmentPrunerTest extends ControllerTest {
       "SELECT * FROM testTable where timeColumn <= 20200101 OR timeColumn in (20200201, 20200401)";
   private static final String SDF_QUERY_5 =
       "SELECT * FROM testTable where timeColumn in (20200101, 20200102) AND timeColumn >= 20200530";
+
+  // this is duplicate with KinesisConfig.STREAM_TYPE, while instead of use KinesisConfig.STREAM_TYPE directly, we
+  // hardcode the value here to avoid pulling the entire pinot-kinesis module as dependency.
+  private static final String KINESIS_STREAM_TYPE = "kinesis";
 
   private ZkClient _zkClient;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
@@ -225,16 +228,16 @@ public class SegmentPrunerTest extends ControllerTest {
 
     // When indexingConfig is configured with Kinesis streaming, EmptySegmentPruner should be returned.
     when(indexingConfig.getStreamConfigs()).thenReturn(
-        Collections.singletonMap(StreamConfigProperties.STREAM_TYPE, KinesisConfig.STREAM_TYPE));
+        Collections.singletonMap(StreamConfigProperties.STREAM_TYPE, KINESIS_STREAM_TYPE));
     segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
     assertEquals(segmentPruners.size(), 1);
     assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
 
     // When streamIngestionConfig is configured with Kinesis streaming, EmptySegmentPruner should be returned.
     when(streamIngestionConfig.getStreamConfigMaps()).thenReturn(Collections.singletonList(
-        Collections.singletonMap(StreamConfigProperties.STREAM_TYPE, KinesisConfig.STREAM_TYPE)));
+        Collections.singletonMap(StreamConfigProperties.STREAM_TYPE, KINESIS_STREAM_TYPE)));
     when(indexingConfig.getStreamConfigs()).thenReturn(
-        Collections.singletonMap(StreamConfigProperties.STREAM_TYPE, KinesisConfig.STREAM_TYPE));
+        Collections.singletonMap(StreamConfigProperties.STREAM_TYPE, KINESIS_STREAM_TYPE));
     segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
     assertEquals(segmentPruners.size(), 1);
     assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
