@@ -482,22 +482,16 @@ public class QueryContext {
           if (_groupByExpressions != null) {
             throw new IllegalStateException("GROUP BY with FILTER clauses is not supported");
           }
-
           queryContext._hasFilteredAggregations = true;
-
           filterContext = pair.getLeft();
-
           Pair<FunctionContext, FilterContext> filterContextPair =
               Pair.of(function, filterContext);
-
           if (!filterExpressionIndexMap.containsKey(filterContextPair)) {
             int filterMapIndex = filterExpressionIndexMap.size();
-
             filterExpressionIndexMap.put(filterContextPair, filterMapIndex);
           }
         }
         filteredAggregations.add(Pair.of(aggregationFunction, filterContext));
-
         aggregationFunctionIndexMap.put(function, functionIndex);
       }
 

@@ -67,13 +67,150 @@ public class AggregationPlanNode implements PlanNode {
   @Override
   public Operator<IntermediateResultsBlock> run() {
     assert _queryContext.getAggregationFunctions() != null;
+    return _queryContext.isHasFilteredAggregations() ? buildFilteredAggOperator() : buildNonFilteredAggOperator();
+  }
 
-    boolean hasFilteredPredicates = _queryContext.isHasFilteredAggregations();
-    if (hasFilteredPredicates) {
-      return buildFilteredAggOperator();
+  /**
+   * Build the operator to be used for filtered aggregations
+   */
+  private BaseOperator<IntermediateResultsBlock> buildFilteredAggOperator() {
+    int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
+    // Build the operator chain for the main predicate
+    Pair<FilterPlanNode, BaseFilterOperator> filterOperatorPair = buildFilterOperator(_queryContext.getFilter());
+    TransformOperator transformOperator = buildTransformOperatorForFilteredAggregates(filterOperatorPair.getRight());
+
+    return buildFilterOperatorInternal(filterOperatorPair.getRight(), transformOperator, numTotalDocs);
+  }
+
+  /**
+   * Build a FilteredAggregationOperator given the parameters.
+   * @param mainPredicateFilterOperator Filter operator corresponding to the main predicate
+   * @param mainTransformOperator Transform operator corresponding to the main predicate
+   * @param numTotalDocs Number of total docs
+   */
+  private BaseOperator<IntermediateResultsBlock> buildFilterOperatorInternal(
+      BaseFilterOperator mainPredicateFilterOperator, TransformOperator mainTransformOperator, int numTotalDocs) {
+    Map<FilterContext, Pair<List<AggregationFunction>, TransformOperator>> filterContextToAggFuncsMap = new HashMap<>();
+    List<AggregationFunction> nonFilteredAggregationFunctions = new ArrayList<>();
+    List<Pair<AggregationFunction, FilterContext>> aggregationFunctions = _queryContext.getFilteredAggregations();
+
+    // For each aggregation function, check if the aggregation function is a filtered agg.
+    // If it is, populate the corresponding filter operator and corresponding transform operator
+    for (Pair<AggregationFunction, FilterContext> inputPair : aggregationFunctions) {
+      if (inputPair.getLeft() != null) {
+        FilterContext currentFilterExpression = inputPair.getRight();
+        if (filterContextToAggFuncsMap.get(currentFilterExpression) != null) {
+          filterContextToAggFuncsMap.get(currentFilterExpression).getLeft().add(inputPair.getLeft());
+          continue;
+        }
+        Pair<FilterPlanNode, BaseFilterOperator> pair = buildFilterOperator(currentFilterExpression);
+        BaseFilterOperator wrappedFilterOperator =
+            new CombinedFilterOperator(mainPredicateFilterOperator, pair.getRight());
+        TransformOperator newTransformOperator = buildTransformOperatorForFilteredAggregates(wrappedFilterOperator);
+        // For each transform operator, associate it with the underlying expression. This allows
+        // fetching the relevant TransformOperator when resolving blocks during aggregation
+        // execution
+        List<AggregationFunction> aggFunctionList = new ArrayList<>();
+        aggFunctionList.add(inputPair.getLeft());
+        filterContextToAggFuncsMap.put(currentFilterExpression, Pair.of(aggFunctionList, newTransformOperator));
+      } else {
+        nonFilteredAggregationFunctions.add(inputPair.getLeft());
+      }
+    }
+    List<Pair<AggregationFunction[], TransformOperator>> aggToTransformOpList = new ArrayList<>();
+    // Convert to array since FilteredAggregationOperator expects it
+    for (Pair<List<AggregationFunction>, TransformOperator> pair : filterContextToAggFuncsMap.values()) {
+      List<AggregationFunction> aggregationFunctionList = pair.getLeft();
+      if (aggregationFunctionList == null) {
+        throw new IllegalStateException("Null aggregation list seen");
+      }
+      aggToTransformOpList.add(Pair.of(aggregationFunctionList.toArray(new AggregationFunction[0]), pair.getRight()));
+    }
+    aggToTransformOpList.add(
+        Pair.of(nonFilteredAggregationFunctions.toArray(new AggregationFunction[0]), mainTransformOperator));
+
+    return new FilteredAggregationOperator(_queryContext.getAggregationFunctions(), aggToTransformOpList, numTotalDocs);
+  }
+
+  /**
+   * Build a filter operator from the given FilterContext.
+   *
+   * It returns the FilterPlanNode to allow reusing plan level components such as predicate
+   * evaluator map
+   */
+  private Pair<FilterPlanNode, BaseFilterOperator> buildFilterOperator(FilterContext filterContext) {
+    FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext, filterContext);
+    return Pair.of(filterPlanNode, filterPlanNode.run());
+  }
+
+  private TransformOperator buildTransformOperatorForFilteredAggregates(BaseFilterOperator filterOperator) {
+    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
+    Set<ExpressionContext> expressionsToTransform =
+        AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, null);
+
+    return new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform,
+        DocIdSetPlanNode.MAX_DOC_PER_CALL, filterOperator).run();
+  }
+
+  /**
+   * Processing workhorse for non filtered aggregates. Note that this code path is invoked only
+   * if the query has no filtered aggregates at all. If a query has mixed aggregates, filtered
+   * aggregates code will be invoked
+   */
+  public Operator<IntermediateResultsBlock> buildNonFilteredAggOperator() {
+    assert _queryContext.getAggregationFunctions() != null;
+
+    int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
+    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
+
+    FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);
+    BaseFilterOperator filterOperator = filterPlanNode.run();
+
+    // Use metadata/dictionary to solve the query if possible
+    // TODO: Use the same operator for both of them so that COUNT(*), MAX(col) can be optimized
+    if (filterOperator.isResultMatchingAll()) {
+      if (isFitForMetadataBasedPlan(aggregationFunctions)) {
+        return new MetadataBasedAggregationOperator(aggregationFunctions, _indexSegment.getSegmentMetadata(),
+            Collections.emptyMap());
+      } else if (isFitForDictionaryBasedPlan(aggregationFunctions, _indexSegment)) {
+        Map<String, Dictionary> dictionaryMap = new HashMap<>();
+        for (AggregationFunction aggregationFunction : aggregationFunctions) {
+          String column = ((ExpressionContext) aggregationFunction.getInputExpressions().get(0)).getIdentifier();
+          dictionaryMap.computeIfAbsent(column, k -> _indexSegment.getDataSource(k).getDictionary());
+        }
+        return new DictionaryBasedAggregationOperator(aggregationFunctions, dictionaryMap, numTotalDocs);
+      }
     }
 
-    return buildNonFilteredAggOperator();
+    // Use star-tree to solve the query if possible
+    List<StarTreeV2> starTrees = _indexSegment.getStarTrees();
+    if (starTrees != null && !StarTreeUtils.isStarTreeDisabled(_queryContext)) {
+      AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
+          StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
+      if (aggregationFunctionColumnPairs != null) {
+        Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
+            StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, _queryContext.getFilter(),
+                filterPlanNode.getPredicateEvaluatorMap());
+        if (predicateEvaluatorsMap != null) {
+          for (StarTreeV2 starTreeV2 : starTrees) {
+            if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, null,
+                predicateEvaluatorsMap.keySet())) {
+              TransformOperator transformOperator =
+                  new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, null,
+                      predicateEvaluatorsMap, _queryContext.getDebugOptions()).run();
+              return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, true);
+            }
+          }
+        }
+      }
+    }
+
+    Set<ExpressionContext> expressionsToTransform =
+        AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, null);
+    TransformOperator transformOperator =
+        new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
+            filterOperator).run();
+    return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, false);
   }
 
   /**
@@ -114,180 +251,5 @@ public class AggregationPlanNode implements PlanNode {
       }
     }
     return true;
-  }
-
-  /**
-   * Build a FilteredAggregationOperator given the parameters.
-   * @param mainPredicateFilterOperator Filter operator corresponding to the main predicate
-   * @param mainTransformOperator Transform operator corresponding to the main predicate
-   * @param numTotalDocs Number of total docs
-   */
-  private BaseOperator<IntermediateResultsBlock> buildOperatorForFilteredAggregations(
-      BaseFilterOperator mainPredicateFilterOperator,
-      TransformOperator mainTransformOperator, int numTotalDocs) {
-    Map<FilterContext, Pair<List<AggregationFunction>, TransformOperator>> filterContextToAggFuncsMap =
-        new HashMap<>();
-    List<AggregationFunction> nonFilteredAggregationFunctions = new ArrayList<>();
-    List<Pair<AggregationFunction, FilterContext>> aggregationFunctions = _queryContext
-        .getFilteredAggregations();
-
-    // For each aggregation function, check if the aggregation function is a filtered agg.
-    // If it is, populate the corresponding filter operator and corresponding transform operator
-    for (Pair<AggregationFunction, FilterContext> inputPair : aggregationFunctions) {
-      if (inputPair.getLeft() != null) {
-        FilterContext currentFilterExpression = inputPair.getRight();
-        if (filterContextToAggFuncsMap.get(currentFilterExpression) != null) {
-          filterContextToAggFuncsMap.get(currentFilterExpression).getLeft().add(inputPair.getLeft());
-          continue;
-        }
-        Pair<FilterPlanNode, BaseFilterOperator> pair =
-            buildFilterOperator(currentFilterExpression);
-        BaseFilterOperator wrappedFilterOperator = new CombinedFilterOperator(mainPredicateFilterOperator,
-            pair.getRight());
-        TransformOperator newTransformOperator = buildTransformOperatorForFilteredAggregates(wrappedFilterOperator);
-        // For each transform operator, associate it with the underlying expression. This allows
-        // fetching the relevant TransformOperator when resolving blocks during aggregation
-        // execution
-        List<AggregationFunction> aggFunctionList = new ArrayList<>();
-        aggFunctionList.add(inputPair.getLeft());
-        filterContextToAggFuncsMap.put(currentFilterExpression,
-            Pair.of(aggFunctionList, newTransformOperator));
-      } else {
-        nonFilteredAggregationFunctions.add(inputPair.getLeft());
-      }
-    }
-    List<Pair<AggregationFunction[], TransformOperator>> aggToTransformOpList =
-        new ArrayList<>();
-    // Convert to array since FilteredAggregationOperator expects it
-    for (Pair<List<AggregationFunction>, TransformOperator> pair
-        : filterContextToAggFuncsMap.values()) {
-      List<AggregationFunction> aggregationFunctionList = pair.getLeft();
-      if (aggregationFunctionList == null) {
-        throw new IllegalStateException("Null aggregation list seen");
-      }
-      aggToTransformOpList.add(Pair.of(aggregationFunctionList.toArray(new AggregationFunction[0]),
-          pair.getRight()));
-    }
-    aggToTransformOpList.add(Pair.of(nonFilteredAggregationFunctions.toArray(new AggregationFunction[0]),
-        mainTransformOperator));
-
-    return new FilteredAggregationOperator(_queryContext.getAggregationFunctions(), aggToTransformOpList,
-        numTotalDocs);
-  }
-
-  /**
-   * Build a filter operator from the given FilterContext.
-   *
-   * It returns the FilterPlanNode to allow reusing plan level components such as predicate
-   * evaluator map
-   */
-  private Pair<FilterPlanNode, BaseFilterOperator> buildFilterOperator(FilterContext filterContext) {
-    FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext, filterContext);
-
-    return Pair.of(filterPlanNode, filterPlanNode.run());
-  }
-
-  /**
-   * Build transform and aggregation operators for the given bottom level plan.
-   * Note that this method operates only for non filtered aggregates.
-   * @param filterOperator Filter operator to be used in the corresponding chain
-   * @param filterPlanNode Plan node associated with the filter operator
-   * @return Pair, consisting of the built TransformOperator and Aggregation operator for chain
-   */
-  private BaseOperator<IntermediateResultsBlock> buildOperatorsForNonFilteredAggs(BaseFilterOperator filterOperator,
-      FilterPlanNode filterPlanNode) {
-    assert _queryContext.getAggregationFunctions() != null;
-
-    int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
-    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
-
-    Set<ExpressionContext> expressionsToTransform =
-        AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, null);
-
-    List<StarTreeV2> starTrees = _indexSegment.getStarTrees();
-
-    // Use metadata/dictionary to solve the query if possible
-    // TODO: Use the same operator for both of them so that COUNT(*), MAX(col) can be optimized
-    if (filterOperator.isResultMatchingAll()) {
-      if (isFitForMetadataBasedPlan(aggregationFunctions)) {
-        return new MetadataBasedAggregationOperator(aggregationFunctions,
-            _indexSegment.getSegmentMetadata(), Collections.emptyMap());
-      } else if (isFitForDictionaryBasedPlan(aggregationFunctions, _indexSegment)) {
-        Map<String, Dictionary> dictionaryMap = new HashMap<>();
-        for (AggregationFunction aggregationFunction : aggregationFunctions) {
-          String column = ((ExpressionContext) aggregationFunction.getInputExpressions().get(0)).getIdentifier();
-          dictionaryMap.computeIfAbsent(column, k -> _indexSegment.getDataSource(k).getDictionary());
-        }
-        return new DictionaryBasedAggregationOperator(aggregationFunctions, dictionaryMap,
-            numTotalDocs);
-      }
-    }
-
-    if (starTrees != null && !StarTreeUtils.isStarTreeDisabled(_queryContext)) {
-      // Use star-tree to solve the query if possible
-
-      AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
-          StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
-      if (aggregationFunctionColumnPairs != null) {
-        Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
-            StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, _queryContext.getFilter(),
-                filterPlanNode.getPredicateEvaluatorMap());
-        if (predicateEvaluatorsMap != null) {
-          for (StarTreeV2 starTreeV2 : starTrees) {
-            if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, null,
-                predicateEvaluatorsMap.keySet())) {
-
-              TransformOperator transformOperator = new StarTreeTransformPlanNode(starTreeV2,
-                  aggregationFunctionColumnPairs, null,
-                      predicateEvaluatorsMap, _queryContext.getDebugOptions()).run();
-              AggregationOperator aggregationOperator = new AggregationOperator(aggregationFunctions,
-                  transformOperator, numTotalDocs, true);
-
-              return aggregationOperator;
-            }
-          }
-        }
-      }
-    }
-
-    TransformOperator transformOperator = new TransformPlanNode(_indexSegment, _queryContext,
-          expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL, filterOperator).run();
-    AggregationOperator aggregationOperator = new AggregationOperator(aggregationFunctions,
-        transformOperator, numTotalDocs, false);
-
-    return aggregationOperator;
-  }
-
-  /**
-   * Builds the operator to be used for non filtered aggregations
-   */
-  private BaseOperator<IntermediateResultsBlock> buildNonFilteredAggOperator() {
-    Pair<FilterPlanNode, BaseFilterOperator> filterOperatorPair =
-        buildFilterOperator(_queryContext.getFilter());
-
-    return buildOperatorsForNonFilteredAggs(filterOperatorPair.getRight(), filterOperatorPair.getLeft());
-  }
-
-  /**
-   * Build the operator to be used for filtered aggregations
-   */
-  private BaseOperator<IntermediateResultsBlock> buildFilteredAggOperator() {
-    int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
-    // Build the operator chain for the main predicate
-    Pair<FilterPlanNode, BaseFilterOperator> filterOperatorPair =
-        buildFilterOperator(_queryContext.getFilter());
-    TransformOperator transformOperator = buildTransformOperatorForFilteredAggregates(filterOperatorPair.getRight());
-
-    return buildOperatorForFilteredAggregations(filterOperatorPair.getRight(), transformOperator,
-        numTotalDocs);
-  }
-
-  private TransformOperator buildTransformOperatorForFilteredAggregates(BaseFilterOperator filterOperator) {
-    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
-    Set<ExpressionContext> expressionsToTransform =
-        AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, null);
-
-    return new TransformPlanNode(_indexSegment, _queryContext,
-        expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL, filterOperator).run();
   }
 }
