@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.common.Block;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -60,6 +60,7 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
+import org.openjdk.jmh.infra.Blackhole;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
@@ -88,6 +89,8 @@ public class BenchmarkNativeAndLuceneBasedLike {
   int _numRows;
   @Param("1000")
   int _intBaseValue;
+  @Param({"0", "1", "10", "100"})
+  int _numBlocks;
 
   private PlanMaker _planMaker;
   private IndexSegment _indexSegment;
@@ -166,8 +169,12 @@ public class BenchmarkNativeAndLuceneBasedLike {
 
   @Benchmark
   @CompilerControl(CompilerControl.Mode.DONT_INLINE)
-  public Block query() {
-    return _planMaker.makeSegmentPlanNode(_indexSegment, _queryContext).run().nextBlock();
+  public void query(Blackhole bh) {
+    Operator<?> operator = _planMaker.makeSegmentPlanNode(_indexSegment, _queryContext).run();
+    bh.consume(operator);
+    for (int i = 0; i < _numBlocks; i++) {
+      bh.consume(operator.nextBlock());
+    }
   }
 
   public static void main(String[] args)
