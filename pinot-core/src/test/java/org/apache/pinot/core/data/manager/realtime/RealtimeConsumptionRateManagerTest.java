@@ -21,7 +21,7 @@ public class RealtimeConsumptionRateManagerTest {
   private static final StreamConfig STREAM_CONFIG_A = mock(StreamConfig.class);
   private static final StreamConfig STREAM_CONFIG_B = mock(StreamConfig.class);
   private static final StreamConfig STREAM_CONFIG_C = mock(StreamConfig.class);
-  private static RealtimeConsumptionRateManager consumptionRateManager;
+  private static RealtimeConsumptionRateManager _consumptionRateManager;
 
   static {
     LoadingCache<StreamConfig, Integer> cache = mock(LoadingCache.class);
@@ -34,21 +34,21 @@ public class RealtimeConsumptionRateManagerTest {
     when(STREAM_CONFIG_A.getTopicConsumptionRateLimit()).thenReturn(Optional.of(RATE_LIMIT_FOR_ENTIRE_TOPIC));
     when(STREAM_CONFIG_B.getTopicConsumptionRateLimit()).thenReturn(Optional.of(RATE_LIMIT_FOR_ENTIRE_TOPIC));
     when(STREAM_CONFIG_C.getTopicConsumptionRateLimit()).thenReturn(Optional.empty());
-    consumptionRateManager = new RealtimeConsumptionRateManager(cache);
+    _consumptionRateManager = new RealtimeConsumptionRateManager(cache);
   }
 
   @Test
   public void testCreateRateLimiter() {
     // topic A
-    ConsumptionRateLimiter rateLimiter = consumptionRateManager.createRateLimiter(STREAM_CONFIG_A, TABLE_NAME);
+    ConsumptionRateLimiter rateLimiter = _consumptionRateManager.createRateLimiter(STREAM_CONFIG_A, TABLE_NAME);
     assertEquals(5.0, ((RateLimiterImpl) rateLimiter).getRate(), DELTA);
 
     // topic B
-    rateLimiter = consumptionRateManager.createRateLimiter(STREAM_CONFIG_B, TABLE_NAME);
+    rateLimiter = _consumptionRateManager.createRateLimiter(STREAM_CONFIG_B, TABLE_NAME);
     assertEquals(2.5, ((RateLimiterImpl) rateLimiter).getRate(), DELTA);
 
     // topic C
-    rateLimiter = consumptionRateManager.createRateLimiter(STREAM_CONFIG_C, TABLE_NAME);
+    rateLimiter = _consumptionRateManager.createRateLimiter(STREAM_CONFIG_C, TABLE_NAME);
     assertEquals(rateLimiter, NOOP_RATE_LIMITER);
   }
 
