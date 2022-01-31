@@ -19,6 +19,7 @@
 
 package org.apache.pinot.core.data.manager.realtime;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -42,17 +43,27 @@ import org.slf4j.LoggerFactory;
  */
 public class RealtimeConsumptionRateManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeConsumptionRateManager.class);
-  private static final RealtimeConsumptionRateManager INSTANCE = new RealtimeConsumptionRateManager();
   private static final int CACHE_ENTRY_EXPIRATION_TIME_IN_MINUTES = 10;
 
+  private static volatile RealtimeConsumptionRateManager INSTANCE;
+
   // stream config object is required for fetching the partition count from the stream
-  private final LoadingCache<StreamConfig, Integer> _streamConfigToTopicPartitionCountMap = buildCache();
+  private final LoadingCache<StreamConfig, Integer> _streamConfigToTopicPartitionCountMap;
   private volatile boolean _isThrottlingAllowed = false;
 
-  private RealtimeConsumptionRateManager() {
+  @VisibleForTesting
+  RealtimeConsumptionRateManager(LoadingCache<StreamConfig, Integer> streamConfigToTopicPartitionCountMap) {
+    _streamConfigToTopicPartitionCountMap = streamConfigToTopicPartitionCountMap;
   }
 
   public static RealtimeConsumptionRateManager getInstance() {
+    if (INSTANCE == null) {
+      synchronized (RealtimeConsumptionRateManager.class) {
+        if (INSTANCE == null) {
+          INSTANCE = new RealtimeConsumptionRateManager(buildCache());
+        }
+      }
+    }
     return INSTANCE;
   }
 
@@ -60,7 +71,7 @@ public class RealtimeConsumptionRateManager {
     _isThrottlingAllowed = true;
   }
 
-  public ConsumptionRateLimiter createRateLimiter(StreamConfig streamConfig) {
+  public ConsumptionRateLimiter createRateLimiter(StreamConfig streamConfig, String tableName) {
     if (!streamConfig.getTopicConsumptionRateLimit().isPresent()) {
       return NOOP_RATE_LIMITER;
     }
@@ -73,14 +84,15 @@ public class RealtimeConsumptionRateManager {
     }
     double topicRateLimit = streamConfig.getTopicConsumptionRateLimit().get();
     double partitionRateLimit = topicRateLimit / partitionCount;
-    LOGGER.info("A rate limiter is setup for topic {} with rate limit: {} (topic rate limit: {}, partition count: {})",
-        streamConfig.getTopicName(), partitionRateLimit, topicRateLimit, partitionCount);
+    LOGGER.info("A consumption rate limiter is set up for topic {} in table {} with rate limit: {} "
+            + "(topic rate limit: {}, partition count: {})", streamConfig.getTopicName(), tableName, partitionRateLimit,
+        topicRateLimit, partitionCount);
     return new RateLimiterImpl(partitionRateLimit);
   }
 
-  private LoadingCache<StreamConfig, Integer> buildCache() {
+  private static LoadingCache<StreamConfig, Integer> buildCache() {
     return CacheBuilder.newBuilder().expireAfterWrite(CACHE_ENTRY_EXPIRATION_TIME_IN_MINUTES, TimeUnit.MINUTES)
-        .build(new CacheLoader<StreamConfig, Integer>() {
+        .build(new CacheLoader<>() {
           @Override
           public Integer load(StreamConfig streamConfig)
               throws Exception {
@@ -98,15 +110,18 @@ public class RealtimeConsumptionRateManager {
     void throttle(int numMsgs);
   }
 
-  private static final ConsumptionRateLimiter NOOP_RATE_LIMITER = n -> {
+  @VisibleForTesting
+  static final ConsumptionRateLimiter NOOP_RATE_LIMITER = n -> {
   };
 
-  private static class RateLimiterImpl implements ConsumptionRateLimiter {
+  @VisibleForTesting
+  static class RateLimiterImpl implements ConsumptionRateLimiter {
+    private final double _rate;
+    private final RateLimiter _rateLimiter;
 
-    private RateLimiter _rateLimiter;
-
-    public RateLimiterImpl(double rateLimit) {
-      _rateLimiter = RateLimiter.create(rateLimit);
+    private RateLimiterImpl(double rate) {
+      _rate = rate;
+      _rateLimiter = RateLimiter.create(rate);
     }
 
     @Override
@@ -114,6 +129,11 @@ public class RealtimeConsumptionRateManager {
       if (INSTANCE._isThrottlingAllowed && numMsgs > 0) {
         _rateLimiter.acquire(numMsgs);
       }
+    }
+
+    @VisibleForTesting
+    double getRate() {
+      return _rate;
     }
   }
 }

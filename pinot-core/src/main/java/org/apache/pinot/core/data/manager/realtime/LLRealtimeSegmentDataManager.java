@@ -1257,7 +1257,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         indexLoadingConfig.isRealtimeOffHeapAllocation(), indexLoadingConfig.isDirectRealtimeOffHeapAllocation(),
         serverMetrics);
 
-    _rateLimiter = RealtimeConsumptionRateManager.getInstance().createRateLimiter(_partitionLevelStreamConfig);
+    _rateLimiter = RealtimeConsumptionRateManager.getInstance()
+        .createRateLimiter(_partitionLevelStreamConfig, _tableNameWithType);
 
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
     if (sortedColumns.isEmpty()) {
