@@ -58,6 +58,7 @@ public class FilterPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;
   private final int _numDocs;
+  private FilterContext _filterContext;
 
   // Cache the predicate evaluators
   private final Map<Predicate, PredicateEvaluator> _predicateEvaluatorMap = new HashMap<>();
@@ -70,9 +71,16 @@ public class FilterPlanNode implements PlanNode {
     _numDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
   }
 
+  public FilterPlanNode(IndexSegment indexSegment, QueryContext queryContext,
+      FilterContext filterContext) {
+    this(indexSegment, queryContext);
+
+    _filterContext = filterContext;
+  }
+
   @Override
   public BaseFilterOperator run() {
-    FilterContext filter = _queryContext.getFilter();
+    FilterContext filter = _filterContext == null ? _queryContext.getFilter() : _filterContext;
     ThreadSafeMutableRoaringBitmap validDocIds = _indexSegment.getValidDocIds();
     boolean applyValidDocIds = validDocIds != null && !QueryOptionsUtils.isSkipUpsert(_queryContext.getQueryOptions());
     if (filter != null) {

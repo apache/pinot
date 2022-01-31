@@ -30,14 +30,25 @@ import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
  */
 public class FilterBlock implements Block {
   private final FilterBlockDocIdSet _filterBlockDocIdSet;
+  private FilterBlockDocIdSet _nonScanFilterBlockDocIdSet;
 
   public FilterBlock(FilterBlockDocIdSet filterBlockDocIdSet) {
     _filterBlockDocIdSet = filterBlockDocIdSet;
   }
 
+  /**
+   * Pre-scans the documents if needed, and returns a non-scan-based FilterBlockDocIdSet.
+   */
+  public FilterBlockDocIdSet getNonScanFilterBLockDocIdSet() {
+    if (_nonScanFilterBlockDocIdSet == null) {
+      _nonScanFilterBlockDocIdSet = _filterBlockDocIdSet.toNonScanDocIdSet();
+    }
+    return _nonScanFilterBlockDocIdSet;
+  }
+
   @Override
   public FilterBlockDocIdSet getBlockDocIdSet() {
-    return _filterBlockDocIdSet;
+    return _nonScanFilterBlockDocIdSet != null ? _nonScanFilterBlockDocIdSet : _filterBlockDocIdSet;
   }
 
   @Override

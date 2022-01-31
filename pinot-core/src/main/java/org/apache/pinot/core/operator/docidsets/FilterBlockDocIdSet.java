@@ -18,7 +18,16 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
+import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
+import org.apache.pinot.core.operator.dociditerators.AndDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.OrDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
+import org.apache.pinot.segment.spi.Constants;
+import org.roaringbitmap.RoaringBitmapWriter;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
@@ -32,4 +41,35 @@ public interface FilterBlockDocIdSet extends BlockDocIdSet {
    * filtering phase. This method should be called after the filtering is done.
    */
   long getNumEntriesScannedInFilter();
+
+  /**
+   * For scan-based FilterBlockDocIdSet, pre-scans the documents and returns a non-scan-based FilterBlockDocIdSet.
+   */
+  default FilterBlockDocIdSet toNonScanDocIdSet() {
+    BlockDocIdIterator docIdIterator = iterator();
+
+    // NOTE: AND and OR DocIdIterator might contain scan-based DocIdIterator
+    // TODO: This scan is not counted in the execution stats
+    if (docIdIterator instanceof ScanBasedDocIdIterator || docIdIterator instanceof AndDocIdIterator
+        || docIdIterator instanceof OrDocIdIterator) {
+      RoaringBitmapWriter<MutableRoaringBitmap> bitmapWriter =
+          RoaringBitmapWriter.bufferWriter().runCompress(false).get();
+      int docId;
+      while ((docId = docIdIterator.next()) != Constants.EOF) {
+        bitmapWriter.add(docId);
+      }
+      return new RangelessBitmapDocIdSet(bitmapWriter.get());
+    }
+
+    // NOTE: AND and OR DocIdSet might return BitmapBasedDocIdIterator after processing the iterators. Create a new
+    //       DocIdSet to prevent processing the iterators again
+    if (docIdIterator instanceof RangelessBitmapDocIdIterator) {
+      return new RangelessBitmapDocIdSet((RangelessBitmapDocIdIterator) docIdIterator);
+    }
+    if (docIdIterator instanceof BitmapDocIdIterator) {
+      return new BitmapDocIdSet((BitmapDocIdIterator) docIdIterator);
+    }
+
+    return this;
+  }
 }

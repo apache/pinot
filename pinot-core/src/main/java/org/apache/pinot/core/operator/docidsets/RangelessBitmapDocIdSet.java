@@ -18,23 +18,23 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
-import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-public class BitmapDocIdSet implements FilterBlockDocIdSet {
-  private final BitmapDocIdIterator _iterator;
+public class RangelessBitmapDocIdSet implements FilterBlockDocIdSet {
+  private final RangelessBitmapDocIdIterator _iterator;
 
-  public BitmapDocIdSet(ImmutableRoaringBitmap docIds, int numDocs) {
-    _iterator = new BitmapDocIdIterator(docIds, numDocs);
+  public RangelessBitmapDocIdSet(ImmutableRoaringBitmap docIds) {
+    _iterator = new RangelessBitmapDocIdIterator(docIds);
   }
 
-  public BitmapDocIdSet(BitmapDocIdIterator iterator) {
+  public RangelessBitmapDocIdSet(RangelessBitmapDocIdIterator iterator) {
     _iterator = iterator;
   }
 
   @Override
-  public BitmapDocIdIterator iterator() {
+  public RangelessBitmapDocIdIterator iterator() {
     return _iterator;
   }
 
