@@ -45,8 +45,6 @@ public class RealtimeConsumptionRateManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeConsumptionRateManager.class);
   private static final int CACHE_ENTRY_EXPIRATION_TIME_IN_MINUTES = 10;
 
-  private static volatile RealtimeConsumptionRateManager _instance;
-
   // stream config object is required for fetching the partition count from the stream
   private final LoadingCache<StreamConfig, Integer> _streamConfigToTopicPartitionCountMap;
   private volatile boolean _isThrottlingAllowed = false;
@@ -56,15 +54,12 @@ public class RealtimeConsumptionRateManager {
     _streamConfigToTopicPartitionCountMap = streamConfigToTopicPartitionCountMap;
   }
 
+  private static class InstanceHolder {
+    private static final RealtimeConsumptionRateManager INSTANCE = new RealtimeConsumptionRateManager(buildCache());
+  }
+
   public static RealtimeConsumptionRateManager getInstance() {
-    if (_instance == null) {
-      synchronized (RealtimeConsumptionRateManager.class) {
-        if (_instance == null) {
-          _instance = new RealtimeConsumptionRateManager(buildCache());
-        }
-      }
-    }
-    return _instance;
+    return InstanceHolder.INSTANCE;
   }
 
   public void enableThrottling() {
@@ -126,7 +121,7 @@ public class RealtimeConsumptionRateManager {
 
     @Override
     public void throttle(int numMsgs) {
-      if (_instance._isThrottlingAllowed && numMsgs > 0) {
+      if (InstanceHolder.INSTANCE._isThrottlingAllowed && numMsgs > 0) {
         _rateLimiter.acquire(numMsgs);
       }
     }
