@@ -75,7 +75,7 @@ public class ZKOperator {
       }
       LOGGER.info("Adding new segment {} from table {}", segmentName, tableNameWithType);
       processNewSegment(segmentMetadata, finalSegmentLocationURI, currentSegmentLocation, zkDownloadURI, headers,
-          crypter, tableNameWithType, segmentName, moveSegmentToFinalLocation);
+          crypter, tableNameWithType, segmentName, moveSegmentToFinalLocation, enableParallelPushProtection);
       return;
     }
 
@@ -222,8 +222,36 @@ public class ZKOperator {
 
   private void processNewSegment(SegmentMetadata segmentMetadata, URI finalSegmentLocationURI,
       File currentSegmentLocation, String zkDownloadURI, HttpHeaders headers, String crypter, String tableNameWithType,
-      String segmentName, boolean moveSegmentToFinalLocation)
+      String segmentName, boolean moveSegmentToFinalLocation, boolean enableParallelPushProtection)
       throws Exception {
+    SegmentZKMetadata newSegmentZKMetadata = _pinotHelixResourceManager
+        .constructZkMetadataForNewSegment(tableNameWithType, segmentMetadata, zkDownloadURI, crypter);
+
+    // Lock if enableParallelPushProtection is true.
+    if (enableParallelPushProtection) {
+      newSegmentZKMetadata.setSegmentUploadStartTime(System.currentTimeMillis());
+    }
+
+    // Update zk metadata customer map
+    String segmentZKMetadataCustomMapModifierStr = headers != null ? headers
+        .getHeaderString(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER) : null;
+    if (segmentZKMetadataCustomMapModifierStr != null) {
+      SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier =
+          new SegmentZKMetadataCustomMapModifier(segmentZKMetadataCustomMapModifierStr);
+      newSegmentZKMetadata
+          .setCustomMap(segmentZKMetadataCustomMapModifier.modifyMap(newSegmentZKMetadata.getCustomMap()));
+    }
+
+    int expectedVersion = -1;
+
+    if (!_pinotHelixResourceManager.createSegmentZkMetadata(tableNameWithType, newSegmentZKMetadata)) {
+      throw new RuntimeException(
+          "Failed to create ZK metadata for segment: " + segmentName + " of table: " + tableNameWithType);
+    } else {
+      // Update version because zk metadata update is successful.
+      ++expectedVersion;
+    }
+
     // For v1 segment uploads, we will not move the segment
     if (moveSegmentToFinalLocation) {
       try {
@@ -232,29 +260,36 @@ public class ZKOperator {
             .info("Moved segment {} from temp location {} to {}", segmentName, currentSegmentLocation.getAbsolutePath(),
                 finalSegmentLocationURI.getPath());
       } catch (Exception e) {
+        // Cleanup the Zk entry and the segment from the permanent directory if it exists.
         LOGGER
             .error("Could not move segment {} from table {} to permanent directory", segmentName, tableNameWithType, e);
-        throw new RuntimeException(e);
+        _pinotHelixResourceManager.deleteSegment(tableNameWithType, segmentName);
+        LOGGER.info("Deleted zk entry and segment {} for table {}.", segmentName, tableNameWithType);
+        throw e;
       }
     } else {
       LOGGER.info("Skipping segment move, keeping segment {} from table {} at {}", segmentName, tableNameWithType,
           zkDownloadURI);
     }
-    _pinotHelixResourceManager.addNewSegment(tableNameWithType, segmentMetadata, zkDownloadURI, crypter);
 
-    // Update zk metadata customer map
-    String segmentZKMetadataCustomMapModifierStr = headers != null ? headers
-        .getHeaderString(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER) : null;
-    if (segmentZKMetadataCustomMapModifierStr != null) {
-      ZNRecord segmentMetadataZnRecord =
-          _pinotHelixResourceManager.getSegmentMetadataZnRecord(tableNameWithType, segmentName);
-      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadataZnRecord);
+    try {
+      _pinotHelixResourceManager.assignTableSegment(tableNameWithType, segmentMetadata.getName());
+    } catch (Exception e) {
+      // assignTableSegment removes the zk entry. Call deleteSegment to remove the segment from permanent location.
+      LOGGER
+          .error("Caught exception while calling assignTableSegment for adding segment: {} to table: {}", segmentName,
+              tableNameWithType, e);
+      _pinotHelixResourceManager.deleteSegment(tableNameWithType, segmentName);
+      LOGGER.info("Deleted zk entry and segment {} for table {}.", segmentName, tableNameWithType);
+      throw e;
+    }
 
-      SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier =
-          new SegmentZKMetadataCustomMapModifier(segmentZKMetadataCustomMapModifierStr);
-      segmentZKMetadata.setCustomMap(segmentZKMetadataCustomMapModifier.modifyMap(segmentZKMetadata.getCustomMap()));
-      if (!_pinotHelixResourceManager
-          .updateZkMetadata(tableNameWithType, segmentZKMetadata, segmentMetadataZnRecord.getVersion())) {
+    if (enableParallelPushProtection) {
+      // Release lock.
+      newSegmentZKMetadata.setSegmentUploadStartTime(-1);
+      if (!_pinotHelixResourceManager.updateZkMetadata(tableNameWithType, newSegmentZKMetadata, expectedVersion)) {
+        _pinotHelixResourceManager.deleteSegment(tableNameWithType, segmentName);
+        LOGGER.info("Deleted zk entry and segment {} for table {}.", segmentName, tableNameWithType);
         throw new RuntimeException(
             "Failed to update ZK metadata for segment: " + segmentName + " of table: " + tableNameWithType);
       }

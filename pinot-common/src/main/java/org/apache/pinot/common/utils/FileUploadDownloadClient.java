@@ -811,6 +811,33 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   /**
+   * Upload segment with segment file using  table name, type and enableParallelPushProtection as a request parameters.
+   *
+   * @param uri URI
+   * @param segmentName Segment name
+   * @param segmentFile Segment file
+   * @param tableName Table name with or without type suffix
+   * @param tableType Table type
+   * @param enableParallelPushProtection enable protection against concurrent segment uploads for the same segment
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public SimpleHttpResponse uploadSegment(URI uri, String segmentName, File segmentFile, String tableName,
+      TableType tableType, boolean enableParallelPushProtection)
+      throws IOException, HttpErrorStatusException {
+    NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, tableName);
+    NameValuePair tableTypeValuePair = new BasicNameValuePair(QueryParameters.TABLE_TYPE, tableType.name());
+    NameValuePair enableParallelPushProtectionValuePair =
+        new BasicNameValuePair(QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION,
+            String.valueOf(enableParallelPushProtection));
+
+    List<NameValuePair> parameters =
+        Arrays.asList(tableNameValuePair, tableTypeValuePair, enableParallelPushProtectionValuePair);
+    return uploadSegment(uri, segmentName, segmentFile, null, parameters, DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  /**
    * Upload segment with segment file input stream.
    *
    * Note: table name has to be set as a parameter.

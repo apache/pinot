@@ -1778,48 +1778,69 @@ public class PinotHelixResourceManager {
 
   public void addNewSegment(String tableNameWithType, SegmentMetadata segmentMetadata, String downloadUrl,
       @Nullable String crypter) {
-    String segmentName = segmentMetadata.getName();
-    InstancePartitionsType instancePartitionsType;
     // NOTE: must first set the segment ZK metadata before assigning segment to instances because segment assignment
     // might need them to determine the partition of the segment, and server will need them to download the segment
-    ZNRecord znRecord;
+    SegmentZKMetadata segmentZkmetadata =
+        constructZkMetadataForNewSegment(tableNameWithType, segmentMetadata, downloadUrl, crypter);
+    ZNRecord znRecord = segmentZkmetadata.toZNRecord();
+
+    String segmentName = segmentMetadata.getName();
+    String segmentZKMetadataPath =
+        ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
+    Preconditions.checkState(_propertyStore.set(segmentZKMetadataPath, znRecord, AccessOption.PERSISTENT),
+        "Failed to set segment ZK metadata for table: " + tableNameWithType + ", segment: " + segmentName);
+    LOGGER.info("Added segment: {} of table: {} to property store", segmentName, tableNameWithType);
+
+    assignTableSegment(tableNameWithType, segmentName);
+  }
+
+  /**
+   * Construct segmentZkMetadata for the realtime or offline table.
+   *
+   * @param tableNameWithType
+   * @param segmentMetadata
+   * @param downloadUrl
+   * @param crypter
+   * @return
+   */
+  public SegmentZKMetadata constructZkMetadataForNewSegment(String tableNameWithType, SegmentMetadata segmentMetadata,
+      String downloadUrl, @Nullable String crypter) {
+    // Construct segment zk metadata with common fields for offline and realtime.
+    String segmentName = segmentMetadata.getName();
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
+    ZKMetadataUtils.updateSegmentMetadata(segmentZKMetadata, segmentMetadata);
+    segmentZKMetadata.setDownloadUrl(downloadUrl);
+    segmentZKMetadata.setCrypterName(crypter);
+
     if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
       Preconditions.checkState(isUpsertTable(tableNameWithType),
           "Upload segment " + segmentName + " for non upsert enabled realtime table " + tableNameWithType
               + " is not supported");
+      // Set fields specific to realtime segments.
+      segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.UPLOADED);
+    } else {
+      // Set fields specific to offline segments.
+      segmentZKMetadata.setPushTime(System.currentTimeMillis());
+    }
+
+    return segmentZKMetadata;
+  }
+
+  public void assignTableSegment(String tableNameWithType, String segmentName) {
+    String segmentZKMetadataPath =
+        ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
+    InstancePartitionsType instancePartitionsType;
+    if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
       // In an upsert enabled LLC realtime table, all segments of the same partition are collocated on the same server
       // -- consuming or completed. So it is fine to use CONSUMING as the InstancePartitionsType.
       // TODO When upload segments is open to all realtime tables, we should change the type to COMPLETED instead.
       // In addition, RealtimeSegmentAssignment.assignSegment(..) method should be updated so that the method does not
       // assign segments to CONSUMING instance partition only.
       instancePartitionsType = InstancePartitionsType.CONSUMING;
-      // Build the realtime segment zk metadata with necessary fields.
-      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
-      ZKMetadataUtils.updateSegmentMetadata(segmentZKMetadata, segmentMetadata);
-      segmentZKMetadata.setDownloadUrl(downloadUrl);
-      segmentZKMetadata.setCrypterName(crypter);
-      segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.UPLOADED);
-      znRecord = segmentZKMetadata.toZNRecord();
     } else {
       instancePartitionsType = InstancePartitionsType.OFFLINE;
-      // Build the offline segment zk metadata with necessary fields.
-      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
-      ZKMetadataUtils.updateSegmentMetadata(segmentZKMetadata, segmentMetadata);
-      segmentZKMetadata.setDownloadUrl(downloadUrl);
-      segmentZKMetadata.setCrypterName(crypter);
-      segmentZKMetadata.setPushTime(System.currentTimeMillis());
-      znRecord = segmentZKMetadata.toZNRecord();
     }
-    String segmentZKMetadataPath =
-        ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
-    Preconditions.checkState(_propertyStore.set(segmentZKMetadataPath, znRecord, AccessOption.PERSISTENT),
-        "Failed to set segment ZK metadata for table: " + tableNameWithType + ", segment: " + segmentName);
-    LOGGER.info("Added segment: {} of table: {} to property store", segmentName, tableNameWithType);
-    assignTableSegment(tableNameWithType, segmentName, segmentZKMetadataPath, instancePartitionsType);
-  }
 
-  private void assignTableSegment(String tableNameWithType, String segmentName, String segmentZKMetadataPath,
-      InstancePartitionsType instancePartitionsType) {
     // Assign instances for the segment and add it into IdealState
     try {
       TableConfig tableConfig = getTableConfig(tableNameWithType);
@@ -1878,6 +1899,17 @@ public class PinotHelixResourceManager {
   public ZNRecord getSegmentMetadataZnRecord(String tableNameWithType, String segmentName) {
     return ZKMetadataProvider.getZnRecord(_propertyStore,
         ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName));
+  }
+
+  /**
+   * Creates a new SegmentZkMetadata entry. This call is atomic and ensures that only of the create calls succeeds.
+   *
+   * @param tableNameWithType
+   * @param segmentZKMetadata
+   * @return
+   */
+  public boolean createSegmentZkMetadata(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
+    return ZKMetadataProvider.createSegmentZkMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);
   }
 
   public boolean updateZkMetadata(String tableNameWithType, SegmentZKMetadata segmentZKMetadata, int expectedVersion) {

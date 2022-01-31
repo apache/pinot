@@ -141,6 +141,26 @@ public class ZKMetadataProvider {
     }
   }
 
+  /**
+   * Creates a new znode for SegmentZkMetadata. This call is atomic. If there are concurrent calls trying to create the
+   * same znode, only one of them would succeed.
+   *
+   * @param propertyStore Helix property store
+   * @param tableNameWithType Table name with type
+   * @param segmentZKMetadata Segment Zk metadata
+   * @return boolean indicating success/failure
+   */
+  public static boolean createSegmentZkMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType,
+      SegmentZKMetadata segmentZKMetadata) {
+    try {
+      return propertyStore
+          .create(constructPropertyStorePathForSegment(tableNameWithType, segmentZKMetadata.getSegmentName()),
+              segmentZKMetadata.toZNRecord(), AccessOption.PERSISTENT);
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
   public static boolean setSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType,
       SegmentZKMetadata segmentZKMetadata, int expectedVersion) {
     // NOTE: Helix will throw ZkBadVersionException if version does not match
