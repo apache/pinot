@@ -87,7 +87,7 @@ public class ServerChannels {
       throws Exception {
     byte[] requestBytes = _serializer.serialize(instanceRequest);
     _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new)
-        .sendRequestOrTimeOut(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes, timeoutMs);
+        .sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes, timeoutMs);
   }
 
   public void shutDown() {
@@ -100,7 +100,7 @@ public class ServerChannels {
     final ServerRoutingInstance _serverRoutingInstance;
     final Bootstrap _bootstrap;
     // lock to protect channel as requests must be written into channel sequentially
-    private final ReentrantLock _channelLock = new ReentrantLock();
+    final ReentrantLock _channelLock = new ReentrantLock();
     Channel _channel;
 
     ServerChannel(ServerRoutingInstance serverRoutingInstance) {
@@ -143,7 +143,7 @@ public class ServerChannels {
       }
     }
 
-    private void sendRequestOrTimeOut(String rawTableName, AsyncQueryResponse asyncQueryResponse,
+    private void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
         ServerRoutingInstance serverRoutingInstance, byte[] requestBytes, long timeoutMs)
         throws Exception {
       if (_channelLock.tryLock(timeoutMs, TimeUnit.MILLISECONDS)) {
