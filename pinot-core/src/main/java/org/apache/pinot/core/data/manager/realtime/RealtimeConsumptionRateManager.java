@@ -92,7 +92,7 @@ public class RealtimeConsumptionRateManager {
 
   private static LoadingCache<StreamConfig, Integer> buildCache() {
     return CacheBuilder.newBuilder().expireAfterWrite(CACHE_ENTRY_EXPIRATION_TIME_IN_MINUTES, TimeUnit.MINUTES)
-        .build(new CacheLoader<>() {
+        .build(new CacheLoader<StreamConfig, Integer>() {
           @Override
           public Integer load(StreamConfig streamConfig)
               throws Exception {
