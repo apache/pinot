@@ -77,14 +77,11 @@ public class RealTimeRegexpMatcher {
     if (_automaton.getNumberOfStates() == 0) {
       return;
     }
-
     // Automaton start state and FST start node is added to the queue.
     queue.add(new Path(_automaton.getInitialState(), _fst.getStartState(), null, new ArrayList<>()));
-
     Set<State> acceptStates = _automaton.getAcceptStates();
     while (!queue.isEmpty()) {
       final Path path = queue.remove();
-
       // If automaton is in accept state and the fstNode is final (i.e. end node) then add the entry to endNodes which
       // contains the result set.
       if (acceptStates.contains(path._state)) {
@@ -95,20 +92,16 @@ public class RealTimeRegexpMatcher {
       }
 
       Set<Transition> stateTransitions = path._state.getTransitionSet();
-
       for (Transition t : stateTransitions) {
         final int min = t._min;
         final int max = t._max;
-
         if (min == max) {
           MutableArc arc = getArcForLabel(path._node, t._min);
-
           if (arc != null) {
             queue.add(new Path(t._to, arc.getNextState(), arc, path._pathState));
           }
         } else {
           List<MutableArc> arcs = path._node.getArcs();
-
           for (MutableArc arc : arcs) {
             char label = arc.getNextState().getLabel();
             if (label >= min && label <= max) {
@@ -144,9 +137,7 @@ public class RealTimeRegexpMatcher {
       _state = state;
       _node = node;
       _fstArc = fstArc;
-
       _pathState = pathState;
-
       _pathState.add(node.getLabel());
     }
   }

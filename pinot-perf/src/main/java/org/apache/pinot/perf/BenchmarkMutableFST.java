@@ -26,7 +26,9 @@ import java.util.Objects;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import org.apache.lucene.util.fst.FST;
 import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
+import org.apache.pinot.segment.local.utils.fst.RegexpMatcher;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.MutableFST;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.MutableFSTImpl;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RealTimeRegexpMatcher;
@@ -56,9 +58,8 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 public class BenchmarkMutableFST {
   @Param({"q.[aeiou]c.*", ".*a", "b.*", ".*", ".*ated", ".*ba.*"})
   public String _regex;
-
   private MutableFST _mutableFST;
-  private org.apache.lucene.util.fst.FST _fst;
+  private FST _fst;
 
   @Setup
   public void setUp()
@@ -90,7 +91,7 @@ public class BenchmarkMutableFST {
   @Benchmark
   public List testLuceneRegex()
       throws IOException {
-    return org.apache.pinot.segment.local.utils.fst.RegexpMatcher.regexMatch(_regex, _fst);
+    return RegexpMatcher.regexMatch(_regex, _fst);
   }
 
   public static void main(String[] args)
