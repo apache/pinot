@@ -77,6 +77,10 @@
       <artifactId>pinot-segment-spi</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-kinesis</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.xerial.larray</groupId>
       <artifactId>larray-mmap</artifactId>
     </dependency>
@@ -165,6 +169,12 @@
       <version>${project.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-kinesis</artifactId>
+      <version>${project.version}</version>
+      <scope>compile</scope>
     </dependency>
   </dependencies>
 </project>
