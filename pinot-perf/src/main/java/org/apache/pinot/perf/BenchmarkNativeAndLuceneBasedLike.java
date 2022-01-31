@@ -83,7 +83,8 @@ public class BenchmarkNativeAndLuceneBasedLike {
 
   @Param({"LUCENE", "NATIVE"})
   private FSTType _fstType;
-  @Param("SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE '%domain%'")
+  @Param({"SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE '%domain%'",
+      "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE 'www.domain%'"})
   String _query;
   @Param("2500000")
   int _numRows;
