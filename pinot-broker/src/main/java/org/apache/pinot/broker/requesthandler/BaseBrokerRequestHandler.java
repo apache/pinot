@@ -1471,7 +1471,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
       //if query has a '*' selection along with other columns
       if (selectStarExpr != null) {
-        expandStarExpressionToActualColumns(pinotQuery, columnNameMap, selectStarExpr);
+        expandStarExpressionsToActualColumns(pinotQuery, columnNameMap, selectStarExpr);
       }
       Expression filterExpression = pinotQuery.getFilterExpression();
       if (filterExpression != null) {
@@ -1498,7 +1498,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
   }
 
-  private static void expandStarExpressionToActualColumns(PinotQuery pinotQuery, Map<String, String> columnNameMap,
+  private static void expandStarExpressionsToActualColumns(PinotQuery pinotQuery, Map<String, String> columnNameMap,
       Expression selectStarExpr) {
     List<Expression> originalSelections = pinotQuery.getSelectList();
     //expand '*'
