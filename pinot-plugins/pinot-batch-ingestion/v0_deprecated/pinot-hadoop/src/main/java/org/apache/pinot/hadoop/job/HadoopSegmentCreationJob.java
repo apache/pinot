@@ -133,7 +133,7 @@ public class HadoopSegmentCreationJob extends SegmentCreationJob {
       throw new RuntimeException("Job failed: " + job);
     }
 
-    moveSegmentsToOutputDir();
+    moveSegmentsToOutputDir(numDataFiles);
 
     cleanup(job);
   }
@@ -171,9 +171,18 @@ public class HadoopSegmentCreationJob extends SegmentCreationJob {
   protected void addAdditionalJobProperties(Job job) {
   }
 
-  protected void moveSegmentsToOutputDir()
+  protected void moveSegmentsToOutputDir(int numberOfDataFiles)
       throws IOException {
     Path segmentTarDir = new Path(new Path(_stagingDir, "output"), JobConfigConstants.SEGMENT_TAR_DIR);
+
+    // Validate whether the number of input files match with the number of output files,
+    // as there is 1:1 mapping between the input and output files.
+    int numberOfOutputFiles = _outputDirFileSystem.listStatus(segmentTarDir).length;
+    if (numberOfDataFiles != numberOfOutputFiles) {
+      throw new RuntimeException(
+          String.format("The number of input files doesn't match with the number of output files."
+              + " Number of input files: %d. Number of output files: %d", numberOfDataFiles, numberOfOutputFiles));
+    }
     movePath(_outputDirFileSystem, segmentTarDir.toString(), _outputDir, true);
   }
 
