@@ -33,6 +33,7 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.ReentrantLock;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.BrokerGauge;
@@ -152,6 +153,8 @@ public class ServerChannels {
         } finally {
           _channelLock.unlock();
         }
+      } else {
+        throw new TimeoutException("Timeout while acquiring channel lock");
       }
     }
 
