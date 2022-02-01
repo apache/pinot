@@ -261,8 +261,8 @@ public class ZKMetadataProvider {
         }
       }
     }
-    if (schema != null) {
-      LOGGER.warn("Schema name does not match raw table name, schema name: {}, raw table name: {}",
+    if (schema != null && LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Schema name does not match raw table name, schema name: {}, raw table name: {}",
           schema.getSchemaName(), TableNameBuilder.extractRawTableName(tableName));
     }
     return schema;
