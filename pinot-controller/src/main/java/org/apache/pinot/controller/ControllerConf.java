@@ -379,16 +379,16 @@ public class ControllerConf extends PinotConfiguration {
         getControllerPort() == null ? Arrays.asList("http") : Arrays.asList());
   }
 
-  public String getControllerAccessProtocolProperty(String protocol, String property) {
-    return getProperty(CONTROLLER_ACCESS_PROTOCOLS + "." + protocol + "." + property);
+  public String getControllerAccessProtocolProperty(String name, String property) {
+    return getProperty(CONTROLLER_ACCESS_PROTOCOLS + "." + name + "." + property);
   }
 
-  public String getControllerAccessProtocolProperty(String protocol, String property, String defaultValue) {
-    return getProperty(CONTROLLER_ACCESS_PROTOCOLS + "." + protocol + "." + property, defaultValue);
+  public String getControllerAccessProtocolProperty(String name, String property, String defaultValue) {
+    return getProperty(CONTROLLER_ACCESS_PROTOCOLS + "." + name + "." + property, defaultValue);
   }
 
-  public boolean getControllerAccessProtocolProperty(String protocol, String property, boolean defaultValue) {
-    return getProperty(CONTROLLER_ACCESS_PROTOCOLS + "." + protocol + "." + property, defaultValue);
+  public boolean getControllerAccessProtocolProperty(String name, String property, boolean defaultValue) {
+    return getProperty(CONTROLLER_ACCESS_PROTOCOLS + "." + name + "." + property, defaultValue);
   }
 
   public String getDataDir() {
