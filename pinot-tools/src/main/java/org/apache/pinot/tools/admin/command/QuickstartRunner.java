@@ -124,8 +124,8 @@ public class QuickstartRunner {
     for (int i = 0; i < _numControllers; i++) {
       StartControllerCommand controllerStarter = new StartControllerCommand();
       controllerStarter.setControllerPort(String.valueOf(DEFAULT_CONTROLLER_PORT + i))
-          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS)
-          .setClusterName(CLUSTER_NAME).setTenantIsolation(_enableTenantIsolation)
+          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
+          .setTenantIsolation(_enableTenantIsolation)
           .setDataDir(new File(_tempDir, DEFAULT_CONTROLLER_DIR + i).getAbsolutePath())
           .setConfigOverrides(_configOverrides);
       controllerStarter.execute();
@@ -138,8 +138,7 @@ public class QuickstartRunner {
     for (int i = 0; i < _numBrokers; i++) {
       StartBrokerCommand brokerStarter = new StartBrokerCommand();
       brokerStarter.setPort(DEFAULT_BROKER_PORT + i)
-          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS)
-          .setClusterName(CLUSTER_NAME)
+          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
           .setConfigOverrides(_configOverrides);
       brokerStarter.execute();
       _brokerPorts.add(DEFAULT_BROKER_PORT + i);
@@ -151,8 +150,7 @@ public class QuickstartRunner {
     for (int i = 0; i < _numServers; i++) {
       StartServerCommand serverStarter = new StartServerCommand();
       serverStarter.setPort(DEFAULT_SERVER_NETTY_PORT + i).setAdminPort(DEFAULT_SERVER_ADMIN_API_PORT + i)
-          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS)
-          .setClusterName(CLUSTER_NAME)
+          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
           .setDataDir(new File(_tempDir, DEFAULT_SERVER_DATA_DIR + i).getAbsolutePath())
           .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath())
           .setConfigOverrides(_configOverrides);
@@ -165,8 +163,7 @@ public class QuickstartRunner {
     for (int i = 0; i < _numMinions; i++) {
       StartMinionCommand minionStarter = new StartMinionCommand();
       minionStarter.setMinionPort(DEFAULT_MINION_PORT + i)
-          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS)
-          .setClusterName(CLUSTER_NAME)
+          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
           .setConfigOverrides(_configOverrides);
       minionStarter.execute();
     }
@@ -270,6 +267,14 @@ public class QuickstartRunner {
     int brokerPort = _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
     return JsonUtils.stringToJsonNode(new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort))
         .setQueryType(CommonConstants.Broker.Request.SQL).setAuthToken(_authToken).setQuery(query).run());
+  }
+
+  public String estimateTableSize(String tableName, String schemaPath, String tableConfigPath, float messageRate)
+      throws Exception {
+    int brokerPort = _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
+    return new HeapUsageEstimateCommand().setBrokerPort(String.valueOf(brokerPort)).setAuthToken(_authToken)
+        .setTableName(tableName).setSchemaFile(schemaPath).setTableConfigFile(tableConfigPath)
+        .setMessageRate(messageRate).run();
   }
 
   public static void registerDefaultPinotFS() {
