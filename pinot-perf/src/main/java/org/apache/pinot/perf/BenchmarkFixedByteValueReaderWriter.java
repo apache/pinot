@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.SplittableRandom;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
+import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Level;
@@ -39,7 +40,7 @@ public class BenchmarkFixedByteValueReaderWriter {
   @Param({"8", "32", "1024", "65536"})
   int _length;
 
-  @Param("4096")
+  @Param({"512", "4096", "8192", "16384"})
   int _values;
 
   @Param({"true", "false"})
@@ -50,6 +51,7 @@ public class BenchmarkFixedByteValueReaderWriter {
 
   private PinotDataBuffer _dataBuffer;
   private FixedByteValueReaderWriter _writer;
+  private StringDictionary _stringDictionary;
   byte[] _buffer;
 
   @Setup(Level.Trial)
@@ -66,6 +68,7 @@ public class BenchmarkFixedByteValueReaderWriter {
       bytes[index] = 0;
     }
     _buffer = bytes;
+    _stringDictionary = new StringDictionary(_dataBuffer, _values, _length, (byte) _paddingByte);
   }
 
   @TearDown(Level.Trial)
@@ -78,6 +81,13 @@ public class BenchmarkFixedByteValueReaderWriter {
   public void readStrings(Blackhole bh) {
     for (int i = 0; i < _values; i++) {
       bh.consume(_writer.getUnpaddedString(i, _length, (byte) _paddingByte, _buffer));
+    }
+  }
+
+  @Benchmark
+  public void readStringsFromDictionary(Blackhole bh) {
+    for (int i = 0; i < _values; i++) {
+      bh.consume(_stringDictionary.getStringValue(i));
     }
   }
 }

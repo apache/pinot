@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers;
 
+import java.io.IOException;
+import java.util.Arrays;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -25,8 +27,12 @@ import org.apache.pinot.spi.utils.BytesUtils;
 
 public class StringDictionary extends BaseImmutableDictionary {
 
+  private static final int MAX_INTERNED_BYTES = 10 * 1024 * 1024; // 10MB
+  private final String[] _internTable;
+
   public StringDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
     super(dataBuffer, length, numBytesPerValue, paddingByte);
+    _internTable = length * numBytesPerValue < MAX_INTERNED_BYTES ? new String[length] : null;
   }
 
   @Override
@@ -41,44 +47,44 @@ public class StringDictionary extends BaseImmutableDictionary {
 
   @Override
   public String get(int dictId) {
-    return getUnpaddedString(dictId, getBuffer());
+    return internStringValue(dictId);
   }
 
   @Override
   public int getIntValue(int dictId) {
-    return Integer.parseInt(getUnpaddedString(dictId, getBuffer()));
+    return Integer.parseInt(internStringValue(dictId));
   }
 
   @Override
   public long getLongValue(int dictId) {
-    return Long.parseLong(getUnpaddedString(dictId, getBuffer()));
+    return Long.parseLong(internStringValue(dictId));
   }
 
   @Override
   public float getFloatValue(int dictId) {
-    return Float.parseFloat(getUnpaddedString(dictId, getBuffer()));
+    return Float.parseFloat(internStringValue(dictId));
   }
 
   @Override
   public double getDoubleValue(int dictId) {
-    return Double.parseDouble(getUnpaddedString(dictId, getBuffer()));
+    return Double.parseDouble(internStringValue(dictId));
   }
 
   @Override
   public String getStringValue(int dictId) {
-    return getUnpaddedString(dictId, getBuffer());
+    return internStringValue(dictId);
   }
 
   @Override
   public byte[] getBytesValue(int dictId) {
-    return BytesUtils.toBytes(getUnpaddedString(dictId, getBuffer()));
+    return BytesUtils.toBytes(internStringValue(dictId, getBuffer()));
   }
 
   @Override
   public void readIntValues(int[] dictIds, int length, int[] outValues) {
     byte[] buffer = getBuffer();
     for (int i = 0; i < length; i++) {
-      outValues[i] = Integer.parseInt(getUnpaddedString(dictIds[i], buffer));
+      outValues[i] = Integer.parseInt(internStringValue(dictIds[i], buffer));
     }
   }
 
@@ -86,7 +92,7 @@ public class StringDictionary extends BaseImmutableDictionary {
   public void readLongValues(int[] dictIds, int length, long[] outValues) {
     byte[] buffer = getBuffer();
     for (int i = 0; i < length; i++) {
-      outValues[i] = Long.parseLong(getUnpaddedString(dictIds[i], buffer));
+      outValues[i] = Long.parseLong(internStringValue(dictIds[i], buffer));
     }
   }
 
@@ -94,7 +100,7 @@ public class StringDictionary extends BaseImmutableDictionary {
   public void readFloatValues(int[] dictIds, int length, float[] outValues) {
     byte[] buffer = getBuffer();
     for (int i = 0; i < length; i++) {
-      outValues[i] = Float.parseFloat(getUnpaddedString(dictIds[i], buffer));
+      outValues[i] = Float.parseFloat(internStringValue(dictIds[i], buffer));
     }
   }
 
@@ -102,7 +108,7 @@ public class StringDictionary extends BaseImmutableDictionary {
   public void readDoubleValues(int[] dictIds, int length, double[] outValues) {
     byte[] buffer = getBuffer();
     for (int i = 0; i < length; i++) {
-      outValues[i] = Double.parseDouble(getUnpaddedString(dictIds[i], buffer));
+      outValues[i] = Double.parseDouble(internStringValue(dictIds[i], buffer));
     }
   }
 
@@ -110,7 +116,7 @@ public class StringDictionary extends BaseImmutableDictionary {
   public void readStringValues(int[] dictIds, int length, String[] outValues) {
     byte[] buffer = getBuffer();
     for (int i = 0; i < length; i++) {
-      outValues[i] = getUnpaddedString(dictIds[i], buffer);
+      outValues[i] = internStringValue(dictIds[i], buffer);
     }
   }
 
@@ -118,7 +124,40 @@ public class StringDictionary extends BaseImmutableDictionary {
   public void readBytesValues(int[] dictIds, int length, byte[][] outValues) {
     byte[] buffer = getBuffer();
     for (int i = 0; i < length; i++) {
-      outValues[i] = BytesUtils.toBytes(getUnpaddedString(dictIds[i], buffer));
+      outValues[i] = BytesUtils.toBytes(internStringValue(dictIds[i], buffer));
     }
+  }
+
+  private String internStringValue(int dictId) {
+    if (_internTable == null) {
+      return getUnpaddedString(dictId, getBuffer());
+    }
+    String interned = _internTable[dictId];
+    if (interned == null) {
+      interned = getUnpaddedString(dictId, getBuffer());
+      _internTable[dictId] = interned;
+    }
+    return interned;
+  }
+
+  private String internStringValue(int dictId, byte[] buffer) {
+    if (_internTable == null) {
+      return getUnpaddedString(dictId, buffer);
+    }
+    String interned = _internTable[dictId];
+    if (interned == null) {
+      interned = getUnpaddedString(dictId, buffer);
+      _internTable[dictId] = interned;
+    }
+    return interned;
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    if (_internTable != null) {
+      Arrays.fill(_internTable, null);
+    }
+    super.close();
   }
 }
