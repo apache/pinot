@@ -31,7 +31,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -107,6 +106,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final String IN_SUBQUERY = "inSubquery";
   private static final Expression FALSE = RequestUtils.getLiteralExpression(false);
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
+  private static final Expression STAR = RequestUtils.getIdentifierExpression("*");
 
   protected final PinotConfiguration _config;
   protected final RoutingManager _routingManager;
@@ -1460,18 +1460,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       Map<String, String> columnNameMap) {
     Map<String, String> aliasMap = new HashMap<>();
     if (pinotQuery != null) {
-      Expression selectStarExpr = null;
+      boolean hasStar = false;
       for (Expression expression : pinotQuery.getSelectList()) {
         fixColumnName(rawTableName, expression, columnNameMap, aliasMap, isCaseInsensitive);
         //check if the select expression is '*'
-        if (selectStarExpr == null && expression.isSetIdentifier() && expression.getIdentifier().getName()
+        if (!hasStar && expression.isSetIdentifier() && expression.getIdentifier().getName()
             .equals("*")) {
-          selectStarExpr = expression;
+          hasStar = true;
         }
       }
       //if query has a '*' selection along with other columns
-      if (selectStarExpr != null) {
-        expandStarExpressionsToActualColumns(pinotQuery, columnNameMap, selectStarExpr);
+      if (hasStar) {
+        expandStarExpressionsToActualColumns(pinotQuery, columnNameMap);
       }
       Expression filterExpression = pinotQuery.getFilterExpression();
       if (filterExpression != null) {
@@ -1498,8 +1498,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
   }
 
-  private static void expandStarExpressionsToActualColumns(PinotQuery pinotQuery, Map<String, String> columnNameMap,
-      Expression selectStarExpr) {
+  private static void expandStarExpressionsToActualColumns(PinotQuery pinotQuery, Map<String, String> columnNameMap) {
     List<Expression> originalSelections = pinotQuery.getSelectList();
     //expand '*'
     List<Expression> expandedSelections = new ArrayList<>();
@@ -1512,17 +1511,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     //sort naturally
     expandedSelections.sort(null);
-    ListIterator<Expression> li = originalSelections.listIterator();
-    while (li.hasNext()) {
-      Expression selection = li.next();
-      if (selection.equals(selectStarExpr)) {
-        //remove '*'
-        li.remove();
-        for (Expression expandedSelection : expandedSelections) {
-          li.add(expandedSelection);
-        }
+    List<Expression> newSelections = new ArrayList<>();
+    for (Expression originalSelection : originalSelections) {
+      if (originalSelection.equals(STAR)) {
+        newSelections.addAll(expandedSelections);
+      } else {
+        newSelections.add(originalSelection);
       }
     }
+    pinotQuery.setSelectList(newSelections);
   }
 
   /**
