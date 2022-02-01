@@ -49,6 +49,12 @@ public class NumberGeneratorTest {
       assertEquals(generator.next(), expected);
     }
 
+    // timestamp generator
+    generator = new NumberGenerator(cardinality, FieldSpec.DataType.TIMESTAMP, numValuesPerEntry, random);
+    for (long expected : expectedValues) {
+      assertEquals(generator.next(), expected);
+    }
+
     // double generator
     generator = new NumberGenerator(cardinality, FieldSpec.DataType.FLOAT, numValuesPerEntry, random);
     float[] expectedValueFloat = { //

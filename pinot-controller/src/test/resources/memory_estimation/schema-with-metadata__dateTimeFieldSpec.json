@@ -49,6 +49,14 @@
       "format": "1:MILLISECONDS:EPOCH",
       "granularity": "1:MILLISECONDS",
       "cardinality": 750
+    },
+    {
+      "name": "colTime3",
+      "dataType": "TIMESTAMP",
+      "format": "1:MILLISECONDS:EPOCH",
+      "granularity": "1:MILLISECONDS",
+      "cardinality": 850
     }
+
   ]
 }
