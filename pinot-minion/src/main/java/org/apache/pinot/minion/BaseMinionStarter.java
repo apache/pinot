@@ -194,6 +194,9 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     // Start all components
     LOGGER.info("Initializing PinotFSFactory");
     PinotConfiguration pinotFSConfig = _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
+    if (pinotFSConfig.isEmpty()) {
+      pinotFSConfig = _config.subset(CommonConstants.Minion.DEPRECATED_PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
+    }
     PinotFSFactory.init(pinotFSConfig);
 
     LOGGER.info("Initializing QueryRewriterFactory");
@@ -202,16 +205,28 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     LOGGER.info("Initializing segment fetchers for all protocols");
     PinotConfiguration segmentFetcherFactoryConfig =
         _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
+    if (segmentFetcherFactoryConfig.isEmpty()) {
+      segmentFetcherFactoryConfig =
+          _config.subset(CommonConstants.Minion.DEPRECATED_PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
+    }
     SegmentFetcherFactory.init(segmentFetcherFactoryConfig);
 
     LOGGER.info("Initializing pinot crypter");
     PinotConfiguration pinotCrypterConfig = _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
+    if (pinotCrypterConfig.isEmpty()) {
+      pinotCrypterConfig = _config.subset(CommonConstants.Minion.DEPRECATED_PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
+    }
     PinotCrypterFactory.init(pinotCrypterConfig);
 
     // Need to do this before we start receiving state transitions.
     LOGGER.info("Initializing ssl context for segment uploader");
-    PinotConfiguration httpsConfig = _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER)
-        .subset(CommonConstants.HTTPS_PROTOCOL);
+    PinotConfiguration segmentUploaderConfig =
+        _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER);
+    if (segmentUploaderConfig.isEmpty()) {
+      segmentUploaderConfig =
+          _config.subset(CommonConstants.Minion.DEPRECATED_PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER);
+    }
+    PinotConfiguration httpsConfig = segmentUploaderConfig.subset(CommonConstants.HTTPS_PROTOCOL);
     if (httpsConfig.getProperty(HTTPS_ENABLED, false)) {
       SSLContext sslContext =
           new ClientSSLContextGenerator(httpsConfig.subset(CommonConstants.PREFIX_OF_SSL_SUBSET)).generate();

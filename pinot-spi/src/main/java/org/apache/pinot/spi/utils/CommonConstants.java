@@ -453,10 +453,16 @@ public class CommonConstants {
     public static final String DEFAULT_INSTANCE_BASE_DIR =
         System.getProperty("java.io.tmpdir") + File.separator + "PinotMinion";
     public static final String DEFAULT_INSTANCE_DATA_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "data";
-    public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "storage.factory";
-    public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "segment.fetcher";
-    public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "segment.uploader";
-    public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "crypter";
+
+    // Add pinot.minion prefix on those configs to be consistent with configs of controller and server.
+    public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.minion.storage.factory";
+    public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "pinot.minion.segment.fetcher";
+    public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.minion.segment.uploader";
+    public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.minion.crypter";
+    public static final String DEPRECATED_PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "storage.factory";
+    public static final String DEPRECATED_PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "segment.fetcher";
+    public static final String DEPRECATED_PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "segment.uploader";
+    public static final String DEPRECATED_PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "crypter";
 
     /**
      * Service token for accessing protected controller APIs.

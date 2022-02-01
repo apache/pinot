@@ -31,6 +31,7 @@ import java.util.Map;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -185,6 +186,43 @@ public class PinotConfigurationTest {
     Assert.assertEquals(config.getProperty("pinot.server.storage.factory.class.s3"),
         "org.apache.pinot.plugin.filesystem.S3PinotFS");
     Assert.assertEquals(config.getProperty("pinot.server.segment.fetcher.protocols"), "file,http,s3");
+  }
+
+  @Test
+  public void assertMinionProperties()
+      throws ConfigurationException {
+    // Check configs with old names that have no pinot.minion prefix.
+    String[] cfgKeys = new String[]{
+        CommonConstants.Minion.DEPRECATED_PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY,
+        CommonConstants.Minion.DEPRECATED_PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY,
+        CommonConstants.Minion.DEPRECATED_PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER,
+        CommonConstants.Minion.DEPRECATED_PREFIX_OF_CONFIG_OF_PINOT_CRYPTER
+    };
+    PinotConfiguration config = new PinotConfiguration(new PropertiesConfiguration(
+        PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-old-minion.properties")
+            .getFile()));
+    for (String cfgKey : cfgKeys) {
+      Assert.assertFalse(config.subset(cfgKey).isEmpty(), cfgKey);
+      Assert.assertTrue(config.subset("pinot.minion." + cfgKey).isEmpty(), cfgKey);
+    }
+    // Check configs with new names that have the pinot.minion prefix.
+    config = new PinotConfiguration(new PropertiesConfiguration(
+        PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-new-minion.properties")
+            .getFile()));
+    for (String cfgKey : cfgKeys) {
+      Assert.assertTrue(config.subset(cfgKey).isEmpty(), cfgKey);
+      Assert.assertFalse(config.subset("pinot.minion." + cfgKey).isEmpty(), cfgKey);
+    }
+    // Check the config values.
+    PinotConfiguration subcfg = config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
+    Assert.assertEquals(subcfg.subset("class").getProperty("s3"), "org.apache.pinot.plugin.filesystem.S3PinotFS");
+    subcfg = config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
+    Assert.assertEquals(subcfg.getProperty("protocols"), "file,http,s3");
+    subcfg = config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER);
+    Assert.assertEquals(subcfg.subset("https").getProperty("enabled"), "true");
+    subcfg = config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
+    Assert.assertEquals(subcfg.subset("class").getProperty("nooppinotcrypter"),
+        "org.apache.pinot.core.crypt.NoOpPinotCrypter");
   }
 
   @Test
