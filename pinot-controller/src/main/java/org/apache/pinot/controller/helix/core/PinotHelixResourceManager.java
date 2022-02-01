@@ -1636,12 +1636,8 @@ public class PinotHelixResourceManager {
     }
 
     // Remove all stored segments for the table
-    _segmentDeletionManager.removeSegmentsFromStore(offlineTableName, getSegmentsFor(offlineTableName, false));
+    _segmentDeletionManager.deleteSegments(offlineTableName, getSegmentsFor(offlineTableName, false));
     LOGGER.info("Deleting table {}: Removed stored segments", offlineTableName);
-
-    // Remove segment metadata
-    ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(_propertyStore, offlineTableName);
-    LOGGER.info("Deleting table {}: Removed segment metadata", offlineTableName);
 
     // Remove table config
     ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, offlineTableName);
@@ -1680,12 +1676,8 @@ public class PinotHelixResourceManager {
     }
 
     // Remove all stored segments for the table
-    _segmentDeletionManager.removeSegmentsFromStore(realtimeTableName, getSegmentsFor(realtimeTableName, false));
+    _segmentDeletionManager.deleteSegments(realtimeTableName, getSegmentsFor(realtimeTableName, false));
     LOGGER.info("Deleting table {}: Removed stored segments", realtimeTableName);
-
-    // Remove segment metadata
-    ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(_propertyStore, realtimeTableName);
-    LOGGER.info("Deleting table {}: Removed segment metadata", realtimeTableName);
 
     // Remove table config
     ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, realtimeTableName);

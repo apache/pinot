@@ -165,7 +165,7 @@ public class SegmentDeletionManager {
     }
   }
 
-  public void removeSegmentsFromStore(String tableNameWithType, List<String> segments) {
+  protected void removeSegmentsFromStore(String tableNameWithType, List<String> segments) {
     for (String segment : segments) {
       removeSegmentFromStore(tableNameWithType, segment);
     }
