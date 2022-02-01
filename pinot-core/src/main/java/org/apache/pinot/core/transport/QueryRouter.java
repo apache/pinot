@@ -119,7 +119,8 @@ public class QueryRouter {
       ServerRoutingInstance serverRoutingInstance = entry.getKey();
       ServerChannels serverChannels = serverRoutingInstance.isTlsEnabled() ? _serverChannelsTls : _serverChannels;
       try {
-        serverChannels.sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, entry.getValue());
+        serverChannels.sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, entry.getValue(),
+            timeoutMs);
         asyncQueryResponse.markRequestSubmitted(serverRoutingInstance);
       } catch (Exception e) {
         LOGGER.error("Caught exception while sending request {} to server: {}, marking query failed", requestId,
