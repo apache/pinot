@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import com.jayway.jsonpath.JsonPathException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -48,15 +49,11 @@ public class ArrayAwareJacksonJsonProviderTest {
 
     List<Object> dataInList = Arrays.asList("abc", "efg", "hij");
     assertEquals(jp.length(dataInList), 3);
+  }
 
-    try {
-      jp.length(null);
-      fail();
-    } catch (NullPointerException e) {
-      // It's supposed to get a JsonPathException, but JsonPath library actually
-      // has a bug leading to NullPointerException while creating the JsonPathException.
-      assertNull(e.getMessage());
-    }
+  @Test(expectedExceptions = JsonPathException.class)
+  public void testArrayLengthThrowsForNullArray() {
+    new JsonFunctions.ArrayAwareJacksonJsonProvider().length(null);
   }
 
   @Test

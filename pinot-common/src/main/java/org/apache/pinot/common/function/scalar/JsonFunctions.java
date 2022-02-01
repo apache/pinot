@@ -22,6 +22,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.ParseContext;
 import com.jayway.jsonpath.Predicate;
 import com.jayway.jsonpath.spi.cache.CacheProvider;
@@ -50,10 +51,12 @@ public class JsonFunctions {
   private JsonFunctions() {
   }
 
+  private static final Object[] EMPTY = new Object[0];
   private static final Predicate[] NO_PREDICATES = new Predicate[0];
   private static final ParseContext PARSE_CONTEXT = JsonPath.using(
       new Configuration.ConfigurationBuilder().jsonProvider(new ArrayAwareJacksonJsonProvider())
-          .mappingProvider(new JacksonMappingProvider()).build());
+          .mappingProvider(new JacksonMappingProvider()).options(Option.SUPPRESS_EXCEPTIONS)
+          .build());
 
   static {
     // Set the JsonPath cache before the cache is accessed
@@ -93,8 +96,7 @@ public class JsonFunctions {
    * Extract object array based on Json path
    */
   @ScalarFunction
-  public static Object[] jsonPathArray(Object object, String jsonPath)
-      throws JsonProcessingException {
+  public static Object[] jsonPathArray(Object object, String jsonPath) {
     if (object instanceof String) {
       return convertObjectToArray(PARSE_CONTEXT.parse((String) object).read(jsonPath, NO_PREDICATES));
     }
@@ -103,11 +105,8 @@ public class JsonFunctions {
 
   @ScalarFunction
   public static Object[] jsonPathArrayDefaultEmpty(Object object, String jsonPath) {
-    try {
-      return jsonPathArray(object, jsonPath);
-    } catch (Exception e) {
-      return new Object[0];
-    }
+    Object[] result = jsonPathArray(object, jsonPath);
+    return result == null ? EMPTY : result;
   }
 
   private static Object[] convertObjectToArray(Object arrayObject) {
@@ -115,6 +114,8 @@ public class JsonFunctions {
       return ((List) arrayObject).toArray();
     } else if (arrayObject instanceof Object[]) {
       return (Object[]) arrayObject;
+    } else if (arrayObject == null) {
+      return null;
     }
     return new Object[]{arrayObject};
   }
@@ -129,7 +130,7 @@ public class JsonFunctions {
     if (jsonValue instanceof String) {
       return (String) jsonValue;
     }
-    return JsonUtils.objectToString(jsonValue);
+    return jsonValue == null ? null : JsonUtils.objectToString(jsonValue);
   }
 
   /**
@@ -137,9 +138,13 @@ public class JsonFunctions {
    */
   @ScalarFunction
   public static String jsonPathString(Object object, String jsonPath, String defaultValue) {
+    Object jsonValue = jsonPath(object, jsonPath);
+    if (jsonValue instanceof String) {
+      return (String) jsonValue;
+    }
     try {
-      return jsonPathString(object, jsonPath);
-    } catch (Exception e) {
+      return jsonValue == null ? defaultValue : JsonUtils.objectToString(jsonValue);
+    } catch (JsonProcessingException e) {
       return defaultValue;
     }
   }
@@ -149,9 +154,17 @@ public class JsonFunctions {
    */
   @ScalarFunction
   public static long jsonPathLong(Object object, String jsonPath) {
-    final Object jsonValue = jsonPath(object, jsonPath);
+    return jsonPathLong(object, jsonPath, Long.MIN_VALUE);
+  }
+
+  /**
+   * Extract from Json with path to Long
+   */
+  @ScalarFunction
+  public static long jsonPathLong(Object object, String jsonPath, long defaultValue) {
+    Object jsonValue = jsonPath(object, jsonPath);
     if (jsonValue == null) {
-      return Long.MIN_VALUE;
+      return defaultValue;
     }
     if (jsonValue instanceof Number) {
       return ((Number) jsonValue).longValue();
@@ -160,27 +173,11 @@ public class JsonFunctions {
   }
 
   /**
-   * Extract from Json with path to Long
-   */
-  @ScalarFunction
-  public static long jsonPathLong(Object object, String jsonPath, long defaultValue) {
-    try {
-      return jsonPathLong(object, jsonPath);
-    } catch (Exception e) {
-      return defaultValue;
-    }
-  }
-
-  /**
    * Extract from Json with path to Double
    */
   @ScalarFunction
   public static double jsonPathDouble(Object object, String jsonPath) {
-    final Object jsonValue = jsonPath(object, jsonPath);
-    if (jsonValue instanceof Number) {
-      return ((Number) jsonValue).doubleValue();
-    }
-    return Double.parseDouble(jsonValue.toString());
+    return jsonPathDouble(object, jsonPath, Double.NaN);
   }
 
   /**
@@ -188,11 +185,14 @@ public class JsonFunctions {
    */
   @ScalarFunction
   public static double jsonPathDouble(Object object, String jsonPath, double defaultValue) {
-    try {
-      return jsonPathDouble(object, jsonPath);
-    } catch (Exception e) {
+    Object jsonValue = jsonPath(object, jsonPath);
+    if (jsonValue == null) {
       return defaultValue;
     }
+    if (jsonValue instanceof Number) {
+      return ((Number) jsonValue).doubleValue();
+    }
+    return Double.parseDouble(jsonValue.toString());
   }
 
   @VisibleForTesting
