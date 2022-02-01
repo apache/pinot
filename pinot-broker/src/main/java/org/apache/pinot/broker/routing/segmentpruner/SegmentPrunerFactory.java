@@ -49,7 +49,7 @@ public class SegmentPrunerFactory {
     List<SegmentPruner> segmentPruners = new ArrayList<>();
     boolean needsEmptySegment = TableConfigUtils.needsEmptySegmentPruner(tableConfig);
     if (needsEmptySegment) {
-      // Always add EmptySegmentPruner if Kinesis consumer is used.
+      // Add EmptySegmentPruner if needed
       segmentPruners.add(new EmptySegmentPruner(tableConfig, propertyStore));
     }
 
