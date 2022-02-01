@@ -54,13 +54,25 @@ public class ArithmeticFunctions {
   }
 
   @ScalarFunction
-  public static double min(double a, double b) {
+  public static double least(double a, double b) {
     return Double.min(a, b);
   }
 
   @ScalarFunction
-  public static double max(double a, double b) {
+  public static double greatest(double a, double b) {
     return Double.max(a, b);
+  }
+
+  @Deprecated
+  @ScalarFunction
+  public static double min(double a, double b) {
+    return least(a, b);
+  }
+
+  @Deprecated
+  @ScalarFunction
+  public static double max(double a, double b) {
+    return greatest(a, b);
   }
 
   @ScalarFunction
