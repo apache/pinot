@@ -224,6 +224,8 @@ public class CommonConstants {
 
     public static final String BROKER_TLS_PREFIX = "pinot.broker.tls";
     public static final String BROKER_NETTYTLS_ENABLED = "pinot.broker.nettytls.enabled";
+    //Set to true to load all services tagged and compiled with hk2-metadata-generator. Default to False
+    public static final String BROKER_SERVICE_AUTO_DISCOVERY = "pinot.broker.service.auto.discovery";
 
     public static class Request {
       public static final String PQL = "pql";
