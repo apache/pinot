@@ -89,7 +89,7 @@ public class JsonFunctions {
     if (object instanceof String) {
       return PARSE_CONTEXT.parse((String) object).read(jsonPath, NO_PREDICATES);
     }
-    return PARSE_CONTEXT.parse(object).read(jsonPath, NO_PREDICATES);
+    return object == null ? null : PARSE_CONTEXT.parse(object).read(jsonPath, NO_PREDICATES);
   }
 
   /**
@@ -138,13 +138,13 @@ public class JsonFunctions {
    */
   @ScalarFunction
   public static String jsonPathString(Object object, String jsonPath, String defaultValue) {
-    Object jsonValue = jsonPath(object, jsonPath);
-    if (jsonValue instanceof String) {
-      return (String) jsonValue;
-    }
     try {
+      Object jsonValue = jsonPath(object, jsonPath);
+      if (jsonValue instanceof String) {
+        return (String) jsonValue;
+      }
       return jsonValue == null ? defaultValue : JsonUtils.objectToString(jsonValue);
-    } catch (JsonProcessingException e) {
+    } catch (Exception ignore) {
       return defaultValue;
     }
   }
@@ -162,14 +162,18 @@ public class JsonFunctions {
    */
   @ScalarFunction
   public static long jsonPathLong(Object object, String jsonPath, long defaultValue) {
-    Object jsonValue = jsonPath(object, jsonPath);
-    if (jsonValue == null) {
+    try {
+      Object jsonValue = jsonPath(object, jsonPath);
+      if (jsonValue == null) {
+        return defaultValue;
+      }
+      if (jsonValue instanceof Number) {
+        return ((Number) jsonValue).longValue();
+      }
+      return Long.parseLong(jsonValue.toString());
+    } catch (Exception ignore) {
       return defaultValue;
     }
-    if (jsonValue instanceof Number) {
-      return ((Number) jsonValue).longValue();
-    }
-    return Long.parseLong(jsonValue.toString());
   }
 
   /**
@@ -185,14 +189,18 @@ public class JsonFunctions {
    */
   @ScalarFunction
   public static double jsonPathDouble(Object object, String jsonPath, double defaultValue) {
-    Object jsonValue = jsonPath(object, jsonPath);
-    if (jsonValue == null) {
+    try {
+      Object jsonValue = jsonPath(object, jsonPath);
+      if (jsonValue == null) {
+        return defaultValue;
+      }
+      if (jsonValue instanceof Number) {
+        return ((Number) jsonValue).doubleValue();
+      }
+      return Double.parseDouble(jsonValue.toString());
+    } catch (Exception ignore) {
       return defaultValue;
     }
-    if (jsonValue instanceof Number) {
-      return ((Number) jsonValue).doubleValue();
-    }
-    return Double.parseDouble(jsonValue.toString());
   }
 
   @VisibleForTesting
