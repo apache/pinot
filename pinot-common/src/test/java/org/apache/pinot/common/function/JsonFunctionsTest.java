@@ -75,9 +75,15 @@ public class JsonFunctionsTest {
     assertEquals(JsonFunctions.jsonPathLong(jsonString, "$.actor.id"), 33500718L);
     assertEquals(JsonFunctions.jsonPathDouble(jsonString, "$.actor.id"), 33500718.0);
     assertEquals(JsonFunctions.jsonPathString(jsonString, "$.actor.aaa", "null"), "null");
+    assertEquals(JsonFunctions.jsonPathString("not json", "$.actor.aaa", "null"), "null");
+    assertEquals(JsonFunctions.jsonPathString(null, "$.actor.aaa", "null"), "null");
     assertEquals(JsonFunctions.jsonPathLong(jsonString, "$.actor.aaa", 100L), 100L);
     assertEquals(JsonFunctions.jsonPathLong(jsonString, "$.actor.aaa"), Long.MIN_VALUE);
+    assertEquals(JsonFunctions.jsonPathLong("not json", "$.actor.aaa", Long.MIN_VALUE), Long.MIN_VALUE);
+    assertEquals(JsonFunctions.jsonPathLong(null, "$.actor.aaa", Long.MIN_VALUE), Long.MIN_VALUE);
     assertEquals(JsonFunctions.jsonPathDouble(jsonString, "$.actor.aaa", 53.2), 53.2);
+    assertEquals(JsonFunctions.jsonPathDouble("not json", "$.actor.aaa", 53.2), 53.2);
+    assertEquals(JsonFunctions.jsonPathDouble(null, "$.actor.aaa", 53.2), 53.2);
     assertTrue(Double.isNaN(JsonFunctions.jsonPathDouble(jsonString, "$.actor.aaa")));
   }
 
