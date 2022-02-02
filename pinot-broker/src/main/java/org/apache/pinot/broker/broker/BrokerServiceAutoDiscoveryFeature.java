@@ -68,8 +68,8 @@ import org.slf4j.LoggerFactory;
  * pinot-integration-tests/src/main/java/org/apache/pinot/broker/integration/tests/BrokerTestAutoLoadedService.java
  * </code>
  */
-public class ServiceAutoDiscoveryFeature implements Feature {
-    private static final Logger LOGGER = LoggerFactory.getLogger(ServiceAutoDiscoveryFeature.class);
+public class BrokerServiceAutoDiscoveryFeature implements Feature {
+    private static final Logger LOGGER = LoggerFactory.getLogger(BrokerServiceAutoDiscoveryFeature.class);
 
     @Inject
     ServiceLocator _serviceLocator;

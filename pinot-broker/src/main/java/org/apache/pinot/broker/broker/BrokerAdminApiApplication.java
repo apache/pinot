@@ -51,7 +51,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     packages(RESOURCE_PACKAGE);
     property(PINOT_CONFIGURATION, brokerConf);
     if (brokerConf.getProperty(CommonConstants.Broker.BROKER_SERVICE_AUTO_DISCOVERY, false)) {
-      register(ServiceAutoDiscoveryFeature.class);
+      register(BrokerServiceAutoDiscoveryFeature.class);
     }
     register(new AbstractBinder() {
       @Override
