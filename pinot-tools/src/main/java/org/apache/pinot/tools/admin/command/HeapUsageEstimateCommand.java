@@ -253,7 +253,7 @@ public class HeapUsageEstimateCommand extends AbstractBaseAdminCommand implement
     // KeySpace = bytesPerKey * uniqueCombinations
     // ValueSpace = bytesPerValue * uniqueCombinations
     if (recordNumsSkipUpsert.asLong() != 0) {
-      float appendFrequency = recordNums.asLong() / recordNumsSkipUpsert.asLong();
+      float appendFrequency = (float) recordNums.asLong() / recordNumsSkipUpsert.asLong();
       float totalKeySpace =
           bytesPerKey * _messageRate * Integer.valueOf(retentionTimeValue) * 24 * 3600 * appendFrequency / (1024 * 1024
               * 1024);
