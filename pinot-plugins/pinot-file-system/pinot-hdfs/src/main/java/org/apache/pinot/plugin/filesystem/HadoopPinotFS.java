@@ -183,6 +183,9 @@ public class HadoopPinotFS extends BasePinotFS {
       if (_hadoopFS == null) {
         throw new RuntimeException("_hadoopFS client is not initialized when trying to copy files");
       }
+      if (_hadoopFS.isDirectory(remoteFile)) {
+        throw new IllegalArgumentException(srcUri.toString() + " is a direactory");
+      }
       long startMs = System.currentTimeMillis();
       _hadoopFS.copyToLocalFile(remoteFile, localFile);
       LOGGER.debug("copied {} from hdfs to {} in local for size {}, take {} ms", srcUri, dstFilePath, dstFile.length(),

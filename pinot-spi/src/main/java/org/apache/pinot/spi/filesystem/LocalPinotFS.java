@@ -170,7 +170,7 @@ public class LocalPinotFS extends BasePinotFS {
     }
     if (srcFile.isDirectory()) {
       // Throws Exception on failure
-      FileUtils.copyDirectory(srcFile, dstFile);
+      throw new IOException(srcFile.getAbsolutePath() + " is a directory");
     } else {
       // Will create parent directories, throws Exception on failure
       FileUtils.copyFile(srcFile, dstFile);

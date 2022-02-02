@@ -143,7 +143,7 @@ public interface PinotFS extends Closeable, Serializable {
 
   /**
    * Copies a file from a remote filesystem to the local one. Keeps the original file.
-   * @param srcUri location of current file on remote filesystem
+   * @param srcUri location of current file on remote filesystem (must not be a directory)
    * @param dstFile location of destination on local filesystem
    * @throws Exception if srcUri is not valid or not present, or timeout when downloading file to local
    */
@@ -153,7 +153,7 @@ public interface PinotFS extends Closeable, Serializable {
   /**
    * The src file is on the local disk. Add it to filesystem at the given dst name and the source is kept intact
    * afterwards.
-   * @param srcFile location of src file on local disk
+   * @param srcFile location of src file on local disk (must not be a directory)
    * @param dstUri location of dst on remote filesystem
    * @throws Exception if fileUri is not valid or not present, or timeout when uploading file from local
    */
