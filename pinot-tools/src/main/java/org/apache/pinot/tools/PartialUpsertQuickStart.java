@@ -141,9 +141,7 @@ public class PartialUpsertQuickStart extends QuickStartBase {
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q2)));
     printStatus(Color.GREEN, "***************************************************");
 
-    printStatus(Color.YELLOW, "Estimated heap usage for the table");
-    printStatus(Color.CYAN,
-        "EstimateHeapSize -tableName meetupRsvp -schemaFile meetupRsvp_schema.json -tableConfigFile meetupRsvp_realtime_table_config.json -messageRate 1000");
+    printStatus(Color.CYAN, "Estimated heap usage for the table");
     printStatus(Color.YELLOW,
         runner.estimateTableSize("meetupRsvp", schemaFile.getAbsolutePath(), tableConfigFile.getAbsolutePath(), 1000));
 
