@@ -120,24 +120,29 @@ public class QueryRouter {
       ServerRoutingInstance serverRoutingInstance = entry.getKey();
       ServerChannels serverChannels = serverRoutingInstance.isTlsEnabled() ? _serverChannelsTls : _serverChannels;
       try {
-        serverChannels.sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, entry.getValue(),
-            timeoutMs);
+        serverChannels
+            .sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, entry.getValue(), timeoutMs);
         asyncQueryResponse.markRequestSubmitted(serverRoutingInstance);
+      } catch (TimeoutException e) {
+        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_CHANNEL_LOCK_TIMEOUT_EXCEPTIONS, 1);
+        markQueryFailed(requestId, serverRoutingInstance, asyncQueryResponse, e);
+        break;
       } catch (Exception e) {
-        LOGGER.error("Caught exception while sending request {} to server: {}, marking query failed", requestId,
-            serverRoutingInstance, e);
-        if (e instanceof TimeoutException) {
-          _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_CHANNEL_LOCK_TIMEOUT_EXCEPTIONS, 1);
-        } else {
-          _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_SEND_EXCEPTIONS, 1);
-        }
-        asyncQueryResponse.setBrokerRequestSendException(e);
-        asyncQueryResponse.markQueryFailed();
+        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_SEND_EXCEPTIONS, 1);
+        markQueryFailed(requestId, serverRoutingInstance, asyncQueryResponse, e);
         break;
       }
     }
 
     return asyncQueryResponse;
+  }
+
+  private void markQueryFailed(long requestId, ServerRoutingInstance serverRoutingInstance,
+      AsyncQueryResponse asyncQueryResponse, Exception e) {
+    LOGGER.error("Caught exception while sending request {} to server: {}, marking query failed", requestId,
+        serverRoutingInstance, e);
+    asyncQueryResponse.setBrokerRequestSendException(e);
+    asyncQueryResponse.markQueryFailed();
   }
 
   public void shutDown() {
