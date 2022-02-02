@@ -1464,8 +1464,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       for (Expression expression : pinotQuery.getSelectList()) {
         fixColumnName(rawTableName, expression, columnNameMap, aliasMap, isCaseInsensitive);
         //check if the select expression is '*'
-        if (!hasStar && expression.isSetIdentifier() && expression.getIdentifier().getName()
-            .equals("*")) {
+        if (!hasStar && expression.equals(STAR)) {
           hasStar = true;
         }
       }
