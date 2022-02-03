@@ -104,35 +104,23 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   }
 
   @Override
-  public Future<BrokerResponse> executeQueryAsync(String brokerAddress, final String query) {
-    return executeQueryAsync(brokerAddress, new Request("pql", query));
-  }
-
-  public Future<BrokerResponse> executePinotQueryAsync(String brokerAddress, final Request request) {
+  public Future<BrokerResponse> executeQueryAsync(String brokerAddress, String query) {
     try {
       ObjectNode json = JsonNodeFactory.instance.objectNode();
-      String queryFormat = request.getQueryFormat();
-      json.put(queryFormat, request.getQuery());
+      json.put("sql", query);
+      json.put("queryOptions", "groupByMode=sql;responseFormat=sql");
 
-      final String url;
-      if (queryFormat.equalsIgnoreCase("sql")) {
-        url = _scheme + "://" + brokerAddress + "/query/sql";
-        json.put("queryOptions", "groupByMode=sql;responseFormat=sql");
-      } else {
-        url = _scheme + "://" + brokerAddress + "/query";
-      }
-
+      String url = _scheme + "://" + brokerAddress + "/query/sql";
       BoundRequestBuilder requestBuilder = _httpClient.preparePost(url);
 
       if (_headers != null) {
         _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));
       }
 
-      final Future<Response> response =
+      Future<Response> response =
           requestBuilder.addHeader("Content-Type", "application/json; charset=utf-8").setBody(json.toString())
               .execute();
-
-      return new BrokerResponseFuture(response, request.getQuery(), url);
+      return new BrokerResponseFuture(response, query, url);
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
@@ -151,7 +139,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   @Override
   public Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
       throws PinotClientException {
-    return executePinotQueryAsync(brokerAddress, request);
+    return executeQueryAsync(brokerAddress, request.getQuery());
   }
 
   @Override

@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import java.io.File;
-import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -138,35 +137,35 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   @Test
   public void testTotalCount()
       throws Exception {
-    String query = "SELECT count(*) FROM " + getTableName();
-    testQuery(query, Collections.singletonList(query));
+    String query = "SELECT COUNT(*) FROM " + getTableName();
+    testQuery(query);
   }
 
   @Test
   public void testCountWithNullDescription()
       throws Exception {
-    String query = "SELECT count(*) FROM " + getTableName() + " where description IS NOT NULL";
-    testQuery(query, Collections.singletonList(query));
+    String query = "SELECT COUNT(*) FROM " + getTableName() + " WHERE description IS NOT NULL";
+    testQuery(query);
   }
 
   @Test
   public void testCountWithNullDescriptionAndSalary()
       throws Exception {
-    String query = "SELECT count(*) FROM " + getTableName() + " where description IS NOT NULL AND salary IS NOT NULL";
-    testQuery(query, Collections.singletonList(query));
+    String query = "SELECT COUNT(*) FROM " + getTableName() + " WHERE description IS NOT NULL AND salary IS NOT NULL";
+    testQuery(query);
   }
 
   @Test
   public void testCaseWithNullSalary()
       throws Exception {
     String query = "SELECT CASE WHEN salary IS NULL THEN 1 ELSE 0 END FROM " + getTableName();
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
   }
 
   @Test
   public void testCaseWithNotNullDescription()
       throws Exception {
     String query = "SELECT CASE WHEN description IS NOT NULL THEN 1 ELSE 0 END FROM " + getTableName();
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
   }
 }

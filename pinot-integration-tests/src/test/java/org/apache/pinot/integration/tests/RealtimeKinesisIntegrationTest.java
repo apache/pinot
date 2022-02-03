@@ -48,7 +48,6 @@ import javax.activation.UnsupportedDataTypeException;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.plugin.stream.kinesis.KinesisConfig;
@@ -320,8 +319,9 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
       throws Exception {
     Assert.assertNotEquals(_totalRecordsPushedInStream, 0);
 
-    ResultSet pinotResultSet = getPinotConnection().execute(
-        new Request("sql", "SELECT * FROM " + getTableName() + " ORDER BY Origin LIMIT 10000")).getResultSet(0);
+    ResultSet pinotResultSet =
+        getPinotConnection().execute("SELECT * FROM " + getTableName() + " ORDER BY Origin LIMIT 10000")
+            .getResultSet(0);
 
     Assert.assertNotEquals(pinotResultSet.getRowCount(), 0);
 
@@ -378,10 +378,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
 
   @Test(enabled = false)
   public void testCountRecords() {
-    long count =
-        getPinotConnection().execute(new Request("sql", "SELECT COUNT(*) FROM " + getTableName())).getResultSet(0)
-            .getLong(0);
-
+    long count = getPinotConnection().execute("SELECT COUNT(*) FROM " + getTableName()).getResultSet(0).getLong(0);
     Assert.assertEquals(count, _totalRecordsPushedInStream);
   }
 

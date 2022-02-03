@@ -124,7 +124,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testSegmentMetadataApi()
       throws Exception {
     {
-      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(getTableName()));
+      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName()));
       JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
       Assert.assertEquals(tableSegmentsMetadata.size(), 8);
 
@@ -220,23 +220,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
   @Test
   @Override
-  public void testHardcodedSqlQueries()
-      throws Exception {
-    super.testHardcodedSqlQueries();
-  }
-
-  @Test
-  @Override
   public void testQueriesFromQueryFile()
       throws Exception {
     super.testQueriesFromQueryFile();
-  }
-
-  @Test
-  @Override
-  public void testSqlQueriesFromQueryFile()
-      throws Exception {
-    super.testSqlQueriesFromQueryFile();
   }
 
   @Test

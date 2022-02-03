@@ -30,7 +30,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
-import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.core.common.MinionConstants;
@@ -166,7 +165,7 @@ public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest
   @Test
   public void testSegmentUploadDownload()
       throws Exception {
-    final Request query = new Request("sql", "SELECT count(*) FROM " + getTableName());
+    String query = "SELECT count(*) FROM " + getTableName();
 
     ResultSetGroup resultBeforeOffline = getPinotConnection().execute(query);
     Assert.assertTrue(resultBeforeOffline.getResultSet(0).getLong(0) > 0);

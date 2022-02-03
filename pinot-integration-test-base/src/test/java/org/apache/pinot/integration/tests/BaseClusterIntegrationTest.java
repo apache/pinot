@@ -34,7 +34,6 @@ import java.util.Properties;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ConnectionFactory;
-import org.apache.pinot.client.Request;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
@@ -316,42 +315,40 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     boolean useLlc = useLlc();
     if (useLlc) {
       // LLC
-      streamConfigMap
-          .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-              StreamConfig.ConsumerType.LOWLEVEL.toString());
-      streamConfigMap.put(KafkaStreamConfigProperties
-              .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST),
+      streamConfigMap.put(
+          StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+          StreamConfig.ConsumerType.LOWLEVEL.toString());
+      streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
+              KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST),
           "localhost:" + _kafkaStarters.get(0).getPort());
       if (useKafkaTransaction()) {
-        streamConfigMap.put(KafkaStreamConfigProperties
-                .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL),
+        streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
+                KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL),
             KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_COMMITTED);
       }
     } else {
       // HLC
-      streamConfigMap
-          .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-              StreamConfig.ConsumerType.HIGHLEVEL.toString());
-      streamConfigMap.put(KafkaStreamConfigProperties
-              .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_ZK_CONNECTION_STRING),
-          getKafkaZKAddress());
-      streamConfigMap.put(KafkaStreamConfigProperties
-              .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_BOOTSTRAP_SERVER),
+      streamConfigMap.put(
+          StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+          StreamConfig.ConsumerType.HIGHLEVEL.toString());
+      streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
+          KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_ZK_CONNECTION_STRING), getKafkaZKAddress());
+      streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
+              KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_BOOTSTRAP_SERVER),
           "localhost:" + _kafkaStarters.get(0).getPort());
     }
-    streamConfigMap.put(StreamConfigProperties
-            .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
-        getStreamConsumerFactoryClassName());
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
-            getKafkaTopic());
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
-            AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
-    streamConfigMap
-        .put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, Integer.toString(getRealtimeSegmentFlushSize()));
-    streamConfigMap.put(StreamConfigProperties
-        .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), getStreamConsumerFactoryClassName());
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
+        getKafkaTopic());
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+        AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
+    streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS,
+        Integer.toString(getRealtimeSegmentFlushSize()));
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
     return streamConfigMap;
   }
 
@@ -471,9 +468,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected void pushAvroIntoKafka(List<File> avroFiles)
       throws Exception {
 
-    ClusterIntegrationTestUtils
-        .pushAvroIntoKafka(avroFiles, "localhost:" + getKafkaPort(), getKafkaTopic(), getMaxNumKafkaMessagesPerBatch(),
-            getKafkaMessageHeader(), getPartitionColumn(), injectTombstones());
+    ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles, "localhost:" + getKafkaPort(), getKafkaTopic(),
+        getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(), injectTombstones());
   }
 
   protected boolean injectTombstones() {
@@ -536,8 +532,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected long getCurrentCountStarResult()
       throws Exception {
-    return getPinotConnection().execute(new Request("sql", "SELECT COUNT(*) FROM " + getTableName())).getResultSet(0)
-        .getLong(0);
+    return getPinotConnection().execute("SELECT COUNT(*) FROM " + getTableName()).getResultSet(0).getLong(0);
   }
 
   /**
@@ -568,27 +563,18 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   /**
    * Run equivalent Pinot and H2 query and compare the results.
-   *
-   * @param pqlQuery Pinot query
-   * @param sqlQueries H2 query
-   * @throws Exception
    */
-  protected void testQuery(String pqlQuery, @Nullable List<String> sqlQueries)
+  protected void testQuery(String query)
       throws Exception {
-    ClusterIntegrationTestUtils
-        .testPqlQuery(pqlQuery, _brokerBaseApiUrl, getPinotConnection(), sqlQueries, getH2Connection());
+    testQuery(query, query);
   }
 
   /**
-   * Run equivalent Pinot SQL and H2 query and compare the results.
-   *
-   * @param pinotQuery Pinot query
-   * @param sqlQueries H2 query
-   * @throws Exception
+   * Run equivalent Pinot and H2 query and compare the results.
    */
-  protected void testSqlQuery(String pinotQuery, @Nullable List<String> sqlQueries)
+  protected void testQuery(String pinotQuery, String h2Query)
       throws Exception {
-    ClusterIntegrationTestUtils
-        .testSqlQuery(pinotQuery, _brokerBaseApiUrl, getPinotConnection(), sqlQueries, getH2Connection());
+    ClusterIntegrationTestUtils.testQuery(pinotQuery, _brokerBaseApiUrl, getPinotConnection(), h2Query,
+        getH2Connection());
   }
 }
