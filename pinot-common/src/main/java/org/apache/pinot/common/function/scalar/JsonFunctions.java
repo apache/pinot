@@ -105,8 +105,12 @@ public class JsonFunctions {
 
   @ScalarFunction
   public static Object[] jsonPathArrayDefaultEmpty(Object object, String jsonPath) {
-    Object[] result = jsonPathArray(object, jsonPath);
-    return result == null ? EMPTY : result;
+    try {
+      Object[] result = object == null ? null : jsonPathArray(object, jsonPath);
+      return result == null ? EMPTY : result;
+    } catch (Exception e) {
+      return EMPTY;
+    }
   }
 
   private static Object[] convertObjectToArray(Object arrayObject) {
