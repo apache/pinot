@@ -19,6 +19,7 @@
 package org.apache.pinot.common.utils;
 
 import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -131,7 +132,7 @@ public class PinotDataTypeTest {
         {LONG_ARRAY, TIMESTAMP_ARRAY, new long[] {1000000L, 2000000L},
             new Timestamp[] { new Timestamp(1000000L), new Timestamp(2000000L) }},
         {TIMESTAMP_ARRAY, TIMESTAMP_ARRAY, new Timestamp[] { new Timestamp(1000000L), new Timestamp(2000000L) },
-        new Timestamp[] { new Timestamp(1000000L), new Timestamp(2000000L) }},
+            new Timestamp[] { new Timestamp(1000000L), new Timestamp(2000000L) }},
         {BYTES_ARRAY, BYTES_ARRAY, new byte[][] { "foo".getBytes(UTF_8), "bar".getBytes(UTF_8) },
             new byte[][] { "foo".getBytes(UTF_8), "bar".getBytes(UTF_8) }}
     };
@@ -186,11 +187,14 @@ public class PinotDataTypeTest {
 
   @Test
   public void testTimestamp() {
-    Timestamp timestamp = new Timestamp(System.currentTimeMillis());
-    assertEquals(TIMESTAMP.convert(timestamp.getTime(), LONG), timestamp);
-    assertEquals(TIMESTAMP.convert(timestamp.toString(), STRING), timestamp);
-    assertEquals(TIMESTAMP.convert(timestamp.getTime(), JSON), timestamp);
-    assertEquals(TIMESTAMP.convert(timestamp.toString(), JSON), timestamp);
+    Timestamp timestamp1 = new Timestamp(System.currentTimeMillis());
+    Timestamp timestamp2 = new Timestamp(1643173200000L);
+    assertEquals(TIMESTAMP.convert(timestamp1.getTime(), LONG), timestamp1);
+    assertEquals(TIMESTAMP.convert(timestamp1.toString(), STRING), timestamp1);
+    assertEquals(TIMESTAMP.convert(timestamp1.getTime(), JSON), timestamp1);
+    assertEquals(TIMESTAMP.convert(timestamp1.toString(), JSON), timestamp1);
+    assertEquals(TIMESTAMP.convert(new SimpleDateFormat("MM/dd/yyyy").format(timestamp2), STRING),
+        timestamp2);
   }
 
   @Test
