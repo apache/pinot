@@ -38,6 +38,9 @@ public enum TransformFunctionType {
   LN("ln"),
   SQRT("sqrt"),
 
+  LEAST("least"),
+  GREATEST("greatest"),
+
   EQUALS("equals"),
   NOT_EQUALS("not_equals"),
   GREATER_THAN("greater_than"),

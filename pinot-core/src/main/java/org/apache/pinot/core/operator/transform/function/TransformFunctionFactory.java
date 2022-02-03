@@ -162,6 +162,10 @@ public class TransformFunctionFactory {
 
           // geo indexing
           put(canonicalize(TransformFunctionType.GEOTOH3.getName().toLowerCase()), GeoToH3Function.class);
+
+          // tuple selection
+          put(canonicalize(TransformFunctionType.LEAST.getName().toLowerCase()), LeastTransformFunction.class);
+          put(canonicalize(TransformFunctionType.GREATEST.getName().toLowerCase()), GreatestTransformFunction.class);
         }
       };
 
