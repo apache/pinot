@@ -100,7 +100,7 @@ $ cd pinot
 $ mvn clean install -DskipTests -Pbin-dist
 
 # Run the Quick Demo
-$ cd pinot-distribution/target/apache-pinot-<version>-SNAPSHOT-bin/apache-pinot-<version>-SNAPSHOT-bin
+$ cd build/
 $ bin/quick-start-batch.sh
 ```
 

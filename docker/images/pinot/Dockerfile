@@ -58,7 +58,7 @@ RUN git clone ${PINOT_GIT_URL} ${PINOT_BUILD_DIR} && \
     mvn install package -DskipTests -Pbin-dist -Pbuild-shaded-jar -Dkafka.version=${KAFKA_VERSION} -Djdk.version=${JDK_VERSION} && \
     mkdir -p ${PINOT_HOME}/configs && \
     mkdir -p ${PINOT_HOME}/data && \
-    cp -r pinot-distribution/target/apache-pinot-*-bin/apache-pinot-*-bin/* ${PINOT_HOME}/. && \
+    cp -r build/* ${PINOT_HOME}/. && \
     chmod +x ${PINOT_HOME}/bin/*.sh
 
 FROM ${OPENJDK_IMAGE}:${JAVA_VERSION}-jdk-slim
