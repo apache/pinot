@@ -142,8 +142,8 @@ public class PartialUpsertQuickStart extends QuickStartBase {
     printStatus(Color.GREEN, "***************************************************");
 
     printStatus(Color.CYAN, "Estimated heap usage for the table");
-    printStatus(Color.YELLOW,
-        runner.estimateTableSize("meetupRsvp", schemaFile.getAbsolutePath(), tableConfigFile.getAbsolutePath(), 1000));
+    printStatus(Color.YELLOW, runner
+        .estimateTableSize("meetupRsvp", schemaFile.getAbsolutePath(), tableConfigFile.getAbsolutePath(), 1000, 16000));
 
     printStatus(Color.GREEN, "You can always go to http://localhost:9000 to play around in the query console");
   }

@@ -269,12 +269,13 @@ public class QuickstartRunner {
         .setQueryType(CommonConstants.Broker.Request.SQL).setAuthToken(_authToken).setQuery(query).run());
   }
 
-  public String estimateTableSize(String tableName, String schemaPath, String tableConfigPath, float messageRate)
+  public String estimateTableSize(String tableName, String schemaPath, String tableConfigPath, float messageRate,
+      long primaryKeyCardinality)
       throws Exception {
     int brokerPort = _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
     return new HeapUsageEstimateCommand().setBrokerPort(String.valueOf(brokerPort)).setAuthToken(_authToken)
         .setTableName(tableName).setSchemaFile(schemaPath).setTableConfigFile(tableConfigPath)
-        .setMessageRate(messageRate).run();
+        .setMessageRate(messageRate).setPrimaryKeyCardinality(primaryKeyCardinality).run();
   }
 
   public static void registerDefaultPinotFS() {

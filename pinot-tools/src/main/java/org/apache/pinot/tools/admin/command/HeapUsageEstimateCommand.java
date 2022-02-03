@@ -66,8 +66,11 @@ public class HeapUsageEstimateCommand extends AbstractBaseAdminCommand implement
   @CommandLine.Option(names = {"-comparisonColSize"}, required = false, description = "Comparison columns bytes")
   private int _comparisonColSize = 8;
 
-  @CommandLine.Option(names = {"-messageRate"}, required = true, description = "Message rate per second")
-  private float _messageRate;
+  @CommandLine.Option(names = {"-messageRate"}, required = false, description = "Message rate per second")
+  private float _messageRate = 0;
+
+  @CommandLine.Option(names = {"-primaryKeyCardinality"}, required = false, description = "Unique combinations of pks")
+  private long _primaryKeyCardinality = 0;
 
   @CommandLine.Option(names = {"-user"}, required = false, description = "Username for basic auth.")
   private String _user;
@@ -96,8 +99,8 @@ public class HeapUsageEstimateCommand extends AbstractBaseAdminCommand implement
   public String toString() {
     return ("EstimateHeapSize -brokerProtocol " + _brokerProtocol + " -brokerHost " + _brokerHost + " -brokerPort "
         + _brokerPort + " -tableName " + _tableName + " -schemaFile " + _schemaFile + " -tableConfigFile "
-        + _tableConfigFile + " -messageRate" + _messageRate + " -primaryKeySize" + _primaryKeySize
-        + " -comparisonColSize " + _comparisonColSize);
+        + _tableConfigFile + " -messageRate " + _messageRate + " -primaryKeySize " + _primaryKeySize
+        + " -comparisonColSize " + _comparisonColSize + " -primaryKeyCardinality " + _primaryKeyCardinality);
   }
 
   @Override
@@ -170,6 +173,11 @@ public class HeapUsageEstimateCommand extends AbstractBaseAdminCommand implement
     return this;
   }
 
+  public HeapUsageEstimateCommand setPrimaryKeyCardinality(long primaryKeyCardinality) {
+    _primaryKeyCardinality = primaryKeyCardinality;
+    return this;
+  }
+
   public String run()
       throws Exception {
     if (_brokerHost == null) {
@@ -224,46 +232,60 @@ public class HeapUsageEstimateCommand extends AbstractBaseAdminCommand implement
     responseBuilder.append("Bytes per key").append(TAB).append(bytesPerKey).append(NEW_LINE);
     responseBuilder.append("Bytes per value").append(TAB).append(bytesPerValue).append(NEW_LINE);
     responseBuilder.append("Message rate per second").append(TAB).append(_messageRate).append(NEW_LINE);
+    responseBuilder.append("Cardinality").append(TAB).append(_primaryKeyCardinality).append(NEW_LINE);
     responseBuilder.append("Retention").append(TAB).append(retentionTimeValue).append(retentionTimeUnit)
         .append(NEW_LINE);
 
-    // Calculate upsert frequency.
-    // UpsertFrequency = 1 - nums of records / nums of skipUpsert records.
-    String request;
-    String urlString = _brokerProtocol + "://" + _brokerHost + ":" + _brokerPort + "/query";
-    urlString += "/sql";
-    String query = "select count(*) from " + _tableName;
-    request = JsonUtils.objectToString(Collections.singletonMap(Request.SQL, query));
-    JsonNode recordNums = JsonUtils.stringToJsonNode(
-        sendRequest("POST", urlString, request, makeAuthHeader(makeAuthToken(_authToken, _user, _password))))
-        .get("resultTable").get("rows").get(0).get(0);
+    if (_primaryKeyCardinality != 0) {
 
-    responseBuilder.append("Nums of records").append(TAB).append(recordNums.asText()).append(NEW_LINE);
-
-    request = JsonUtils.objectToString(Collections.singletonMap(Request.SQL, query + " option(skipUpsert=True)"));
-    JsonNode recordNumsSkipUpsert = JsonUtils.stringToJsonNode(
-        sendRequest("POST", urlString, request, makeAuthHeader(makeAuthToken(_authToken, _user, _password))))
-        .get("resultTable").get("rows").get(0).get(0);
-
-    responseBuilder.append("Nums of records (skipUpsert)").append(TAB).append(recordNumsSkipUpsert.asText())
-        .append(NEW_LINE);
-
-    // Estimate total Key/Value space based on unique key combinations.
-    // Keycombination = messageRate * retentionValue * (1 - upsertFrequency).
-    // KeySpace = bytesPerKey * uniqueCombinations
-    // ValueSpace = bytesPerValue * uniqueCombinations
-    if (recordNumsSkipUpsert.asLong() != 0) {
-      float appendFrequency = (float) recordNums.asLong() / recordNumsSkipUpsert.asLong();
-      float totalKeySpace =
-          bytesPerKey * _messageRate * Integer.valueOf(retentionTimeValue) * 24 * 3600 * appendFrequency / (1024 * 1024
-              * 1024);
-      float totalValueSpace =
-          bytesPerValue * _messageRate * Integer.valueOf(retentionTimeValue) * 24 * 3600 * appendFrequency / (1024
-              * 1024 * 1024);
-
-      responseBuilder.append("Upsert frequency").append(TAB).append(1 - appendFrequency).append(NEW_LINE);
+      float totalKeySpace = bytesPerKey * _primaryKeyCardinality;
+      float totalValueSpace = bytesPerValue * _primaryKeyCardinality;
+      float totalSpace = totalKeySpace + totalValueSpace;
       responseBuilder.append("Estimated total key space (GB)").append(TAB).append(totalKeySpace).append(NEW_LINE);
       responseBuilder.append("Estimated total value space (GB)").append(TAB).append(totalValueSpace).append(NEW_LINE);
+      responseBuilder.append("Estimated total space (GB)").append(TAB).append(totalSpace).append(NEW_LINE);
+    } else {
+      // Cardinality for primaryKeys are not specificed.
+      // Estimate unique combination of Pks based on upsert frequency.
+      // UpsertFrequency = 1 - recordsCount/skipUpsertRecordscount.
+      String request;
+      String urlString = _brokerProtocol + "://" + _brokerHost + ":" + _brokerPort + "/query";
+      urlString += "/sql";
+      String query = "select count(*) from " + _tableName;
+      request = JsonUtils.objectToString(Collections.singletonMap(Request.SQL, query));
+      JsonNode recordNums = JsonUtils.stringToJsonNode(
+          sendRequest("POST", urlString, request, makeAuthHeader(makeAuthToken(_authToken, _user, _password))))
+          .get("resultTable").get("rows").get(0).get(0);
+
+      responseBuilder.append("Nums of records").append(TAB).append(recordNums.asText()).append(NEW_LINE);
+
+      request = JsonUtils.objectToString(Collections.singletonMap(Request.SQL, query + " option(skipUpsert=True)"));
+      JsonNode recordNumsSkipUpsert = JsonUtils.stringToJsonNode(
+          sendRequest("POST", urlString, request, makeAuthHeader(makeAuthToken(_authToken, _user, _password))))
+          .get("resultTable").get("rows").get(0).get(0);
+
+      responseBuilder.append("Nums of records (skipUpsert)").append(TAB).append(recordNumsSkipUpsert.asText())
+          .append(NEW_LINE);
+
+      // Estimate total Key/Value space based on unique key combinations.
+      // Keycombination = messageRate * retentionValue * (1 - upsertFrequency).
+      // KeySpace = bytesPerKey * uniqueCombinations
+      // ValueSpace = bytesPerValue * uniqueCombinations
+      if (recordNumsSkipUpsert.asLong() != 0) {
+        float appendFrequency = (float) recordNums.asLong() / recordNumsSkipUpsert.asLong();
+        float totalKeySpace =
+            bytesPerKey * _messageRate * Integer.valueOf(retentionTimeValue) * 24 * 3600 * appendFrequency / (1024
+                * 1024 * 1024);
+        float totalValueSpace =
+            bytesPerValue * _messageRate * Integer.valueOf(retentionTimeValue) * 24 * 3600 * appendFrequency / (1024
+                * 1024 * 1024);
+        float totalSpace = totalKeySpace + totalValueSpace;
+
+        responseBuilder.append("Upsert frequency").append(TAB).append(1 - appendFrequency).append(NEW_LINE);
+        responseBuilder.append("Estimated total key space (GB)").append(TAB).append(totalKeySpace).append(NEW_LINE);
+        responseBuilder.append("Estimated total value space (GB)").append(TAB).append(totalValueSpace).append(NEW_LINE);
+        responseBuilder.append("Estimated total space (GB)").append(TAB).append(totalSpace).append(NEW_LINE);
+      }
     }
 
     return responseBuilder.toString();
