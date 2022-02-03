@@ -242,14 +242,9 @@ public class ZKOperator {
           .setCustomMap(segmentZKMetadataCustomMapModifier.modifyMap(newSegmentZKMetadata.getCustomMap()));
     }
 
-    int expectedVersion = -1;
-
     if (!_pinotHelixResourceManager.createSegmentZkMetadata(tableNameWithType, newSegmentZKMetadata)) {
       throw new RuntimeException(
           "Failed to create ZK metadata for segment: " + segmentName + " of table: " + tableNameWithType);
-    } else {
-      // Update version because zk metadata update is successful.
-      ++expectedVersion;
     }
 
     // For v1 segment uploads, we will not move the segment
@@ -285,9 +280,9 @@ public class ZKOperator {
     }
 
     if (enableParallelPushProtection) {
-      // Release lock.
+      // Release lock. Expected version will be 0 as we hold a lock and no updates could take place meanwhile.
       newSegmentZKMetadata.setSegmentUploadStartTime(-1);
-      if (!_pinotHelixResourceManager.updateZkMetadata(tableNameWithType, newSegmentZKMetadata, expectedVersion)) {
+      if (!_pinotHelixResourceManager.updateZkMetadata(tableNameWithType, newSegmentZKMetadata, 0)) {
         _pinotHelixResourceManager.deleteSegment(tableNameWithType, segmentName);
         LOGGER.info("Deleted zk entry and segment {} for table {}.", segmentName, tableNameWithType);
         throw new RuntimeException(
