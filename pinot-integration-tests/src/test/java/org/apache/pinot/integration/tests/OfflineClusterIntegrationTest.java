@@ -170,9 +170,29 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);
 
-    // Create and upload segments
+    // Create and upload segments. For exhaustive testing, concurrently upload multiple segments with the same name
+    // and validate correctness with parallel push protection enabled.
     ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(getTableName(), _tarDir);
+    // Create a copy of _tarDir to create multiple segments with the same name.
+    File tarDir2 = new File(_tempDir, "tarDir2");
+    FileUtils.copyDirectory(_tarDir, tarDir2);
+
+    List<File> tarDirPaths = new ArrayList<>();
+    tarDirPaths.add(_tarDir);
+    tarDirPaths.add(tarDir2);
+
+    // TODO: Move this block to a separate method.
+    try {
+      uploadSegments(getTableName(), tarDirPaths, TableType.OFFLINE, true);
+    } catch (Exception e) {
+      // If enableParallelPushProtection is enabled and the same segment is uploaded concurrently, we could get one
+      // of the two exception - 409 conflict of the second call enters ProcessExistingSegment ; segmentZkMetadata
+      // creation failure if both calls entered ProcessNewSegment. In/such cases ensure that we upload all the
+      // segments again/to ensure that the data is setup correctly.
+      assertTrue(e.getMessage().contains("Another segment upload is in progress for segment") || e.getMessage()
+          .contains("Failed to create ZK metadata for segment"));
+      uploadSegments(getTableName(), _tarDir);
+    }
 
     // Set up the H2 connection
     setUpH2Connection(avroFiles);
