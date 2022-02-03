@@ -79,22 +79,33 @@ const JSONbig = require('json-bigint')({'storeAsString': true})
 const getTenantsData = () => {
   return getTenants().then(({ data }) => {
     const records = _.union(data.SERVER_TENANTS, data.BROKER_TENANTS);
-    const promiseArr = [];
+    const serverPromiseArr = [], brokerPromiseArr = [], tablePromiseArr = [];
     const finalResponse = {
       columns: ['Tenant Name', 'Server', 'Broker', 'Tables'],
       records: []
     };
     records.map((record)=>{
       finalResponse.records.push([
-        record,
-        data.SERVER_TENANTS.indexOf(record) > -1 ? 1 : 0,
-        data.BROKER_TENANTS.indexOf(record) > -1 ? 1 : 0
+        record
       ]);
-      promiseArr.push(getTenantTable(record));
+      serverPromiseArr.push(getServerOfTenant(record));
+      brokerPromiseArr.push(getBrokerOfTenant(record));
+      tablePromiseArr.push(getTenantTable(record));
     });
-    return Promise.all(promiseArr).then((results)=>{
-      results.map((result, index)=>{
-        finalResponse.records[index].push(result.data.tables.length);
+    return Promise.all([
+      Promise.all(serverPromiseArr),
+      Promise.all(brokerPromiseArr),
+      Promise.all(tablePromiseArr)
+    ]).then((results)=>{
+      const serversResponseData = results[0];
+      const brokersResponseData = results[1];
+      const tablesResponseData = results[2];
+
+      tablesResponseData.map((tableResult, index)=>{
+        const serverCount = serversResponseData[index]?.length || 0;
+        const brokerCount = brokersResponseData[index]?.length || 0;
+        const tablesCount = tableResult.data.tables.length
+        finalResponse.records[index].push(serverCount, brokerCount, tablesCount);
       });
       return finalResponse;
     });
