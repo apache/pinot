@@ -43,6 +43,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -516,12 +517,20 @@ public final class TableConfigUtils {
 
   /**
    * Validates the Indexing Config
+   * Ensures that there is exact one partition column in segment partition config if available.
    * Ensures that every referred column name exists in the corresponding schema.
    * Also ensures proper dependency between index types (eg: Inverted Index columns
    * cannot be present in no-dictionary columns).
    */
-  private static void validateIndexingConfig(@Nullable IndexingConfig indexingConfig, @Nullable Schema schema) {
-    if (indexingConfig == null || schema == null) {
+  private static void validateIndexingConfig(IndexingConfig indexingConfig, @Nullable Schema schema) {
+    SegmentPartitionConfig segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
+    if (segmentPartitionConfig != null) {
+      Preconditions.checkState(segmentPartitionConfig.getColumnPartitionMap().size() == 1,
+          "Segment partition config should have exact one partition column, got %s",
+          segmentPartitionConfig.getColumnPartitionMap());
+    }
+
+    if (schema == null) {
       return;
     }
     ArrayListMultimap<String, String> columnNameToConfigMap = ArrayListMultimap.create();
@@ -577,9 +586,8 @@ public final class TableConfigUtils {
         columnNameToConfigMap.put(columnName, "Var Length Column Config");
       }
     }
-    if (indexingConfig.getSegmentPartitionConfig() != null
-        && indexingConfig.getSegmentPartitionConfig().getColumnPartitionMap() != null) {
-      for (String columnName : indexingConfig.getSegmentPartitionConfig().getColumnPartitionMap().keySet()) {
+    if (segmentPartitionConfig != null) {
+      for (String columnName : segmentPartitionConfig.getColumnPartitionMap().keySet()) {
         columnNameToConfigMap.put(columnName, "Segment Partition Config");
       }
     }

@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -46,8 +47,8 @@ public class InstanceAssignmentConfigUtils {
     Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap =
         tableConfig.getInstanceAssignmentConfigMap();
     return (instanceAssignmentConfigMap != null
-        && instanceAssignmentConfigMap.get(InstancePartitionsType.COMPLETED) != null) || TagNameUtils
-        .isRelocateCompletedSegments(tableConfig.getTenantConfig());
+        && instanceAssignmentConfigMap.get(InstancePartitionsType.COMPLETED) != null)
+        || TagNameUtils.isRelocateCompletedSegments(tableConfig.getTenantConfig());
   }
 
   /**
@@ -64,8 +65,8 @@ public class InstanceAssignmentConfigUtils {
       case OFFLINE:
         return tableType == TableType.OFFLINE && ((instanceAssignmentConfigMap != null
             && instanceAssignmentConfigMap.get(InstancePartitionsType.OFFLINE) != null)
-            || AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY
-            .equalsIgnoreCase(tableConfig.getValidationConfig().getSegmentAssignmentStrategy()));
+            || AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY.equalsIgnoreCase(
+            tableConfig.getValidationConfig().getSegmentAssignmentStrategy()));
       // Allow CONSUMING/COMPLETED instance assignment if the real-time table has it configured
       case CONSUMING:
       case COMPLETED:
@@ -105,9 +106,11 @@ public class InstanceAssignmentConfigUtils {
     int numReplicaGroups = segmentConfig.getReplicationNumber();
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig = segmentConfig.getReplicaGroupStrategyConfig();
     Preconditions.checkState(replicaGroupStrategyConfig != null, "Failed to find the replica-group strategy config");
+    SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
+    Preconditions.checkState(segmentPartitionConfig != null, "Failed to find the segment partition config");
     String partitionColumn = replicaGroupStrategyConfig.getPartitionColumn();
     if (partitionColumn != null) {
-      int numPartitions = tableConfig.getIndexingConfig().getSegmentPartitionConfig().getNumPartitions(partitionColumn);
+      int numPartitions = segmentPartitionConfig.getNumPartitions(partitionColumn);
       Preconditions.checkState(numPartitions > 0, "Number of partitions for column: %s is not properly configured",
           partitionColumn);
       replicaGroupPartitionConfig = new InstanceReplicaGroupPartitionConfig(true, 0, numReplicaGroups, 0, numPartitions,

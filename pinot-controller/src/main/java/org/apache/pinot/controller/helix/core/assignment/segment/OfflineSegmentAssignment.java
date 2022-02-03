@@ -37,7 +37,8 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
-import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
@@ -81,9 +82,13 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
     _helixManager = helixManager;
     _offlineTableName = tableConfig.getTableName();
     _replication = tableConfig.getValidationConfig().getReplicationNumber();
-    ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
-        tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
-    _partitionColumn = replicaGroupStrategyConfig != null ? replicaGroupStrategyConfig.getPartitionColumn() : null;
+    SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
+    if (segmentPartitionConfig != null) {
+      Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
+      Preconditions.checkState(columnPartitionMap.size() == 1,
+          "SegmentPartitionConfig should have exact one partition column");
+      _partitionColumn = columnPartitionMap.keySet().iterator().next();
+    }
 
     if (_partitionColumn == null) {
       LOGGER.info("Initialized OfflineSegmentAssignment with replication: {} without partition column for table: {} ",

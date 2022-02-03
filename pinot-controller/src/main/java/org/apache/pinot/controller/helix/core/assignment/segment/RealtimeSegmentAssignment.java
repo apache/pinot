@@ -34,7 +34,8 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
-import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
@@ -93,9 +94,13 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
     _helixManager = helixManager;
     _realtimeTableName = tableConfig.getTableName();
     _replication = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
-    ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
-        tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
-    _partitionColumn = replicaGroupStrategyConfig != null ? replicaGroupStrategyConfig.getPartitionColumn() : null;
+    SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
+    if (segmentPartitionConfig != null) {
+      Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
+      Preconditions.checkState(columnPartitionMap.size() == 1,
+          "SegmentPartitionConfig should have exact one partition column");
+      _partitionColumn = columnPartitionMap.keySet().iterator().next();
+    }
 
     LOGGER.info("Initialized RealtimeSegmentAssignment with replication: {}, partitionColumn: {} for table: {}",
         _replication, _partitionColumn, _realtimeTableName);
