@@ -1262,14 +1262,12 @@ public class PinotHelixResourceManager {
     String tableNameWithType = tableConfig.getTableName();
     SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
 
+    if (getTableConfig(tableNameWithType) != null) {
+      throw new TableAlreadyExistsException("Table " + tableNameWithType + " already exists");
+    }
     TableType tableType = tableConfig.getTableType();
     switch (tableType) {
       case OFFLINE:
-        // existing tooling relies on this check not existing for realtime table (to migrate to LLC)
-        // So, we avoid adding that for REALTIME just yet
-        if (getAllTables().contains(tableNameWithType)) {
-          throw new TableAlreadyExistsException("Table " + tableNameWithType + " already exists");
-        }
         // now lets build an ideal state
         LOGGER.info("building empty ideal state for table : " + tableNameWithType);
         final IdealState offlineIdealState = PinotTableIdealStateBuilder
@@ -1643,10 +1641,6 @@ public class PinotHelixResourceManager {
     ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(_propertyStore, offlineTableName);
     LOGGER.info("Deleting table {}: Removed segment metadata", offlineTableName);
 
-    // Remove table config
-    ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, offlineTableName);
-    LOGGER.info("Deleting table {}: Removed table config", offlineTableName);
-
     // Remove instance partitions
     InstancePartitionsUtils.removeInstancePartitions(_propertyStore, offlineTableName);
     LOGGER.info("Deleting table {}: Removed instance partitions", offlineTableName);
@@ -1659,6 +1653,11 @@ public class PinotHelixResourceManager {
     MinionTaskMetadataUtils
         .deleteTaskMetadata(_propertyStore, MinionConstants.MergeRollupTask.TASK_TYPE, offlineTableName);
     LOGGER.info("Deleting table {}: Removed merge rollup task metadata", offlineTableName);
+
+    // Remove table config
+    // this should always be the last step for deletion to avoid race condition in table re-create.
+    ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, offlineTableName);
+    LOGGER.info("Deleting table {}: Removed table config", offlineTableName);
 
     LOGGER.info("Deleting table {}: Finish", offlineTableName);
   }
@@ -1686,10 +1685,6 @@ public class PinotHelixResourceManager {
     // Remove segment metadata
     ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(_propertyStore, realtimeTableName);
     LOGGER.info("Deleting table {}: Removed segment metadata", realtimeTableName);
-
-    // Remove table config
-    ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, realtimeTableName);
-    LOGGER.info("Deleting table {}: Removed table config", realtimeTableName);
 
     // Remove instance partitions
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
@@ -1723,6 +1718,11 @@ public class PinotHelixResourceManager {
       }
     }
     LOGGER.info("Deleting table {}: Removed groupId/partitionId mapping for HLC table", realtimeTableName);
+
+    // Remove table config
+    // this should always be the last step for deletion to avoid race condition in table re-create.
+    ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, realtimeTableName);
+    LOGGER.info("Deleting table {}: Removed table config", realtimeTableName);
 
     LOGGER.info("Deleting table {}: Finish", realtimeTableName);
   }
