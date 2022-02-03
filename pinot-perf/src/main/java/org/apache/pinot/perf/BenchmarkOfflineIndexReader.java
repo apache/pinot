@@ -123,7 +123,7 @@ public class BenchmarkOfflineIndexReader {
     props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap.toString());
     SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
         .load(indexDir.toURI(),
-            new SegmentDirectoryLoaderContext(null, null, segmentMetadata.getName(), new PinotConfiguration(props)));
+            new SegmentDirectoryLoaderContext(null, null, null, segmentMetadata.getName(),null,  new PinotConfiguration(props)));
     SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();
 
     // Forward index

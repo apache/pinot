@@ -327,7 +327,7 @@ public class RawIndexCreatorTest {
     props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap.toString());
     _segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
         .load(driver.getOutputDirectory().toURI(),
-            new SegmentDirectoryLoaderContext(tableConfig, null, null, new PinotConfiguration(props)));
+            new SegmentDirectoryLoaderContext(tableConfig, null, null, null, null, new PinotConfiguration(props)));
     _segmentReader = _segmentDirectory.createReader();
     recordReader.rewind();
     return recordReader;

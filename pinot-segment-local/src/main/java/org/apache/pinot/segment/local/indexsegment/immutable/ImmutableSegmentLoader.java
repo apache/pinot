@@ -110,8 +110,9 @@ public class ImmutableSegmentLoader {
     }
     String segmentName = segmentMetadata.getName();
     SegmentDirectoryLoaderContext segmentLoaderContext =
-        new SegmentDirectoryLoaderContext(indexLoadingConfig.getTableConfig(), indexLoadingConfig.getInstanceId(),
-            segmentName, indexLoadingConfig.getSegmentDirectoryConfigs());
+        new SegmentDirectoryLoaderContext(indexLoadingConfig.getTableConfig(), schema,
+            indexLoadingConfig.getInstanceId(), segmentName, segmentMetadata.getCrc(),
+            indexLoadingConfig.getSegmentDirectoryConfigs());
     SegmentDirectoryLoader segmentLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
     SegmentDirectory segmentDirectory = segmentLoader.load(indexDir.toURI(), segmentLoaderContext);
@@ -135,7 +136,7 @@ public class ImmutableSegmentLoader {
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
     if (segmentMetadata.getTotalDocs() > 0) {
       convertSegmentFormat(indexDir, indexLoadingConfig, segmentMetadata);
-      preprocessSegment(indexDir, segmentMetadata.getName(), indexLoadingConfig, schema);
+      preprocessSegment(indexDir, segmentMetadata.getName(), segmentMetadata.getCrc(), indexLoadingConfig, schema);
     }
   }
 
@@ -251,13 +252,13 @@ public class ImmutableSegmentLoader {
         segmentVersionToLoad);
   }
 
-  private static void preprocessSegment(File indexDir, String segmentName, IndexLoadingConfig indexLoadingConfig,
-      @Nullable Schema schema)
+  private static void preprocessSegment(File indexDir, String segmentName, String segmentCrc,
+      IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema)
       throws Exception {
     PinotConfiguration segmentDirectoryConfigs = indexLoadingConfig.getSegmentDirectoryConfigs();
     SegmentDirectoryLoaderContext segmentLoaderContext =
-        new SegmentDirectoryLoaderContext(indexLoadingConfig.getTableConfig(), indexLoadingConfig.getInstanceId(),
-            segmentName, segmentDirectoryConfigs);
+        new SegmentDirectoryLoaderContext(indexLoadingConfig.getTableConfig(), schema,
+            indexLoadingConfig.getInstanceId(), segmentName, segmentCrc, segmentDirectoryConfigs);
     SegmentDirectory segmentDirectory =
         SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader().load(indexDir.toURI(), segmentLoaderContext);
     try (SegmentPreProcessor preProcessor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema)) {

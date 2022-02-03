@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.loader;
 
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -28,20 +29,28 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 public class SegmentDirectoryLoaderContext {
 
   private final TableConfig _tableConfig;
+  private final Schema _schema;
   private final String _instanceId;
   private final String _segmentName;
   private final PinotConfiguration _segmentDirectoryConfigs;
+  private final String _segmentCrc;
 
-  public SegmentDirectoryLoaderContext(TableConfig tableConfig, String instanceId, String segmentName,
-      PinotConfiguration segmentDirectoryConfigs) {
+  public SegmentDirectoryLoaderContext(TableConfig tableConfig, Schema schema, String instanceId, String segmentName,
+      String segmentCrc, PinotConfiguration segmentDirectoryConfigs) {
     _tableConfig = tableConfig;
+    _schema = schema;
     _instanceId = instanceId;
     _segmentName = segmentName;
+    _segmentCrc = segmentCrc;
     _segmentDirectoryConfigs = segmentDirectoryConfigs;
   }
 
   public TableConfig getTableConfig() {
     return _tableConfig;
+  }
+
+  public Schema getSchema() {
+    return _schema;
   }
 
   public String getInstanceId() {
@@ -50,6 +59,10 @@ public class SegmentDirectoryLoaderContext {
 
   public String getSegmentName() {
     return _segmentName;
+  }
+
+  public String getSegmentCrc() {
+    return _segmentCrc;
   }
 
   public PinotConfiguration getSegmentDirectoryConfigs() {

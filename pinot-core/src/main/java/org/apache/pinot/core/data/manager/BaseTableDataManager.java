@@ -107,8 +107,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _indexDir = new File(_tableDataDir);
     if (!_indexDir.exists()) {
       Preconditions.checkState(_indexDir.mkdirs(),
-          "Unable to create index directory at %s. Check that the user has permissions on this directory.",
-          _indexDir);
+          "Unable to create index directory at %s. Check that the user has permissions on this directory.", _indexDir);
     }
     _resourceTmpDir = new File(_indexDir, "tmp");
     // This is meant to cleanup temp resources from TableDataManager. But other code using this same
@@ -316,7 +315,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
         // The indexDir is empty after calling createBackup, as it's renamed to a backup directory.
         // The SegmentDirectory should initialize accordingly. Like for SegmentLocalFSDirectory, it
         // doesn't load anything from an empty indexDir, but gets the info to complete the copyTo.
-        try (SegmentDirectory segmentDirectory = initSegmentDirectory(segmentName, indexLoadingConfig)) {
+        try (SegmentDirectory segmentDirectory = initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()),
+            indexLoadingConfig, schema)) {
           segmentDirectory.copyTo(indexDir);
         }
       }
@@ -366,8 +366,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (localMetadata == null) {
       LOGGER.info("Download segment: {} of table: {} as it doesn't exist", segmentName, _tableNameWithType);
     } else {
-      LOGGER.info("Download segment: {} of table: {} as crc changes from: {} to: {}", segmentName,
-          _tableNameWithType, localMetadata.getCrc(), zkMetadata.getCrc());
+      LOGGER.info("Download segment: {} of table: {} as crc changes from: {} to: {}", segmentName, _tableNameWithType,
+          localMetadata.getCrc(), zkMetadata.getCrc());
     }
     File indexDir = downloadSegment(segmentName, zkMetadata);
     addSegment(indexDir, indexLoadingConfig);
@@ -503,9 +503,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
     File indexDir = getSegmentDataDir(segmentName);
     recoverReloadFailureQuietly(_tableNameWithType, segmentName, indexDir);
 
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
     // Creates the SegmentDirectory object to access the segment metadata.
     // The metadata is null if the segment doesn't exist yet.
-    SegmentDirectory segmentDirectory = tryInitSegmentDirectory(segmentName, indexLoadingConfig);
+    SegmentDirectory segmentDirectory =
+        tryInitSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig, schema);
     SegmentMetadataImpl segmentMetadata = (segmentDirectory == null) ? null : segmentDirectory.getSegmentMetadata();
 
     // If the segment doesn't exist on server or its CRC has changed, then we
@@ -525,7 +527,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
       // If the segment is still kept by the server, then we can
       // either load it directly if it's still consistent with latest table config and schema;
       // or reprocess it to reflect latest table config and schema before loading.
-      Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
       if (!ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, schema)) {
         LOGGER.info("Segment: {} of table: {} is consistent with latest table config and schema", segmentName,
             _tableNameWithType);
@@ -536,7 +537,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
         // Close the stale SegmentDirectory object and recreate it with reprocessed segment.
         closeSegmentDirectoryQuietly(segmentDirectory);
         ImmutableSegmentLoader.preprocess(indexDir, indexLoadingConfig, schema);
-        segmentDirectory = initSegmentDirectory(segmentName, indexLoadingConfig);
+        segmentDirectory =
+            initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig, schema);
       }
       ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, schema);
       addSegment(segment);
@@ -550,9 +552,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private SegmentDirectory tryInitSegmentDirectory(String segmentName, IndexLoadingConfig indexLoadingConfig) {
+  private SegmentDirectory tryInitSegmentDirectory(String segmentName, String segmentCrc,
+      IndexLoadingConfig indexLoadingConfig, Schema schema) {
     try {
-      return initSegmentDirectory(segmentName, indexLoadingConfig);
+      return initSegmentDirectory(segmentName, segmentCrc, indexLoadingConfig, schema);
     } catch (Exception e) {
       LOGGER.warn("Failed to initialize SegmentDirectory for segment: {} of table: {} with error: {}", segmentName,
           _tableNameWithType, e.getMessage());
@@ -560,11 +563,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private SegmentDirectory initSegmentDirectory(String segmentName, IndexLoadingConfig indexLoadingConfig)
+  private SegmentDirectory initSegmentDirectory(String segmentName, String segmentCrc,
+      IndexLoadingConfig indexLoadingConfig, Schema schema)
       throws Exception {
     SegmentDirectoryLoaderContext loaderContext =
-        new SegmentDirectoryLoaderContext(indexLoadingConfig.getTableConfig(), indexLoadingConfig.getInstanceId(),
-            segmentName, indexLoadingConfig.getSegmentDirectoryConfigs());
+        new SegmentDirectoryLoaderContext(indexLoadingConfig.getTableConfig(), schema,
+            indexLoadingConfig.getInstanceId(), segmentName, segmentCrc,
+            indexLoadingConfig.getSegmentDirectoryConfigs());
     SegmentDirectoryLoader segmentDirectoryLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
     File indexDir = getSegmentDataDir(segmentName);
