@@ -124,7 +124,9 @@ public class QueryRouter {
             .sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, entry.getValue(), timeoutMs);
         asyncQueryResponse.markRequestSubmitted(serverRoutingInstance);
       } catch (TimeoutException e) {
-        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_CHANNEL_LOCK_TIMEOUT_EXCEPTIONS, 1);
+        if (ServerChannels.CHANNEL_LOCK_TIMEOUT_MSG.equals(e.getMessage())) {
+          _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_CHANNEL_LOCK_TIMEOUT_EXCEPTIONS, 1);
+        }
         markQueryFailed(requestId, serverRoutingInstance, asyncQueryResponse, e);
         break;
       } catch (Exception e) {

@@ -53,6 +53,7 @@ import org.apache.thrift.protocol.TCompactProtocol;
  */
 @ThreadSafe
 public class ServerChannels {
+  public static final String CHANNEL_LOCK_TIMEOUT_MSG = "Timeout while acquiring channel lock";
   private final QueryRouter _queryRouter;
   private final BrokerMetrics _brokerMetrics;
   private final TSerializer _serializer = new TSerializer(new TCompactProtocol.Factory());
@@ -154,7 +155,7 @@ public class ServerChannels {
           _channelLock.unlock();
         }
       } else {
-        throw new TimeoutException("Timeout while acquiring channel lock");
+        throw new TimeoutException(CHANNEL_LOCK_TIMEOUT_MSG);
       }
     }
 
