@@ -188,13 +188,13 @@ public class PinotDataTypeTest {
   @Test
   public void testTimestamp() {
     Timestamp timestamp1 = new Timestamp(System.currentTimeMillis());
-    Timestamp timestamp2 = new Timestamp(1643173200000L);
+    Timestamp timestamp2 = new Timestamp(1643864400000L);
     assertEquals(TIMESTAMP.convert(timestamp1.getTime(), LONG), timestamp1);
     assertEquals(TIMESTAMP.convert(timestamp1.toString(), STRING), timestamp1);
     assertEquals(TIMESTAMP.convert(timestamp1.getTime(), JSON), timestamp1);
     assertEquals(TIMESTAMP.convert(timestamp1.toString(), JSON), timestamp1);
-    assertEquals(TIMESTAMP.convert(new SimpleDateFormat("MM/dd/yyyy").format(timestamp2), STRING),
-        timestamp2);
+    assertEquals(TIMESTAMP.convert(new SimpleDateFormat("MM/dd/yyyy").format(timestamp2), STRING).toString(),
+        "2022-02-03 00:00:00.0");
   }
 
   @Test
