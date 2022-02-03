@@ -225,19 +225,11 @@ public class HeapUsageEstimateCommand extends AbstractBaseAdminCommand implement
     }
     // Estimated value space, it contains <segmentName, DocId, ComparisonValue(timestamp)>
     int bytesPerValue = tableConfig.getUpsertConfig().getComparisonColumn() != null ? 52 + _comparisonColSize : 64;
-
-    String retentionTimeValue = tableConfig.getValidationConfig().getRetentionTimeValue();
-    String retentionTimeUnit = tableConfig.getValidationConfig().getRetentionTimeUnit();
-
     responseBuilder.append("Bytes per key").append(TAB).append(bytesPerKey).append(NEW_LINE);
     responseBuilder.append("Bytes per value").append(TAB).append(bytesPerValue).append(NEW_LINE);
-    responseBuilder.append("Message rate per second").append(TAB).append(_messageRate).append(NEW_LINE);
     responseBuilder.append("Cardinality").append(TAB).append(_primaryKeyCardinality).append(NEW_LINE);
-    responseBuilder.append("Retention").append(TAB).append(retentionTimeValue).append(retentionTimeUnit)
-        .append(NEW_LINE);
 
     if (_primaryKeyCardinality != 0) {
-
       float totalKeySpace = bytesPerKey * _primaryKeyCardinality;
       float totalValueSpace = bytesPerValue * _primaryKeyCardinality;
       float totalSpace = totalKeySpace + totalValueSpace;
@@ -247,7 +239,14 @@ public class HeapUsageEstimateCommand extends AbstractBaseAdminCommand implement
     } else {
       // Cardinality for primaryKeys are not specificed.
       // Estimate unique combination of Pks based on upsert frequency.
-      // UpsertFrequency = 1 - recordsCount/skipUpsertRecordscount.
+      // UpsertFrequency = 1 - recordsCount/skipUpsertRecordsCount.
+      String retentionTimeValue = tableConfig.getValidationConfig().getRetentionTimeValue();
+      String retentionTimeUnit = tableConfig.getValidationConfig().getRetentionTimeUnit();
+      responseBuilder.append("Message rate per second").append(TAB).append(_messageRate).append(NEW_LINE);
+      responseBuilder.append("Retention").append(TAB).append(retentionTimeValue).append(retentionTimeUnit)
+          .append(NEW_LINE);
+
+      // Send a request to broker to get recordsCount and skipUpsertRecordsCount.
       String request;
       String urlString = _brokerProtocol + "://" + _brokerHost + ":" + _brokerPort + "/query";
       urlString += "/sql";
@@ -256,14 +255,12 @@ public class HeapUsageEstimateCommand extends AbstractBaseAdminCommand implement
       JsonNode recordNums = JsonUtils.stringToJsonNode(
           sendRequest("POST", urlString, request, makeAuthHeader(makeAuthToken(_authToken, _user, _password))))
           .get("resultTable").get("rows").get(0).get(0);
-
       responseBuilder.append("Nums of records").append(TAB).append(recordNums.asText()).append(NEW_LINE);
 
       request = JsonUtils.objectToString(Collections.singletonMap(Request.SQL, query + " option(skipUpsert=True)"));
       JsonNode recordNumsSkipUpsert = JsonUtils.stringToJsonNode(
           sendRequest("POST", urlString, request, makeAuthHeader(makeAuthToken(_authToken, _user, _password))))
           .get("resultTable").get("rows").get(0).get(0);
-
       responseBuilder.append("Nums of records (skipUpsert)").append(TAB).append(recordNumsSkipUpsert.asText())
           .append(NEW_LINE);
 
