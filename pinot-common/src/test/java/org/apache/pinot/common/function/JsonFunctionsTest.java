@@ -114,6 +114,9 @@ public class JsonFunctionsTest {
     assertEquals(JsonFunctions.jsonPathArray(jsonString, "$.subjects[*].grade"), new String[]{"A", "B"});
     assertEquals(JsonFunctions.jsonPathArray(jsonString, "$.subjects[*].homework_grades"),
         new Object[]{Arrays.asList(80, 85, 90, 95, 100), Arrays.asList(60, 65, 70, 85, 90)});
+    assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, null), new Object[0]);
+    assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "not json"), new Object[0]);
+    assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "$.subjects[*].missing"), new Object[0]);
   }
 
   @Test
