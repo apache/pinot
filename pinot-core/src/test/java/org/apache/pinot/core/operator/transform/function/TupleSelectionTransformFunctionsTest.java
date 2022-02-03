@@ -37,13 +37,19 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
     return new Object[][] {
         {"()"},
         {String.format("(%s)", INT_MV_COLUMN)},
-        {String.format("(%s)", STRING_SV_COLUMN)},
+        {String.format("(%s)", LONG_MV_COLUMN)},
+        {String.format("(%s)", FLOAT_MV_COLUMN)},
+        {String.format("(%s)", DOUBLE_MV_COLUMN)},
+        {String.format("(%s)", STRING_MV_COLUMN)},
         {String.format("(%s, %s)", INT_MV_COLUMN, INT_SV_COLUMN)},
         {String.format("(%s, %s)", STRING_SV_COLUMN, INT_SV_COLUMN)},
+        {String.format("(%s, %s)", STRING_SV_COLUMN, LONG_SV_COLUMN)},
+        {String.format("(%s, %s)", STRING_SV_COLUMN, FLOAT_SV_COLUMN)},
+        {String.format("(%s, %s)", STRING_SV_COLUMN, DOUBLE_SV_COLUMN)},
+        {String.format("(%s, %s)", STRING_SV_COLUMN, TIMESTAMP_COLUMN)},
         {String.format("(%s, %s)", INT_SV_COLUMN, TIMESTAMP_COLUMN)},
         {String.format("(%s, %s)", FLOAT_SV_COLUMN, TIMESTAMP_COLUMN)},
         {String.format("(%s, %s)", DOUBLE_SV_COLUMN, TIMESTAMP_COLUMN)},
-        {String.format("(%s, %s)", STRING_SV_COLUMN, TIMESTAMP_COLUMN)},
         {String.format("(%s, %s)", TIMESTAMP_COLUMN, INT_SV_COLUMN)},
         {String.format("(%s, %s)", INT_SV_COLUMN, INT_MV_COLUMN)},
         {String.format("(%s, %s)", INT_SV_COLUMN, STRING_SV_COLUMN)},
@@ -63,6 +69,19 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
     int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       assertEquals(intValues[i], Math.min(Math.min(_intSVValues[i], -1), (int) _floatSVValues[i]));
+    }
+  }
+
+  @Test
+  public void testLeastTransformFunctionString() {
+    TransformFunction transformFunction = testLeastPreconditions(
+        String.format("least(cast(%s as STRING), cast(%s as STRING))", INT_SV_COLUMN, FLOAT_SV_COLUMN));
+    assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.STRING);
+    String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      String left = Integer.toString(_intSVValues[i]);
+      String right = Float.toString(_floatSVValues[i]);
+      assertEquals(stringValues[i], left.compareTo(right) < 0 ? left : right);
     }
   }
 
@@ -155,6 +174,16 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
   }
 
   @Test
+  public void testLeastTransformFunctionUnaryString() {
+    TransformFunction transformFunction = testLeastPreconditions(String.format("least(%s)", STRING_SV_COLUMN));
+    assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.STRING);
+    String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      assertEquals(stringValues[i], _stringSVValues[i]);
+    }
+  }
+
+  @Test
   public void testLeastTransformFunctionTimestampWithLegacyTimeColumn() {
     TransformFunction transformFunction = testLeastPreconditions(
         String.format("least(%s, cast(%s as TIMESTAMP))", TIMESTAMP_COLUMN, TIME_COLUMN));
@@ -234,6 +263,16 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
   }
 
   @Test
+  public void testGreatestTransformFunctionUnaryString() {
+    TransformFunction transformFunction = testGreatestPreconditions(String.format("greatest(%s)", STRING_SV_COLUMN));
+    assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.STRING);
+    String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      assertEquals(stringValues[i], _stringSVValues[i]);
+    }
+  }
+
+  @Test
   public void testGreatestTransformFunctionIntDouble() {
     TransformFunction transformFunction = testGreatestPreconditions(
         String.format("greatest(%s, %d, %s)", INT_SV_COLUMN, -1, DOUBLE_SV_COLUMN));
@@ -241,6 +280,19 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
     double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       assertEquals(doubleValues[i], Math.max(Math.max(_intSVValues[i], -1), _doubleSVValues[i]));
+    }
+  }
+
+  @Test
+  public void testGreatestTransformFunctionString() {
+    TransformFunction transformFunction = testGreatestPreconditions(
+        String.format("greatest(cast(%s as STRING), cast(%s as STRING))", INT_SV_COLUMN, FLOAT_SV_COLUMN));
+    assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.STRING);
+    String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      String left = Integer.toString(_intSVValues[i]);
+      String right = Float.toString(_floatSVValues[i]);
+      assertEquals(stringValues[i], left.compareTo(right) >= 0 ? left : right);
     }
   }
 

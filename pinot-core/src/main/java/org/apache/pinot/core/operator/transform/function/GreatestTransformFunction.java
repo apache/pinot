@@ -95,4 +95,23 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
     }
     return _doubleValuesSV;
   }
+
+  @Override
+  public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
+    int numDocs = projectionBlock.getNumDocs();
+    if (_stringValuesSV == null || _stringValuesSV.length < numDocs) {
+      _stringValuesSV = new String[numDocs];
+    }
+    String[] values = _arguments.get(0).transformToStringValuesSV(projectionBlock);
+    System.arraycopy(values, 0, _stringValuesSV, 0, numDocs);
+    for (int i = 1; i < _arguments.size(); i++) {
+      values = _arguments.get(i).transformToStringValuesSV(projectionBlock);
+      for (int j = 0; j < numDocs & j < values.length; j++) {
+        if (_stringValuesSV[j].compareTo(values[j]) < 0) {
+          _stringValuesSV[j] = values[j];
+        }
+      }
+    }
+    return _stringValuesSV;
+  }
 }
