@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.common.function;
 
+import java.util.Arrays;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+
 public enum TransformFunctionType {
   // Aggregation functions for single-valued columns
   ADD("add"),
@@ -101,10 +107,26 @@ public enum TransformFunctionType {
   // Geo indexing
   GEOTOH3("geoToH3");
 
+  private static final Set<String> NAMES = Arrays.stream(values())
+      .flatMap(func -> Stream.of(func.getName(), func.getName().replace("_", "").toUpperCase(),
+          func.getName().toUpperCase(), func.getName().toLowerCase(), func.name(), func.name().toLowerCase()))
+      .collect(Collectors.toSet());
+
   private final String _name;
 
   TransformFunctionType(String name) {
     _name = name;
+  }
+
+  public static boolean isTransformFunction(String functionName) {
+    if (NAMES.contains(functionName)) {
+      return true;
+    }
+    // scalar functions
+    if (FunctionRegistry.containsFunction(functionName)) {
+      return true;
+    }
+    return NAMES.contains(functionName.toUpperCase().replace("_", ""));
   }
 
   /**

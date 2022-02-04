@@ -29,12 +29,29 @@ public class FunctionDefinitionRegistryTest {
   @Test
   public void testIsAggFunc() {
     assertTrue(FunctionDefinitionRegistry.isAggFunc("count"));
+    assertTrue(FunctionDefinitionRegistry.isAggFunc("percentileRawEstMV"));
+    assertTrue(FunctionDefinitionRegistry.isAggFunc("PERCENTILERAWESTMV"));
+    assertTrue(FunctionDefinitionRegistry.isAggFunc("percentilerawestmv"));
+    assertTrue(FunctionDefinitionRegistry.isAggFunc("percentile_raw_est_mv"));
+    assertTrue(FunctionDefinitionRegistry.isAggFunc("PERCENTILE_RAW_EST_MV"));
+    assertTrue(FunctionDefinitionRegistry.isAggFunc("PERCENTILEEST90"));
+    assertTrue(FunctionDefinitionRegistry.isAggFunc("percentileest90"));
     assertFalse(FunctionDefinitionRegistry.isAggFunc("toEpochSeconds"));
   }
 
   @Test
   public void testIsTransformFunc() {
     assertTrue(FunctionDefinitionRegistry.isTransformFunc("toEpochSeconds"));
+    assertTrue(FunctionDefinitionRegistry.isTransformFunc("json_extract_scalar"));
+    assertTrue(FunctionDefinitionRegistry.isTransformFunc("jsonextractscalar"));
+    assertTrue(FunctionDefinitionRegistry.isTransformFunc("JSON_EXTRACT_SCALAR"));
+    assertTrue(FunctionDefinitionRegistry.isTransformFunc("JSONEXTRACTSCALAR"));
+    assertTrue(FunctionDefinitionRegistry.isTransformFunc("jsonExtractScalar"));
+    assertTrue(FunctionDefinitionRegistry.isTransformFunc("ST_AsText"));
+    assertTrue(FunctionDefinitionRegistry.isTransformFunc("STAsText"));
+    assertTrue(FunctionDefinitionRegistry.isTransformFunc("stastext"));
+    assertTrue(FunctionDefinitionRegistry.isTransformFunc("ST_ASTEXT"));
+    assertTrue(FunctionDefinitionRegistry.isTransformFunc("STASTEXT"));
     assertFalse(FunctionDefinitionRegistry.isTransformFunc("foo_bar"));
   }
 }

@@ -29,20 +29,10 @@ public class FunctionDefinitionRegistry {
   }
 
   public static boolean isAggFunc(String functionName) {
-    try {
-      AggregationFunctionType.getAggregationFunctionType(functionName);
-      return true;
-    } catch (IllegalArgumentException e) {
-      return false;
-    }
+    return AggregationFunctionType.isAggregationFunction(functionName);
   }
 
   public static boolean isTransformFunc(String functionName) {
-    try {
-      TransformFunctionType.getTransformFunctionType(functionName);
-      return true;
-    } catch (IllegalArgumentException e) {
-      return false;
-    }
+    return TransformFunctionType.isTransformFunction(functionName);
   }
 }

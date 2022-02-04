@@ -247,10 +247,8 @@ public class CalciteSqlParser {
     Function functionCall = expression.getFunctionCall();
     if (functionCall != null) {
       String operator = functionCall.getOperator();
-      try {
-        AggregationFunctionType.getAggregationFunctionType(operator);
+      if (AggregationFunctionType.isAggregationFunction(operator)) {
         return true;
-      } catch (IllegalArgumentException e) {
       }
       if (functionCall.getOperandsSize() > 0) {
         for (Expression operand : functionCall.getOperands()) {

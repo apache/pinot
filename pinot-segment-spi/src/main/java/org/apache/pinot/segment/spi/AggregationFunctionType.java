@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.segment.spi;
 
-import org.apache.commons.lang3.StringUtils;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 
 /**
@@ -71,6 +74,9 @@ public enum AggregationFunctionType {
   PERCENTILERAWTDIGESTMV("percentileRawTDigestMV"),
   DISTINCT("distinct");
 
+  private static final Set<String> NAMES = Arrays.stream(values()).flatMap(func -> Stream.of(func.name(),
+      func.getName(), func.getName().toLowerCase())).collect(Collectors.toSet());
+
   private final String _name;
 
   AggregationFunctionType(String name) {
@@ -81,14 +87,28 @@ public enum AggregationFunctionType {
     return _name;
   }
 
+  public static boolean isAggregationFunction(String functionName) {
+    if (NAMES.contains(functionName)) {
+      return true;
+    }
+    if (functionName.regionMatches(true, 0, "percentile", 0, 10)) {
+      try {
+        getAggregationFunctionType(functionName);
+        return true;
+      } catch (Exception ignore) {
+      }
+    }
+    String upperCaseFunctionName = functionName.replace("_", "").toUpperCase();
+    return NAMES.contains(upperCaseFunctionName);
+  }
+
   /**
    * Returns the corresponding aggregation function type for the given function name.
    * <p>NOTE: Underscores in the function name are ignored.
    */
   public static AggregationFunctionType getAggregationFunctionType(String functionName) {
-    String upperCaseFunctionName = StringUtils.remove(functionName, '_').toUpperCase();
-    if (upperCaseFunctionName.startsWith("PERCENTILE")) {
-      String remainingFunctionName = upperCaseFunctionName.substring(10);
+    if (functionName.regionMatches(true, 0, "percentile", 0, 10)) {
+      String remainingFunctionName = functionName.replace("_", "").substring(10).toUpperCase();
       if (remainingFunctionName.isEmpty() || remainingFunctionName.matches("\\d+")) {
         return PERCENTILE;
       } else if (remainingFunctionName.equals("EST") || remainingFunctionName.matches("EST\\d+")) {
@@ -114,7 +134,7 @@ public enum AggregationFunctionType {
       }
     } else {
       try {
-        return AggregationFunctionType.valueOf(upperCaseFunctionName);
+        return AggregationFunctionType.valueOf(functionName.replace("_", "").toUpperCase());
       } catch (IllegalArgumentException e) {
         throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
       }
