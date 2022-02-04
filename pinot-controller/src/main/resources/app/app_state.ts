@@ -22,6 +22,7 @@ class app_state {
   queryConsoleOnlyView: boolean;
   authWorkflow: AuthWorkflow;
   authToken: string | null;
+  columnNameSeparator: string = '#$%';
 }
 
 export default new app_state();
