@@ -56,9 +56,7 @@ public class StEqualsFunction extends BaseTransformFunction {
         "First argument must be single-valued for transform function: %s", getName());
     Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES
             || transformFunction instanceof LiteralTransformFunction,
-        String.format("The %s argument must be of type %s , but was %s",
-            "first",
-            FieldSpec.DataType.BYTES,
+        String.format("The first argument must be of type BYTES , but was %s",
             transformFunction.getResultMetadata().getDataType()
         ));
     _firstArgument = transformFunction;
