@@ -39,7 +39,11 @@ public class QueryContextUtils {
    * Returns {@code true} if the given query is a selection query, {@code false} otherwise.
    */
   public static boolean isSelectionQuery(QueryContext query) {
-    return query.getAggregationFunctions() == null && !GapfillUtils.isGapfill(query);
+    if (GapfillUtils.isGapfill(query)) {
+      return isSelectionOnlyQuery(query.getSubQueryContext());
+    } else {
+      return query.getAggregationFunctions() == null;
+    }
   }
 
   /**
@@ -57,10 +61,13 @@ public class QueryContextUtils {
    * Returns {@code trgue} if the given query is an agregation query, {@code false} otherwise.
    */
   public static boolean isAggregationQuery(QueryContext query) {
-    AggregationFunction[] aggregationFunctions = query.getAggregationFunctions();
-    return !GapfillUtils.isGapfill(query)
-        && (aggregationFunctions != null
-        && (aggregationFunctions.length != 1 || !(aggregationFunctions[0] instanceof DistinctAggregationFunction)));
+    if (GapfillUtils.isGapfill(query)) {
+      return isAggregationQuery(query.getSubQueryContext());
+    } else {
+      AggregationFunction[] aggregationFunctions = query.getAggregationFunctions();
+      return aggregationFunctions != null
+          && (aggregationFunctions.length != 1 || !(aggregationFunctions[0] instanceof DistinctAggregationFunction));
+    }
   }
 
   /**

@@ -209,6 +209,9 @@ public abstract class BaseQueriesTest {
   private BrokerResponseNative getBrokerResponse(QueryContext queryContext, PlanMaker planMaker) {
     // Server side.
     queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    if (queryContext.getSubQueryContext() != null) {
+      queryContext.getSubQueryContext().setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    }
     Plan plan = planMaker.makeInstancePlan(getIndexSegments(), queryContext, EXECUTOR_SERVICE);
 
     BrokerRequest brokerRequest = queryContext.getBrokerRequest();
@@ -228,8 +231,8 @@ public abstract class BaseQueriesTest {
       byte[] serializedResponse = instanceResponse.toBytes();
       dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.OFFLINE),
           DataTableFactory.getDataTable(serializedResponse));
-      dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.REALTIME),
-          DataTableFactory.getDataTable(serializedResponse));
+     // dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.REALTIME),
+     //     DataTableFactory.getDataTable(serializedResponse));
     } catch (Exception e) {
       Utils.rethrowException(e);
     }

@@ -391,6 +391,9 @@ public class SelectionOperatorUtils {
           row[i] = dataTable.getStringArray(rowId, i);
           break;
 
+        case OBJECT:
+          row[i] = dataTable.getObject(rowId, i);
+          break;
         default:
           throw new IllegalStateException(String
               .format("Unsupported data type: %s for column: %s", storedColumnDataTypes[i],

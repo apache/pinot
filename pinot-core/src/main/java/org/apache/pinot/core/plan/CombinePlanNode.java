@@ -33,6 +33,7 @@ import org.apache.pinot.core.operator.combine.AggregationOnlyCombineOperator;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.operator.combine.CombineOperatorUtils;
 import org.apache.pinot.core.operator.combine.DistinctCombineOperator;
+import org.apache.pinot.core.operator.combine.GapfillGroupByOrderByCombineOperator;
 import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.GroupByOrderByCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOnlyCombineOperator;
@@ -163,7 +164,9 @@ public class CombinePlanNode implements PlanNode {
       return new StreamingSelectionOnlyCombineOperator(operators, _queryContext, _executorService, _streamObserver);
     }
     if (QueryContextUtils.isAggregationQuery(_queryContext)) {
-      if (_queryContext.getGroupByExpressions() == null) {
+      if (GapfillUtils.isGapfill(_queryContext)) {
+        return new GapfillGroupByOrderByCombineOperator(operators, _queryContext, _executorService);
+      } else if (_queryContext.getGroupByExpressions() == null) {
         // Aggregation only
         return new AggregationOnlyCombineOperator(operators, _queryContext, _executorService);
       } else {

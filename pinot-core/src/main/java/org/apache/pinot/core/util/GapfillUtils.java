@@ -19,6 +19,7 @@
 package org.apache.pinot.core.util;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,7 +50,7 @@ public class GapfillUtils {
 
     FunctionContext function = expression.getFunction();
     String functionName = canonicalizeFunctionName(function.getFunctionName());
-    if (functionName.equals(POST_AGGREGATE_GAP_FILL) || functionName.equals(FILL)) {
+    if (functionName.equals(POST_AGGREGATE_GAP_FILL) || functionName.equals(FILL) || functionName.equals(GAP_FILL)) {
       return function.getArguments().get(0);
     }
     return expression;
@@ -158,7 +159,7 @@ public class GapfillUtils {
 
   public static ExpressionContext getPreAggregateGapfillExpressionContext(QueryContext queryContext) {
     for (ExpressionContext expressionContext : queryContext.getSelectExpressions()) {
-      if (GapfillUtils.isGapfill(expressionContext)) {
+      if (isGapfill(expressionContext)) {
         return expressionContext;
       }
     }
@@ -185,5 +186,22 @@ public class GapfillUtils {
       }
     }
     return fillExpressions;
+  }
+
+  public static List<ExpressionContext> getGroupByExpressions(QueryContext queryContext) {
+    ExpressionContext gapFillSelection =
+        GapfillUtils.getPreAggregateGapfillExpressionContext(queryContext);
+    if(gapFillSelection == null) {
+      return null;
+    }
+    List<ExpressionContext> groupByExpressions = new ArrayList<>();
+
+    ExpressionContext timeseriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);
+    groupByExpressions.add(gapFillSelection.getFunction().getArguments().get(0));
+    List<ExpressionContext> timeseriesExpressions = timeseriesOn.getFunction().getArguments();
+    for(int i = 1; i < timeseriesExpressions.size(); i ++) {
+      groupByExpressions.add(timeseriesExpressions.get(i));
+    }
+    return groupByExpressions;
   }
 }
