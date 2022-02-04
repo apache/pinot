@@ -45,11 +45,11 @@ public final class ResultReducerFactory {
     }
 
     AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
-    if (aggregationFunctions == null) {
+    if (GapfillUtils.isGapfill(queryContext)) {
+      return new PreAggregationGapFillDataTableReducer(queryContext);
+    } else if (aggregationFunctions == null) {
       // Selection query
       return new SelectionDataTableReducer(queryContext);
-    } else if (GapfillUtils.isGapfill(queryContext)) {
-      return new PreAggregationGapFillDataTableReducer(queryContext);
     } else {
       // Aggregation query
       if (queryContext.getGroupByExpressions() == null) {

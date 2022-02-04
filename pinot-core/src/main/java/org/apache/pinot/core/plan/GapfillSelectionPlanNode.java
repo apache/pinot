@@ -19,14 +19,16 @@
 package org.apache.pinot.core.plan;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 
@@ -35,11 +37,11 @@ import org.apache.pinot.segment.spi.IndexSegment;
  * The <code>PreAggGapFillSelectionPlanNode</code> class provides the execution
  * plan for pre-aggregate gapfill query on a single segment.
  */
-public class PreAggGapFillSelectionPlanNode implements PlanNode {
+public class GapfillSelectionPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;
 
-  public PreAggGapFillSelectionPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
+  public GapfillSelectionPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
     _indexSegment = indexSegment;
     _queryContext = queryContext.getSubQueryContext();
   }
@@ -48,22 +50,25 @@ public class PreAggGapFillSelectionPlanNode implements PlanNode {
   public Operator<IntermediateResultsBlock> run() {
     int limit = _queryContext.getLimit();
 
+    Preconditions.checkArgument(
+        _queryContext.getOrderByExpressions() == null,
+        "Subquery of Gapfill query should not have orderby expression.");
+
     ExpressionContext gapFillSelection = GapfillUtils.getPreAggregateGapfillExpressionContext(_queryContext);
     Preconditions.checkArgument(gapFillSelection != null, "PreAggregate Gapfill Expression is expected.");
 
     ExpressionContext timeSeriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);
     Preconditions.checkArgument(timeSeriesOn != null, "TimeSeriesOn Expression is expected.");
 
-    String timeCol = timeSeriesOn.getFunction().getArguments().get(0).getIdentifier();
+    List<ExpressionContext> expressions = GapfillUtils.getGroupByExpressions(_queryContext);
+    Preconditions.checkArgument(expressions != null, "GroupByExpressions should not be null.");
+    Set<ExpressionContext> expressionContextSet = new HashSet<>(expressions);
 
-    List<ExpressionContext> expressions = new ArrayList<>();
-    expressions.add(ExpressionContext.forIdentifier(timeCol));
-
-    expressions.add(gapFillSelection.getFunction().getArguments().get(0));
-
-    for (String column : _queryContext.getColumns()) {
-      if (!timeCol.equals(column)) {
-        expressions.add(ExpressionContext.forIdentifier(column));
+    List<ExpressionContext> selectionExpressions = SelectionOperatorUtils.extractExpressions(_queryContext, _indexSegment);
+    for(ExpressionContext expressionContext : selectionExpressions) {
+      if (!GapfillUtils.isGapfill(expressionContext) && !expressionContextSet.contains(expressionContext)) {
+        expressions.add(expressionContext);
+        expressionContextSet.add(expressionContext);
       }
     }
 

@@ -33,7 +33,6 @@ import java.util.PriorityQueue;
 import java.util.Set;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -73,7 +72,6 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
   private final Set<Key> _groupByKeys;
   private final Map<Key, Object[]> _previousByGroupKey;
   private final Map<String, ExpressionContext> _fillExpressions;
-  private final FilterContext _gapFillFilterContext;
   private final List<ExpressionContext> _timeSeries;
 
   PreAggregationGapFillDataTableReducer(QueryContext queryContext) {
@@ -84,6 +82,8 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     ExpressionContext gapFillSelection =
         GapfillUtils.getPreAggregateGapfillExpressionContext(queryContext.getSubQueryContext());
 
+    Preconditions.checkArgument(
+        gapFillSelection != null && gapFillSelection.getFunction() != null, "Gapfill Expression should be function.");
     List<ExpressionContext> args = gapFillSelection.getFunction().getArguments();
     Preconditions.checkArgument(
         args.size() > 5, "PreAggregateGapFill does not have correct number of arguments.");
@@ -96,7 +96,6 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     Preconditions.checkArgument(
         args.get(4).getLiteral() != null, "The fifth argument of PostAggregateGapFill should be time bucket size.");
 
-    _gapFillFilterContext = _queryContext.getFilter();
     _dateTimeFormatter = new DateTimeFormatSpec(args.get(1).getLiteral());
     _dateTimeGranularity = new DateTimeGranularitySpec(args.get(4).getLiteral());
     String start = args.get(2).getLiteral();
@@ -114,6 +113,25 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     ExpressionContext timeseriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);
     Preconditions.checkArgument(timeseriesOn != null, "The TimeSeriesOn expressions should be specified.");
     _timeSeries = timeseriesOn.getFunction().getArguments();
+  }
+
+  private void replaceColumnNameWithAlias(DataSchema dataSchema) {
+    List<String> aliasList = _queryContext.getSubQueryContext().getAliasList();
+    Map<String, String> columnNameToAliasMap = new HashMap<>();
+    for(int i = 0; i < aliasList.size(); i ++) {
+      if(aliasList.get(i) != null) {
+        ExpressionContext selection = _queryContext.getSubQueryContext().getSelectExpressions().get(i);
+        if(GapfillUtils.isGapfill(selection)) {
+          selection = selection.getFunction().getArguments().get(0);
+        }
+        columnNameToAliasMap.put(selection.toString(), aliasList.get(i));
+      }
+    }
+    for(int i = 0; i < dataSchema.getColumnNames().length; i ++) {
+      if(columnNameToAliasMap.containsKey(dataSchema.getColumnNames()[i] )) {
+        dataSchema.getColumnNames()[i] = columnNameToAliasMap.get(dataSchema.getColumnNames()[i]);
+      }
+    }
   }
 
   /**
@@ -148,11 +166,73 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
       _groupByKeyIndexes.add(index);
     }
 
+
     List<Object[]> sortedRawRows = mergeAndSort(dataTableMap.values(), dataSchema);
+    List<Object[]> resultRows;
+    replaceColumnNameWithAlias(dataSchema);
+    if (_queryContext.getAggregationFunctions() != null) {
+      validateGroupByForOuterQuery();
+    }
+    if (_queryContext.getSubQueryContext().getAggregationFunctions() == null) {
+      List<Object[]> gapfilledRows = gapFillAndAggregate(sortedRawRows, resultTableSchema, dataSchema);
+      if(_queryContext.getAggregationFunctions() == null) {
+        List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(_queryContext, dataSchema);
+        resultRows = new ArrayList<>(gapfilledRows.size());
 
-    List<Object[]> aggregateResult = gapFillAndAggregate(sortedRawRows, resultTableSchema, dataSchema);
+        Map<String, Integer> columnNameToIndexMap = new HashMap<>(dataSchema.getColumnNames().length);
+        String[] columnNames = dataSchema.getColumnNames();
+        for (int i = 0; i < columnNames.length; i++) {
+          columnNameToIndexMap.put(columnNames[i], i);
+        }
 
-    brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, aggregateResult));
+        ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+        ColumnDataType[] resultColumnDataTypes = new ColumnDataType[selectionColumns.size()];
+        for (int i = 0; i < resultColumnDataTypes.length; i++) {
+          String name = selectionColumns.get(i);
+          int index = columnNameToIndexMap.get(name);
+          resultColumnDataTypes[i] = columnDataTypes[index];
+        }
+
+        for (Object[] row : gapfilledRows) {
+          Object[] resultRow = new Object[selectionColumns.size()];
+          for (int i = 0; i < selectionColumns.size(); i++) {
+            int index = columnNameToIndexMap.get(selectionColumns.get(i));
+            resultRow[i] = resultColumnDataTypes[i].convertAndFormat(row[index]);
+          }
+          resultRows.add(resultRow);
+        }
+      } else {
+        resultRows = gapfilledRows;
+      }
+    } else {
+      this.setupColumnTypeForAggregatedColum(dataSchema.getColumnDataTypes());
+      ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+      for (Object[] row : sortedRawRows) {
+        extractFinalAggregationResults(row);
+        for (int i = 0; i < columnDataTypes.length; i++) {
+          row[i] = columnDataTypes[i].convert(row[i]);
+        }
+      }
+      resultRows = gapFillAndAggregate(sortedRawRows, resultTableSchema, dataSchema);
+    }
+    brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, resultRows));
+  }
+
+  private void extractFinalAggregationResults(Object[] row) {
+    AggregationFunction[] aggregationFunctions = _queryContext.getSubQueryContext().getAggregationFunctions();
+    int numAggregationFunctionsForInnerQuery = aggregationFunctions == null ? 0 : aggregationFunctions.length;
+    for (int i = 0; i < numAggregationFunctionsForInnerQuery; i++) {
+      int valueIndex = i + _timeSeries.size();
+      row[valueIndex] = aggregationFunctions[i].extractFinalResult(row[valueIndex]);
+    }
+  }
+
+  private void setupColumnTypeForAggregatedColum(ColumnDataType[] columnDataTypes) {
+    AggregationFunction[] aggregationFunctions = _queryContext.getSubQueryContext().getAggregationFunctions();
+    int numAggregationFunctionsForInnerQuery = aggregationFunctions == null ? 0 : aggregationFunctions.length;
+    for (int i = 0; i < numAggregationFunctionsForInnerQuery; i++) {
+      columnDataTypes[i + _timeSeries.size()] = aggregationFunctions[i].getFinalResultColumnType();
+    }
   }
 
   /**
@@ -196,24 +276,31 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     List<Object[]> result = new ArrayList<>();
 
     PreAggregateGapfillFilterHandler postGapfillFilterHandler = null;
-    if (_gapFillFilterContext != null) {
-      postGapfillFilterHandler = new PreAggregateGapfillFilterHandler(_gapFillFilterContext, dataSchema);
+    if (_queryContext.getFilter() != null) {
+      postGapfillFilterHandler = new PreAggregateGapfillFilterHandler(_queryContext.getFilter(), dataSchema);
     }
-    PreAggregateGapfillFilterHandler postAggregateFilterHandler = null;
+    PreAggregateGapfillFilterHandler postAggregateHavingFilterHandler = null;
     if (_queryContext.getHavingFilter() != null) {
-      postAggregateFilterHandler = new PreAggregateGapfillFilterHandler(
+      postAggregateHavingFilterHandler = new PreAggregateGapfillFilterHandler(
           _queryContext.getHavingFilter(), dataSchemaForAggregatedResult);
     }
     Object[] previous = null;
+    Iterator<Object[]> sortedIterator = sortedRows.iterator();
     for (long time = _startMs; time < _endMs; time += _timeBucketSize) {
       List<Object[]> bucketedResult = new ArrayList<>();
-      previous = gapfill(time, bucketedResult, sortedRows.iterator(), previous, dataSchema, postGapfillFilterHandler);
-      Object[] aggregatedRow = aggregateGapfilledData(bucketedResult, time, dataSchema);
-      if (postAggregateFilterHandler == null || postAggregateFilterHandler.isMatch(aggregatedRow)) {
-        result.add(aggregatedRow);
-      }
-      if (result.size() >= _limitForAggregatedResult) {
-        break;
+      previous = gapfill(time, bucketedResult, sortedIterator, previous, dataSchema, postGapfillFilterHandler);
+      if (_queryContext.getAggregationFunctions() == null) {
+        result.addAll(bucketedResult);
+      } else if (bucketedResult.size() > 0) {
+        List<Object[]> aggregatedRows = aggregateGapfilledData(bucketedResult, dataSchema);
+        for(Object[] aggregatedRow : aggregatedRows) {
+          if (postAggregateHavingFilterHandler == null || postAggregateHavingFilterHandler.isMatch(aggregatedRow)) {
+            result.add(aggregatedRow);
+          }
+          if (result.size() >= _limitForAggregatedResult) {
+            return result;
+          }
+        }
       }
     }
     return result;
@@ -238,7 +325,7 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
         resultRow[i] = resultColumnDataTypes[i].format(resultRow[i]);
       }
 
-      long timeCol = _dateTimeFormatter.fromFormatToMillis(String.valueOf(resultRow[1]));
+      long timeCol = _dateTimeFormatter.fromFormatToMillis(String.valueOf(resultRow[0]));
       if (timeCol > bucketTime) {
         break;
       }
@@ -263,13 +350,12 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     for (Key key : keys) {
       Object[] gapfillRow = new Object[numResultColumns];
       int keyIndex = 0;
-      gapfillRow[0] = bucketTime;
-      if (resultColumnDataTypes[1] == ColumnDataType.LONG) {
-        gapfillRow[1] = Long.valueOf(_dateTimeFormatter.fromMillisToFormat(bucketTime));
+      if (resultColumnDataTypes[0] == ColumnDataType.LONG) {
+        gapfillRow[0] = Long.valueOf(_dateTimeFormatter.fromMillisToFormat(bucketTime));
       } else {
-        gapfillRow[1] = _dateTimeFormatter.fromMillisToFormat(bucketTime);
+        gapfillRow[0] = _dateTimeFormatter.fromMillisToFormat(bucketTime);
       }
-      for (int i = 2; i < _isGroupBySelections.length; i++) {
+      for (int i = 1; i < _isGroupBySelections.length; i++) {
         if (_isGroupBySelections[i]) {
           gapfillRow[i] = key.getValues()[keyIndex++];
         } else {
@@ -287,35 +373,99 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     return previous;
   }
 
-  private Object[] aggregateGapfilledData(List<Object[]> bucketedRows, long time, DataSchema dataSchema) {
-    Object[] resultRow = new Object[_queryContext.getSelectExpressions().size()];
-    String formattedTime = _dateTimeFormatter.fromMillisToFormat(time);
+  /**
+   * Make sure that the outer query has the group by clause and the group by clause has the time bucket.
+   */
+  private void validateGroupByForOuterQuery() {
+    List<ExpressionContext> groupbyExpressions = _queryContext.getGroupByExpressions();
+    Preconditions.checkArgument(groupbyExpressions != null, "No GroupBy Clause.");
+    List<ExpressionContext> innerSelections = _queryContext.getSubQueryContext().getSelectExpressions();
+    String timeBucketCol = null;
+    List<String> strAlias = _queryContext.getSubQueryContext().getAliasList();
+    for(int i = 0; i < innerSelections.size(); i ++) {
+      ExpressionContext innerSelection = innerSelections.get(i);
+      if(GapfillUtils.isGapfill(innerSelection)) {
+        if (strAlias.get(i) != null) {
+          timeBucketCol = strAlias.get(i);
+        } else {
+          timeBucketCol = innerSelection.getFunction().getArguments().get(0).toString();
+        }
+        break;
+      }
+    }
+
+    Preconditions.checkArgument(timeBucketCol != null, "No Group By timebucket.");
+
+    boolean findTimeBucket = false;
+    for(ExpressionContext groupbyExp : groupbyExpressions) {
+      if(timeBucketCol.equals(groupbyExp.toString())) {
+        findTimeBucket = true;
+        break;
+      }
+    }
+
+    Preconditions.checkArgument(findTimeBucket, "No Group By timebucket.");
+  }
+
+  private List<Object[]> aggregateGapfilledData(List<Object[]> bucketedRows, DataSchema dataSchema) {
+    List<ExpressionContext> groupbyExpressions = _queryContext.getGroupByExpressions();
+    Preconditions.checkArgument(groupbyExpressions != null, "No GroupBy Clause.");
+    Map<String, Integer> indexes = new HashMap<>();
+    for(int i = 0; i < dataSchema.getColumnNames().length; i ++) {
+      indexes.put(dataSchema.getColumnName(i), i);
+    }
+
+    Map<List<Object>, Integer> groupKeyIndexes = new HashMap<>();
+    int[] groupKeyArray = new int[bucketedRows.size()];
+    List<Object[]> aggregatedResult = new ArrayList<>();
+    for(int j = 0; j < bucketedRows.size(); j ++) {
+      Object [] bucketedRow = bucketedRows.get(j);
+      List<Object> groupKey = new ArrayList<>(groupbyExpressions.size());
+      for(ExpressionContext groupbyExpression : groupbyExpressions) {
+        int columnIndex = indexes.get(groupbyExpression.toString());
+        groupKey.add(bucketedRow[columnIndex]);
+      }
+      if(groupKeyIndexes.containsKey(groupKey)) {
+        groupKeyArray[j] = groupKeyIndexes.get(groupKey);
+      } else {
+        // create the new groupBy Result row and fill the group by key
+        groupKeyArray[j] = groupKeyIndexes.size();
+        groupKeyIndexes.put(groupKey, groupKeyIndexes.size());
+        Object[] row  = new Object[_queryContext.getSelectExpressions().size()];
+        for(int i = 0; i < _queryContext.getSelectExpressions().size(); i ++) {
+          ExpressionContext expressionContext = _queryContext.getSelectExpressions().get(i);
+          if(expressionContext.getType() != ExpressionContext.Type.FUNCTION) {
+            row[i] = bucketedRow[indexes.get(expressionContext.toString())];
+          }
+        }
+        aggregatedResult.add(row);
+      }
+    }
+
     Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
-    blockValSetMap.put(ExpressionContext.forIdentifier(dataSchema.getColumnName(0)),
-        new ColumnDataToBlockValSetConverter(dataSchema.getColumnDataType(0), bucketedRows, 0));
-    for (int i = 2; i < dataSchema.getColumnNames().length - 1; i++) {
+    for (int i = 1; i < dataSchema.getColumnNames().length; i++) {
       blockValSetMap.put(ExpressionContext.forIdentifier(dataSchema.getColumnName(i)),
           new ColumnDataToBlockValSetConverter(dataSchema.getColumnDataType(i), bucketedRows, i));
     }
 
     for (int i = 0; i < _queryContext.getSelectExpressions().size(); i++) {
       ExpressionContext expressionContext = _queryContext.getSelectExpressions().get(i);
-      if (expressionContext.getType() != ExpressionContext.Type.FUNCTION) {
-        resultRow[i] = formattedTime;
-      } else {
+      if (expressionContext.getType() == ExpressionContext.Type.FUNCTION) {
         FunctionContext functionContext = expressionContext.getFunction();
         AggregationFunction aggregationFunction =
             AggregationFunctionFactory.getAggregationFunction(functionContext, _queryContext);
-        GroupByResultHolder firstGroupByResultHolder =
+        GroupByResultHolder groupByResultHolder =
             aggregationFunction.createGroupByResultHolder(_groupByKeys.size(), _groupByKeys.size());
-        int[] groupKeyArray = new int[bucketedRows.size()];
         aggregationFunction
-            .aggregateGroupBySV(bucketedRows.size(), groupKeyArray, firstGroupByResultHolder, blockValSetMap);
-        resultRow[i] = aggregationFunction.extractGroupByResult(firstGroupByResultHolder, 0);
-        resultRow[i] = aggregationFunction.extractFinalResult(resultRow[i]);
+            .aggregateGroupBySV(bucketedRows.size(), groupKeyArray, groupByResultHolder, blockValSetMap);
+        for(int j = 0; j < groupKeyIndexes.size(); j ++) {
+          Object [] row = aggregatedResult.get(j);
+          row[i] = aggregationFunction.extractGroupByResult(groupByResultHolder, j);
+          row[i] = aggregationFunction.extractFinalResult(row[i]);
+        }
       }
     }
-    return resultRow;
+    return aggregatedResult;
   }
 
   private Object getFillValue(int columnIndex, String columnName, Object key, ColumnDataType dataType) {
@@ -361,15 +511,22 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
       if (columnDataTypes[0].isNumber()) {
         result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
       } else {
-        //noinspection unchecked
-        result = ((Comparable) v1).compareTo(v2);
+        long timeCol1 = _dateTimeFormatter.fromFormatToMillis(String.valueOf(v1));
+        long timeCol2 = _dateTimeFormatter.fromFormatToMillis(String.valueOf(v2));
+        if (timeCol1 < timeCol2) {
+          return -1;
+        } else if(timeCol1 == timeCol2) {
+          return 0;
+        } else {
+          return 1;
+        }
       }
       return result;
     };
   }
 
   /**
-   * Merge all result tables from different pinot servers and sort the rows based on timestsamp.
+   * Merge all result tables from different pinot servers and sort the rows based on timebucket.
    */
   private List<Object[]> mergeAndSort(Collection<DataTable> dataTables, DataSchema dataSchema) {
     PriorityQueue<Object[]> rows = new PriorityQueue<>(Math.min(_limitForAggregatedResult,

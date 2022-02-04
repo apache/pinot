@@ -36,11 +36,12 @@ import org.apache.pinot.core.plan.AggregationGroupByPlanNode;
 import org.apache.pinot.core.plan.AggregationPlanNode;
 import org.apache.pinot.core.plan.CombinePlanNode;
 import org.apache.pinot.core.plan.DistinctPlanNode;
+import org.apache.pinot.core.plan.GapfillAggregationGroupByOrderByPlanNode;
 import org.apache.pinot.core.plan.GlobalPlanImplV0;
 import org.apache.pinot.core.plan.InstanceResponsePlanNode;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.PlanNode;
-import org.apache.pinot.core.plan.PreAggGapFillSelectionPlanNode;
+import org.apache.pinot.core.plan.GapfillSelectionPlanNode;
 import org.apache.pinot.core.plan.SelectionPlanNode;
 import org.apache.pinot.core.plan.StreamingInstanceResponsePlanNode;
 import org.apache.pinot.core.plan.StreamingSelectionPlanNode;
@@ -228,21 +229,27 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   @Override
   public PlanNode makeSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
     if (QueryContextUtils.isAggregationQuery(queryContext)) {
-      List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
-      if (groupByExpressions != null) {
-        // Aggregation group-by query
-        if (QueryOptionsUtils.isGroupByModeSQL(queryContext.getQueryOptions())) {
-          return new AggregationGroupByOrderByPlanNode(indexSegment, queryContext);
-        }
-        return new AggregationGroupByPlanNode(indexSegment, queryContext);
+      if(GapfillUtils.isGapfill(queryContext)) {
+        return new GapfillAggregationGroupByOrderByPlanNode(indexSegment, queryContext);
       } else {
-        // Aggregation only query
-        return new AggregationPlanNode(indexSegment, queryContext);
+        List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
+        if (groupByExpressions != null) {
+          // Aggregation group-by query
+          if (QueryOptionsUtils.isGroupByModeSQL(queryContext.getQueryOptions())) {
+            return new AggregationGroupByOrderByPlanNode(indexSegment, queryContext);
+          }
+          return new AggregationGroupByPlanNode(indexSegment, queryContext);
+        } else {
+          // Aggregation only query
+          return new AggregationPlanNode(indexSegment, queryContext);
+        }
       }
     } else if (QueryContextUtils.isSelectionQuery(queryContext)) {
-      return new SelectionPlanNode(indexSegment, queryContext);
-    } else if (GapfillUtils.isGapfill(queryContext)) {
-      return new PreAggGapFillSelectionPlanNode(indexSegment, queryContext);
+      if (GapfillUtils.isGapfill(queryContext)) {
+        return new GapfillSelectionPlanNode(indexSegment, queryContext);
+      } else {
+        return new SelectionPlanNode(indexSegment, queryContext);
+      }
     } else {
       assert QueryContextUtils.isDistinctQuery(queryContext);
       return new DistinctPlanNode(indexSegment, queryContext);
