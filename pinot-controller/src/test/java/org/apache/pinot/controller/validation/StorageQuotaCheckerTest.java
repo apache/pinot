@@ -80,7 +80,7 @@ public class StorageQuotaCheckerTest {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
     _tableSizeReader = mock(TableSizeReader.class);
-    ControllerMetrics controllerMetrics  = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     _storageQuotaChecker = new StorageQuotaChecker(tableConfig, _tableSizeReader, controllerMetrics, true,
         mock(PinotHelixResourceManager.class));
     tableConfig.setQuotaConfig(new QuotaConfig(null, null));
