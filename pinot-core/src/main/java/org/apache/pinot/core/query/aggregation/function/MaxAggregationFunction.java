@@ -54,13 +54,39 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
     double max = aggregationResultHolder.getDoubleResult();
-    for (int i = 0; i < length; i++) {
-      double value = valueArray[i];
-      if (value > max) {
-        max = value;
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    switch (blockValSet.getValueType().getStoredType()) {
+      case INT: {
+        int[] values = blockValSet.getIntValuesSV();
+        for (int i = 0; i < length & i < values.length; i++) {
+          max = Math.max(values[i], max);
+        }
+        break;
       }
+      case LONG: {
+        long[] values = blockValSet.getLongValuesSV();
+        for (int i = 0; i < length & i < values.length; i++) {
+          max = Math.max(values[i], max);
+        }
+        break;
+      }
+      case FLOAT: {
+        float[] values = blockValSet.getFloatValuesSV();
+        for (int i = 0; i < length & i < values.length; i++) {
+          max = Math.max(values[i], max);
+        }
+        break;
+      }
+      case DOUBLE: {
+        double[] values = blockValSet.getDoubleValuesSV();
+        for (int i = 0; i < length & i < values.length; i++) {
+          max = Math.max(values[i], max);
+        }
+        break;
+      }
+      default:
+        throw new IllegalStateException();
     }
     aggregationResultHolder.setValue(max);
   }
