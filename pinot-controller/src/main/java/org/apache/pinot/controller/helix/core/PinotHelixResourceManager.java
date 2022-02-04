@@ -1258,14 +1258,15 @@ public class PinotHelixResourceManager {
    */
   public void addTable(TableConfig tableConfig)
       throws IOException {
-    validateTableTenantConfig(tableConfig);
     String tableNameWithType = tableConfig.getTableName();
-    SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
-
     if (getTableConfig(tableNameWithType) != null) {
       throw new TableAlreadyExistsException("Table " + tableNameWithType + " already exists");
     }
+
+    validateTableTenantConfig(tableConfig);
+    SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
     TableType tableType = tableConfig.getTableType();
+
     switch (tableType) {
       case OFFLINE:
         // now lets build an ideal state
