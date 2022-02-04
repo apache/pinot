@@ -34,6 +34,8 @@ public class FunctionDefinitionRegistryTest {
     assertTrue(FunctionDefinitionRegistry.isAggFunc("percentilerawestmv"));
     assertTrue(FunctionDefinitionRegistry.isAggFunc("percentile_raw_est_mv"));
     assertTrue(FunctionDefinitionRegistry.isAggFunc("PERCENTILE_RAW_EST_MV"));
+    assertTrue(FunctionDefinitionRegistry.isAggFunc("PERCENTILEEST90"));
+    assertTrue(FunctionDefinitionRegistry.isAggFunc("percentileest90"));
     assertFalse(FunctionDefinitionRegistry.isAggFunc("toEpochSeconds"));
   }
 

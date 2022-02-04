@@ -22,7 +22,6 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.commons.lang3.StringUtils;
 
 
 /**
@@ -92,6 +91,13 @@ public enum AggregationFunctionType {
     if (NAMES.contains(functionName)) {
       return true;
     }
+    if (functionName.regionMatches(true, 0, "percentile", 0, 10)) {
+      try {
+        getAggregationFunctionType(functionName);
+        return true;
+      } catch (Exception ignore) {
+      }
+    }
     String upperCaseFunctionName = functionName.replace("_", "").toUpperCase();
     return NAMES.contains(upperCaseFunctionName);
   }
@@ -101,9 +107,8 @@ public enum AggregationFunctionType {
    * <p>NOTE: Underscores in the function name are ignored.
    */
   public static AggregationFunctionType getAggregationFunctionType(String functionName) {
-    String upperCaseFunctionName = StringUtils.remove(functionName, '_').toUpperCase();
-    if (upperCaseFunctionName.startsWith("PERCENTILE")) {
-      String remainingFunctionName = upperCaseFunctionName.substring(10);
+    if (functionName.regionMatches(true, 0, "percentile", 0, 10)) {
+      String remainingFunctionName = functionName.replace("_", "").substring(10).toUpperCase();
       if (remainingFunctionName.isEmpty() || remainingFunctionName.matches("\\d+")) {
         return PERCENTILE;
       } else if (remainingFunctionName.equals("EST") || remainingFunctionName.matches("EST\\d+")) {
@@ -129,7 +134,7 @@ public enum AggregationFunctionType {
       }
     } else {
       try {
-        return AggregationFunctionType.valueOf(upperCaseFunctionName);
+        return AggregationFunctionType.valueOf(functionName.replace("_", "").toUpperCase());
       } catch (IllegalArgumentException e) {
         throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
       }
