@@ -98,6 +98,7 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   public static class QueryParameters {
+    public static final String OVERWRITE_IF_EXISTS = "overwriteIfExists";
     public static final String ENABLE_PARALLEL_PUSH_PROTECTION = "enableParallelPushProtection";
     public static final String TABLE_NAME = "tableName";
     public static final String TABLE_TYPE = "tableType";
@@ -811,7 +812,8 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   /**
-   * Upload segment with segment file using  table name, type and enableParallelPushProtection as a request parameters.
+   * Upload segment with segment file using  table name, type, enableParallelPushProtection and overwriteIfExists as a
+   * request parameters.
    *
    * @param uri URI
    * @param segmentName Segment name
@@ -824,16 +826,19 @@ public class FileUploadDownloadClient implements Closeable {
    * @throws HttpErrorStatusException
    */
   public SimpleHttpResponse uploadSegment(URI uri, String segmentName, File segmentFile, String tableName,
-      TableType tableType, boolean enableParallelPushProtection)
+      TableType tableType, boolean enableParallelPushProtection, boolean overwriteIfExists)
       throws IOException, HttpErrorStatusException {
     NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, tableName);
     NameValuePair tableTypeValuePair = new BasicNameValuePair(QueryParameters.TABLE_TYPE, tableType.name());
     NameValuePair enableParallelPushProtectionValuePair =
         new BasicNameValuePair(QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION,
             String.valueOf(enableParallelPushProtection));
+    NameValuePair overwriteIfExistsValuePair =
+        new BasicNameValuePair(QueryParameters.OVERWRITE_IF_EXISTS, String.valueOf(overwriteIfExists));
 
-    List<NameValuePair> parameters =
-        Arrays.asList(tableNameValuePair, tableTypeValuePair, enableParallelPushProtectionValuePair);
+    List<NameValuePair> parameters = Arrays
+        .asList(tableNameValuePair, tableTypeValuePair, enableParallelPushProtectionValuePair,
+            overwriteIfExistsValuePair);
     return uploadSegment(uri, segmentName, segmentFile, null, parameters, DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
