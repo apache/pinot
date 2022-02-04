@@ -52,7 +52,7 @@ public class AggregateMetricsRuleTest {
       throws Exception {
     Set<String> metrics = ImmutableSet.of("a", "b", "c");
     InputManager input =
-        createInput(metrics, "select sum(a), sum(b), sum(c) from tableT", "select sum(a), b from tableT2");
+        createInput(metrics, "select sum(a), sum(b), sum(c) from tableT", "select sum(a), avg(b) from tableT2");
     ConfigManager output = new ConfigManager();
     AggregateMetricsRule rule = new AggregateMetricsRule(input, output);
     rule.run();

@@ -360,6 +360,9 @@ public class PinotConfiguration {
     if (rawProperty instanceof List) {
       return StringUtils.join(((ArrayList) rawProperty).toArray(), ',');
     } else {
+      if (rawProperty == null) {
+        return null;
+      }
       return rawProperty.toString();
     }
   }
@@ -449,5 +452,9 @@ public class PinotConfiguration {
   @Override
   public String toString() {
     return new Obfuscator().toJsonString(this);
+  }
+
+  public boolean isEmpty() {
+    return _configuration.isEmpty();
   }
 }

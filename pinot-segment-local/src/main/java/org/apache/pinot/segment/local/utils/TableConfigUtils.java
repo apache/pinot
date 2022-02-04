@@ -53,12 +53,14 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -82,6 +84,10 @@ public final class TableConfigUtils {
 
   // supported TableTaskTypes, must be identical to the one return in the impl of {@link PinotTaskGenerator}.
   private static final String REALTIME_TO_OFFLINE_TASK_TYPE = "RealtimeToOfflineSegmentsTask";
+
+  // this is duplicate with KinesisConfig.STREAM_TYPE, while instead of use KinesisConfig.STREAM_TYPE directly, we
+  // hardcode the value here to avoid pulling the entire pinot-kinesis module as dependency.
+  private static final String KINESIS_STREAM_TYPE = "kinesis";
 
   /**
    * @see TableConfigUtils#validate(TableConfig, Schema, String)
@@ -107,7 +113,7 @@ public final class TableConfigUtils {
     }
     // Sanitize the table config before validation
     sanitize(tableConfig);
-    // skip all validation if skip type ALL is selected. 
+    // skip all validation if skip type ALL is selected.
     if (!skipTypes.contains(ValidationType.ALL)) {
       validateValidationConfig(tableConfig, schema);
       validateIngestionConfig(tableConfig, schema);
@@ -856,5 +862,54 @@ public final class TableConfigUtils {
   // enum of all the skip-able validation types.
   public enum ValidationType {
     ALL, TASK, UPSERT
+  }
+
+  /**
+   * needsEmptySegmentPruner checks if EmptySegmentPruner is needed for a TableConfig.
+   * @param tableConfig Input table config.
+   */
+  public static boolean needsEmptySegmentPruner(TableConfig tableConfig) {
+    if (isKinesisConfigured(tableConfig)) {
+      return true;
+    }
+    RoutingConfig routingConfig = tableConfig.getRoutingConfig();
+    if (routingConfig == null) {
+      return false;
+    }
+    List<String> segmentPrunerTypes = routingConfig.getSegmentPrunerTypes();
+    if (segmentPrunerTypes == null || segmentPrunerTypes.isEmpty()) {
+      return false;
+    }
+    for (String segmentPrunerType : segmentPrunerTypes) {
+      if (RoutingConfig.EMPTY_SEGMENT_PRUNER_TYPE.equalsIgnoreCase(segmentPrunerType)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean isKinesisConfigured(TableConfig tableConfig) {
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    if (indexingConfig != null) {
+      Map<String, String> streamConfig = indexingConfig.getStreamConfigs();
+      if (streamConfig != null && KINESIS_STREAM_TYPE.equals(
+          streamConfig.get(StreamConfigProperties.STREAM_TYPE))) {
+        return true;
+      }
+    }
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig == null) {
+      return false;
+    }
+    StreamIngestionConfig streamIngestionConfig = ingestionConfig.getStreamIngestionConfig();
+    if (streamIngestionConfig == null) {
+      return false;
+    }
+    for (Map<String, String> config : streamIngestionConfig.getStreamConfigMaps()) {
+      if (config != null && KINESIS_STREAM_TYPE.equals(config.get(StreamConfigProperties.STREAM_TYPE))) {
+        return true;
+      }
+    }
+    return false;
   }
 }

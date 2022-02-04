@@ -75,6 +75,7 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
 @SuppressWarnings("unused")
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.NONE)
 public class InputManager {
+
   private static final Logger LOGGER = LoggerFactory.getLogger(InputManager.class);
 
   /******************************Deserialized from input json*********************************/
@@ -130,10 +131,12 @@ public class InputManager {
   Map<FieldSpec.DataType, Integer> _dataTypeSizeMap = new HashMap<FieldSpec.DataType, Integer>() {{
     put(FieldSpec.DataType.INT, Integer.BYTES);
     put(FieldSpec.DataType.LONG, Long.BYTES);
+    put(FieldSpec.DataType.TIMESTAMP, Long.BYTES);
     put(FieldSpec.DataType.FLOAT, Float.BYTES);
     put(FieldSpec.DataType.DOUBLE, Double.BYTES);
     put(FieldSpec.DataType.BYTES, Byte.BYTES);
     put(FieldSpec.DataType.STRING, Character.BYTES);
+    put(FieldSpec.DataType.BOOLEAN, Integer.BYTES); // Stored internally as an INTEGER
     put(null, DEFAULT_NULL_SIZE);
   }};
   protected final QueryOptimizer _queryOptimizer = new QueryOptimizer();

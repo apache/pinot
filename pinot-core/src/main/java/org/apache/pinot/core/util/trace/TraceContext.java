@@ -137,7 +137,10 @@ public final class TraceContext {
   static void registerThreadToRequest(TraceEntry parentTraceEntry) {
     Trace trace = new Trace(parentTraceEntry._trace);
     TRACE_ENTRY_THREAD_LOCAL.set(new TraceEntry(parentTraceEntry._requestId, trace));
-    REQUEST_TO_TRACES_MAP.get(parentTraceEntry._requestId).add(trace);
+    Queue<Trace> traces = REQUEST_TO_TRACES_MAP.get(parentTraceEntry._requestId);
+    if (traces != null) {
+      traces.add(trace);
+    }
   }
 
   /**

@@ -26,6 +26,7 @@ import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.DistinctOperator;
+import org.apache.pinot.core.operator.query.FilteredAggregationOperator;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -70,6 +71,52 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     QueriesTestUtils
         .testInnerSegmentAggregationResult(resultsBlock.getAggregationResult(), 6129L, 6875947596072L, 999813884,
             1980174, 4699510391301L, 6129L);
+  }
+
+  @Test
+  public void testFilteredAggregations() {
+    String query = "SELECT SUM(column6) FILTER(WHERE column6 > 5), COUNT(*) FILTER(WHERE column1 IS NOT NULL),"
+        + "MAX(column3) FILTER(WHERE column3 IS NOT NULL), "
+        + "SUM(column3), AVG(column7) FILTER(WHERE column7 > 0) FROM testTable WHERE column3 > 0";
+
+    FilteredAggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
+    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils
+        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(),
+            180000L, 0L, 540000L, 30000L);
+    QueriesTestUtils
+        .testInnerSegmentAggregationResultForFilteredAggs(resultsBlock.getAggregationResult(), 22266008882250L,
+            30000, 2147419555,
+            2147483647, 28175373944314L, 30000L);
+
+    query = "SELECT SUM(column6) FILTER(WHERE column6 > 5), COUNT(*) FILTER(WHERE column1 IS NOT NULL),"
+        + "MAX(column3) FILTER(WHERE column3 IS NOT NULL), "
+        + "SUM(column3), AVG(column7) FILTER(WHERE column7 > 0) FROM testTable";
+
+    aggregationOperator = getOperatorForSqlQuery(query);
+    resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils
+        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(),
+            180000L, 0L, 540000L, 30000L);
+    QueriesTestUtils
+        .testInnerSegmentAggregationResultForFilteredAggs(resultsBlock.getAggregationResult(), 22266008882250L,
+            30000, 2147419555,
+            2147483647, 28175373944314L, 30000L);
+
+    query = "SELECT SUM(column6) FILTER(WHERE column6 > 5 OR column6 < 15),"
+        + "COUNT(*) FILTER(WHERE column1 IS NOT NULL),"
+        + "MAX(column3) FILTER(WHERE column3 IS NOT NULL AND column3 > 0), "
+        + "SUM(column3), AVG(column7) FILTER(WHERE column7 > 0 AND column7 < 100) FROM testTable";
+
+    aggregationOperator = getOperatorForSqlQuery(query);
+    resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils
+        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(),
+            150000L, 0L, 450000L, 30000L);
+    QueriesTestUtils
+        .testInnerSegmentAggregationResultForFilteredAggs(resultsBlock.getAggregationResult(), 22266008882250L,
+            30000, 2147419555,
+            2147483647, 0L, 0L);
   }
 
   @Test

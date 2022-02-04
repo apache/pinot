@@ -88,6 +88,12 @@
       "format": "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd",
       "granularity": "1:DAYS",
       "defaultNullValue": "20200101"
+    },
+    {
+      "name": "dateTime3",
+      "dataType": "TIMESTAMP",
+      "format": "1:MILLISECONDS:TIMESTAMP",
+      "granularity": "1:SECOND"
     }
   ],
   "schemaName": "schemaTest"

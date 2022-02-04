@@ -20,6 +20,7 @@ package org.apache.pinot.tools;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.configuration.ConfigurationException;
@@ -31,12 +32,44 @@ import org.apache.pinot.tools.utils.PinotConfigUtils;
 
 public abstract class QuickStartBase {
   protected File _dataDir = FileUtils.getTempDirectory();
+  protected String _bootstrapDataDir;
   protected String _zkExternalAddress;
   protected String _configFilePath;
 
   public QuickStartBase setDataDir(String dataDir) {
     _dataDir = new File(dataDir);
     return this;
+  }
+
+  public QuickStartBase setBootstrapDataDir(String bootstrapDataDir) {
+    _bootstrapDataDir = bootstrapDataDir;
+    return this;
+  }
+
+  /**
+   * Assuming that database name is DBNAME, bootstrap path must have the file structure specified below to properly
+   * load the table:
+   *  DBNAME
+   *  ├── ingestionJobSpec.yaml
+   *  ├── rawdata
+   *  │   └── DBNAME_data.csv
+   *  ├── DBNAME_offline_table_config.json
+   *  └── DBNAME_schema.json
+   *
+   * @return bootstrap path if specified by command line argument -bootstrapTableDir; otherwise, default.
+   */
+  public String getBootstrapDataDir(String bootstrapDataDir) {
+    return _bootstrapDataDir != null ? _bootstrapDataDir : bootstrapDataDir;
+  }
+
+  /** @return Table name if specified by command line argument -bootstrapTableDir; otherwise, default. */
+  public String getTableName(String bootstrapDataDir) {
+    return Paths.get(getBootstrapDataDir(bootstrapDataDir)).getFileName().toString();
+  }
+
+  /** @return true if bootstrapTableDir is not specified by command line argument -bootstrapTableDir, else false.*/
+  public boolean useDefaultBootstrapTableDir() {
+    return _bootstrapDataDir == null;
   }
 
   public QuickStartBase setZkExternalAddress(String zkExternalAddress) {

@@ -103,6 +103,7 @@ abstract class BaseStarTreeV2Test<R, A> {
       " WHERE (d2 > 95 OR d2 < 25) AND (d1 > 10 OR d1 < 50)";
   private static final String QUERY_FILTER_COMPLEX_OR_SINGLE_DIMENSION = " WHERE d1 = 95 AND (d1 > 90 OR d1 < 100)";
   private static final String QUERY_GROUP_BY = " GROUP BY d2";
+  private static final String FILTER_AGG_CLAUSE = " FILTER(WHERE d1 > 10)";
 
   private ValueAggregator _valueAggregator;
   private DataType _aggregatedValueType;
@@ -163,8 +164,15 @@ abstract class BaseStarTreeV2Test<R, A> {
   @Test
   public void testQueries()
       throws IOException {
+    testQueriesHelper(false);
+    testQueriesHelper(true);
+  }
+
+  private void testQueriesHelper(boolean runFilteredAggregate)
+      throws IOException {
     AggregationFunctionType aggregationType = _valueAggregator.getAggregationType();
     String aggregation;
+    String filteredAggregation = null;
     if (aggregationType == AggregationFunctionType.COUNT) {
       aggregation = "COUNT(*)";
     } else if (aggregationType == AggregationFunctionType.PERCENTILEEST
@@ -176,13 +184,22 @@ abstract class BaseStarTreeV2Test<R, A> {
     }
 
     String baseQuery = String.format("SELECT %s FROM %s", aggregation, TABLE_NAME);
-    testQuery(baseQuery);
-    testQuery(baseQuery + QUERY_FILTER_AND);
-    testQuery(baseQuery + QUERY_FILTER_OR);
-    testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS);
-    testQuery(baseQuery + QUERY_FILTER_COMPLEX_AND_MULTIPLE_DIMENSIONS_THREE_PREDICATES);
-    testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS_THREE_PREDICATES);
-    testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR_SINGLE_DIMENSION);
+    String filteredQuery;
+
+    if (runFilteredAggregate) {
+      filteredAggregation = aggregation + FILTER_AGG_CLAUSE;
+      filteredQuery = String.format("SELECT %s FROM %s", filteredAggregation, TABLE_NAME);
+    } else {
+      filteredQuery = baseQuery;
+    }
+
+    testQuery(filteredQuery);
+    testQuery(filteredQuery + QUERY_FILTER_AND);
+    testQuery(filteredQuery + QUERY_FILTER_OR);
+    testQuery(filteredQuery + QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS);
+    testQuery(filteredQuery + QUERY_FILTER_COMPLEX_AND_MULTIPLE_DIMENSIONS_THREE_PREDICATES);
+    testQuery(filteredQuery + QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS_THREE_PREDICATES);
+    testQuery(filteredQuery + QUERY_FILTER_COMPLEX_OR_SINGLE_DIMENSION);
     testQuery(baseQuery + QUERY_GROUP_BY);
     testQuery(baseQuery + QUERY_FILTER_AND + QUERY_GROUP_BY);
     testQuery(baseQuery + QUERY_FILTER_OR + QUERY_GROUP_BY);

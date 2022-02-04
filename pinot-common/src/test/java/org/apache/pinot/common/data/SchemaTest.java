@@ -198,7 +198,10 @@ public class SchemaTest {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
         .addMetric("metric", FieldSpec.DataType.INT)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
-        .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
+        .addDateTime("dateTime0", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
+        .addDateTime("dateTime1", FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .addDateTime("dateTime2", FieldSpec.DataType.INT, "1:DAYS:EPOCH", "1:DAYS")
+        .build();
 
     // Test method which fetches the DateTimeFieldSpec given the timeColumnName
     // Test is on TIME
@@ -213,15 +216,35 @@ public class SchemaTest {
     Assert.assertEquals(dateTimeFieldSpec.getGranularity(), "1:DAYS");
 
     // Test it on DATE_TIME
-    dateTimeFieldSpec = schema.getSpecForTimeColumn("dateTime");
+    dateTimeFieldSpec = schema.getSpecForTimeColumn("dateTime0");
     Assert.assertNotNull(dateTimeFieldSpec);
     Assert.assertEquals(dateTimeFieldSpec.getFieldType(), FieldSpec.FieldType.DATE_TIME);
-    Assert.assertEquals(dateTimeFieldSpec.getName(), "dateTime");
+    Assert.assertEquals(dateTimeFieldSpec.getName(), "dateTime0");
     Assert.assertEquals(dateTimeFieldSpec.getDataType(), FieldSpec.DataType.LONG);
     Assert.assertTrue(dateTimeFieldSpec.isSingleValueField());
     Assert.assertEquals(dateTimeFieldSpec.getDefaultNullValue(), Long.MIN_VALUE);
     Assert.assertEquals(dateTimeFieldSpec.getFormat(), "1:HOURS:EPOCH");
     Assert.assertEquals(dateTimeFieldSpec.getGranularity(), "1:HOURS");
+
+    dateTimeFieldSpec = schema.getSpecForTimeColumn("dateTime1");
+    Assert.assertNotNull(dateTimeFieldSpec);
+    Assert.assertEquals(dateTimeFieldSpec.getFieldType(), FieldSpec.FieldType.DATE_TIME);
+    Assert.assertEquals(dateTimeFieldSpec.getName(), "dateTime1");
+    Assert.assertEquals(dateTimeFieldSpec.getDataType(), FieldSpec.DataType.TIMESTAMP);
+    Assert.assertTrue(dateTimeFieldSpec.isSingleValueField());
+    Assert.assertEquals(dateTimeFieldSpec.getDefaultNullValue(), 0L);
+    Assert.assertEquals(dateTimeFieldSpec.getFormat(), "1:MILLISECONDS:EPOCH");
+    Assert.assertEquals(dateTimeFieldSpec.getGranularity(), "1:MILLISECONDS");
+
+    dateTimeFieldSpec = schema.getSpecForTimeColumn("dateTime2");
+    Assert.assertNotNull(dateTimeFieldSpec);
+    Assert.assertEquals(dateTimeFieldSpec.getFieldType(), FieldSpec.FieldType.DATE_TIME);
+    Assert.assertEquals(dateTimeFieldSpec.getName(), "dateTime2");
+    Assert.assertEquals(dateTimeFieldSpec.getDataType(), FieldSpec.DataType.INT);
+    Assert.assertTrue(dateTimeFieldSpec.isSingleValueField());
+    Assert.assertEquals(dateTimeFieldSpec.getDefaultNullValue(), Integer.MIN_VALUE);
+    Assert.assertEquals(dateTimeFieldSpec.getFormat(), "1:DAYS:EPOCH");
+    Assert.assertEquals(dateTimeFieldSpec.getGranularity(), "1:DAYS");
   }
 
   @Test

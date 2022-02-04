@@ -217,18 +217,18 @@ public class PinotConfigUtils {
 
   private static List<String> validateControllerAccessProtocols(ControllerConf conf)
       throws ConfigurationException {
-    List<String> protocols = conf.getControllerAccessProtocols();
+    List<String> listeners = conf.getControllerAccessProtocols();
 
-    if (!protocols.isEmpty()) {
-      Optional<String> invalidProtocol =
-          protocols.stream().filter(protocol -> !protocol.equals("http") && !protocol.equals("https")).findFirst();
+    if (!listeners.isEmpty()) {
+      Optional<String> invalidProtocol = listeners.stream().filter(name -> !isValidProtocol(name) && !isValidProtocol(
+          conf.getControllerAccessProtocolProperty(name, "protocol"))).findFirst();
 
       if (invalidProtocol.isPresent()) {
         throw new ConfigurationException(String.format(CONTROLLER_CONFIG_VALIDATION_ERROR_MESSAGE_FORMAT,
             invalidProtocol.get() + " is not a valid protocol for the 'controller.access.protocols' property."));
       }
 
-      Optional<ConfigurationException> invalidPort = protocols.stream()
+      Optional<ConfigurationException> invalidPort = listeners.stream()
           .map(protocol -> validatePort(protocol, conf.getControllerAccessProtocolProperty(protocol, "port")))
 
           .filter(Optional::isPresent)
@@ -242,14 +242,18 @@ public class PinotConfigUtils {
       }
     }
 
-    return protocols;
+    return listeners;
+  }
+
+  private static boolean isValidProtocol(String protocol) {
+    return "http".equals(protocol) || "https".equals(protocol);
   }
 
   private static Optional<ConfigurationException> validatePort(String protocol, String port) {
     if (port == null) {
       return Optional.of(new ConfigurationException(String.format(CONTROLLER_CONFIG_VALIDATION_ERROR_MESSAGE_FORMAT,
           "missing controller " + protocol + " port, please fix 'controller.access.protocols." + protocol
-              + ".port' property in config file.")));
+              + ".port' property in the config file.")));
     }
 
     try {
@@ -257,7 +261,7 @@ public class PinotConfigUtils {
     } catch (NumberFormatException e) {
       return Optional.of(new ConfigurationException(String.format(CONTROLLER_CONFIG_VALIDATION_ERROR_MESSAGE_FORMAT,
           port + " is not a valid port, please fix 'controller.access.protocols." + protocol
-              + ".port' property in config file.")));
+              + ".port' property in the config file.")));
     }
 
     return Optional.empty();

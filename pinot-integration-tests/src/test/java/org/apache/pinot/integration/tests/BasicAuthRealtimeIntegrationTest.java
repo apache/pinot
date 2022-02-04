@@ -49,6 +49,10 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER;
 
 
+/**
+ * NOTE: fully covered by TlsIntegrationTest. If that one fails for realtime segments try this one to isolate any TLS
+ * related issues.
+ */
 public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   @BeforeClass
   public void setUp()

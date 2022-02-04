@@ -23,17 +23,19 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 public class BitmapDocIdSet implements FilterBlockDocIdSet {
-  private final ImmutableRoaringBitmap _docIds;
-  private final int _numDocs;
+  private final BitmapDocIdIterator _iterator;
 
   public BitmapDocIdSet(ImmutableRoaringBitmap docIds, int numDocs) {
-    _docIds = docIds;
-    _numDocs = numDocs;
+    _iterator = new BitmapDocIdIterator(docIds, numDocs);
+  }
+
+  public BitmapDocIdSet(BitmapDocIdIterator iterator) {
+    _iterator = iterator;
   }
 
   @Override
   public BitmapDocIdIterator iterator() {
-    return new BitmapDocIdIterator(_docIds, _numDocs);
+    return _iterator;
   }
 
   @Override

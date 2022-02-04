@@ -82,7 +82,7 @@ if [ "${PASS}" != 1 ]; then
 fi
 
 # Quickstart
-DIST_BIN_DIR=`ls -d pinot-distribution/target/apache-pinot-*/apache-pinot-*`
+DIST_BIN_DIR=`ls -d build/`
 cd "${DIST_BIN_DIR}"
 
 # Test standalone pinot. Configure JAVA_OPTS for smaller memory, and don't use System.exit

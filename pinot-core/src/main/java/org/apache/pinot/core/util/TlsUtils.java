@@ -19,14 +19,16 @@
 package org.apache.pinot.core.util;
 
 import com.google.common.base.Preconditions;
-import io.netty.handler.ssl.SslProvider;
-import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.MalformedURLException;
 import java.net.Socket;
 import java.net.SocketAddress;
-import java.net.UnknownHostException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import javax.net.ssl.HttpsURLConnection;
@@ -36,10 +38,10 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
-import org.apache.commons.httpclient.ConnectTimeoutException;
 import org.apache.commons.httpclient.params.HttpConnectionParams;
 import org.apache.commons.httpclient.protocol.Protocol;
 import org.apache.commons.httpclient.protocol.ProtocolSocketFactory;
+import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.core.transport.TlsConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -72,31 +74,36 @@ public final class TlsUtils {
    * @return TlsConfig instance
    */
   public static TlsConfig extractTlsConfig(PinotConfiguration pinotConfig, String namespace) {
-    TlsConfig tlsConfig = new TlsConfig();
+    return extractTlsConfig(pinotConfig, namespace, new TlsConfig());
+  }
 
-    tlsConfig.setClientAuthEnabled(pinotConfig.getProperty(key(namespace, CLIENT_AUTH_ENABLED), false));
-
-    tlsConfig.setKeyStoreType(pinotConfig.getProperty(key(namespace, KEYSTORE_TYPE), KeyStore.getDefaultType()));
-
-    if (pinotConfig.containsKey(key(namespace, KEYSTORE_PATH))) {
-      tlsConfig.setKeyStorePath(pinotConfig.getProperty(key(namespace, KEYSTORE_PATH)));
-    }
-
-    if (pinotConfig.containsKey(key(namespace, KEYSTORE_PASSWORD))) {
-      tlsConfig.setKeyStorePassword(pinotConfig.getProperty(key(namespace, KEYSTORE_PASSWORD)));
-    }
-
-    tlsConfig.setTrustStoreType(pinotConfig.getProperty(key(namespace, TRUSTSTORE_TYPE), KeyStore.getDefaultType()));
-
-    if (pinotConfig.containsKey(key(namespace, TRUSTSTORE_PATH))) {
-      tlsConfig.setTrustStorePath(pinotConfig.getProperty(key(namespace, TRUSTSTORE_PATH)));
-    }
-
-    if (pinotConfig.containsKey(key(namespace, TRUSTSTORE_PASSWORD))) {
-      tlsConfig.setTrustStorePassword(pinotConfig.getProperty(key(namespace, TRUSTSTORE_PASSWORD)));
-    }
-
-    tlsConfig.setSslProvider(pinotConfig.getProperty(key(namespace, SSL_PROVIDER), SslProvider.JDK.toString()));
+  /**
+   * Extract a TlsConfig instance from a namespaced set of configuration keys, based on a default config
+   *
+   * @param pinotConfig pinot configuration
+   * @param namespace namespace prefix
+   * @param defaultConfig TLS config defaults
+   *
+   * @return TlsConfig instance
+   */
+  public static TlsConfig extractTlsConfig(PinotConfiguration pinotConfig, String namespace, TlsConfig defaultConfig) {
+    TlsConfig tlsConfig = new TlsConfig(defaultConfig);
+    tlsConfig.setClientAuthEnabled(
+        pinotConfig.getProperty(key(namespace, CLIENT_AUTH_ENABLED), defaultConfig.isClientAuthEnabled()));
+    tlsConfig.setKeyStoreType(
+        pinotConfig.getProperty(key(namespace, KEYSTORE_TYPE), defaultConfig.getKeyStoreType()));
+    tlsConfig.setKeyStorePath(
+        pinotConfig.getProperty(key(namespace, KEYSTORE_PATH), defaultConfig.getKeyStorePath()));
+    tlsConfig.setKeyStorePassword(
+        pinotConfig.getProperty(key(namespace, KEYSTORE_PASSWORD), defaultConfig.getKeyStorePassword()));
+    tlsConfig.setTrustStoreType(
+        pinotConfig.getProperty(key(namespace, TRUSTSTORE_TYPE), defaultConfig.getTrustStoreType()));
+    tlsConfig.setTrustStorePath(
+        pinotConfig.getProperty(key(namespace, TRUSTSTORE_PATH), defaultConfig.getTrustStorePath()));
+    tlsConfig.setTrustStorePassword(
+        pinotConfig.getProperty(key(namespace, TRUSTSTORE_PASSWORD), defaultConfig.getTrustStorePassword()));
+    tlsConfig.setSslProvider(
+        pinotConfig.getProperty(key(namespace, SSL_PROVIDER), defaultConfig.getSslProvider()));
 
     return tlsConfig;
   }
@@ -109,8 +116,8 @@ public final class TlsUtils {
    * @return KeyManagerFactory
    */
   public static KeyManagerFactory createKeyManagerFactory(TlsConfig tlsConfig) {
-    return createKeyManagerFactory(tlsConfig.getKeyStorePath(),
-        tlsConfig.getKeyStorePassword(), tlsConfig.getKeyStoreType());
+    return createKeyManagerFactory(tlsConfig.getKeyStorePath(), tlsConfig.getKeyStorePassword(),
+        tlsConfig.getKeyStoreType());
   }
 
   /**
@@ -128,7 +135,7 @@ public final class TlsUtils {
 
     try {
       KeyStore keyStore = KeyStore.getInstance(keyStoreType);
-      try (FileInputStream is = new FileInputStream(keyStorePath)) {
+      try (InputStream is = makeKeyStoreUrl(keyStorePath).openStream()) {
         keyStore.load(is, keyStorePassword.toCharArray());
       }
 
@@ -168,7 +175,7 @@ public final class TlsUtils {
 
     try {
       KeyStore keyStore = KeyStore.getInstance(trustStoreType);
-      try (FileInputStream is = new FileInputStream(trustStorePath)) {
+      try (InputStream is = makeKeyStoreUrl(trustStorePath).openStream()) {
         keyStore.load(is, trustStorePassword.toCharArray());
       }
 
@@ -189,8 +196,8 @@ public final class TlsUtils {
    */
   public static void installDefaultSSLSocketFactory(TlsConfig tlsConfig) {
     installDefaultSSLSocketFactory(tlsConfig.getKeyStoreType(), tlsConfig.getKeyStorePath(),
-        tlsConfig.getKeyStorePassword(), tlsConfig.getTrustStoreType(),
-        tlsConfig.getTrustStorePath(), tlsConfig.getTrustStorePassword());
+        tlsConfig.getKeyStorePassword(), tlsConfig.getTrustStoreType(), tlsConfig.getTrustStorePath(),
+        tlsConfig.getTrustStorePassword());
   }
 
   /**
@@ -237,6 +244,18 @@ public final class TlsUtils {
     return namespace + "." + suffix;
   }
 
+  public static URL makeKeyStoreUrl(String storePath)
+      throws URISyntaxException, MalformedURLException {
+    URI inputUri = new URI(storePath);
+    if (StringUtils.isBlank(inputUri.getScheme())) {
+      if (storePath.startsWith("/")) {
+        return new URL("file://" + storePath);
+      }
+      return new URL("file://./" + storePath);
+    }
+    return inputUri.toURL();
+  }
+
   /**
    * Adapted from: https://svn.apache.org/viewvc/httpcomponents/oac
    * .hc3x/trunk/src/contrib/org/apache/commons/httpclient/contrib/ssl/AuthSSLProtocolSocketFactory.java?view=markup
@@ -250,14 +269,14 @@ public final class TlsUtils {
 
     @Override
     public Socket createSocket(String host, int port, InetAddress localAddress, int localPort)
-        throws IOException, UnknownHostException {
+        throws IOException {
       return _sslSocketFactory.createSocket(host, port, localAddress, localPort);
     }
 
     @Override
     public Socket createSocket(String host, int port, InetAddress localAddress, int localPort,
         HttpConnectionParams params)
-        throws IOException, UnknownHostException, ConnectTimeoutException {
+        throws IOException {
       Preconditions.checkNotNull(params);
 
       int timeout = params.getConnectionTimeout();
@@ -275,7 +294,7 @@ public final class TlsUtils {
 
     @Override
     public Socket createSocket(String host, int port)
-        throws IOException, UnknownHostException {
+        throws IOException {
       return _sslSocketFactory.createSocket(host, port);
     }
   }

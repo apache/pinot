@@ -146,23 +146,30 @@ public class CalciteSqlParser {
 
   private static void validateGroupByClause(PinotQuery pinotQuery)
       throws SqlCompilationException {
-    if (pinotQuery.getGroupByList() == null) {
-      return;
-    }
-    // Sanity check group by query: All non-aggregate expression in selection list should be also included in group
-    // by list.
-    Set<Expression> groupByExprs = new HashSet<>(pinotQuery.getGroupByList());
+    boolean hasGroupByClause = pinotQuery.getGroupByList() != null;
+    Set<Expression> groupByExprs = hasGroupByClause ? new HashSet<>(pinotQuery.getGroupByList()) : null;
+    int aggregateExprCount = 0;
     for (Expression selectExpression : pinotQuery.getSelectList()) {
-      if (!isAggregateExpression(selectExpression) && expressionOutsideGroupByList(selectExpression, groupByExprs)) {
-        throw new SqlCompilationException(
+      if (isAggregateExpression(selectExpression)) {
+        aggregateExprCount++;
+      } else if (hasGroupByClause && expressionOutsideGroupByList(selectExpression, groupByExprs)) {
+          throw new SqlCompilationException(
             "'" + RequestUtils.prettyPrint(selectExpression) + "' should appear in GROUP BY clause.");
       }
     }
+
+    // block mixture of aggregate and non-aggregate expression when group by is absent
+    int nonAggregateExprCount = pinotQuery.getSelectListSize() - aggregateExprCount;
+    if (!hasGroupByClause && aggregateExprCount > 0 && nonAggregateExprCount > 0) {
+      throw new SqlCompilationException("Columns and Aggregate functions can't co-exist without GROUP BY clause");
+    }
     // Sanity check on group by clause shouldn't contain aggregate expression.
-    for (Expression groupByExpression : pinotQuery.getGroupByList()) {
-      if (isAggregateExpression(groupByExpression)) {
-        throw new SqlCompilationException("Aggregate expression '" + RequestUtils.prettyPrint(groupByExpression)
-            + "' is not allowed in GROUP BY clause.");
+    if (hasGroupByClause) {
+      for (Expression groupByExpression : pinotQuery.getGroupByList()) {
+        if (isAggregateExpression(groupByExpression)) {
+          throw new SqlCompilationException("Aggregate expression '" + RequestUtils.prettyPrint(groupByExpression)
+              + "' is not allowed in GROUP BY clause.");
+        }
       }
     }
   }

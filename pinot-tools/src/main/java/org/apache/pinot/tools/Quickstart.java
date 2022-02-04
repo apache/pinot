@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.File;
+import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,6 +40,7 @@ public class Quickstart extends QuickStartBase {
 
   private static final String TAB = "\t\t";
   private static final String NEW_LINE = "\n";
+  private static final String DEFAULT_BOOTSTRAP_DIRECTORY = "examples/batch/baseballStats";
 
   public enum Color {
     RESET("\u001B[0m"), GREEN("\u001B[32m"), YELLOW("\u001B[33m"), CYAN("\u001B[36m");
@@ -52,10 +54,6 @@ public class Quickstart extends QuickStartBase {
     Color(String code) {
       _code = code;
     }
-  }
-
-  public String getBootstrapDataDir() {
-    return "examples/batch/baseballStats";
   }
 
   public int getNumMinions() {
@@ -85,97 +83,23 @@ public class Quickstart extends QuickStartBase {
         }
         responseBuilder.append(NEW_LINE);
       }
-      return responseBuilder.toString();
-    }
-
-    // Selection query
-    if (response.has("selectionResults")) {
-      JsonNode columns = response.get("selectionResults").get("columns");
-      int numColumns = columns.size();
-      for (int i = 0; i < numColumns; i++) {
-        responseBuilder.append(columns.get(i).asText()).append(TAB);
-      }
-      responseBuilder.append(NEW_LINE);
-      JsonNode rows = response.get("selectionResults").get("results");
-      int numRows = rows.size();
-      for (int i = 0; i < numRows; i++) {
-        JsonNode row = rows.get(i);
-        for (int j = 0; j < numColumns; j++) {
-          responseBuilder.append(row.get(j).asText()).append(TAB);
-        }
-        responseBuilder.append(NEW_LINE);
-      }
-      return responseBuilder.toString();
-    }
-
-    // Aggregation only query
-    if (!response.get("aggregationResults").get(0).has("groupByResult")) {
-      JsonNode aggregationResults = response.get("aggregationResults");
-      int numAggregations = aggregationResults.size();
-      for (int i = 0; i < numAggregations; i++) {
-        responseBuilder.append(aggregationResults.get(i).get("function").asText()).append(TAB);
-      }
-      responseBuilder.append(NEW_LINE);
-      for (int i = 0; i < numAggregations; i++) {
-        responseBuilder.append(aggregationResults.get(i).get("value").asText()).append(TAB);
-      }
-      responseBuilder.append(NEW_LINE);
-      return responseBuilder.toString();
-    }
-
-    // Aggregation group-by query
-    JsonNode groupByResults = response.get("aggregationResults");
-    int numGroupBys = groupByResults.size();
-    for (int i = 0; i < numGroupBys; i++) {
-      JsonNode groupByResult = groupByResults.get(i);
-      responseBuilder.append(groupByResult.get("function").asText()).append(TAB);
-      JsonNode columns = groupByResult.get("groupByColumns");
-      int numColumns = columns.size();
-      for (int j = 0; j < numColumns; j++) {
-        responseBuilder.append(columns.get(j).asText()).append(TAB);
-      }
-      responseBuilder.append(NEW_LINE);
-      JsonNode rows = groupByResult.get("groupByResult");
-      int numRows = rows.size();
-      for (int j = 0; j < numRows; j++) {
-        JsonNode row = rows.get(j);
-        responseBuilder.append(row.get("value").asText()).append(TAB);
-        JsonNode columnValues = row.get("group");
-        for (int k = 0; k < numColumns; k++) {
-          responseBuilder.append(columnValues.get(k).asText()).append(TAB);
-        }
-        responseBuilder.append(NEW_LINE);
-      }
     }
     return responseBuilder.toString();
   }
 
   public void execute()
       throws Exception {
+    String tableName = getTableName(DEFAULT_BOOTSTRAP_DIRECTORY);
     File quickstartTmpDir = new File(_dataDir, String.valueOf(System.currentTimeMillis()));
-    File baseDir = new File(quickstartTmpDir, "baseballStats");
+    File baseDir = new File(quickstartTmpDir, tableName);
     File dataDir = new File(baseDir, "rawdata");
     Preconditions.checkState(dataDir.mkdirs());
 
-    File schemaFile = new File(baseDir, "baseballStats_schema.json");
-    File tableConfigFile = new File(baseDir, "baseballStats_offline_table_config.json");
-    File ingestionJobSpecFile = new File(baseDir, "ingestionJobSpec.yaml");
-    File dataFile = new File(dataDir, "baseballStats_data.csv");
-
-    ClassLoader classLoader = Quickstart.class.getClassLoader();
-    URL resource = classLoader.getResource(getBootstrapDataDir() + "/baseballStats_schema.json");
-    com.google.common.base.Preconditions.checkNotNull(resource);
-    FileUtils.copyURLToFile(resource, schemaFile);
-    resource = classLoader.getResource(getBootstrapDataDir() + "/rawdata/baseballStats_data.csv");
-    com.google.common.base.Preconditions.checkNotNull(resource);
-    FileUtils.copyURLToFile(resource, dataFile);
-    resource = classLoader.getResource(getBootstrapDataDir() + "/ingestionJobSpec.yaml");
-    if (resource != null) {
-      FileUtils.copyURLToFile(resource, ingestionJobSpecFile);
+    if (useDefaultBootstrapTableDir()) {
+      copyResourceTableToTmpDirectory(getBootstrapDataDir(DEFAULT_BOOTSTRAP_DIRECTORY), tableName, baseDir, dataDir);
+    } else {
+      copyFilesystemTableToTmpDirectory(getBootstrapDataDir(DEFAULT_BOOTSTRAP_DIRECTORY), tableName, baseDir);
     }
-    resource = classLoader.getResource(getBootstrapDataDir() + "/baseballStats_offline_table_config.json");
-    com.google.common.base.Preconditions.checkNotNull(resource);
-    FileUtils.copyURLToFile(resource, tableConfigFile);
 
     QuickstartTableRequest request = new QuickstartTableRequest(baseDir.getAbsolutePath());
     QuickstartRunner runner =
@@ -194,13 +118,74 @@ public class Quickstart extends QuickStartBase {
         e.printStackTrace();
       }
     }));
-    printStatus(Color.CYAN, "***** Bootstrap baseballStats table *****");
+    printStatus(Color.CYAN, "***** Bootstrap " + tableName + " table *****");
     runner.bootstrapTable();
 
     waitForBootstrapToComplete(runner);
 
     printStatus(Color.YELLOW, "***** Offline quickstart setup complete *****");
 
+    if (useDefaultBootstrapTableDir()) {
+      // Quickstart is using the default baseballStats sample table, so run sample queries.
+      runSampleQueries(runner);
+    }
+
+    printStatus(Color.GREEN, "You can always go to http://localhost:9000 to play around in the query console");
+  }
+
+  private static void copyResourceTableToTmpDirectory(String sourcePath, String tableName, File baseDir, File dataDir)
+      throws IOException {
+
+    File schemaFile = new File(baseDir, tableName + "_schema.json");
+    File tableConfigFile = new File(baseDir, tableName + "_offline_table_config.json");
+    File ingestionJobSpecFile = new File(baseDir, "ingestionJobSpec.yaml");
+    File dataFile = new File(dataDir, tableName + "_data.csv");
+
+    ClassLoader classLoader = Quickstart.class.getClassLoader();
+    URL resource = classLoader.getResource(sourcePath + File.separator + tableName + "_schema.json");
+    com.google.common.base.Preconditions.checkNotNull(resource);
+    FileUtils.copyURLToFile(resource, schemaFile);
+    resource =
+        classLoader.getResource(sourcePath + File.separator + "rawdata" + File.separator + tableName + "_data.csv");
+    com.google.common.base.Preconditions.checkNotNull(resource);
+    FileUtils.copyURLToFile(resource, dataFile);
+    resource = classLoader.getResource(sourcePath + File.separator + "ingestionJobSpec.yaml");
+    if (resource != null) {
+      FileUtils.copyURLToFile(resource, ingestionJobSpecFile);
+    }
+    resource = classLoader.getResource(sourcePath + File.separator + tableName + "_offline_table_config.json");
+    com.google.common.base.Preconditions.checkNotNull(resource);
+    FileUtils.copyURLToFile(resource, tableConfigFile);
+  }
+
+  private static void copyFilesystemTableToTmpDirectory(String sourcePath, String tableName, File baseDir)
+      throws IOException {
+    File fileDb = new File(sourcePath);
+
+    if (!fileDb.exists() || !fileDb.isDirectory()) {
+      throw new RuntimeException("Directory " + fileDb.getAbsolutePath() + " not found.");
+    }
+
+    File schemaFile = new File(fileDb, tableName + "_schema.json");
+    if (!schemaFile.exists()) {
+      throw new RuntimeException("Schema file " + schemaFile.getAbsolutePath() + " not found.");
+    }
+
+    File tableFile = new File(fileDb, tableName + "_offline_table_config.json");
+    if (!tableFile.exists()) {
+      throw new RuntimeException("Table table " + tableFile.getAbsolutePath() + " not found.");
+    }
+
+    File data = new File(fileDb, "rawdata" + File.separator + tableName + "_data.csv");
+    if (!data.exists()) {
+      throw new RuntimeException(("Data file " + data.getAbsolutePath() + " not found. "));
+    }
+
+    FileUtils.copyDirectory(fileDb, baseDir);
+  }
+
+  private static void runSampleQueries(QuickstartRunner runner)
+      throws Exception {
     String q1 = "select count(*) from baseballStats limit 1";
     printStatus(Color.YELLOW, "Total number of documents in the table");
     printStatus(Color.CYAN, "Query : " + q1);
@@ -234,8 +219,6 @@ public class Quickstart extends QuickStartBase {
     printStatus(Color.CYAN, "Query : " + q5);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q5)));
     printStatus(Color.GREEN, "***************************************************");
-
-    printStatus(Color.GREEN, "You can always go to http://localhost:9000 to play around in the query console");
   }
 
   public static void main(String[] args)

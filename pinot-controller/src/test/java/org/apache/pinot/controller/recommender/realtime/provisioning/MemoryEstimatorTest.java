@@ -87,6 +87,7 @@ public class MemoryEstimatorTest {
       assertEquals(extract(metadata, "column.colMetric.cardinality = (\\d+)"), "900");
       assertEquals(extract(metadata, "column.colTime.cardinality = (\\d+)"), "250");
       assertEquals(extract(metadata, "column.colTime2.cardinality = (\\d+)"), "750");
+      assertEquals(extract(metadata, "column.colTime3.cardinality = (\\d+)"), "850");
       assertEquals(extract(metadata, "column.colInt.maxNumberOfMultiValues = (\\d+)"), "3");
       assertEquals(extract(metadata, "column.colFloat.maxNumberOfMultiValues = (\\d+)"), "2");
       assertEquals(extract(metadata, "column.colString.maxNumberOfMultiValues = (\\d+)"), "0");
@@ -94,6 +95,7 @@ public class MemoryEstimatorTest {
       assertEquals(extract(metadata, "column.colMetric.maxNumberOfMultiValues = (\\d+)"), "0");
       assertEquals(extract(metadata, "column.colTime.maxNumberOfMultiValues = (\\d+)"), "0");
       assertEquals(extract(metadata, "column.colTime2.maxNumberOfMultiValues = (\\d+)"), "0");
+      assertEquals(extract(metadata, "column.colTime3.maxNumberOfMultiValues = (\\d+)"), "0");
     });
   }
 

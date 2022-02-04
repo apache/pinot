@@ -166,6 +166,7 @@ public class PinotHelixResourceManager {
   private final boolean _isSingleTenantCluster;
   private final boolean _enableBatchMessageMode;
   private final boolean _allowHLCTables;
+  private final int _deletedSegmentsRetentionInDays;
 
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
@@ -177,12 +178,14 @@ public class PinotHelixResourceManager {
   private TableCache _tableCache;
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
-      boolean isSingleTenantCluster, boolean enableBatchMessageMode, boolean allowHLCTables) {
+      boolean isSingleTenantCluster, boolean enableBatchMessageMode, boolean allowHLCTables,
+      int deletedSegmentsRetentionInDays) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
     _dataDir = dataDir;
     _isSingleTenantCluster = isSingleTenantCluster;
     _enableBatchMessageMode = enableBatchMessageMode;
+    _deletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
     _allowHLCTables = allowHLCTables;
     _instanceAdminEndpointCache =
         CacheBuilder.newBuilder().expireAfterWrite(CACHE_ENTRY_EXPIRE_TIME_HOURS, TimeUnit.HOURS)
@@ -225,7 +228,7 @@ public class PinotHelixResourceManager {
   public PinotHelixResourceManager(ControllerConf controllerConf) {
     this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
         controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
-        controllerConf.getHLCTablesAllowed());
+        controllerConf.getHLCTablesAllowed(), controllerConf.getDeletedSegmentsRetentionInDays());
   }
 
   /**
@@ -242,7 +245,8 @@ public class PinotHelixResourceManager {
     _propertyStore = _helixZkManager.getHelixPropertyStore();
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
     _keyBuilder = _helixDataAccessor.keyBuilder();
-    _segmentDeletionManager = new SegmentDeletionManager(_dataDir, _helixAdmin, _helixClusterName, _propertyStore);
+    _segmentDeletionManager = new SegmentDeletionManager(_dataDir, _helixAdmin, _helixClusterName, _propertyStore,
+        _deletedSegmentsRetentionInDays);
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
 
     // Initialize TableCache
@@ -1774,48 +1778,69 @@ public class PinotHelixResourceManager {
 
   public void addNewSegment(String tableNameWithType, SegmentMetadata segmentMetadata, String downloadUrl,
       @Nullable String crypter) {
-    String segmentName = segmentMetadata.getName();
-    InstancePartitionsType instancePartitionsType;
     // NOTE: must first set the segment ZK metadata before assigning segment to instances because segment assignment
     // might need them to determine the partition of the segment, and server will need them to download the segment
-    ZNRecord znRecord;
+    SegmentZKMetadata segmentZkmetadata =
+        constructZkMetadataForNewSegment(tableNameWithType, segmentMetadata, downloadUrl, crypter);
+    ZNRecord znRecord = segmentZkmetadata.toZNRecord();
+
+    String segmentName = segmentMetadata.getName();
+    String segmentZKMetadataPath =
+        ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
+    Preconditions.checkState(_propertyStore.set(segmentZKMetadataPath, znRecord, AccessOption.PERSISTENT),
+        "Failed to set segment ZK metadata for table: " + tableNameWithType + ", segment: " + segmentName);
+    LOGGER.info("Added segment: {} of table: {} to property store", segmentName, tableNameWithType);
+
+    assignTableSegment(tableNameWithType, segmentName);
+  }
+
+  /**
+   * Construct segmentZkMetadata for the realtime or offline table.
+   *
+   * @param tableNameWithType
+   * @param segmentMetadata
+   * @param downloadUrl
+   * @param crypter
+   * @return
+   */
+  public SegmentZKMetadata constructZkMetadataForNewSegment(String tableNameWithType, SegmentMetadata segmentMetadata,
+      String downloadUrl, @Nullable String crypter) {
+    // Construct segment zk metadata with common fields for offline and realtime.
+    String segmentName = segmentMetadata.getName();
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
+    ZKMetadataUtils.updateSegmentMetadata(segmentZKMetadata, segmentMetadata);
+    segmentZKMetadata.setDownloadUrl(downloadUrl);
+    segmentZKMetadata.setCrypterName(crypter);
+
     if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
       Preconditions.checkState(isUpsertTable(tableNameWithType),
           "Upload segment " + segmentName + " for non upsert enabled realtime table " + tableNameWithType
               + " is not supported");
+      // Set fields specific to realtime segments.
+      segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.UPLOADED);
+    } else {
+      // Set fields specific to offline segments.
+      segmentZKMetadata.setPushTime(System.currentTimeMillis());
+    }
+
+    return segmentZKMetadata;
+  }
+
+  public void assignTableSegment(String tableNameWithType, String segmentName) {
+    String segmentZKMetadataPath =
+        ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
+    InstancePartitionsType instancePartitionsType;
+    if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
       // In an upsert enabled LLC realtime table, all segments of the same partition are collocated on the same server
       // -- consuming or completed. So it is fine to use CONSUMING as the InstancePartitionsType.
       // TODO When upload segments is open to all realtime tables, we should change the type to COMPLETED instead.
       // In addition, RealtimeSegmentAssignment.assignSegment(..) method should be updated so that the method does not
       // assign segments to CONSUMING instance partition only.
       instancePartitionsType = InstancePartitionsType.CONSUMING;
-      // Build the realtime segment zk metadata with necessary fields.
-      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
-      ZKMetadataUtils.updateSegmentMetadata(segmentZKMetadata, segmentMetadata);
-      segmentZKMetadata.setDownloadUrl(downloadUrl);
-      segmentZKMetadata.setCrypterName(crypter);
-      segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.UPLOADED);
-      znRecord = segmentZKMetadata.toZNRecord();
     } else {
       instancePartitionsType = InstancePartitionsType.OFFLINE;
-      // Build the offline segment zk metadata with necessary fields.
-      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
-      ZKMetadataUtils.updateSegmentMetadata(segmentZKMetadata, segmentMetadata);
-      segmentZKMetadata.setDownloadUrl(downloadUrl);
-      segmentZKMetadata.setCrypterName(crypter);
-      segmentZKMetadata.setPushTime(System.currentTimeMillis());
-      znRecord = segmentZKMetadata.toZNRecord();
     }
-    String segmentZKMetadataPath =
-        ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
-    Preconditions.checkState(_propertyStore.set(segmentZKMetadataPath, znRecord, AccessOption.PERSISTENT),
-        "Failed to set segment ZK metadata for table: " + tableNameWithType + ", segment: " + segmentName);
-    LOGGER.info("Added segment: {} of table: {} to property store", segmentName, tableNameWithType);
-    assignTableSegment(tableNameWithType, segmentName, segmentZKMetadataPath, instancePartitionsType);
-  }
 
-  private void assignTableSegment(String tableNameWithType, String segmentName, String segmentZKMetadataPath,
-      InstancePartitionsType instancePartitionsType) {
     // Assign instances for the segment and add it into IdealState
     try {
       TableConfig tableConfig = getTableConfig(tableNameWithType);
@@ -1874,6 +1899,17 @@ public class PinotHelixResourceManager {
   public ZNRecord getSegmentMetadataZnRecord(String tableNameWithType, String segmentName) {
     return ZKMetadataProvider.getZnRecord(_propertyStore,
         ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName));
+  }
+
+  /**
+   * Creates a new SegmentZkMetadata entry. This call is atomic and ensures that only of the create calls succeeds.
+   *
+   * @param tableNameWithType
+   * @param segmentZKMetadata
+   * @return
+   */
+  public boolean createSegmentZkMetadata(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
+    return ZKMetadataProvider.createSegmentZkMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);
   }
 
   public boolean updateZkMetadata(String tableNameWithType, SegmentZKMetadata segmentZKMetadata, int expectedVersion) {
@@ -2752,6 +2788,11 @@ public class PinotHelixResourceManager {
    * 2. Compute validation on the user inputs
    * 3. Add the new lineage entry to the segment lineage metadata in the property store
    *
+   * If the previous lineage entry is "IN_PROGRESS" while having the same "segmentsFrom", this means that some other job
+   * is attempting to replace the same target segments or some previous attempt failed in the middle. Default behavior
+   * to handle this case is to throw the exception and block the protocol. If "forceCleanup=true", we proactively set
+   * the previous lineage to be "REVERTED" and move forward with the existing replacement attempt.
+   *
    * Update is done with retry logic along with read-modify-write block for achieving atomic update of the lineage
    * metadata.
    *
@@ -2809,6 +2850,10 @@ public class PinotHelixResourceManager {
           // If the lineage entry is in 'REVERTED' state, no need to go through the validation because we can regard
           // the entry as not existing.
           if (lineageEntry.getState() == LineageEntryState.REVERTED) {
+            // When 'forceCleanup' is enabled, proactively clean up 'segmentsTo' since it's safe to do so.
+            if (forceCleanup) {
+              segmentsToCleanUp.addAll(lineageEntry.getSegmentsTo());
+            }
             continue;
           }
 
@@ -3038,10 +3083,8 @@ public class PinotHelixResourceManager {
           // different after updating the lineage entry.
           sendRoutingTableRebuildMessage(tableNameWithType);
 
-          // Invoke the proactive clean-up for segments that we no longer needs in case 'forceRevert' is enabled
-          if (forceRevert) {
-            deleteSegments(tableNameWithType, lineageEntry.getSegmentsTo());
-          }
+          // Invoke the proactive clean-up for segments that we no longer needs
+          deleteSegments(tableNameWithType, lineageEntry.getSegmentsTo());
           return true;
         } else {
           return false;
