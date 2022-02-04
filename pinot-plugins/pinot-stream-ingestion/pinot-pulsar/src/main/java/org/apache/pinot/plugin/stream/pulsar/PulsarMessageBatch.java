@@ -77,14 +77,26 @@ public class PulsarMessageBatch implements MessageBatch<byte[]> {
   public StreamPartitionMsgOffset getNextStreamPartitionMsgOffsetAtIndex(int index) {
     MessageIdImpl currentMessageId = MessageIdImpl.convertToMessageIdImpl(_messageList.get(index).getMessageId());
     MessageId nextMessageId;
+
+    long currentLedgerId = currentMessageId.getLedgerId();
+    long currentEntryId = currentMessageId.getEntryId();
+    int currentPartitionIndex = currentMessageId.getPartitionIndex();
+
     if (currentMessageId instanceof BatchMessageIdImpl) {
-      nextMessageId = new BatchMessageIdImpl(currentMessageId.getLedgerId(), currentMessageId.getEntryId() + 1,
-          currentMessageId.getPartitionIndex(), ((BatchMessageIdImpl) currentMessageId).getBatchIndex(),
-          ((BatchMessageIdImpl) currentMessageId).getBatchSize(), ((BatchMessageIdImpl) currentMessageId).getAcker());
+      int currentBatchIndex = ((BatchMessageIdImpl) currentMessageId).getBatchIndex();
+      int currentBatchSize = ((BatchMessageIdImpl) currentMessageId).getBatchSize();
+
+      if (currentBatchIndex < currentBatchSize - 1) {
+        nextMessageId =
+            new BatchMessageIdImpl(currentLedgerId, currentEntryId, currentPartitionIndex, currentBatchIndex + 1,
+                currentBatchSize, ((BatchMessageIdImpl) currentMessageId).getAcker());
+      } else {
+        nextMessageId =
+            new BatchMessageIdImpl(currentLedgerId, currentEntryId + 1, currentPartitionIndex, 0, currentBatchSize,
+                ((BatchMessageIdImpl) currentMessageId).getAcker());
+      }
     } else {
-      nextMessageId =
-          DefaultImplementation.newMessageId(currentMessageId.getLedgerId(), currentMessageId.getEntryId() + 1,
-              currentMessageId.getPartitionIndex());
+      nextMessageId = DefaultImplementation.newMessageId(currentLedgerId, currentEntryId + 1, currentPartitionIndex);
     }
     return new MessageIdStreamOffset(nextMessageId);
   }
