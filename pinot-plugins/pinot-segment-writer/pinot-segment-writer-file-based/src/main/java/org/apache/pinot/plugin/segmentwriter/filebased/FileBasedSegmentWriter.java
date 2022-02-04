@@ -194,9 +194,18 @@ public class FileBasedSegmentWriter implements SegmentWriter {
 
       // Tar segment
       File segmentTarFile = new File(_outputDirURI, segmentName + Constants.TAR_GZ_FILE_EXT);
-      if (!_batchConfig.isOverwriteOutput() && segmentTarFile.exists()) {
-        segmentTarFile = new File(_outputDirURI,
-            String.format("%s_%d%s", segmentName, System.currentTimeMillis(), Constants.TAR_GZ_FILE_EXT));
+      if (segmentTarFile.exists()) {
+        if (!_batchConfig.isOverwriteOutput()) {
+          throw new IllegalArgumentException(String.format("Duplicate segment name generated '%s' in '%s', please "
+              + "adjust segment name generator config to avoid duplicates, or allow batch config overwrite",
+              segmentName, _outputDirURI));
+        } else {
+          LOGGER.warn(String.format("Duplicate segment name detected '%s' in file '%s', deleting old segment",
+              segmentName, segmentDir));
+          if (segmentTarFile.delete()) {
+            LOGGER.warn(String.format("Segment file deleted: '%s/%s'", _outputDirURI, segmentName));
+          }
+        }
       }
       TarGzCompressionUtils.createTarGzFile(new File(segmentDir, segmentName), segmentTarFile);
       LOGGER.info("Created segment tar: {} for segment: {} of table: {}", segmentTarFile.getAbsolutePath(), segmentName,
