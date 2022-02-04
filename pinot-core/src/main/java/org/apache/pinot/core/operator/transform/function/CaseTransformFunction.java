@@ -101,8 +101,9 @@ public class CaseTransformFunction extends BaseTransformFunction {
     for (int i = 0; i < numThenStatements; i++) {
       TransformFunction thenStatement = _elseThenStatements.get(i + 1);
       TransformResultMetadata thenStatementResultMetadata = thenStatement.getResultMetadata();
-      Preconditions.checkState(thenStatementResultMetadata.isSingleValue(),
-          String.format("Unsupported multi-value expression in the THEN clause of index: %d", i));
+      if (!thenStatementResultMetadata.isSingleValue()) {
+        throw new IllegalStateException("Unsupported multi-value expression in the THEN clause of index: " + i);
+      }
       DataType thenStatementDataType = thenStatementResultMetadata.getDataType();
 
       // Upcast the data type to cover all the data types in THEN and ELSE clauses if they don't match
