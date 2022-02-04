@@ -313,9 +313,9 @@ public class LoaderTest {
     FieldSpec byteMetric = new MetricFieldSpec(newColumnName, FieldSpec.DataType.BYTES, defaultValue);
     schema.addField(byteMetric);
     IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig, schema);
-    Assert
-        .assertEquals(BytesUtils.toHexString((byte[]) indexSegment.getDataSource(newColumnName).getDictionary().get(0)),
-            defaultValue);
+    Assert.assertEquals(
+        BytesUtils.toHexString((byte[]) indexSegment.getDataSource(newColumnName).getDictionary().get(0)),
+        defaultValue);
     indexSegment.destroy();
   }
 
@@ -522,8 +522,8 @@ public class LoaderTest {
     Assert.assertEquals(textIndexFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     Assert.assertEquals(textIndexDocIdMappingFile.getName(),
         TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
-    Assert
-        .assertEquals(textIndexDocIdMappingFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+    Assert.assertEquals(textIndexDocIdMappingFile.getParentFile().getName(),
+        SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     indexSegment.destroy();
 
     // CASE 2: set the segment version to load in IndexLoadingConfig as V3
@@ -550,8 +550,8 @@ public class LoaderTest {
     Assert.assertEquals(textIndexFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     Assert.assertEquals(textIndexDocIdMappingFile.getName(),
         TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
-    Assert
-        .assertEquals(textIndexDocIdMappingFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+    Assert.assertEquals(textIndexDocIdMappingFile.getParentFile().getName(),
+        SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     indexSegment.destroy();
 
     // Test for scenarios by creating on-disk segment in V1 and then loading
@@ -652,8 +652,8 @@ public class LoaderTest {
     Assert.assertEquals(textIndexFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     Assert.assertEquals(textIndexDocIdMappingFile.getName(),
         TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
-    Assert
-        .assertEquals(textIndexDocIdMappingFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+    Assert.assertEquals(textIndexDocIdMappingFile.getParentFile().getName(),
+        SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     indexSegment.destroy();
   }
 

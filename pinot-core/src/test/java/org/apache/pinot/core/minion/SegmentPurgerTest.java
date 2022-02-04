@@ -165,9 +165,8 @@ public class SegmentPurgerTest {
     props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap.toString());
     try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
         .load(purgedIndexDir.toURI(),
-            new SegmentDirectoryLoaderContext(_tableConfig, null, null, purgedSegmentMetadata.getName(),null,
-                new PinotConfiguration(props)));
-        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+            new SegmentDirectoryLoaderContext(_tableConfig, null, null, purgedSegmentMetadata.getName(), null,
+                new PinotConfiguration(props))); SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
       assertTrue(reader.hasIndexFor(D1, ColumnIndexType.INVERTED_INDEX));
       assertFalse(reader.hasIndexFor(D2, ColumnIndexType.INVERTED_INDEX));
     }
