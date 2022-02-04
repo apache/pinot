@@ -301,7 +301,7 @@ public class PinotSegmentRestletResource {
       // infer the table type from segment name
       TableType tableType = SegmentName.isRealtimeSegmentName(segmentName) ? TableType.REALTIME : TableType.OFFLINE;
       tableNameWithType =
-          ResourceUtils.getExistingTableNamesWithType((_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+          ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
     }
 
     Map<String, String> segmentMetadata = getSegmentMetadataInternal(tableNameWithType, segmentName);
