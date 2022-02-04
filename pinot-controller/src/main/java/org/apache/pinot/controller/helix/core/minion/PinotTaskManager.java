@@ -28,7 +28,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.I0Itec.zkclient.IZkChildListener;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.helix.AccessOption;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -88,6 +92,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   private final Map<String, TaskTypeMetricsUpdater> _taskTypeMetricsUpdaterMap = new ConcurrentHashMap<>();
   private final Map<TaskState, Integer> _taskStateToCountMap = new ConcurrentHashMap<>();
 
+  private final ZkTableConfigChangeListener _zkTableConfigChangeListener = new ZkTableConfigChangeListener();
+
   public PinotTaskManager(PinotHelixTaskResourceManager helixTaskResourceManager,
       PinotHelixResourceManager helixResourceManager, LeadControllerManager leadControllerManager,
       ControllerConf controllerConf, ControllerMetrics controllerMetrics) {
@@ -104,38 +110,60 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       try {
         _scheduler = new StdSchedulerFactory().getScheduler();
         _scheduler.start();
-        LOGGER.info("Subscribe to tables change under PropertyStore path: {}", TABLE_CONFIG_PARENT_PATH);
-        _pinotHelixResourceManager.getPropertyStore().subscribeChildChanges(TABLE_CONFIG_PARENT_PATH,
-            (parentPath, tables) -> {
-              if (_tableTaskSchedulerUpdaterMap.isEmpty()) {
-                // Initial setup
-                for (String tableNameWithType : tables) {
-                  subscribeTableConfigChanges(tableNameWithType);
-                }
-              } else {
-                Set<String> existingTables = new HashSet<>(_tableTaskSchedulerUpdaterMap.keySet());
-                Set<String> tablesToAdd = new HashSet<>();
-                for (String tableNameWithType : tables) {
-                  if (!existingTables.remove(tableNameWithType)) {
-                    tablesToAdd.add(tableNameWithType);
-                  }
-                }
-                for (String tableNameWithType : tablesToAdd) {
-                  subscribeTableConfigChanges(tableNameWithType);
-                }
-                if (!existingTables.isEmpty()) {
-                  LOGGER.info("Found tables to clean up cron task scheduler: {}", existingTables);
-                  for (String tableNameWithType : existingTables) {
-                    cleanUpCronTaskSchedulerForTable(tableNameWithType);
-                  }
-                }
-              }
-            });
+        synchronized (_zkTableConfigChangeListener) {
+          // Subscribe child changes before reading the data to avoid missing changes
+          LOGGER.info("Check and subscribe to tables change under PropertyStore path: {}", TABLE_CONFIG_PARENT_PATH);
+          _pinotHelixResourceManager.getPropertyStore()
+              .subscribeChildChanges(TABLE_CONFIG_PARENT_PATH, _zkTableConfigChangeListener);
+          List<String> tables = _pinotHelixResourceManager.getPropertyStore()
+              .getChildNames(TABLE_CONFIG_PARENT_PATH, AccessOption.PERSISTENT);
+          if (CollectionUtils.isNotEmpty(tables)) {
+            checkTableConfigChanges(tables);
+          }
+        }
       } catch (SchedulerException e) {
         throw new RuntimeException("Caught exception while setting up the scheduler", e);
       }
     } else {
       _scheduler = null;
+    }
+  }
+
+  private class ZkTableConfigChangeListener implements IZkChildListener {
+
+    @Override
+    public synchronized void handleChildChange(String path, List<String> tableNamesWithType) {
+      checkTableConfigChanges(tableNamesWithType);
+    }
+  }
+
+  private void checkTableConfigChanges(List<String> allTableNamesWithType) {
+    LOGGER.info("Checking task config changes in table configs");
+    // Just check on tables the current controller is leader for, and skip the rest.
+    List<String> tableNamesWithType =
+        allTableNamesWithType.stream().filter(_leadControllerManager::isLeaderForTable).collect(Collectors.toList());
+    if (_tableTaskSchedulerUpdaterMap.isEmpty()) {
+      // Initial setup
+      for (String tableNameWithType : tableNamesWithType) {
+        subscribeTableConfigChanges(tableNameWithType);
+      }
+    } else {
+      Set<String> existingTables = new HashSet<>(_tableTaskSchedulerUpdaterMap.keySet());
+      Set<String> tablesToAdd = new HashSet<>();
+      for (String tableNameWithType : tableNamesWithType) {
+        if (!existingTables.remove(tableNameWithType)) {
+          tablesToAdd.add(tableNameWithType);
+        }
+      }
+      for (String tableNameWithType : tablesToAdd) {
+        subscribeTableConfigChanges(tableNameWithType);
+      }
+      if (!existingTables.isEmpty()) {
+        LOGGER.info("Found tables to clean up cron task scheduler: {}", existingTables);
+        for (String tableNameWithType : existingTables) {
+          cleanUpCronTaskSchedulerForTable(tableNameWithType);
+        }
+      }
     }
   }
 
