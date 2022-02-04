@@ -138,11 +138,10 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   }
 
   private void checkTableConfigChanges(List<String> allTableNamesWithType) {
-    LOGGER.info("Checking task config changes of tables: {}", allTableNamesWithType);
+    LOGGER.info("Checking task config changes in table configs");
     // Just check on tables the current controller is leader for, and skip the rest.
     List<String> tableNamesWithType =
         allTableNamesWithType.stream().filter(_leadControllerManager::isLeaderForTable).collect(Collectors.toList());
-    LOGGER.info("Current controller is only leader for tables: {}", tableNamesWithType);
     if (_tableTaskSchedulerUpdaterMap.isEmpty()) {
       // Initial setup
       for (String tableNameWithType : tableNamesWithType) {
@@ -166,7 +165,6 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         }
       }
     }
-    LOGGER.info("Checked task config changes of tables: {}", tableNamesWithType);
   }
 
   private String getPropertyStorePathForTable(String tableWithType) {
