@@ -128,6 +128,7 @@ public class BenchmarkFilteredAggregations extends BaseQueriesTest {
     }
 
     FileUtils.deleteQuietly(INDEX_DIR);
+    EXECUTOR_SERVICE.shutdownNow();
   }
 
   private List<GenericRow> createTestData(int numRows) {
