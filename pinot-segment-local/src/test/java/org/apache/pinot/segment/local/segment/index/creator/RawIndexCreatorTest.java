@@ -106,8 +106,7 @@ public class RawIndexCreatorTest {
     schema.addField(new DimensionFieldSpec(STRING_MV_COLUMN, DataType.STRING, false));
     schema.addField(new DimensionFieldSpec(BYTES_MV_COLUMN, DataType.BYTES, false));
 
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test")
-        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
 
     _random = new Random(System.nanoTime());
     _recordReader = buildIndex(tableConfig, schema);
@@ -170,13 +169,11 @@ public class RawIndexCreatorTest {
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(STRING_COLUMN);
     try (VarByteChunkSVForwardIndexReader rawIndexReader = new VarByteChunkSVForwardIndexReader(indexBuffer,
-        DataType.STRING);
-        ChunkReaderContext readerContext = rawIndexReader.createContext()) {
+        DataType.STRING); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
       _recordReader.rewind();
       for (int row = 0; row < NUM_ROWS; row++) {
         GenericRow expectedRow = _recordReader.next();
-        Assert.assertEquals(rawIndexReader.getString(row, readerContext),
-            expectedRow.getValue(STRING_COLUMN));
+        Assert.assertEquals(rawIndexReader.getString(row, readerContext), expectedRow.getValue(STRING_COLUMN));
       }
     }
   }
@@ -190,14 +187,12 @@ public class RawIndexCreatorTest {
   private void testFixedLengthRawIndexCreator(String column, DataType dataType)
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(column);
-    try (FixedByteChunkSVForwardIndexReader rawIndexReader = new FixedByteChunkSVForwardIndexReader(
-        indexBuffer, dataType);
-        ChunkReaderContext readerContext = rawIndexReader.createContext()) {
+    try (FixedByteChunkSVForwardIndexReader rawIndexReader = new FixedByteChunkSVForwardIndexReader(indexBuffer,
+        dataType); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
       _recordReader.rewind();
       for (int row = 0; row < NUM_ROWS; row++) {
         GenericRow expectedRow = _recordReader.next();
-        Assert.assertEquals(readValueFromIndex(rawIndexReader, readerContext, row),
-            expectedRow.getValue(column));
+        Assert.assertEquals(readValueFromIndex(rawIndexReader, readerContext, row), expectedRow.getValue(column));
       }
     }
   }
@@ -210,14 +205,11 @@ public class RawIndexCreatorTest {
   public void testStringMVRawIndexCreator()
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(STRING_MV_COLUMN);
-    try (VarByteChunkMVForwardIndexReader rawIndexReader = new VarByteChunkMVForwardIndexReader(
-        indexBuffer,
-        DataType.STRING);
-        ChunkReaderContext readerContext = rawIndexReader
-            .createContext()) {
+    try (VarByteChunkMVForwardIndexReader rawIndexReader = new VarByteChunkMVForwardIndexReader(indexBuffer,
+        DataType.STRING); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
       _recordReader.rewind();
-      int maxNumberOfMultiValues = _segmentDirectory.getSegmentMetadata()
-          .getColumnMetadataFor(STRING_MV_COLUMN).getMaxNumberOfMultiValues();
+      int maxNumberOfMultiValues =
+          _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(STRING_MV_COLUMN).getMaxNumberOfMultiValues();
       final String[] valueBuffer = new String[maxNumberOfMultiValues];
       for (int row = 0; row < NUM_ROWS; row++) {
         GenericRow expectedRow = _recordReader.next();
@@ -245,13 +237,11 @@ public class RawIndexCreatorTest {
   public void testBytesMVRawIndexCreator()
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(BYTES_MV_COLUMN);
-    try (VarByteChunkMVForwardIndexReader rawIndexReader = new VarByteChunkMVForwardIndexReader(
-        indexBuffer, DataType.BYTES);
-        ChunkReaderContext readerContext = rawIndexReader
-            .createContext()) {
+    try (VarByteChunkMVForwardIndexReader rawIndexReader = new VarByteChunkMVForwardIndexReader(indexBuffer,
+        DataType.BYTES); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
       _recordReader.rewind();
-      int maxNumberOfMultiValues = _segmentDirectory.getSegmentMetadata()
-          .getColumnMetadataFor(BYTES_MV_COLUMN).getMaxNumberOfMultiValues();
+      int maxNumberOfMultiValues =
+          _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(BYTES_MV_COLUMN).getMaxNumberOfMultiValues();
       final byte[][] valueBuffer = new byte[maxNumberOfMultiValues][];
       for (int row = 0; row < NUM_ROWS; row++) {
         GenericRow expectedRow = _recordReader.next();
@@ -327,7 +317,8 @@ public class RawIndexCreatorTest {
     props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap.toString());
     _segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
         .load(driver.getOutputDirectory().toURI(),
-            new SegmentDirectoryLoaderContext(tableConfig, null, null, new PinotConfiguration(props)));
+            new SegmentDirectoryLoaderContext.Builder().setTableConfig(tableConfig)
+                .setSegmentDirectoryConfigs(new PinotConfiguration(props)).build());
     _segmentReader = _segmentDirectory.createReader();
     recordReader.rewind();
     return recordReader;
@@ -350,15 +341,13 @@ public class RawIndexCreatorTest {
       case DOUBLE:
         return random.nextDouble();
       case STRING:
-        return StringUtil
-            .sanitizeStringValue(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)), Integer.MAX_VALUE);
+        return StringUtil.sanitizeStringValue(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)),
+            Integer.MAX_VALUE);
       case BYTES:
-        return StringUtil
-            .sanitizeStringValue(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)), Integer.MAX_VALUE)
-            .getBytes();
+        return StringUtil.sanitizeStringValue(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)),
+            Integer.MAX_VALUE).getBytes();
       default:
-        throw new UnsupportedOperationException(
-            "Unsupported data type for random value generator: " + dataType);
+        throw new UnsupportedOperationException("Unsupported data type for random value generator: " + dataType);
     }
   }
 
