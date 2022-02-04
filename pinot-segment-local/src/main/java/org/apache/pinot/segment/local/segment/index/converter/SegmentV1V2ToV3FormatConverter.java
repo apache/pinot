@@ -142,11 +142,11 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap.toString());
     PinotConfiguration configuration = new PinotConfiguration(props);
     try (SegmentDirectory v2Segment = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
-        .load(v2Directory.toURI(),
-            new SegmentDirectoryLoaderContext(null, null, null, v2Metadata.getName(), null, configuration));
+        .load(v2Directory.toURI(), new SegmentDirectoryLoaderContext.Builder().setSegmentName(v2Metadata.getName())
+            .setSegmentDirectoryConfigs(configuration).build());
         SegmentDirectory v3Segment = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
-            .load(v3Directory.toURI(),
-                new SegmentDirectoryLoaderContext(null, null, null, v2Metadata.getName(), null, configuration))) {
+            .load(v3Directory.toURI(), new SegmentDirectoryLoaderContext.Builder().setSegmentName(v2Metadata.getName())
+                .setSegmentDirectoryConfigs(configuration).build())) {
 
       // for each dictionary and each fwdIndex, copy that to newDirectory buffer
       Set<String> allColumns = v2Metadata.getAllColumns();

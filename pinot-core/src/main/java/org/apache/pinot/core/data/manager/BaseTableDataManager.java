@@ -567,9 +567,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
       IndexLoadingConfig indexLoadingConfig, Schema schema)
       throws Exception {
     SegmentDirectoryLoaderContext loaderContext =
-        new SegmentDirectoryLoaderContext(indexLoadingConfig.getTableConfig(), schema,
-            indexLoadingConfig.getInstanceId(), segmentName, segmentCrc,
-            indexLoadingConfig.getSegmentDirectoryConfigs());
+        new SegmentDirectoryLoaderContext.Builder().setTableConfig(indexLoadingConfig.getTableConfig())
+            .setSchema(schema).setInstanceId(indexLoadingConfig.getInstanceId()).setSegmentName(segmentName)
+            .setSegmentCrc(segmentCrc).setSegmentDirectoryConfigs(indexLoadingConfig.getSegmentDirectoryConfigs())
+            .build();
     SegmentDirectoryLoader segmentDirectoryLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
     File indexDir = getSegmentDataDir(segmentName);

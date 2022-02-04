@@ -32,10 +32,10 @@ public class SegmentDirectoryLoaderContext {
   private final Schema _schema;
   private final String _instanceId;
   private final String _segmentName;
-  private final PinotConfiguration _segmentDirectoryConfigs;
   private final String _segmentCrc;
+  private final PinotConfiguration _segmentDirectoryConfigs;
 
-  public SegmentDirectoryLoaderContext(TableConfig tableConfig, Schema schema, String instanceId, String segmentName,
+  private SegmentDirectoryLoaderContext(TableConfig tableConfig, Schema schema, String instanceId, String segmentName,
       String segmentCrc, PinotConfiguration segmentDirectoryConfigs) {
     _tableConfig = tableConfig;
     _schema = schema;
@@ -67,5 +67,49 @@ public class SegmentDirectoryLoaderContext {
 
   public PinotConfiguration getSegmentDirectoryConfigs() {
     return _segmentDirectoryConfigs;
+  }
+
+  public static class Builder {
+    private TableConfig _tableConfig;
+    private Schema _schema;
+    private String _instanceId;
+    private String _segmentName;
+    private String _segmentCrc;
+    private PinotConfiguration _segmentDirectoryConfigs;
+
+    public Builder setTableConfig(TableConfig tableConfig) {
+      _tableConfig = tableConfig;
+      return this;
+    }
+
+    public Builder setSchema(Schema schema) {
+      _schema = schema;
+      return this;
+    }
+
+    public Builder setInstanceId(String instanceId) {
+      _instanceId = instanceId;
+      return this;
+    }
+
+    public Builder setSegmentName(String segmentName) {
+      _segmentName = segmentName;
+      return this;
+    }
+
+    public Builder setSegmentCrc(String segmentCrc) {
+      _segmentCrc = segmentCrc;
+      return this;
+    }
+
+    public Builder setSegmentDirectoryConfigs(PinotConfiguration segmentDirectoryConfigs) {
+      _segmentDirectoryConfigs = segmentDirectoryConfigs;
+      return this;
+    }
+
+    public SegmentDirectoryLoaderContext build() {
+      return new SegmentDirectoryLoaderContext(_tableConfig, _schema, _instanceId, _segmentName, _segmentCrc,
+          _segmentDirectoryConfigs);
+    }
   }
 }
