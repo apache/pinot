@@ -88,11 +88,18 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     _primaryKeyColumns = _tableSchema.getPrimaryKeyColumns();
   }
 
+  public void reloadPropertyStore() {
+    _propertyStore = _helixManager.getHelixPropertyStore();
+    _tableSchema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+    _primaryKeyColumns = _tableSchema.getPrimaryKeyColumns();
+  }
+
   @Override
   public void addSegment(File indexDir, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     super.addSegment(indexDir, indexLoadingConfig);
     try {
+      reloadPropertyStore();
       loadLookupTable();
       _logger.info("Successfully added segment {} and loaded lookup table: {}", indexDir.getName(), getTableName());
     } catch (Exception e) {
@@ -104,6 +111,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
   public void removeSegment(String segmentName) {
     super.removeSegment(segmentName);
     try {
+      reloadPropertyStore();
       loadLookupTable();
       _logger.info("Successfully removed segment {} and reloaded lookup table: {}", segmentName, getTableName());
     } catch (Exception e) {
