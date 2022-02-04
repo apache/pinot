@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -185,16 +184,17 @@ public class CaseTransformFunction extends BaseTransformFunction {
    * index(1 to N) of matched WHEN clause, 0 means nothing matched, so go to ELSE.
    */
   private int[] getSelectedArray(ProjectionBlock projectionBlock) {
-    if (_selectedResults == null) {
-      _selectedResults = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int numDocs = projectionBlock.getNumDocs();
+    if (_selectedResults == null || _selectedResults.length < numDocs) {
+      _selectedResults = new int[numDocs];
     } else {
-      Arrays.fill(_selectedResults, 0);
+      Arrays.fill(_selectedResults, 0, numDocs, 0);
     }
     int numWhenStatements = _whenStatements.size();
     for (int i = 0; i < numWhenStatements; i++) {
       TransformFunction whenStatement = _whenStatements.get(i);
       int[] conditions = whenStatement.transformToIntValuesSV(projectionBlock);
-      for (int j = 0; j < conditions.length; j++) {
+      for (int j = 0; j < numDocs & j < conditions.length; j++) {
         if (_selectedResults[j] == 0 && conditions[j] == 1) {
           _selectedResults[j] = i + 1;
         }
@@ -209,8 +209,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
       return super.transformToIntValuesSV(projectionBlock);
     }
     int[] selected = getSelectedArray(projectionBlock);
-    if (_intResults == null) {
-      _intResults = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    if (_intResults == null || _intResults.length < projectionBlock.getNumDocs()) {
+      _intResults = new int[projectionBlock.getNumDocs()];
     }
     int numElseThenStatements = _elseThenStatements.size();
     for (int i = 0; i < numElseThenStatements; i++) {
@@ -232,8 +232,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
       return super.transformToLongValuesSV(projectionBlock);
     }
     int[] selected = getSelectedArray(projectionBlock);
-    if (_longResults == null) {
-      _longResults = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    if (_longResults == null || _longResults.length < projectionBlock.getNumDocs()) {
+      _longResults = new long[projectionBlock.getNumDocs()];
     }
     int numElseThenStatements = _elseThenStatements.size();
     for (int i = 0; i < numElseThenStatements; i++) {
@@ -255,8 +255,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
       return super.transformToFloatValuesSV(projectionBlock);
     }
     int[] selected = getSelectedArray(projectionBlock);
-    if (_floatResults == null) {
-      _floatResults = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    if (_floatResults == null || _floatResults.length < projectionBlock.getNumDocs()) {
+      _floatResults = new float[projectionBlock.getNumDocs()];
     }
     int numElseThenStatements = _elseThenStatements.size();
     for (int i = 0; i < numElseThenStatements; i++) {
@@ -278,8 +278,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
       return super.transformToDoubleValuesSV(projectionBlock);
     }
     int[] selected = getSelectedArray(projectionBlock);
-    if (_doubleResults == null) {
-      _doubleResults = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    if (_doubleResults == null || _doubleResults.length < projectionBlock.getNumDocs()) {
+      _doubleResults = new double[projectionBlock.getNumDocs()];
     }
     int numElseThenStatements = _elseThenStatements.size();
     for (int i = 0; i < numElseThenStatements; i++) {
@@ -301,8 +301,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
       return super.transformToStringValuesSV(projectionBlock);
     }
     int[] selected = getSelectedArray(projectionBlock);
-    if (_stringResults == null) {
-      _stringResults = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    if (_stringResults == null || _selectedResults.length < projectionBlock.getNumDocs()) {
+      _stringResults = new String[projectionBlock.getNumDocs()];
     }
     int numElseThenStatements = _elseThenStatements.size();
     for (int i = 0; i < numElseThenStatements; i++) {
@@ -324,8 +324,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
       return super.transformToBytesValuesSV(projectionBlock);
     }
     int[] selected = getSelectedArray(projectionBlock);
-    if (_bytesResults == null) {
-      _bytesResults = new byte[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    if (_bytesResults == null || _bytesResults.length < projectionBlock.getNumDocs()) {
+      _bytesResults = new byte[projectionBlock.getNumDocs()][];
     }
     int numElseThenStatements = _elseThenStatements.size();
     for (int i = 0; i < numElseThenStatements; i++) {
