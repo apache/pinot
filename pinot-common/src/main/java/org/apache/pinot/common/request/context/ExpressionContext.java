@@ -99,7 +99,11 @@ public class ExpressionContext {
 
   @Override
   public int hashCode() {
-    return Objects.hash(_type, _value, _function);
+    int hash = 31 * 31 * _type.hashCode();
+    if (_type == Type.FUNCTION) {
+      return hash + _function.hashCode();
+    }
+    return hash + 31 * _value.hashCode();
   }
 
   @Override

@@ -84,7 +84,7 @@ public class FunctionContext {
 
   @Override
   public int hashCode() {
-    return Objects.hash(_type, _functionName, _arguments);
+    return 31 * 31 * _type.hashCode() + 31 * _functionName.hashCode() + _arguments.hashCode();
   }
 
   @Override
