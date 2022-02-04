@@ -21,6 +21,7 @@ package org.apache.pinot.segment.spi;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 
 
@@ -74,8 +75,8 @@ public enum AggregationFunctionType {
   PERCENTILERAWTDIGESTMV("percentileRawTDigestMV"),
   DISTINCT("distinct");
 
-  private static final Set<String> NAMES = Arrays.stream(values()).map(AggregationFunctionType::name)
-      .collect(Collectors.toSet());
+  private static final Set<String> NAMES = Arrays.stream(values()).flatMap(func -> Stream.of(func.name(),
+      func.getName(), func.getName().toLowerCase())).collect(Collectors.toSet());
 
   private final String _name;
 
@@ -88,7 +89,10 @@ public enum AggregationFunctionType {
   }
 
   public static boolean isAggregationFunction(String functionName) {
-    String upperCaseFunctionName = StringUtils.remove(functionName, '_').toUpperCase();
+    if (NAMES.contains(functionName)) {
+      return true;
+    }
+    String upperCaseFunctionName = functionName.replace("_", "").toUpperCase();
     return NAMES.contains(upperCaseFunctionName);
   }
 
