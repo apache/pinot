@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.I0Itec.zkclient.IZkChildListener;
 import org.apache.commons.collections.CollectionUtils;
@@ -136,8 +137,12 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     }
   }
 
-  private void checkTableConfigChanges(List<String> tableNamesWithType) {
-    LOGGER.info("Checking task config changes of tables: {}", tableNamesWithType);
+  private void checkTableConfigChanges(List<String> allTableNamesWithType) {
+    LOGGER.info("Checking task config changes of tables: {}", allTableNamesWithType);
+    // Just check on tables the current controller is leader for, and skip the rest.
+    List<String> tableNamesWithType =
+        allTableNamesWithType.stream().filter(_leadControllerManager::isLeaderForTable).collect(Collectors.toList());
+    LOGGER.info("Current controller is only leader for tables: {}", tableNamesWithType);
     if (_tableTaskSchedulerUpdaterMap.isEmpty()) {
       // Initial setup
       for (String tableNameWithType : tableNamesWithType) {
