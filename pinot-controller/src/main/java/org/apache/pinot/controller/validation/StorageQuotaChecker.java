@@ -49,11 +49,13 @@ public class StorageQuotaChecker {
   private final boolean _isLeaderForTable;
 
   public StorageQuotaChecker(TableConfig tableConfig, TableSizeReader tableSizeReader,
-      ControllerMetrics controllerMetrics, boolean isLeaderForTable) {
+      ControllerMetrics controllerMetrics, boolean isLeaderForTable,
+      PinotHelixResourceManager pinotHelixResourceManager) {
     _tableConfig = tableConfig;
     _tableSizeReader = tableSizeReader;
     _controllerMetrics = controllerMetrics;
     _isLeaderForTable = isLeaderForTable;
+    _pinotHelixResourceManager = pinotHelixResourceManager;
   }
 
   public static class QuotaCheckerResponse {

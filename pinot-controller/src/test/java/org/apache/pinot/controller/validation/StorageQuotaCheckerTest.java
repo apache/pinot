@@ -23,6 +23,7 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -55,7 +56,8 @@ public class StorageQuotaCheckerTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
     _tableSizeReader = mock(TableSizeReader.class);
     _controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
-    _storageQuotaChecker = new StorageQuotaChecker(_tableConfig, _tableSizeReader, _controllerMetrics, true);
+    _storageQuotaChecker = new StorageQuotaChecker(_tableConfig, _tableSizeReader, _controllerMetrics, true,
+        mock(PinotHelixResourceManager.class));
   }
 
   private boolean isSegmentWithinQuota()
