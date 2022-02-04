@@ -23,7 +23,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
@@ -41,6 +44,7 @@ import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.zookeeper.data.Stat;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 import org.mockito.ArgumentMatchers;
@@ -49,7 +53,6 @@ import org.mockito.stubbing.Answer;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -103,7 +106,7 @@ public class RetentionManagerTest {
     SegmentDeletionManager deletionManager = pinotHelixResourceManager.getSegmentDeletionManager();
 
     // Verify that the removeAgedDeletedSegments() method in deletion manager is actually called.
-    verify(deletionManager, times(1)).removeAgedDeletedSegments(anyInt());
+    verify(deletionManager, times(1)).removeAgedDeletedSegments(any());
 
     // Verify that the deleteSegments method is actually called.
     verify(pinotHelixResourceManager, times(1)).deleteSegments(anyString(), anyList());
@@ -177,7 +180,7 @@ public class RetentionManagerTest {
           throws Throwable {
         return null;
       }
-    }).when(deletionManager).removeAgedDeletedSegments(anyInt());
+    }).when(deletionManager).removeAgedDeletedSegments(any());
     when(resourceManager.getSegmentDeletionManager()).thenReturn(deletionManager);
 
     // If and when PinotHelixResourceManager.deleteSegments() is invoked, make sure that the segments deleted
@@ -197,6 +200,15 @@ public class RetentionManagerTest {
         return null;
       }
     }).when(resourceManager).deleteSegments(anyString(), ArgumentMatchers.anyList());
+
+    // fake segment lineage.
+    SegmentLineage segmentLineage = new SegmentLineage(REALTIME_TABLE_NAME);
+
+    ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
+    when(mockPropertyStore.get(anyString(), any(Stat.class), anyInt())).thenReturn(segmentLineage.toZNRecord());
+    when(mockPropertyStore.set(anyString(), any(ZNRecord.class), anyInt(), anyInt())).thenReturn(true);
+
+    when(resourceManager.getPropertyStore()).thenReturn(mockPropertyStore);
   }
 
   // This test makes sure that we clean up the segments marked OFFLINE in realtime for more than 7 days
@@ -229,7 +241,7 @@ public class RetentionManagerTest {
     SegmentDeletionManager deletionManager = pinotHelixResourceManager.getSegmentDeletionManager();
 
     // Verify that the removeAgedDeletedSegments() method in deletion manager is actually called.
-    verify(deletionManager, times(1)).removeAgedDeletedSegments(anyInt());
+    verify(deletionManager, times(1)).removeAgedDeletedSegments(any());
 
     // Verify that the deleteSegments method is actually called.
     verify(pinotHelixResourceManager, times(1)).deleteSegments(anyString(), anyList());
@@ -295,6 +307,15 @@ public class RetentionManagerTest {
     HelixAdmin helixAdmin = mock(HelixAdmin.class);
     when(helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, REALTIME_TABLE_NAME)).thenReturn(idealState);
     when(pinotHelixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
+
+    // fake segment lineage.
+    SegmentLineage segmentLineage = new SegmentLineage(REALTIME_TABLE_NAME);
+
+    ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
+    when(mockPropertyStore.get(anyString(), any(Stat.class), anyInt())).thenReturn(segmentLineage.toZNRecord());
+    when(mockPropertyStore.set(anyString(), any(ZNRecord.class), anyInt(), anyInt())).thenReturn(true);
+
+    when(pinotHelixResourceManager.getPropertyStore()).thenReturn(mockPropertyStore);
 
     return pinotHelixResourceManager;
   }

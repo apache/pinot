@@ -31,6 +31,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
@@ -40,6 +41,8 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -60,7 +63,7 @@ public class SegmentDeletionManager {
   private final String _helixClusterName;
   private final HelixAdmin _helixAdmin;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
-  private final int _defaultDeletedSegmentsRetentionInDays;
+  private final long _defaultDeletedSegmentsRetentionMs;
 
   public SegmentDeletionManager(String dataDir, HelixAdmin helixAdmin, String helixClusterName,
       ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays) {
@@ -68,7 +71,7 @@ public class SegmentDeletionManager {
     _helixAdmin = helixAdmin;
     _helixClusterName = helixClusterName;
     _propertyStore = propertyStore;
-    _defaultDeletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
+    _defaultDeletedSegmentsRetentionMs = TimeUnit.DAYS.toMillis(deletedSegmentsRetentionInDays);
 
     _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
       @Override
@@ -84,22 +87,28 @@ public class SegmentDeletionManager {
     _executorService.shutdownNow();
   }
 
-  public void deleteSegments(final String tableName, final Collection<String> segmentIds) {
-    deleteSegmentsWithDelay(tableName, segmentIds, DEFAULT_DELETION_DELAY_SECONDS);
+  public void deleteSegments(String tableName, Collection<String> segmentIds) {
+    deleteSegments(tableName, segmentIds, _defaultDeletedSegmentsRetentionMs);
   }
 
-  protected void deleteSegmentsWithDelay(final String tableName, final Collection<String> segmentIds,
-      final long deletionDelaySeconds) {
+  public void deleteSegments(String tableName, Collection<String> segmentIds,
+      long deletedSegmentsRetentionMs) {
+    deleteSegmentsWithDelay(tableName, segmentIds, deletedSegmentsRetentionMs, DEFAULT_DELETION_DELAY_SECONDS);
+  }
+
+  protected void deleteSegmentsWithDelay(String tableName, Collection<String> segmentIds,
+      long deletedSegmentsRetentionMs, long deletionDelaySeconds) {
     _executorService.schedule(new Runnable() {
       @Override
       public void run() {
-        deleteSegmentFromPropertyStoreAndLocal(tableName, segmentIds, deletionDelaySeconds);
+        deleteSegmentFromPropertyStoreAndLocal(tableName, segmentIds, deletedSegmentsRetentionMs,
+            deletionDelaySeconds);
       }
     }, deletionDelaySeconds, TimeUnit.SECONDS);
   }
 
   protected synchronized void deleteSegmentFromPropertyStoreAndLocal(String tableName, Collection<String> segmentIds,
-      long deletionDelay) {
+      long deletedSegmentsRetentionMs, long deletionDelay) {
     // Check if segment got removed from ExternalView or IdealState
     ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, tableName);
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
@@ -151,7 +160,7 @@ public class SegmentDeletionManager {
       }
       segmentsToDelete.removeAll(propStoreFailedSegs);
 
-      removeSegmentsFromStore(tableName, segmentsToDelete);
+      removeSegmentsFromStore(tableName, segmentsToDelete, deletedSegmentsRetentionMs);
     }
 
     LOGGER.info("Deleted {} segments from table {}:{}", segmentsToDelete.size(), tableName,
@@ -160,18 +169,24 @@ public class SegmentDeletionManager {
     if (!segmentsToRetryLater.isEmpty()) {
       long effectiveDeletionDelay = Math.min(deletionDelay * 2, MAX_DELETION_DELAY_SECONDS);
       LOGGER.info("Postponing deletion of {} segments from table {}", segmentsToRetryLater.size(), tableName);
-      deleteSegmentsWithDelay(tableName, segmentsToRetryLater, effectiveDeletionDelay);
+      deleteSegmentsWithDelay(tableName, segmentsToRetryLater, deletedSegmentsRetentionMs, effectiveDeletionDelay);
       return;
     }
   }
 
   public void removeSegmentsFromStore(String tableNameWithType, List<String> segments) {
+    removeSegmentsFromStore(tableNameWithType, segments, _defaultDeletedSegmentsRetentionMs);
+  }
+
+  public void removeSegmentsFromStore(String tableNameWithType, List<String> segments,
+      long deletedSegmentsRetentionMs) {
     for (String segment : segments) {
-      removeSegmentFromStore(tableNameWithType, segment);
+      removeSegmentFromStore(tableNameWithType, segment, deletedSegmentsRetentionMs);
     }
   }
 
-  protected void removeSegmentFromStore(String tableNameWithType, String segmentId) {
+  protected void removeSegmentFromStore(String tableNameWithType, String segmentId,
+      long deletedSegmentsRetentionMs) {
     // Ignore HLC segments as they are not stored in Pinot FS
     if (SegmentName.isHighLevelConsumerSegmentName(segmentId)) {
       return;
@@ -180,7 +195,7 @@ public class SegmentDeletionManager {
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       URI fileToDeleteURI = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
       PinotFS pinotFS = PinotFSFactory.create(fileToDeleteURI.getScheme());
-      if (_defaultDeletedSegmentsRetentionInDays <= 0) {
+      if (deletedSegmentsRetentionMs <= 0) {
         // delete the segment file instantly if retention is set to zero
         try {
           if (pinotFS.delete(fileToDeleteURI, true)) {
@@ -223,9 +238,8 @@ public class SegmentDeletionManager {
 
   /**
    * Removes aged deleted segments from the deleted directory
-   * @param retentionInDays: retention for deleted segments in days
    */
-  public void removeAgedDeletedSegments(int retentionInDays) {
+  public void removeAgedDeletedSegments(PinotHelixResourceManager helixResourceManager) {
     if (_dataDir != null) {
       URI deletedDirURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS);
       PinotFS pinotFS = PinotFSFactory.create(deletedDirURI.getScheme());
@@ -248,34 +262,64 @@ public class SegmentDeletionManager {
         }
 
         for (String tableNameDir : tableNameDirs) {
-          URI tableNameURI = URIUtils.getUri(tableNameDir);
-          // Get files that are aged
-          final String[] targetFiles = pinotFS.listFiles(tableNameURI, false);
-          int numFilesDeleted = 0;
-          for (String targetFile : targetFiles) {
-            URI targetURI = URIUtils.getUri(targetFile);
-            Date dateToDelete = DateTime.now().minusDays(retentionInDays).toDate();
-            if (pinotFS.lastModified(targetURI) < dateToDelete.getTime()) {
-              if (!pinotFS.delete(targetURI, true)) {
-                LOGGER.warn("Cannot remove file {} from deleted directory.", targetURI.toString());
-              } else {
-                numFilesDeleted++;
-              }
-            }
-          }
-
-          if (numFilesDeleted == targetFiles.length) {
-            // Delete directory if it's empty
-            if (!pinotFS.delete(tableNameURI, false)) {
-              LOGGER.warn("The directory {} cannot be removed.", tableNameDir);
-            }
-          }
+          deleteAgedTableFiles(tableNameDir, pinotFS, helixResourceManager);
         }
       } catch (IOException e) {
         LOGGER.error("Had trouble deleting directories: {}", deletedDirURI.toString(), e);
       }
     } else {
       LOGGER.info("dataDir is not configured, won't delete any expired segments from deleted directory.");
+    }
+  }
+
+  public long getRetentionMsFromTableConfig(TableConfig tableConfig) {
+    long retentionMs = _defaultDeletedSegmentsRetentionMs;
+    if (tableConfig != null && tableConfig.getValidationConfig() != null) {
+      SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+      if (!StringUtils.isEmpty(validationConfig.getDeletedSegmentRetentionTimeUnit())
+          && !StringUtils.isEmpty(validationConfig.getDeletedSegmentRetentionTimeValue())) {
+        try {
+          retentionMs = TimeUnit.valueOf(validationConfig.getDeletedSegmentRetentionTimeUnit().toUpperCase())
+              .toMillis(Long.parseLong(validationConfig.getDeletedSegmentRetentionTimeValue()));
+        } catch (Exception e) {
+          LOGGER.warn(String.format("Unable to parse deleted segment retention config for table %s, using to default "
+              + "retention value %dms", tableConfig.getTableName(), _defaultDeletedSegmentsRetentionMs), e);
+        }
+      }
+    }
+    return retentionMs;
+  }
+
+  private static String getTableNameFromTableNameDir(String tableNameDir) {
+    String[] splits = StringUtils.split(tableNameDir, '/');
+    return splits[splits.length - 1];
+  }
+
+  private void deleteAgedTableFiles(String tableNameDir, PinotFS pinotFS,
+      PinotHelixResourceManager helixResourceManager) throws IOException {
+    // Get files that are aged
+    URI deletedTableDirUri = URIUtils.getUri(tableNameDir);
+    TableConfig tableConfig = helixResourceManager.getTableConfig(getTableNameFromTableNameDir(tableNameDir));
+    long retentionMs = getRetentionMsFromTableConfig(tableConfig);
+    final String[] targetFiles = pinotFS.listFiles(deletedTableDirUri, false);
+    int numFilesDeleted = 0;
+    for (String targetFile : targetFiles) {
+      URI targetURI = URIUtils.getUri(targetFile);
+      Date dateToDelete = DateTime.now().minus(retentionMs).toDate();
+      if (pinotFS.lastModified(targetURI) < dateToDelete.getTime()) {
+        if (!pinotFS.delete(targetURI, true)) {
+          LOGGER.warn("Cannot remove file {} from deleted directory.", targetURI.toString());
+        } else {
+          numFilesDeleted++;
+        }
+      }
+    }
+
+    if (numFilesDeleted == targetFiles.length) {
+      // Delete directory if it's empty
+      if (!pinotFS.delete(deletedTableDirUri, false)) {
+        LOGGER.warn("The directory {} cannot be removed.", deletedTableDirUri);
+      }
     }
   }
 }
