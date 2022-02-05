@@ -191,7 +191,7 @@ public class GapfillUtils {
   public static List<ExpressionContext> getGroupByExpressions(QueryContext queryContext) {
     ExpressionContext gapFillSelection =
         GapfillUtils.getPreAggregateGapfillExpressionContext(queryContext);
-    if(gapFillSelection == null) {
+    if (gapFillSelection == null) {
       return null;
     }
     List<ExpressionContext> groupByExpressions = new ArrayList<>();
@@ -199,7 +199,7 @@ public class GapfillUtils {
     ExpressionContext timeseriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);
     groupByExpressions.add(gapFillSelection.getFunction().getArguments().get(0));
     List<ExpressionContext> timeseriesExpressions = timeseriesOn.getFunction().getArguments();
-    for(int i = 1; i < timeseriesExpressions.size(); i ++) {
+    for (int i = 1; i < timeseriesExpressions.size(); i++) {
       groupByExpressions.add(timeseriesExpressions.get(i));
     }
     return groupByExpressions;

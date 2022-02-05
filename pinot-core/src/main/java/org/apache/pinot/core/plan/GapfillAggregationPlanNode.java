@@ -121,7 +121,7 @@ public class GapfillAggregationPlanNode implements PlanNode {
     List<ExpressionContext> listOfGroupByExpressions = timeSeriesOn.getFunction().getArguments();
     ExpressionContext[] groupByExpressions = new ExpressionContext[listOfGroupByExpressions.size()];
     groupByExpressions[0] = _queryContext.getSelectExpressions().get(0).getFunction().getArguments().get(0);
-    for(int i = 1; i < groupByExpressions.length; i ++) {
+    for (int i = 1; i < groupByExpressions.length; i++) {
       groupByExpressions[i] = listOfGroupByExpressions.get(i);
     }
 

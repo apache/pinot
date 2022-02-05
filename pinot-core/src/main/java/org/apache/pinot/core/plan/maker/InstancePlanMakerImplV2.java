@@ -37,11 +37,11 @@ import org.apache.pinot.core.plan.AggregationPlanNode;
 import org.apache.pinot.core.plan.CombinePlanNode;
 import org.apache.pinot.core.plan.DistinctPlanNode;
 import org.apache.pinot.core.plan.GapfillAggregationGroupByOrderByPlanNode;
+import org.apache.pinot.core.plan.GapfillSelectionPlanNode;
 import org.apache.pinot.core.plan.GlobalPlanImplV0;
 import org.apache.pinot.core.plan.InstanceResponsePlanNode;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.PlanNode;
-import org.apache.pinot.core.plan.GapfillSelectionPlanNode;
 import org.apache.pinot.core.plan.SelectionPlanNode;
 import org.apache.pinot.core.plan.StreamingInstanceResponsePlanNode;
 import org.apache.pinot.core.plan.StreamingSelectionPlanNode;
@@ -229,7 +229,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   @Override
   public PlanNode makeSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
     if (QueryContextUtils.isAggregationQuery(queryContext)) {
-      if(GapfillUtils.isGapfill(queryContext)) {
+      if (GapfillUtils.isGapfill(queryContext)) {
         return new GapfillAggregationGroupByOrderByPlanNode(indexSegment, queryContext);
       } else {
         List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
