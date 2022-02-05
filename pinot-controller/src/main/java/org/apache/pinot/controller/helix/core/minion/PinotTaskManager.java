@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.I0Itec.zkclient.IZkChildListener;
 import org.apache.commons.collections.CollectionUtils;
@@ -137,11 +136,12 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     }
   }
 
-  private void checkTableConfigChanges(List<String> allTableNamesWithType) {
+  private void checkTableConfigChanges(List<String> tableNamesWithType) {
     LOGGER.info("Checking task config changes in table configs");
-    // Just check on tables the current controller is leader for, and skip the rest.
-    List<String> tableNamesWithType =
-        allTableNamesWithType.stream().filter(_leadControllerManager::isLeaderForTable).collect(Collectors.toList());
+    // NOTE: we avoided calling _leadControllerManager::isLeaderForTable here to skip tables the current
+    // controller is not leader for. Because _leadControllerManager updates its leadership states based
+    // on a ZK event, and that ZK event may come later than this method call, making current controller
+    // think it's not lead for certain tables, when it should be if the leadership states are fully updated.
     if (_tableTaskSchedulerUpdaterMap.isEmpty()) {
       // Initial setup
       for (String tableNameWithType : tableNamesWithType) {
