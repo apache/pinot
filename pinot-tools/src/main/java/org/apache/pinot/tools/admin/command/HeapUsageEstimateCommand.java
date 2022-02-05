@@ -230,15 +230,15 @@ public class HeapUsageEstimateCommand extends AbstractBaseAdminCommand implement
     responseBuilder.append("Cardinality").append(TAB).append(_primaryKeyCardinality).append(NEW_LINE);
 
     if (_primaryKeyCardinality != 0) {
-      float totalKeySpace = bytesPerKey * _primaryKeyCardinality;
-      float totalValueSpace = bytesPerValue * _primaryKeyCardinality;
+      float totalKeySpace = bytesPerKey * _primaryKeyCardinality / (1024 * 1024 * 1024);
+      float totalValueSpace = bytesPerValue * _primaryKeyCardinality / (1024 * 1024 * 1024);
       float totalSpace = totalKeySpace + totalValueSpace;
       responseBuilder.append("Estimated total key space (GB)").append(TAB).append(totalKeySpace).append(NEW_LINE);
       responseBuilder.append("Estimated total value space (GB)").append(TAB).append(totalValueSpace).append(NEW_LINE);
       responseBuilder.append("Estimated total space (GB)").append(TAB).append(totalSpace).append(NEW_LINE);
     } else {
       // Cardinality for primaryKeys are not specificed.
-      // Estimate unique combination of Pks based on upsert frequency.
+      // Estimate unique combinations of Pks based on upsert frequency.
       // UpsertFrequency = 1 - recordsCount/skipUpsertRecordsCount.
       String retentionTimeValue = tableConfig.getValidationConfig().getRetentionTimeValue();
       String retentionTimeUnit = tableConfig.getValidationConfig().getRetentionTimeUnit();
