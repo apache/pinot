@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
+import org.apache.pinot.core.operator.transform.function.LiteralTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
@@ -53,14 +54,20 @@ public class StEqualsFunction extends BaseTransformFunction {
     TransformFunction transformFunction = arguments.get(0);
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
         "First argument must be single-valued for transform function: %s", getName());
-    Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES,
-        "The first argument must be of bytes type");
+    Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES
+            || transformFunction instanceof LiteralTransformFunction,
+        String.format("The first argument must be of type BYTES , but was %s",
+            transformFunction.getResultMetadata().getDataType()
+        ));
     _firstArgument = transformFunction;
     transformFunction = arguments.get(1);
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
         "Second argument must be single-valued for transform function: %s", getName());
-    Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES,
-        "The second argument must be of bytes type");
+    Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES
+            || transformFunction instanceof LiteralTransformFunction,
+        "The second argument must be of type BYTES , but was %s",
+            transformFunction.getResultMetadata().getDataType()
+        );
     _secondArgument = transformFunction;
   }
 
