@@ -118,17 +118,17 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
   private void replaceColumnNameWithAlias(DataSchema dataSchema) {
     List<String> aliasList = _queryContext.getSubQueryContext().getAliasList();
     Map<String, String> columnNameToAliasMap = new HashMap<>();
-    for(int i = 0; i < aliasList.size(); i ++) {
-      if(aliasList.get(i) != null) {
+    for (int i = 0; i < aliasList.size(); i++) {
+      if (aliasList.get(i) != null) {
         ExpressionContext selection = _queryContext.getSubQueryContext().getSelectExpressions().get(i);
-        if(GapfillUtils.isGapfill(selection)) {
+        if (GapfillUtils.isGapfill(selection)) {
           selection = selection.getFunction().getArguments().get(0);
         }
         columnNameToAliasMap.put(selection.toString(), aliasList.get(i));
       }
     }
-    for(int i = 0; i < dataSchema.getColumnNames().length; i ++) {
-      if(columnNameToAliasMap.containsKey(dataSchema.getColumnNames()[i] )) {
+    for (int i = 0; i < dataSchema.getColumnNames().length; i++) {
+      if (columnNameToAliasMap.containsKey(dataSchema.getColumnNames()[i])) {
         dataSchema.getColumnNames()[i] = columnNameToAliasMap.get(dataSchema.getColumnNames()[i]);
       }
     }
@@ -175,7 +175,7 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     }
     if (_queryContext.getSubQueryContext().getAggregationFunctions() == null) {
       List<Object[]> gapfilledRows = gapFillAndAggregate(sortedRawRows, resultTableSchema, dataSchema);
-      if(_queryContext.getAggregationFunctions() == null) {
+      if (_queryContext.getAggregationFunctions() == null) {
         List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(_queryContext, dataSchema);
         resultRows = new ArrayList<>(gapfilledRows.size());
 
@@ -293,7 +293,7 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
         result.addAll(bucketedResult);
       } else if (bucketedResult.size() > 0) {
         List<Object[]> aggregatedRows = aggregateGapfilledData(bucketedResult, dataSchema);
-        for(Object[] aggregatedRow : aggregatedRows) {
+        for (Object[] aggregatedRow : aggregatedRows) {
           if (postAggregateHavingFilterHandler == null || postAggregateHavingFilterHandler.isMatch(aggregatedRow)) {
             result.add(aggregatedRow);
           }
@@ -382,9 +382,9 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     List<ExpressionContext> innerSelections = _queryContext.getSubQueryContext().getSelectExpressions();
     String timeBucketCol = null;
     List<String> strAlias = _queryContext.getSubQueryContext().getAliasList();
-    for(int i = 0; i < innerSelections.size(); i ++) {
+    for (int i = 0; i < innerSelections.size(); i++) {
       ExpressionContext innerSelection = innerSelections.get(i);
-      if(GapfillUtils.isGapfill(innerSelection)) {
+      if (GapfillUtils.isGapfill(innerSelection)) {
         if (strAlias.get(i) != null) {
           timeBucketCol = strAlias.get(i);
         } else {
@@ -397,8 +397,8 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     Preconditions.checkArgument(timeBucketCol != null, "No Group By timebucket.");
 
     boolean findTimeBucket = false;
-    for(ExpressionContext groupbyExp : groupbyExpressions) {
-      if(timeBucketCol.equals(groupbyExp.toString())) {
+    for (ExpressionContext groupbyExp : groupbyExpressions) {
+      if (timeBucketCol.equals(groupbyExp.toString())) {
         findTimeBucket = true;
         break;
       }
@@ -411,30 +411,30 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     List<ExpressionContext> groupbyExpressions = _queryContext.getGroupByExpressions();
     Preconditions.checkArgument(groupbyExpressions != null, "No GroupBy Clause.");
     Map<String, Integer> indexes = new HashMap<>();
-    for(int i = 0; i < dataSchema.getColumnNames().length; i ++) {
+    for (int i = 0; i < dataSchema.getColumnNames().length; i++) {
       indexes.put(dataSchema.getColumnName(i), i);
     }
 
     Map<List<Object>, Integer> groupKeyIndexes = new HashMap<>();
     int[] groupKeyArray = new int[bucketedRows.size()];
     List<Object[]> aggregatedResult = new ArrayList<>();
-    for(int j = 0; j < bucketedRows.size(); j ++) {
+    for (int j = 0; j < bucketedRows.size(); j++) {
       Object [] bucketedRow = bucketedRows.get(j);
       List<Object> groupKey = new ArrayList<>(groupbyExpressions.size());
-      for(ExpressionContext groupbyExpression : groupbyExpressions) {
+      for (ExpressionContext groupbyExpression : groupbyExpressions) {
         int columnIndex = indexes.get(groupbyExpression.toString());
         groupKey.add(bucketedRow[columnIndex]);
       }
-      if(groupKeyIndexes.containsKey(groupKey)) {
+      if (groupKeyIndexes.containsKey(groupKey)) {
         groupKeyArray[j] = groupKeyIndexes.get(groupKey);
       } else {
         // create the new groupBy Result row and fill the group by key
         groupKeyArray[j] = groupKeyIndexes.size();
         groupKeyIndexes.put(groupKey, groupKeyIndexes.size());
-        Object[] row  = new Object[_queryContext.getSelectExpressions().size()];
-        for(int i = 0; i < _queryContext.getSelectExpressions().size(); i ++) {
+        Object[] row = new Object[_queryContext.getSelectExpressions().size()];
+        for (int i = 0; i < _queryContext.getSelectExpressions().size(); i++) {
           ExpressionContext expressionContext = _queryContext.getSelectExpressions().get(i);
-          if(expressionContext.getType() != ExpressionContext.Type.FUNCTION) {
+          if (expressionContext.getType() != ExpressionContext.Type.FUNCTION) {
             row[i] = bucketedRow[indexes.get(expressionContext.toString())];
           }
         }
@@ -458,7 +458,7 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
             aggregationFunction.createGroupByResultHolder(_groupByKeys.size(), _groupByKeys.size());
         aggregationFunction
             .aggregateGroupBySV(bucketedRows.size(), groupKeyArray, groupByResultHolder, blockValSetMap);
-        for(int j = 0; j < groupKeyIndexes.size(); j ++) {
+        for (int j = 0; j < groupKeyIndexes.size(); j++) {
           Object [] row = aggregatedResult.get(j);
           row[i] = aggregationFunction.extractGroupByResult(groupByResultHolder, j);
           row[i] = aggregationFunction.extractFinalResult(row[i]);
@@ -515,7 +515,7 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
         long timeCol2 = _dateTimeFormatter.fromFormatToMillis(String.valueOf(v2));
         if (timeCol1 < timeCol2) {
           return -1;
-        } else if(timeCol1 == timeCol2) {
+        } else if (timeCol1 == timeCol2) {
           return 0;
         } else {
           return 1;

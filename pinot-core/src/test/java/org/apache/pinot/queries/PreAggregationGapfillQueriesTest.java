@@ -168,7 +168,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    int [][] expectedOccupiedSlotsCounts1 = new int [][] {{3, 6}, {5, 4}, {7, 2}, {9, 0}, {6, 2}, {4, 4}, {2, 7}, {0, 8}};
+    int [][] expectedOccupiedSlotsCounts1 =
+        new int [][] {{3, 6}, {5, 4}, {7, 2}, {9, 0}, {6, 2}, {4, 4}, {2, 7}, {0, 8}};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
@@ -177,16 +178,16 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
       int ones = expectedOccupiedSlotsCounts1[i][0];
       int zeros = expectedOccupiedSlotsCounts1[i][1];
       int total = ones + zeros;
-      for(int k = 0; k < total; k ++) {
+      for (int k = 0; k < total; k++) {
         String firstTimeCol = (String) gapFillRows1.get(index)[0];
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
-        if(gapFillRows1.get(index)[3].equals(1)) {
-          ones --;
+        if (gapFillRows1.get(index)[3].equals(1)) {
+          ones--;
         } else {
-          zeros --;
+          zeros--;
         }
-        index ++;
+        index++;
       }
       Assert.assertEquals(ones, 0);
       Assert.assertEquals(zeros, 0);
@@ -218,12 +219,12 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
-      for(int k = 0; k < expectedOccupiedSlotsCounts2[i]; k ++) {
+      for (int k = 0; k < expectedOccupiedSlotsCounts2[i]; k++) {
         String firstTimeCol = (String) gapFillRows2.get(index)[0];
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
         Assert.assertEquals(gapFillRows2.get(index)[3], 1);
-        index ++;
+        index++;
       }
       start += dateTimeGranularity.granularityToMillis();
     }
@@ -248,13 +249,15 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " LIMIT 200 ";
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    int [][] expectedOccupiedSlotsCounts1 = new int [][] {{2, 6}, {4, 4}, {6, 2}, {8, 0}, {6, 2}, {4, 4}, {2, 6}, {0, 8}};
+    int [][] expectedOccupiedSlotsCounts1 =
+        new int [][] {{2, 6}, {4, 4}, {6, 2}, {8, 0}, {6, 2}, {4, 4}, {2, 6}, {0, 8}};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
@@ -263,16 +266,16 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
       int ones = expectedOccupiedSlotsCounts1[i][0];
       int zeros = expectedOccupiedSlotsCounts1[i][1];
       int total = ones + zeros;
-      for(int k = 0; k < total; k ++) {
+      for (int k = 0; k < total; k++) {
         String firstTimeCol = (String) gapFillRows1.get(index)[0];
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
-        if(gapFillRows1.get(index)[3].equals(1)) {
-          ones --;
+        if (gapFillRows1.get(index)[3].equals(1)) {
+          ones--;
         } else {
-          zeros --;
+          zeros--;
         }
-        index ++;
+        index++;
       }
       Assert.assertEquals(ones, 0);
       Assert.assertEquals(zeros, 0);
@@ -291,6 +294,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -304,12 +308,12 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
-      for(int k = 0; k < expectedOccupiedSlotsCounts2[i]; k ++) {
+      for (int k = 0; k < expectedOccupiedSlotsCounts2[i]; k++) {
         String firstTimeCol = (String) gapFillRows2.get(index)[0];
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
         Assert.assertEquals(gapFillRows2.get(index)[3], 1);
-        index ++;
+        index++;
       }
       start += dateTimeGranularity.granularityToMillis();
     }
@@ -345,7 +349,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS'), "
         + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
         + "    '2021-11-07 4:00:00.000',  '2021-11-07 12:00:00.000', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -375,7 +380,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS'), "
         + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
         + "    '2021-11-07 4:00:00.000',  '2021-11-07 12:00:00.000', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -414,7 +420,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS'), "
         + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
         + "    '2021-11-07 4:00:00.000',  '2021-11-07 12:00:00.000', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -430,7 +437,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
-    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i+= 2) {
+    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i += 2) {
       String firstTimeCol = (String) gapFillRows1.get(i)[0];
       long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
       Assert.assertEquals(timeStamp, start);
@@ -459,7 +466,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS'), "
         + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
         + "    '2021-11-07 4:00:00.000',  '2021-11-07 12:00:00.000', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -477,7 +485,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCountsForLevel12.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
-    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel12.length * 2; i+= 2) {
+    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel12.length * 2; i += 2) {
       String firstTimeCol = (String) gapFillRows2.get(i)[0];
       long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
       Assert.assertEquals(timeStamp, start);
@@ -514,7 +522,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS'), "
         + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
         + "    '2021-11-07 4:00:00.000',  '2021-11-07 12:00:00.000', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -531,7 +540,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
-    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i+= 2) {
+    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i += 2) {
       String firstTimeCol = (String) gapFillRows1.get(i)[0];
       long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
       Assert.assertEquals(timeStamp, start);
@@ -572,6 +581,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col "
@@ -603,6 +613,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -643,6 +654,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col, levelId "
@@ -678,6 +690,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -717,6 +730,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col, levelId "
@@ -768,7 +782,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    int [][] expectedOccupiedSlotsCounts1 = new int [][] {{3, 6}, {5, 4}, {7, 2}, {9, 0}, {6, 2}, {4, 4}, {2, 7}, {0, 8}};
+    int [][] expectedOccupiedSlotsCounts1 =
+        new int [][] {{3, 6}, {5, 4}, {7, 2}, {9, 0}, {6, 2}, {4, 4}, {2, 7}, {0, 8}};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("454516");
@@ -777,16 +792,16 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
       int ones = expectedOccupiedSlotsCounts1[i][0];
       int zeros = expectedOccupiedSlotsCounts1[i][1];
       int total = ones + zeros;
-      for(int k = 0; k < total; k ++) {
+      for (int k = 0; k < total; k++) {
         String firstTimeCol = ((Long) (gapFillRows1.get(index)[0])).toString();
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
-        if(gapFillRows1.get(index)[3].equals(1)) {
-          ones --;
+        if (gapFillRows1.get(index)[3].equals(1)) {
+          ones--;
         } else {
-          zeros --;
+          zeros--;
         }
-        index ++;
+        index++;
       }
       Assert.assertEquals(ones, 0);
       Assert.assertEquals(zeros, 0);
@@ -816,12 +831,12 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     start = dateTimeFormatter.fromFormatToMillis("454516");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
-      for(int k = 0; k < expectedOccupiedSlotsCounts2[i]; k ++) {
+      for (int k = 0; k < expectedOccupiedSlotsCounts2[i]; k++) {
         String firstTimeCol = ((Long) gapFillRows2.get(index)[0]).toString();
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
         Assert.assertEquals(gapFillRows2.get(index)[3], 1);
-        index ++;
+        index++;
       }
       start += dateTimeGranularity.granularityToMillis();
     }
@@ -843,13 +858,15 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " LIMIT 200 ";
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    int [][] expectedOccupiedSlotsCounts1 = new int [][] {{2, 6}, {4, 4}, {6, 2}, {8, 0}, {6, 2}, {4, 4}, {2, 6}, {0, 8}};
+    int [][] expectedOccupiedSlotsCounts1 =
+        new int [][] {{2, 6}, {4, 4}, {6, 2}, {8, 0}, {6, 2}, {4, 4}, {2, 6}, {0, 8}};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("454516");
@@ -858,16 +875,16 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
       int ones = expectedOccupiedSlotsCounts1[i][0];
       int zeros = expectedOccupiedSlotsCounts1[i][1];
       int total = ones + zeros;
-      for(int k = 0; k < total; k ++) {
+      for (int k = 0; k < total; k++) {
         String firstTimeCol = ((Long) gapFillRows1.get(index)[0]).toString();
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
-        if(gapFillRows1.get(index)[3].equals(1)) {
-          ones --;
+        if (gapFillRows1.get(index)[3].equals(1)) {
+          ones--;
         } else {
-          zeros --;
+          zeros--;
         }
-        index ++;
+        index++;
       }
       Assert.assertEquals(ones, 0);
       Assert.assertEquals(zeros, 0);
@@ -884,6 +901,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -897,12 +915,12 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     start = dateTimeFormatter.fromFormatToMillis("454516");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
-      for(int k = 0; k < expectedOccupiedSlotsCounts2[i]; k ++) {
+      for (int k = 0; k < expectedOccupiedSlotsCounts2[i]; k++) {
         String firstTimeCol = ((Long) gapFillRows2.get(index)[0]).toString();
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
         Assert.assertEquals(gapFillRows2.get(index)[3], 1);
-        index ++;
+        index++;
       }
       start += dateTimeGranularity.granularityToMillis();
     }
@@ -920,7 +938,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "FROM ("
         + "  SELECT GapFill(ToEpochHours(eventTime), '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "    isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -948,7 +967,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "FROM ("
         + "  SELECT GapFill(ToEpochHours(eventTime), '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -984,7 +1004,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "FROM ("
         + "  SELECT GapFill(ToEpochHours(eventTime), '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -1000,7 +1021,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("454516");
-    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i+= 2) {
+    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i += 2) {
       String firstTimeCol = ((Long) gapFillRows1.get(i)[0]).toString();
       long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
       Assert.assertEquals(timeStamp, start);
@@ -1027,7 +1048,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "FROM ("
         + "  SELECT GapFill(ToEpochHours(eventTime), '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -1045,7 +1067,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCountsForLevel12.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("454516");
-    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel12.length * 2; i+= 2) {
+    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel12.length * 2; i += 2) {
       String firstTimeCol = ((Long) gapFillRows2.get(i)[0]).toString();
       long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
       Assert.assertEquals(timeStamp, start);
@@ -1079,7 +1101,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "FROM ("
         + "  SELECT GapFill(ToEpochHours(eventTime), '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "    isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -1096,7 +1119,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("454516");
-    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i+= 2) {
+    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i += 2) {
       String firstTimeCol = ((Long) gapFillRows1.get(i)[0]).toString();
       long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
       Assert.assertEquals(timeStamp, start);
@@ -1134,6 +1157,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col "
@@ -1163,6 +1187,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -1200,6 +1225,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col, levelId "
@@ -1233,6 +1259,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -1270,6 +1297,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col, levelId "
@@ -1320,7 +1348,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    int [][] expectedOccupiedSlotsCounts1 = new int [][] {{3, 6}, {5, 4}, {7, 2}, {9, 0}, {6, 2}, {4, 4}, {2, 7}, {0, 8}};
+    int [][] expectedOccupiedSlotsCounts1 =
+        new int [][] {{3, 6}, {5, 4}, {7, 2}, {9, 0}, {6, 2}, {4, 4}, {2, 7}, {0, 8}};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("27270960");
@@ -1329,16 +1358,16 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
       int ones = expectedOccupiedSlotsCounts1[i][0];
       int zeros = expectedOccupiedSlotsCounts1[i][1];
       int total = ones + zeros;
-      for(int k = 0; k < total; k ++) {
+      for (int k = 0; k < total; k++) {
         String firstTimeCol = ((Long) (gapFillRows1.get(index)[0])).toString();
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
-        if(gapFillRows1.get(index)[3].equals(1)) {
-          ones --;
+        if (gapFillRows1.get(index)[3].equals(1)) {
+          ones--;
         } else {
-          zeros --;
+          zeros--;
         }
-        index ++;
+        index++;
       }
       Assert.assertEquals(ones, 0);
       Assert.assertEquals(zeros, 0);
@@ -1368,12 +1397,12 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     start = dateTimeFormatter.fromFormatToMillis("27270960");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
-      for(int k = 0; k < expectedOccupiedSlotsCounts2[i]; k ++) {
+      for (int k = 0; k < expectedOccupiedSlotsCounts2[i]; k++) {
         String firstTimeCol = ((Long) gapFillRows2.get(index)[0]).toString();
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
         Assert.assertEquals(gapFillRows2.get(index)[3], 1);
-        index ++;
+        index++;
       }
       start += dateTimeGranularity.granularityToMillis();
     }
@@ -1395,13 +1424,15 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " LIMIT 200 ";
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    int [][] expectedOccupiedSlotsCounts1 = new int [][] {{2, 6}, {4, 4}, {6, 2}, {8, 0}, {6, 2}, {4, 4}, {2, 6}, {0, 8}};
+    int [][] expectedOccupiedSlotsCounts1 =
+        new int [][] {{2, 6}, {4, 4}, {6, 2}, {8, 0}, {6, 2}, {4, 4}, {2, 6}, {0, 8}};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("27270960");
@@ -1410,16 +1441,16 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
       int ones = expectedOccupiedSlotsCounts1[i][0];
       int zeros = expectedOccupiedSlotsCounts1[i][1];
       int total = ones + zeros;
-      for(int k = 0; k < total; k ++) {
+      for (int k = 0; k < total; k++) {
         String firstTimeCol = ((Long) gapFillRows1.get(index)[0]).toString();
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
-        if(gapFillRows1.get(index)[3].equals(1)) {
-          ones --;
+        if (gapFillRows1.get(index)[3].equals(1)) {
+          ones--;
         } else {
-          zeros --;
+          zeros--;
         }
-        index ++;
+        index++;
       }
       Assert.assertEquals(ones, 0);
       Assert.assertEquals(zeros, 0);
@@ -1436,6 +1467,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -1449,12 +1481,12 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     start = dateTimeFormatter.fromFormatToMillis("27270960");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
-      for(int k = 0; k < expectedOccupiedSlotsCounts2[i]; k ++) {
+      for (int k = 0; k < expectedOccupiedSlotsCounts2[i]; k++) {
         String firstTimeCol = ((Long) gapFillRows2.get(index)[0]).toString();
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
         Assert.assertEquals(gapFillRows2.get(index)[3], 1);
-        index ++;
+        index++;
       }
       start += dateTimeGranularity.granularityToMillis();
     }
@@ -1472,7 +1504,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "FROM ("
         + "  SELECT  GapFill(ToEpochMinutesRounded(eventTime, 60), '1:MINUTES:EPOCH', "
         + "    '27270960',  '27271440', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -1500,7 +1533,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "FROM ("
         + "  SELECT  GapFill(ToEpochMinutesRounded(eventTime, 60), '1:MINUTES:EPOCH', "
         + "    '27270960',  '27271440', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -1536,7 +1570,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "FROM ("
         + "  SELECT  GapFill(ToEpochMinutesRounded(eventTime, 60), '1:MINUTES:EPOCH', "
         + "    '27270960',  '27271440', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -1552,7 +1587,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("27270960");
-    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i+= 2) {
+    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i += 2) {
       String firstTimeCol = ((Long) gapFillRows1.get(i)[0]).toString();
       long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
       Assert.assertEquals(timeStamp, start);
@@ -1579,7 +1614,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "FROM ("
         + "  SELECT  GapFill(ToEpochMinutesRounded(eventTime, 60), '1:MINUTES:EPOCH', "
         + "    '27270960',  '27271440', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -1597,7 +1633,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCountsForLevel12.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("27270960");
-    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel12.length * 2; i+= 2) {
+    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel12.length * 2; i += 2) {
       String firstTimeCol = ((Long) gapFillRows2.get(i)[0]).toString();
       long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
       Assert.assertEquals(timeStamp, start);
@@ -1631,7 +1667,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "FROM ("
         + "  SELECT  GapFill(ToEpochMinutesRounded(eventTime, 60), '1:MINUTES:EPOCH', "
         + "    '27270960',  '27271440', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -1648,7 +1685,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("27270960");
-    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i+= 2) {
+    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i += 2) {
       String firstTimeCol = ((Long) gapFillRows1.get(i)[0]).toString();
       long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
       Assert.assertEquals(timeStamp, start);
@@ -1686,6 +1723,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col "
@@ -1715,6 +1753,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -1752,6 +1791,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col, levelId "
@@ -1785,6 +1825,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -1822,6 +1863,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col, levelId "
@@ -1872,7 +1914,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    int [][] expectedOccupiedSlotsCounts1 = new int [][] {{3, 6}, {5, 4}, {7, 2}, {9, 0}, {6, 2}, {4, 4}, {2, 7}, {0, 8}};
+    int [][] expectedOccupiedSlotsCounts1 =
+        new int [][] {{3, 6}, {5, 4}, {7, 2}, {9, 0}, {6, 2}, {4, 4}, {2, 7}, {0, 8}};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("454516");
@@ -1881,16 +1924,16 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
       int ones = expectedOccupiedSlotsCounts1[i][0];
       int zeros = expectedOccupiedSlotsCounts1[i][1];
       int total = ones + zeros;
-      for(int k = 0; k < total; k ++) {
+      for (int k = 0; k < total; k++) {
         String firstTimeCol = ((Long) (gapFillRows1.get(index)[0])).toString();
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
-        if(gapFillRows1.get(index)[3].equals(1)) {
-          ones --;
+        if (gapFillRows1.get(index)[3].equals(1)) {
+          ones--;
         } else {
-          zeros --;
+          zeros--;
         }
-        index ++;
+        index++;
       }
       Assert.assertEquals(ones, 0);
       Assert.assertEquals(zeros, 0);
@@ -1920,12 +1963,12 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     start = dateTimeFormatter.fromFormatToMillis("454516");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
-      for(int k = 0; k < expectedOccupiedSlotsCounts2[i]; k ++) {
+      for (int k = 0; k < expectedOccupiedSlotsCounts2[i]; k++) {
         String firstTimeCol = ((Long) gapFillRows2.get(index)[0]).toString();
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
         Assert.assertEquals(gapFillRows2.get(index)[3], 1);
-        index ++;
+        index++;
       }
       start += dateTimeGranularity.granularityToMillis();
     }
@@ -1947,13 +1990,15 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " LIMIT 200 ";
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    int [][] expectedOccupiedSlotsCounts1 = new int [][] {{2, 6}, {4, 4}, {6, 2}, {8, 0}, {6, 2}, {4, 4}, {2, 6}, {0, 8}};
+    int [][] expectedOccupiedSlotsCounts1 =
+        new int [][] {{2, 6}, {4, 4}, {6, 2}, {8, 0}, {6, 2}, {4, 4}, {2, 6}, {0, 8}};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("454516");
@@ -1962,16 +2007,16 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
       int ones = expectedOccupiedSlotsCounts1[i][0];
       int zeros = expectedOccupiedSlotsCounts1[i][1];
       int total = ones + zeros;
-      for(int k = 0; k < total; k ++) {
+      for (int k = 0; k < total; k++) {
         String firstTimeCol = ((Long) gapFillRows1.get(index)[0]).toString();
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
-        if(gapFillRows1.get(index)[3].equals(1)) {
-          ones --;
+        if (gapFillRows1.get(index)[3].equals(1)) {
+          ones--;
         } else {
-          zeros --;
+          zeros--;
         }
-        index ++;
+        index++;
       }
       Assert.assertEquals(ones, 0);
       Assert.assertEquals(zeros, 0);
@@ -1988,6 +2033,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -2001,12 +2047,12 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     start = dateTimeFormatter.fromFormatToMillis("454516");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
-      for(int k = 0; k < expectedOccupiedSlotsCounts2[i]; k ++) {
+      for (int k = 0; k < expectedOccupiedSlotsCounts2[i]; k++) {
         String firstTimeCol = ((Long) gapFillRows2.get(index)[0]).toString();
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
         Assert.assertEquals(gapFillRows2.get(index)[3], 1);
-        index ++;
+        index++;
       }
       start += dateTimeGranularity.granularityToMillis();
     }
@@ -2024,7 +2070,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "FROM ("
         + "  SELECT GapFill(ToEpochMinutesBucket(eventTime, 60), '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -2052,7 +2099,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "FROM ("
         + "  SELECT GapFill(ToEpochMinutesBucket(eventTime, 60), '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -2088,7 +2136,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "FROM ("
         + "  SELECT GapFill(ToEpochMinutesBucket(eventTime, 60), '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -2104,7 +2153,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("454516");
-    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i+= 2) {
+    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i += 2) {
       String firstTimeCol = ((Long) gapFillRows1.get(i)[0]).toString();
       long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
       Assert.assertEquals(timeStamp, start);
@@ -2131,7 +2180,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "FROM ("
         + "  SELECT GapFill(ToEpochMinutesBucket(eventTime, 60), '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -2149,7 +2199,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCountsForLevel12.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("454516");
-    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel12.length * 2; i+= 2) {
+    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel12.length * 2; i += 2) {
       String firstTimeCol = ((Long) gapFillRows2.get(i)[0]).toString();
       long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
       Assert.assertEquals(timeStamp, start);
@@ -2183,7 +2233,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "FROM ("
         + "  SELECT GapFill(ToEpochMinutesBucket(eventTime, 60), '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -2200,7 +2251,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("454516");
-    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i+= 2) {
+    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i += 2) {
       String firstTimeCol = ((Long) gapFillRows1.get(i)[0]).toString();
       long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
       Assert.assertEquals(timeStamp, start);
@@ -2238,6 +2289,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col "
@@ -2267,6 +2319,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -2304,6 +2357,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col, levelId "
@@ -2337,6 +2391,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -2374,6 +2429,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col, levelId "
@@ -2425,7 +2481,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    int [][] expectedOccupiedSlotsCounts1 = new int [][] {{3, 6}, {5, 4}, {7, 2}, {9, 0}, {6, 2}, {4, 4}, {2, 7}, {0, 8}};
+    int [][] expectedOccupiedSlotsCounts1 =
+        new int [][] {{3, 6}, {5, 4}, {7, 2}, {9, 0}, {6, 2}, {4, 4}, {2, 7}, {0, 8}};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("1636257600000");
@@ -2434,16 +2491,16 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
       int ones = expectedOccupiedSlotsCounts1[i][0];
       int zeros = expectedOccupiedSlotsCounts1[i][1];
       int total = ones + zeros;
-      for(int k = 0; k < total; k ++) {
+      for (int k = 0; k < total; k++) {
         String firstTimeCol = ((Long) (gapFillRows1.get(index)[0])).toString();
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
-        if(gapFillRows1.get(index)[3].equals(1)) {
-          ones --;
+        if (gapFillRows1.get(index)[3].equals(1)) {
+          ones--;
         } else {
-          zeros --;
+          zeros--;
         }
-        index ++;
+        index++;
       }
       Assert.assertEquals(ones, 0);
       Assert.assertEquals(zeros, 0);
@@ -2473,12 +2530,12 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     start = dateTimeFormatter.fromFormatToMillis("1636257600000");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
-      for(int k = 0; k < expectedOccupiedSlotsCounts2[i]; k ++) {
+      for (int k = 0; k < expectedOccupiedSlotsCounts2[i]; k++) {
         String firstTimeCol = ((Long) gapFillRows2.get(index)[0]).toString();
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
         Assert.assertEquals(gapFillRows2.get(index)[3], 1);
-        index ++;
+        index++;
       }
       start += dateTimeGranularity.granularityToMillis();
     }
@@ -2500,13 +2557,15 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " LIMIT 200 ";
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    int [][] expectedOccupiedSlotsCounts1 = new int [][] {{2, 6}, {4, 4}, {6, 2}, {8, 0}, {6, 2}, {4, 4}, {2, 6}, {0, 8}};
+    int [][] expectedOccupiedSlotsCounts1 =
+        new int [][] {{2, 6}, {4, 4}, {6, 2}, {8, 0}, {6, 2}, {4, 4}, {2, 6}, {0, 8}};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("1636257600000");
@@ -2515,16 +2574,16 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
       int ones = expectedOccupiedSlotsCounts1[i][0];
       int zeros = expectedOccupiedSlotsCounts1[i][1];
       int total = ones + zeros;
-      for(int k = 0; k < total; k ++) {
+      for (int k = 0; k < total; k++) {
         String firstTimeCol = ((Long) gapFillRows1.get(index)[0]).toString();
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
-        if(gapFillRows1.get(index)[3].equals(1)) {
-          ones --;
+        if (gapFillRows1.get(index)[3].equals(1)) {
+          ones--;
         } else {
-          zeros --;
+          zeros--;
         }
-        index ++;
+        index++;
       }
       Assert.assertEquals(ones, 0);
       Assert.assertEquals(zeros, 0);
@@ -2541,6 +2600,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -2554,12 +2614,12 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     start = dateTimeFormatter.fromFormatToMillis("1636257600000");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
-      for(int k = 0; k < expectedOccupiedSlotsCounts2[i]; k ++) {
+      for (int k = 0; k < expectedOccupiedSlotsCounts2[i]; k++) {
         String firstTimeCol = ((Long) gapFillRows2.get(index)[0]).toString();
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
         Assert.assertEquals(gapFillRows2.get(index)[3], 1);
-        index ++;
+        index++;
       }
       start += dateTimeGranularity.granularityToMillis();
     }
@@ -2577,7 +2637,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "FROM ("
         + "  SELECT GapFill(DATETRUNC('hour', eventTime, 'milliseconds'), '1:MILLISECONDS:EPOCH', "
         + "    '1636257600000',  '1636286400000', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -2605,7 +2666,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "FROM ("
         + "  SELECT GapFill(DATETRUNC('hour', eventTime, 'milliseconds'), '1:MILLISECONDS:EPOCH', "
         + "    '1636257600000',  '1636286400000', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -2641,7 +2703,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "FROM ("
         + "  SELECT GapFill(DATETRUNC('hour', eventTime, 'milliseconds'), '1:MILLISECONDS:EPOCH', "
         + "    '1636257600000',  '1636286400000', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -2657,7 +2720,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("1636257600000");
-    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i+= 2) {
+    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i += 2) {
       String firstTimeCol = ((Long) gapFillRows1.get(i)[0]).toString();
       long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
       Assert.assertEquals(timeStamp, start);
@@ -2684,7 +2747,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "FROM ("
         + "  SELECT GapFill(DATETRUNC('hour', eventTime, 'milliseconds'), '1:MILLISECONDS:EPOCH', "
         + "    '1636257600000',  '1636286400000', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -2702,7 +2766,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCountsForLevel12.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("1636257600000");
-    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel12.length * 2; i+= 2) {
+    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel12.length * 2; i += 2) {
       String firstTimeCol = ((Long) gapFillRows2.get(i)[0]).toString();
       long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
       Assert.assertEquals(timeStamp, start);
@@ -2736,7 +2800,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "FROM ("
         + "  SELECT GapFill(DATETRUNC('hour', eventTime, 'milliseconds'), '1:MILLISECONDS:EPOCH', "
         + "    '1636257600000',  '1636286400000', '1:HOURS',"
-        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col, isOccupied, lotId, levelId"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(eventTime, levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 "
@@ -2753,7 +2818,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("1636257600000");
-    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i+= 2) {
+    for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i += 2) {
       String firstTimeCol = ((Long) gapFillRows1.get(i)[0]).toString();
       long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
       Assert.assertEquals(timeStamp, start);
@@ -2791,6 +2856,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col "
@@ -2820,6 +2886,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -2857,6 +2924,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col, levelId "
@@ -2890,6 +2958,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -2927,6 +2996,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col, levelId "

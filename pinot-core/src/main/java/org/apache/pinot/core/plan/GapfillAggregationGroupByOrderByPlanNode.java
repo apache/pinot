@@ -55,7 +55,7 @@ public class GapfillAggregationGroupByOrderByPlanNode implements PlanNode {
   @Override
   public AggregationGroupByOrderByOperator run() {
     assert _queryContext.getAggregationFunctions() != null;
-    assert _queryContext.getGroupByExpressions() == null;
+    assert _queryContext.getGroupByExpressions() != null;
 
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
@@ -68,7 +68,7 @@ public class GapfillAggregationGroupByOrderByPlanNode implements PlanNode {
     List<ExpressionContext> listOfGroupByExpressions = timeSeriesOn.getFunction().getArguments();
     ExpressionContext[] groupByExpressions = new ExpressionContext[listOfGroupByExpressions.size()];
     groupByExpressions[0] = _queryContext.getSelectExpressions().get(0).getFunction().getArguments().get(0);
-    for(int i = 1; i < groupByExpressions.length; i ++) {
+    for (int i = 1; i < groupByExpressions.length; i++) {
       groupByExpressions[i] = listOfGroupByExpressions.get(i);
     }
 
