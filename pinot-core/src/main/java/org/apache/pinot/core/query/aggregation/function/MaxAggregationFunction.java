@@ -54,41 +54,47 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double max = aggregationResultHolder.getDoubleResult();
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     switch (blockValSet.getValueType().getStoredType()) {
       case INT: {
         int[] values = blockValSet.getIntValuesSV();
+        int max = values[0];
         for (int i = 0; i < length & i < values.length; i++) {
           max = Math.max(values[i], max);
         }
+        aggregationResultHolder.setValue(Math.max(max, aggregationResultHolder.getDoubleResult()));
         break;
       }
       case LONG: {
         long[] values = blockValSet.getLongValuesSV();
+        long max = values[0];
         for (int i = 0; i < length & i < values.length; i++) {
           max = Math.max(values[i], max);
         }
+        aggregationResultHolder.setValue(Math.max(max, aggregationResultHolder.getDoubleResult()));
         break;
       }
       case FLOAT: {
         float[] values = blockValSet.getFloatValuesSV();
+        float max = values[0];
         for (int i = 0; i < length & i < values.length; i++) {
           max = Math.max(values[i], max);
         }
+        aggregationResultHolder.setValue(Math.max(max, aggregationResultHolder.getDoubleResult()));
         break;
       }
       case DOUBLE: {
         double[] values = blockValSet.getDoubleValuesSV();
+        double max = values[0];
         for (int i = 0; i < length & i < values.length; i++) {
           max = Math.max(values[i], max);
         }
+        aggregationResultHolder.setValue(Math.max(max, aggregationResultHolder.getDoubleResult()));
         break;
       }
       default:
-        throw new IllegalStateException();
+        throw new IllegalStateException("Cannot compute min for non-numeric type: " + blockValSet.getValueType());
     }
-    aggregationResultHolder.setValue(max);
   }
 
   @Override

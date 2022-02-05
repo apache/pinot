@@ -86,7 +86,7 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
         break;
       }
       default:
-        throw new IllegalStateException();
+        throw new IllegalStateException("Cannot compute min for non-numeric type: " + blockValSet.getValueType());
     }
     aggregationResultHolder.setValue(sum);
   }
