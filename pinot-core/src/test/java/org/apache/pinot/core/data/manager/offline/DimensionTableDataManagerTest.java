@@ -215,8 +215,7 @@ public class DimensionTableDataManagerTest {
     Assert.assertNotNull(resp, "Should return response after segment load");
     Assert.assertEquals(resp.getValue("teamName"), "San Francisco Giants");
 
-    // WHEN
-    // Update ZK metadata to add new column and refresh segment
+    // WHEN (segment is refreshed)
 
     mgr.addSegment(_indexDir, _indexLoadingConfig);
 
