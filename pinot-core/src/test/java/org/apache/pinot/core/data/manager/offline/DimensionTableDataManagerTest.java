@@ -133,7 +133,10 @@ public class DimensionTableDataManagerTest {
   @Test
   public void instantiationTests()
       throws Exception {
-    DimensionTableDataManager mgr = makeTestableManager(mock(HelixManager.class));
+    HelixManager helixManager = mock(HelixManager.class);
+    ZkHelixPropertyStore propertyStore = mockPropertyStore();
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
+    DimensionTableDataManager mgr = makeTestableManager(helixManager);
     Assert.assertEquals(mgr.getTableName(), TABLE_NAME);
 
     // fetch the same instance via static method
@@ -159,7 +162,10 @@ public class DimensionTableDataManagerTest {
   @Test
   public void lookupTests()
       throws Exception {
-    DimensionTableDataManager mgr = makeTestableManager(mock(HelixManager.class));
+    HelixManager helixManager = mock(HelixManager.class);
+    ZkHelixPropertyStore propertyStore = mockPropertyStore();
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
+    DimensionTableDataManager mgr = makeTestableManager(helixManager);
 
     // try fetching data BEFORE loading segment
     GenericRow resp = mgr.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
