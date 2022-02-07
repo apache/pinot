@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.evaluator.TransformEvaluator;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -65,10 +64,9 @@ public class DataBlockCache {
   public void initNewBlock(int[] docIds, int length) {
     _docIds = docIds;
     _length = length;
-
     _columnDictIdLoaded.clear();
-    for (Set<String> column : _columnValueLoaded.values()) {
-      column.clear();
+    for (Set<String> columns : _columnValueLoaded.values()) {
+      columns.clear();
     }
     _columnNumValuesLoaded.clear();
   }
@@ -412,7 +410,7 @@ public class DataBlockCache {
    * @return Array of string values
    */
   public String[][] getStringValuesForMVColumn(String column) {
-    String[][] stringValues = (String[][]) getValues(FieldSpec.DataType.STRING, column);
+    String[][] stringValues = getValues(FieldSpec.DataType.STRING, column);
     if (markLoaded(FieldSpec.DataType.STRING, column)) {
       if (stringValues == null) {
         stringValues = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
@@ -456,11 +454,12 @@ public class DataBlockCache {
     return _columnValueLoaded.computeIfAbsent(dataType, k -> new HashSet<>()).add(column);
   }
 
-  private <T> T getValues(@Nonnull FieldSpec.DataType dataType, @Nonnull String column) {
+  @SuppressWarnings("unchecked")
+  private <T> T getValues(FieldSpec.DataType dataType, String column) {
     return (T) _valuesMap.computeIfAbsent(dataType, k -> new HashMap<>()).get(column);
   }
 
-  private void putValues(@Nonnull FieldSpec.DataType dataType, @Nonnull String column, @Nonnull Object values) {
+  private void putValues(FieldSpec.DataType dataType, String column, Object values) {
     _valuesMap.get(dataType).put(column, values);
   }
 }
