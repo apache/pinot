@@ -176,7 +176,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         List<String> segmentsTo =
             segmentConversionResults.stream().map(SegmentConversionResult::getSegmentName).collect(Collectors.toList());
         lineageEntryId = SegmentConversionUtils.startSegmentReplace(tableNameWithType, uploadURL,
-            new StartReplaceSegmentsRequest(segmentsFrom, segmentsTo));
+            new StartReplaceSegmentsRequest(segmentsFrom, segmentsTo), authToken);
       }
 
       // Upload the tarred segments
@@ -213,9 +213,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
       // Update the segment lineage to indicate that the segment replacement is done.
       if (replaceSegmentsEnabled) {
-        SegmentConversionUtils
-            .endSegmentReplace(tableNameWithType, uploadURL, lineageEntryId,
-                _minionConf.getEndReplaceSegmentsTimeoutMs());
+        SegmentConversionUtils.endSegmentReplace(tableNameWithType, uploadURL, lineageEntryId,
+            _minionConf.getEndReplaceSegmentsTimeoutMs(), authToken);
       }
 
       String outputSegmentNames = segmentConversionResults.stream().map(SegmentConversionResult::getSegmentName)
