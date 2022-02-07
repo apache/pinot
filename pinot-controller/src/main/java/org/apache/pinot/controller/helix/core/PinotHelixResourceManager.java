@@ -1796,13 +1796,13 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Construct segmentZkMetadata for the realtime or offline table.
+   * Construct segmentZkMetadata for new segment of offline or realtime table.
    *
-   * @param tableNameWithType
-   * @param segmentMetadata
-   * @param downloadUrl
-   * @param crypter
-   * @return
+   * @param tableNameWithType Table name with type
+   * @param segmentMetadata Segment metadata
+   * @param downloadUrl Download URL
+   * @param crypter Crypter
+   * @return SegmentZkMetadata of the input segment
    */
   public SegmentZKMetadata constructZkMetadataForNewSegment(String tableNameWithType, SegmentMetadata segmentMetadata,
       String downloadUrl, @Nullable String crypter) {
