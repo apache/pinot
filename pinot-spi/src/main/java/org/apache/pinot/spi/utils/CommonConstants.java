@@ -228,6 +228,8 @@ public class CommonConstants {
     //Set to true to load all services tagged and compiled with hk2-metadata-generator. Default to False
     public static final String BROKER_SERVICE_AUTO_DISCOVERY = "pinot.broker.service.auto.discovery";
 
+    public static final String DISABLE_GROOVY = "pinot.broker.disable.groovy";
+
     public static class Request {
       public static final String PQL = "pql";
       public static final String SQL = "sql";

@@ -128,6 +128,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private final RateLimiter _numDroppedLogRateLimiter;
   private final AtomicInteger _numDroppedLog;
 
+  private final boolean _disableGroovy;
   private final int _defaultHllLog2m;
   private final boolean _enableQueryLimitOverride;
   private final boolean _enableDistinctCountBitmapOverride;
@@ -142,6 +143,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _tableCache = tableCache;
     _brokerMetrics = brokerMetrics;
 
+    _disableGroovy = _config.getProperty(CommonConstants.Broker.DISABLE_GROOVY, false);
     _defaultHllLog2m = _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
         CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
     _enableQueryLimitOverride = _config.getProperty(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, false);
@@ -269,6 +271,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
       LOGGER.warn("Caught exception while updating column names in request {}: {}, {}", requestId, query,
           e.getMessage());
+    }
+    if (_disableGroovy) {
+      handleDisableGroovyOverride(pinotQuery);
     }
     if (_defaultHllLog2m > 0) {
       handleHLLLog2mOverride(pinotQuery, _defaultHllLog2m);
@@ -1165,6 +1170,56 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     Expression havingExpression = pinotQuery.getHavingExpression();
     if (havingExpression != null) {
       handleHLLLog2mOverride(havingExpression, hllLog2mOverride);
+    }
+  }
+
+  /**
+   * Verifies that no groovy is present in the PinotQuery when disabled.
+   */
+  @VisibleForTesting
+  static void handleDisableGroovyOverride(PinotQuery pinotQuery) {
+    List<Expression> selectList = pinotQuery.getSelectList();
+    for (Expression expression : selectList) {
+      handleDisableGroovyOverride(expression);
+    }
+    List<Expression> orderByList = pinotQuery.getOrderByList();
+    if (orderByList != null) {
+      for (Expression expression : orderByList) {
+        // NOTE: Order-by is always a Function with the ordering of the Expression
+        handleDisableGroovyOverride(expression.getFunctionCall().getOperands().get(0));
+      }
+    }
+    Expression havingExpression = pinotQuery.getHavingExpression();
+    if (havingExpression != null) {
+      handleDisableGroovyOverride(havingExpression);
+    }
+    Expression filterExpression = pinotQuery.getFilterExpression();
+    if (filterExpression != null) {
+      handleDisableGroovyOverride(filterExpression);
+    }
+    List<Expression> groupByList = pinotQuery.getGroupByList();
+    if (groupByList != null) {
+      for (Expression expression : groupByList) {
+        handleDisableGroovyOverride(expression);
+      }
+    }
+  }
+
+  private static void handleDisableGroovyOverride(Expression expression) {
+    Function functionCall = expression.getFunctionCall();
+    if (functionCall == null) {
+      return;
+    }
+
+    if (functionCall.getOperator().toUpperCase().contains("GROOVY")) {
+      throw new RuntimeException("Groovy transform functions are disabled for queries");
+    }
+
+    List<Expression> operands = functionCall.getOperands();
+    if (operands != null) {
+      for (Expression operandExpression : operands) {
+        handleDisableGroovyOverride(operandExpression);
+      }
     }
   }
 
