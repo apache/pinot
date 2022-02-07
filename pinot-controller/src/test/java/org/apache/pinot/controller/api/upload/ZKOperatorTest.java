@@ -108,7 +108,7 @@ public class ZKOperatorTest {
     assertEquals(segmentZKMetadata.getCrypterName(), "crypter");
     assertEquals(segmentZKMetadata.getSegmentUploadStartTime(), -1);
 
-    // Upload the same segment with overwriteIfExists = false. Validate that an exception is thrown.
+    // Upload the same segment with allowRefresh = false. Validate that an exception is thrown.
     try {
       zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, false, httpHeaders,
           "otherDownloadUrl", false, "otherCrypter", false);
