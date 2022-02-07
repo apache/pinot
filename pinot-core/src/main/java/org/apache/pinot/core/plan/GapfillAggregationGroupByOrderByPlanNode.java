@@ -66,10 +66,10 @@ public class GapfillAggregationGroupByOrderByPlanNode implements PlanNode {
     Preconditions.checkArgument(timeSeriesOn != null, "TimeSeriesOn Expression is expected.");
 
     List<ExpressionContext> listOfGroupByExpressions = timeSeriesOn.getFunction().getArguments();
-    ExpressionContext[] groupByExpressions = new ExpressionContext[listOfGroupByExpressions.size()];
+    ExpressionContext[] groupByExpressions = new ExpressionContext[listOfGroupByExpressions.size() + 1];
     groupByExpressions[0] = _queryContext.getSelectExpressions().get(0).getFunction().getArguments().get(0);
     for (int i = 1; i < groupByExpressions.length; i++) {
-      groupByExpressions[i] = listOfGroupByExpressions.get(i);
+      groupByExpressions[i] = listOfGroupByExpressions.get(i - 1);
     }
 
     FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);

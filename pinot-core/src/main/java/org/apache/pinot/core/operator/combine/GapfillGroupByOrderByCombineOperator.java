@@ -106,12 +106,8 @@ public class GapfillGroupByOrderByCombineOperator extends BaseCombineOperator {
     ExpressionContext timeSeriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);
     Preconditions.checkArgument(timeSeriesOn != null, "TimeSeriesOn Expression is expected.");
 
-    List<ExpressionContext> listOfGroupByExpressions = timeSeriesOn.getFunction().getArguments();
-    ExpressionContext[] groupByExpressions = new ExpressionContext[listOfGroupByExpressions.size()];
-    groupByExpressions[0] = subQueryContext.getSelectExpressions().get(0).getFunction().getArguments().get(0);
-
-    //assert _queryContext.getGroupByExpressions() != null;
-    _numGroupByExpressions = listOfGroupByExpressions.size();
+    assert _queryContext.getSubQueryContext().getGroupByExpressions() != null;
+    _numGroupByExpressions = _queryContext.getSubQueryContext().getGroupByExpressions().size();
     _numColumns = _numGroupByExpressions + _numAggregationFunctions;
     _operatorLatch = new CountDownLatch(_numTasks);
   }
