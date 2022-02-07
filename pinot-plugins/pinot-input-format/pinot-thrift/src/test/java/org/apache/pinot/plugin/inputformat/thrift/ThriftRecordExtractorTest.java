@@ -34,7 +34,6 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.transport.TIOStreamTransport;
-import org.apache.thrift.transport.TTransportException;
 
 
 /**
@@ -133,13 +132,9 @@ public class ThriftRecordExtractorTest extends AbstractRecordExtractorTest {
     try (BufferedOutputStream bufferedOut = new BufferedOutputStream(new FileOutputStream(_tempFile))) {
       TBinaryProtocol binaryOut = new TBinaryProtocol(new TIOStreamTransport(bufferedOut));
       for (ComplexTypes record : thriftRecords) {
-        try {
-          record.write(binaryOut);
-        } catch (TException e) {
-          throw new IOException(e);
-        }
+        record.write(binaryOut);
       }
-    } catch (TTransportException e) {
+    } catch (TException e) {
       throw new IOException(e);
     }
   }
