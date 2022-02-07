@@ -45,6 +45,7 @@ import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
@@ -276,11 +277,9 @@ public class SegmentDeletionManager {
     long retentionMs = _defaultDeletedSegmentsRetentionMs;
     if (tableConfig != null && tableConfig.getValidationConfig() != null) {
       SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-      if (!StringUtils.isEmpty(validationConfig.getDeletedSegmentRetentionTimeUnit())
-          && !StringUtils.isEmpty(validationConfig.getDeletedSegmentRetentionTimeValue())) {
+      if (!StringUtils.isEmpty(validationConfig.getDeletedSegmentRetentionPeriod())) {
         try {
-          retentionMs = TimeUnit.valueOf(validationConfig.getDeletedSegmentRetentionTimeUnit().toUpperCase())
-              .toMillis(Long.parseLong(validationConfig.getDeletedSegmentRetentionTimeValue()));
+          retentionMs = TimeUtils.convertPeriodToMillis(validationConfig.getDeletedSegmentRetentionPeriod());
         } catch (Exception e) {
           LOGGER.warn(String.format("Unable to parse deleted segment retention config for table %s, using to default "
               + "retention value %dms", tableConfig.getTableName(), _defaultDeletedSegmentsRetentionMs), e);

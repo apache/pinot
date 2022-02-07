@@ -327,8 +327,7 @@ public class SegmentDeletionManagerTest {
 
   public static PinotHelixResourceManager mockTableConfigWithRetentionPeriod(int retentionPeriod) {
     SegmentsValidationAndRetentionConfig mockValidationConfig = mock(SegmentsValidationAndRetentionConfig.class);
-    when(mockValidationConfig.getDeletedSegmentRetentionTimeUnit()).thenReturn("DAYS");
-    when(mockValidationConfig.getDeletedSegmentRetentionTimeValue()).thenReturn(String.valueOf(retentionPeriod));
+    when(mockValidationConfig.getDeletedSegmentRetentionPeriod()).thenReturn(String.format("%dd", retentionPeriod));
 
     TableConfig mockTableConfig = mock(TableConfig.class);
     when(mockTableConfig.getValidationConfig()).thenReturn(mockValidationConfig);
