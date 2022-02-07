@@ -80,14 +80,14 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
       AtomicReferenceFieldUpdater.newUpdater(DimensionTableDataManager.class,
           DimensionTable.class, "_dimensionTable");
 
-  private volatile DimensionTable _dimensionTable = new DimensionTable();
+  private volatile DimensionTable _dimensionTable;
 
   @Override
   protected void doInit() {
     super.doInit();
     // dimension tables should always have schemas with primary keys
     Schema tableSchema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
-    _dimensionTable.populate(tableSchema, tableSchema.getPrimaryKeyColumns());
+    _dimensionTable = new DimensionTable(tableSchema, tableSchema.getPrimaryKeyColumns());
   }
 
   @Override
@@ -130,7 +130,6 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
 
   private DimensionTable createDimensionTable()
       throws Exception {
-    DimensionTable dimensionTable = new DimensionTable();
     Map<PrimaryKey, GenericRow> map = new HashMap<>();
     List<SegmentDataManager> segmentManagers = acquireAllSegments();
     try {
@@ -148,14 +147,13 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
       ZkHelixPropertyStore<ZNRecord> propertyStore = _helixManager.getHelixPropertyStore();
       Schema tableSchema = ZKMetadataProvider.getTableSchema(propertyStore, _tableNameWithType);
       List<String> primaryKeyColumns = tableSchema.getPrimaryKeyColumns();
-      dimensionTable.populate(map, tableSchema, primaryKeyColumns);
+      return new DimensionTable(tableSchema, primaryKeyColumns, map);
 
     } finally {
       for (SegmentDataManager segmentManager : segmentManagers) {
         releaseSegment(segmentManager);
       }
     }
-    return dimensionTable;
   }
 
   public GenericRow lookupRowByPrimaryKey(PrimaryKey pk) {

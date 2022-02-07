@@ -29,30 +29,29 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 class DimensionTable {
 
-  private Map<PrimaryKey, GenericRow> _lookupTable = new HashMap<>();
-  private Schema _tableSchema;
-  private List<String> _primaryKeyColumns;
+  private final Map<PrimaryKey, GenericRow> _lookupTable;
+  private final Schema _tableSchema;
+  private final List<String> _primaryKeyColumns;
 
-  public void populate(Schema tableSchema, List<String> primaryKeyColumns) {
-    _tableSchema = tableSchema;
-    _primaryKeyColumns = primaryKeyColumns;
+  DimensionTable(Schema tableSchema, List<String> primaryKeyColumns) {
+    this(tableSchema, primaryKeyColumns, new HashMap<>());
   }
 
-  public void populate(Map<PrimaryKey, GenericRow> lookupTable, Schema tableSchema, List<String> primaryKeyColumns) {
+  DimensionTable(Schema tableSchema, List<String> primaryKeyColumns, Map<PrimaryKey, GenericRow> lookupTable) {
     _lookupTable = lookupTable;
     _tableSchema = tableSchema;
     _primaryKeyColumns = primaryKeyColumns;
   }
 
-  public List<String> getPrimaryKeyColumns() {
+  List<String> getPrimaryKeyColumns() {
     return _primaryKeyColumns;
   }
 
-  public GenericRow get(PrimaryKey pk) {
+  GenericRow get(PrimaryKey pk) {
     return _lookupTable.get(pk);
   }
 
-  public FieldSpec getFieldSpecFor(String columnName) {
+  FieldSpec getFieldSpecFor(String columnName) {
     return _tableSchema.getFieldSpecFor(columnName);
   }
 }
