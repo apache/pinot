@@ -120,19 +120,17 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
    */
   private void loadLookupTable()
       throws Exception {
-//    Map<PrimaryKey, GenericRow> snapshot;
-//    Map<PrimaryKey, GenericRow> replacement;
     DimensionTable snapshot;
     DimensionTable replacement;
     do {
       snapshot = _dimensionTable;
-      replacement = new DimensionTable();
-      populate(replacement);
+      replacement = createDimensionTable();
     } while (!UPDATER.compareAndSet(this, snapshot, replacement));
   }
 
-  private void populate(DimensionTable dimensionTable)
+  private DimensionTable createDimensionTable()
       throws Exception {
+    DimensionTable dimensionTable = new DimensionTable();
     Map<PrimaryKey, GenericRow> map = new HashMap<>();
     List<SegmentDataManager> segmentManagers = acquireAllSegments();
     try {
@@ -157,6 +155,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
         releaseSegment(segmentManager);
       }
     }
+    return dimensionTable;
   }
 
   public GenericRow lookupRowByPrimaryKey(PrimaryKey pk) {
