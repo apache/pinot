@@ -160,8 +160,8 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     _isGroupBySelections = new boolean[dataSchema.getColumnDataTypes().length];
 
     // The first one argument of timeSeries is time column. The left ones are defining entity.
-    for (int i = 1; i < _timeSeries.size(); i++) {
-      int index = indexes.get(_timeSeries.get(i).getIdentifier());
+    for (ExpressionContext entityColum : _timeSeries) {
+      int index = indexes.get(entityColum.getIdentifier());
       _isGroupBySelections[index] = true;
       _groupByKeyIndexes.add(index);
     }
@@ -222,7 +222,7 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     AggregationFunction[] aggregationFunctions = _queryContext.getSubQueryContext().getAggregationFunctions();
     int numAggregationFunctionsForInnerQuery = aggregationFunctions == null ? 0 : aggregationFunctions.length;
     for (int i = 0; i < numAggregationFunctionsForInnerQuery; i++) {
-      int valueIndex = i + _timeSeries.size();
+      int valueIndex = _timeSeries.size() + 1 + i;
       row[valueIndex] = aggregationFunctions[i].extractFinalResult(row[valueIndex]);
     }
   }
@@ -231,7 +231,7 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     AggregationFunction[] aggregationFunctions = _queryContext.getSubQueryContext().getAggregationFunctions();
     int numAggregationFunctionsForInnerQuery = aggregationFunctions == null ? 0 : aggregationFunctions.length;
     for (int i = 0; i < numAggregationFunctionsForInnerQuery; i++) {
-      columnDataTypes[i + _timeSeries.size()] = aggregationFunctions[i].getFinalResultColumnType();
+      columnDataTypes[_timeSeries.size() + 1 + i] = aggregationFunctions[i].getFinalResultColumnType();
     }
   }
 

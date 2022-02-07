@@ -198,10 +198,7 @@ public class GapfillUtils {
 
     ExpressionContext timeseriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);
     groupByExpressions.add(gapFillSelection.getFunction().getArguments().get(0));
-    List<ExpressionContext> timeseriesExpressions = timeseriesOn.getFunction().getArguments();
-    for (int i = 1; i < timeseriesExpressions.size(); i++) {
-      groupByExpressions.add(timeseriesExpressions.get(i));
-    }
+    groupByExpressions.addAll(timeseriesOn.getFunction().getArguments());
     return groupByExpressions;
   }
 }
