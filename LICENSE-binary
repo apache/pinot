@@ -377,8 +377,6 @@ org.apache.zookeeper:zookeeper:3.5.8
 org.asynchttpclient:async-http-client-netty-utils:2.12.1
 org.asynchttpclient:async-http-client:2.12.1
 org.codehaus.groovy:groovy-all:2.4.21
-org.codehaus.jackson:jackson-core-asl:1.9.13
-org.codehaus.jackson:jackson-mapper-asl:1.9.13
 org.eclipse.jetty:jetty-http:9.4.39.v20210325
 org.eclipse.jetty:jetty-io:9.4.39.v20210325
 org.eclipse.jetty:jetty-security:9.4.39.v20210325
