@@ -191,8 +191,8 @@ public class QueryValidationTest {
         "SELECT foo FROM bar WHERE GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', 'arg0 + arg1', colA,"
             + " colB) = 'foobarval'", true);
     testDisabledGroovyException(
-        "SELECT COUNT(colA) FROM bar GROUP BY GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', 'arg0 + arg1', colA,"
-            + " colB)", true);
+        "SELECT COUNT(colA) FROM bar GROUP BY GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', "
+            + "'arg0 + arg1', colA, colB)", true);
     testDisabledGroovyException(
         "SELECT foo FROM bar HAVING GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', 'arg0 + arg1', colA,"
             + " colB) = 'foobarval'", true);
