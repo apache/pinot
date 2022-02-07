@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -27,8 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-
-import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
