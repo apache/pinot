@@ -22,6 +22,10 @@ import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.segment.spi.Constants;
 
 
+/**
+ * The iterator performs a linear pass through the underlying child iterator and returns
+ * the complement of the result set.
+ */
 public class NotDocIdIterator implements BlockDocIdIterator {
   private BlockDocIdIterator _childDocIdIterator;
   private int _lowerLimit;

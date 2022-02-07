@@ -31,7 +31,7 @@ import org.testng.annotations.Test;
 public class NotFilterOperatorTest {
 
   @Test
-  public void testUnionForTwoLists() {
+  public void testNotOperator() {
     int[] docIds1 = new int[]{2, 3, 10, 15, 16, 17, 18, 21, 22, 23, 24, 26, 28};
     Set<Integer> expectedResult = new HashSet();
     expectedResult.addAll(Arrays.asList(0, 1, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 19, 20, 25, 27, 29));

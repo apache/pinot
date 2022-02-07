@@ -184,6 +184,12 @@ public class RequestContextUtils {
           children.add(getFilter(operand));
         }
         return new FilterContext(FilterContext.Type.OR, children, null);
+      case NOT:
+        children = new ArrayList<>(numOperands);
+        for (Expression operand : operands) {
+          children.add(getFilter(operand));
+        }
+        return new FilterContext(FilterContext.Type.NOT, children, null);
       case EQUALS:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new EqPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
