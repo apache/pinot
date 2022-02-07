@@ -290,18 +290,21 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName) {
     segmentName = URIUtils.decode(segmentName);
-    String tableNameWithType;
-    // first try without table type, as the segment name may not reflect the actual table type, such as the segments
-    // remotely pushed
-    List<String> tableNamesWithType =
-        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, null, LOGGER);
-    if (tableNamesWithType.size() == 1) {
-      tableNameWithType = tableNamesWithType.get(0);
-    } else {
-      // infer the table type from segment name
-      TableType tableType = SegmentName.isRealtimeSegmentName(segmentName) ? TableType.REALTIME : TableType.OFFLINE;
-      tableNameWithType =
-          ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+    String tableNameWithType = tableName;
+    if (TableNameBuilder.getTableTypeFromTableName(tableName) == null) {
+      // first try without table type, as the segment name may not reflect the actual table type, such as the segments
+      // remotely pushed
+      List<String> tableNamesWithType =
+          ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, null, LOGGER);
+      if (tableNamesWithType.size() == 1) {
+        tableNameWithType = tableNamesWithType.get(0);
+      } else {
+        // infer the table type from segment name
+        TableType tableType = SegmentName.isRealtimeSegmentName(segmentName) ? TableType.REALTIME : TableType.OFFLINE;
+        tableNameWithType =
+            ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER)
+                .get(0);
+      }
     }
 
     Map<String, String> segmentMetadata = getSegmentMetadataInternal(tableNameWithType, segmentName);
