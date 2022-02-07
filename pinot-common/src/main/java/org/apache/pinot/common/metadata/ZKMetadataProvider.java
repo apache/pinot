@@ -157,6 +157,7 @@ public class ZKMetadataProvider {
           .create(constructPropertyStorePathForSegment(tableNameWithType, segmentZKMetadata.getSegmentName()),
               segmentZKMetadata.toZNRecord(), AccessOption.PERSISTENT);
     } catch (Exception e) {
+      LOGGER.error("Caught exception while creating segmentZkMetadata for table: {}", tableNameWithType, e);
       return false;
     }
   }

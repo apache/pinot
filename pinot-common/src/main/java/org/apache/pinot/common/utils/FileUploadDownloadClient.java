@@ -98,6 +98,7 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   public static class QueryParameters {
+    public static final String ALLOW_REFRESH = "allowRefresh";
     public static final String ENABLE_PARALLEL_PUSH_PROTECTION = "enableParallelPushProtection";
     public static final String TABLE_NAME = "tableName";
     public static final String TABLE_TYPE = "tableType";
@@ -811,7 +812,8 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   /**
-   * Upload segment with segment file using  table name, type and enableParallelPushProtection as a request parameters.
+   * Upload segment with segment file using  table name, type, enableParallelPushProtection and allowRefresh as
+   * request parameters.
    *
    * @param uri URI
    * @param segmentName Segment name
@@ -819,21 +821,24 @@ public class FileUploadDownloadClient implements Closeable {
    * @param tableName Table name with or without type suffix
    * @param tableType Table type
    * @param enableParallelPushProtection enable protection against concurrent segment uploads for the same segment
+   * @param allowRefresh whether to refresh a segment if it already exists
    * @return Response
    * @throws IOException
    * @throws HttpErrorStatusException
    */
   public SimpleHttpResponse uploadSegment(URI uri, String segmentName, File segmentFile, String tableName,
-      TableType tableType, boolean enableParallelPushProtection)
+      TableType tableType, boolean enableParallelPushProtection, boolean allowRefresh)
       throws IOException, HttpErrorStatusException {
     NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, tableName);
     NameValuePair tableTypeValuePair = new BasicNameValuePair(QueryParameters.TABLE_TYPE, tableType.name());
     NameValuePair enableParallelPushProtectionValuePair =
         new BasicNameValuePair(QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION,
             String.valueOf(enableParallelPushProtection));
+    NameValuePair allowRefreshValuePair =
+        new BasicNameValuePair(QueryParameters.ALLOW_REFRESH, String.valueOf(allowRefresh));
 
-    List<NameValuePair> parameters =
-        Arrays.asList(tableNameValuePair, tableTypeValuePair, enableParallelPushProtectionValuePair);
+    List<NameValuePair> parameters = Arrays
+        .asList(tableNameValuePair, tableTypeValuePair, enableParallelPushProtectionValuePair, allowRefreshValuePair);
     return uploadSegment(uri, segmentName, segmentFile, null, parameters, DEFAULT_SOCKET_TIMEOUT_MS);
   }
 

@@ -449,7 +449,7 @@ public abstract class ClusterTest extends ControllerTest {
         File segmentTarFile = segmentTarFiles.get(0);
         assertEquals(fileUploadDownloadClient
                 .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName,
-                    tableType.OFFLINE, enableParallelPushProtection)
+                    tableType.OFFLINE, enableParallelPushProtection, true)
                 .getStatusCode(),
             HttpStatus.SC_OK);
       } else {
@@ -460,7 +460,7 @@ public abstract class ClusterTest extends ControllerTest {
           futures.add(executorService.submit(() -> {
             return fileUploadDownloadClient
                 .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName,
-                    tableType.OFFLINE, enableParallelPushProtection)
+                    tableType.OFFLINE, enableParallelPushProtection, true)
                 .getStatusCode();
           }));
         }

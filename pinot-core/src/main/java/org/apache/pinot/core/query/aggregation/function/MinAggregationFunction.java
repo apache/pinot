@@ -54,15 +54,47 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
-    double min = aggregationResultHolder.getDoubleResult();
-    for (int i = 0; i < length; i++) {
-      double value = valueArray[i];
-      if (value < min) {
-        min = value;
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    switch (blockValSet.getValueType().getStoredType()) {
+      case INT: {
+        int[] values = blockValSet.getIntValuesSV();
+        int min = values[0];
+        for (int i = 0; i < length & i < values.length; i++) {
+          min = Math.min(values[i], min);
+        }
+        aggregationResultHolder.setValue(Math.min(min, aggregationResultHolder.getDoubleResult()));
+        break;
       }
+      case LONG: {
+        long[] values = blockValSet.getLongValuesSV();
+        long min = values[0];
+        for (int i = 0; i < length & i < values.length; i++) {
+          min = Math.min(values[i], min);
+        }
+        aggregationResultHolder.setValue(Math.min(min, aggregationResultHolder.getDoubleResult()));
+        break;
+      }
+      case FLOAT: {
+        float[] values = blockValSet.getFloatValuesSV();
+        float min = values[0];
+        for (int i = 0; i < length & i < values.length; i++) {
+          min = Math.min(values[i], min);
+        }
+        aggregationResultHolder.setValue(Math.min(min, aggregationResultHolder.getDoubleResult()));
+        break;
+      }
+      case DOUBLE: {
+        double[] values = blockValSet.getDoubleValuesSV();
+        double min = values[0];
+        for (int i = 0; i < length & i < values.length; i++) {
+          min = Math.min(values[i], min);
+        }
+        aggregationResultHolder.setValue(Math.min(min, aggregationResultHolder.getDoubleResult()));
+        break;
+      }
+      default:
+        throw new IllegalStateException("Cannot compute min for non-numeric type: " + blockValSet.getValueType());
     }
-    aggregationResultHolder.setValue(min);
   }
 
   @Override

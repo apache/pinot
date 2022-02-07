@@ -127,6 +127,70 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     dropOfflineTable(RAW_TABLE_NAME);
     jobGroupNames = scheduler.getJobGroupNames();
     assertTrue(jobGroupNames.isEmpty());
+
+    stopFakeInstances();
+    stopController();
+  }
+
+  @Test
+  public void testPinotTaskManagerSchedulerWithRestart()
+      throws Exception {
+    Map<String, Object> properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
+    startController(properties);
+    addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
+    addFakeServerInstancesToAutoJoinHelixCluster(1, true);
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension("myMap", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myMapStr", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("complexMapStr", FieldSpec.DataType.STRING).build();
+    addSchema(schema);
+    PinotTaskManager taskManager = _controllerStarter.getTaskManager();
+    Scheduler scheduler = taskManager.getScheduler();
+    assertNotNull(scheduler);
+
+    // Add Table with one task.
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTaskConfig(
+        new TableTaskConfig(
+            ImmutableMap.of("SegmentGenerationAndPushTask", ImmutableMap.of("schedule", "0 */10 * ? * * *")))).build();
+    addTableConfig(tableConfig);
+    Thread.sleep(2000);
+    List<String> jobGroupNames = scheduler.getJobGroupNames();
+    assertEquals(jobGroupNames, Lists.newArrayList(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE));
+    validateJob(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE, "0 */10 * ? * * *");
+
+    // Restart controller
+    stopController();
+    startController(properties);
+
+    // Update table to add a new task
+    tableConfig.setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of("SegmentGenerationAndPushTask", ImmutableMap.of("schedule", "0 */10 * ? * * *"),
+            "MergeRollupTask", ImmutableMap.of("schedule", "0 */20 * ? * * *"))));
+    updateTableConfig(tableConfig);
+    Thread.sleep(2000);
+
+    // Task is put into table config.
+    TableConfig tableConfigAfterRestart =
+        _controllerStarter.getHelixResourceManager().getTableConfig(OFFLINE_TABLE_NAME);
+    Map<String, String> taskCfgs =
+        tableConfigAfterRestart.getTaskConfig().getConfigsForTaskType(MinionConstants.MergeRollupTask.TASK_TYPE);
+    assertTrue(taskCfgs.containsKey("schedule"));
+
+    // The new MergeRollup task wouldn't be scheduled if not eagerly checking table configs
+    // after setting up subscriber on ChildChanges zk event when controller gets restarted.
+    taskManager = _controllerStarter.getTaskManager();
+    scheduler = taskManager.getScheduler();
+    jobGroupNames = scheduler.getJobGroupNames();
+    assertEquals(jobGroupNames.size(), 2);
+    assertTrue(jobGroupNames.contains(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE));
+    assertTrue(jobGroupNames.contains(MinionConstants.MergeRollupTask.TASK_TYPE));
+
+    dropOfflineTable(RAW_TABLE_NAME);
+    jobGroupNames = scheduler.getJobGroupNames();
+    assertTrue(jobGroupNames.isEmpty());
+
+    stopFakeInstances();
     stopController();
   }
 
