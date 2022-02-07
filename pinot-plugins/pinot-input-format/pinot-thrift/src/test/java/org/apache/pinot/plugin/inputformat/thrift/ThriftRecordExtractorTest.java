@@ -130,21 +130,18 @@ public class ThriftRecordExtractorTest extends AbstractRecordExtractorTest {
       thriftRecords.add(thriftRecord);
     }
 
-    BufferedOutputStream bufferedOut = new BufferedOutputStream(new FileOutputStream(_tempFile));
-    TBinaryProtocol binaryOut = null;
-    try {
-      binaryOut = new TBinaryProtocol(new TIOStreamTransport(bufferedOut));
+    try (BufferedOutputStream bufferedOut = new BufferedOutputStream(new FileOutputStream(_tempFile))) {
+      TBinaryProtocol binaryOut = new TBinaryProtocol(new TIOStreamTransport(bufferedOut));
+      for (ComplexTypes record : thriftRecords) {
+        try {
+          record.write(binaryOut);
+        } catch (TException e) {
+          throw new IOException(e);
+        }
+      }
     } catch (TTransportException e) {
       throw new IOException(e);
     }
-    for (ComplexTypes record : thriftRecords) {
-      try {
-        record.write(binaryOut);
-      } catch (TException e) {
-        throw new IOException(e);
-      }
-    }
-    bufferedOut.close();
   }
 
   private Map<String, Object> createRecord1() {
