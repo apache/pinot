@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.commons.lang.StringUtils;
 
 
 /**
@@ -96,9 +97,10 @@ public enum AggregationFunctionType {
         getAggregationFunctionType(functionName);
         return true;
       } catch (Exception ignore) {
+        return false;
       }
     }
-    String upperCaseFunctionName = functionName.replace("_", "").toUpperCase();
+    String upperCaseFunctionName = StringUtils.remove(functionName, '_').toUpperCase();
     return NAMES.contains(upperCaseFunctionName);
   }
 
@@ -108,7 +110,7 @@ public enum AggregationFunctionType {
    */
   public static AggregationFunctionType getAggregationFunctionType(String functionName) {
     if (functionName.regionMatches(true, 0, "percentile", 0, 10)) {
-      String remainingFunctionName = functionName.replace("_", "").substring(10).toUpperCase();
+      String remainingFunctionName = StringUtils.remove(functionName, '_').substring(10).toUpperCase();
       if (remainingFunctionName.isEmpty() || remainingFunctionName.matches("\\d+")) {
         return PERCENTILE;
       } else if (remainingFunctionName.equals("EST") || remainingFunctionName.matches("EST\\d+")) {
@@ -134,7 +136,7 @@ public enum AggregationFunctionType {
       }
     } else {
       try {
-        return AggregationFunctionType.valueOf(functionName.replace("_", "").toUpperCase());
+        return AggregationFunctionType.valueOf(StringUtils.remove(functionName, '_').toUpperCase());
       } catch (IllegalArgumentException e) {
         throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
       }

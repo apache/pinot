@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function;
 
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertFalse;
@@ -28,30 +29,30 @@ public class FunctionDefinitionRegistryTest {
 
   @Test
   public void testIsAggFunc() {
-    assertTrue(FunctionDefinitionRegistry.isAggFunc("count"));
-    assertTrue(FunctionDefinitionRegistry.isAggFunc("percentileRawEstMV"));
-    assertTrue(FunctionDefinitionRegistry.isAggFunc("PERCENTILERAWESTMV"));
-    assertTrue(FunctionDefinitionRegistry.isAggFunc("percentilerawestmv"));
-    assertTrue(FunctionDefinitionRegistry.isAggFunc("percentile_raw_est_mv"));
-    assertTrue(FunctionDefinitionRegistry.isAggFunc("PERCENTILE_RAW_EST_MV"));
-    assertTrue(FunctionDefinitionRegistry.isAggFunc("PERCENTILEEST90"));
-    assertTrue(FunctionDefinitionRegistry.isAggFunc("percentileest90"));
-    assertFalse(FunctionDefinitionRegistry.isAggFunc("toEpochSeconds"));
+    assertTrue(AggregationFunctionType.isAggregationFunction("count"));
+    assertTrue(AggregationFunctionType.isAggregationFunction("percentileRawEstMV"));
+    assertTrue(AggregationFunctionType.isAggregationFunction("PERCENTILERAWESTMV"));
+    assertTrue(AggregationFunctionType.isAggregationFunction("percentilerawestmv"));
+    assertTrue(AggregationFunctionType.isAggregationFunction("percentile_raw_est_mv"));
+    assertTrue(AggregationFunctionType.isAggregationFunction("PERCENTILE_RAW_EST_MV"));
+    assertTrue(AggregationFunctionType.isAggregationFunction("PERCENTILEEST90"));
+    assertTrue(AggregationFunctionType.isAggregationFunction("percentileest90"));
+    assertFalse(AggregationFunctionType.isAggregationFunction("toEpochSeconds"));
   }
 
   @Test
   public void testIsTransformFunc() {
-    assertTrue(FunctionDefinitionRegistry.isTransformFunc("toEpochSeconds"));
-    assertTrue(FunctionDefinitionRegistry.isTransformFunc("json_extract_scalar"));
-    assertTrue(FunctionDefinitionRegistry.isTransformFunc("jsonextractscalar"));
-    assertTrue(FunctionDefinitionRegistry.isTransformFunc("JSON_EXTRACT_SCALAR"));
-    assertTrue(FunctionDefinitionRegistry.isTransformFunc("JSONEXTRACTSCALAR"));
-    assertTrue(FunctionDefinitionRegistry.isTransformFunc("jsonExtractScalar"));
-    assertTrue(FunctionDefinitionRegistry.isTransformFunc("ST_AsText"));
-    assertTrue(FunctionDefinitionRegistry.isTransformFunc("STAsText"));
-    assertTrue(FunctionDefinitionRegistry.isTransformFunc("stastext"));
-    assertTrue(FunctionDefinitionRegistry.isTransformFunc("ST_ASTEXT"));
-    assertTrue(FunctionDefinitionRegistry.isTransformFunc("STASTEXT"));
-    assertFalse(FunctionDefinitionRegistry.isTransformFunc("foo_bar"));
+    assertTrue(TransformFunctionType.isTransformFunction("toEpochSeconds"));
+    assertTrue(TransformFunctionType.isTransformFunction("json_extract_scalar"));
+    assertTrue(TransformFunctionType.isTransformFunction("jsonextractscalar"));
+    assertTrue(TransformFunctionType.isTransformFunction("JSON_EXTRACT_SCALAR"));
+    assertTrue(TransformFunctionType.isTransformFunction("JSONEXTRACTSCALAR"));
+    assertTrue(TransformFunctionType.isTransformFunction("jsonExtractScalar"));
+    assertTrue(TransformFunctionType.isTransformFunction("ST_AsText"));
+    assertTrue(TransformFunctionType.isTransformFunction("STAsText"));
+    assertTrue(TransformFunctionType.isTransformFunction("stastext"));
+    assertTrue(TransformFunctionType.isTransformFunction("ST_ASTEXT"));
+    assertTrue(TransformFunctionType.isTransformFunction("STASTEXT"));
+    assertFalse(TransformFunctionType.isTransformFunction("foo_bar"));
   }
 }

@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.commons.lang.StringUtils;
 
 
 public enum TransformFunctionType {
@@ -108,7 +109,7 @@ public enum TransformFunctionType {
   GEOTOH3("geoToH3");
 
   private static final Set<String> NAMES = Arrays.stream(values())
-      .flatMap(func -> Stream.of(func.getName(), func.getName().replace("_", "").toUpperCase(),
+      .flatMap(func -> Stream.of(func.getName(), StringUtils.remove(func.getName(), '_').toUpperCase(),
           func.getName().toUpperCase(), func.getName().toLowerCase(), func.name(), func.name().toLowerCase()))
       .collect(Collectors.toSet());
 
@@ -126,7 +127,7 @@ public enum TransformFunctionType {
     if (FunctionRegistry.containsFunction(functionName)) {
       return true;
     }
-    return NAMES.contains(functionName.toUpperCase().replace("_", ""));
+    return NAMES.contains(StringUtils.remove(functionName, '_').toUpperCase());
   }
 
   /**
@@ -142,7 +143,7 @@ public enum TransformFunctionType {
       }
       // Support function name of both jsonExtractScalar and json_extract_scalar
       if (upperCaseFunctionName.contains("_")) {
-        return getTransformFunctionType(upperCaseFunctionName.replace("_", ""));
+        return getTransformFunctionType(StringUtils.remove(upperCaseFunctionName, '_'));
       }
       throw new IllegalArgumentException("Invalid transform function name: " + functionName);
     }
