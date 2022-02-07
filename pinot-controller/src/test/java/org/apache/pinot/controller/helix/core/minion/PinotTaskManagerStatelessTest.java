@@ -218,8 +218,18 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     assertEquals(jobDetail.getKey().getGroup(), taskType);
     assertSame(jobDetail.getJobDataMap().get("PinotTaskManager"), taskManager);
     assertSame(jobDetail.getJobDataMap().get("LeadControllerManager"), _controllerStarter.getLeadControllerManager());
+    // jobDetail and jobTrigger are not added atomically by the scheduler,
+    // the jobDetail is added to an internal map firstly, and jobTrigger
+    // is added to another internal map afterwards, so we check for the existence
+    // of jobTrigger with some waits to be more defensive.
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        return scheduler.getTriggersOfJob(jobKey).size() == 1;
+      } catch (SchedulerException e) {
+        throw new RuntimeException(e);
+      }
+    }, TIMEOUT_IN_MS, "JobDetail exiting but missing JobTrigger");
     List<? extends Trigger> triggersOfJob = scheduler.getTriggersOfJob(jobKey);
-    assertEquals(triggersOfJob.size(), 1);
     Trigger trigger = triggersOfJob.iterator().next();
     assertTrue(trigger instanceof CronTrigger);
     assertEquals(((CronTrigger) trigger).getCronExpression(), cronExpression);
