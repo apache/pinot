@@ -57,6 +57,7 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -478,6 +479,33 @@ public class RoutingManager implements ClusterChangeHandler {
   }
 
   /**
+   * Returns the routing table (a map from server instance to list of segments hosted by the server, and a list of
+   * unavailable segments) based on the table name, or {@code null} if the routing does not exist. This is used to
+   * check for a routing table without constructing a broker request or it is unavailable.
+   */
+  @Nullable
+  public RoutingTable getRoutingTable(String tableName) {
+    String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
+    RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
+    if (routingEntry == null) {
+      return null;
+    }
+    InstanceSelector.SelectionResult selectionResult = routingEntry.calculateRouting(null);
+    Map<String, String> segmentToInstanceMap = selectionResult.getSegmentToInstanceMap();
+    Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = new HashMap<>();
+    for (Map.Entry<String, String> entry : segmentToInstanceMap.entrySet()) {
+      ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
+      if (serverInstance != null) {
+        serverInstanceToSegmentsMap.computeIfAbsent(serverInstance, k -> new ArrayList<>()).add(entry.getKey());
+      } else {
+        // Should not happen in normal case unless encountered unexpected exception when updating routing entries
+        _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.SERVER_MISSING_FOR_ROUTING, 1L);
+      }
+    }
+    return new RoutingTable(serverInstanceToSegmentsMap, selectionResult.getUnavailableSegments());
+  }
+
+  /**
    * Returns the time boundary info for the given offline table, or {@code null} if the routing or time boundary does
    * not exist.
    * <p>NOTE: Time boundary info is only available for the offline part of the hybrid table.
@@ -587,9 +615,9 @@ public class RoutingManager implements ClusterChangeHandler {
       }
     }
 
-    InstanceSelector.SelectionResult calculateRouting(BrokerRequest brokerRequest) {
+    InstanceSelector.SelectionResult calculateRouting(@Nullable BrokerRequest brokerRequest) {
       Set<String> selectedSegments = _segmentSelector.select(brokerRequest);
-      if (!selectedSegments.isEmpty()) {
+      if (!selectedSegments.isEmpty() && brokerRequest != null) {
         for (SegmentPruner segmentPruner : _segmentPruners) {
           selectedSegments = segmentPruner.prune(brokerRequest, selectedSegments);
         }

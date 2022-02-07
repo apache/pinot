@@ -20,6 +20,7 @@ package org.apache.pinot.broker.routing.segmentselector;
 
 import java.util.Collections;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -45,7 +46,7 @@ public class OfflineSegmentSelector implements SegmentSelector {
   }
 
   @Override
-  public Set<String> select(BrokerRequest brokerRequest) {
+  public Set<String> select(@Nullable BrokerRequest brokerRequest) {
     return _segments;
   }
 }

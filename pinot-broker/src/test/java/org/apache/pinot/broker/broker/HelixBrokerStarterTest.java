@@ -54,6 +54,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -155,8 +156,11 @@ public class HelixBrokerStarterTest extends ControllerTest {
     assertEquals(brokerResourceExternalView.getStateMap(REALTIME_TABLE_NAME).size(), NUM_BROKERS);
 
     RoutingManager routingManager = _brokerStarter.getRoutingManager();
+    // check routing exist but there's no routing item in realtime table.
     assertTrue(routingManager.routingExists(OFFLINE_TABLE_NAME));
     assertTrue(routingManager.routingExists(REALTIME_TABLE_NAME));
+    assertNotNull(routingManager.getRoutingTable(OFFLINE_TABLE_NAME));
+    assertNull(routingManager.getRoutingTable(REALTIME_TABLE_NAME));
 
     BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest("SELECT * FROM " + OFFLINE_TABLE_NAME);
     RoutingTable routingTable = routingManager.getRoutingTable(brokerRequest);

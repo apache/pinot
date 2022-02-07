@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
+import javax.annotation.Nullable;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -139,7 +140,7 @@ public class RealtimeSegmentSelector implements SegmentSelector {
   }
 
   @Override
-  public Set<String> select(BrokerRequest brokerRequest) {
+  public Set<String> select(@Nullable BrokerRequest brokerRequest) {
     if (_hlcSegments == null && _llcSegments == null) {
       return Collections.emptySet();
     }
@@ -151,7 +152,7 @@ public class RealtimeSegmentSelector implements SegmentSelector {
     }
 
     // Handle HLC and LLC coexisting scenario, select HLC segments only if it is forced in the routing options
-    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
+    PinotQuery pinotQuery = brokerRequest != null ? brokerRequest.getPinotQuery() : null;
     Map<String, String> debugOptions =
         pinotQuery != null ? pinotQuery.getDebugOptions() : brokerRequest.getDebugOptions();
     if (debugOptions != null) {
