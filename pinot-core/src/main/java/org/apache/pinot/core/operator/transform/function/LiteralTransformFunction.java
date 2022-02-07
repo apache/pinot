@@ -41,6 +41,10 @@ import org.apache.pinot.spi.utils.BytesUtils;
 public class LiteralTransformFunction implements TransformFunction {
   private final String _literal;
   private final DataType _dataType;
+  private final int _intLiteral;
+  private final long _longLiteral;
+  private final float _floatLiteral;
+  private final double _doubleLiteral;
 
   // literals may be shared but values are intentionally not volatile as assignment races are benign
   private int[] _intResult;
@@ -53,6 +57,18 @@ public class LiteralTransformFunction implements TransformFunction {
   public LiteralTransformFunction(String literal) {
     _literal = literal;
     _dataType = inferLiteralDataType(literal);
+    if (_dataType.isNumeric()) {
+      BigDecimal bigDecimal = new BigDecimal(_literal);
+      _intLiteral = bigDecimal.intValue();
+      _longLiteral = bigDecimal.longValue();
+      _floatLiteral = bigDecimal.floatValue();
+      _doubleLiteral = bigDecimal.doubleValue();
+    } else {
+      _intLiteral = 0;
+      _longLiteral = 0L;
+      _floatLiteral = 0F;
+      _doubleLiteral = 0D;
+    }
   }
 
   @VisibleForTesting
@@ -133,7 +149,9 @@ public class LiteralTransformFunction implements TransformFunction {
     if (intResult == null || intResult.length < numDocs) {
       intResult = new int[numDocs];
       if (_dataType != DataType.BOOLEAN) {
-        Arrays.fill(intResult, new BigDecimal(_literal).intValue());
+        if (_intLiteral != 0) {
+          Arrays.fill(intResult, _intLiteral);
+        }
       } else {
         Arrays.fill(intResult, _literal.equals("true") ? 1 : 0);
       }
@@ -149,7 +167,9 @@ public class LiteralTransformFunction implements TransformFunction {
     if (longResult == null || longResult.length < numDocs) {
       longResult = new long[numDocs];
       if (_dataType != DataType.TIMESTAMP) {
-        Arrays.fill(longResult, new BigDecimal(_literal).longValue());
+        if (_longLiteral != 0) {
+          Arrays.fill(longResult, _longLiteral);
+        }
       } else {
         Arrays.fill(longResult, Timestamp.valueOf(_literal).getTime());
       }
@@ -164,7 +184,9 @@ public class LiteralTransformFunction implements TransformFunction {
     float[] floatResult = _floatResult;
     if (floatResult == null || floatResult.length < numDocs) {
       floatResult = new float[numDocs];
-      Arrays.fill(floatResult, new BigDecimal(_literal).floatValue());
+      if (_floatLiteral != 0F) {
+        Arrays.fill(floatResult, _floatLiteral);
+      }
       _floatResult = floatResult;
     }
     return floatResult;
@@ -176,7 +198,9 @@ public class LiteralTransformFunction implements TransformFunction {
     double[] doubleResult = _doubleResult;
     if (doubleResult == null || doubleResult.length < numDocs) {
       doubleResult = new double[numDocs];
-      Arrays.fill(doubleResult, new BigDecimal(_literal).doubleValue());
+      if (_doubleLiteral != 0) {
+        Arrays.fill(doubleResult, _doubleLiteral);
+      }
       _doubleResult = doubleResult;
     }
     return doubleResult;
