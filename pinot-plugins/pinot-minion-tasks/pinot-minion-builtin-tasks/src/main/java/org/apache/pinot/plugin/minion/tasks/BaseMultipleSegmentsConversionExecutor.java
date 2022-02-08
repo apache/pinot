@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -57,6 +58,7 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseMultipleSegmentsConversionExecutor.class);
+  private static final String UPLOAD_CONTEXT_LINEAGE_ENTRY_ID = "lineageEntryId";
 
   protected MinionConf _minionConf;
 
@@ -89,6 +91,49 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
   protected void postProcess(PinotTaskConfig pinotTaskConfig) {
   }
 
+  protected Map<String, Object> preUploadSegments(PinotTaskConfig pinotTaskConfig,
+      List<SegmentConversionResult> segmentConversionResults)
+      throws Exception {
+    // Update the segment lineage to indicate that the segment replacement is in progress.
+    Map<String, String> configs = pinotTaskConfig.getConfigs();
+    String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
+    String inputSegmentNames = configs.get(MinionConstants.SEGMENT_NAME_KEY);
+    String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
+    String authToken = configs.get(MinionConstants.AUTH_TOKEN);
+    String replaceSegmentsString = configs.get(MinionConstants.ENABLE_REPLACE_SEGMENTS_KEY);
+    boolean replaceSegmentsEnabled = Boolean.parseBoolean(replaceSegmentsString);
+
+    Map<String, Object> uploadContext = new HashMap<>();
+    if (replaceSegmentsEnabled) {
+      List<String> segmentsFrom =
+          Arrays.stream(inputSegmentNames.split(",")).map(String::trim).collect(Collectors.toList());
+      List<String> segmentsTo =
+          segmentConversionResults.stream().map(SegmentConversionResult::getSegmentName).collect(Collectors.toList());
+      String lineageEntryId = SegmentConversionUtils.startSegmentReplace(tableNameWithType, uploadURL,
+          new StartReplaceSegmentsRequest(segmentsFrom, segmentsTo), authToken);
+      uploadContext.put(UPLOAD_CONTEXT_LINEAGE_ENTRY_ID, lineageEntryId);
+    }
+    return uploadContext;
+  }
+
+  protected void postUploadSegments(PinotTaskConfig pinotTaskConfig, Map<String, Object> uploadContext)
+      throws Exception {
+    // Update the segment lineage to indicate that the segment replacement is done.
+    Map<String, String> configs = pinotTaskConfig.getConfigs();
+    String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
+    String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
+    String authToken = configs.get(MinionConstants.AUTH_TOKEN);
+    String replaceSegmentsString = configs.get(MinionConstants.ENABLE_REPLACE_SEGMENTS_KEY);
+    boolean replaceSegmentsEnabled = Boolean.parseBoolean(replaceSegmentsString);
+
+    if (replaceSegmentsEnabled) {
+      String lineageEntryId = (String) uploadContext.get(UPLOAD_CONTEXT_LINEAGE_ENTRY_ID);
+      SegmentConversionUtils
+          .endSegmentReplace(tableNameWithType, uploadURL, lineageEntryId, _minionConf.getEndReplaceSegmentsTimeoutMs(),
+              authToken);
+    }
+  }
+
   @Override
   public List<SegmentConversionResult> executeTask(PinotTaskConfig pinotTaskConfig)
       throws Exception {
@@ -102,8 +147,6 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     String[] downloadURLs = downloadURLString.split(MinionConstants.URL_SEPARATOR);
     String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
     String authToken = configs.get(MinionConstants.AUTH_TOKEN);
-    String replaceSegmentsString = configs.get(MinionConstants.ENABLE_REPLACE_SEGMENTS_KEY);
-    boolean replaceSegmentsEnabled = Boolean.parseBoolean(replaceSegmentsString);
 
     LOGGER.info("Start executing {} on table: {}, input segments: {} with downloadURLs: {}, uploadURL: {}", taskType,
         tableNameWithType, inputSegmentNames, downloadURLString, uploadURL);
@@ -168,22 +211,14 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
             taskType + " on table: " + tableNameWithType + ", segments: " + inputSegmentNames + " got cancelled");
       }
 
-      // Update the segment lineage to indicate that the segment replacement is in progress.
-      String lineageEntryId = null;
-      if (replaceSegmentsEnabled) {
-        List<String> segmentsFrom =
-            Arrays.stream(inputSegmentNames.split(",")).map(String::trim).collect(Collectors.toList());
-        List<String> segmentsTo =
-            segmentConversionResults.stream().map(SegmentConversionResult::getSegmentName).collect(Collectors.toList());
-        lineageEntryId = SegmentConversionUtils.startSegmentReplace(tableNameWithType, uploadURL,
-            new StartReplaceSegmentsRequest(segmentsFrom, segmentsTo), authToken);
-      }
+      Map<String, Object> uploadContext = preUploadSegments(pinotTaskConfig, segmentConversionResults);
 
       // Upload the tarred segments
       for (int i = 0; i < numOutputSegments; i++) {
         File convertedTarredSegmentFile = tarredSegmentFiles.get(i);
         SegmentConversionResult segmentConversionResult = segmentConversionResults.get(i);
         String resultSegmentName = segmentConversionResult.getSegmentName();
+        LOGGER.info("Uploading segment: {}", resultSegmentName);
 
         // Set segment ZK metadata custom map modifier into HTTP header to modify the segment ZK metadata
         SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier =
@@ -209,13 +244,10 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         if (!FileUtils.deleteQuietly(convertedTarredSegmentFile)) {
           LOGGER.warn("Failed to delete tarred converted segment: {}", convertedTarredSegmentFile.getAbsolutePath());
         }
+        LOGGER.info("Uploaded segment: {}", resultSegmentName);
       }
 
-      // Update the segment lineage to indicate that the segment replacement is done.
-      if (replaceSegmentsEnabled) {
-        SegmentConversionUtils.endSegmentReplace(tableNameWithType, uploadURL, lineageEntryId,
-            _minionConf.getEndReplaceSegmentsTimeoutMs(), authToken);
-      }
+      postUploadSegments(pinotTaskConfig, uploadContext);
 
       String outputSegmentNames = segmentConversionResults.stream().map(SegmentConversionResult::getSegmentName)
           .collect(Collectors.joining(","));
