@@ -382,7 +382,7 @@ public class PinotSegmentUploadDownloadRestletResource {
         tableName);
     URI uri = new URI(currentSegmentLocationURI);
     if (uri.getScheme().equalsIgnoreCase("file")) {
-      throw new ControllerApplicationException(LOGGER, "Unsupported URI" + currentSegmentLocationURI,
+      throw new ControllerApplicationException(LOGGER, "Unsupported URI: " + currentSegmentLocationURI,
           Response.Status.BAD_REQUEST);
     }
     SegmentFetcherFactory.fetchSegmentToLocal(currentSegmentLocationURI, destFile);

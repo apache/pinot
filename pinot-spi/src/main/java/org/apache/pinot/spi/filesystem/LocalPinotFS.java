@@ -85,7 +85,7 @@ public class LocalPinotFS extends BasePinotFS {
   @Override
   public boolean copy(URI srcUri, URI dstUri)
       throws IOException {
-    copy(toFile(srcUri), toFile(dstUri));
+    copy(toFile(srcUri), toFile(dstUri), false);
     return true;
   }
 
@@ -118,13 +118,22 @@ public class LocalPinotFS extends BasePinotFS {
   @Override
   public void copyToLocalFile(URI srcUri, File dstFile)
       throws Exception {
-    copy(toFile(srcUri), dstFile);
+    copy(toFile(srcUri), dstFile, false);
   }
 
   @Override
   public void copyFromLocalFile(File srcFile, URI dstUri)
       throws Exception {
-    copy(srcFile, toFile(dstUri));
+    copy(srcFile, toFile(dstUri), false);
+  }
+
+  @Override
+  public void copyFromLocalDir(File srcFile, URI dstUri)
+      throws Exception {
+    if (!srcFile.isDirectory()) {
+      throw new IllegalArgumentException(srcFile.getAbsolutePath() + " is not a directory");
+    }
+    copy(srcFile, toFile(dstUri), true);
   }
 
   @Override
@@ -163,14 +172,18 @@ public class LocalPinotFS extends BasePinotFS {
     }
   }
 
-  private static void copy(File srcFile, File dstFile)
+  private static void copy(File srcFile, File dstFile, boolean recursive)
       throws IOException {
     if (dstFile.exists()) {
       FileUtils.deleteQuietly(dstFile);
     }
     if (srcFile.isDirectory()) {
-      // Throws Exception on failure
-      throw new IOException(srcFile.getAbsolutePath() + " is a directory");
+      if (recursive) {
+        FileUtils.copyDirectory(srcFile, dstFile);
+      } else {
+        // Throws Exception on failure
+        throw new IOException(srcFile.getAbsolutePath() + " is a directory");
+      }
     } else {
       // Will create parent directories, throws Exception on failure
       FileUtils.copyFile(srcFile, dstFile);

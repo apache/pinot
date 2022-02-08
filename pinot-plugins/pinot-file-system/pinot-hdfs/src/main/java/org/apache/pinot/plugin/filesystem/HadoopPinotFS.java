@@ -199,7 +199,19 @@ public class HadoopPinotFS extends BasePinotFS {
   @Override
   public void copyFromLocalFile(File srcFile, URI dstUri)
       throws Exception {
+    if (srcFile.isDirectory()) {
+      throw new IllegalArgumentException(srcFile.getAbsolutePath() + " is a direactory");
+    }
     _hadoopFS.copyFromLocalFile(new Path(srcFile.toURI()), new Path(dstUri));
+  }
+
+  public  void copyFromLocalDir(File srcFile, URI dstUri)
+      throws Exception{
+    Path srcPath = new Path(srcFile.toURI());
+    if (!_hadoopFS.isDirectory(srcPath)) {
+      throw new IllegalArgumentException(srcFile.getAbsolutePath() + " is not a directory");
+    }
+    _hadoopFS.copyFromLocalFile(srcPath, new Path(dstUri));
   }
 
   @Override

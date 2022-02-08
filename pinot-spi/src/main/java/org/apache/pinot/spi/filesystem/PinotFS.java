@@ -151,6 +151,18 @@ public interface PinotFS extends Closeable, Serializable {
       throws Exception;
 
   /**
+   * @apiNote This API is to be used with caution, since recursive copies can lead to adverse situations.
+   *
+   * Add srcFile to filesystem at the given dst name and the source is kept intact afterwards.
+   * @param srcFile location of src file on local disk (must be a directory)
+   * @param dstUri location of dst on remote filesystem
+   * @throws Exception if fileUri is not valid or not present, or timeout when uploading file from local
+   */
+  default void copyFromLocalDir(File srcFile, URI dstUri)
+      throws Exception {
+    throw new UnsupportedOperationException("Recursive copy not supported");
+  }
+  /**
    * The src file is on the local disk. Add it to filesystem at the given dst name and the source is kept intact
    * afterwards.
    * @param srcFile location of src file on local disk (must not be a directory)
