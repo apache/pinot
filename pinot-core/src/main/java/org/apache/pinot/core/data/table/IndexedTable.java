@@ -178,6 +178,6 @@ public abstract class IndexedTable extends BaseTable {
   }
 
   public boolean IsNumGroupsLimitReached() {
-    return _groupLimitReached.get();
+    return _groupLimitReached.get() || _tableResizer.is_groupLimitReached();
   }
 }

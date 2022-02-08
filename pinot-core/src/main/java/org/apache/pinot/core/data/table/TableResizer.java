@@ -324,6 +324,10 @@ public class TableResizer {
     return getIntermediateRecord(new Key(keys), new Record(values));
   }
 
+  public boolean is_groupLimitReached() {
+    return _groupLimitReached;
+  }
+
   /**
    * Extractor for the order-by value from a Record.
    */
