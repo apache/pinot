@@ -259,7 +259,7 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
       job.getConfiguration().setBoolean(MRJobConfig.MAP_SPECULATIVE, false);
 
       // But we have to copy ourselves to HDFS, and add us to the distributed cache, so
-      // that the mapper code is available. 
+      // that the mapper code is available.
       addMapperJarToDistributedCache(job, outputDirFS, stagingDirURI);
 
       org.apache.hadoop.conf.Configuration jobConf = job.getConfiguration();
@@ -277,7 +277,7 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
       // In order to ensure pinot plugins would be loaded to each worker, this method
       // tars entire plugins directory and set this file into Distributed cache.
       // Then each mapper job will untar the plugin tarball, and set system properties accordingly.
-      // Note that normally we'd just use Hadoop's support for putting jars on the 
+      // Note that normally we'd just use Hadoop's support for putting jars on the
       // classpath via the distributed cache, but some of the plugins (e.g. the pinot-parquet
       // input format) include Hadoop classes, which can be incompatibile with the Hadoop
       // installation/jars being used to run the mapper, leading to errors such as:
@@ -386,7 +386,7 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
       throws Exception {
     File ourJar = new File(getClass().getProtectionDomain().getCodeSource().getLocation().toURI());
     Path distributedCacheJar = new Path(stagingDirURI.toString(), ourJar.getName());
-    outputDirFS.copyFromLocalFile(ourJar, distributedCacheJar.toUri());
+    outputDirFS.copyFromLocalDir(ourJar, distributedCacheJar.toUri());
     job.addFileToClassPath(distributedCacheJar);
   }
 
