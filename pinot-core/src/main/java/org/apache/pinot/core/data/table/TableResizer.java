@@ -324,7 +324,7 @@ public class TableResizer {
     return getIntermediateRecord(new Key(keys), new Record(values));
   }
 
-  public boolean is_groupLimitReached() {
+  public boolean isNumGroupsLimitReached() {
     return _groupLimitReached;
   }
 

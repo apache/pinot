@@ -177,7 +177,7 @@ public abstract class IndexedTable extends BaseTable {
     return TimeUnit.NANOSECONDS.toMillis(_resizeTimeNs);
   }
 
-  public boolean IsNumGroupsLimitReached() {
-    return _groupLimitReached.get() || _tableResizer.is_groupLimitReached();
+  public boolean isNumGroupsLimitReached() {
+    return _groupLimitReached.get() || _tableResizer.isNumGroupsLimitReached();
   }
 }

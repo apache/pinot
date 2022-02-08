@@ -245,7 +245,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
         resultRows.add(resultRow);
       }
       brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, resultRows));
-      if (indexedTable.IsNumGroupsLimitReached()) {
+      if (indexedTable.isNumGroupsLimitReached()) {
         brokerResponseNative.setNumGroupsLimitReached(true);
       }
     } else {

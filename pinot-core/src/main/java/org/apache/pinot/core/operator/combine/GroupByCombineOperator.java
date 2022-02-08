@@ -219,9 +219,9 @@ public class GroupByCombineOperator extends BaseCombineOperator {
     }
     // TODO: this value should be set in the inner-segment operators. Setting it here might cause false positive as we
     //       are comparing number of groups across segments with the groups limit for each segment.
-    if (_resultsMap.size() >= _innerSegmentNumGroupsLimit ||
-            _groupLimitReached.get() ||
-            aggregationGroupByTrimmingService.isTrimApplied()) {
+    if (_resultsMap.size() >= _innerSegmentNumGroupsLimit
+            || _groupLimitReached.get()
+            || aggregationGroupByTrimmingService.isTrimApplied()) {
       mergedBlock.setNumGroupsLimitReached(true);
     }
 
