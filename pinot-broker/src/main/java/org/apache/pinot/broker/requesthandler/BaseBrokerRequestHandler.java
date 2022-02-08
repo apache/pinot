@@ -76,6 +76,7 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
@@ -1211,7 +1212,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return;
     }
 
-    if (functionCall.getOperator().toLowerCase().contains(TransformFunctionType.GROOVY.getName())) {
+    if (TransformFunctionFactory.canonicalize(functionCall.getOperator())
+        .contains(TransformFunctionType.GROOVY.getName())) {
       throw new BadQueryRequestException("Groovy transform functions are disabled for queries");
     }
 

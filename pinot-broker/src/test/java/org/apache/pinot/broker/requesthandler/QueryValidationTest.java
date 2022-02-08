@@ -188,6 +188,8 @@ public class QueryValidationTest {
     testRejectGroovyQuery(
         "SELECT GROOVY('{\"returnType\":\"INT\",\"isSingleValue\":true}', 'arg0 + arg1', colA, colB) FROM foo", true);
     testRejectGroovyQuery(
+        "SELECT groo_vy('{\"returnType\":\"INT\",\"isSingleValue\":true}', 'arg0 + arg1', colA, colB) FROM foo", true);
+    testRejectGroovyQuery(
         "SELECT foo FROM bar WHERE GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', 'arg0 + arg1', colA,"
             + " colB) = 'foobarval'", true);
     testRejectGroovyQuery(
