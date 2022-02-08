@@ -273,7 +273,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           e.getMessage());
     }
     if (_disableGroovy) {
-      handleDisableGroovyOverride(pinotQuery);
+      rejectGroovyQuery(pinotQuery);
     }
     if (_defaultHllLog2m > 0) {
       handleHLLLog2mOverride(pinotQuery, _defaultHllLog2m);
@@ -1177,48 +1177,48 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Verifies that no groovy is present in the PinotQuery when disabled.
    */
   @VisibleForTesting
-  static void handleDisableGroovyOverride(PinotQuery pinotQuery) {
+  static void rejectGroovyQuery(PinotQuery pinotQuery) {
     List<Expression> selectList = pinotQuery.getSelectList();
     for (Expression expression : selectList) {
-      handleDisableGroovyOverride(expression);
+      rejectGroovyQuery(expression);
     }
     List<Expression> orderByList = pinotQuery.getOrderByList();
     if (orderByList != null) {
       for (Expression expression : orderByList) {
         // NOTE: Order-by is always a Function with the ordering of the Expression
-        handleDisableGroovyOverride(expression.getFunctionCall().getOperands().get(0));
+        rejectGroovyQuery(expression.getFunctionCall().getOperands().get(0));
       }
     }
     Expression havingExpression = pinotQuery.getHavingExpression();
     if (havingExpression != null) {
-      handleDisableGroovyOverride(havingExpression);
+      rejectGroovyQuery(havingExpression);
     }
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
-      handleDisableGroovyOverride(filterExpression);
+      rejectGroovyQuery(filterExpression);
     }
     List<Expression> groupByList = pinotQuery.getGroupByList();
     if (groupByList != null) {
       for (Expression expression : groupByList) {
-        handleDisableGroovyOverride(expression);
+        rejectGroovyQuery(expression);
       }
     }
   }
 
-  private static void handleDisableGroovyOverride(Expression expression) {
+  private static void rejectGroovyQuery(Expression expression) {
     Function functionCall = expression.getFunctionCall();
     if (functionCall == null) {
       return;
     }
 
-    if (functionCall.getOperator().toUpperCase().contains("GROOVY")) {
-      throw new RuntimeException("Groovy transform functions are disabled for queries");
+    if (functionCall.getOperator().toLowerCase().contains(TransformFunctionType.GROOVY.getName())) {
+      throw new BadQueryRequestException("Groovy transform functions are disabled for queries");
     }
 
     List<Expression> operands = functionCall.getOperands();
     if (operands != null) {
       for (Expression operandExpression : operands) {
-        handleDisableGroovyOverride(operandExpression);
+        rejectGroovyQuery(operandExpression);
       }
     }
   }

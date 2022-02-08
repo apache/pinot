@@ -182,29 +182,29 @@ public class QueryValidationTest {
   }
 
   @Test
-  public void testDisabledGroovyOverride() {
-    testDisabledGroovyException(
+  public void testRejectGroovyQuery() {
+    testRejectGroovyQuery(
         "SELECT groovy('{\"returnType\":\"INT\",\"isSingleValue\":true}', 'arg0 + arg1', colA, colB) FROM foo", true);
-    testDisabledGroovyException(
+    testRejectGroovyQuery(
         "SELECT GROOVY('{\"returnType\":\"INT\",\"isSingleValue\":true}', 'arg0 + arg1', colA, colB) FROM foo", true);
-    testDisabledGroovyException(
+    testRejectGroovyQuery(
         "SELECT foo FROM bar WHERE GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', 'arg0 + arg1', colA,"
             + " colB) = 'foobarval'", true);
-    testDisabledGroovyException(
+    testRejectGroovyQuery(
         "SELECT COUNT(colA) FROM bar GROUP BY GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', "
             + "'arg0 + arg1', colA, colB)", true);
-    testDisabledGroovyException(
+    testRejectGroovyQuery(
         "SELECT foo FROM bar HAVING GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', 'arg0 + arg1', colA,"
             + " colB) = 'foobarval'", true);
 
-    testDisabledGroovyException("SELECT foo FROM bar", false);
+    testRejectGroovyQuery("SELECT foo FROM bar", false);
   }
 
-  private void testDisabledGroovyException(String query, boolean queryContainsGroovy) {
+  private void testRejectGroovyQuery(String query, boolean queryContainsGroovy) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
 
     try {
-      BaseBrokerRequestHandler.handleDisableGroovyOverride(pinotQuery);
+      BaseBrokerRequestHandler.rejectGroovyQuery(pinotQuery);
       if (queryContainsGroovy) {
         Assert.fail("Query should have failed since groovy was found in query: " + pinotQuery);
       }
