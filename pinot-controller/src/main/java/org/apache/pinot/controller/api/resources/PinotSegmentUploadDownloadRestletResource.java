@@ -199,7 +199,6 @@ public class PinotSegmentUploadDownloadRestletResource {
       uploadTypeStr = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE);
       crypterClassNameInHeader = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.CRYPTER);
       downloadUri = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
-      // TODO throw exception if downloadUri has a file:// scheme
     }
     File tempEncryptedFile = null;
     File tempDecryptedFile = null;
