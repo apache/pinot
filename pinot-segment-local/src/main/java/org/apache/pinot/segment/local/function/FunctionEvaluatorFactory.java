@@ -96,6 +96,14 @@ public class FunctionEvaluatorFactory {
     return functionEvaluator;
   }
 
+  public static FunctionEvaluator getExpressionEvaluator(String transformExpression, boolean disableGroovy) {
+    if (disableGroovy && transformExpression.startsWith(GroovyFunctionEvaluator.getGroovyExpressionPrefix())) {
+      throw new IllegalArgumentException("Groovy functions are disabled for table config");
+    }
+
+    return getExpressionEvaluator(transformExpression);
+  }
+
   public static FunctionEvaluator getExpressionEvaluator(String transformExpression) {
     if (transformExpression.startsWith(GroovyFunctionEvaluator.getGroovyExpressionPrefix())) {
       return new GroovyFunctionEvaluator(transformExpression);

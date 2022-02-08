@@ -90,10 +90,10 @@ public final class TableConfigUtils {
   private static final String KINESIS_STREAM_TYPE = "kinesis";
 
   /**
-   * @see TableConfigUtils#validate(TableConfig, Schema, String)
+   * @see TableConfigUtils#validate(TableConfig, Schema, String, boolean)
    */
   public static void validate(TableConfig tableConfig, @Nullable Schema schema) {
-    validate(tableConfig, schema, null);
+    validate(tableConfig, schema, null, false);
   }
 
   /**
@@ -106,7 +106,8 @@ public final class TableConfigUtils {
    *
    * TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
    */
-  public static void validate(TableConfig tableConfig, @Nullable Schema schema, @Nullable String typesToSkip) {
+  public static void validate(TableConfig tableConfig, @Nullable Schema schema, @Nullable String typesToSkip,
+      boolean disableGroovy) {
     Set<ValidationType> skipTypes = parseTypesToSkipString(typesToSkip);
     if (tableConfig.getTableType() == TableType.REALTIME) {
       Preconditions.checkState(schema != null, "Schema should not be null for REALTIME table");
@@ -116,7 +117,7 @@ public final class TableConfigUtils {
     // skip all validation if skip type ALL is selected.
     if (!skipTypes.contains(ValidationType.ALL)) {
       validateValidationConfig(tableConfig, schema);
-      validateIngestionConfig(tableConfig, schema);
+      validateIngestionConfig(tableConfig, schema, disableGroovy);
       validateTierConfigList(tableConfig.getTierConfigsList());
       validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
       validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);
@@ -234,6 +235,11 @@ public final class TableConfigUtils {
     validateRetentionConfig(tableConfig);
   }
 
+  @VisibleForTesting
+  public static void validateIngestionConfig(TableConfig tableConfig, @Nullable Schema schema) {
+    validateIngestionConfig(tableConfig, schema, false);
+  }
+
   /**
    * Validates the following:
    * 1. validity of filter function
@@ -244,7 +250,7 @@ public final class TableConfigUtils {
    * 6. ingestion type for dimension tables
    */
   @VisibleForTesting
-  public static void validateIngestionConfig(TableConfig tableConfig, @Nullable Schema schema) {
+  public static void validateIngestionConfig(TableConfig tableConfig, @Nullable Schema schema, boolean disableGroovy) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
 
     if (ingestionConfig != null) {
@@ -293,7 +299,7 @@ public final class TableConfigUtils {
         String filterFunction = filterConfig.getFilterFunction();
         if (filterFunction != null) {
           try {
-            FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction);
+            FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction, disableGroovy);
           } catch (Exception e) {
             throw new IllegalStateException("Invalid filter function " + filterFunction, e);
           }
@@ -320,10 +326,10 @@ public final class TableConfigUtils {
           }
           FunctionEvaluator expressionEvaluator;
           try {
-            expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
+            expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction, disableGroovy);
           } catch (Exception e) {
             throw new IllegalStateException(
-                "Invalid transform function '" + transformFunction + "' for column '" + columnName + "'");
+                "Invalid transform function '" + transformFunction + "' for column '" + columnName + "'", e);
           }
           List<String> arguments = expressionEvaluator.getArguments();
           if (arguments.contains(columnName)) {
