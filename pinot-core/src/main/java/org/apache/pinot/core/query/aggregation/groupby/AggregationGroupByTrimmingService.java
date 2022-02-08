@@ -51,6 +51,8 @@ public class AggregationGroupByTrimmingService {
   private final int _trimSize;
   private final int _trimThreshold;
 
+  private boolean _trimApplied = false;
+
   public AggregationGroupByTrimmingService(QueryContext queryContext) {
     _aggregationFunctions = queryContext.getAggregationFunctions();
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
@@ -77,6 +79,8 @@ public class AggregationGroupByTrimmingService {
 
     int numGroups = intermediateResultsMap.size();
     if (numGroups > _trimThreshold) {
+      _trimApplied = true;
+
       // Trim the result only if number of groups is larger than the threshold
 
       Sorter[] sorters = new Sorter[numAggregationFunctions];
@@ -360,5 +364,9 @@ public class AggregationGroupByTrimmingService {
     public void dumpToGroupByResults(LinkedList<GroupByResult> dest, int numGroupByExpressions) {
       throw new UnsupportedOperationException();
     }
+  }
+
+  public boolean isTrimApplied() {
+    return _trimApplied;
   }
 }

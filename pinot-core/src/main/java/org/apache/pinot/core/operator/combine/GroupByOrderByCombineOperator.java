@@ -243,7 +243,9 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
 
     mergedBlock.setNumResizes(indexedTable.getNumResizes());
     mergedBlock.setResizeTimeMs(indexedTable.getResizeTimeMs());
-    // TODO - set numGroupsLimitReached
+    if (_indexedTable.IsNumGroupsLimitReached()) {
+      mergedBlock.setNumGroupsLimitReached(true);
+    }
     return mergedBlock;
   }
 

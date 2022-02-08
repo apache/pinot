@@ -24,6 +24,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -45,6 +47,7 @@ public abstract class IndexedTable extends BaseTable {
   protected final int _trimSize;
   protected final int _trimThreshold;
 
+  protected final AtomicBoolean _groupLimitReached = new AtomicBoolean();
   protected Collection<Record> _topRecords;
   private int _numResizes;
   private long _resizeTimeNs;
@@ -172,5 +175,9 @@ public abstract class IndexedTable extends BaseTable {
 
   public long getResizeTimeMs() {
     return TimeUnit.NANOSECONDS.toMillis(_resizeTimeNs);
+  }
+
+  public boolean IsNumGroupsLimitReached() {
+    return _groupLimitReached.get();
   }
 }

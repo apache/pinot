@@ -245,6 +245,9 @@ public class GroupByDataTableReducer implements DataTableReducer {
         resultRows.add(resultRow);
       }
       brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, resultRows));
+      if (indexedTable.IsNumGroupsLimitReached()) {
+        brokerResponseNative.setNumGroupsLimitReached(true);
+      }
     } else {
       // PQL query with SQL group-by mode and response format
       // NOTE: For PQL query, keep the order of columns as is (group-by expressions followed by aggregations), no need

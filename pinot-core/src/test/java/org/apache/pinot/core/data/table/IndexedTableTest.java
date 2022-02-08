@@ -108,6 +108,7 @@ public class IndexedTableTest {
         future.get(10, TimeUnit.SECONDS);
       }
 
+      Assert.assertTrue(indexedTable.IsNumGroupsLimitReached());
       indexedTable.finish(false);
       Assert.assertEquals(indexedTable.size(), 5);
       checkEvicted(indexedTable, "c", "f");
