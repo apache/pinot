@@ -31,6 +31,7 @@ import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.locationtech.jts.geom.Geometry;
 
 
@@ -43,6 +44,8 @@ public class StContainsFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "ST_Contains";
   private TransformFunction _firstArgument;
   private TransformFunction _secondArgument;
+  private Geometry _firstLiteral;
+  private Geometry _secondLiteral;
   private int[] _results;
 
   @Override
@@ -62,7 +65,12 @@ public class StContainsFunction extends BaseTransformFunction {
         "The first argument must be of type BYTES , but was %s",
             transformFunction.getResultMetadata().getDataType()
         );
-    _firstArgument = transformFunction;
+    if (transformFunction instanceof LiteralTransformFunction) {
+      _firstLiteral = GeometrySerializer.deserialize(
+          BytesUtils.toBytes(((LiteralTransformFunction) transformFunction).getLiteral()));
+    } else {
+      _firstArgument = transformFunction;
+    }
     transformFunction = arguments.get(1);
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
         "Second argument must be single-valued for transform function: %s", getName());
@@ -71,7 +79,12 @@ public class StContainsFunction extends BaseTransformFunction {
         "The second argument must be of type BYTES , but was %s",
             transformFunction.getResultMetadata().getDataType()
         );
-    _secondArgument = transformFunction;
+    if (transformFunction instanceof LiteralTransformFunction) {
+      _secondLiteral = GeometrySerializer.deserialize(
+          BytesUtils.toBytes(((LiteralTransformFunction) transformFunction).getLiteral()));
+    } else {
+      _secondArgument = transformFunction;
+    }
   }
 
   @Override
@@ -84,11 +97,17 @@ public class StContainsFunction extends BaseTransformFunction {
     if (_results == null) {
       _results = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
-    byte[][] firstValues = _firstArgument.transformToBytesValuesSV(projectionBlock);
-    byte[][] secondValues = _secondArgument.transformToBytesValuesSV(projectionBlock);
+    byte[][] firstValues = null;
+    byte[][] secondValues = null;
+    if (_firstArgument != null) {
+      firstValues = _firstArgument.transformToBytesValuesSV(projectionBlock);
+    }
+    if (_secondArgument != null) {
+      secondValues = _secondArgument.transformToBytesValuesSV(projectionBlock);
+    }
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      Geometry firstGeometry = GeometrySerializer.deserialize(firstValues[i]);
-      Geometry secondGeometry = GeometrySerializer.deserialize(secondValues[i]);
+      Geometry firstGeometry = firstValues == null ? _firstLiteral : GeometrySerializer.deserialize(firstValues[i]);
+      Geometry secondGeometry = secondValues == null ? _secondLiteral : GeometrySerializer.deserialize(secondValues[i]);
       if (GeometryUtils.isGeography(firstGeometry) || GeometryUtils.isGeography(secondGeometry)) {
         throw new RuntimeException(String.format("%s is available for Geometry objects only", FUNCTION_NAME));
       }
