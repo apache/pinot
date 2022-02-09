@@ -277,12 +277,15 @@ public class IndexedTableTest {
   @Test
   public void testUpsertOrderByWithTrim() {
     QueryContext queryContext =
-            QueryContextConverterUtils.getQueryContextFromSQL("SELECT key, count(*) FROM testTable GROUP BY key ORDER BY 2 DESC");
+            QueryContextConverterUtils.getQueryContextFromSQL(
+                    "SELECT key, count(*) FROM testTable GROUP BY key ORDER BY 2 DESC"
+            );
     DataSchema dataSchema = new DataSchema(new String[]{"key", "count(*)"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.LONG
     });
 
-    IndexedTable indexedTable = new ConcurrentIndexedTable(dataSchema, queryContext, TRIM_SIZE, TRIM_SIZE, TRIM_THRESHOLD);
+    IndexedTable indexedTable =
+            new ConcurrentIndexedTable(dataSchema, queryContext, TRIM_SIZE, TRIM_SIZE, TRIM_THRESHOLD);
     for (int i = 1; i <= 21; i++) {
       indexedTable.upsert(getRecord(new Object[]{i, new Long(i + 10)}));
     }
