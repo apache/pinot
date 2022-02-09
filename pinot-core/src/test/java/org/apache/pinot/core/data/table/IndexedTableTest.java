@@ -108,7 +108,7 @@ public class IndexedTableTest {
         future.get(10, TimeUnit.SECONDS);
       }
 
-      Assert.assertTrue(indexedTable.isNumGroupsLimitReached());
+      Assert.assertFalse(indexedTable.isNumGroupsLimitReached());
       indexedTable.finish(false);
       Assert.assertEquals(indexedTable.size(), 5);
       checkEvicted(indexedTable, "c", "f");
@@ -256,6 +256,21 @@ public class IndexedTableTest {
 
     indexedTable = new ConcurrentIndexedTable(dataSchema, queryContext, 5, TRIM_SIZE, TRIM_THRESHOLD);
     testNoMoreNewRecordsInTable(indexedTable);
+  }
+
+  @Test
+  public void testUpsertWithTrim() {
+    QueryContext queryContext =
+            QueryContextConverterUtils.getQueryContextFromSQL("SELECT key, count(*) FROM testTable GROUP BY key");
+    DataSchema dataSchema = new DataSchema(new String[]{"key", "count(*)"}, new ColumnDataType[]{
+            ColumnDataType.INT, ColumnDataType.DOUBLE
+    });
+
+    IndexedTable indexedTable = new ConcurrentIndexedTable(dataSchema, queryContext, TRIM_SIZE, TRIM_SIZE, TRIM_THRESHOLD);
+    for (int i = 1; i <= 11; i++) {
+      indexedTable.upsert(getRecord(new Object[]{i, 10d}));
+    }
+    Assert.assertTrue(indexedTable.isNumGroupsLimitReached());
   }
 
   private void testNoMoreNewRecordsInTable(IndexedTable indexedTable) {
