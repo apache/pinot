@@ -27,6 +27,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
@@ -51,8 +53,10 @@ import static org.mockito.Mockito.when;
 
 
 public class SegmentDeletionManagerTest {
-  private final static String TABLE_NAME = "table";
-  private final static String CLUSTER_NAME = "mock";
+  private static final String TABLE_NAME = "table";
+  private static final String CLUSTER_NAME = "mock";
+  // these prefix must be the same as those in SegmentDeletionManager.
+  private static final String RETENTION_PERIOD_SEPARATOR = "__RETENTION_MS__";
 
   HelixAdmin makeHelixAdmin() {
     HelixAdmin admin = mock(HelixAdmin.class);
@@ -211,7 +215,7 @@ public class SegmentDeletionManagerTest {
     FakeDeletionManager deletionManager = new FakeDeletionManager(tempDir.getAbsolutePath(), helixAdmin, propertyStore);
 
     // Test delete when deleted segments directory does not exists
-    deletionManager.removeAgedDeletedSegments(1);
+    deletionManager.removeAgedDeletedSegments();
 
     // Create deleted directory
     String deletedDirectoryPath = tempDir + File.separator + "Deleted_Segments";
@@ -219,7 +223,7 @@ public class SegmentDeletionManagerTest {
     deletedDirectory.mkdir();
 
     // Test delete when deleted segments directory is empty
-    deletionManager.removeAgedDeletedSegments(1);
+    deletionManager.removeAgedDeletedSegments();
 
     // Create dummy directories and files
     File dummyDir1 = new File(deletedDirectoryPath + File.separator + "dummy1");
@@ -228,7 +232,7 @@ public class SegmentDeletionManagerTest {
     dummyDir2.mkdir();
 
     // Test delete when there is no files but some directories exist
-    deletionManager.removeAgedDeletedSegments(1);
+    deletionManager.removeAgedDeletedSegments();
     Assert.assertEquals(dummyDir1.exists(), false);
     Assert.assertEquals(dummyDir2.exists(), false);
 
@@ -238,10 +242,10 @@ public class SegmentDeletionManagerTest {
 
     // Create dummy files
     for (int i = 0; i < 3; i++) {
-      createTestFileWithAge(dummyDir1.getAbsolutePath() + File.separator + "file" + i, i);
+      createTestFileWithAge(dummyDir1.getAbsolutePath() + File.separator + genDeletedSegmentName("file" + i, 1), i);
     }
     for (int i = 2; i < 5; i++) {
-      createTestFileWithAge(dummyDir2.getAbsolutePath() + File.separator + "file" + i, i);
+      createTestFileWithAge(dummyDir2.getAbsolutePath() + File.separator + genDeletedSegmentName("file" + i, 1), i);
     }
 
     // Sleep 1 second to ensure the clock moves.
@@ -251,17 +255,68 @@ public class SegmentDeletionManagerTest {
     Assert.assertEquals(dummyDir1.list().length, 3);
     Assert.assertEquals(dummyDir2.list().length, 3);
 
-    // Try to remove files with the retention of 3 days.
-    deletionManager.removeAgedDeletedSegments(3);
-    Assert.assertEquals(dummyDir1.list().length, 3);
-    Assert.assertEquals(dummyDir2.list().length, 1);
-
-    // Try to further remove files with the retention of 1 days.
-    deletionManager.removeAgedDeletedSegments(1);
+    // Try to remove files with the retention of 1 days.
+    deletionManager.removeAgedDeletedSegments();
     Assert.assertEquals(dummyDir1.list().length, 1);
 
     // Check that empty directory has successfully been removed.
     Assert.assertEquals(dummyDir2.exists(), false);
+  }
+
+  @Test
+  public void testSegmentDeletionLogic()
+      throws Exception {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY + ".class",
+        LocalPinotFS.class.getName());
+    PinotFSFactory.init(new PinotConfiguration(properties));
+
+    HelixAdmin helixAdmin = makeHelixAdmin();
+    ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
+    File tempDir = Files.createTempDir();
+    tempDir.deleteOnExit();
+    SegmentDeletionManager deletionManager = new SegmentDeletionManager(
+        tempDir.getAbsolutePath(), helixAdmin, CLUSTER_NAME, propertyStore, 7);
+
+    // create table segment files.
+    Set<String> segments = new HashSet<>(segmentsThatShouldBeDeleted());
+    createTableAndSegmentFiles(tempDir, segmentsThatShouldBeDeleted());
+    File tableDir = new File(tempDir.getAbsolutePath() + File.separator + TABLE_NAME);
+    File deletedTableDir = new File(tempDir.getAbsolutePath() + File.separator + "Deleted_Segments"
+        + File.separator + TABLE_NAME);
+
+    // delete the segments instantly.
+    deletionManager.deleteSegments(TABLE_NAME, segments, 0);
+
+    // Sleep 3 second to ensure the async delete actually kicked in.
+    Thread.sleep(3000L);
+    Assert.assertEquals(tableDir.listFiles().length, 0);
+    Assert.assertTrue(!deletedTableDir.exists() || deletedTableDir.listFiles().length == 0);
+
+    // create table segment files
+    createTableAndSegmentFiles(tempDir, segmentsThatShouldBeDeleted());
+    // delete the segments with default retention
+    deletionManager.deleteSegments(TABLE_NAME, segments);
+
+    // Sleep 3 second to ensure the async delete actually kicked in.
+    Thread.sleep(3000L);
+    tableDir = new File(tempDir.getAbsolutePath() + File.separator + TABLE_NAME);
+    Assert.assertEquals(tableDir.listFiles().length, 0);
+    Assert.assertEquals(deletedTableDir.listFiles().length, segments.size());
+  }
+
+  public void createTableAndSegmentFiles(File tempDir, List<String> segmentIds)
+      throws Exception {
+    File tableDir = new File(tempDir.getAbsolutePath() + File.separator + TABLE_NAME);
+    tableDir.mkdir();
+    for (String segmentId : segmentIds) {
+      createTestFileWithAge(tableDir.getAbsolutePath() + File.separator + segmentId, 0);
+    }
+  }
+
+  public String genDeletedSegmentName(String fileName, int retentionInDays) {
+    String retentionMs = String.valueOf(TimeUnit.DAYS.toMillis(retentionInDays));
+    return StringUtils.join(fileName, RETENTION_PERIOD_SEPARATOR, retentionMs);
   }
 
   public void createTestFileWithAge(String path, int age)
@@ -285,17 +340,17 @@ public class SegmentDeletionManagerTest {
     }
 
     public void deleteSegmentsFromPropertyStoreAndLocal(String tableName, Collection<String> segments) {
-      super.deleteSegmentFromPropertyStoreAndLocal(tableName, segments, 0L);
+      super.deleteSegmentFromPropertyStoreAndLocal(tableName, segments, 0, 0L);
     }
 
     @Override
-    protected void removeSegmentFromStore(String tableName, String segmentId) {
+    protected void removeSegmentFromStore(String tableName, String segmentId, long deletedSegmentsRetentionMs) {
       _segmentsRemovedFromStore.add(segmentId);
     }
 
     @Override
-    protected void deleteSegmentsWithDelay(final String tableName, final Collection<String> segmentIds,
-        final long deletionDelaySeconds) {
+    protected void deleteSegmentsWithDelay(String tableName, Collection<String> segmentIds,
+        long deletedSegmentsRetentionMs, long deletionDelaySeconds) {
       _segmentsToRetry.addAll(segmentIds);
     }
   }

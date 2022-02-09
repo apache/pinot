@@ -50,6 +50,7 @@ public class TableConfigBuilder {
   private static final String DEFAULT_SEGMENT_PUSH_TYPE = "APPEND";
   private static final String REFRESH_SEGMENT_PUSH_TYPE = "REFRESH";
   private static final String DEFAULT_SEGMENT_ASSIGNMENT_STRATEGY = "BalanceNumSegmentAssignmentStrategy";
+  private static final String DEFAULT_SEGMENT_DELETION_RETENTION_PERIOD = "7d";
   private static final String DEFAULT_NUM_REPLICAS = "1";
   private static final String DEFAULT_LOAD_MODE = "HEAP";
   private static final String MMAP_LOAD_MODE = "MMAP";
@@ -67,6 +68,7 @@ public class TableConfigBuilder {
   private boolean _allowNullTimeValue;
   private String _retentionTimeUnit;
   private String _retentionTimeValue;
+  private String _deletedSegmentRetentionPeriod = DEFAULT_SEGMENT_DELETION_RETENTION_PERIOD;
   @Deprecated
   private String _segmentPushFrequency;
   @Deprecated
@@ -373,6 +375,7 @@ public class TableConfigBuilder {
     validationConfig.setAllowNullTimeValue(_allowNullTimeValue);
     validationConfig.setRetentionTimeUnit(_retentionTimeUnit);
     validationConfig.setRetentionTimeValue(_retentionTimeValue);
+    validationConfig.setDeletedSegmentRetentionPeriod(_deletedSegmentRetentionPeriod);
     validationConfig.setSegmentPushFrequency(_segmentPushFrequency);
     validationConfig.setSegmentPushType(_segmentPushType);
     validationConfig.setSegmentAssignmentStrategy(_segmentAssignmentStrategy);
