@@ -16,33 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.function;
+package org.apache.pinot.broker.integration.tests;
 
-import org.apache.pinot.segment.spi.AggregationFunctionType;
+import javax.inject.Singleton;
+import org.jvnet.hk2.annotations.Service;
 
-
-/**
- * Place where all functions are registered.
- */
-public class FunctionDefinitionRegistry {
-  private FunctionDefinitionRegistry() {
-  }
-
-  public static boolean isAggFunc(String functionName) {
-    try {
-      AggregationFunctionType.getAggregationFunctionType(functionName);
-      return true;
-    } catch (IllegalArgumentException e) {
-      return false;
+@Service
+@Singleton
+public class BrokerTestAutoLoadedService {
+    public String echo(String echoText) {
+        return echoText;
     }
-  }
-
-  public static boolean isTransformFunc(String functionName) {
-    try {
-      TransformFunctionType.getTransformFunctionType(functionName);
-      return true;
-    } catch (IllegalArgumentException e) {
-      return false;
-    }
-  }
 }

@@ -58,13 +58,19 @@ public class StContainsFunction extends BaseTransformFunction {
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
         "First argument must be single-valued for transform function: %s", getName());
     Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES
-        || transformFunction instanceof LiteralTransformFunction, "The first argument must be of bytes type");
+            || transformFunction instanceof LiteralTransformFunction,
+        "The first argument must be of type BYTES , but was %s",
+            transformFunction.getResultMetadata().getDataType()
+        );
     _firstArgument = transformFunction;
     transformFunction = arguments.get(1);
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
         "Second argument must be single-valued for transform function: %s", getName());
     Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES
-        || transformFunction instanceof LiteralTransformFunction, "The second argument must be of bytes type");
+            || transformFunction instanceof LiteralTransformFunction,
+        "The second argument must be of type BYTES , but was %s",
+            transformFunction.getResultMetadata().getDataType()
+        );
     _secondArgument = transformFunction;
   }
 

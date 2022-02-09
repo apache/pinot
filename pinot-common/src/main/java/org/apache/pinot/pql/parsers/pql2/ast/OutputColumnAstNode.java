@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.pql.parsers.pql2.ast;
 
-import org.apache.pinot.common.function.FunctionDefinitionRegistry;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
@@ -26,6 +25,7 @@ import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 /**
@@ -37,7 +37,7 @@ public class OutputColumnAstNode extends BaseAstNode {
     for (AstNode astNode : getChildren()) {
       if (astNode instanceof FunctionCallAstNode) {
         String functionName = ((FunctionCallAstNode) astNode).getName();
-        if (FunctionDefinitionRegistry.isAggFunc(functionName)) {
+        if (AggregationFunctionType.isAggregationFunction(functionName)) {
           FunctionCallAstNode node = (FunctionCallAstNode) astNode;
           brokerRequest.addToAggregationsInfo(node.buildAggregationInfo());
         } else {

@@ -54,10 +54,39 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
     double sum = aggregationResultHolder.getDoubleResult();
-    for (int i = 0; i < length; i++) {
-      sum += valueArray[i];
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    switch (blockValSet.getValueType().getStoredType()) {
+      case INT: {
+        int[] values = blockValSet.getIntValuesSV();
+        for (int i = 0; i < length & i < values.length; i++) {
+          sum += values[i];
+        }
+        break;
+      }
+      case LONG: {
+        long[] values = blockValSet.getLongValuesSV();
+        for (int i = 0; i < length & i < values.length; i++) {
+          sum += values[i];
+        }
+        break;
+      }
+      case FLOAT: {
+        float[] values = blockValSet.getFloatValuesSV();
+        for (int i = 0; i < length & i < values.length; i++) {
+          sum += values[i];
+        }
+        break;
+      }
+      case DOUBLE: {
+        double[] values = blockValSet.getDoubleValuesSV();
+        for (int i = 0; i < length & i < values.length; i++) {
+          sum += values[i];
+        }
+        break;
+      }
+      default:
+        throw new IllegalStateException("Cannot compute sum for non-numeric type: " + blockValSet.getValueType());
     }
     aggregationResultHolder.setValue(sum);
   }

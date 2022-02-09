@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -41,14 +40,16 @@ public abstract class LogicalOperatorTransformFunction extends BaseTransformFunc
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     _arguments = arguments;
     int numArguments = arguments.size();
-    Preconditions.checkState(numArguments > 1, String
-        .format("Expect more than 1 argument for logical operator [%s], args [%s].", getName(),
-            Arrays.toString(arguments.toArray())));
+    if (numArguments <= 1) {
+      throw new IllegalArgumentException("Expect more than 1 argument for logical operator [" + getName() + "], args ["
+          + Arrays.toString(arguments.toArray()) + "].");
+    }
     for (int i = 0; i < numArguments; i++) {
       TransformResultMetadata argumentMetadata = arguments.get(i).getResultMetadata();
-      Preconditions
-          .checkState(argumentMetadata.isSingleValue() && argumentMetadata.getDataType().getStoredType().isNumeric(),
-              String.format("Unsupported argument of index: %d, expecting single-valued boolean/number", i));
+      if (!(argumentMetadata.isSingleValue() && argumentMetadata.getDataType().getStoredType().isNumeric())) {
+        throw new IllegalArgumentException(
+            "Unsupported argument of index: " + i + ", expecting single-valued boolean/number");
+      }
     }
   }
 

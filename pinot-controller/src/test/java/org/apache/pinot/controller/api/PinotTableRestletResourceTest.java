@@ -173,10 +173,6 @@ public class PinotTableRestletResourceTest {
     realtimeTableConfig = _realtimeBuilder.setTableName(REALTIME_TABLE_NAME).setTimeColumnName("timeColumn").build();
     String realtimeTableConfigString = realtimeTableConfig.toJsonString();
     ControllerTestUtils.sendPostRequest(_createTableUrl, realtimeTableConfigString);
-
-    // TODO: check whether we should allow POST request to create REALTIME table that already exists
-    // Create a REALTIME table that already exists which should succeed
-    ControllerTestUtils.sendPostRequest(_createTableUrl, realtimeTableConfigString);
   }
 
   @Test

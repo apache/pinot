@@ -45,6 +45,7 @@ import ArrowDropUpIcon from '@material-ui/icons/ArrowDropUp';
 import { Link } from 'react-router-dom';
 import Chip from '@material-ui/core/Chip';
 import _ from 'lodash';
+import app_state from '../app_state';
 import Utils from '../utils/Utils';
 import TableToolbar from './TableToolbar';
 import SimpleAccordion from './SimpleAccordion';
@@ -450,14 +451,14 @@ export default function CustomizedTables({
                     onClick={() => {
                       if(column === 'Number of Segments'){
                         const data = finalData.sort((a,b)=>{
-                          const aSegmentInt = parseInt(a[column]);
-                          const bSegmentInt = parseInt(b[column]);
+                          const aSegmentInt = parseInt(a[column+app_state.columnNameSeparator+index]);
+                          const bSegmentInt = parseInt(b[column+app_state.columnNameSeparator+index]);
                           const result = order ? (aSegmentInt > bSegmentInt) : (aSegmentInt < bSegmentInt);
                           return result ? 1 : -1;
                         });
                         setFinalData(data);
                       } else {
-                        setFinalData(_.orderBy(finalData, column, order ? 'asc' : 'desc'));
+                        setFinalData(_.orderBy(finalData, column+app_state.columnNameSeparator+index, order ? 'asc' : 'desc'));
                       }
                       setOrder(!order);
                       setColumnClicked(column);

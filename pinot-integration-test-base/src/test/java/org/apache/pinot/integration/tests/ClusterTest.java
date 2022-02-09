@@ -57,6 +57,7 @@ import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -414,6 +415,53 @@ public abstract class ClusterTest extends ControllerTest {
               return uploadSegmentWithOnlyMetadata(tableName, uploadSegmentHttpURI, fileUploadDownloadClient,
                   segmentTarFile);
             }
+          }));
+        }
+        executorService.shutdown();
+        for (Future<Integer> future : futures) {
+          assertEquals((int) future.get(), HttpStatus.SC_OK);
+        }
+      }
+    }
+  }
+
+  /**
+   * tarDirPaths contains a list of directories that contain segment files. API uploads all segments inside the given
+   * list of directories to the cluster.
+   *
+   * @param tarDirPaths List of directories containing segments
+   */
+  protected void uploadSegments(String tableName, List<File> tarDirPaths, TableType tableType,
+      boolean enableParallelPushProtection)
+      throws Exception {
+    List<File> segmentTarFiles = new ArrayList<>();
+
+    for (File tarDir : tarDirPaths) {
+      Collections.addAll(segmentTarFiles, tarDir.listFiles());
+    }
+    assertNotNull(segmentTarFiles);
+    int numSegments = segmentTarFiles.size();
+    assertTrue(numSegments > 0);
+
+    URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentHttpURI(LOCAL_HOST, _controllerPort);
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      if (numSegments == 1) {
+        File segmentTarFile = segmentTarFiles.get(0);
+        assertEquals(fileUploadDownloadClient
+                .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName,
+                    tableType.OFFLINE, enableParallelPushProtection, true)
+                .getStatusCode(),
+            HttpStatus.SC_OK);
+      } else {
+        // Upload all segments in parallel
+        ExecutorService executorService = Executors.newFixedThreadPool(numSegments);
+        List<Future<Integer>> futures = new ArrayList<>(numSegments);
+        for (File segmentTarFile : segmentTarFiles) {
+          futures.add(executorService.submit(() -> {
+            return fileUploadDownloadClient
+                .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName,
+                    tableType.OFFLINE, enableParallelPushProtection, true)
+                .getStatusCode();
           }));
         }
         executorService.shutdown();

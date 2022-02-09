@@ -19,18 +19,20 @@
 package org.apache.pinot.common.function;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.jayway.jsonpath.PathNotFoundException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.scalar.JsonFunctions;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class JsonFunctionsTest {
@@ -73,8 +75,16 @@ public class JsonFunctionsTest {
     assertEquals(JsonFunctions.jsonPathLong(jsonString, "$.actor.id"), 33500718L);
     assertEquals(JsonFunctions.jsonPathDouble(jsonString, "$.actor.id"), 33500718.0);
     assertEquals(JsonFunctions.jsonPathString(jsonString, "$.actor.aaa", "null"), "null");
+    assertEquals(JsonFunctions.jsonPathString("not json", "$.actor.aaa", "null"), "null");
+    assertEquals(JsonFunctions.jsonPathString(null, "$.actor.aaa", "null"), "null");
     assertEquals(JsonFunctions.jsonPathLong(jsonString, "$.actor.aaa", 100L), 100L);
+    assertEquals(JsonFunctions.jsonPathLong(jsonString, "$.actor.aaa"), Long.MIN_VALUE);
+    assertEquals(JsonFunctions.jsonPathLong("not json", "$.actor.aaa", Long.MIN_VALUE), Long.MIN_VALUE);
+    assertEquals(JsonFunctions.jsonPathLong(null, "$.actor.aaa", Long.MIN_VALUE), Long.MIN_VALUE);
     assertEquals(JsonFunctions.jsonPathDouble(jsonString, "$.actor.aaa", 53.2), 53.2);
+    assertEquals(JsonFunctions.jsonPathDouble("not json", "$.actor.aaa", 53.2), 53.2);
+    assertEquals(JsonFunctions.jsonPathDouble(null, "$.actor.aaa", 53.2), 53.2);
+    assertTrue(Double.isNaN(JsonFunctions.jsonPathDouble(jsonString, "$.actor.aaa")));
   }
 
   @Test
@@ -104,6 +114,9 @@ public class JsonFunctionsTest {
     assertEquals(JsonFunctions.jsonPathArray(jsonString, "$.subjects[*].grade"), new String[]{"A", "B"});
     assertEquals(JsonFunctions.jsonPathArray(jsonString, "$.subjects[*].homework_grades"),
         new Object[]{Arrays.asList(80, 85, 90, 95, 100), Arrays.asList(60, 65, 70, 85, 90)});
+    assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, null), new Object[0]);
+    assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "not json"), new Object[0]);
+    assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "$.subjects[*].missing"), new Object[0]);
   }
 
   @Test
@@ -111,12 +124,7 @@ public class JsonFunctionsTest {
       throws JsonProcessingException {
     String jsonString = "{\"name\": \"Pete\", \"age\": 24}";
 
-    try {
-      assertEquals(JsonFunctions.jsonPathArray(jsonString, "$.subjects[*].name"), new String[]{});
-      fail();
-    } catch (PathNotFoundException e) {
-      assertEquals(e.getMessage(), "Missing property in path $['subjects']");
-    }
+    assertEquals(JsonFunctions.jsonPathArray(jsonString, "$.subjects[*].name"), new String[]{});
     assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "$.subjects[*].name"), new String[]{});
     assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "$.subjects[*].grade"), new String[]{});
     assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(jsonString, "$.subjects[*].homework_grades"), new Object[]{});
@@ -244,5 +252,57 @@ public class JsonFunctionsTest {
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].homework_grades"),
         new Object[]{Arrays.asList(80, 85, 90, 95, 100), Arrays.asList(60, 65, 70, 85, 90)});
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].score"), new Integer[]{90, 50});
+  }
+
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+  @DataProvider
+  public static Object[][] jsonPathStringTestCases() {
+    return new Object[][]{
+        {ImmutableMap.of("foo", "x", "bar", ImmutableMap.of("foo", "y")), "$.foo", "x"},
+        {ImmutableMap.of("foo", "x", "bar", ImmutableMap.of("foo", "y")), "$.qux", null},
+        {ImmutableMap.of("foo", "x", "bar", ImmutableMap.of("foo", "y")), "$.bar", "{\"foo\":\"y\"}"},
+    };
+  }
+
+  @Test(dataProvider = "jsonPathStringTestCases")
+  public void testJsonPathString(Map<String, Object> map, String path, String expected)
+      throws JsonProcessingException {
+    String value = JsonFunctions.jsonPathString(OBJECT_MAPPER.writeValueAsString(map), path);
+    assertEquals(value, expected);
+  }
+
+  @Test(dataProvider = "jsonPathStringTestCases")
+  public void testJsonPathStringWithDefaultValue(Map<String, Object> map, String path, String expected)
+      throws JsonProcessingException {
+    String value = JsonFunctions.jsonPathString(OBJECT_MAPPER.writeValueAsString(map), path, expected);
+    assertEquals(value, expected);
+  }
+
+  @DataProvider
+  public static Object[][] jsonPathArrayTestCases() {
+    return new Object[][]{
+        {ImmutableMap.of("foo", "x", "bar", ImmutableMap.of("foo", "y")), "$.foo", new Object[]{"x"}},
+        {ImmutableMap.of("foo", "x", "bar", ImmutableMap.of("foo", "y")), "$.qux", null},
+        {
+            ImmutableMap.of("foo", "x", "bar", ImmutableMap.of("foo", "y")), "$.bar", new Object[]{
+            ImmutableMap.of("foo", "y")
+        }
+        },
+    };
+  }
+
+  @Test(dataProvider = "jsonPathArrayTestCases")
+  public void testJsonPathArray(Map<String, Object> map, String path, Object[] expected)
+      throws JsonProcessingException {
+    Object[] value = JsonFunctions.jsonPathArray(OBJECT_MAPPER.writeValueAsString(map), path);
+    if (expected == null) {
+      assertNull(value);
+    } else {
+      assertEquals(value.length, expected.length);
+      for (int i = 0; i < value.length; i++) {
+        assertEquals(value[i], expected[i]);
+      }
+    }
   }
 }

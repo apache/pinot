@@ -38,11 +38,11 @@ import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.babel.SqlBabelParserImpl;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
-import org.apache.pinot.common.function.FunctionDefinitionRegistry;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.slf4j.Logger;
@@ -509,7 +509,7 @@ public class SqlResultComparator {
       if (expression.getType() == ExpressionType.FUNCTION) {
         Function functionCall = expression.getFunctionCall();
         String functionName = functionCall.getOperator();
-        if (FunctionDefinitionRegistry.isAggFunc(functionName)) {
+        if (AggregationFunctionType.isAggregationFunction(functionName)) {
           return false;
         }
       }

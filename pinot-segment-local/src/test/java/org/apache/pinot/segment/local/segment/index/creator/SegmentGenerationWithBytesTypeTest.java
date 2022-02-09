@@ -168,8 +168,8 @@ public class SegmentGenerationWithBytesTypeTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       int value = (i * NUM_SORTED_VALUES) / NUM_ROWS;
       // For sorted columns, values are written as 0, 0, 0.., 1, 1, 1...n, n, n
-      Assert
-          .assertEquals(dictionary.indexOf(BytesUtils.toHexString(Ints.toByteArray(value))), value % NUM_SORTED_VALUES);
+      Assert.assertEquals(dictionary.indexOf(BytesUtils.toHexString(Ints.toByteArray(value))),
+          value % NUM_SORTED_VALUES);
     }
 
     // Test value not in dictionary.
@@ -217,8 +217,8 @@ public class SegmentGenerationWithBytesTypeTest {
     int i = 0;
     while (reader.hasNext()) {
       row = reader.next(row);
-      Assert
-          .assertEquals(ByteArray.compare((byte[]) row.getValue(FIXED_BYTES_UNSORTED_COLUMN), fixedExpected.get(i)), 0);
+      Assert.assertEquals(ByteArray.compare((byte[]) row.getValue(FIXED_BYTES_UNSORTED_COLUMN), fixedExpected.get(i)),
+          0);
       Assert.assertEquals(ByteArray.compare((byte[]) row.getValue(VARIABLE_BYTES_COLUMN), varExpected.get(i++)), 0);
     }
     segment.destroy();
@@ -272,9 +272,9 @@ public class SegmentGenerationWithBytesTypeTest {
 
     Map<String, Object> props = new HashMap<>();
     props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap.toString());
-    SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
-        .load(driver.getOutputDirectory().toURI(),
-            new SegmentDirectoryLoaderContext(_tableConfig, null, null, new PinotConfiguration(props)));
+    SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader().load(driver.getOutputDirectory().toURI(),
+        new SegmentDirectoryLoaderContext.Builder().setTableConfig(_tableConfig)
+            .setSegmentDirectoryConfigs(new PinotConfiguration(props)).build());
     recordReader.rewind();
     return recordReader;
   }

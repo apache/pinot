@@ -33,6 +33,8 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.ReentrantLock;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -51,8 +53,12 @@ import org.apache.thrift.protocol.TCompactProtocol;
  */
 @ThreadSafe
 public class ServerChannels {
+  public static final String CHANNEL_LOCK_TIMEOUT_MSG = "Timeout while acquiring channel lock";
   private final QueryRouter _queryRouter;
   private final BrokerMetrics _brokerMetrics;
+  // TSerializer currently is not thread safe, must be put into a ThreadLocal.
+  private final ThreadLocal<TSerializer> _threadLocalTSerializer =
+      ThreadLocal.withInitial(() -> new TSerializer(new TCompactProtocol.Factory()));
   private final ConcurrentHashMap<ServerRoutingInstance, ServerChannel> _serverToChannelMap = new ConcurrentHashMap<>();
   private final EventLoopGroup _eventLoopGroup = new NioEventLoopGroup();
   private final TlsConfig _tlsConfig;
@@ -81,10 +87,11 @@ public class ServerChannels {
   }
 
   public void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
-      ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest)
+      ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest, long timeoutMs)
       throws Exception {
+    byte[] requestBytes = _threadLocalTSerializer.get().serialize(instanceRequest);
     _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new)
-        .sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, instanceRequest);
+        .sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes, timeoutMs);
   }
 
   public void shutDown() {
@@ -94,9 +101,10 @@ public class ServerChannels {
 
   @ThreadSafe
   private class ServerChannel {
-    final TSerializer _serializer = new TSerializer(new TCompactProtocol.Factory());
     final ServerRoutingInstance _serverRoutingInstance;
     final Bootstrap _bootstrap;
+    // lock to protect channel as requests must be written into channel sequentially
+    final ReentrantLock _channelLock = new ReentrantLock();
     Channel _channel;
 
     ServerChannel(ServerRoutingInstance serverRoutingInstance) {
@@ -122,8 +130,8 @@ public class ServerChannels {
 
     private void attachSSLHandler(SocketChannel ch) {
       try {
-        SslContextBuilder sslContextBuilder = SslContextBuilder.forClient()
-            .sslProvider(SslProvider.valueOf(_tlsConfig.getSslProvider()));
+        SslContextBuilder sslContextBuilder =
+            SslContextBuilder.forClient().sslProvider(SslProvider.valueOf(_tlsConfig.getSslProvider()));
 
         if (_tlsConfig.getKeyStorePath() != null) {
           sslContextBuilder.keyManager(TlsUtils.createKeyManagerFactory(_tlsConfig));
@@ -139,8 +147,22 @@ public class ServerChannels {
       }
     }
 
-    synchronized void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
-        ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest)
+    private void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
+        ServerRoutingInstance serverRoutingInstance, byte[] requestBytes, long timeoutMs)
+        throws Exception {
+      if (_channelLock.tryLock(timeoutMs, TimeUnit.MILLISECONDS)) {
+        try {
+          sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes);
+        } finally {
+          _channelLock.unlock();
+        }
+      } else {
+        throw new TimeoutException(CHANNEL_LOCK_TIMEOUT_MSG);
+      }
+    }
+
+    private void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
+        ServerRoutingInstance serverRoutingInstance, byte[] requestBytes)
         throws Exception {
       if (_channel == null || !_channel.isActive()) {
         long startTime = System.currentTimeMillis();
@@ -148,13 +170,11 @@ public class ServerChannels {
         _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.NETTY_CONNECTION_CONNECT_TIME_MS,
             System.currentTimeMillis() - startTime);
       }
-      byte[] requestBytes = _serializer.serialize(instanceRequest);
       long sendRequestStartTimeMs = System.currentTimeMillis();
       _channel.writeAndFlush(Unpooled.wrappedBuffer(requestBytes)).addListener(f -> {
         long requestSentLatencyMs = System.currentTimeMillis() - sendRequestStartTimeMs;
-        _brokerMetrics
-            .addTimedTableValue(rawTableName, BrokerTimer.NETTY_CONNECTION_SEND_REQUEST_LATENCY, requestSentLatencyMs,
-                TimeUnit.MILLISECONDS);
+        _brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.NETTY_CONNECTION_SEND_REQUEST_LATENCY,
+            requestSentLatencyMs, TimeUnit.MILLISECONDS);
         asyncQueryResponse.markRequestSent(serverRoutingInstance, requestSentLatencyMs);
       });
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_REQUESTS_SENT, 1);

@@ -453,4 +453,8 @@ public class PinotConfiguration {
   public String toString() {
     return new Obfuscator().toJsonString(this);
   }
+
+  public boolean isEmpty() {
+    return _configuration.isEmpty();
+  }
 }

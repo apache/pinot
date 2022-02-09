@@ -381,11 +381,12 @@ public class FileBasedSegmentWriterTest {
     segmentWriter.collect(getGenericRow("record7", 1616238000000L));
     segmentWriter.collect(getGenericRow("record8", 1616238000000L));
     segmentWriter.collect(getGenericRow("record9", 1616238000000L));
-    segmentWriter.flush();
-
-    // verify tar was not overwritten
-    segmentTars = _outputDir.listFiles();
-    Assert.assertEquals(segmentTars.length, 2);
+    try {
+      segmentWriter.flush();
+      Assert.fail();
+    } catch (RuntimeException e) {
+      // expected.
+    }
 
     segmentWriter.close();
     FileUtils.deleteQuietly(_outputDir);

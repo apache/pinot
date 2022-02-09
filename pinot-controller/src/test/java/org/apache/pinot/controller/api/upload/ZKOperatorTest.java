@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.controller.api.upload;
 
+import java.io.File;
+import java.net.URI;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -28,6 +31,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -38,7 +42,6 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
-
 
 public class ZKOperatorTest {
   private static final String TABLE_NAME = "operatorTestTable";
@@ -64,9 +67,34 @@ public class ZKOperatorTest {
     when(segmentMetadata.getCrc()).thenReturn("12345");
     when(segmentMetadata.getIndexCreationTime()).thenReturn(123L);
     HttpHeaders httpHeaders = mock(HttpHeaders.class);
+
+    // Test if Zk segment metadata is removed if exception is thrown when moving segment to final location.
+    try {
+      // Create mock finalSegmentLocationURI and currentSegmentLocation.
+      URI finalSegmentLocationURI =
+          URIUtils.getUri("mockPath", OFFLINE_TABLE_NAME, URIUtils.encode(segmentMetadata.getName()));
+      File currentSegmentLocation = new File(new File("foo/bar"), "mockChild");
+
+      zkOperator
+          .completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, finalSegmentLocationURI,
+              currentSegmentLocation, true, httpHeaders, "downloadUrl",
+              true, "crypter", true);
+      fail();
+    } catch (Exception e) {
+      // Expected
+    }
+
+    // Wait for the segment Zk entry to be deleted.
+    TestUtils.waitForCondition(aVoid -> {
+      SegmentZKMetadata segmentZKMetadata =
+          ControllerTestUtils.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
+      return segmentZKMetadata == null;
+    }, 30_000L, "Failed to delete segmentZkMetadata.");
+
+
     zkOperator
-        .completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, false, httpHeaders, "downloadUrl",
-            false, "crypter");
+        .completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, true, httpHeaders, "downloadUrl",
+            false, "crypter", true);
 
     SegmentZKMetadata segmentZKMetadata =
         ControllerTestUtils.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
@@ -78,12 +106,22 @@ public class ZKOperatorTest {
     assertEquals(segmentZKMetadata.getRefreshTime(), Long.MIN_VALUE);
     assertEquals(segmentZKMetadata.getDownloadUrl(), "downloadUrl");
     assertEquals(segmentZKMetadata.getCrypterName(), "crypter");
+    assertEquals(segmentZKMetadata.getSegmentUploadStartTime(), -1);
+
+    // Upload the same segment with allowRefresh = false. Validate that an exception is thrown.
+    try {
+      zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, false, httpHeaders,
+          "otherDownloadUrl", false, "otherCrypter", false);
+      fail();
+    } catch (Exception e) {
+      // Expected
+    }
 
     // Refresh the segment with unmatched IF_MATCH field
     when(httpHeaders.getHeaderString(HttpHeaders.IF_MATCH)).thenReturn("123");
     try {
-      zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, false, httpHeaders,
-          "otherDownloadUrl", false, null);
+      zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, true, httpHeaders,
+          "otherDownloadUrl", false, null, true);
       fail();
     } catch (Exception e) {
       // Expected
@@ -93,8 +131,8 @@ public class ZKOperatorTest {
     // downloadURL and crypter
     when(httpHeaders.getHeaderString(HttpHeaders.IF_MATCH)).thenReturn("12345");
     when(segmentMetadata.getIndexCreationTime()).thenReturn(456L);
-    zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, false, httpHeaders,
-        "otherDownloadUrl", false, "otherCrypter");
+    zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, true, httpHeaders,
+        "otherDownloadUrl", false, "otherCrypter", true);
     segmentZKMetadata =
         ControllerTestUtils.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
     assertEquals(segmentZKMetadata.getCrc(), 12345L);
@@ -107,6 +145,7 @@ public class ZKOperatorTest {
     // DownloadURL and crypter should not unchanged
     assertEquals(segmentZKMetadata.getDownloadUrl(), "downloadUrl");
     assertEquals(segmentZKMetadata.getCrypterName(), "crypter");
+    assertEquals(segmentZKMetadata.getSegmentUploadStartTime(), -1);
 
     // Refresh the segment with a different segment (different CRC)
     when(segmentMetadata.getCrc()).thenReturn("23456");
@@ -115,8 +154,8 @@ public class ZKOperatorTest {
     // 1 second delay to avoid "org.apache.helix.HelixException: Specified EXTERNALVIEW operatorTestTable_OFFLINE is
     // not found!" exception from being thrown sporadically.
     Thread.sleep(1000L);
-    zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, false, httpHeaders,
-        "otherDownloadUrl", false, "otherCrypter");
+    zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, true, httpHeaders,
+        "otherDownloadUrl", false, "otherCrypter", true);
     segmentZKMetadata =
         ControllerTestUtils.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
     assertEquals(segmentZKMetadata.getCrc(), 23456L);

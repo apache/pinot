@@ -21,6 +21,7 @@
 import React from 'react';
 import ReactDiffViewer, {DiffMethod} from 'react-diff-viewer';
 import _ from 'lodash';
+import app_state from '../app_state';
 
 const sortArray = function (sortingArr, keyName, ascendingFlag) {
   if (ascendingFlag) {
@@ -53,7 +54,7 @@ const tableFormat = (data) => {
   rows.forEach((singleRow) => {
     const obj = {};
     singleRow.forEach((val: any, index: number) => {
-      obj[header[index]] = val;
+      obj[header[index]+app_state.columnNameSeparator+index] = val;
     });
     results.push(obj);
   });

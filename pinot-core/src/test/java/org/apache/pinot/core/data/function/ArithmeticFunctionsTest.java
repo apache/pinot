@@ -75,6 +75,12 @@ public class ArithmeticFunctionsTest {
     row4.putValue("b", 5);
     inputs.add(new Object[]{"a % b", Lists.newArrayList("a", "b"), row4, 4.0});
 
+    GenericRow row5 = new GenericRow();
+    row5.putValue("a", 9);
+    row5.putValue("b", 5);
+    inputs.add(new Object[]{"least(a, b)", Lists.newArrayList("a", "b"), row5, 5.0});
+    inputs.add(new Object[]{"greatest(a, b)", Lists.newArrayList("a", "b"), row5, 9.0});
+
     return inputs.toArray(new Object[0][]);
   }
 }

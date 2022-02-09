@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.Header;
@@ -45,6 +46,7 @@ import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.integration.tests.access.CertBasedTlsChannelAccessControlFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -54,6 +56,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.tools.utils.PinotConfigUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -145,7 +148,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
 
     prop.put("controller.broker.protocol", "https");
 
-    // announce external only
+    // announce internal only
     prop.put("controller.vip.protocol", "https");
     prop.put("controller.vip.port", DEFAULT_CONTROLLER_PORT);
 
@@ -271,6 +274,34 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     sendDeleteRequest(
         _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)),
         AUTH_HEADER);
+  }
+
+  @Test
+  public void testControllerConfigValidation()
+      throws Exception {
+    PinotConfigUtils.validateControllerConfig(new ControllerConf(getDefaultControllerConfiguration()));
+  }
+
+  @Test
+  public void testControllerConfigValidationImplicitProtocol()
+      throws Exception {
+    Map<String, Object> prop = new HashMap<>(getDefaultControllerConfiguration());
+    prop.put("controller.access.protocols", "https,http");
+    prop.put("controller.access.protocols.https.port", DEFAULT_CONTROLLER_PORT);
+    prop.put("controller.access.protocols.http.port", EXTERNAL_CONTROLLER_PORT);
+
+    PinotConfigUtils.validateControllerConfig(new ControllerConf(prop));
+  }
+
+  @Test(expectedExceptions = ConfigurationException.class)
+  public void testControllerConfigValidationNoProtocol()
+      throws Exception {
+    Map<String, Object> prop = new HashMap<>(getDefaultControllerConfiguration());
+    prop.put("controller.access.protocols", "invalid,http");
+    prop.put("controller.access.protocols.invalid.port", DEFAULT_CONTROLLER_PORT);
+    prop.put("controller.access.protocols.http.port", EXTERNAL_CONTROLLER_PORT);
+
+    PinotConfigUtils.validateControllerConfig(new ControllerConf(prop));
   }
 
   @Test

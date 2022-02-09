@@ -275,6 +275,35 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
       driver.init(segmentGeneratorConfig);
       validateSchema(driver.getIngestionSchemaValidator());
       driver.build();
+      String segmentName = driver.getSegmentName();
+      _logger.info("Finish creating segment: {} with sequence id: {}", segmentName, sequenceId);
+
+      File localSegmentDir = new File(_localSegmentDir, segmentName);
+      String segmentTarFileName = segmentName + JobConfigConstants.TAR_GZ_FILE_EXT;
+      File localSegmentTarFile = new File(_localSegmentTarDir, segmentTarFileName);
+      _logger.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
+      TarGzCompressionUtils.createTarGzFile(localSegmentDir, localSegmentTarFile);
+
+      long uncompressedSegmentSize = FileUtils.sizeOf(localSegmentDir);
+      long compressedSegmentSize = FileUtils.sizeOf(localSegmentTarFile);
+      _logger.info("Size for segment: {}, uncompressed: {}, compressed: {}", segmentName,
+          DataSizeUtils.fromBytes(uncompressedSegmentSize), DataSizeUtils.fromBytes(compressedSegmentSize));
+
+      Path hdfsSegmentTarFile = new Path(_hdfsSegmentTarDir, segmentTarFileName);
+      if (_useRelativePath) {
+        Path relativeOutputPath =
+            getRelativeOutputPath(new Path(_jobConf.get(JobConfigConstants.PATH_TO_INPUT)).toUri(),
+                hdfsInputFile.toUri(), _hdfsSegmentTarDir);
+        hdfsSegmentTarFile = new Path(relativeOutputPath, segmentTarFileName);
+      }
+      _logger.info("Copying segment tar file from: {} to: {}", localSegmentTarFile, hdfsSegmentTarFile);
+      FileSystem.get(hdfsSegmentTarFile.toUri(), _jobConf)
+          .copyFromLocalFile(true, true, new Path(localSegmentTarFile.getAbsolutePath()), hdfsSegmentTarFile);
+
+      context.write(new LongWritable(sequenceId), new Text(segmentTarFileName));
+      _logger
+          .info("Finish generating segment: {} with HDFS input file: {}, sequence id: {}", segmentName, hdfsInputFile,
+              sequenceId);
     } catch (Exception e) {
       _logger.error("Caught exception while creating segment with HDFS input file: {}, sequence id: {}", hdfsInputFile,
           sequenceId, e);
@@ -286,34 +315,6 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
         _logger.error("Failed to interrupt progress reporter thread: {}", progressReporterThread);
       }
     }
-    String segmentName = driver.getSegmentName();
-    _logger.info("Finish creating segment: {} with sequence id: {}", segmentName, sequenceId);
-
-    File localSegmentDir = new File(_localSegmentDir, segmentName);
-    String segmentTarFileName = segmentName + JobConfigConstants.TAR_GZ_FILE_EXT;
-    File localSegmentTarFile = new File(_localSegmentTarDir, segmentTarFileName);
-    _logger.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
-    TarGzCompressionUtils.createTarGzFile(localSegmentDir, localSegmentTarFile);
-
-    long uncompressedSegmentSize = FileUtils.sizeOf(localSegmentDir);
-    long compressedSegmentSize = FileUtils.sizeOf(localSegmentTarFile);
-    _logger.info("Size for segment: {}, uncompressed: {}, compressed: {}", segmentName,
-        DataSizeUtils.fromBytes(uncompressedSegmentSize), DataSizeUtils.fromBytes(compressedSegmentSize));
-
-    Path hdfsSegmentTarFile = new Path(_hdfsSegmentTarDir, segmentTarFileName);
-    if (_useRelativePath) {
-      Path relativeOutputPath =
-          getRelativeOutputPath(new Path(_jobConf.get(JobConfigConstants.PATH_TO_INPUT)).toUri(), hdfsInputFile.toUri(),
-              _hdfsSegmentTarDir);
-      hdfsSegmentTarFile = new Path(relativeOutputPath, segmentTarFileName);
-    }
-    _logger.info("Copying segment tar file from: {} to: {}", localSegmentTarFile, hdfsSegmentTarFile);
-    FileSystem.get(hdfsSegmentTarFile.toUri(), _jobConf)
-        .copyFromLocalFile(true, true, new Path(localSegmentTarFile.getAbsolutePath()), hdfsSegmentTarFile);
-
-    context.write(new LongWritable(sequenceId), new Text(segmentTarFileName));
-    _logger.info("Finish generating segment: {} with HDFS input file: {}, sequence id: {}", segmentName, hdfsInputFile,
-        sequenceId);
   }
 
   protected FileFormat getFileFormat(String fileName) {
