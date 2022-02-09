@@ -186,8 +186,10 @@ public class BrokerRequestToQueryContextConverter {
           for (String expression : stringExpressions) {
             arguments.add(RequestContextUtils.getExpressionFromPQL(expression));
           }
-        } else if (functionName.equalsIgnoreCase(AggregationFunctionType.LASTWITHTIME.getName())) {
-          // For LASTWITHTIME query, only the first two arguments are expression, third one is literal if available
+        } else if (functionName.equalsIgnoreCase(AggregationFunctionType.FIRSTWITHTIME.getName())
+            || functionName.equalsIgnoreCase(AggregationFunctionType.LASTWITHTIME.getName())) {
+          // For LASTWITHTIME or FIRSTWITHTIME query
+          // only the first two arguments are expression, third one is literal if available
           arguments.add(RequestContextUtils.getExpressionFromPQL(stringExpressions.get(0)));
           arguments.add(RequestContextUtils.getExpressionFromPQL(stringExpressions.get(1)));
           for (int i = 2; i < numArguments; i++) {
