@@ -1213,7 +1213,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     if (TransformFunctionFactory.canonicalize(functionCall.getOperator())
-        .contains(TransformFunctionType.GROOVY.getName())) {
+        .equals(TransformFunctionType.GROOVY.getName())) {
       throw new BadQueryRequestException("Groovy transform functions are disabled for queries");
     }
 
