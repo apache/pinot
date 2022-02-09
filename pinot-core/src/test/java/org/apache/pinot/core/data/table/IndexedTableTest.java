@@ -274,6 +274,21 @@ public class IndexedTableTest {
     Assert.assertTrue(indexedTable.isNumGroupsLimitReached());
   }
 
+  @Test
+  public void testUpsertOrderByWithTrim() {
+    QueryContext queryContext =
+            QueryContextConverterUtils.getQueryContextFromSQL("SELECT key, count(*) FROM testTable GROUP BY key ORDER BY 2 DESC");
+    DataSchema dataSchema = new DataSchema(new String[]{"key", "count(*)"}, new ColumnDataType[]{
+            ColumnDataType.INT, ColumnDataType.LONG
+    });
+
+    IndexedTable indexedTable = new ConcurrentIndexedTable(dataSchema, queryContext, TRIM_SIZE, TRIM_SIZE, TRIM_THRESHOLD);
+    for (int i = 1; i <= 21; i++) {
+      indexedTable.upsert(getRecord(new Object[]{i, new Long(i + 10)}));
+    }
+    Assert.assertTrue(indexedTable.isNumGroupsLimitReached());
+  }
+
   private void testNoMoreNewRecordsInTable(IndexedTable indexedTable) {
     // Insert 7 records. Check that last 2 never made it.
     indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d, 10d, 100d}));
