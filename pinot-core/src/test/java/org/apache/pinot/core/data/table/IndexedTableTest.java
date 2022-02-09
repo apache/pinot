@@ -266,7 +266,8 @@ public class IndexedTableTest {
             ColumnDataType.INT, ColumnDataType.DOUBLE
     });
 
-    IndexedTable indexedTable = new ConcurrentIndexedTable(dataSchema, queryContext, TRIM_SIZE, TRIM_SIZE, TRIM_THRESHOLD);
+    IndexedTable indexedTable =
+            new ConcurrentIndexedTable(dataSchema, queryContext, TRIM_SIZE, TRIM_SIZE, TRIM_THRESHOLD);
     for (int i = 1; i <= 11; i++) {
       indexedTable.upsert(getRecord(new Object[]{i, 10d}));
     }
