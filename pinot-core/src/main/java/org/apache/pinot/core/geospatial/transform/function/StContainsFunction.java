@@ -18,20 +18,8 @@
  */
 package org.apache.pinot.core.geospatial.transform.function;
 
-import com.google.common.base.Preconditions;
-import java.util.List;
-import java.util.Map;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
-import org.apache.pinot.core.operator.transform.function.LiteralTransformFunction;
-import org.apache.pinot.core.operator.transform.function.TransformFunction;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
-import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.locationtech.jts.geom.Geometry;
 
 
@@ -40,51 +28,12 @@ import org.locationtech.jts.geom.Geometry;
  * second geometry lie in the exterior of the first geometry, and at least one point of the interior of the first
  * geometry lies in the interior of the second geometry.
  */
-public class StContainsFunction extends BaseTransformFunction {
+public class StContainsFunction extends BaseBinaryGeoTransformFunction {
   public static final String FUNCTION_NAME = "ST_Contains";
-  private TransformFunction _firstArgument;
-  private TransformFunction _secondArgument;
-  private Geometry _firstLiteral;
-  private Geometry _secondLiteral;
-  private int[] _results;
 
   @Override
   public String getName() {
     return FUNCTION_NAME;
-  }
-
-  @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    Preconditions
-        .checkArgument(arguments.size() == 2, "2 arguments are required for transform function: %s", getName());
-    TransformFunction transformFunction = arguments.get(0);
-    Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
-        "First argument must be single-valued for transform function: %s", getName());
-    Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES
-            || transformFunction instanceof LiteralTransformFunction,
-        "The first argument must be of type BYTES , but was %s",
-            transformFunction.getResultMetadata().getDataType()
-        );
-    if (transformFunction instanceof LiteralTransformFunction) {
-      _firstLiteral = GeometrySerializer.deserialize(
-          BytesUtils.toBytes(((LiteralTransformFunction) transformFunction).getLiteral()));
-    } else {
-      _firstArgument = transformFunction;
-    }
-    transformFunction = arguments.get(1);
-    Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
-        "Second argument must be single-valued for transform function: %s", getName());
-    Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES
-            || transformFunction instanceof LiteralTransformFunction,
-        "The second argument must be of type BYTES , but was %s",
-            transformFunction.getResultMetadata().getDataType()
-        );
-    if (transformFunction instanceof LiteralTransformFunction) {
-      _secondLiteral = GeometrySerializer.deserialize(
-          BytesUtils.toBytes(((LiteralTransformFunction) transformFunction).getLiteral()));
-    } else {
-      _secondArgument = transformFunction;
-    }
   }
 
   @Override
@@ -93,26 +42,10 @@ public class StContainsFunction extends BaseTransformFunction {
   }
 
   @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    if (_results == null) {
-      _results = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+  public int transformGeometryToInt(Geometry firstGeometry, Geometry secondGeometry) {
+    if (GeometryUtils.isGeography(firstGeometry) || GeometryUtils.isGeography(secondGeometry)) {
+      throw new RuntimeException(String.format("%s is available for Geometry objects only", FUNCTION_NAME));
     }
-    byte[][] firstValues = null;
-    byte[][] secondValues = null;
-    if (_firstArgument != null) {
-      firstValues = _firstArgument.transformToBytesValuesSV(projectionBlock);
-    }
-    if (_secondArgument != null) {
-      secondValues = _secondArgument.transformToBytesValuesSV(projectionBlock);
-    }
-    for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      Geometry firstGeometry = firstValues == null ? _firstLiteral : GeometrySerializer.deserialize(firstValues[i]);
-      Geometry secondGeometry = secondValues == null ? _secondLiteral : GeometrySerializer.deserialize(secondValues[i]);
-      if (GeometryUtils.isGeography(firstGeometry) || GeometryUtils.isGeography(secondGeometry)) {
-        throw new RuntimeException(String.format("%s is available for Geometry objects only", FUNCTION_NAME));
-      }
-      _results[i] = firstGeometry.contains(secondGeometry) ? 1 : 0;
-    }
-    return _results;
+    return firstGeometry.contains(secondGeometry) ? 1 : 0;
   }
 }
