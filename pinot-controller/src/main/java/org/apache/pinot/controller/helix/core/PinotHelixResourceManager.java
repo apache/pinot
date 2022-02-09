@@ -461,6 +461,10 @@ public class PinotHelixResourceManager {
       return false;
     }
     ParticipantHistory participantHistory = _helixDataAccessor.getProperty(_keyBuilder.participantHistory(instanceId));
+    // returns false if there is no history for this participant.
+    if (participantHistory == null) {
+      return false;
+    }
     long lastOfflineTime = participantHistory.getLastOfflineTime();
     // returns false if the last offline time is a negative number.
     if (lastOfflineTime < 0) {
