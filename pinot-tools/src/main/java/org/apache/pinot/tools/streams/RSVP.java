@@ -18,36 +18,29 @@
  */
 package org.apache.pinot.tools.streams;
 
-import java.util.function.Consumer;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
+import com.fasterxml.jackson.databind.JsonNode;
 
 
-public class MeetupRsvpJsonStream extends MeetupRsvpStream {
+class RSVP {
+  private final String _eventId;
+  private final String _rsvpId;
+  private final JsonNode _payload;
 
-  public MeetupRsvpJsonStream()
-      throws Exception {
-    super();
+  RSVP(String eventId, String rsvpId, JsonNode payload) {
+    _eventId = eventId;
+    _rsvpId = rsvpId;
+    _payload = payload;
   }
 
-  public MeetupRsvpJsonStream(boolean partitionByKey)
-      throws Exception {
-    super(partitionByKey);
+  public String getEventId() {
+    return _eventId;
   }
 
-  @Override
-  protected Consumer<RSVP> createConsumer() {
-    return message -> {
-      if (_partitionByKey) {
-        try {
-          _producer.produce(_topicName, message.getRsvpId().getBytes(UTF_8), message.getPayload().toString()
-              .getBytes(UTF_8));
-        } catch (Exception e) {
-          LOGGER.error("Caught exception while processing the message: {}", message, e);
-        }
-      } else {
-        _producer.produce(_topicName, message.getPayload().toString().getBytes(UTF_8));
-      }
-    };
+  public String getRsvpId() {
+    return _rsvpId;
+  }
+
+  public JsonNode getPayload() {
+    return _payload;
   }
 }
