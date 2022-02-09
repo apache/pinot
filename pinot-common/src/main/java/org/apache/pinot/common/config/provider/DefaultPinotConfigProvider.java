@@ -52,11 +52,12 @@ import org.slf4j.LoggerFactory;
 
 /**
  * An implementation of {@link PinotConfigProvider}
- * The {@code TableCache} caches all the table configs and schemas within the cluster, and listens on ZK changes to keep
- * them in sync. It also maintains the table name map and the column name map for case-insensitive queries.
+ * The {@code DefaultPinotConfigProvider} caches all the table configs and schemas within the cluster, and listens on
+ * ZK changes to keep them in sync. It also maintains the table name map and the column name map for case-insensitive
+ * queries.
  */
-public class TableCache implements PinotConfigProvider {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TableCache.class);
+public class DefaultPinotConfigProvider implements PinotConfigProvider {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DefaultPinotConfigProvider.class);
   private static final String TABLE_CONFIG_PARENT_PATH = "/CONFIGS/TABLE";
   private static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
   private static final String SCHEMA_PARENT_PATH = "/SCHEMAS";
@@ -84,7 +85,7 @@ public class TableCache implements PinotConfigProvider {
   // Key is schema name, value is schema info
   private final Map<String, SchemaInfo> _schemaInfoMap = new ConcurrentHashMap<>();
 
-  public TableCache(ZkHelixPropertyStore<ZNRecord> propertyStore, boolean caseInsensitive) {
+  public DefaultPinotConfigProvider(ZkHelixPropertyStore<ZNRecord> propertyStore, boolean caseInsensitive) {
     _propertyStore = propertyStore;
     _caseInsensitive = caseInsensitive;
     _tableNameMap = caseInsensitive ? new ConcurrentHashMap<>() : null;
@@ -117,11 +118,11 @@ public class TableCache implements PinotConfigProvider {
       }
     }
 
-    LOGGER.info("Initialized TableCache with caseInsensitive: {}", caseInsensitive);
+    LOGGER.info("Initialized DefaultPinotConfigProvider with caseInsensitive: {}", caseInsensitive);
   }
 
   /**
-   * Returns {@code true} if the TableCache is case-insensitive, {@code false} otherwise.
+   * Returns {@code true} if the DefaultPinotConfigProvider is case-insensitive, {@code false} otherwise.
    */
   public boolean isCaseInsensitive() {
     return _caseInsensitive;
@@ -133,7 +134,7 @@ public class TableCache implements PinotConfigProvider {
    */
   @Nullable
   public String getActualTableName(String caseInsensitiveTableName) {
-    Preconditions.checkState(_caseInsensitive, "TableCache is not case-insensitive");
+    Preconditions.checkState(_caseInsensitive, "DefaultPinotConfigProvider is not case-insensitive");
     return _tableNameMap.get(caseInsensitiveTableName.toLowerCase());
   }
 

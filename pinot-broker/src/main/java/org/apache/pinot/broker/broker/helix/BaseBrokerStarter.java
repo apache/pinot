@@ -45,7 +45,7 @@ import org.apache.pinot.broker.requesthandler.GrpcBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
 import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.config.provider.DefaultPinotConfigProvider;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -235,7 +235,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     boolean caseInsensitive =
         _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, false) || _brokerConf.getProperty(
             Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY, false);
-    TableCache tableCache = new TableCache(_propertyStore, caseInsensitive);
+    DefaultPinotConfigProvider defaultPinotConfigProvider =
+        new DefaultPinotConfigProvider(_propertyStore, caseInsensitive);
     // Configure TLS for netty connection to server
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_TLS_PREFIX);
 
@@ -243,18 +244,18 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         .equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
       LOGGER.info("Starting Grpc BrokerRequestHandler.");
       _brokerRequestHandler =
-          new GrpcBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
-              queryQuotaManager, tableCache, _brokerMetrics, null);
+          new GrpcBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory, queryQuotaManager,
+              defaultPinotConfigProvider, _brokerMetrics, null);
     } else { // default request handler type, e.g. netty
       LOGGER.info("Starting Netty BrokerRequestHandler.");
       if (_brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false)) {
         _brokerRequestHandler =
             new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
-                queryQuotaManager, tableCache, _brokerMetrics, tlsDefaults);
+                queryQuotaManager, defaultPinotConfigProvider, _brokerMetrics, tlsDefaults);
       } else {
         _brokerRequestHandler =
             new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
-                queryQuotaManager, tableCache, _brokerMetrics, null);
+                queryQuotaManager, defaultPinotConfigProvider, _brokerMetrics, null);
       }
     }
 

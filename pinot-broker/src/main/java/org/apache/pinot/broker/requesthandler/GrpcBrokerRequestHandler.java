@@ -29,7 +29,7 @@ import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.RoutingManager;
-import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.config.provider.DefaultPinotConfigProvider;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -56,9 +56,9 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final PinotStreamingQueryClient _streamingQueryClient;
 
   public GrpcBrokerRequestHandler(PinotConfiguration config, RoutingManager routingManager,
-      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      BrokerMetrics brokerMetrics, TlsConfig tlsConfig) {
-    super(config, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
+      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager,
+      DefaultPinotConfigProvider defaultPinotConfigProvider, BrokerMetrics brokerMetrics, TlsConfig tlsConfig) {
+    super(config, routingManager, accessControlFactory, queryQuotaManager, defaultPinotConfigProvider, brokerMetrics);
     _grpcConfig = buildGrpcQueryClientConfig(config);
 
     // create streaming query client
@@ -101,8 +101,8 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
       streamingQueryToPinotServer(requestId, _brokerId, rawTableName, TableType.REALTIME, responseMap,
           realtimeBrokerRequest, realtimeRoutingTable, timeoutMs, true, 1);
     }
-    BrokerResponseNative brokerResponse = _streamingReduceService.reduceOnStreamResponse(
-        originalBrokerRequest, responseMap, timeoutMs, _brokerMetrics);
+    BrokerResponseNative brokerResponse =
+        _streamingReduceService.reduceOnStreamResponse(originalBrokerRequest, responseMap, timeoutMs, _brokerMetrics);
     return brokerResponse;
   }
 
@@ -122,10 +122,7 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
       int port = serverInstance.getGrpcPort();
       // TODO: enable throttling on per host bases.
       Iterator<Server.ServerResponse> streamingResponse = _streamingQueryClient.submit(serverHost, port,
-          new GrpcRequestBuilder()
-              .setSegments(segments)
-              .setBrokerRequest(brokerRequest)
-              .setEnableStreaming(true));
+          new GrpcRequestBuilder().setSegments(segments).setBrokerRequest(brokerRequest).setEnableStreaming(true));
       responseMap.put(serverInstance.toServerRoutingInstance(tableType), streamingResponse);
     }
   }
