@@ -40,14 +40,13 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerResponse;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.transport.TlsConfig;
-import org.apache.pinot.pql.parsers.Pql2CompilationException;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 
 
 public class PinotScatterGatherQueryClient {
-  private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
+  private static final CalciteSqlCompiler REQUEST_COMPILER = new CalciteSqlCompiler();
   private static final String PRESTO_HOST_PREFIX = "presto-pinot-";
 
   private final String _prestoHostId;
@@ -58,7 +57,7 @@ public class PinotScatterGatherQueryClient {
 
   public enum ErrorCode {
     PINOT_INSUFFICIENT_SERVER_RESPONSE(true),
-    PINOT_INVALID_PQL_GENERATED(false),
+    PINOT_INVALID_SQL_GENERATED(false),
     PINOT_UNCLASSIFIED_ERROR(false),
     PINOT_QUERY_BACKLOG_FULL(false);
 
@@ -251,8 +250,8 @@ public class PinotScatterGatherQueryClient {
     BrokerRequest brokerRequest;
     try {
       brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(pql);
-    } catch (Pql2CompilationException e) {
-      throw new PinotException(ErrorCode.PINOT_INVALID_PQL_GENERATED,
+    } catch (Exception e) {
+      throw new PinotException(ErrorCode.PINOT_INVALID_SQL_GENERATED,
           String.format("Parsing error with on %s, Error = %s", serverHost, e.getMessage()), e);
     }
 
