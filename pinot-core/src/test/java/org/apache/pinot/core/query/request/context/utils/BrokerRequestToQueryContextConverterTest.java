@@ -582,7 +582,7 @@ public class BrokerRequestToQueryContextConverterTest {
     String query = "SELECT COUNT(*) FILTER(WHERE foo > 5), COUNT(*) FILTER(WHERE foo < 6) FROM testTable WHERE bar > 0";
     QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
     List<Pair<AggregationFunction, FilterContext>> filteredAggregationList =
-        queryContext.getFilteredAggregations();
+        queryContext.getFilteredAggregationFunctions();
     assertNotNull(filteredAggregationList);
     assertEquals(filteredAggregationList.size(), 2);
     assertTrue(filteredAggregationList.get(0).getLeft() instanceof CountAggregationFunction);
