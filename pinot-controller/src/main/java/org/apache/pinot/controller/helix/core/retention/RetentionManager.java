@@ -93,7 +93,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
   @Override
   protected void postprocess() {
-    LOGGER.info("Clean up aged deleted segments for all tables");
+    LOGGER.info("Removing aged deleted segments for all tables");
     _pinotHelixResourceManager.getSegmentDeletionManager().removeAgedDeletedSegments();
   }
 

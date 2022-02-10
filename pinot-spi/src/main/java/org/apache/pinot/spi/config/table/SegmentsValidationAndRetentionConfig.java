@@ -29,7 +29,7 @@ import org.apache.pinot.spi.utils.TimeUtils;
 public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _retentionTimeUnit;
   private String _retentionTimeValue;
-  private String _deletedSegmentRetentionPeriod;
+  private String _deletedSegmentsRetentionPeriod;
   @Deprecated
   private String _segmentPushFrequency; // DO NOT REMOVE, this is used in internal segment generation management
   @Deprecated
@@ -103,12 +103,12 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _retentionTimeValue = retentionTimeValue;
   }
 
-  public String getDeletedSegmentRetentionPeriod() {
-    return _deletedSegmentRetentionPeriod;
+  public String getDeletedSegmentsRetentionPeriod() {
+    return _deletedSegmentsRetentionPeriod;
   }
 
-  public void setDeletedSegmentRetentionPeriod(String deletedSegmentRetentionPeriod) {
-    _deletedSegmentRetentionPeriod = deletedSegmentRetentionPeriod;
+  public void setDeletedSegmentsRetentionPeriod(String deletedSegmentsRetentionPeriod) {
+    _deletedSegmentsRetentionPeriod = deletedSegmentsRetentionPeriod;
   }
 
   /**

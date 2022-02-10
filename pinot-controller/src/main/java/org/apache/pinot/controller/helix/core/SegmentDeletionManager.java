@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +46,6 @@ import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,7 +56,7 @@ public class SegmentDeletionManager {
   private static final long MAX_DELETION_DELAY_SECONDS = 300L;  // Maximum of 5 minutes back-off to retry the deletion
   private static final long DEFAULT_DELETION_DELAY_SECONDS = 2L;
   private static final String DELETED_SEGMENTS = "Deleted_Segments";
-  private static final String RETENTION_PERIOD_SEPARATOR = "__RETENTION_MS__";
+  private static final String RETENTION_MS_SEPARATOR = "__RETENTION_MS__";
 
   private final ScheduledExecutorService _executorService;
   private final String _dataDir;
@@ -211,7 +209,7 @@ public class SegmentDeletionManager {
       } else {
         // move the segment file to deleted segments first and let retention manager handler the deletion
         URI deletedSegmentMoveDestURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS, rawTableName,
-            getRetentionSegmentFileName(URIUtils.encode(segmentId), deletedSegmentsRetentionMs));
+            getDeletedSegmentFileName(URIUtils.encode(segmentId), deletedSegmentsRetentionMs));
         try {
           if (pinotFS.exists(fileToDeleteURI)) {
             // Overwrites the file if it already exists in the target directory.
@@ -270,8 +268,8 @@ public class SegmentDeletionManager {
           int numFilesDeleted = 0;
           for (String targetFile : targetFiles) {
             URI targetURI = URIUtils.getUri(targetFile);
-            Date dateToDelete = DateTime.now().minus(getRetentionPeriodFromFile(targetFile)).toDate();
-            if (pinotFS.lastModified(targetURI) < dateToDelete.getTime()) {
+            long deletionTimeMs = System.currentTimeMillis() - getRetentionMsFromFile(targetFile);
+            if (pinotFS.lastModified(targetURI) < deletionTimeMs) {
               if (!pinotFS.delete(targetURI, true)) {
                 LOGGER.warn("Cannot remove file {} from deleted directory.", targetURI.toString());
               } else {
@@ -295,34 +293,32 @@ public class SegmentDeletionManager {
     }
   }
 
-  private String getRetentionSegmentFileName(String fileName, long deletedSegmentsRetentionMs) {
-    return fileName + RETENTION_PERIOD_SEPARATOR + deletedSegmentsRetentionMs;
+  private String getDeletedSegmentFileName(String fileName, long deletedSegmentsRetentionMs) {
+    return fileName + RETENTION_MS_SEPARATOR + deletedSegmentsRetentionMs;
   }
 
-  private long getRetentionPeriodFromFile(String targetFile) {
-    String[] split = targetFile.split(RETENTION_PERIOD_SEPARATOR);
+  private long getRetentionMsFromFile(String targetFile) {
+    String[] split = StringUtils.split(targetFile, RETENTION_MS_SEPARATOR);
     if (split.length > 1) {
       try {
         return Long.parseLong(split[split.length - 1]);
       } catch (Exception e) {
-        LOGGER.warn(String.format("No retention suffix found for file %s, using default %d", targetFile,
-            _defaultDeletedSegmentsRetentionMs));
+        LOGGER.warn("No retention suffix found for file: {}", targetFile);
       }
     }
+    LOGGER.info("Fallback to using default cluster retention config: {} ms", _defaultDeletedSegmentsRetentionMs);
     return _defaultDeletedSegmentsRetentionMs;
   }
 
   public long getRetentionMsFromTableConfig(TableConfig tableConfig) {
     long retentionMs = _defaultDeletedSegmentsRetentionMs;
-    if (tableConfig != null && tableConfig.getValidationConfig() != null) {
-      SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-      if (!StringUtils.isEmpty(validationConfig.getDeletedSegmentRetentionPeriod())) {
-        try {
-          retentionMs = TimeUtils.convertPeriodToMillis(validationConfig.getDeletedSegmentRetentionPeriod());
-        } catch (Exception e) {
-          LOGGER.warn(String.format("Unable to parse deleted segment retention config for table %s, using to default "
-              + "retention value %dms", tableConfig.getTableName(), _defaultDeletedSegmentsRetentionMs), e);
-        }
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    if (!StringUtils.isEmpty(validationConfig.getDeletedSegmentsRetentionPeriod())) {
+      try {
+        retentionMs = TimeUtils.convertPeriodToMillis(validationConfig.getDeletedSegmentsRetentionPeriod());
+      } catch (Exception e) {
+        LOGGER.warn("Unable to parse deleted segment retention config for table {}, using to default: {} ms",
+            tableConfig.getTableName(), _defaultDeletedSegmentsRetentionMs, e);
       }
     }
     return retentionMs;
