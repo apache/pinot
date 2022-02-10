@@ -189,9 +189,8 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
         break;
       case METADATA:
         try {
-          Map<String, String> segmentUriToTarPathMap = SegmentPushUtils
-              .getSegmentUriToTarPathMap(outputSegmentDirURI, pushJobSpec.getSegmentUriPrefix(),
-                  pushJobSpec.getSegmentUriSuffix(), new String[]{outputSegmentTarURI.toString()});
+          Map<String, String> segmentUriToTarPathMap = SegmentPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI,
+              pushJobSpec, new String[] { outputSegmentTarURI.toString() });
           SegmentPushUtils.sendSegmentUriAndMetadata(spec, outputFileFS, segmentUriToTarPathMap);
         } catch (RetriableOperationException | AttemptsExceededException e) {
           throw new RuntimeException(e);
