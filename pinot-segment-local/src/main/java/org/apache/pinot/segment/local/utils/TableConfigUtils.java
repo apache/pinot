@@ -298,8 +298,12 @@ public final class TableConfigUtils {
       if (filterConfig != null) {
         String filterFunction = filterConfig.getFilterFunction();
         if (filterFunction != null) {
+          if (disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(filterFunction)) {
+            throw new IllegalStateException(
+                "Groovy filter functions are disabled for table config. Found '" + filterFunction + "'");
+          }
           try {
-            FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction, disableGroovy);
+            FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction);
           } catch (Exception e) {
             throw new IllegalStateException("Invalid filter function " + filterFunction, e);
           }
@@ -325,8 +329,13 @@ public final class TableConfigUtils {
             throw new IllegalStateException("Duplicate transform config found for column '" + columnName + "'");
           }
           FunctionEvaluator expressionEvaluator;
+          if (disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
+            throw new IllegalStateException(
+                "Groovy transform functions are disabled for table config. Found '" + transformFunction
+                    + "' for column '" + columnName + "'");
+          }
           try {
-            expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction, disableGroovy);
+            expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
           } catch (Exception e) {
             throw new IllegalStateException(
                 "Invalid transform function '" + transformFunction + "' for column '" + columnName + "'", e);
