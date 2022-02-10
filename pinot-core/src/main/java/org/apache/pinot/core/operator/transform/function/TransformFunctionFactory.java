@@ -131,7 +131,6 @@ public class TransformFunctionFactory {
           put(canonicalize(TransformFunctionType.AND.getName().toLowerCase()), AndOperatorTransformFunction.class);
           put(canonicalize(TransformFunctionType.OR.getName().toLowerCase()), OrOperatorTransformFunction.class);
 
-
           // geo functions
           // geo constructors
           put(canonicalize(TransformFunctionType.ST_GEOG_FROM_TEXT.getName().toLowerCase()),
@@ -269,7 +268,13 @@ public class TransformFunctionFactory {
     }
   }
 
-  private static String canonicalize(String functionName) {
+  /**
+   * Converts the transform function name into its canonical form
+   *
+   * @param functionName Name of the transform function
+   * @return canonicalized transform function name
+   */
+  public static String canonicalize(String functionName) {
     return StringUtils.remove(functionName, '_').toLowerCase();
   }
 }

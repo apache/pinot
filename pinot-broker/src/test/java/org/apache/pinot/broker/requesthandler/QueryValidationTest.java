@@ -181,6 +181,40 @@ public class QueryValidationTest {
     testExistedColumnInSQLQuery("foo", true, ImmutableMap.of("col1", "COL1", "b", "B", "c", "C"), sql);
   }
 
+  @Test
+  public void testRejectGroovyQuery() {
+    testRejectGroovyQuery(
+        "SELECT groovy('{\"returnType\":\"INT\",\"isSingleValue\":true}', 'arg0 + arg1', colA, colB) FROM foo", true);
+    testRejectGroovyQuery(
+        "SELECT GROOVY('{\"returnType\":\"INT\",\"isSingleValue\":true}', 'arg0 + arg1', colA, colB) FROM foo", true);
+    testRejectGroovyQuery(
+        "SELECT groo_vy('{\"returnType\":\"INT\",\"isSingleValue\":true}', 'arg0 + arg1', colA, colB) FROM foo", true);
+    testRejectGroovyQuery(
+        "SELECT foo FROM bar WHERE GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', 'arg0 + arg1', colA,"
+            + " colB) = 'foobarval'", true);
+    testRejectGroovyQuery(
+        "SELECT COUNT(colA) FROM bar GROUP BY GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', "
+            + "'arg0 + arg1', colA, colB)", true);
+    testRejectGroovyQuery(
+        "SELECT foo FROM bar HAVING GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', 'arg0 + arg1', colA,"
+            + " colB) = 'foobarval'", true);
+
+    testRejectGroovyQuery("SELECT foo FROM bar", false);
+  }
+
+  private void testRejectGroovyQuery(String query, boolean queryContainsGroovy) {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+
+    try {
+      BaseBrokerRequestHandler.rejectGroovyQuery(pinotQuery);
+      if (queryContainsGroovy) {
+        Assert.fail("Query should have failed since groovy was found in query: " + pinotQuery);
+      }
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(), "Groovy transform functions are disabled for queries");
+    }
+  }
+
   private void testUnsupportedPQLQuery(String query, String errorMessage) {
     try {
       BrokerRequest brokerRequest = PQL_COMPILER.compileToBrokerRequest(query);
