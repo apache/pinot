@@ -16,29 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.hadoop.job.reducers;
+package org.apache.pinot.ingestion.preprocess.reducers;
 
 import java.io.IOException;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.mapred.AvroKey;
-import org.apache.avro.mapred.AvroValue;
-import org.apache.avro.mapreduce.AvroMultipleOutputs;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapreduce.Reducer;
-import org.apache.pinot.hadoop.job.InternalConfigConstants;
+import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
+import org.apache.orc.mapred.OrcStruct;
+import org.apache.orc.mapred.OrcValue;
+import org.apache.pinot.ingestion.utils.InternalConfigConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class AvroDataPreprocessingReducer<T>
-    extends Reducer<T, AvroValue<GenericRecord>, AvroKey<GenericRecord>, NullWritable> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(AvroDataPreprocessingReducer.class);
+public class OrcDataPreprocessingReducer extends Reducer<WritableComparable, OrcValue, NullWritable, OrcStruct> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(OrcDataPreprocessingReducer.class);
 
-  private AvroMultipleOutputs _multipleOutputs;
-  private long _numRecords;
   private int _maxNumRecordsPerFile;
+  private MultipleOutputs<NullWritable, OrcStruct> _multipleOutputs;
+  private long _numRecords;
   private String _filePrefix;
 
   @Override
@@ -49,26 +48,26 @@ public class AvroDataPreprocessingReducer<T>
     _maxNumRecordsPerFile = configuration.getInt(InternalConfigConstants.PREPROCESSING_MAX_NUM_RECORDS_PER_FILE, 0);
     if (_maxNumRecordsPerFile > 0) {
       LOGGER.info("Using multiple outputs strategy.");
-      _multipleOutputs = new AvroMultipleOutputs(context);
+      _multipleOutputs = new MultipleOutputs<>(context);
       _numRecords = 0L;
       _filePrefix = RandomStringUtils.randomAlphanumeric(4);
-      LOGGER.info("Initialized AvroDataPreprocessingReducer with maxNumRecordsPerFile: {}", _maxNumRecordsPerFile);
+      LOGGER.info("Initialized OrcDataPreprocessingReducer with maxNumRecordsPerFile: {}", _maxNumRecordsPerFile);
     } else {
-      LOGGER.info("Initialized AvroDataPreprocessingReducer without limit on maxNumRecordsPerFile");
+      LOGGER.info("Initialized OrcDataPreprocessingReducer without limit on maxNumRecordsPerFile");
     }
   }
 
   @Override
-  public void reduce(final T inputRecord, final Iterable<AvroValue<GenericRecord>> values, final Context context)
+  public void reduce(WritableComparable key, Iterable<OrcValue> values, Context context)
       throws IOException, InterruptedException {
     if (_maxNumRecordsPerFile > 0) {
-      for (final AvroValue<GenericRecord> value : values) {
+      for (final OrcValue value : values) {
         String fileName = _filePrefix + (_numRecords++ / _maxNumRecordsPerFile);
-        _multipleOutputs.write(new AvroKey<>(value.datum()), NullWritable.get(), fileName);
+        _multipleOutputs.write(NullWritable.get(), (OrcStruct) value.value, fileName);
       }
     } else {
-      for (final AvroValue<GenericRecord> value : values) {
-        context.write(new AvroKey<>(value.datum()), NullWritable.get());
+      for (final OrcValue value : values) {
+        context.write(NullWritable.get(), (OrcStruct) value.value);
       }
     }
   }

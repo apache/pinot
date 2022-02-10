@@ -16,27 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.hadoop.utils.preprocess;
+package org.apache.pinot.spark.jobs.preprocess;
 
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.WritableComparator;
-import org.apache.hadoop.io.WritableUtils;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
+import org.apache.pinot.ingestion.preprocess.DataPreprocessingHelper;
 
 
-/**
- * Override the Text comparison logic to compare with the decoded String instead of the byte array.
- */
-public class TextComparator extends WritableComparator {
-  public TextComparator() {
-    super(Text.class);
+public class SparkOrcDataPreprocessingHelper extends SparkDataPreprocessingHelper {
+  public SparkOrcDataPreprocessingHelper(DataPreprocessingHelper dataPreprocessingHelper) {
+    super(dataPreprocessingHelper);
   }
 
   @Override
-  public int compare(byte[] b1, int s1, int l1, byte[] b2, int s2, int l2) {
-    int n1 = WritableUtils.decodeVIntSize(b1[s1]);
-    int n2 = WritableUtils.decodeVIntSize(b2[s2]);
-    return new String(b1, s1 + n1, l1 - n1, UTF_8).compareTo(new String(b2, s2 + n2, l2 - n2, UTF_8));
+  public String getDataFormat() {
+    return "orc";
   }
 }

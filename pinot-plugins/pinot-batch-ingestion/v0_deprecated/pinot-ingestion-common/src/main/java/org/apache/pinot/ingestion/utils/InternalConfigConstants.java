@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.hadoop.job;
+package org.apache.pinot.ingestion.utils;
 
 /**
  * Internal-only constants for Hadoop MapReduce jobs. These constants are propagated across different segment creation

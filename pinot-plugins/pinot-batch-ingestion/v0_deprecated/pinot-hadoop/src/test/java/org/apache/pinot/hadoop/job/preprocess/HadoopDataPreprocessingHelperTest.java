@@ -19,13 +19,13 @@
 package org.apache.pinot.hadoop.job.preprocess;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.pinot.hadoop.job.InternalConfigConstants;
+import org.apache.pinot.ingestion.utils.InternalConfigConstants;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -34,6 +34,8 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -41,18 +43,34 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 
 
-public class DataPreprocessingHelperTest {
+public class HadoopDataPreprocessingHelperTest {
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "HadoopDataPreprocessingHelperTest");
+
+  @BeforeClass
+  public static void setUp()
+      throws IOException {
+    String pathString = Preconditions
+        .checkNotNull(
+            HadoopDataPreprocessingHelperTest.class.getClassLoader().getResource("data/test_sample_data.avro"))
+        .getPath();
+
+    // Copy the input path to a temp directory.
+    FileUtils.deleteQuietly(TEMP_DIR);
+    FileUtils.forceMkdir(TEMP_DIR);
+    FileUtils.copyFileToDirectory(new File(pathString), TEMP_DIR);
+  }
+
+  @AfterClass
+  public static void tearDown() {
+    FileUtils.deleteQuietly(TEMP_DIR);
+  }
 
   @Test
   public void testDataPreprocessingHelper()
       throws IOException {
-    List<Path> inputPaths = new ArrayList<>();
-    String pathString = Preconditions
-        .checkNotNull(DataPreprocessingHelperTest.class.getClassLoader().getResource("data/test_sample_data.avro"))
-        .getPath();
-    inputPaths.add(new Path(pathString));
     Path outputPath = new Path("mockOutputPath");
-    DataPreprocessingHelper dataPreprocessingHelper = new AvroDataPreprocessingHelper(inputPaths, outputPath);
+    HadoopDataPreprocessingHelper dataPreprocessingHelper =
+        HadoopDataPreprocessingHelperFactory.generateDataPreprocessingHelper(new Path(TEMP_DIR.toString()), outputPath);
 
     BatchIngestionConfig batchIngestionConfig = new BatchIngestionConfig(null, "APPEND", "DAILY");
     IngestionConfig ingestionConfig = new IngestionConfig(batchIngestionConfig, null, null, null, null);

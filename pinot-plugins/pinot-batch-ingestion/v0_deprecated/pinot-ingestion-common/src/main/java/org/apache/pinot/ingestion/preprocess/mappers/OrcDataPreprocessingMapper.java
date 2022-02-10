@@ -16,72 +16,75 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.hadoop.job.mappers;
+package org.apache.pinot.ingestion.preprocess.mappers;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.mapred.AvroKey;
-import org.apache.avro.mapred.AvroValue;
+import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.pinot.hadoop.job.InternalConfigConstants;
-import org.apache.pinot.hadoop.utils.preprocess.DataPreprocessingUtils;
-import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
+import org.apache.orc.mapred.OrcStruct;
+import org.apache.orc.mapred.OrcValue;
+import org.apache.pinot.ingestion.utils.DataPreprocessingUtils;
+import org.apache.pinot.ingestion.utils.InternalConfigConstants;
+import org.apache.pinot.ingestion.utils.preprocess.OrcUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class AvroDataPreprocessingMapper
-    extends Mapper<AvroKey<GenericRecord>, NullWritable, WritableComparable, AvroValue<GenericRecord>> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(AvroDataPreprocessingMapper.class);
+public class OrcDataPreprocessingMapper extends Mapper<NullWritable, OrcStruct, WritableComparable, OrcValue> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(OrcDataPreprocessingMapper.class);
 
+  private final OrcValue _valueWrapper = new OrcValue();
   private String _sortingColumn = null;
   private FieldSpec.DataType _sortingColumnType = null;
   private String _sortingColumnDefaultNullValue = null;
-  private AvroRecordExtractor _avroRecordExtractor;
+  private int _sortingColumnId = -1;
 
   @Override
   public void setup(Context context) {
     Configuration configuration = context.getConfiguration();
-    _avroRecordExtractor = new AvroRecordExtractor();
     String sortingColumnConfig = configuration.get(InternalConfigConstants.SORTING_COLUMN_CONFIG);
     if (sortingColumnConfig != null) {
       _sortingColumn = sortingColumnConfig;
       _sortingColumnType = FieldSpec.DataType.valueOf(configuration.get(InternalConfigConstants.SORTING_COLUMN_TYPE));
       _sortingColumnDefaultNullValue = configuration.get(InternalConfigConstants.SORTING_COLUMN_DEFAULT_NULL_VALUE);
-      LOGGER.info("Initialized AvroDataPreprocessingMapper with sortingColumn: {} of type: {}, default null value: {}",
+      LOGGER.info("Initialized OrcDataPreprocessingMapper with sortingColumn: {} of type: {}, default null value: {}",
           _sortingColumn, _sortingColumnType, _sortingColumnDefaultNullValue);
     } else {
-      LOGGER.info("Initialized AvroDataPreprocessingMapper without sorting column");
+      LOGGER.info("Initialized OrcDataPreprocessingMapper without sorting column");
     }
   }
 
   @Override
-  public void map(AvroKey<GenericRecord> key, NullWritable value, Context context)
+  public void map(NullWritable key, OrcStruct value, Context context)
       throws IOException, InterruptedException {
-    GenericRecord record = key.datum();
+    _valueWrapper.value = value;
     if (_sortingColumn != null) {
-      Object object = record.get(_sortingColumn);
-      Object valueToConvert = object != null ? _avroRecordExtractor.convert(object) : _sortingColumnDefaultNullValue;
-      Preconditions.checkState(valueToConvert != null, "Invalid value: %s for sorting column: %s in record: %s", object,
-          _sortingColumn, record);
-
+      if (_sortingColumnId == -1) {
+        List<String> fieldNames = value.getSchema().getFieldNames();
+        _sortingColumnId = fieldNames.indexOf(_sortingColumn);
+        Preconditions.checkState(_sortingColumnId != -1, "Failed to find sorting column: %s in the ORC fields: %s",
+            _sortingColumn, fieldNames);
+        LOGGER.info("Field id for sorting column: {} is: {}", _sortingColumn, _sortingColumnId);
+      }
+      WritableComparable sortingColumnValue = value.getFieldValue(_sortingColumnId);
       WritableComparable outputKey;
       try {
+        Object valueToConvert =
+            sortingColumnValue != null ? OrcUtils.convert(sortingColumnValue) : _sortingColumnDefaultNullValue;
         outputKey = DataPreprocessingUtils.convertToWritableComparable(valueToConvert, _sortingColumnType);
       } catch (Exception e) {
-        throw new IllegalStateException(
-            String
-                .format("Caught exception while processing sorting column: %s in record: %s", _sortingColumn, record),
-            e);
+        throw new IllegalStateException(String
+            .format("Caught exception while processing sorting column: %s, id: %d in ORC struct: %s", _sortingColumn,
+                _sortingColumnId, value), e);
       }
-      context.write(outputKey, new AvroValue<>(record));
+      context.write(outputKey, _valueWrapper);
     } else {
-      context.write(NullWritable.get(), new AvroValue<>(record));
+      context.write(NullWritable.get(), _valueWrapper);
     }
   }
 }

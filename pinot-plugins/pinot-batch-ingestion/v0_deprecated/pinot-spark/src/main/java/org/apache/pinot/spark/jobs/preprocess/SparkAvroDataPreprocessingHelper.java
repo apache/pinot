@@ -16,26 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.hadoop.utils.preprocess;
+package org.apache.pinot.spark.jobs.preprocess;
 
-import java.io.IOException;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
+import org.apache.pinot.ingestion.preprocess.DataPreprocessingHelper;
 
 
-public class HadoopUtils {
-  private HadoopUtils() {
+public class SparkAvroDataPreprocessingHelper extends SparkDataPreprocessingHelper {
+  public SparkAvroDataPreprocessingHelper(DataPreprocessingHelper dataPreprocessingHelper) {
+    super(dataPreprocessingHelper);
   }
 
-  public static final Configuration DEFAULT_CONFIGURATION;
-  public static final FileSystem DEFAULT_FILE_SYSTEM;
-
-  static {
-    DEFAULT_CONFIGURATION = new Configuration();
-    try {
-      DEFAULT_FILE_SYSTEM = FileSystem.get(DEFAULT_CONFIGURATION);
-    } catch (IOException e) {
-      throw new IllegalStateException("Failed to get the default file system", e);
-    }
+  @Override
+  public String getDataFormat() {
+    return "avro";
   }
 }
