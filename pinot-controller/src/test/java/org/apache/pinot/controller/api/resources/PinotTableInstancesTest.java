@@ -19,13 +19,12 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.google.common.collect.ImmutableList;
+import java.util.List;
+import java.util.Map;
+import javax.ws.rs.WebApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import javax.ws.rs.WebApplicationException;
-import java.util.List;
-import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
