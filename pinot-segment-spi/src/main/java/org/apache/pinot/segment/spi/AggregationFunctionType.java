@@ -44,6 +44,7 @@ public enum AggregationFunctionType {
   SEGMENTPARTITIONEDDISTINCTCOUNT("segmentPartitionedDistinctCount"),
   DISTINCTCOUNTHLL("distinctCountHLL"),
   DISTINCTCOUNTRAWHLL("distinctCountRawHLL"),
+  DISTINCTCOUNTSMARTHLL("distinctCountSmartHLL"),
   FASTHLL("fastHLL"),
   DISTINCTCOUNTTHETASKETCH("distinctCountThetaSketch"),
   DISTINCTCOUNTRAWTHETASKETCH("distinctCountRawThetaSketch"),
