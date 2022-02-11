@@ -20,6 +20,7 @@ package org.apache.pinot.integration.tests;
 
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -44,10 +45,18 @@ public class ControllerServiceDiscoveryIntegrationTest extends BaseClusterIntegr
     return TENANT_NAME;
   }
 
+  @Override
   public Map<String, Object> getDefaultControllerConfiguration() {
     Map<String, Object> retVal = super.getDefaultControllerConfiguration();
     retVal.put(CommonConstants.Controller.CONTROLLER_SERVICE_AUTO_DISCOVERY, true);
     return retVal;
+  }
+
+  @Override
+  protected PinotConfiguration getDefaultBrokerConfiguration() {
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(CommonConstants.Broker.BROKER_SERVICE_AUTO_DISCOVERY, true);
+    return config;
   }
 
   @BeforeClass
@@ -77,6 +86,8 @@ public class ControllerServiceDiscoveryIntegrationTest extends BaseClusterIntegr
   public void testControllerExtraEndpointsAutoLoaded()
       throws Exception {
     String response = sendGetRequest(_controllerBaseApiUrl + "/test/echo/doge");
+    Assert.assertEquals(response, "doge");
+    response = sendGetRequest(_brokerBaseApiUrl + "/test/echo/doge");
     Assert.assertEquals(response, "doge");
   }
 }
