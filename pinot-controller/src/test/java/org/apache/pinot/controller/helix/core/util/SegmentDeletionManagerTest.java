@@ -223,7 +223,8 @@ public class SegmentDeletionManagerTest {
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
     File tempDir = Files.createTempDir();
     tempDir.deleteOnExit();
-    FakeDeletionManager deletionManager = new FakeDeletionManager(tempDir.getAbsolutePath(), helixAdmin, propertyStore);
+    FakeDeletionManager deletionManager = new FakeDeletionManager(
+        tempDir.getAbsolutePath(), helixAdmin, propertyStore, 7);
 
     // Test delete when deleted segments directory does not exists
     deletionManager.removeAgedDeletedSegments();
@@ -241,15 +242,19 @@ public class SegmentDeletionManagerTest {
     dummyDir1.mkdir();
     File dummyDir2 = new File(deletedDirectoryPath + File.separator + "dummy2");
     dummyDir2.mkdir();
+    File dummyDir3 = new File(deletedDirectoryPath + File.separator + "dummy3");
+    dummyDir3.mkdir();
 
     // Test delete when there is no files but some directories exist
     deletionManager.removeAgedDeletedSegments();
     Assert.assertEquals(dummyDir1.exists(), false);
     Assert.assertEquals(dummyDir2.exists(), false);
+    Assert.assertEquals(dummyDir3.exists(), false);
 
-    // Create dummy directories and files
+    // Create dummy directories and files again
     dummyDir1.mkdir();
     dummyDir2.mkdir();
+    dummyDir3.mkdir();
 
     // Create dummy files
     for (int i = 0; i < 3; i++) {
@@ -258,6 +263,9 @@ public class SegmentDeletionManagerTest {
     for (int i = 2; i < 5; i++) {
       createTestFileWithAge(dummyDir2.getAbsolutePath() + File.separator + genDeletedSegmentName("file" + i, i, 1), i);
     }
+    for (int i = 6; i < 9; i++) {
+      createTestFileWithAge(dummyDir3.getAbsolutePath() + File.separator + "file" + i, i);
+    }
 
     // Sleep 1 second to ensure the clock moves.
     Thread.sleep(1000L);
@@ -265,13 +273,19 @@ public class SegmentDeletionManagerTest {
     // Check that dummy directories and files are successfully created.
     Assert.assertEquals(dummyDir1.list().length, 3);
     Assert.assertEquals(dummyDir2.list().length, 3);
+    Assert.assertEquals(dummyDir3.list().length, 3);
 
     // Try to remove files with the retention of 1 days.
     deletionManager.removeAgedDeletedSegments();
+
+    // Check that only 1 day retention file is remaining
     Assert.assertEquals(dummyDir1.list().length, 1);
 
     // Check that empty directory has successfully been removed.
     Assert.assertEquals(dummyDir2.exists(), false);
+
+    // Check that deleted file without retention suffix is honoring cluster-wide retention period of 7 days.
+    Assert.assertEquals(dummyDir3.list().length, 1);
   }
 
   @Test
@@ -348,6 +362,11 @@ public class SegmentDeletionManagerTest {
 
     FakeDeletionManager(String localDiskDir, HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore) {
       super(localDiskDir, helixAdmin, CLUSTER_NAME, propertyStore, 0);
+    }
+
+    FakeDeletionManager(String localDiskDir, HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore, int
+        deletedSegmentsRetentionInDays) {
+      super(localDiskDir, helixAdmin, CLUSTER_NAME, propertyStore, deletedSegmentsRetentionInDays);
     }
 
     public void deleteSegmentsFromPropertyStoreAndLocal(String tableName, Collection<String> segments) {
