@@ -169,7 +169,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
     int [][] expectedOccupiedSlotsCounts1 =
-        new int [][] {{3, 6}, {5, 4}, {7, 2}, {9, 0}, {6, 2}, {4, 4}, {2, 7}, {0, 8}};
+        new int [][] {{6, 6}, {8, 4}, {10, 2}, {12, 0}, {6, 4}, {4, 6}, {2, 10}, {0, 10}};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
@@ -213,7 +213,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
 
-    int [] expectedOccupiedSlotsCounts2 = new int [] {3, 5, 7, 9, 6, 4, 2, 0};
+    int [] expectedOccupiedSlotsCounts2 = new int [] {6, 8, 10, 12, 6, 4, 2, 0};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
     List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
@@ -360,7 +360,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    double [] expectedOccupiedSlotsCounts1 = new double [] {3, 5, 7, 9, 6, 4, 2, 0};
+    double [] expectedOccupiedSlotsCounts1 = new double [] {6, 8, 10, 12, 6, 4, 2, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
@@ -392,7 +392,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
 
-    double [] expectedOccupiedSlotsCounts2 = new double [] {3, 5, 7, 9, 6, 4, 2};
+    double [] expectedOccupiedSlotsCounts2 = new double [] {6, 8, 10, 12, 6, 4, 2};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
     List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length);
@@ -431,8 +431,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    double [] expectedOccupiedSlotsCountsForLevel11 = new double [] {2, 3, 4, 4, 3, 2, 1, 0};
-    double [] expectedOccupiedSlotsCountsForLevel21 = new double [] {1, 2, 3, 5, 3, 2, 1, 0};
+    double [] expectedOccupiedSlotsCountsForLevel11 = new double [] {4, 5, 6, 5, 3, 2, 1, 0};
+    double [] expectedOccupiedSlotsCountsForLevel21 = new double [] {2, 3, 4, 7, 3, 2, 1, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
@@ -478,9 +478,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
 
-
-    double [] expectedOccupiedSlotsCountsForLevel12 = new double [] {2, 3, 4, 4, 3, 2, 1};
-    double [] expectedOccupiedSlotsCountsForLevel22 = new double [] {1, 2, 3, 5, 3, 2, 1};
+    double [] expectedOccupiedSlotsCountsForLevel12 = new double [] {4, 5, 6, 5, 3, 2, 1};
+    double [] expectedOccupiedSlotsCountsForLevel22 = new double [] {2, 3, 4, 7, 3, 2, 1};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
     List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCountsForLevel12.length * 2);
@@ -534,8 +533,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    double [] expectedOccupiedSlotsCountsForLevel11 = new double [] {2, 3, 4, 4, 3, 2, 1};
-    double [] expectedOccupiedSlotsCountsForLevel21 = new double [] {1, 2, 3, 5, 3, 2, 1};
+    double [] expectedOccupiedSlotsCountsForLevel11 = new double [] {4, 5, 6, 5, 3, 2, 1};
+    double [] expectedOccupiedSlotsCountsForLevel21 = new double [] {2, 3, 4, 7, 3, 2, 1};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
@@ -783,7 +782,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
     int [][] expectedOccupiedSlotsCounts1 =
-        new int [][] {{3, 6}, {5, 4}, {7, 2}, {9, 0}, {6, 2}, {4, 4}, {2, 7}, {0, 8}};
+        new int [][] {{6, 6}, {8, 4}, {10, 2}, {12, 0}, {6, 4}, {4, 6}, {2, 10}, {0, 10}};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("454516");
@@ -825,7 +824,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
 
-    int [] expectedOccupiedSlotsCounts2 = new int [] {3, 5, 7, 9, 6, 4, 2, 0};
+    int [] expectedOccupiedSlotsCounts2 = new int [] {6, 8, 10, 12, 6, 4, 2, 0};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
     List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
     start = dateTimeFormatter.fromFormatToMillis("454516");
@@ -949,7 +948,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    double [] expectedOccupiedSlotsCounts1 = new double [] {3, 5, 7, 9, 6, 4, 2, 0};
+    double [] expectedOccupiedSlotsCounts1 = new double [] {6, 8, 10, 12, 6, 4, 2, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
@@ -979,7 +978,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
 
-    double [] expectedOccupiedSlotsCounts2 = new double [] {3, 5, 7, 9, 6, 4, 2};
+    double [] expectedOccupiedSlotsCounts2 = new double [] {6, 8, 10, 12, 6, 4, 2};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
     List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length);
@@ -1015,8 +1014,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    double [] expectedOccupiedSlotsCountsForLevel11 = new double [] {2, 3, 4, 4, 3, 2, 1, 0};
-    double [] expectedOccupiedSlotsCountsForLevel21 = new double [] {1, 2, 3, 5, 3, 2, 1, 0};
+    double [] expectedOccupiedSlotsCountsForLevel11 = new double [] {4, 5, 6, 5, 3, 2, 1, 0};
+    double [] expectedOccupiedSlotsCountsForLevel21 = new double [] {2, 3, 4, 7, 3, 2, 1, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
@@ -1060,9 +1059,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
 
-
-    double [] expectedOccupiedSlotsCountsForLevel12 = new double [] {2, 3, 4, 4, 3, 2, 1};
-    double [] expectedOccupiedSlotsCountsForLevel22 = new double [] {1, 2, 3, 5, 3, 2, 1};
+    double [] expectedOccupiedSlotsCountsForLevel12 = new double [] {4, 5, 6, 5, 3, 2, 1};
+    double [] expectedOccupiedSlotsCountsForLevel22 = new double [] {2, 3, 4, 7, 3, 2, 1};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
     List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCountsForLevel12.length * 2);
@@ -1113,8 +1111,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    double [] expectedOccupiedSlotsCountsForLevel11 = new double [] {2, 3, 4, 4, 3, 2, 1};
-    double [] expectedOccupiedSlotsCountsForLevel21 = new double [] {1, 2, 3, 5, 3, 2, 1};
+    double [] expectedOccupiedSlotsCountsForLevel11 = new double [] {4, 5, 6, 5, 3, 2, 1};
+    double [] expectedOccupiedSlotsCountsForLevel21 = new double [] {2, 3, 4, 7, 3, 2, 1};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
@@ -1349,7 +1347,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
     int [][] expectedOccupiedSlotsCounts1 =
-        new int [][] {{3, 6}, {5, 4}, {7, 2}, {9, 0}, {6, 2}, {4, 4}, {2, 7}, {0, 8}};
+        new int [][] {{6, 6}, {8, 4}, {10, 2}, {12, 0}, {6, 4}, {4, 6}, {2, 10}, {0, 10}};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("27270960");
@@ -1391,7 +1389,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
 
-    int [] expectedOccupiedSlotsCounts2 = new int [] {3, 5, 7, 9, 6, 4, 2, 0};
+    int [] expectedOccupiedSlotsCounts2 = new int [] {6, 8, 10, 12, 6, 4, 2, 0};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
     List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
     start = dateTimeFormatter.fromFormatToMillis("27270960");
@@ -1515,7 +1513,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    double [] expectedOccupiedSlotsCounts1 = new double [] {3, 5, 7, 9, 6, 4, 2, 0};
+    double [] expectedOccupiedSlotsCounts1 = new double [] {6, 8, 10, 12, 6, 4, 2, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
@@ -1545,7 +1543,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
 
-    double [] expectedOccupiedSlotsCounts2 = new double [] {3, 5, 7, 9, 6, 4, 2};
+    double [] expectedOccupiedSlotsCounts2 = new double [] {6, 8, 10, 12, 6, 4, 2};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
     List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length);
@@ -1581,8 +1579,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    double [] expectedOccupiedSlotsCountsForLevel11 = new double [] {2, 3, 4, 4, 3, 2, 1, 0};
-    double [] expectedOccupiedSlotsCountsForLevel21 = new double [] {1, 2, 3, 5, 3, 2, 1, 0};
+    double [] expectedOccupiedSlotsCountsForLevel11 = new double [] {4, 5, 6, 5, 3, 2, 1, 0};
+    double [] expectedOccupiedSlotsCountsForLevel21 = new double [] {2, 3, 4, 7, 3, 2, 1, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
@@ -1626,9 +1624,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
 
-
-    double [] expectedOccupiedSlotsCountsForLevel12 = new double [] {2, 3, 4, 4, 3, 2, 1};
-    double [] expectedOccupiedSlotsCountsForLevel22 = new double [] {1, 2, 3, 5, 3, 2, 1};
+    double [] expectedOccupiedSlotsCountsForLevel12 = new double [] {4, 5, 6, 5, 3, 2, 1};
+    double [] expectedOccupiedSlotsCountsForLevel22 = new double [] {2, 3, 4, 7, 3, 2, 1};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
     List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCountsForLevel12.length * 2);
@@ -1679,8 +1676,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    double [] expectedOccupiedSlotsCountsForLevel11 = new double [] {2, 3, 4, 4, 3, 2, 1};
-    double [] expectedOccupiedSlotsCountsForLevel21 = new double [] {1, 2, 3, 5, 3, 2, 1};
+    double [] expectedOccupiedSlotsCountsForLevel11 = new double [] {4, 5, 6, 5, 3, 2, 1};
+    double [] expectedOccupiedSlotsCountsForLevel21 = new double [] {2, 3, 4, 7, 3, 2, 1};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
@@ -1915,7 +1912,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
     int [][] expectedOccupiedSlotsCounts1 =
-        new int [][] {{3, 6}, {5, 4}, {7, 2}, {9, 0}, {6, 2}, {4, 4}, {2, 7}, {0, 8}};
+        new int [][] {{6, 6}, {8, 4}, {10, 2}, {12, 0}, {6, 4}, {4, 6}, {2, 10}, {0, 10}};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("454516");
@@ -1957,7 +1954,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
 
-    int [] expectedOccupiedSlotsCounts2 = new int [] {3, 5, 7, 9, 6, 4, 2, 0};
+    int [] expectedOccupiedSlotsCounts2 = new int [] {6, 8, 10, 12, 6, 4, 2, 0};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
     List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
     start = dateTimeFormatter.fromFormatToMillis("454516");
@@ -2081,7 +2078,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    double [] expectedOccupiedSlotsCounts1 = new double [] {3, 5, 7, 9, 6, 4, 2, 0};
+    double [] expectedOccupiedSlotsCounts1 = new double [] {6, 8, 10, 12, 6, 4, 2, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
@@ -2111,7 +2108,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
 
-    double [] expectedOccupiedSlotsCounts2 = new double [] {3, 5, 7, 9, 6, 4, 2};
+    double [] expectedOccupiedSlotsCounts2 = new double [] {6, 8, 10, 12, 6, 4, 2};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
     List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length);
@@ -2147,8 +2144,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    double [] expectedOccupiedSlotsCountsForLevel11 = new double [] {2, 3, 4, 4, 3, 2, 1, 0};
-    double [] expectedOccupiedSlotsCountsForLevel21 = new double [] {1, 2, 3, 5, 3, 2, 1, 0};
+    double [] expectedOccupiedSlotsCountsForLevel11 = new double [] {4, 5, 6, 5, 3, 2, 1, 0};
+    double [] expectedOccupiedSlotsCountsForLevel21 = new double [] {2, 3, 4, 7, 3, 2, 1, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
@@ -2192,9 +2189,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
 
-
-    double [] expectedOccupiedSlotsCountsForLevel12 = new double [] {2, 3, 4, 4, 3, 2, 1};
-    double [] expectedOccupiedSlotsCountsForLevel22 = new double [] {1, 2, 3, 5, 3, 2, 1};
+    double [] expectedOccupiedSlotsCountsForLevel12 = new double [] {4, 5, 6, 5, 3, 2, 1};
+    double [] expectedOccupiedSlotsCountsForLevel22 = new double [] {2, 3, 4, 7, 3, 2, 1};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
     List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCountsForLevel12.length * 2);
@@ -2245,8 +2241,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    double [] expectedOccupiedSlotsCountsForLevel11 = new double [] {2, 3, 4, 4, 3, 2, 1};
-    double [] expectedOccupiedSlotsCountsForLevel21 = new double [] {1, 2, 3, 5, 3, 2, 1};
+    double [] expectedOccupiedSlotsCountsForLevel11 = new double [] {4, 5, 6, 5, 3, 2, 1};
+    double [] expectedOccupiedSlotsCountsForLevel21 = new double [] {2, 3, 4, 7, 3, 2, 1};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
@@ -2482,7 +2478,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
     int [][] expectedOccupiedSlotsCounts1 =
-        new int [][] {{3, 6}, {5, 4}, {7, 2}, {9, 0}, {6, 2}, {4, 4}, {2, 7}, {0, 8}};
+        new int [][] {{6, 6}, {8, 4}, {10, 2}, {12, 0}, {6, 4}, {4, 6}, {2, 10}, {0, 10}};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("1636257600000");
@@ -2524,7 +2520,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
 
-    int [] expectedOccupiedSlotsCounts2 = new int [] {3, 5, 7, 9, 6, 4, 2, 0};
+    int [] expectedOccupiedSlotsCounts2 = new int [] {6, 8, 10, 12, 6, 4, 2, 0};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
     List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
     start = dateTimeFormatter.fromFormatToMillis("1636257600000");
@@ -2648,7 +2644,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    double [] expectedOccupiedSlotsCounts1 = new double [] {3, 5, 7, 9, 6, 4, 2, 0};
+    double [] expectedOccupiedSlotsCounts1 = new double [] {6, 8, 10, 12, 6, 4, 2, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
@@ -2678,7 +2674,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
 
-    double [] expectedOccupiedSlotsCounts2 = new double [] {3, 5, 7, 9, 6, 4, 2};
+    double [] expectedOccupiedSlotsCounts2 = new double [] {6, 8, 10, 12, 6, 4, 2};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
     List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length);
@@ -2714,8 +2710,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    double [] expectedOccupiedSlotsCountsForLevel11 = new double [] {2, 3, 4, 4, 3, 2, 1, 0};
-    double [] expectedOccupiedSlotsCountsForLevel21 = new double [] {1, 2, 3, 5, 3, 2, 1, 0};
+    double [] expectedOccupiedSlotsCountsForLevel11 = new double [] {4, 5, 6, 5, 3, 2, 1, 0};
+    double [] expectedOccupiedSlotsCountsForLevel21 = new double [] {2, 3, 4, 7, 3, 2, 1, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
@@ -2759,9 +2755,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
 
-
-    double [] expectedOccupiedSlotsCountsForLevel12 = new double [] {2, 3, 4, 4, 3, 2, 1};
-    double [] expectedOccupiedSlotsCountsForLevel22 = new double [] {1, 2, 3, 5, 3, 2, 1};
+    double [] expectedOccupiedSlotsCountsForLevel12 = new double [] {4, 5, 6, 5, 3, 2, 1};
+    double [] expectedOccupiedSlotsCountsForLevel22 = new double [] {2, 3, 4, 7, 3, 2, 1};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
     List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCountsForLevel12.length * 2);
@@ -2812,8 +2807,8 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
-    double [] expectedOccupiedSlotsCountsForLevel11 = new double [] {2, 3, 4, 4, 3, 2, 1};
-    double [] expectedOccupiedSlotsCountsForLevel21 = new double [] {1, 2, 3, 5, 3, 2, 1};
+    double [] expectedOccupiedSlotsCountsForLevel11 = new double [] {4, 5, 6, 5, 3, 2, 1};
+    double [] expectedOccupiedSlotsCountsForLevel21 = new double [] {2, 3, 4, 7, 3, 2, 1};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
