@@ -2871,7 +2871,7 @@ public class PinotHelixResourceManager {
           //    at any time in case of REFRESH use case.
           if (forceCleanup) {
             if (lineageEntry.getState() == LineageEntryState.IN_PROGRESS && CollectionUtils
-              .isEqualCollection(segmentsFrom, lineageEntry.getSegmentsFrom())) {
+                .isEqualCollection(segmentsFrom, lineageEntry.getSegmentsFrom())) {
               LOGGER.info(
                   "Detected the incomplete lineage entry with the same 'segmentsFrom'. Reverting the lineage "
                       + "entry to unblock the new segment protocol. tableNameWithType={}, entryId={}, segmentsFrom={}, "
@@ -3076,6 +3076,25 @@ public class PinotHelixResourceManager {
                   + "segmentLineageEntryId=%s, segmentLineageEntryState=%s, forceRevert=%s)", tableNameWithType,
               segmentLineageEntryId, lineageEntry.getState(), forceRevert);
           throw new RuntimeException(errorMsg);
+        }
+
+        // We do not allow to revert the lineage entry which segments in 'segmentsTo' appear in 'segmentsFrom' of other
+        // 'IN_PROGRESS' or 'COMPLETED' entries. E.g. we do not allow reverting entry1 because it will block reverting
+        // entry2.
+        // entry1: {(Seg_0, Seg_1, Seg_2) -> (Seg_3, Seg_4, Seg_5), COMPLETED}
+        // entry2: {(Seg_3, Seg_4, Seg_5) -> (Seg_6, Seg_7, Seg_8), IN_PROGRESS/COMPLETED}
+        // TODO: need to expand the logic to revert multiple entries in one go when we support > 2 data snapshots
+        for (String currentEntryId : segmentLineage.getLineageEntryIds()) {
+          LineageEntry currentLineageEntry = segmentLineage.getLineageEntry(currentEntryId);
+          if (currentLineageEntry.getState() == LineageEntryState.IN_PROGRESS
+              || currentLineageEntry.getState() == LineageEntryState.COMPLETED) {
+            Preconditions.checkArgument(Collections.disjoint(lineageEntry.getSegmentsTo(), currentLineageEntry
+                .getSegmentsFrom()), String.format("Cannot revert lineage entry, found segments from 'segmentsTo' "
+                    + "appear in 'segmentsFrom' of another lineage entry. (tableNameWithType='%s', "
+                    + "segmentLineageEntryId='%s', segmentsTo = '%s', segmentLineageEntryId='%s' "
+                    + "segmentsFrom = '%s')", tableNameWithType, segmentLineageEntryId, lineageEntry.getSegmentsTo(),
+                currentEntryId, currentLineageEntry.getSegmentsFrom()));
+          }
         }
 
         // Update segment lineage entry to 'REVERTED'
