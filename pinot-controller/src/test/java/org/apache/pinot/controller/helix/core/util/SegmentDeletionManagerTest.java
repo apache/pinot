@@ -20,13 +20,17 @@ package org.apache.pinot.controller.helix.core.util;
 
 import com.google.common.io.Files;
 import java.io.File;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
@@ -56,7 +60,14 @@ public class SegmentDeletionManagerTest {
   private static final String TABLE_NAME = "table";
   private static final String CLUSTER_NAME = "mock";
   // these prefix must be the same as those in SegmentDeletionManager.
-  private static final String RETENTION_PERIOD_SEPARATOR = "__RETENTION_MS__";
+  private static final String RETENTION_UNTIL_SEPARATOR = "__RETENTION_UNTIL__";
+  private static final String RETENTION_DATE_FORMAT_STR = "yyyyMMdd_HHmmss";
+  private static final SimpleDateFormat RETENTION_DATE_FORMAT;
+
+  static {
+    RETENTION_DATE_FORMAT = new SimpleDateFormat(RETENTION_DATE_FORMAT_STR, Locale.getDefault());
+    RETENTION_DATE_FORMAT.setTimeZone(TimeZone.getDefault());
+  }
 
   HelixAdmin makeHelixAdmin() {
     HelixAdmin admin = mock(HelixAdmin.class);
@@ -242,10 +253,10 @@ public class SegmentDeletionManagerTest {
 
     // Create dummy files
     for (int i = 0; i < 3; i++) {
-      createTestFileWithAge(dummyDir1.getAbsolutePath() + File.separator + genDeletedSegmentName("file" + i, 1), i);
+      createTestFileWithAge(dummyDir1.getAbsolutePath() + File.separator + genDeletedSegmentName("file" + i, i, 1), i);
     }
     for (int i = 2; i < 5; i++) {
-      createTestFileWithAge(dummyDir2.getAbsolutePath() + File.separator + genDeletedSegmentName("file" + i, 1), i);
+      createTestFileWithAge(dummyDir2.getAbsolutePath() + File.separator + genDeletedSegmentName("file" + i, i, 1), i);
     }
 
     // Sleep 1 second to ensure the clock moves.
@@ -314,9 +325,9 @@ public class SegmentDeletionManagerTest {
     }
   }
 
-  public String genDeletedSegmentName(String fileName, int retentionInDays) {
-    String retentionMs = String.valueOf(TimeUnit.DAYS.toMillis(retentionInDays));
-    return StringUtils.join(fileName, RETENTION_PERIOD_SEPARATOR, retentionMs);
+  public String genDeletedSegmentName(String fileName, int age, int retentionInDays) {
+    return StringUtils.join(fileName, RETENTION_UNTIL_SEPARATOR, RETENTION_DATE_FORMAT.format(new Date(
+        DateTime.now().minusDays(age).getMillis() + TimeUnit.DAYS.toMillis(retentionInDays))));
   }
 
   public void createTestFileWithAge(String path, int age)

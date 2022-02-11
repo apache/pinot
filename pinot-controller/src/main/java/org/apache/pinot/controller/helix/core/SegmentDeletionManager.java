@@ -20,12 +20,16 @@ package org.apache.pinot.controller.helix.core;
 
 import java.io.IOException;
 import java.net.URI;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
@@ -55,8 +59,19 @@ public class SegmentDeletionManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentDeletionManager.class);
   private static final long MAX_DELETION_DELAY_SECONDS = 300L;  // Maximum of 5 minutes back-off to retry the deletion
   private static final long DEFAULT_DELETION_DELAY_SECONDS = 2L;
+
+  // Retention date format will be written as suffix to deleted segments under `Deleted_Segments` folder. for example:
+  // `Deleted_Segments/myTable/myTable_mySegment_0__RETENTION_UNTIL__20220202_120000` to indicate that this segment
+  // file will be permanently deleted after Feb 2nd 2022 12PM.
   private static final String DELETED_SEGMENTS = "Deleted_Segments";
-  private static final String RETENTION_MS_SEPARATOR = "__RETENTION_MS__";
+  private static final String RETENTION_UNTIL_SEPARATOR = "__RETENTION_UNTIL__";
+  private static final String RETENTION_DATE_FORMAT_STR = "yyyyMMdd_HHmmss";
+  private static final SimpleDateFormat RETENTION_DATE_FORMAT;
+
+  static {
+    RETENTION_DATE_FORMAT = new SimpleDateFormat(RETENTION_DATE_FORMAT_STR, Locale.getDefault());
+    RETENTION_DATE_FORMAT.setTimeZone(TimeZone.getDefault());
+  }
 
   private final ScheduledExecutorService _executorService;
   private final String _dataDir;
@@ -268,8 +283,8 @@ public class SegmentDeletionManager {
           int numFilesDeleted = 0;
           for (String targetFile : targetFiles) {
             URI targetURI = URIUtils.getUri(targetFile);
-            long deletionTimeMs = System.currentTimeMillis() - getRetentionMsFromFile(targetFile);
-            if (pinotFS.lastModified(targetURI) < deletionTimeMs) {
+            long deletionTimeMs = getDeletionTimeMsFromFile(targetFile, pinotFS.lastModified(targetURI));
+            if (System.currentTimeMillis() >= deletionTimeMs) {
               if (!pinotFS.delete(targetURI, true)) {
                 LOGGER.warn("Cannot remove file {} from deleted directory.", targetURI.toString());
               } else {
@@ -294,20 +309,21 @@ public class SegmentDeletionManager {
   }
 
   private String getDeletedSegmentFileName(String fileName, long deletedSegmentsRetentionMs) {
-    return fileName + RETENTION_MS_SEPARATOR + deletedSegmentsRetentionMs;
+    return fileName + RETENTION_UNTIL_SEPARATOR + RETENTION_DATE_FORMAT.format(new Date(
+        System.currentTimeMillis() + deletedSegmentsRetentionMs));
   }
 
-  private long getRetentionMsFromFile(String targetFile) {
-    String[] split = StringUtils.split(targetFile, RETENTION_MS_SEPARATOR);
-    if (split.length > 1) {
+  private long getDeletionTimeMsFromFile(String targetFile, long lastModifiedTime) {
+    String[] split = StringUtils.splitByWholeSeparator(targetFile, RETENTION_UNTIL_SEPARATOR);
+    if (split.length == 2) {
       try {
-        return Long.parseLong(split[split.length - 1]);
+        return RETENTION_DATE_FORMAT.parse(split[1]).getTime();
       } catch (Exception e) {
         LOGGER.warn("No retention suffix found for file: {}", targetFile);
       }
     }
     LOGGER.info("Fallback to using default cluster retention config: {} ms", _defaultDeletedSegmentsRetentionMs);
-    return _defaultDeletedSegmentsRetentionMs;
+    return lastModifiedTime + _defaultDeletedSegmentsRetentionMs;
   }
 
   public long getRetentionMsFromTableConfig(TableConfig tableConfig) {
