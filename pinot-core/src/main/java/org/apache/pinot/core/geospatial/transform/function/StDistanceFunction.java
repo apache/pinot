@@ -19,6 +19,7 @@
 package org.apache.pinot.core.geospatial.transform.function;
 
 import com.google.common.base.Preconditions;
+import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.locationtech.jts.geom.Geometry;
@@ -45,6 +46,11 @@ public class StDistanceFunction extends BaseBinaryGeoTransformFunction {
   @Override
   public TransformResultMetadata getResultMetadata() {
     return DOUBLE_SV_NO_DICTIONARY_METADATA;
+  }
+
+  @Override
+  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
+    return transformGeometryToDoubleValuesSV(projectionBlock);
   }
 
   @Override

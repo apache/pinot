@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.geospatial.transform.function;
 
+import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.locationtech.jts.geom.Geometry;
@@ -38,6 +39,11 @@ public class StWithinFunction extends BaseBinaryGeoTransformFunction {
   @Override
   public TransformResultMetadata getResultMetadata() {
     return INT_SV_NO_DICTIONARY_METADATA;
+  }
+
+  @Override
+  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
+    return transformGeometryToIntValuesSV(projectionBlock);
   }
 
   @Override

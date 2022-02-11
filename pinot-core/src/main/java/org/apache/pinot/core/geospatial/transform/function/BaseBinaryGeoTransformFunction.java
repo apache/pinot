@@ -19,10 +19,10 @@
 package org.apache.pinot.core.geospatial.transform.function;
 
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
-import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.LiteralTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
@@ -79,66 +79,63 @@ public abstract class BaseBinaryGeoTransformFunction extends BaseTransformFuncti
     }
   }
 
-  @Override
-  public TransformResultMetadata getResultMetadata() {
-    return INT_SV_NO_DICTIONARY_METADATA;
-  }
-
-  @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
+  protected int[] transformGeometryToIntValuesSV(ProjectionBlock projectionBlock) {
     if (_intResults == null) {
       _intResults = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
-    final byte[][] firstValues;
-    final byte[][] secondValues;
-    if (_firstArgument != null) {
-      firstValues = _firstArgument.transformToBytesValuesSV(projectionBlock);
+    byte[][] firstValues = _firstArgument != null ? _firstArgument.transformToBytesValuesSV(projectionBlock) : null;
+    byte[][] secondValues = _secondArgument != null ? _secondArgument.transformToBytesValuesSV(projectionBlock) : null;
+    if (firstValues == null && secondValues == null) {
+      _intResults = new int[Math.min(projectionBlock.getNumDocs(), DocIdSetPlanNode.MAX_DOC_PER_CALL)];
+      Arrays.fill(_intResults, transformGeometryToInt(_firstLiteral, _secondLiteral));
+    } else if (firstValues == null) {
+      for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
+        _intResults[i] = transformGeometryToInt(_firstLiteral, GeometrySerializer.deserialize(secondValues[i]));
+      }
+    } else if (secondValues == null) {
+      for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
+        _intResults[i] = transformGeometryToInt(GeometrySerializer.deserialize(firstValues[i]), _secondLiteral);
+      }
     } else {
-      firstValues = null;
-    }
-    if (_secondArgument != null) {
-      secondValues = _secondArgument.transformToBytesValuesSV(projectionBlock);
-    } else {
-      secondValues = null;
-    }
-    for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      Geometry firstGeometry = firstValues == null ? _firstLiteral : GeometrySerializer.deserialize(firstValues[i]);
-      Geometry secondGeometry = secondValues == null ? _secondLiteral : GeometrySerializer.deserialize(secondValues[i]);
-      _intResults[i] = transformGeometryToInt(firstGeometry, secondGeometry);
+      for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
+        _intResults[i] = transformGeometryToInt(GeometrySerializer.deserialize(firstValues[i]),
+            GeometrySerializer.deserialize(secondValues[i]));
+      }
     }
     return _intResults;
   }
 
-  @Override
-  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
+  protected double[] transformGeometryToDoubleValuesSV(ProjectionBlock projectionBlock) {
     if (_doubleResults == null) {
       _doubleResults = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
-    final byte[][] firstValues;
-    final byte[][] secondValues;
-    if (_firstArgument != null) {
-      firstValues = _firstArgument.transformToBytesValuesSV(projectionBlock);
+    byte[][] firstValues = _firstArgument != null ? _firstArgument.transformToBytesValuesSV(projectionBlock) : null;
+    byte[][] secondValues = _secondArgument != null ? _secondArgument.transformToBytesValuesSV(projectionBlock) : null;
+    if (firstValues == null && secondValues == null) {
+      _doubleResults = new double[Math.min(projectionBlock.getNumDocs(), DocIdSetPlanNode.MAX_DOC_PER_CALL)];
+      Arrays.fill(_doubleResults, transformGeometryToDouble(_firstLiteral, _secondLiteral));
+    } else if (firstValues == null) {
+      for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
+        _doubleResults[i] = transformGeometryToDouble(_firstLiteral, GeometrySerializer.deserialize(secondValues[i]));
+      }
+    } else if (secondValues == null) {
+      for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
+        _doubleResults[i] = transformGeometryToDouble(GeometrySerializer.deserialize(firstValues[i]), _secondLiteral);
+      }
     } else {
-      firstValues = null;
-    }
-    if (_secondArgument != null) {
-      secondValues = _secondArgument.transformToBytesValuesSV(projectionBlock);
-    } else {
-      secondValues = null;
-    }
-    for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      Geometry firstGeometry = firstValues == null ? _firstLiteral : GeometrySerializer.deserialize(firstValues[i]);
-      Geometry secondGeometry = secondValues == null ? _secondLiteral : GeometrySerializer.deserialize(secondValues[i]);
-      _doubleResults[i] = transformGeometryToDouble(firstGeometry, secondGeometry);
+      for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
+        _doubleResults[i] = transformGeometryToDouble(GeometrySerializer.deserialize(firstValues[i]),
+            GeometrySerializer.deserialize(secondValues[i]));
+      }
     }
     return _doubleResults;
   }
 
   public int transformGeometryToInt(Geometry firstGeometry, Geometry secondGeometry) {
-    throw new UnsupportedOperationException("Unsupported!");
+    throw new UnsupportedOperationException();
   }
 
   public double transformGeometryToDouble(Geometry firstGeometry, Geometry secondGeometry) {
-    throw new UnsupportedOperationException("Unsupported!");
+    throw new UnsupportedOperationException();
   }
 }
