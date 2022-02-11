@@ -105,7 +105,8 @@ public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implemen
     PluginManager.get().init();
     if (PULL_REQUEST_MERGED_EVENT_TYPE.equals(_eventType)) {
       PullRequestMergedEventsStream pullRequestMergedEventsStream =
-          new PullRequestMergedEventsStream(_schemaFile, _topic, _kafkaBrokerList, _personalAccessToken);
+          new PullRequestMergedEventsStream(_schemaFile, _topic, _personalAccessToken,
+              PullRequestMergedEventsStream.getKafkaStreamDataProducer(_kafkaBrokerList));
       pullRequestMergedEventsStream.execute();
     } else {
       throw new UnsupportedOperationException("Event type " + _eventType + " is unsupported");

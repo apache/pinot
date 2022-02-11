@@ -59,21 +59,31 @@ public class AirlineDataStream {
 
   public AirlineDataStream(Schema pinotSchema, TableConfig tableConfig, File avroFile)
       throws Exception {
+    this(pinotSchema, tableConfig, avroFile, getDefaultKafkaProducer());
+  }
+
+  public AirlineDataStream(Schema pinotSchema, TableConfig tableConfig, File avroFile, StreamDataProducer producer)
+      throws IOException {
     _pinotSchema = pinotSchema;
     _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     _avroFile = avroFile;
     createStream();
+    _producer = producer;
+    _service = Executors.newFixedThreadPool(1);
+    QuickStartBase.printStatus(Quickstart.Color.YELLOW,
+        "***** Offine data has max time as 16101, realtime will start consuming from time 16102 and increment time "
+            + "every 60 events (which is approximately 60 seconds) *****");
+  }
+
+  public static StreamDataProducer getDefaultKafkaProducer()
+      throws Exception {
     Properties properties = new Properties();
     properties.put("metadata.broker.list", KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
     properties.put("request.required.acks", "1");
 
-    _producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
+    return StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
 
-    _service = Executors.newFixedThreadPool(1);
-    QuickStartBase.printStatus(Quickstart.Color.YELLOW,
-        "***** Offine data has max time as 16101, realtime will start consuming from time 16102 and increment time "
-            + "every 60 events (which is approximately 60 seconds) *****");
   }
 
   public void shutdown() {
