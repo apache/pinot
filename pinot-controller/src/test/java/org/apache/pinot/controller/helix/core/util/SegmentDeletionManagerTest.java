@@ -374,7 +374,8 @@ public class SegmentDeletionManagerTest {
     }
 
     @Override
-    protected void removeSegmentFromStore(String tableName, String segmentId, long deletedSegmentsRetentionMs) {
+    protected void removeSegmentFromStore(String tableName, String segmentId, long deletedSegmentsRetentionMs,
+        boolean usedDefaultClusterRetention) {
       _segmentsRemovedFromStore.add(segmentId);
     }
 

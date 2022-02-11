@@ -190,18 +190,23 @@ public class SegmentDeletionManager {
   }
 
   public void removeSegmentsFromStore(String tableNameWithType, List<String> segments) {
-    removeSegmentsFromStore(tableNameWithType, segments, _defaultDeletedSegmentsRetentionMs);
+    removeSegmentsFromStore(tableNameWithType, segments, _defaultDeletedSegmentsRetentionMs, true);
   }
 
   public void removeSegmentsFromStore(String tableNameWithType, List<String> segments,
       long deletedSegmentsRetentionMs) {
+    removeSegmentsFromStore(tableNameWithType, segments, deletedSegmentsRetentionMs, false);
+  }
+
+  public void removeSegmentsFromStore(String tableNameWithType, List<String> segments,
+      long deletedSegmentsRetentionMs, boolean usedDefaultClusterRetention) {
     for (String segment : segments) {
-      removeSegmentFromStore(tableNameWithType, segment, deletedSegmentsRetentionMs);
+      removeSegmentFromStore(tableNameWithType, segment, deletedSegmentsRetentionMs, usedDefaultClusterRetention);
     }
   }
 
   protected void removeSegmentFromStore(String tableNameWithType, String segmentId,
-      long deletedSegmentsRetentionMs) {
+      long deletedSegmentsRetentionMs, boolean usedDefaultClusterRetention) {
     // Ignore HLC segments as they are not stored in Pinot FS
     if (SegmentName.isHighLevelConsumerSegmentName(segmentId)) {
       return;
@@ -223,8 +228,9 @@ public class SegmentDeletionManager {
         }
       } else {
         // move the segment file to deleted segments first and let retention manager handler the deletion
-        URI deletedSegmentMoveDestURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS, rawTableName,
-            getDeletedSegmentFileName(URIUtils.encode(segmentId), deletedSegmentsRetentionMs));
+        String deletedFileName = usedDefaultClusterRetention ? URIUtils.encode(segmentId)
+            : getDeletedSegmentFileName(URIUtils.encode(segmentId), deletedSegmentsRetentionMs);
+        URI deletedSegmentMoveDestURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS, rawTableName, deletedFileName);
         try {
           if (pinotFS.exists(fileToDeleteURI)) {
             // Overwrites the file if it already exists in the target directory.
