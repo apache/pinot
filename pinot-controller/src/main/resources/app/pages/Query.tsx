@@ -46,6 +46,7 @@ import SimpleAccordion from '../components/SimpleAccordion';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import '../styles/styles.css';
 import {Resizable} from "re-resizable";
+import { useHistory, useLocation } from 'react-router';
 
 const useStyles = makeStyles((theme) => ({
   title: {
@@ -147,8 +148,17 @@ const responseStatCols = [
   'realtimeTotalCpuTimeNs'
 ];
 
+// A custom hook that builds on useLocation to parse the query string
+function useQuery() {
+  const { search } = useLocation();
+
+  return React.useMemo(() => new URLSearchParams(search), [search]);
+}
+
 const QueryPage = () => {
   const classes = useStyles();
+  const history = useHistory();
+  let queryParam = useQuery();
   const [fetching, setFetching] = useState(true);
   const [queryLoader, setQueryLoader] = useState(false);
   const [tableList, setTableList] = useState<TableData>({
@@ -167,9 +177,9 @@ const QueryPage = () => {
 
   const [selectedTable, setSelectedTable] = useState('');
 
-  const [inputQuery, setInputQuery] = useState('');
+  const [inputQuery, setInputQuery] = useState(queryParam.get('query') || '');
 
-  const [queryTimeout, setQueryTimeout] = useState('');
+  const [queryTimeout, setQueryTimeout] = useState(Number(queryParam.get('timeout') || '') || '');
 
   const [outputResult, setOutputResult] = useState('');
 
@@ -181,10 +191,13 @@ const QueryPage = () => {
   });
 
   const [checked, setChecked] = React.useState({
-    tracing: false,
-    querySyntaxPQL: false,
+    tracing: queryParam.get('tracing') === 'true',
+    querySyntaxPQL: queryParam.get('pqlSyntax') === 'true',
     showResultJSON: false,
   });
+
+  const queryExecuted = React.useRef(false);
+  const [boolFlag, setBoolFlag] = useState(false);
 
   const [copyMsg, showCopyMsg] = React.useState(false);
 
@@ -254,24 +267,39 @@ const QueryPage = () => {
 
   const handleRunNow = async (query?: string) => {
     setQueryLoader(true);
+    queryExecuted.current = true;
     let url;
     let params;
     let timeoutStr = '';
-    if(queryTimeout !== ''){
-      timeoutStr = ` option(timeoutMs=${parseInt(queryTimeout, 10)})`
+    if(queryTimeout){
+      timeoutStr = ` option(timeoutMs=${queryTimeout})`
     }
+    const finalQuery = `${query || inputQuery.trim()}`;
     if (checked.querySyntaxPQL) {
       url = 'pql';
       params = JSON.stringify({
-        pql: `${query || inputQuery.trim()}${timeoutStr}`,
+        pql: `${finalQuery}${timeoutStr}`,
         trace: checked.tracing,
       });
     } else {
       url = 'sql';
       params = JSON.stringify({
-        sql: `${query || inputQuery.trim()}${timeoutStr}`,
+        sql: `${finalQuery}${timeoutStr}`,
         trace: checked.tracing,
       });
+    }
+
+    if(finalQuery !== ''){
+      queryParam.set('query', finalQuery);
+      queryParam.set('tracing', checked.tracing.toString());
+      queryParam.set('pqlSyntax', checked.querySyntaxPQL.toString());
+      if(queryTimeout !== undefined && queryTimeout !== ''){
+        queryParam.set('timeout', queryTimeout.toString());
+      }
+      history.push({
+        pathname: '/query',
+        search: `?${queryParam.toString()}`
+      })
     }
 
     const results = await PinotMethodUtils.getQueryResults(
@@ -284,6 +312,7 @@ const QueryPage = () => {
     setQueryStats(results.queryStats || { columns: responseStatCols, records: [] });
     setOutputResult(JSON.stringify(results.data, null, 2) || '');
     setQueryLoader(false);
+    queryExecuted.current = false;
   };
 
   const fetchSQLData = async (tableName) => {
@@ -339,7 +368,31 @@ const QueryPage = () => {
 
   useEffect(() => {
     fetchData();
+    if(inputQuery){
+      handleRunNow(inputQuery);
+    }
   }, []);
+
+  useEffect(()=>{
+    const query = queryParam.get('query');
+    if(!queryExecuted.current && query){
+      setInputQuery(query);
+      setChecked({
+        tracing: queryParam.get('tracing') === 'true',
+        querySyntaxPQL: queryParam.get('pqlSyntax') === 'true',
+        showResultJSON: checked.showResultJSON,
+      });
+      setQueryTimeout(Number(queryParam.get('timeout') || '') || '');
+      setBoolFlag(!boolFlag);
+    }
+  }, [queryParam]);
+
+  useEffect(()=>{
+    const query = queryParam.get('query');
+    if(!queryExecuted.current && query){
+      handleRunNow();
+    }
+  }, [boolFlag]);
 
   const handleSqlHints = (cm: NativeCodeMirror.Editor) => {
     const tableNames = [];
@@ -455,7 +508,7 @@ const QueryPage = () => {
               <Grid item xs={3}>
                 <FormControl fullWidth={true} className={classes.timeoutControl}>
                   <InputLabel htmlFor="my-input">Timeout (in Milliseconds)</InputLabel>
-                  <Input id="my-input" type="number" value={queryTimeout} onChange={(e)=> setQueryTimeout(e.target.value)}/>
+                  <Input id="my-input" type="number" value={queryTimeout} onChange={(e)=> setQueryTimeout(Number(e.target.value) || '')}/>
                 </FormControl>
               </Grid>
 
