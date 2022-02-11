@@ -23,6 +23,7 @@ import java.io.File;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import org.apache.http.Header;
 import org.apache.http.HttpHeaders;
@@ -122,7 +123,7 @@ public class SegmentConversionUtils {
   }
 
   public static String startSegmentReplace(String tableNameWithType, String uploadURL,
-      StartReplaceSegmentsRequest startReplaceSegmentsRequest)
+      StartReplaceSegmentsRequest startReplaceSegmentsRequest, @Nullable String authToken)
       throws Exception {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
@@ -130,7 +131,8 @@ public class SegmentConversionUtils {
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
       URI uri =
           FileUploadDownloadClient.getStartReplaceSegmentsURI(new URI(uploadURL), rawTableName, tableType.name(), true);
-      SimpleHttpResponse response = fileUploadDownloadClient.startReplaceSegments(uri, startReplaceSegmentsRequest);
+      SimpleHttpResponse response =
+          fileUploadDownloadClient.startReplaceSegments(uri, startReplaceSegmentsRequest, authToken);
       String responseString = response.getResponse();
       LOGGER.info(
           "Got response {}: {} while sending start replace segment request for table: {}, uploadURL: {}, request: {}",
@@ -140,7 +142,7 @@ public class SegmentConversionUtils {
   }
 
   public static void endSegmentReplace(String tableNameWithType, String uploadURL, String segmentLineageEntryId,
-      int socketTimeoutMs)
+      int socketTimeoutMs, @Nullable String authToken)
       throws Exception {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
@@ -148,7 +150,7 @@ public class SegmentConversionUtils {
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
       URI uri = FileUploadDownloadClient
           .getEndReplaceSegmentsURI(new URI(uploadURL), rawTableName, tableType.name(), segmentLineageEntryId);
-      SimpleHttpResponse response = fileUploadDownloadClient.endReplaceSegments(uri, socketTimeoutMs);
+      SimpleHttpResponse response = fileUploadDownloadClient.endReplaceSegments(uri, socketTimeoutMs, authToken);
       LOGGER.info("Got response {}: {} while sending end replace segment request for table: {}, uploadURL: {}",
           response.getStatusCode(), response.getResponse(), tableNameWithType, uploadURL);
     }

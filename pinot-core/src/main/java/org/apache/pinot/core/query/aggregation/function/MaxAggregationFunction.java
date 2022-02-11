@@ -93,7 +93,7 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
         break;
       }
       default:
-        throw new IllegalStateException("Cannot compute min for non-numeric type: " + blockValSet.getValueType());
+        throw new IllegalStateException("Cannot compute max for non-numeric type: " + blockValSet.getValueType());
     }
   }
 

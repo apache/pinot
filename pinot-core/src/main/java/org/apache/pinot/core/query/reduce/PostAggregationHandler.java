@@ -117,19 +117,18 @@ public class PostAggregationHandler {
       }
     }
     FunctionContext function = expression.getFunction();
-    Preconditions
-        .checkState(function != null, "Failed to find SELECT expression: %s in the GROUP-BY clause", expression);
+    Preconditions.checkState(function != null, "Failed to find SELECT expression: %s in the GROUP-BY clause",
+        expression);
     if (function.getType() == FunctionContext.Type.AGGREGATION) {
       // Aggregation function
       return new ColumnValueExtractor(_aggregationFunctionIndexMap.get(function) + _numGroupByExpressions);
-    } else if (function.getType() == FunctionContext.Type.TRANSFORM
-        && function.getFunctionName().equalsIgnoreCase("filter")) {
+    } else if (function.getType() == FunctionContext.Type.TRANSFORM && function.getFunctionName()
+        .equalsIgnoreCase("filter")) {
       ExpressionContext filterExpression = function.getArguments().get(1);
       FilterContext filter = RequestContextUtils.getFilter(filterExpression);
       FunctionContext filterFunction = function.getArguments().get(0).getFunction();
 
-      return new ColumnValueExtractor(_filteredAggregationsIndexMap
-          .get(Pair.of(filterFunction, filter)));
+      return new ColumnValueExtractor(_filteredAggregationsIndexMap.get(Pair.of(filterFunction, filter)));
     } else {
       // Post-aggregation function
       return new PostAggregationValueExtractor(function);

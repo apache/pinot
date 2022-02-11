@@ -293,6 +293,7 @@ public class TableConfigsRestletResource {
       tableConfigs = JsonUtils.stringToObject(tableConfigsStr, TableConfigs.class);
       Preconditions.checkState(tableConfigs.getTableName().equals(tableName),
           "'tableName' in TableConfigs: %s must match provided tableName: %s", tableConfigs.getTableName(), tableName);
+
       validateConfig(tableConfigs, typesToSkip);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, String.format("Invalid TableConfigs: %s", tableName),
@@ -396,14 +397,14 @@ public class TableConfigsRestletResource {
         Preconditions.checkState(offlineRawTableName.equals(rawTableName),
             "Name in 'offline' table config: %s must be equal to 'tableName': %s", offlineRawTableName, rawTableName);
         TableConfigUtils.validateTableName(offlineTableConfig);
-        TableConfigUtils.validate(offlineTableConfig, schema, typesToSkip);
+        TableConfigUtils.validate(offlineTableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
       }
       if (realtimeTableConfig != null) {
         String realtimeRawTableName = TableNameBuilder.extractRawTableName(realtimeTableConfig.getTableName());
         Preconditions.checkState(realtimeRawTableName.equals(rawTableName),
             "Name in 'realtime' table config: %s must be equal to 'tableName': %s", realtimeRawTableName, rawTableName);
         TableConfigUtils.validateTableName(realtimeTableConfig);
-        TableConfigUtils.validate(realtimeTableConfig, schema, typesToSkip);
+        TableConfigUtils.validate(realtimeTableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
       }
       if (offlineTableConfig != null && realtimeTableConfig != null) {
         TableConfigUtils.verifyHybridTableConfigs(rawTableName, offlineTableConfig, realtimeTableConfig);

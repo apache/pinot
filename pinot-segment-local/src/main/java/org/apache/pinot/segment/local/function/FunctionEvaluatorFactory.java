@@ -97,11 +97,18 @@ public class FunctionEvaluatorFactory {
   }
 
   public static FunctionEvaluator getExpressionEvaluator(String transformExpression) {
-    if (transformExpression.startsWith(GroovyFunctionEvaluator.getGroovyExpressionPrefix())) {
+    if (isGroovyExpression(transformExpression)) {
       return new GroovyFunctionEvaluator(transformExpression);
     } else {
       return new InbuiltFunctionEvaluator(transformExpression);
     }
+  }
+
+  /**
+   * @return true if the given transform function is a groovy expression, otherwise returns false
+   */
+  public static boolean isGroovyExpression(String transformExpression) {
+    return transformExpression.startsWith(GroovyFunctionEvaluator.getGroovyExpressionPrefix());
   }
 
   private static String getDefaultMapKeysTransformExpression(String mapColumnName) {

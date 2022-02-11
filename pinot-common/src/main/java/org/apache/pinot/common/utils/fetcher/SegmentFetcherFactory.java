@@ -144,6 +144,7 @@ public class SegmentFetcherFactory {
 
   private void fetchSegmentToLocalInternal(URI uri, File dest)
       throws Exception {
+    // caller untars
     getSegmentFetcher(uri.getScheme()).fetchSegmentToLocal(uri, dest);
   }
 
