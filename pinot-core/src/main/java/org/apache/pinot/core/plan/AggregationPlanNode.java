@@ -92,7 +92,8 @@ public class AggregationPlanNode implements PlanNode {
       BaseFilterOperator mainPredicateFilterOperator, TransformOperator mainTransformOperator, int numTotalDocs) {
     Map<FilterContext, Pair<List<AggregationFunction>, TransformOperator>> filterContextToAggFuncsMap = new HashMap<>();
     List<AggregationFunction> nonFilteredAggregationFunctions = new ArrayList<>();
-    List<Pair<AggregationFunction, FilterContext>> aggregationFunctions = _queryContext.getFilteredAggregations();
+    List<Pair<AggregationFunction, FilterContext>> aggregationFunctions =
+        _queryContext.getFilteredAggregationFunctions();
 
     // For each aggregation function, check if the aggregation function is a filtered agg.
     // If it is, populate the corresponding filter operator and corresponding transform operator

@@ -21,7 +21,6 @@ package org.apache.pinot.common.request.context;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import org.apache.pinot.common.function.FunctionDefinitionRegistry;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.FilterOperator;
@@ -122,7 +121,7 @@ public class RequestContextUtils {
           Collections.singletonList(ExpressionContext.forIdentifier("*")));
     }
     FunctionContext.Type functionType =
-        FunctionDefinitionRegistry.isAggFunc(functionName) ? FunctionContext.Type.AGGREGATION
+        AggregationFunctionType.isAggregationFunction(functionName) ? FunctionContext.Type.AGGREGATION
             : FunctionContext.Type.TRANSFORM;
     List<Expression> operands = thriftFunction.getOperands();
     if (operands != null) {
@@ -147,7 +146,7 @@ public class RequestContextUtils {
           Collections.singletonList(ExpressionContext.forIdentifier("*")));
     }
     FunctionContext.Type functionType =
-        FunctionDefinitionRegistry.isAggFunc(functionName) ? FunctionContext.Type.AGGREGATION
+        AggregationFunctionType.isAggregationFunction(functionName) ? FunctionContext.Type.AGGREGATION
             : FunctionContext.Type.TRANSFORM;
     List<? extends AstNode> children = astNode.getChildren();
     if (children != null) {
