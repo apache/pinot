@@ -75,6 +75,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.LEAD_CONTROLLER_R
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
+import static org.testng.Assert.fail;
 
 
 public class PinotHelixResourceManagerTest {
@@ -491,6 +492,7 @@ public class PinotHelixResourceManagerTest {
     try {
       ControllerTestUtils.getHelixResourceManager()
           .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo, false);
+      fail();
     } catch (Exception e) {
       // expected
     }
@@ -499,6 +501,7 @@ public class PinotHelixResourceManagerTest {
     try {
       ControllerTestUtils.getHelixResourceManager()
           .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo, false);
+      fail();
     } catch (Exception e) {
       // expected
     }
@@ -508,6 +511,7 @@ public class PinotHelixResourceManagerTest {
     try {
       ControllerTestUtils.getHelixResourceManager()
           .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo, false);
+      fail();
     } catch (Exception e) {
       // expected
     }
@@ -515,6 +519,7 @@ public class PinotHelixResourceManagerTest {
     // Invalid table
     try {
       ControllerTestUtils.getHelixResourceManager().endReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId);
+      fail();
     } catch (Exception e) {
       // expected
     }
@@ -522,6 +527,7 @@ public class PinotHelixResourceManagerTest {
     // Invalid lineage entry id
     try {
       ControllerTestUtils.getHelixResourceManager().endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "aaa");
+      fail();
     } catch (Exception e) {
       // expected
     }
@@ -530,6 +536,7 @@ public class PinotHelixResourceManagerTest {
     try {
       ControllerTestUtils.getHelixResourceManager()
           .endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, lineageEntryId);
+      fail();
     } catch (Exception e) {
       // expected
     }
@@ -575,6 +582,7 @@ public class PinotHelixResourceManagerTest {
     try {
       ControllerTestUtils.getHelixResourceManager()
           .revertReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, lineageEntryId2, false);
+      fail();
     } catch (Exception e) {
       // expected
     }
@@ -613,6 +621,7 @@ public class PinotHelixResourceManagerTest {
     try {
       ControllerTestUtils.getHelixResourceManager()
           .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo, false);
+      fail();
     } catch (Exception e) {
       // expected
     }
@@ -755,6 +764,14 @@ public class PinotHelixResourceManagerTest {
     Assert.assertEquals(new HashSet<>(ControllerTestUtils.getHelixResourceManager()
             .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, true)),
         new HashSet<>(Arrays.asList("s3", "s4", "s5")));
+    // Try to revert the first entry should fail
+    try {
+      ControllerTestUtils.getHelixResourceManager()
+          .revertReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, lineageEntryId, false);
+      fail();
+    } catch (Exception e) {
+      // expected
+    }
 
     // Add partial segments to indicate incomplete protocol
     ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME,
@@ -799,6 +816,7 @@ public class PinotHelixResourceManagerTest {
     try {
       ControllerTestUtils.getHelixResourceManager()
           .endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, lineageEntryId2);
+      fail();
     } catch (Exception e) {
       // expected
     }
