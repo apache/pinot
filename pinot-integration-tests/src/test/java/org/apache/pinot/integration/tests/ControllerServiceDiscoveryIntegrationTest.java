@@ -20,7 +20,6 @@ package org.apache.pinot.integration.tests;
 
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
