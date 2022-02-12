@@ -30,6 +30,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -327,6 +328,18 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validate(tableConfig, schema, null, true);
       Assert.fail("Should fail when Groovy functions disabled but found in filter config");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+
+    // invalid filter config since Groovy is disabled through table config
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
+            new IngestionConfig(null, null, new FilterConfig("Groovy({timestamp > 0}, timestamp)"), null, null))
+        .setQueryConfig(new QueryConfig(null, true))
+        .build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema, null, false);
+      Assert.fail("Should fail when Groovy functions disabled through table config but found in filter config");
     } catch (IllegalStateException e) {
       // expected
     }

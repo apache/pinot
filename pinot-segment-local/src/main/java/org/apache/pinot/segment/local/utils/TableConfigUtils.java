@@ -251,6 +251,10 @@ public final class TableConfigUtils {
    */
   @VisibleForTesting
   public static void validateIngestionConfig(TableConfig tableConfig, @Nullable Schema schema, boolean disableGroovy) {
+    if (tableConfig.getQueryConfig() != null && tableConfig.getQueryConfig().getDisableGroovyQuery() != null) {
+      disableGroovy = tableConfig.getQueryConfig().getDisableGroovyQuery();
+    }
+
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
 
     if (ingestionConfig != null) {
