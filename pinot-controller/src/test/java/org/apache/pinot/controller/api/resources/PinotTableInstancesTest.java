@@ -20,8 +20,6 @@ package org.apache.pinot.controller.api.resources;
 
 import com.google.common.collect.ImmutableList;
 import java.util.List;
-import java.util.Map;
-import javax.ws.rs.WebApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -29,21 +27,30 @@ import org.testng.annotations.Test;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 
 public class PinotTableInstancesTest {
 
     @Test
-    public void testGetLiveBrokersForTableByType() {
+    public void testGetLiveBrokersForTable() {
         String tableName = "testTable";
         String offlineTableName = "testTable_OFFLINE";
         String realtimeTableName = "testTable_REALTIME";
-        List<String> expectedBrokers = ImmutableList.of("pinot_broker_0");
+        String realtimeBroker = "pinot_realtime_broker_0";
+        String offlineBroker = "pinot_offline_broker_0";
+        String commonBroker = "pinot_common_broker";
         // Setup mock helix resource manager.
         PinotHelixResourceManager mockedHelixResourceManager = mock(PinotHelixResourceManager.class);
-        doReturn(expectedBrokers)
+        doReturn(ImmutableList.of(commonBroker, offlineBroker))
                 .when(mockedHelixResourceManager)
-                .getLiveBrokersForTable(anyString());
+                .getLiveBrokersForTable(offlineTableName);
+        doReturn(ImmutableList.of(commonBroker, realtimeBroker))
+                .when(mockedHelixResourceManager)
+                .getLiveBrokersForTable(realtimeTableName);
+        doThrow(IllegalArgumentException.class)
+                .when(mockedHelixResourceManager)
+                .getLiveBrokersForTable(tableName);
         doAnswer((invocationOnMock) -> {
             String inputTableName = invocationOnMock.getArgument(0);
             return inputTableName.equals(tableName) || inputTableName.equals(offlineTableName);
@@ -62,22 +69,18 @@ public class PinotTableInstancesTest {
         pinotTableInstances.setPinotHelixResourceManager(mockedHelixResourceManager);
 
         // Test with table name without type suffix.
-        Map<String, List<String>> result = pinotTableInstances.getLiveBrokersForTableByType(tableName);
-        Assert.assertEquals(2, result.size());
-        Assert.assertEquals(expectedBrokers, result.get("OFFLINE"));
-        Assert.assertEquals(expectedBrokers, result.get("REALTIME"));
+        List<String> result = pinotTableInstances.getLiveBrokersForTable(tableName);
+        Assert.assertEquals(result, ImmutableList.of(commonBroker));
 
         // Test with table name with a type suffix.
-        result = pinotTableInstances.getLiveBrokersForTableByType(offlineTableName);
-        Assert.assertEquals(1, result.size());
-        Assert.assertEquals(expectedBrokers, result.get("OFFLINE"));
+        result = pinotTableInstances.getLiveBrokersForTable(offlineTableName);
+        Assert.assertEquals(result, ImmutableList.of(commonBroker, offlineBroker));
+
+        result = pinotTableInstances.getLiveBrokersForTable(realtimeTableName);
+        Assert.assertEquals(result, ImmutableList.of(commonBroker, realtimeBroker));
 
         // Test with non-existent table
-        try {
-            pinotTableInstances.getLiveBrokersForTableByType("non_existent_table");
-            Assert.fail("API call should have failed with 404 for non-existent table");
-        } catch (WebApplicationException e) {
-            Assert.assertEquals(404, e.getResponse().getStatus());
-        }
+        result = pinotTableInstances.getLiveBrokersForTable("non_existent_table");
+        Assert.assertEquals(0, result.size());
     }
 }
