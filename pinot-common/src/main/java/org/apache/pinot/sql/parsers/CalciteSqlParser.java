@@ -711,6 +711,10 @@ public class CalciteSqlParser {
           compilePathExpression(functionName, functionNode, path);
           return RequestUtils.getIdentifierExpression(path.toString());
         }
+        if ((functionNode.getFunctionQuantifier() != null) && ("DISTINCT".equals(
+            functionNode.getFunctionQuantifier().toString()))) {
+          functionName = "DISTINCTCOUNT";
+        }
         break;
       default:
         functionName = functionKind.name();
