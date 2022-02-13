@@ -19,5 +19,4 @@
 package org.apache.pinot.spi.data.readers;
 
 public interface RecordReaderConfig {
-
 }

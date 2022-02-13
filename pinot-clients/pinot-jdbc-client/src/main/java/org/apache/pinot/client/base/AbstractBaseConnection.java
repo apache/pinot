@@ -147,7 +147,6 @@ public abstract class AbstractBaseConnection implements Connection {
   @Override
   public void setClientInfo(Properties properties)
       throws SQLClientInfoException {
-
   }
 
   @Override
@@ -311,7 +310,6 @@ public abstract class AbstractBaseConnection implements Connection {
   @Override
   public void setClientInfo(String name, String value)
       throws SQLClientInfoException {
-
   }
 
   @Override

@@ -412,5 +412,4 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   default int getBytesMV(int docId, byte[][] valueBuffer, T context) {
     throw new UnsupportedOperationException();
   }
-
 }

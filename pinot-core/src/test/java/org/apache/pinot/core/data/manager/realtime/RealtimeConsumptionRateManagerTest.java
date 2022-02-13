@@ -69,5 +69,4 @@ public class RealtimeConsumptionRateManagerTest {
     rateLimiter = _consumptionRateManager.createRateLimiter(STREAM_CONFIG_C, TABLE_NAME);
     assertEquals(rateLimiter, NOOP_RATE_LIMITER);
   }
-
 }

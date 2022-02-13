@@ -34,7 +34,6 @@ public class TableResponse {
   private JsonNode _tables;
 
   private TableResponse() {
-
   }
 
   private TableResponse(JsonNode tableResponse) {

@@ -55,7 +55,6 @@ public class HadoopPinotFS extends BasePinotFS {
   private org.apache.hadoop.conf.Configuration _hadoopConf;
 
   public HadoopPinotFS() {
-
   }
 
   @Override

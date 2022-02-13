@@ -85,7 +85,6 @@ public class BrokerServiceAutoDiscoveryFeature implements Feature {
             populator.populate(
                     new ClasspathDescriptorFileFinder(this.getClass().getClassLoader()),
                     new DuplicatePostProcessor());
-
         } catch (IOException | MultiException ex) {
             LOGGER.error("Failed to register service locator. Auto-discovery will fail, but app will continue", ex);
         }

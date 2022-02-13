@@ -309,7 +309,6 @@ public class Expression implements org.apache.thrift.TBase<Expression, Expressio
         setIdentifier((Identifier)value);
       }
       break;
-
     }
   }
 
@@ -327,7 +326,6 @@ public class Expression implements org.apache.thrift.TBase<Expression, Expressio
 
     case IDENTIFIER:
       return getIdentifier();
-
     }
     throw new java.lang.IllegalStateException();
   }
@@ -658,7 +656,6 @@ public class Expression implements org.apache.thrift.TBase<Expression, Expressio
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
-
   }
 
   private static class ExpressionTupleSchemeFactory implements org.apache.thrift.scheme.SchemeFactory {

@@ -54,7 +54,7 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
   @CommandLine.Option(names = {"-tenantName"}, required = false, description = "Name of tenant.")
   private String _tenantName;
 
-  @CommandLine.Option(names = {"-tableName"}, required = false, 
+  @CommandLine.Option(names = {"-tableName"}, required = false,
       description = "Name of the table (e.g. foo_table_OFFLINE).")
   private String _tableName;
 

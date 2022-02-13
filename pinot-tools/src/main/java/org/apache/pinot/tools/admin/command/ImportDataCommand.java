@@ -85,7 +85,7 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
   @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
   private String _authToken;
 
-  @CommandLine.Option(names = {"-tempDir"}, 
+  @CommandLine.Option(names = {"-tempDir"},
       description = "Temporary directory used to hold data during segment creation.")
   private String _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName()).getAbsolutePath();
 

@@ -39,7 +39,6 @@ public class PinotCrypterFactory {
 
   // Prevent factory from being instantiated
   private PinotCrypterFactory() {
-
   }
 
   /**

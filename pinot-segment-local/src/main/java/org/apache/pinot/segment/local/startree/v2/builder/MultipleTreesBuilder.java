@@ -144,8 +144,8 @@ public class MultipleTreesBuilder implements Closeable {
       }
 
       // Save the metadata and index maps to the disk
-      // Commons Configuration 1.10 does not support file path containing '%'. 
-      // Explicitly providing the output stream for the file bypasses the problem.       
+      // Commons Configuration 1.10 does not support file path containing '%'.
+      // Explicitly providing the output stream for the file bypasses the problem.
       try (FileOutputStream fileOutputStream = new FileOutputStream(_metadataProperties.getFile())) {
         _metadataProperties.save(fileOutputStream);
       }

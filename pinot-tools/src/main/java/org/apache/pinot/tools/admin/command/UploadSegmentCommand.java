@@ -91,7 +91,6 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
 
   @Override
   public void cleanup() {
-
   }
 
   @Override

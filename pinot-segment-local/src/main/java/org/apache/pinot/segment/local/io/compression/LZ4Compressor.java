@@ -36,7 +36,6 @@ class LZ4Compressor implements ChunkCompressor {
   static final LZ4Compressor INSTANCE = new LZ4Compressor();
 
   private LZ4Compressor() {
-
   }
 
   @Override

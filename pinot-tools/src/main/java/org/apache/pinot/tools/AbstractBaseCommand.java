@@ -35,7 +35,6 @@ public class AbstractBaseCommand {
   }
 
   public AbstractBaseCommand() {
-
   }
 
   public String getName() {
@@ -48,7 +47,6 @@ public class AbstractBaseCommand {
   }
 
   public void printExamples() {
-
   }
 
   public void cleanup() {

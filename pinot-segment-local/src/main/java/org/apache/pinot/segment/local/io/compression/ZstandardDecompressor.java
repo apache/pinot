@@ -34,7 +34,6 @@ class ZstandardDecompressor implements ChunkDecompressor {
   static final ZstandardDecompressor INSTANCE = new ZstandardDecompressor();
 
   private ZstandardDecompressor() {
-
   }
 
   @Override

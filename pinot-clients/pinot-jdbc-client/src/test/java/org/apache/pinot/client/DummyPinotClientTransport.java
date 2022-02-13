@@ -59,6 +59,5 @@ public class DummyPinotClientTransport implements PinotClientTransport {
   @Override
   public void close()
       throws PinotClientException {
-
   }
 }

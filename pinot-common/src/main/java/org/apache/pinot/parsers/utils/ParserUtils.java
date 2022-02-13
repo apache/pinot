@@ -37,7 +37,6 @@ import org.apache.pinot.spi.utils.CommonConstants.Query.Range;
 public class ParserUtils {
   // Private constructor to disable instantiation.
   private ParserUtils() {
-
   }
 
   private static final Map<FilterKind, FilterOperator> FILTER_OPERATOR_MAP;

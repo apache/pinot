@@ -25,7 +25,7 @@ import java.util.IdentityHashMap;
 
 
 /**
- * Operations for building minimal deterministic automata from sets of strings. 
+ * Operations for building minimal deterministic automata from sets of strings.
  * The algorithm requires sorted input data, but is very fast (nearly linear with the input size).
  *
  * NOTE: This class is not used today but is a fast way of building automata so is kept for future uses

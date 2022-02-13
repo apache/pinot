@@ -166,7 +166,6 @@ public class QuerySource implements org.apache.thrift.TBase<QuerySource, QuerySo
         setTableName((java.lang.String)value);
       }
       break;
-
     }
   }
 
@@ -175,7 +174,6 @@ public class QuerySource implements org.apache.thrift.TBase<QuerySource, QuerySo
     switch (field) {
     case TABLE_NAME:
       return getTableName();
-
     }
     throw new java.lang.IllegalStateException();
   }
@@ -353,7 +351,6 @@ public class QuerySource implements org.apache.thrift.TBase<QuerySource, QuerySo
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
-
   }
 
   private static class QuerySourceTupleSchemeFactory implements org.apache.thrift.scheme.SchemeFactory {

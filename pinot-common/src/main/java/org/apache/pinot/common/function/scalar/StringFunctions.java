@@ -192,10 +192,10 @@ public class StringFunctions {
   }
 
   /**
-   * @see #StringFunctions#regexpExtract(String, String, int, String) 
-   * @param value 
+   * @see #StringFunctions#regexpExtract(String, String, int, String)
+   * @param value
    * @param regexp
-   * @param group 
+   * @param group
    * @return the matched result.
    */
   @ScalarFunction

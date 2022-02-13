@@ -27,6 +27,5 @@ public class CompilerConstants {
 
   // Private constructor to prevent instantiation
   private CompilerConstants() {
-
   }
 }

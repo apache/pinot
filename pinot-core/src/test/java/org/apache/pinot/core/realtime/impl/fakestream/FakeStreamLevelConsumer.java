@@ -30,7 +30,6 @@ public class FakeStreamLevelConsumer implements StreamLevelConsumer {
   @Override
   public void start()
       throws Exception {
-
   }
 
   @Override
@@ -40,12 +39,10 @@ public class FakeStreamLevelConsumer implements StreamLevelConsumer {
 
   @Override
   public void commit() {
-
   }
 
   @Override
   public void shutdown()
       throws Exception {
-
   }
 }

@@ -34,7 +34,6 @@ public class ControllerTenantBrokerResponse {
   private JsonNode _brokers;
 
   private ControllerTenantBrokerResponse() {
-
   }
 
   private ControllerTenantBrokerResponse(JsonNode controllerTenantBrokerResponse) {
