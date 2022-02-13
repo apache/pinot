@@ -74,6 +74,8 @@ controller:
     size: 1G
     mountPath: /var/pinot/controller/data
     storageClass: ""
+    extraVolumes: []
+    extraVolumeMounts: []
 
   data:
     dir: /var/pinot/controller/data
@@ -174,6 +176,10 @@ broker:
     livenessEnabled: true
     readinessEnabled: true
 
+  persistence:
+    extraVolumes: []
+    extraVolumeMounts: []
+
   service:
     annotations: {}
     clusterIP: "None"
@@ -262,6 +268,8 @@ server:
     mountPath: /var/pinot/server/data
     storageClass: ""
     #storageClass: "ssd"
+    extraVolumes: []
+    extraVolumeMounts: []
 
   jvmOpts: "-Xms512M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-server.log"
 
@@ -347,6 +355,8 @@ minion:
     mountPath: /var/pinot/minion/data
     storageClass: ""
     #storageClass: "ssd"
+    extraVolumes: []
+    extraVolumeMounts: []
 
   service:
     annotations: {}
