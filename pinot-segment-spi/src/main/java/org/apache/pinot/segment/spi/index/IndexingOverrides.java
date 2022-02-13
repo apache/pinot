@@ -232,7 +232,7 @@ public class IndexingOverrides {
       ensureReaderPresent();
       return READER_DEFAULTS.newTextIndexReader(file, columnMetadata, textIndexProperties);
     }
-    
+
     private void ensureReaderPresent() {
       if (READER_DEFAULTS == null) {
         throw new UnsupportedOperationException("default implementation not present on classpath");

@@ -74,7 +74,7 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   @CommandLine.Option(names = {"-readerConfigFile"}, description = "Config file for record reader.")
   private String _readerConfigFile;
 
-  @CommandLine.Option(names = {"-retry"}, 
+  @CommandLine.Option(names = {"-retry"},
       description = "Number of retries if encountered any segment creation failure, default is 0.")
   private int _retry = 0;
 

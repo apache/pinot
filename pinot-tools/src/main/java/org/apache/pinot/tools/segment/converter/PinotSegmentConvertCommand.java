@@ -53,21 +53,21 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
   @CommandLine.Option(names = {"-outputDir"}, required = true, description = "Path to output directory.")
   private String _outputDir;
 
-  @CommandLine.Option(names = {"-outputFormat"}, required = true, 
+  @CommandLine.Option(names = {"-outputFormat"}, required = true,
       description = "Format to convert to (AVRO/CSV/JSON).")
   private String _outputFormat;
 
   @CommandLine.Option(names = {"-csvDelimiter"}, required = false, description = "CSV delimiter (default ',').")
   private char _csvDelimiter = ',';
 
-  @CommandLine.Option(names = {"-csvListDelimiter"}, required = false, 
+  @CommandLine.Option(names = {"-csvListDelimiter"}, required = false,
       description = "CSV List delimiter for multi-value columns (default ';').")
   private char _csvListDelimiter = ';';
 
   @CommandLine.Option(names = {"-csvWithHeader"}, required = false, description = "Print CSV Header (default false).")
   private boolean _csvWithHeader;
 
-  @CommandLine.Option(names = {"-overwrite"}, required = false, 
+  @CommandLine.Option(names = {"-overwrite"}, required = false,
       description = "Overwrite the existing file (default false).")
   private boolean _overwrite;
 

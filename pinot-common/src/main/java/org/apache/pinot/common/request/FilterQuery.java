@@ -407,7 +407,6 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
         setNestedFilterQueryIds((java.util.List<java.lang.Integer>)value);
       }
       break;
-
     }
   }
 
@@ -428,7 +427,6 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
 
     case NESTED_FILTER_QUERY_IDS:
       return getNestedFilterQueryIds();
-
     }
     throw new java.lang.IllegalStateException();
   }
@@ -826,7 +824,6 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
-
   }
 
   private static class FilterQueryTupleSchemeFactory implements org.apache.thrift.scheme.SchemeFactory {

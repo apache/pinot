@@ -2513,6 +2513,5 @@ public class CalciteSqlCompilerTest {
 
     Assert.expectThrows(SqlCompilationException.class,
         () -> CalciteSqlParser.compileToPinotQuery("SELECT UPPER(col1), avg(col2) from foo"));
-
   }
 }

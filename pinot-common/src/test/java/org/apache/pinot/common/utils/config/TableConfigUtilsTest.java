@@ -119,7 +119,6 @@ public class TableConfigUtilsTest {
     @Override
     public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
         throws Exception {
-
     }
 
     @Override

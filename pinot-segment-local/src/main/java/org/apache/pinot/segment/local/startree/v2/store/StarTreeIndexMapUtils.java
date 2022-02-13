@@ -156,8 +156,8 @@ public class StarTreeIndexMapUtils {
       }
     }
 
-    // Commons Configuration 1.10 does not support file path containing '%'. 
-    // Explicitly providing the output stream for the file bypasses the problem.       
+    // Commons Configuration 1.10 does not support file path containing '%'.
+    // Explicitly providing the output stream for the file bypasses the problem.
     try (FileOutputStream fileOutputStream = new FileOutputStream(configuration.getFile())) {
       configuration.save(fileOutputStream);
     } catch (IOException e) {

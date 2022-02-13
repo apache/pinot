@@ -106,9 +106,7 @@ public final class Obfuscator {
       } else {
         node = JsonUtils.objectToJsonNode(object);
       }
-
       return toJsonRecursive(node);
-
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

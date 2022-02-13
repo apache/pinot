@@ -108,7 +108,6 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
 
   @Override
   public void cleanup() {
-
   }
 
   @Override

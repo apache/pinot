@@ -83,7 +83,6 @@ public class AirlineDataStream {
     properties.put("request.required.acks", "1");
 
     return StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
-
   }
 
   public void shutdown() {

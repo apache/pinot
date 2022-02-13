@@ -114,6 +114,5 @@ public class ChangeTableState extends AbstractBaseAdminCommand implements Comman
 
   @Override
   public void cleanup() {
-
   }
 }

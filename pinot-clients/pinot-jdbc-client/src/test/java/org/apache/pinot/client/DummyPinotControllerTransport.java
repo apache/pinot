@@ -34,7 +34,6 @@ public class DummyPinotControllerTransport extends PinotControllerTransport {
       JsonNode dummyBrokerJsonResponse = objectMapper.readTree(jsonString);
       return ControllerTenantBrokerResponse.fromJson(dummyBrokerJsonResponse);
     } catch (Exception e) {
-
     }
     return ControllerTenantBrokerResponse.empty();
   }
