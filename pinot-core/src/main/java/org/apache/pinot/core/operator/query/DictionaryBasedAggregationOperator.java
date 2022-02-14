@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -27,12 +28,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.DistinctCountSmartHLLAggregationFunction;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -66,8 +69,7 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    int numAggregationFunctions = _aggregationFunctions.length;
-    List<Object> aggregationResults = new ArrayList<>(numAggregationFunctions);
+    List<Object> aggregationResults = new ArrayList<>(_aggregationFunctions.length);
     for (AggregationFunction aggregationFunction : _aggregationFunctions) {
       String column = ((ExpressionContext) aggregationFunction.getInputExpressions().get(0)).getIdentifier();
       Dictionary dictionary = _dictionaryMap.get(column);
@@ -84,55 +86,24 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
               new MinMaxRangePair(toDouble(dictionary.getMinVal()), toDouble(dictionary.getMaxVal())));
           break;
         case DISTINCTCOUNT:
-          switch (dictionary.getValueType()) {
-            case INT:
-              IntOpenHashSet intSet = new IntOpenHashSet(dictionarySize);
-              for (int dictId = 0; dictId < dictionarySize; dictId++) {
-                intSet.add(dictionary.getIntValue(dictId));
-              }
-              aggregationResults.add(intSet);
-              break;
-            case LONG:
-              LongOpenHashSet longSet = new LongOpenHashSet(dictionarySize);
-              for (int dictId = 0; dictId < dictionarySize; dictId++) {
-                longSet.add(dictionary.getLongValue(dictId));
-              }
-              aggregationResults.add(longSet);
-              break;
-            case FLOAT:
-              FloatOpenHashSet floatSet = new FloatOpenHashSet(dictionarySize);
-              for (int dictId = 0; dictId < dictionarySize; dictId++) {
-                floatSet.add(dictionary.getFloatValue(dictId));
-              }
-              aggregationResults.add(floatSet);
-              break;
-            case DOUBLE:
-              DoubleOpenHashSet doubleSet = new DoubleOpenHashSet(dictionarySize);
-              for (int dictId = 0; dictId < dictionarySize; dictId++) {
-                doubleSet.add(dictionary.getDoubleValue(dictId));
-              }
-              aggregationResults.add(doubleSet);
-              break;
-            case STRING:
-              ObjectOpenHashSet<String> stringSet = new ObjectOpenHashSet<>(dictionarySize);
-              for (int dictId = 0; dictId < dictionarySize; dictId++) {
-                stringSet.add(dictionary.getStringValue(dictId));
-              }
-              aggregationResults.add(stringSet);
-              break;
-            case BYTES:
-              ObjectOpenHashSet<ByteArray> bytesSet = new ObjectOpenHashSet<>(dictionarySize);
-              for (int dictId = 0; dictId < dictionarySize; dictId++) {
-                bytesSet.add(new ByteArray(dictionary.getBytesValue(dictId)));
-              }
-              aggregationResults.add(bytesSet);
-              break;
-            default:
-              throw new IllegalStateException();
-          }
+          aggregationResults.add(getDistinctValueSet(dictionary));
           break;
         case SEGMENTPARTITIONEDDISTINCTCOUNT:
           aggregationResults.add((long) dictionarySize);
+          break;
+        case DISTINCTCOUNTSMARTHLL:
+          DistinctCountSmartHLLAggregationFunction distinctCountSmartHLLAggregationFunction =
+              (DistinctCountSmartHLLAggregationFunction) aggregationFunction;
+          if (dictionarySize > distinctCountSmartHLLAggregationFunction.getHllConversionThreshold()) {
+            // Store values into a HLL when the dictionary size exceeds the conversion threshold
+            HyperLogLog hll = new HyperLogLog(distinctCountSmartHLLAggregationFunction.getHllLog2m());
+            for (int dictId = 0; dictId < dictionarySize; dictId++) {
+              hll.offer(dictionary.get(dictId));
+            }
+            aggregationResults.add(hll);
+          } else {
+            aggregationResults.add(getDistinctValueSet(dictionary));
+          }
           break;
         default:
           throw new IllegalStateException(
@@ -149,6 +120,50 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
       return ((Number) value).doubleValue();
     } else {
       return Double.parseDouble(value.toString());
+    }
+  }
+
+  private Set getDistinctValueSet(Dictionary dictionary) {
+    int dictionarySize = dictionary.length();
+    switch (dictionary.getValueType()) {
+      case INT:
+        IntOpenHashSet intSet = new IntOpenHashSet(dictionarySize);
+        for (int dictId = 0; dictId < dictionarySize; dictId++) {
+          intSet.add(dictionary.getIntValue(dictId));
+        }
+        return intSet;
+      case LONG:
+        LongOpenHashSet longSet = new LongOpenHashSet(dictionarySize);
+        for (int dictId = 0; dictId < dictionarySize; dictId++) {
+          longSet.add(dictionary.getLongValue(dictId));
+        }
+        return longSet;
+      case FLOAT:
+        FloatOpenHashSet floatSet = new FloatOpenHashSet(dictionarySize);
+        for (int dictId = 0; dictId < dictionarySize; dictId++) {
+          floatSet.add(dictionary.getFloatValue(dictId));
+        }
+        return floatSet;
+      case DOUBLE:
+        DoubleOpenHashSet doubleSet = new DoubleOpenHashSet(dictionarySize);
+        for (int dictId = 0; dictId < dictionarySize; dictId++) {
+          doubleSet.add(dictionary.getDoubleValue(dictId));
+        }
+        return doubleSet;
+      case STRING:
+        ObjectOpenHashSet<String> stringSet = new ObjectOpenHashSet<>(dictionarySize);
+        for (int dictId = 0; dictId < dictionarySize; dictId++) {
+          stringSet.add(dictionary.getStringValue(dictId));
+        }
+        return stringSet;
+      case BYTES:
+        ObjectOpenHashSet<ByteArray> bytesSet = new ObjectOpenHashSet<>(dictionarySize);
+        for (int dictId = 0; dictId < dictionarySize; dictId++) {
+          bytesSet.add(new ByteArray(dictionary.getBytesValue(dictId)));
+        }
+        return bytesSet;
+      default:
+        throw new IllegalStateException();
     }
   }
 
