@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.filter;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.Operator;
@@ -44,10 +45,7 @@ public class NotFilterOperator extends BaseFilterOperator {
 
   @Override
   public List<Operator> getChildOperators() {
-    List<Operator> resultList = new ArrayList<>();
-    resultList.add(_filterOperator);
-
-    return resultList;
+    return Collections.singletonList(_filterOperator);
   }
 
   @Nullable

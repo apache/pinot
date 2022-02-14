@@ -27,39 +27,39 @@ import org.apache.pinot.segment.spi.Constants;
  * the complement of the result set.
  */
 public class NotDocIdIterator implements BlockDocIdIterator {
-  private BlockDocIdIterator _childDocIdIterator;
-  private int _lowerLimit;
-  private int _upperLimit;
-  private int _numDocs;
+  private final BlockDocIdIterator _childDocIdIterator;
+  private final int _numDocs;
+  private int _nextDocId;
+  private int _nextNonMatchingDocId;
 
   public NotDocIdIterator(BlockDocIdIterator childDocIdIterator, int numDocs) {
     _childDocIdIterator = childDocIdIterator;
-    _lowerLimit = 0;
+    _nextDocId = 0;
 
     int currentDocIdFromChildIterator = childDocIdIterator.next();
-    _upperLimit = currentDocIdFromChildIterator == Constants.EOF ? numDocs : currentDocIdFromChildIterator;
+    _nextNonMatchingDocId = currentDocIdFromChildIterator == Constants.EOF ? numDocs : currentDocIdFromChildIterator;
     _numDocs = numDocs;
   }
 
   @Override
   public int next() {
-    while (_lowerLimit == _upperLimit) {
-      _lowerLimit = _upperLimit + 1;
+    while (_nextDocId == _nextNonMatchingDocId) {
+      _nextDocId = _nextNonMatchingDocId + 1;
 
       int nextMatchingDocId = _childDocIdIterator.next();
 
       if (nextMatchingDocId == Constants.EOF) {
-        _upperLimit = _numDocs;
+        _nextNonMatchingDocId = _numDocs;
       } else {
-        _upperLimit = nextMatchingDocId;
+        _nextNonMatchingDocId = nextMatchingDocId;
       }
     }
 
-    if (_lowerLimit >= _numDocs) {
+    if (_nextDocId >= _numDocs) {
       return Constants.EOF;
     }
 
-    return _lowerLimit++;
+    return _nextDocId++;
   }
 
   @Override
@@ -68,21 +68,21 @@ public class NotDocIdIterator implements BlockDocIdIterator {
       return Constants.EOF;
     }
 
-    if (targetDocId < _lowerLimit) {
-      return _lowerLimit;
+    if (targetDocId < _nextDocId) {
+      return _nextDocId;
     }
 
-    _lowerLimit = targetDocId + 1;
+    _nextDocId = targetDocId + 1;
 
     int upperLimit = findUpperLimitGreaterThanDocId(targetDocId);
 
     if (upperLimit == Constants.EOF) {
-      _upperLimit = _numDocs;
+      _nextNonMatchingDocId = _numDocs;
     } else {
-      _upperLimit = upperLimit;
+      _nextNonMatchingDocId = upperLimit;
     }
 
-    return _lowerLimit++;
+    return _nextDocId++;
   }
 
   private int findUpperLimitGreaterThanDocId(int currentDocId) {
