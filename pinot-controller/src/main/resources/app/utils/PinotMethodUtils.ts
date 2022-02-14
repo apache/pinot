@@ -422,8 +422,8 @@ const getAllTableDetails = (tablesList) => {
           } = result.data;
           singleTableData.push(
             tableName,
-            reportedSizeInBytes,
-            estimatedSizeInBytes
+            Utils.formatBytes(reportedSizeInBytes),
+            Utils.formatBytes(estimatedSizeInBytes)
           );
         } else if (index % 3 === 1) {
           // response of getIdealState API
