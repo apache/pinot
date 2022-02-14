@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.filter;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
