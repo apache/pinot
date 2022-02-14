@@ -270,7 +270,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     // Set timeout as 5ms so that query will timeout
     TableConfig tableConfig = getOfflineTableConfig();
-    tableConfig.setQueryConfig(new QueryConfig(5L));
+    tableConfig.setQueryConfig(new QueryConfig(5L, null));
     updateTableConfig(tableConfig);
 
     // Wait for at most 1 minute for broker to receive and process the table config refresh message
@@ -667,7 +667,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Set query timeout
     long queryTimeout = 5000;
     TableConfig tableConfig = getOfflineTableConfig();
-    tableConfig.setQueryConfig(new QueryConfig(queryTimeout));
+    tableConfig.setQueryConfig(new QueryConfig(queryTimeout, null));
     updateTableConfig(tableConfig);
 
     long startTime = System.currentTimeMillis();
@@ -856,6 +856,27 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(queryResponse.get("selectionResults").get("columns").size(), 79);
 
     _tableSizeAfterRemovingIndex = getTableSize(getTableName());
+  }
+
+  @Test
+  public void testDisableGroovyQueryTableConfigOverride()
+      throws Exception {
+    TableConfig tableConfig = getOfflineTableConfig();
+    tableConfig.setQueryConfig(new QueryConfig(5L, Boolean.TRUE));
+    updateTableConfig(tableConfig);
+
+    reloadOfflineTable(getTableName());
+    try {
+      postSqlQuery("SELECT GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', "
+          + "'arg0 + arg1', FlightNum, Origin) FROM myTable");
+      fail("Failed to reject Groovy query with table override");
+    } catch (Exception e) {
+      // expected
+    }
+
+    // Remove query config
+    tableConfig.setQueryConfig(null);
+    updateTableConfig(tableConfig);
   }
 
   private void reloadWithExtraColumns()

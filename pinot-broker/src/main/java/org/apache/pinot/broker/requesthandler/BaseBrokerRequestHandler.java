@@ -273,9 +273,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       LOGGER.warn("Caught exception while updating column names in request {}: {}, {}", requestId, query,
           e.getMessage());
     }
-    if (_disableGroovy) {
-      rejectGroovyQuery(pinotQuery);
-    }
     if (_defaultHllLog2m > 0) {
       handleHLLLog2mOverride(pinotQuery, _defaultHllLog2m);
     }
@@ -327,10 +324,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         realtimeTableName = realtimeTableNameToCheck;
       }
     }
+
+    TableConfig offlineTableConfig =
+        _tableCache.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
+    TableConfig realtimeTableConfig =
+        _tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
+
     if ((offlineTableName == null) && (realtimeTableName == null)) {
       // No table matches the request
-      if (_tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName)) == null
-          && _tableCache.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)) == null) {
+      if (realtimeTableConfig == null && offlineTableConfig == null) {
         LOGGER.info("Table not found for request {}: {}", requestId, query);
         requestStatistics.setErrorCode(QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE);
         return BrokerResponseNative.TABLE_DOES_NOT_EXIST;
@@ -340,6 +342,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.RESOURCE_MISSING_EXCEPTIONS, 1);
       return BrokerResponseNative.NO_TABLE_RESULT;
     }
+
+    if (isDisableGroovy(offlineTableName != null ? offlineTableConfig : null,
+        realtimeTableName != null ? realtimeTableConfig : null)) {
+      rejectGroovyQuery(pinotQuery);
+    }
+
 
     // Validate QPS quota
     if (!_queryQuotaManager.acquire(tableName)) {
@@ -1172,6 +1180,26 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (havingExpression != null) {
       handleHLLLog2mOverride(havingExpression, hllLog2mOverride);
     }
+  }
+
+  private boolean isDisableGroovy(@Nullable TableConfig offlineTableConfig, @Nullable TableConfig realtimeTableConfig) {
+    Boolean offlineTableDisableGroovyQuery = null;
+    if (offlineTableConfig != null && offlineTableConfig.getQueryConfig() != null) {
+      offlineTableDisableGroovyQuery = offlineTableConfig.getQueryConfig().getDisableGroovyQuery();
+    }
+
+    Boolean realtimeTableDisableGroovyQuery = null;
+    if (realtimeTableConfig != null && realtimeTableConfig.getQueryConfig() != null) {
+      realtimeTableDisableGroovyQuery = realtimeTableConfig.getQueryConfig().getDisableGroovyQuery();
+    }
+
+    if (offlineTableDisableGroovyQuery == null && realtimeTableDisableGroovyQuery == null) {
+      return _disableGroovy;
+    }
+
+    // If offline or online table config disables Groovy, then Groovy should be disabled
+    return (offlineTableDisableGroovyQuery == null ? false : offlineTableDisableGroovyQuery) || (
+        realtimeTableDisableGroovyQuery == null ? false : realtimeTableDisableGroovyQuery);
   }
 
   /**
