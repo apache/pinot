@@ -61,6 +61,12 @@ public class BrokerRequestToQueryContextConverter {
     if (brokerRequest.getPinotQuery().getDataSource().getSubquery() != null) {
       queryContext.setSubQueryContext(
           convertSQL(brokerRequest.getPinotQuery().getDataSource().getSubquery(), brokerRequest));
+      if (brokerRequest.getPinotQuery().getDataSource().getSubquery().getDataSource().getSubquery() != null) {
+        queryContext.getSubQueryContext().setSubQueryContext(
+            convertSQL(brokerRequest.getPinotQuery().getDataSource().getSubquery().getDataSource().getSubquery(),
+                brokerRequest)
+        );
+      }
     }
     return queryContext;
   }

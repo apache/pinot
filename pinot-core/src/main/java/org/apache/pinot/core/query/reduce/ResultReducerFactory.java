@@ -45,7 +45,8 @@ public final class ResultReducerFactory {
     }
 
     AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
-    if (GapfillUtils.isGapfill(queryContext)) {
+    GapfillUtils.GapfillType gapfillType = GapfillUtils.getGapfillType(queryContext);
+    if (gapfillType != GapfillUtils.GapfillType.None) {
       return new PreAggregationGapFillDataTableReducer(queryContext);
     } else if (aggregationFunctions == null) {
       // Selection query

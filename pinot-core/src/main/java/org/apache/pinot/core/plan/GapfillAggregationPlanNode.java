@@ -112,7 +112,7 @@ public class GapfillAggregationPlanNode implements PlanNode {
         _queryContext.getOrderByExpressions() == null,
         "Subquery of Gapfill query should not have orderby expression.");
 
-    ExpressionContext gapFillSelection = GapfillUtils.getPreAggregateGapfillExpressionContext(_queryContext);
+    ExpressionContext gapFillSelection = GapfillUtils.getGapfillExpressionContext(_queryContext);
     Preconditions.checkArgument(gapFillSelection != null, "PreAggregate Gapfill Expression is expected.");
 
     ExpressionContext timeSeriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);

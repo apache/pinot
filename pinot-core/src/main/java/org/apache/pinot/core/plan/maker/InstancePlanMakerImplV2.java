@@ -36,7 +36,6 @@ import org.apache.pinot.core.plan.AggregationGroupByPlanNode;
 import org.apache.pinot.core.plan.AggregationPlanNode;
 import org.apache.pinot.core.plan.CombinePlanNode;
 import org.apache.pinot.core.plan.DistinctPlanNode;
-import org.apache.pinot.core.plan.GapfillAggregationGroupByOrderByPlanNode;
 import org.apache.pinot.core.plan.GapfillSelectionPlanNode;
 import org.apache.pinot.core.plan.GlobalPlanImplV0;
 import org.apache.pinot.core.plan.InstanceResponsePlanNode;
@@ -228,24 +227,27 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   @Override
   public PlanNode makeSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
+    GapfillUtils.GapfillType gapfillType = GapfillUtils.getGapfillType(queryContext);
     if (QueryContextUtils.isAggregationQuery(queryContext)) {
-      if (GapfillUtils.isGapfill(queryContext)) {
-        return new GapfillAggregationGroupByOrderByPlanNode(indexSegment, queryContext);
-      } else {
-        List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
-        if (groupByExpressions != null) {
-          // Aggregation group-by query
-          if (QueryOptionsUtils.isGroupByModeSQL(queryContext.getQueryOptions())) {
-            return new AggregationGroupByOrderByPlanNode(indexSegment, queryContext);
-          }
-          return new AggregationGroupByPlanNode(indexSegment, queryContext);
-        } else {
-          // Aggregation only query
-          return new AggregationPlanNode(indexSegment, queryContext);
+      if (gapfillType == GapfillUtils.GapfillType.AggregateGapfill) {
+        queryContext = queryContext.getSubQueryContext();
+      } else if (gapfillType == GapfillUtils.GapfillType.AggregateGapfillAggregate) {
+        queryContext = queryContext.getSubQueryContext().getSubQueryContext();
+      }
+      List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
+      if (groupByExpressions != null) {
+        // Aggregation group-by query
+        if (QueryOptionsUtils.isGroupByModeSQL(queryContext.getQueryOptions())
+            || gapfillType != GapfillUtils.GapfillType.None) {
+          return new AggregationGroupByOrderByPlanNode(indexSegment, queryContext);
         }
+        return new AggregationGroupByPlanNode(indexSegment, queryContext);
+      } else {
+        // Aggregation only query
+        return new AggregationPlanNode(indexSegment, queryContext);
       }
     } else if (QueryContextUtils.isSelectionQuery(queryContext)) {
-      if (GapfillUtils.isGapfill(queryContext)) {
+      if (gapfillType != GapfillUtils.GapfillType.None) {
         return new GapfillSelectionPlanNode(indexSegment, queryContext);
       } else {
         return new SelectionPlanNode(indexSegment, queryContext);

@@ -163,8 +163,9 @@ public class CombinePlanNode implements PlanNode {
       // Streaming query (only support selection only)
       return new StreamingSelectionOnlyCombineOperator(operators, _queryContext, _executorService, _streamObserver);
     }
+    GapfillUtils.GapfillType gapfillType = GapfillUtils.getGapfillType(_queryContext);
     if (QueryContextUtils.isAggregationQuery(_queryContext)) {
-      if (GapfillUtils.isGapfill(_queryContext)) {
+      if (gapfillType != GapfillUtils.GapfillType.None) {
         return new GapfillGroupByOrderByCombineOperator(operators, _queryContext, _executorService);
       } else if (_queryContext.getGroupByExpressions() == null) {
         // Aggregation only
@@ -184,7 +185,7 @@ public class CombinePlanNode implements PlanNode {
         // Selection order-by
         return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService);
       }
-    } else if (GapfillUtils.isGapfill(_queryContext)) {
+    } else if (gapfillType != GapfillUtils.GapfillType.None) {
         return new SelectionOnlyCombineOperator(operators, _queryContext, _executorService);
     } else {
       assert QueryContextUtils.isDistinctQuery(_queryContext);

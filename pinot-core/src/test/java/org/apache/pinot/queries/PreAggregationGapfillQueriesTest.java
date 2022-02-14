@@ -152,19 +152,15 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     long start;
 
     String gapfillQuery1 = "SELECT "
-        + "time_col, levelId, lotId, isOccupied, time_col "
-        + "FROM ("
-        + "  SELECT GapFill(DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
+        + "  GapFill(DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
         + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS'), "
         + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
         + "    '2021-11-07 4:00:00.000',  '2021-11-07 12:00:00.000', '1:HOURS',"
         + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     isOccupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  LIMIT 200 "
-        + ") "
-        + " LIMIT 200 ";
+        + "     levelId, lotId, isOccupied "
+        + "FROM parkingData "
+        + "WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "LIMIT 200 ";
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
@@ -239,13 +235,13 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     long start;
 
     String gapfillQuery1 = "SELECT "
-        + "time_col, levelId, lotId, occupied, time_col "
-        + "FROM ("
-        + "  SELECT  GapFill(DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
-        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS'), "
+        + "GapFill(time_col, "
         + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
         + "    '2021-11-07 4:00:00.000',  '2021-11-07 12:00:00.000', '1:HOURS',"
-        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
+        + "    FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)), levelId, lotId, occupied "
+        + "FROM ("
+        + "  SELECT DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
+        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS') AS time_col,"
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
@@ -284,13 +280,13 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(gapFillRows1.size(), index);
 
     String gapfillQuery2 = "SELECT "
-        + "time_col, levelId, lotId, occupied, time_col "
-        + "FROM ("
-        + "  SELECT  GapFill(DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
-        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS'), "
+        + "GapFill(time_col, "
         + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
         + "    '2021-11-07 4:00:00.000',  '2021-11-07 12:00:00.000', '1:HOURS',"
-        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
+        + "    FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)), levelId, lotId, occupied "
+        + "FROM ("
+        + "  SELECT DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
+        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS') AS time_col,"
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
@@ -321,7 +317,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void datetimeconvertGapfillTestSelectAggregate() {
+  public void datetimeconvertGapfillTestGapfillAggregate() {
     DateTimeFormatSpec dateTimeFormatter
         = new DateTimeFormatSpec("1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS");
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
@@ -407,7 +403,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void datetimeconvertGapfillTestSelectAggregateWithOptionalGroupBy() {
+  public void datetimeconvertGapfillTestGapfillAggregateWithOptionalGroupBy() {
     DateTimeFormatSpec dateTimeFormatter
         = new DateTimeFormatSpec("1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS");
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
@@ -508,7 +504,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void datetimeconvertGapfillTestSelectAggregateWithHavingClause() {
+  public void datetimeconvertGapfillTestGapfillAggregateWithHavingClause() {
     DateTimeFormatSpec dateTimeFormatter
         = new DateTimeFormatSpec("1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS");
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
@@ -572,15 +568,20 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     String gapfillQuery1 = "SELECT "
         + "time_col, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT  GapFill(DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
-        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS'), "
+        + "  SELECT GapFill(time_col, "
         + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
         + "    '2021-11-07 4:00:00.000',  '2021-11-07 12:00:00.000', '1:HOURS',"
         + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
+        + "      '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS') AS time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col "
@@ -604,15 +605,20 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     String gapfillQuery2 = "SELECT "
         + "time_col, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT  GapFill(DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
-        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS'), "
+        + "  SELECT GapFill(time_col, "
         + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
         + "    '2021-11-07 4:00:00.000',  '2021-11-07 12:00:00.000', '1:HOURS',"
         + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
+        + "      '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS') AS time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -645,15 +651,20 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     String gapfillQuery1 = "SELECT "
         + "time_col, levelId, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT  GapFill(DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
-        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS'), "
+        + "  SELECT GapFill(time_col, "
         + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
         + "    '2021-11-07 4:00:00.000',  '2021-11-07 12:00:00.000', '1:HOURS',"
         + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
+        + "      '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS') AS time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col, levelId "
@@ -678,18 +689,24 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
       start += dateTimeGranularity.granularityToMillis();
     }
 
+
     String gapfillQuery2 = "SELECT "
-        + "time_col, SUM(occupied) as occupied_slots_count, time_col "
+        + "time_col, levelId, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT  GapFill(DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
-        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS'), "
+        + "  SELECT GapFill(time_col, "
         + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
         + "    '2021-11-07 4:00:00.000',  '2021-11-07 12:00:00.000', '1:HOURS',"
         + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
+        + "      '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS') AS time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -721,15 +738,20 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     String gapfillQuery1 = "SELECT "
         + "time_col, levelId, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT  GapFill(DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
-        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS'), "
+        + "  SELECT GapFill(time_col, "
         + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
         + "    '2021-11-07 4:00:00.000',  '2021-11-07 12:00:00.000', '1:HOURS',"
-        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)),"
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
+        + "      '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS') AS time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col, levelId "
@@ -767,17 +789,13 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     long start;
 
     String gapfillQuery1 = "SELECT "
-        + "time_col, levelId, lotId, isOccupied, time_col "
-        + "FROM ("
-        + "  SELECT GapFill(ToEpochHours(eventTime), '1:HOURS:EPOCH', "
+        + "  GapFill(ToEpochHours(eventTime), '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
         + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     isOccupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  LIMIT 200 "
-        + ") "
-        + " LIMIT 200 ";
+        + "     isOccupied, lotId, levelId "
+        + "FROM parkingData "
+        + "WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "LIMIT 200 ";
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
@@ -849,11 +867,12 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     long start;
 
     String gapfillQuery1 = "SELECT "
-        + "time_col, levelId, lotId, occupied, time_col "
-        + "FROM ("
-        + "  SELECT GapFill(ToEpochHours(eventTime), '1:HOURS:EPOCH', "
+        + "  GapFill(time_col, '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
-        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
+        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)),"
+        + "  levelId, lotId, occupied "
+        + "FROM ("
+        + "  SELECT ToEpochHours(eventTime) AS time_col,"
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
@@ -892,11 +911,12 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(gapFillRows1.size(), index);
 
     String gapfillQuery2 = "SELECT "
-        + "time_col, levelId, lotId, occupied, time_col "
-        + "FROM ("
-        + "  SELECT GapFill(ToEpochHours(eventTime), '1:HOURS:EPOCH', "
+        + "  GapFill(time_col, '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
-        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
+        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)),"
+        + " levelId, lotId, occupied "
+        + "FROM ("
+        + "  SELECT ToEpochHours(eventTime) AS time_col,"
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
@@ -927,7 +947,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void toEpochHoursGapfillTestSelectAggregate() {
+  public void toEpochHoursGapfillTestGapfillAggregate() {
     DateTimeFormatSpec dateTimeFormatter = new DateTimeFormatSpec("1:HOURS:EPOCH");
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
     long start;
@@ -993,7 +1013,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void toEpochHoursGapfillTestSelectAggregateWithOptionalGroupBy() {
+  public void toEpochHoursGapfillTestGapfillAggregateWithOptionalGroupBy() {
     DateTimeFormatSpec dateTimeFormatter = new DateTimeFormatSpec("1:HOURS:EPOCH");
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
     long start;
@@ -1089,7 +1109,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void toEpochHoursGapfillTestSelectAggregateWithHavingClause() {
+  public void toEpochHoursGapfillTestGapfillAggregateWithHavingClause() {
     DateTimeFormatSpec dateTimeFormatter = new DateTimeFormatSpec("1:HOURS:EPOCH");
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
     long start;
@@ -1149,13 +1169,18 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     String gapfillQuery1 = "SELECT "
         + "time_col, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT GapFill(ToEpochHours(eventTime), '1:HOURS:EPOCH', "
+        + "  SELECT GapFill(time_col, '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
-        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)),"
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT ToEpochHours(eventTime) AS time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col "
@@ -1179,13 +1204,18 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     String gapfillQuery2 = "SELECT "
         + "time_col, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT GapFill(ToEpochHours(eventTime), '1:HOURS:EPOCH', "
+        + "  SELECT GapFill(time_col, '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
         + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT ToEpochHours(eventTime) AS time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -1217,13 +1247,18 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     String gapfillQuery1 = "SELECT "
         + "time_col, levelId, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT GapFill(ToEpochHours(eventTime), '1:HOURS:EPOCH', "
+        + "  SELECT GapFill(time_col, '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
         + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
+        + "     occupied, lotId, levelId"
+        + " FROM ("
+        + "  SELECT ToEpochHours(eventTime) AS time_col,"
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  GROUP BY time_col, levelId, lotId "
+        + "  LIMIT 200 "
+        + ") "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col, levelId "
@@ -1251,13 +1286,18 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     String gapfillQuery2 = "SELECT "
         + "time_col, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT GapFill(ToEpochHours(eventTime), '1:HOURS:EPOCH', "
+        + "  SELECT GapFill(time_col, '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
         + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT ToEpochHours(eventTime) AS time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -1289,13 +1329,18 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     String gapfillQuery1 = "SELECT "
         + "time_col, levelId, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT GapFill(ToEpochHours(eventTime), '1:HOURS:EPOCH', "
+        + "  SELECT GapFill(time_col, '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
         + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT ToEpochHours(eventTime) AS time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + ") "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col, levelId "
@@ -1331,18 +1376,13 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
     long start;
 
-    String gapfillQuery1 = "SELECT "
-        + "time_col, levelId, lotId, isOccupied, time_col "
-        + "FROM ("
-        + "  SELECT  GapFill(ToEpochMinutesRounded(eventTime, 60), '1:MINUTES:EPOCH', "
+    String gapfillQuery1 = "SELECT GapFill(ToEpochMinutesRounded(eventTime, 60), '1:MINUTES:EPOCH', "
         + "    '27270960',  '27271440', '1:HOURS',"
         + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
         + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  LIMIT 200 "
-        + ") "
-        + " LIMIT 200 ";
+        + "  LIMIT 200 ";
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
@@ -1414,11 +1454,11 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     long start;
 
     String gapfillQuery1 = "SELECT "
-        + "time_col, levelId, lotId, occupied, time_col "
+        + "GapFill(time_col, '1:MINUTES:EPOCH', "
+        + "   '27270960',  '27271440', '1:HOURS',"
+        + "   FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)), levelId, lotId, occupied "
         + "FROM ("
-        + "  SELECT  GapFill(ToEpochMinutesRounded(eventTime, 60), '1:MINUTES:EPOCH', "
-        + "    '27270960',  '27271440', '1:HOURS',"
-        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
+        + "  SELECT ToEpochMinutesRounded(eventTime, 60) AS time_col,"
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
@@ -1457,11 +1497,11 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(gapFillRows1.size(), index);
 
     String gapfillQuery2 = "SELECT "
-        + "time_col, levelId, lotId, occupied, time_col "
+        + "GapFill(time_col, '1:MINUTES:EPOCH', "
+        + "   '27270960',  '27271440', '1:HOURS',"
+        + "   FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)), levelId, lotId, occupied "
         + "FROM ("
-        + "  SELECT  GapFill(ToEpochMinutesRounded(eventTime, 60), '1:MINUTES:EPOCH', "
-        + "    '27270960',  '27271440', '1:HOURS',"
-        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
+        + "  SELECT  ToEpochMinutesRounded(eventTime, 60) AS time_col,"
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
@@ -1492,7 +1532,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void toEpochMinutesRoundedHoursGapfillTestSelectAggregate() {
+  public void toEpochMinutesRoundedHoursGapfillTestGapfillAggregate() {
     DateTimeFormatSpec dateTimeFormatter = new DateTimeFormatSpec("1:MINUTES:EPOCH");
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
     long start;
@@ -1558,7 +1598,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void toEpochMinutesRoundedHoursGapfillTestSelectAggregateWithOptionalGroupBy() {
+  public void toEpochMinutesRoundedHoursGapfillTestGapfillAggregateWithOptionalGroupBy() {
     DateTimeFormatSpec dateTimeFormatter = new DateTimeFormatSpec("1:MINUTES:EPOCH");
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
     long start;
@@ -1654,7 +1694,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void toEpochMinutesRoundedHoursGapfillTestSelectAggregateWithHavingClause() {
+  public void toEpochMinutesRoundedHoursGapfillTestGapfillAggregateWithHavingClause() {
     DateTimeFormatSpec dateTimeFormatter = new DateTimeFormatSpec("1:MINUTES:EPOCH");
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
     long start;
@@ -1714,13 +1754,18 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     String gapfillQuery1 = "SELECT "
         + "time_col, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT  GapFill(ToEpochMinutesRounded(eventTime, 60), '1:MINUTES:EPOCH', "
+        + "  SELECT  GapFill(time_col, '1:MINUTES:EPOCH', "
         + "    '27270960',  '27271440', '1:HOURS',"
         + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT ToEpochMinutesRounded(eventTime, 60) AS time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col "
@@ -1744,13 +1789,18 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     String gapfillQuery2 = "SELECT "
         + "time_col, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT  GapFill(ToEpochMinutesRounded(eventTime, 60), '1:MINUTES:EPOCH', "
+        + "  SELECT  GapFill(time_col, '1:MINUTES:EPOCH', "
         + "    '27270960',  '27271440', '1:HOURS',"
         + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT ToEpochMinutesRounded(eventTime, 60) time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -1782,13 +1832,18 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     String gapfillQuery1 = "SELECT "
         + "time_col, levelId, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT  GapFill(ToEpochMinutesRounded(eventTime, 60), '1:MINUTES:EPOCH', "
+        + "  SELECT  GapFill(time_col, '1:MINUTES:EPOCH', "
         + "    '27270960',  '27271440', '1:HOURS',"
         + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT ToEpochMinutesRounded(eventTime, 60) AS time_col,"
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col, levelId "
@@ -1816,13 +1871,18 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     String gapfillQuery2 = "SELECT "
         + "time_col, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT  GapFill(ToEpochMinutesRounded(eventTime, 60), '1:MINUTES:EPOCH', "
+        + "  SELECT  GapFill(time_col, '1:MINUTES:EPOCH', "
         + "    '27270960',  '27271440', '1:HOURS',"
         + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT ToEpochMinutesRounded(eventTime, 60) AS time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -1854,13 +1914,18 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     String gapfillQuery1 = "SELECT "
         + "time_col, levelId, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT  GapFill(ToEpochMinutesRounded(eventTime, 60), '1:MINUTES:EPOCH', "
+        + "  SELECT  GapFill(time_col, '1:MINUTES:EPOCH', "
         + "    '27270960',  '27271440', '1:HOURS',"
         + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT ToEpochMinutesRounded(eventTime, 60) time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col, levelId "
@@ -1897,17 +1962,13 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     long start;
 
     String gapfillQuery1 = "SELECT "
-        + "time_col, levelId, lotId, isOccupied, time_col "
-        + "FROM ("
-        + "  SELECT GapFill(ToEpochMinutesBucket(eventTime, 60), '1:HOURS:EPOCH', "
+        + "  GapFill(ToEpochMinutesBucket(eventTime, 60), '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
         + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
         + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  LIMIT 200 "
-        + ") "
-        + " LIMIT 200 ";
+        + "  LIMIT 200 ";
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
@@ -1979,11 +2040,12 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     long start;
 
     String gapfillQuery1 = "SELECT "
-        + "time_col, levelId, lotId, occupied, time_col "
-        + "FROM ("
-        + "  SELECT GapFill(ToEpochMinutesBucket(eventTime, 60), '1:HOURS:EPOCH', "
+        + "  GapFill(time_col, '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
-        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
+        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)),"
+        + " levelId, lotId, occupied "
+        + "FROM ("
+        + "  SELECT ToEpochMinutesBucket(eventTime, 60) AS time_col,"
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
@@ -2022,11 +2084,12 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(gapFillRows1.size(), index);
 
     String gapfillQuery2 = "SELECT "
-        + "time_col, levelId, lotId, occupied, time_col "
-        + "FROM ("
-        + "  SELECT GapFill(ToEpochMinutesBucket(eventTime, 60), '1:HOURS:EPOCH', "
+        + "  GapFill(time_col, '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
-        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
+        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)),"
+        + " levelId, lotId, occupied "
+        + "FROM ("
+        + "  SELECT ToEpochMinutesBucket(eventTime, 60) AS time_col,"
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
@@ -2057,7 +2120,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void toEpochMinutesBucketHoursGapfillTestSelectAggregate() {
+  public void toEpochMinutesBucketHoursGapfillTestGapfillAggregate() {
     DateTimeFormatSpec dateTimeFormatter = new DateTimeFormatSpec("1:HOURS:EPOCH");
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
     long start;
@@ -2123,7 +2186,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void toEpochMinutesBucketHoursGapfillTestSelectAggregateWithOptionalGroupBy() {
+  public void toEpochMinutesBucketHoursGapfillTestGapfillAggregateWithOptionalGroupBy() {
     DateTimeFormatSpec dateTimeFormatter = new DateTimeFormatSpec("1:HOURS:EPOCH");
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
     long start;
@@ -2219,7 +2282,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void toEpochMinutesBucketHoursGapfillTestSelectAggregateWithHavingClause() {
+  public void toEpochMinutesBucketHoursGapfillTestGapfillAggregateWithHavingClause() {
     DateTimeFormatSpec dateTimeFormatter = new DateTimeFormatSpec("1:HOURS:EPOCH");
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
     long start;
@@ -2279,13 +2342,18 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     String gapfillQuery1 = "SELECT "
         + "time_col, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT GapFill(ToEpochMinutesBucket(eventTime, 60), '1:HOURS:EPOCH', "
+        + "  SELECT GapFill(time_col, '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
         + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT ToEpochMinutesBucket(eventTime, 60) AS time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col "
@@ -2309,13 +2377,18 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     String gapfillQuery2 = "SELECT "
         + "time_col, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT GapFill(ToEpochMinutesBucket(eventTime, 60), '1:HOURS:EPOCH', "
+        + "  SELECT GapFill(time_col, '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
         + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT ToEpochMinutesBucket(eventTime, 60) AS time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -2347,13 +2420,18 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     String gapfillQuery1 = "SELECT "
         + "time_col, levelId, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT GapFill(ToEpochMinutesBucket(eventTime, 60), '1:HOURS:EPOCH', "
+        + "  SELECT GapFill(time_col, '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
         + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT ToEpochMinutesBucket(eventTime, 60) AS time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col, levelId "
@@ -2381,13 +2459,18 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     String gapfillQuery2 = "SELECT "
         + "time_col, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT GapFill(ToEpochMinutesBucket(eventTime, 60), '1:HOURS:EPOCH', "
+        + "  SELECT GapFill(time_col, '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
         + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "      occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT ToEpochMinutesBucket(eventTime, 60) AS time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -2419,13 +2502,18 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     String gapfillQuery1 = "SELECT "
         + "time_col, levelId, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT GapFill(ToEpochMinutesBucket(eventTime, 60), '1:HOURS:EPOCH', "
+        + "  SELECT GapFill(time_col, '1:HOURS:EPOCH', "
         + "    '454516',  '454524', '1:HOURS',"
         + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT ToEpochMinutesBucket(eventTime, 60) AS time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col, levelId "
@@ -2463,17 +2551,13 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     long start;
 
     String gapfillQuery1 = "SELECT "
-        + "time_col, levelId, lotId, isOccupied, time_col "
-        + "FROM ("
-        + "  SELECT GapFill(DATETRUNC('hour', eventTime, 'milliseconds'), '1:MILLISECONDS:EPOCH', "
+        + "  GapFill(DATETRUNC('hour', eventTime, 'milliseconds'), '1:MILLISECONDS:EPOCH', "
         + "    '1636257600000',  '1636286400000', '1:HOURS',"
         + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
         + "     isOccupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  LIMIT 200 "
-        + ") "
-        + " LIMIT 200 ";
+        + "  LIMIT 200 ";
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
 
@@ -2545,11 +2629,12 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     long start;
 
     String gapfillQuery1 = "SELECT "
-        + "time_col, levelId, lotId, occupied, time_col "
-        + "FROM ("
-        + "  SELECT GapFill(DATETRUNC('hour', eventTime, 'milliseconds'), '1:MILLISECONDS:EPOCH', "
+        + "  GapFill(time_col, '1:MILLISECONDS:EPOCH', "
         + "    '1636257600000',  '1636286400000', '1:HOURS',"
-        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
+        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)),"
+        + " levelId, lotId, occupied "
+        + "FROM ("
+        + "  SELECT DATETRUNC('hour', eventTime, 'milliseconds') AS time_col,"
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
@@ -2588,11 +2673,12 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(gapFillRows1.size(), index);
 
     String gapfillQuery2 = "SELECT "
-        + "time_col, levelId, lotId, occupied, time_col "
-        + "FROM ("
-        + "  SELECT GapFill(DATETRUNC('hour', eventTime, 'milliseconds'), '1:MILLISECONDS:EPOCH', "
+        + "  GapFill(time_col, '1:MILLISECONDS:EPOCH', "
         + "    '1636257600000',  '1636286400000', '1:HOURS',"
-        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
+        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)),"
+        + "  levelId, lotId, occupied "
+        + "FROM ("
+        + "  SELECT DATETRUNC('hour', eventTime, 'milliseconds') AS time_col,"
         + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
         + "  FROM parkingData "
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
@@ -2623,7 +2709,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void dateTruncHoursGapfillTestSelectAggregate() {
+  public void dateTruncHoursGapfillTestGapfillAggregate() {
     DateTimeFormatSpec dateTimeFormatter = new DateTimeFormatSpec("1:MILLISECONDS:EPOCH");
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
     long start;
@@ -2689,7 +2775,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void dateTruncHoursGapfillTestSelectAggregateWithOptionalGroupBy() {
+  public void dateTruncHoursGapfillTestGapfillAggregateWithOptionalGroupBy() {
     DateTimeFormatSpec dateTimeFormatter = new DateTimeFormatSpec("1:MILLISECONDS:EPOCH");
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
     long start;
@@ -2785,7 +2871,7 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void dateTruncHoursGapfillTestSelectAggregateWithHavingClause() {
+  public void dateTruncHoursGapfillTestGapfillAggregateWithHavingClause() {
     DateTimeFormatSpec dateTimeFormatter = new DateTimeFormatSpec("1:MILLISECONDS:EPOCH");
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
     long start;
@@ -2845,13 +2931,18 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     String gapfillQuery1 = "SELECT "
         + "SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT GapFill(DATETRUNC('hour', eventTime, 'milliseconds'), '1:MILLISECONDS:EPOCH', "
+        + "  SELECT GapFill(time_col, '1:MILLISECONDS:EPOCH', "
         + "    '1636257600000',  '1636286400000', '1:HOURS',"
-        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)), "
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT DATETRUNC('hour', eventTime, 'milliseconds') AS time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col "
@@ -2875,13 +2966,18 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     String gapfillQuery2 = "SELECT "
         + "time_col, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT GapFill(DATETRUNC('hour', eventTime, 'milliseconds'), '1:MILLISECONDS:EPOCH', "
+        + "  SELECT GapFill(time_col, '1:MILLISECONDS:EPOCH', "
         + "    '1636257600000',  '1636286400000', '1:HOURS',"
         + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT DATETRUNC('hour', eventTime, 'milliseconds') AS time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -2913,13 +3009,18 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     String gapfillQuery1 = "SELECT "
         + "time_col, levelId, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT GapFill(DATETRUNC('hour', eventTime, 'milliseconds'), '1:MILLISECONDS:EPOCH', "
+        + "  SELECT GapFill(time_col, '1:MILLISECONDS:EPOCH', "
         + "    '1636257600000',  '1636286400000', '1:HOURS',"
-        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)), "
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT DATETRUNC('hour', eventTime, 'milliseconds') AS time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col, levelId "
@@ -2945,15 +3046,20 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     }
 
     String gapfillQuery2 = "SELECT "
-        + "time_col, SUM(occupied) as occupied_slots_count, time_col "
+        + "time_col, levelId, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT GapFill(DATETRUNC('hour', eventTime, 'milliseconds'), '1:MILLISECONDS:EPOCH', "
+        + "  SELECT GapFill(time_col, '1:MILLISECONDS:EPOCH', "
         + "    '1636257600000',  '1636286400000', '1:HOURS',"
-        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)), "
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT DATETRUNC('hour', eventTime, 'milliseconds') AS time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
         + "  LIMIT 200 "
         + ") "
         + " WHERE occupied = 1 "
@@ -2985,13 +3091,18 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     String gapfillQuery1 = "SELECT "
         + "time_col, levelId, SUM(occupied) as occupied_slots_count, time_col "
         + "FROM ("
-        + "  SELECT GapFill(DATETRUNC('hour', eventTime, 'milliseconds'), '1:MILLISECONDS:EPOCH', "
+        + "  SELECT GapFill(time_col, '1:MILLISECONDS:EPOCH', "
         + "    '1636257600000',  '1636286400000', '1:HOURS',"
-        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
-        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
-        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
-        + "  GROUP BY time_col, levelId, lotId "
+        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)),"
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT DATETRUNC('hour', eventTime, 'milliseconds') AS time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
         + "  LIMIT 200 "
         + ") "
         + " GROUP BY time_col, levelId "

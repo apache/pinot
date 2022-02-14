@@ -384,6 +384,9 @@ public class CalciteSqlParser {
       DataSource dataSource = new DataSource();
       dataSource.setTableName(fromNode.toString());
       pinotQuery.setDataSource(dataSource);
+      if (fromNode instanceof SqlSelect || fromNode instanceof SqlOrderBy) {
+        pinotQuery.getDataSource().setSubquery(compileSqlNodeToPinotQuery(fromNode));
+      }
     }
     // WHERE
     SqlNode whereNode = selectNode.getWhere();

@@ -79,6 +79,11 @@ public class GapfillGroupByOrderByCombineOperator extends BaseCombineOperator {
       ExecutorService executorService) {
     super(operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
 
+    GapfillUtils.GapfillType gapfillType = GapfillUtils.getGapfillType(queryContext);
+    if (gapfillType == GapfillUtils.GapfillType.AggregateGapfillAggregate) {
+      queryContext = queryContext.getSubQueryContext();
+    }
+
     int minTrimSize = queryContext.getMinServerGroupTrimSize();
     if (minTrimSize > 0) {
       int limit = queryContext.getLimit();
@@ -96,18 +101,17 @@ public class GapfillGroupByOrderByCombineOperator extends BaseCombineOperator {
       _trimThreshold = Integer.MAX_VALUE;
     }
 
-    QueryContext subQueryContext = _queryContext.getSubQueryContext();
-    AggregationFunction[] aggregationFunctions = subQueryContext.getAggregationFunctions();
+    QueryContext aggregateQueryContext = queryContext.getSubQueryContext();
+    AggregationFunction[] aggregationFunctions = aggregateQueryContext.getAggregationFunctions();
     assert aggregationFunctions != null;
     _numAggregationFunctions = aggregationFunctions.length;
-    ExpressionContext gapFillSelection = GapfillUtils.getPreAggregateGapfillExpressionContext(subQueryContext);
+    ExpressionContext gapFillSelection = GapfillUtils.getGapfillExpressionContext(queryContext);
     Preconditions.checkArgument(gapFillSelection != null, "PreAggregate Gapfill Expression is expected.");
 
     ExpressionContext timeSeriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);
     Preconditions.checkArgument(timeSeriesOn != null, "TimeSeriesOn Expression is expected.");
-
-    assert _queryContext.getSubQueryContext().getGroupByExpressions() != null;
-    _numGroupByExpressions = _queryContext.getSubQueryContext().getGroupByExpressions().size();
+    assert queryContext.getSubQueryContext().getGroupByExpressions() != null;
+    _numGroupByExpressions = queryContext.getSubQueryContext().getGroupByExpressions().size();
     _numColumns = _numGroupByExpressions + _numAggregationFunctions;
     _operatorLatch = new CountDownLatch(_numTasks);
   }

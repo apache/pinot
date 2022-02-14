@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.util;
 
+import com.google.common.base.Preconditions;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -39,6 +40,21 @@ public class GapfillUtils {
   private static final String FILL = "fill";
   private static final String TIME_SERIES_ON = "timeSeriesOn";
   private static final int STARTING_INDEX_OF_OPTIONAL_ARGS_FOR_PRE_AGGREGATE_GAP_FILL = 5;
+
+  public enum GapfillType {
+    // one sql query with gapfill only
+    Gapfill,
+    // gapfill as subquery, the outer query may have the filter
+    GapfillSelect,
+    // gapfill as subquery, the outer query has the aggregation
+    GapfillAggregate,
+    // aggregation as subqery, the outer query is gapfill
+    AggregateGapfill,
+    // aggegration as second nesting subquery, gapfill as fist nesting subquery, different aggregation as outer query
+    AggregateGapfillAggregate,
+    // no gapfill at all.
+    None
+  }
 
   private GapfillUtils() {
   }
@@ -143,13 +159,8 @@ public class GapfillUtils {
     return GAP_FILL.equals(canonicalizeFunctionName(expressionContext.getFunction().getFunctionName()));
   }
 
-  public static boolean isGapfill(QueryContext queryContext) {
-    if (queryContext.getSubQueryContext() == null) {
-      return false;
-    }
-
-    for (ExpressionContext expressionContext
-        : queryContext.getSubQueryContext().getSelectExpressions()) {
+  private static boolean isGapfill(QueryContext queryContext) {
+    for (ExpressionContext expressionContext : queryContext.getSelectExpressions()) {
       if (isGapfill(expressionContext)) {
         return true;
       }
@@ -157,13 +168,57 @@ public class GapfillUtils {
     return false;
   }
 
-  public static ExpressionContext getPreAggregateGapfillExpressionContext(QueryContext queryContext) {
+  public static GapfillType getGapfillType(QueryContext queryContext) {
+    if (queryContext.getSubQueryContext() == null) {
+      if (isGapfill(queryContext)) {
+        Preconditions.checkArgument(queryContext.getAggregationFunctions() == null,
+            "Aggregation and Gapfill can not be in the same sql statement.");
+        return GapfillType.Gapfill;
+      } else {
+        return GapfillType.None;
+      }
+    } else if (isGapfill(queryContext)) {
+      Preconditions.checkArgument(queryContext.getSubQueryContext().getAggregationFunctions() != null,
+          "Select and Gapfill should be in the same sql statement.");
+      Preconditions.checkArgument(queryContext.getSubQueryContext().getSubQueryContext() == null,
+          "There is no three levels nesting sql when the outer query is gapfill.");
+      return GapfillType.AggregateGapfill;
+    } else if (isGapfill(queryContext.getSubQueryContext())) {
+      if (queryContext.getAggregationFunctions() == null) {
+        return GapfillType.GapfillSelect;
+      } else if (queryContext.getSubQueryContext().getSubQueryContext() == null) {
+        return GapfillType.GapfillAggregate;
+      } else {
+        Preconditions
+            .checkArgument(queryContext.getSubQueryContext().getSubQueryContext().getAggregationFunctions() != null,
+                "Select cannot happen before gapfill.");
+        return GapfillType.AggregateGapfillAggregate;
+      }
+    } else {
+      return GapfillType.None;
+    }
+  }
+
+  private static ExpressionContext findGapfillExpressionContext(QueryContext queryContext) {
     for (ExpressionContext expressionContext : queryContext.getSelectExpressions()) {
       if (isGapfill(expressionContext)) {
         return expressionContext;
       }
     }
     return null;
+  }
+
+  public static ExpressionContext getGapfillExpressionContext(QueryContext queryContext) {
+    GapfillType gapfillType = getGapfillType(queryContext);
+    if (gapfillType == GapfillType.AggregateGapfill || gapfillType == GapfillType.Gapfill) {
+      return findGapfillExpressionContext(queryContext);
+    } else if (gapfillType == GapfillType.GapfillAggregate
+        || gapfillType == GapfillType.AggregateGapfillAggregate
+        || gapfillType == GapfillType.GapfillSelect) {
+      return findGapfillExpressionContext(queryContext.getSubQueryContext());
+    } else {
+      return null;
+    }
   }
 
   public static ExpressionContext getTimeSeriesOnExpressionContext(ExpressionContext gapFillSelection) {
@@ -190,7 +245,7 @@ public class GapfillUtils {
 
   public static List<ExpressionContext> getGroupByExpressions(QueryContext queryContext) {
     ExpressionContext gapFillSelection =
-        GapfillUtils.getPreAggregateGapfillExpressionContext(queryContext);
+        GapfillUtils.getGapfillExpressionContext(queryContext);
     if (gapFillSelection == null) {
       return null;
     }

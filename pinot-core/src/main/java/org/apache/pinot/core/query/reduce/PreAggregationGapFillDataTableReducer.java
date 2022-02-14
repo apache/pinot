@@ -89,14 +89,19 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
   private final Map<Key, Object[]> _previousByGroupKey;
   private final Map<String, ExpressionContext> _fillExpressions;
   private final List<ExpressionContext> _timeSeries;
+  private final GapfillUtils.GapfillType _gapfillType;
 
   PreAggregationGapFillDataTableReducer(QueryContext queryContext) {
     _queryContext = queryContext;
+    _gapfillType = GapfillUtils.getGapfillType(queryContext);
     _limitForAggregatedResult = queryContext.getLimit();
-    _limitForGapfilledResult = queryContext.getSubQueryContext().getLimit();
+    if (_gapfillType == GapfillUtils.GapfillType.AggregateGapfill || _gapfillType == GapfillUtils.GapfillType.Gapfill) {
+      _limitForGapfilledResult = queryContext.getLimit();
+    } else {
+      _limitForGapfilledResult = queryContext.getSubQueryContext().getLimit();
+    }
 
-    ExpressionContext gapFillSelection =
-        GapfillUtils.getPreAggregateGapfillExpressionContext(queryContext.getSubQueryContext());
+    ExpressionContext gapFillSelection = GapfillUtils.getGapfillExpressionContext(queryContext);
 
     Preconditions.checkArgument(
         gapFillSelection != null && gapFillSelection.getFunction() != null, "Gapfill Expression should be function.");
@@ -132,11 +137,19 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
   }
 
   private void replaceColumnNameWithAlias(DataSchema dataSchema) {
-    List<String> aliasList = _queryContext.getSubQueryContext().getAliasList();
+    QueryContext queryContext;
+    if (_gapfillType == GapfillUtils.GapfillType.AggregateGapfillAggregate) {
+      queryContext = _queryContext.getSubQueryContext().getSubQueryContext();
+    } else if (_gapfillType == GapfillUtils.GapfillType.Gapfill) {
+      queryContext = _queryContext;
+    } else {
+      queryContext = _queryContext.getSubQueryContext();
+    }
+    List<String> aliasList = queryContext.getAliasList();
     Map<String, String> columnNameToAliasMap = new HashMap<>();
     for (int i = 0; i < aliasList.size(); i++) {
       if (aliasList.get(i) != null) {
-        ExpressionContext selection = _queryContext.getSubQueryContext().getSelectExpressions().get(i);
+        ExpressionContext selection = queryContext.getSelectExpressions().get(i);
         if (GapfillUtils.isGapfill(selection)) {
           selection = selection.getFunction().getArguments().get(0);
         }
@@ -294,7 +307,7 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
   public void reduceAndSetResults(String tableName, DataSchema dataSchema,
       Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
       DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics) {
-    DataSchema resultTableSchema = getResultTableDataSchema();
+    DataSchema resultTableSchema = getResultTableDataSchema(dataSchema);
     if (dataTableMap.isEmpty()) {
       brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, Collections.emptyList()));
       return;
@@ -317,7 +330,9 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     }
 
     List<Object[]> sortedRawRows;
-    if (_queryContext.getSubQueryContext().getAggregationFunctions() == null) {
+    if (_gapfillType == GapfillUtils.GapfillType.GapfillAggregate
+        || _gapfillType == GapfillUtils.GapfillType.Gapfill
+        || _gapfillType == GapfillUtils.GapfillType.GapfillSelect) {
       sortedRawRows = mergeAndSort(dataTableMap.values(), dataSchema);
     } else {
       try {
@@ -334,9 +349,12 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     if (_queryContext.getAggregationFunctions() != null) {
       validateGroupByForOuterQuery();
     }
-    if (_queryContext.getSubQueryContext().getAggregationFunctions() == null) {
+
+    if (_gapfillType == GapfillUtils.GapfillType.GapfillAggregate
+        || _gapfillType == GapfillUtils.GapfillType.Gapfill
+        || _gapfillType == GapfillUtils.GapfillType.GapfillSelect) {
       List<Object[]> gapfilledRows = gapFillAndAggregate(sortedRawRows, resultTableSchema, dataSchema);
-      if (_queryContext.getAggregationFunctions() == null) {
+      if (_gapfillType == GapfillUtils.GapfillType.GapfillSelect) {
         List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(_queryContext, dataSchema);
         resultRows = new ArrayList<>(gapfilledRows.size());
 
@@ -380,7 +398,12 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
   }
 
   private void extractFinalAggregationResults(Object[] row) {
-    AggregationFunction[] aggregationFunctions = _queryContext.getSubQueryContext().getAggregationFunctions();
+    AggregationFunction[] aggregationFunctions;
+    if (_gapfillType == GapfillUtils.GapfillType.AggregateGapfill) {
+      aggregationFunctions = _queryContext.getSubQueryContext().getAggregationFunctions();
+    } else {
+      aggregationFunctions = _queryContext.getSubQueryContext().getSubQueryContext().getAggregationFunctions();
+    }
     int numAggregationFunctionsForInnerQuery = aggregationFunctions == null ? 0 : aggregationFunctions.length;
     for (int i = 0; i < numAggregationFunctionsForInnerQuery; i++) {
       int valueIndex = _timeSeries.size() + 1 + i;
@@ -389,7 +412,12 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
   }
 
   private void setupColumnTypeForAggregatedColum(ColumnDataType[] columnDataTypes) {
-    AggregationFunction[] aggregationFunctions = _queryContext.getSubQueryContext().getAggregationFunctions();
+    AggregationFunction[] aggregationFunctions;
+    if (_gapfillType == GapfillUtils.GapfillType.AggregateGapfill) {
+      aggregationFunctions = _queryContext.getSubQueryContext().getAggregationFunctions();
+    } else {
+      aggregationFunctions = _queryContext.getSubQueryContext().getSubQueryContext().getAggregationFunctions();
+    }
     int numAggregationFunctionsForInnerQuery = aggregationFunctions == null ? 0 : aggregationFunctions.length;
     for (int i = 0; i < numAggregationFunctionsForInnerQuery; i++) {
       columnDataTypes[_timeSeries.size() + 1 + i] = aggregationFunctions[i].getFinalResultColumnType();
@@ -399,11 +427,19 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
   /**
    * Constructs the DataSchema for the ResultTable.
    */
-  private DataSchema getResultTableDataSchema() {
-    String [] columnNames = new String[_queryContext.getSelectExpressions().size()];
-    ColumnDataType [] columnDataTypes = new ColumnDataType[_queryContext.getSelectExpressions().size()];
-    for (int i = 0; i < _queryContext.getSelectExpressions().size(); i++) {
+  private DataSchema getResultTableDataSchema(DataSchema dataSchema) {
+    if (_gapfillType == GapfillUtils.GapfillType.Gapfill) {
+      return dataSchema;
+    }
+
+    int numOfColumns = _queryContext.getSelectExpressions().size();
+    String [] columnNames = new String[numOfColumns];
+    ColumnDataType [] columnDataTypes = new ColumnDataType[numOfColumns];
+    for (int i = 0; i < numOfColumns; i++) {
       ExpressionContext expressionContext = _queryContext.getSelectExpressions().get(i);
+      if (GapfillUtils.isGapfill(expressionContext)) {
+        expressionContext = expressionContext.getFunction().getArguments().get(0);
+      }
       if (expressionContext.getType() != ExpressionContext.Type.FUNCTION) {
         columnNames[i] = expressionContext.getIdentifier();
         columnDataTypes[i] = ColumnDataType.STRING;
@@ -437,7 +473,7 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     List<Object[]> result = new ArrayList<>();
 
     PreAggregateGapfillFilterHandler postGapfillFilterHandler = null;
-    if (_queryContext.getFilter() != null) {
+    if (_queryContext.getSubQueryContext() != null && _queryContext.getFilter() != null) {
       postGapfillFilterHandler = new PreAggregateGapfillFilterHandler(_queryContext.getFilter(), dataSchema);
     }
     PreAggregateGapfillFilterHandler postAggregateHavingFilterHandler = null;
@@ -579,24 +615,24 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     Map<List<Object>, Integer> groupKeyIndexes = new HashMap<>();
     int[] groupKeyArray = new int[bucketedRows.size()];
     List<Object[]> aggregatedResult = new ArrayList<>();
-    for (int j = 0; j < bucketedRows.size(); j++) {
-      Object [] bucketedRow = bucketedRows.get(j);
+    for (int i = 0; i < bucketedRows.size(); i++) {
+      Object [] bucketedRow = bucketedRows.get(i);
       List<Object> groupKey = new ArrayList<>(groupbyExpressions.size());
       for (ExpressionContext groupbyExpression : groupbyExpressions) {
         int columnIndex = indexes.get(groupbyExpression.toString());
         groupKey.add(bucketedRow[columnIndex]);
       }
       if (groupKeyIndexes.containsKey(groupKey)) {
-        groupKeyArray[j] = groupKeyIndexes.get(groupKey);
+        groupKeyArray[i] = groupKeyIndexes.get(groupKey);
       } else {
         // create the new groupBy Result row and fill the group by key
-        groupKeyArray[j] = groupKeyIndexes.size();
+        groupKeyArray[i] = groupKeyIndexes.size();
         groupKeyIndexes.put(groupKey, groupKeyIndexes.size());
         Object[] row = new Object[_queryContext.getSelectExpressions().size()];
-        for (int i = 0; i < _queryContext.getSelectExpressions().size(); i++) {
-          ExpressionContext expressionContext = _queryContext.getSelectExpressions().get(i);
+        for (int j = 0; j < _queryContext.getSelectExpressions().size(); j++) {
+          ExpressionContext expressionContext = _queryContext.getSelectExpressions().get(j);
           if (expressionContext.getType() != ExpressionContext.Type.FUNCTION) {
-            row[i] = bucketedRow[indexes.get(expressionContext.toString())];
+            row[j] = bucketedRow[indexes.get(expressionContext.toString())];
           }
         }
         aggregatedResult.add(row);

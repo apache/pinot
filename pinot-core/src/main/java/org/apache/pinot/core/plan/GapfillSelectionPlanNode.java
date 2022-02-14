@@ -40,21 +40,23 @@ import org.apache.pinot.segment.spi.IndexSegment;
 public class GapfillSelectionPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;
+  private final GapfillUtils.GapfillType _gapfillType;
 
   public GapfillSelectionPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
     _indexSegment = indexSegment;
-    _queryContext = queryContext.getSubQueryContext();
+    _queryContext = queryContext;
+    _gapfillType = GapfillUtils.getGapfillType(queryContext);
   }
 
   @Override
   public Operator<IntermediateResultsBlock> run() {
     int limit = _queryContext.getLimit();
 
-    Preconditions.checkArgument(
-        _queryContext.getOrderByExpressions() == null,
-        "Subquery of Gapfill query should not have orderby expression.");
+    QueryContext queryContext = getSelectQueryContext();
+    Preconditions.checkArgument(queryContext.getOrderByExpressions() == null,
+        "The gapfill query should not have orderby expression.");
 
-    ExpressionContext gapFillSelection = GapfillUtils.getPreAggregateGapfillExpressionContext(_queryContext);
+    ExpressionContext gapFillSelection = GapfillUtils.getGapfillExpressionContext(_queryContext);
     Preconditions.checkArgument(gapFillSelection != null, "PreAggregate Gapfill Expression is expected.");
 
     ExpressionContext timeSeriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);
@@ -65,7 +67,7 @@ public class GapfillSelectionPlanNode implements PlanNode {
     Set<ExpressionContext> expressionContextSet = new HashSet<>(expressions);
 
     List<ExpressionContext> selectionExpressions
-        = SelectionOperatorUtils.extractExpressions(_queryContext, _indexSegment);
+        = SelectionOperatorUtils.extractExpressions(queryContext, _indexSegment);
     for (ExpressionContext expressionContext : selectionExpressions) {
       if (!GapfillUtils.isGapfill(expressionContext) && !expressionContextSet.contains(expressionContext)) {
         expressions.add(expressionContext);
@@ -73,8 +75,18 @@ public class GapfillSelectionPlanNode implements PlanNode {
       }
     }
 
-    TransformOperator transformOperator = new TransformPlanNode(_indexSegment, _queryContext, expressions,
+    TransformOperator transformOperator = new TransformPlanNode(_indexSegment, queryContext, expressions,
         Math.min(limit, DocIdSetPlanNode.MAX_DOC_PER_CALL)).run();
-    return new SelectionOnlyOperator(_indexSegment, _queryContext, expressions, transformOperator);
+    return new SelectionOnlyOperator(_indexSegment, queryContext, expressions, transformOperator);
+  }
+
+  private QueryContext getSelectQueryContext() {
+    if (_gapfillType == GapfillUtils.GapfillType.GapfillAggregate) {
+      return _queryContext.getSubQueryContext();
+    } else if (_queryContext.getSubQueryContext() == null) {
+      return _queryContext;
+    } else {
+      return _queryContext.getSubQueryContext();
+    }
   }
 }
