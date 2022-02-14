@@ -877,6 +877,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Remove query config
     tableConfig.setQueryConfig(null);
     updateTableConfig(tableConfig);
+    reloadOfflineTable(getTableName());
   }
 
   private void reloadWithExtraColumns()

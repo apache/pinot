@@ -342,7 +342,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return BrokerResponseNative.NO_TABLE_RESULT;
     }
 
-    if (isDisableGroovy(realtimeTableConfig, offlineTableConfig)) {
+    if (isDisableGroovy(offlineTableName != null ? offlineTableConfig : null,
+        realtimeTableName != null ? realtimeTableConfig : null)) {
       rejectGroovyQuery(pinotQuery);
     }
 
@@ -1179,7 +1180,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
   }
 
-  private boolean isDisableGroovy(@Nullable TableConfig realtimeTableConfig, @Nullable TableConfig offlineTableConfig) {
+  private boolean isDisableGroovy(@Nullable TableConfig offlineTableConfig, @Nullable TableConfig realtimeTableConfig) {
     Boolean offlineTableDisableGroovyQuery = null;
     if (offlineTableConfig != null && offlineTableConfig.getQueryConfig() != null) {
       offlineTableDisableGroovyQuery = offlineTableConfig.getQueryConfig().getDisableGroovyQuery();
