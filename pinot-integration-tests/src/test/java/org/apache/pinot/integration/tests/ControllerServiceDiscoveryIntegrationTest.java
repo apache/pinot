@@ -69,7 +69,6 @@ public class ControllerServiceDiscoveryIntegrationTest extends BaseClusterIntegr
     startController();
     startBrokers(1);
     startServers(1);
-
   }
   @AfterClass
   public void tearDown()
