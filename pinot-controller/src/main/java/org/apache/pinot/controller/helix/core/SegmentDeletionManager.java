@@ -26,7 +26,6 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
@@ -65,12 +64,12 @@ public class SegmentDeletionManager {
   // file will be permanently deleted after Feb 2nd 2022 12PM.
   private static final String DELETED_SEGMENTS = "Deleted_Segments";
   private static final String RETENTION_UNTIL_SEPARATOR = "__RETENTION_UNTIL__";
-  private static final String RETENTION_DATE_FORMAT_STR = "yyyyMMdd_HHmmss";
+  private static final String RETENTION_DATE_FORMAT_STR = "yyyyMMddHHmm";
   private static final SimpleDateFormat RETENTION_DATE_FORMAT;
 
   static {
-    RETENTION_DATE_FORMAT = new SimpleDateFormat(RETENTION_DATE_FORMAT_STR, Locale.getDefault());
-    RETENTION_DATE_FORMAT.setTimeZone(TimeZone.getDefault());
+    RETENTION_DATE_FORMAT = new SimpleDateFormat(RETENTION_DATE_FORMAT_STR);
+    RETENTION_DATE_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
   }
 
   private final ScheduledExecutorService _executorService;

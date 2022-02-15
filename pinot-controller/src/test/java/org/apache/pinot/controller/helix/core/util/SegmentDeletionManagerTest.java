@@ -27,7 +27,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
@@ -63,12 +62,12 @@ public class SegmentDeletionManagerTest {
   private static final String CLUSTER_NAME = "mock";
   // these prefix must be the same as those in SegmentDeletionManager.
   private static final String RETENTION_UNTIL_SEPARATOR = "__RETENTION_UNTIL__";
-  private static final String RETENTION_DATE_FORMAT_STR = "yyyyMMdd_HHmmss";
+  private static final String RETENTION_DATE_FORMAT_STR = "yyyyMMddHHmm";
   private static final SimpleDateFormat RETENTION_DATE_FORMAT;
 
   static {
-    RETENTION_DATE_FORMAT = new SimpleDateFormat(RETENTION_DATE_FORMAT_STR, Locale.getDefault());
-    RETENTION_DATE_FORMAT.setTimeZone(TimeZone.getDefault());
+    RETENTION_DATE_FORMAT = new SimpleDateFormat(RETENTION_DATE_FORMAT_STR);
+    RETENTION_DATE_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
   }
 
   HelixAdmin makeHelixAdmin() {
@@ -346,8 +345,12 @@ public class SegmentDeletionManagerTest {
   }
 
   public String genDeletedSegmentName(String fileName, int age, int retentionInDays) {
+    // adding one more hours to the deletion time just to make sure the test goes pass the retention period because
+    // we no longer keep second level info in the date format.
     return StringUtils.join(fileName, RETENTION_UNTIL_SEPARATOR, RETENTION_DATE_FORMAT.format(new Date(
-        DateTime.now().minusDays(age).getMillis() + TimeUnit.DAYS.toMillis(retentionInDays))));
+        DateTime.now().minusDays(age).getMillis()
+            + TimeUnit.DAYS.toMillis(retentionInDays)
+            - TimeUnit.HOURS.toMillis(1))));
   }
 
   public void createTestFileWithAge(String path, int age)
