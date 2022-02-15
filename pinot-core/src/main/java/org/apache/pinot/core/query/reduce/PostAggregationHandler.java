@@ -43,7 +43,6 @@ import org.apache.pinot.core.util.GapfillUtils;
  * aggregation result.
  */
 public class PostAggregationHandler implements ValueExtractorFactory {
-  private final Map<FunctionContext, Integer> _aggregationFunctionIndexMap;
   private final Map<Pair<FunctionContext, FilterContext>, Integer> _filteredAggregationsIndexMap;
   private final int _numGroupByExpressions;
   private final Map<ExpressionContext, Integer> _groupByExpressionIndexMap;
@@ -52,9 +51,8 @@ public class PostAggregationHandler implements ValueExtractorFactory {
   private final DataSchema _resultDataSchema;
 
   public PostAggregationHandler(QueryContext queryContext, DataSchema dataSchema) {
-    _aggregationFunctionIndexMap = queryContext.getAggregationFunctionIndexMap();
     _filteredAggregationsIndexMap = queryContext.getFilteredAggregationsIndexMap();
-    assert _aggregationFunctionIndexMap != null;
+    assert _filteredAggregationsIndexMap != null;
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     if (groupByExpressions == null) {
       groupByExpressions = GapfillUtils.getGroupByExpressions(queryContext);
@@ -129,14 +127,15 @@ public class PostAggregationHandler implements ValueExtractorFactory {
         expression);
     if (function.getType() == FunctionContext.Type.AGGREGATION) {
       // Aggregation function
-      return new ColumnValueExtractor(_aggregationFunctionIndexMap.get(function) + _numGroupByExpressions, _dataSchema);
+      return new ColumnValueExtractor(
+          _filteredAggregationsIndexMap.get(Pair.of(function, null)) + _numGroupByExpressions, _dataSchema);
     } else if (function.getType() == FunctionContext.Type.TRANSFORM && function.getFunctionName()
         .equalsIgnoreCase("filter")) {
+      FunctionContext aggregation = function.getArguments().get(0).getFunction();
       ExpressionContext filterExpression = function.getArguments().get(1);
       FilterContext filter = RequestContextUtils.getFilter(filterExpression);
-      FunctionContext filterFunction = function.getArguments().get(0).getFunction();
-
-      return new ColumnValueExtractor(_filteredAggregationsIndexMap.get(Pair.of(filterFunction, filter)), _dataSchema);
+      return new ColumnValueExtractor(
+          _filteredAggregationsIndexMap.get(Pair.of(aggregation, filter)) + _numGroupByExpressions, _dataSchema);
     } else {
       // Post-aggregation function
       return new PostAggregationValueExtractor(function);

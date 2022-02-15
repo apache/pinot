@@ -26,7 +26,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
-import org.apache.pinot.broker.integration.tests.BrokerTestAutoLoadedService;
+import org.apache.pinot.core.api.AutoLoadedServiceForTest;
 
 /**
  * This class is a typical "echo" service that will return whatever string you call GET with a path.
@@ -35,9 +35,9 @@ import org.apache.pinot.broker.integration.tests.BrokerTestAutoLoadedService;
  */
 @Api(tags = "Test")
 @Path("/test")
-public class EchoWithAutoDiscovery {
+public class BrokerEchoWithAutoDiscovery {
     @Inject
-    public BrokerTestAutoLoadedService _injectedService;
+    public AutoLoadedServiceForTest _injectedService;
     @GET
     @Path("/echo/{table}")
     @Produces(MediaType.TEXT_PLAIN)

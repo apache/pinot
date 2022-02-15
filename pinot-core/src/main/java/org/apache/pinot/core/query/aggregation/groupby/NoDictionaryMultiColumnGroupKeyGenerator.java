@@ -92,60 +92,62 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   @Override
   public void generateKeysForBlock(TransformBlock transformBlock, int[] groupKeys) {
     int numDocs = transformBlock.getNumDocs();
-    int[][] keys = new int[numDocs][_numGroupByExpressions];
+    Object[] values = new Object[_numGroupByExpressions];
     for (int i = 0; i < _numGroupByExpressions; i++) {
       BlockValSet blockValSet = transformBlock.getBlockValueSet(_groupByExpressions[i]);
       if (_dictionaries[i] != null) {
-        int[] dictIds = blockValSet.getDictionaryIdsSV();
-        for (int j = 0; j < numDocs; j++) {
-          keys[j][i] = dictIds[j];
-        }
+        values[i] = blockValSet.getDictionaryIdsSV();
       } else {
-        ValueToIdMap onTheFlyDictionary = _onTheFlyDictionaries[i];
         switch (_storedTypes[i]) {
           case INT:
-            int[] intValues = blockValSet.getIntValuesSV();
-            for (int j = 0; j < numDocs; j++) {
-              keys[j][i] = onTheFlyDictionary.put(intValues[j]);
-            }
+            values[i] = blockValSet.getIntValuesSV();
             break;
           case LONG:
-            long[] longValues = blockValSet.getLongValuesSV();
-            for (int j = 0; j < numDocs; j++) {
-              keys[j][i] = onTheFlyDictionary.put(longValues[j]);
-            }
+            values[i] = blockValSet.getLongValuesSV();
             break;
           case FLOAT:
-            float[] floatValues = blockValSet.getFloatValuesSV();
-            for (int j = 0; j < numDocs; j++) {
-              keys[j][i] = onTheFlyDictionary.put(floatValues[j]);
-            }
+            values[i] = blockValSet.getFloatValuesSV();
             break;
           case DOUBLE:
-            double[] doubleValues = blockValSet.getDoubleValuesSV();
-            for (int j = 0; j < numDocs; j++) {
-              keys[j][i] = onTheFlyDictionary.put(doubleValues[j]);
-            }
+            values[i] = blockValSet.getDoubleValuesSV();
             break;
           case STRING:
-            String[] stringValues = blockValSet.getStringValuesSV();
-            for (int j = 0; j < numDocs; j++) {
-              keys[j][i] = onTheFlyDictionary.put(stringValues[j]);
-            }
+            values[i] = blockValSet.getStringValuesSV();
             break;
           case BYTES:
-            byte[][] bytesValues = blockValSet.getBytesValuesSV();
-            for (int j = 0; j < numDocs; j++) {
-              keys[j][i] = onTheFlyDictionary.put(new ByteArray(bytesValues[j]));
-            }
+            values[i] = blockValSet.getBytesValuesSV();
             break;
           default:
             throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _storedTypes[i]);
         }
       }
     }
-    for (int i = 0; i < numDocs; i++) {
-      groupKeys[i] = getGroupIdForKey(new FixedIntArray(keys[i]));
+    int[] keyValues = new int[_numGroupByExpressions];
+    // note that we are mutating its backing array for memory efficiency
+    FixedIntArray flyweightKey = new FixedIntArray(keyValues);
+    for (int row = 0; row < numDocs; row++) {
+      for (int col = 0; col < _numGroupByExpressions; col++) {
+        Object columnValues = values[col];
+        ValueToIdMap onTheFlyDictionary = _onTheFlyDictionaries[col];
+        if (columnValues instanceof int[]) {
+          if (onTheFlyDictionary == null) {
+            keyValues[col] = ((int[]) columnValues)[row];
+          } else {
+            keyValues[col] = onTheFlyDictionary.put(((int[]) columnValues)[row]);
+          }
+        } else if (columnValues instanceof long[]) {
+          keyValues[col] = onTheFlyDictionary.put(((long[]) columnValues)[row]);
+        } else if (columnValues instanceof float[]) {
+          keyValues[col] = onTheFlyDictionary.put(((float[]) columnValues)[row]);
+        } else if (columnValues instanceof double[]) {
+          keyValues[col] = onTheFlyDictionary.put(((double[]) columnValues)[row]);
+        } else if (columnValues instanceof String[]) {
+          keyValues[col] = onTheFlyDictionary.put(((String[]) columnValues)[row]);
+        } else if (columnValues instanceof byte[][]) {
+          keyValues[col] = onTheFlyDictionary.put(new ByteArray(((byte[][]) columnValues)[row]));
+        }
+      }
+      groupKeys[row] = getGroupIdForFlyweightKey(flyweightKey);
     }
   }
 
@@ -293,6 +295,23 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   @Override
   public Iterator<StringGroupKey> getStringGroupKeys() {
     return new StringGroupKeyIterator();
+  }
+
+  /**
+   * Helper method to get or create group-id for a group key.
+   *
+   * @param flyweight Group key, that is a list of objects to be grouped, will be cloned on first occurrence
+   * @return Group id
+   */
+  private int getGroupIdForFlyweightKey(FixedIntArray flyweight) {
+    int groupId = _groupKeyMap.getInt(flyweight);
+    if (groupId == INVALID_ID) {
+      if (_numGroups < _globalGroupIdUpperBound) {
+        groupId = _numGroups;
+        _groupKeyMap.put(flyweight.clone(), _numGroups++);
+      }
+    }
+    return groupId;
   }
 
   /**
