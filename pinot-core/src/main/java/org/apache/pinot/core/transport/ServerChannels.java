@@ -85,7 +85,7 @@ public class ServerChannels {
     _brokerMetrics = brokerMetrics;
     _tlsConfig = tlsConfig;
     try {
-      _serializer = ThreadLocal.withInitial(() -> new TSerializer(new TCompactProtocol.Factory()));
+      _threadLocalTSerializer = ThreadLocal.withInitial(() -> new TSerializer(new TCompactProtocol.Factory()));
     } catch (TTransportException e) {
       throw new RuntimeException("Failed to initialize Thrift Serializer", e);
     }
