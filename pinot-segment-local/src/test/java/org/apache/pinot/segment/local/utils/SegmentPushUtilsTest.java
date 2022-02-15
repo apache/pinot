@@ -29,18 +29,18 @@ import static org.testng.Assert.*;
 
 
 public class SegmentPushUtilsTest {
-  
+
   @Test
   public void testGetSegmentUriToTarPathMap() throws IOException {
     URI outputDirURI = Files.createTempDirectory("test").toUri();
-    
+
     String[] segmentFiles = new String[] {
         outputDirURI.resolve("segment.tar.gz").toString(),
         outputDirURI.resolve("stats_202201.tar.gz").toString(),
         outputDirURI.resolve("/2022/segment.tar.gz").toString(),
         outputDirURI.resolve("/2022/stats_202201.tar.gz").toString()
     };
-    
+
     PushJobSpec pushSpec = new PushJobSpec();
     Map<String, String> result = SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, pushSpec, segmentFiles);
     assertEquals(result.size(), 4);
@@ -48,7 +48,7 @@ public class SegmentPushUtilsTest {
       assertTrue(result.containsKey(segmentFile));
       assertEquals(result.get(segmentFile), segmentFile);
     }
-    
+
     pushSpec.setPushFileNamePattern("glob:**/2022/*.tar.gz");
     result = SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, pushSpec, segmentFiles);
     assertEquals(result.size(), 2);

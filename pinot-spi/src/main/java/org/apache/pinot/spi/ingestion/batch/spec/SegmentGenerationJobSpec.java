@@ -64,7 +64,7 @@ public class SegmentGenerationJobSpec implements Serializable {
    * is the input directory for jobs that push segments to the Pinot cluster.
    */
   private String _outputDirURI;
-  
+
   /**
    * Segment creation job parallelism.
    */
