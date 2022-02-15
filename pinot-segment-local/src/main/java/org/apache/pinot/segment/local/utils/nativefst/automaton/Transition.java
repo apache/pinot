@@ -22,7 +22,7 @@ import java.io.Serializable;
 
 
 /**
- * <tt>Automaton</tt> transition. 
+ * <tt>Automaton</tt> transition.
  * <p>
  * A transition, which belongs to a source state, consists of a Unicode character interval
  * and a destination state.

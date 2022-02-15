@@ -35,7 +35,7 @@ public class VerifyClusterStateCommand extends AbstractBaseAdminCommand implemen
   @CommandLine.Option(names = {"-clusterName"}, required = false, description = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
 
-  @CommandLine.Option(names = {"-tableName"}, required = false, 
+  @CommandLine.Option(names = {"-tableName"}, required = false,
       description = "Table name to check the state (e.g. myTable_OFFLINE).")
   private String _tableName;
 

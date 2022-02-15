@@ -40,7 +40,6 @@ public interface PartitionGroupConsumer extends Closeable {
    * @param startOffset Offset (inclusive) at which the consumption should begin
    */
   default void start(StreamPartitionMsgOffset startOffset) {
-
   }
 
   /**

@@ -53,7 +53,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   private static final long NANO_DELTA = (long) 5E5;
   private static final String CLIENT_TIME_STATISTICS = "CLIENT TIME STATISTICS";
 
-  @CommandLine.Option(names = {"-mode"}, required = true, 
+  @CommandLine.Option(names = {"-mode"}, required = true,
       description = "Mode of query runner (singleThread|multiThreads|targetQPS|increasingQPS).")
   private String _mode;
   @CommandLine.Option(names = {"-queryFile"}, required = true, description = "Path to query file.")
@@ -64,26 +64,26 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   @CommandLine.Option(names = {"-queryCount"}, required = false,
       description = "Number of queries to run (default 0 = all).")
   private int _queryCount = 0;
-  @CommandLine.Option(names = {"-numTimesToRunQueries"}, required = false, 
+  @CommandLine.Option(names = {"-numTimesToRunQueries"}, required = false,
       description = "Number of times to run all queries in the query file, 0 means infinite times (default 1).")
   private int _numTimesToRunQueries = 1;
-  @CommandLine.Option(names = {"-reportIntervalMs"}, required = false, 
+  @CommandLine.Option(names = {"-reportIntervalMs"}, required = false,
       description = "Interval in milliseconds to report simple statistics (default 3000).")
   private int _reportIntervalMs = 3000;
-  @CommandLine.Option(names = {"-numIntervalsToReportAndClearStatistics"}, required = false, 
+  @CommandLine.Option(names = {"-numIntervalsToReportAndClearStatistics"}, required = false,
       description = "Number of report intervals to report detailed statistics and clear them,"
           + " 0 means never (default 10).")
   private int _numIntervalsToReportAndClearStatistics = 10;
-  @CommandLine.Option(names = {"-numThreads"}, required = false, 
+  @CommandLine.Option(names = {"-numThreads"}, required = false,
       description = "Number of threads sending queries for multiThreads, targetQPS and increasingQPS mode (default 5). "
           + "This can be used to simulate multiple clients sending queries concurrently.")
   private int _numThreads = 5;
-  @CommandLine.Option(names = {"-startQPS"}, required = false, 
+  @CommandLine.Option(names = {"-startQPS"}, required = false,
       description = "Start QPS for targetQPS and increasingQPS mode")
   private double _startQPS;
   @CommandLine.Option(names = {"-deltaQPS"}, required = false, description = "Delta QPS for increasingQPS mode.")
   private double _deltaQPS;
-  @CommandLine.Option(names = {"-numIntervalsToIncreaseQPS"}, required = false, 
+  @CommandLine.Option(names = {"-numIntervalsToIncreaseQPS"}, required = false,
       description = "Number of report intervals to increase QPS for increasingQPS mode (default 10).")
   private int _numIntervalsToIncreaseQPS = 10;
   @CommandLine.Option(names = {"-brokerHost"}, required = false, description = "Broker host name (default localhost).")

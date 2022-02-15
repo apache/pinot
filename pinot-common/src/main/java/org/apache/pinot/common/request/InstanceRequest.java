@@ -364,7 +364,6 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
         setBrokerId((java.lang.String)value);
       }
       break;
-
     }
   }
 
@@ -385,7 +384,6 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
 
     case BROKER_ID:
       return getBrokerId();
-
     }
     throw new java.lang.IllegalStateException();
   }
@@ -772,7 +770,6 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
-
   }
 
   private static class InstanceRequestTupleSchemeFactory implements org.apache.thrift.scheme.SchemeFactory {

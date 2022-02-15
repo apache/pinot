@@ -55,5 +55,4 @@ class TestHelper {
     Assert.assertEquals(userQuery.toString(),
         rewrittenQuery.toString().replace("stringValue:-Infinity", "doubleValue:-Infinity"));
   }
-
 }

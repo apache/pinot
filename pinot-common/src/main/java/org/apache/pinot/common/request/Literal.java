@@ -720,6 +720,4 @@ public class Literal extends org.apache.thrift.TUnion<Literal, Literal._Fields> 
       throw new java.io.IOException(te);
     }
   }
-
-
 }

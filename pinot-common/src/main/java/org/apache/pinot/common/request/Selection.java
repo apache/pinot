@@ -142,7 +142,6 @@ public class Selection implements org.apache.thrift.TBase<Selection, Selection._
     this.offset = 0;
 
     this.size = 10;
-
   }
 
   /**
@@ -176,7 +175,6 @@ public class Selection implements org.apache.thrift.TBase<Selection, Selection._
     this.offset = 0;
 
     this.size = 10;
-
   }
 
   public int getSelectionColumnsSize() {
@@ -336,7 +334,6 @@ public class Selection implements org.apache.thrift.TBase<Selection, Selection._
         setSize((java.lang.Integer)value);
       }
       break;
-
     }
   }
 
@@ -354,7 +351,6 @@ public class Selection implements org.apache.thrift.TBase<Selection, Selection._
 
     case SIZE:
       return getSize();
-
     }
     throw new java.lang.IllegalStateException();
   }
@@ -707,7 +703,6 @@ public class Selection implements org.apache.thrift.TBase<Selection, Selection._
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
-
   }
 
   private static class SelectionTupleSchemeFactory implements org.apache.thrift.scheme.SchemeFactory {

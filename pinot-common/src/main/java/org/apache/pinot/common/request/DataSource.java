@@ -449,7 +449,6 @@ public class DataSource implements org.apache.thrift.TBase<DataSource, DataSourc
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
-
   }
 
   private static class DataSourceTupleSchemeFactory implements org.apache.thrift.scheme.SchemeFactory {

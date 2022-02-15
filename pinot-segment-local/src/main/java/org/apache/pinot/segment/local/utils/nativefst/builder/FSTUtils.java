@@ -115,12 +115,12 @@ final class FSTUtils {
   }
 
   /**
-   * Calculate fan-out ratio (how many nodes have a given number of outgoing arcs).  
+   * Calculate fan-out ratio (how many nodes have a given number of outgoing arcs).
    *
    * @param fst The automaton to calculate fanout for.
    *
    * @return The returned map contains keys for the number of outgoing arcs and
-   * an associated value being the number of nodes with that arc number. 
+   * an associated value being the number of nodes with that arc number.
    */
   public static TreeMap<Integer, Integer> calculateFanOuts(final FST fst) {
     final int[] result = new int[256];
@@ -158,7 +158,7 @@ final class FSTUtils {
    *
    * @param fst The automaton to calculate right language for.
    * @return Returns a map with node identifiers as keys and their right language
-   * counts as associated values. 
+   * counts as associated values.
    */
   public static Int2IntOpenHashMap rightLanguageForAllStates(final FST fst) {
     final Int2IntOpenHashMap numbers = new Int2IntOpenHashMap();

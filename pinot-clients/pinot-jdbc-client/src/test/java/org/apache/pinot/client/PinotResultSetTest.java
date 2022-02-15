@@ -209,7 +209,6 @@ public class PinotResultSetTest {
     @Override
     public void close()
         throws PinotClientException {
-
     }
   }
 

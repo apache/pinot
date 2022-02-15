@@ -34,26 +34,26 @@ public class PinotFSBenchmarkRunner extends AbstractBaseCommand implements Comma
       description = "Test mode. (ALL|LISTFILES|READWRITE|DELETE|RENAME)")
   private String _mode;
 
-  @CommandLine.Option(names = {"-pinotFSConfigFile"}, required = true, 
+  @CommandLine.Option(names = {"-pinotFSConfigFile"}, required = true,
       description = "Path for PinotFS configuration file")
   private String _pinotFSConfigFile;
 
-  @CommandLine.Option(names = {"-baseDirectoryUri"}, required = true, 
+  @CommandLine.Option(names = {"-baseDirectoryUri"}, required = true,
       description = "Temp dir path for running benchmark against. e.g. file:///path/to/test, abfss://host/path...")
   private String _baseDirectoryUri;
 
   @CommandLine.Option(names = {"-localTempDir"}, required = false, description = "Local temp directory for benchmark.")
   private String _localTempDir;
 
-  @CommandLine.Option(names = {"-numSegmentsForListTest"}, required = false, 
+  @CommandLine.Option(names = {"-numSegmentsForListTest"}, required = false,
       description = "The number of segments to create before running listFiles test.")
   private Integer _numSegmentsForListTest;
 
-  @CommandLine.Option(names = {"-dataSizeInMBsForCopyTest"}, required = false, 
+  @CommandLine.Option(names = {"-dataSizeInMBsForCopyTest"}, required = false,
       description = "Data size in MB for copy test. (e.g. 1024 = 1GB)")
   private Integer _dataSizeInMBsForCopyTest;
 
-  @CommandLine.Option(names = {"-numOps"}, required = false, 
+  @CommandLine.Option(names = {"-numOps"}, required = false,
       description = "The number of trials of operations when running a benchmark.")
   private Integer _numOps;
 

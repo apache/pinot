@@ -42,41 +42,41 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
       description = "Mode of the PerfBenchmarkRunner (startAll|startAllButServer|startServerWithPreLoadedSegments).")
   private String _mode;
 
-  @CommandLine.Option(names = {"-dataDir"}, required = false, 
+  @CommandLine.Option(names = {"-dataDir"}, required = false,
       description = "Path to directory containing un-tarred segments.")
   private String _dataDir;
 
-  @CommandLine.Option(names = {"-tempDir"}, required = false, 
+  @CommandLine.Option(names = {"-tempDir"}, required = false,
       description = "Path to temporary directory to start the cluster")
   private String _tempDir = "/tmp/";
 
   @CommandLine.Option(names = {"-loadMode"}, required = false, description = "Load mode of the segments (HEAP|MMAP).")
   private String _loadMode = "HEAP";
 
-  @CommandLine.Option(names = {"-segmentFormatVersion"}, required = false, 
+  @CommandLine.Option(names = {"-segmentFormatVersion"}, required = false,
       description = "Segment format version to be loaded (v1|v3).")
   private String _segmentFormatVersion;
 
   @CommandLine.Option(names = {"-batchLoad"}, required = false, description = "Batch load multiple tables.")
   private boolean _isBatchLoad;
 
-  @CommandLine.Option(names = {"-numThreads"}, required = false, 
+  @CommandLine.Option(names = {"-numThreads"}, required = false,
       description = "Number of threads for batch load (default 10).")
   private int _numThreads = 10;
 
-  @CommandLine.Option(names = {"-timeoutInSeconds"}, required = false, 
+  @CommandLine.Option(names = {"-timeoutInSeconds"}, required = false,
       description = "Timeout in seconds for batch load (default 60).")
   private int _timeoutInSeconds = 60;
 
-  @CommandLine.Option(names = {"-tableNames"}, required = false, 
+  @CommandLine.Option(names = {"-tableNames"}, required = false,
       description = "Comma separated table names with types to be loaded (non-batch load).")
   private String _tableNames;
 
-  @CommandLine.Option(names = {"-invertedIndexColumns"}, required = false, 
+  @CommandLine.Option(names = {"-invertedIndexColumns"}, required = false,
       description = "Comma separated inverted index columns to be created (non-batch load).")
   private String _invertedIndexColumns;
 
-  @CommandLine.Option(names = {"-bloomFilterColumns"}, required = false, 
+  @CommandLine.Option(names = {"-bloomFilterColumns"}, required = false,
       description = "Comma separated bloom filter columns to be created (non-batch load).")
   private String _bloomFilterColumns;
 

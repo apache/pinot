@@ -26,5 +26,4 @@ package org.apache.pinot.plugin.stream.kafka09;
  */
 @Deprecated
 public class SimpleConsumerFactory extends KafkaConsumerFactory {
-
 }
