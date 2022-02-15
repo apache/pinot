@@ -59,11 +59,11 @@ public class PushJobSpec implements Serializable {
   public String getPushFileNamePattern() {
     return _pushFileNamePattern;
   }
-  
+
   public void setPushFileNamePattern(String pushFileNamePattern) {
     _pushFileNamePattern = pushFileNamePattern;
   }
-  
+
   public String getSegmentUriPrefix() {
     return _segmentUriPrefix;
   }
