@@ -227,7 +227,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   @Override
   public PlanNode makeSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
-    GapfillUtils.GapfillType gapfillType = GapfillUtils.getGapfillType(queryContext);
+    GapfillUtils.GapfillType gapfillType = queryContext.getGapfillType();
     if (QueryContextUtils.isAggregationQuery(queryContext)) {
       if (gapfillType == GapfillUtils.GapfillType.AggregateGapfill) {
         queryContext = queryContext.getSubQueryContext();

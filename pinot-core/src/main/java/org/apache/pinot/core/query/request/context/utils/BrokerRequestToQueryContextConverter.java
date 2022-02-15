@@ -42,6 +42,7 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
@@ -53,7 +54,14 @@ public class BrokerRequestToQueryContextConverter {
    * Converts the given {@link BrokerRequest} into a {@link QueryContext}.
    */
   public static QueryContext convert(BrokerRequest brokerRequest) {
-    return brokerRequest.getPinotQuery() != null ? convertSQL(brokerRequest) : convertPQL(brokerRequest);
+    QueryContext queryContext;
+    if (brokerRequest.getPinotQuery() != null) {
+      queryContext = convertSQL(brokerRequest);
+    } else {
+      queryContext = convertPQL(brokerRequest);
+    }
+    queryContext.setGapfillType(GapfillUtils.getGapfillType(queryContext));
+    return queryContext;
   }
 
   private static QueryContext convertSQL(BrokerRequest brokerRequest) {

@@ -93,7 +93,7 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
 
   PreAggregationGapFillDataTableReducer(QueryContext queryContext) {
     _queryContext = queryContext;
-    _gapfillType = GapfillUtils.getGapfillType(queryContext);
+    _gapfillType = queryContext.getGapfillType();
     _limitForAggregatedResult = queryContext.getLimit();
     if (_gapfillType == GapfillUtils.GapfillType.AggregateGapfill || _gapfillType == GapfillUtils.GapfillType.Gapfill) {
       _limitForGapfilledResult = queryContext.getLimit();

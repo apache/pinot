@@ -39,9 +39,8 @@ public class QueryContextUtils {
    * Returns {@code true} if the given query is a selection query, {@code false} otherwise.
    */
   public static boolean isSelectionQuery(QueryContext query) {
-    GapfillUtils.GapfillType gapfillType = GapfillUtils.getGapfillType(query);
-    if (gapfillType == GapfillUtils.GapfillType.GapfillAggregate
-        || gapfillType == GapfillUtils.GapfillType.GapfillSelect) {
+    if (query.getGapfillType() == GapfillUtils.GapfillType.GapfillAggregate
+        || query.getGapfillType() == GapfillUtils.GapfillType.GapfillSelect) {
       return isSelectionOnlyQuery(query.getSubQueryContext());
     } else {
       return query.getAggregationFunctions() == null;
@@ -54,15 +53,14 @@ public class QueryContextUtils {
    * Selection-only query at this moment means selection query without order-by.
    */
   public static boolean isSelectionOnlyQuery(QueryContext query) {
-    return query.getAggregationFunctions() == null
-        && query.getOrderByExpressions() == null;
+    return query.getAggregationFunctions() == null && query.getOrderByExpressions() == null;
   }
 
   /**
-   * Returns {@code trgue} if the given query is an agregation query, {@code false} otherwise.
+   * Returns {@code true} if the given query is an aggregation query, {@code false} otherwise.
    */
   public static boolean isAggregationQuery(QueryContext query) {
-    GapfillUtils.GapfillType gapfillType = GapfillUtils.getGapfillType(query);
+    GapfillUtils.GapfillType gapfillType = query.getGapfillType();
     if (gapfillType == GapfillUtils.GapfillType.AggregateGapfill
         || gapfillType == GapfillUtils.GapfillType.AggregateGapfillAggregate) {
       return true;

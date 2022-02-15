@@ -40,12 +40,10 @@ import org.apache.pinot.segment.spi.IndexSegment;
 public class GapfillSelectionPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;
-  private final GapfillUtils.GapfillType _gapfillType;
 
   public GapfillSelectionPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
     _indexSegment = indexSegment;
     _queryContext = queryContext;
-    _gapfillType = GapfillUtils.getGapfillType(queryContext);
   }
 
   @Override
@@ -81,7 +79,7 @@ public class GapfillSelectionPlanNode implements PlanNode {
   }
 
   private QueryContext getSelectQueryContext() {
-    if (_gapfillType == GapfillUtils.GapfillType.GapfillAggregate) {
+    if (_queryContext.getGapfillType() == GapfillUtils.GapfillType.GapfillAggregate) {
       return _queryContext.getSubQueryContext();
     } else if (_queryContext.getSubQueryContext() == null) {
       return _queryContext;

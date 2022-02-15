@@ -33,7 +33,6 @@ import org.apache.pinot.core.operator.combine.AggregationOnlyCombineOperator;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.operator.combine.CombineOperatorUtils;
 import org.apache.pinot.core.operator.combine.DistinctCombineOperator;
-import org.apache.pinot.core.operator.combine.GapfillGroupByOrderByCombineOperator;
 import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.GroupByOrderByCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOnlyCombineOperator;
@@ -165,8 +164,12 @@ public class CombinePlanNode implements PlanNode {
     }
     GapfillUtils.GapfillType gapfillType = GapfillUtils.getGapfillType(_queryContext);
     if (QueryContextUtils.isAggregationQuery(_queryContext)) {
-      if (gapfillType != GapfillUtils.GapfillType.None) {
-        return new GapfillGroupByOrderByCombineOperator(operators, _queryContext, _executorService);
+      if (gapfillType == GapfillUtils.GapfillType.AggregateGapfillAggregate) {
+        _queryContext.getSubQueryContext().getSubQueryContext().setEndTimeMs(_queryContext.getEndTimeMs());
+        return new GroupByOrderByCombineOperator(operators, _queryContext.getSubQueryContext().getSubQueryContext(), _executorService);
+      } else if (gapfillType == GapfillUtils.GapfillType.AggregateGapfill) {
+        _queryContext.getSubQueryContext().setEndTimeMs(_queryContext.getEndTimeMs());
+        return new GroupByOrderByCombineOperator(operators, _queryContext.getSubQueryContext(), _executorService);
       } else if (_queryContext.getGroupByExpressions() == null) {
         // Aggregation only
         return new AggregationOnlyCombineOperator(operators, _queryContext, _executorService);

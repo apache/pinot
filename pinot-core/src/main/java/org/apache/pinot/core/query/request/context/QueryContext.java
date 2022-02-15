@@ -39,6 +39,7 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.core.util.MemoizedClassAssociation;
 
 
@@ -117,6 +118,8 @@ public class QueryContext {
   // Trim threshold to use for server combine for SQL GROUP BY
   private int _groupTrimThreshold = InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD;
 
+  private GapfillUtils.GapfillType _gapfillType;
+
   private QueryContext(String tableName, List<ExpressionContext> selectExpressions, List<String> aliasList,
       @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
       @Nullable FilterContext havingFilter, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit,
@@ -134,6 +137,7 @@ public class QueryContext {
     _queryOptions = queryOptions;
     _debugOptions = debugOptions;
     _brokerRequest = brokerRequest;
+    _gapfillType = GapfillUtils.GapfillType.None;
   }
 
   /**
@@ -312,6 +316,14 @@ public class QueryContext {
 
   public void setMaxInitialResultHolderCapacity(int maxInitialResultHolderCapacity) {
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
+  }
+
+  public GapfillUtils.GapfillType getGapfillType() {
+    return _gapfillType;
+  }
+
+  public void setGapfillType(GapfillUtils.GapfillType gapfillType) {
+    this._gapfillType = gapfillType;
   }
 
   public int getNumGroupsLimit() {
