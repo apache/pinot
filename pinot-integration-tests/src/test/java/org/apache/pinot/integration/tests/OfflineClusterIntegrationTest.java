@@ -857,7 +857,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     _tableSizeAfterRemovingIndex = getTableSize(getTableName());
   }
-
+/*
   @Test
   public void testDisableGroovyQueryTableConfigOverride()
       throws Exception {
@@ -878,7 +878,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     tableConfig.setQueryConfig(null);
     updateTableConfig(tableConfig);
   }
-
+*/
   private void reloadWithExtraColumns()
       throws Exception {
     long numTotalDocs = getCountStarResult();
