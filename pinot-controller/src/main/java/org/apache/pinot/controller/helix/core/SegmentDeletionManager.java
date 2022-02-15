@@ -103,11 +103,12 @@ public class SegmentDeletionManager {
   }
 
   public void deleteSegments(String tableName, Collection<String> segmentIds) {
-    deleteSegments(tableName, segmentIds, _defaultDeletedSegmentsRetentionMs);
+    deleteSegments(tableName, segmentIds, null);
   }
 
   public void deleteSegments(String tableName, Collection<String> segmentIds,
-      long deletedSegmentsRetentionMs) {
+      TableConfig tableConfig) {
+    long deletedSegmentsRetentionMs = getRetentionMsFromTableConfig(tableConfig);
     deleteSegmentsWithDelay(tableName, segmentIds, deletedSegmentsRetentionMs, DEFAULT_DELETION_DELAY_SECONDS);
   }
 
@@ -332,15 +333,17 @@ public class SegmentDeletionManager {
     return lastModifiedTime + _defaultDeletedSegmentsRetentionMs;
   }
 
-  public long getRetentionMsFromTableConfig(TableConfig tableConfig) {
+  private long getRetentionMsFromTableConfig(TableConfig tableConfig) {
     long retentionMs = _defaultDeletedSegmentsRetentionMs;
-    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    if (!StringUtils.isEmpty(validationConfig.getDeletedSegmentsRetentionPeriod())) {
-      try {
-        retentionMs = TimeUtils.convertPeriodToMillis(validationConfig.getDeletedSegmentsRetentionPeriod());
-      } catch (Exception e) {
-        LOGGER.warn("Unable to parse deleted segment retention config for table {}, using to default: {} ms",
-            tableConfig.getTableName(), _defaultDeletedSegmentsRetentionMs, e);
+    if (tableConfig != null) {
+      SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+      if (!StringUtils.isEmpty(validationConfig.getDeletedSegmentsRetentionPeriod())) {
+        try {
+          retentionMs = TimeUtils.convertPeriodToMillis(validationConfig.getDeletedSegmentsRetentionPeriod());
+        } catch (Exception e) {
+          LOGGER.warn("Unable to parse deleted segment retention config for table {}, using to default: {} ms",
+              tableConfig.getTableName(), _defaultDeletedSegmentsRetentionMs, e);
+        }
       }
     }
     return retentionMs;

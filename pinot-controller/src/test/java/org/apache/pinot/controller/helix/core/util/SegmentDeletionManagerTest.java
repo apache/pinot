@@ -39,6 +39,8 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -311,7 +313,11 @@ public class SegmentDeletionManagerTest {
         + File.separator + TABLE_NAME);
 
     // delete the segments instantly.
-    deletionManager.deleteSegments(TABLE_NAME, segments, 0);
+    SegmentsValidationAndRetentionConfig mockValidationConfig = mock(SegmentsValidationAndRetentionConfig.class);
+    when(mockValidationConfig.getDeletedSegmentsRetentionPeriod()).thenReturn("0d");
+    TableConfig mockTableConfig = mock(TableConfig.class);
+    when(mockTableConfig.getValidationConfig()).thenReturn(mockValidationConfig);
+    deletionManager.deleteSegments(TABLE_NAME, segments, mockTableConfig);
 
     // Sleep 3 second to ensure the async delete actually kicked in.
     Thread.sleep(3000L);
