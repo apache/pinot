@@ -50,6 +50,11 @@ public class AvroSchemaUtil {
         return DataType.STRING;
       case BYTES:
         return DataType.BYTES;
+      case MAP:
+      case ARRAY:
+      case RECORD:
+      case UNION:
+        return DataType.JSON;
       default:
         throw new UnsupportedOperationException("Unsupported Avro type: " + avroType);
     }
@@ -94,6 +99,9 @@ public class AvroSchemaUtil {
         return jsonSchema;
       case BYTES:
         jsonSchema.set("type", convertStringsToJsonArray("null", "bytes"));
+        return jsonSchema;
+      case JSON:
+        jsonSchema.set("type", convertStringsToJsonArray("null", "json"));
         return jsonSchema;
       default:
         throw new UnsupportedOperationException();
