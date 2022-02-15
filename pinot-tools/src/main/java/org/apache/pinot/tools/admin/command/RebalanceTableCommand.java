@@ -41,38 +41,38 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
   @CommandLine.Option(names = {"-clusterName"}, required = true, description = "Name of the Pinot cluster")
   private String _clusterName;
 
-  @CommandLine.Option(names = {"-tableName"}, required = true, 
+  @CommandLine.Option(names = {"-tableName"}, required = true,
       description = "Name of the table to rebalance (with type suffix, e.g. myTable_OFFLINE)")
   private String _tableNameWithType;
 
-  @CommandLine.Option(names = {"-dryRun"}, 
+  @CommandLine.Option(names = {"-dryRun"},
       description = "Whether to rebalance table in dry-run mode (just log the target assignment without applying"
           + " changes to the cluster, false by default)")
   private boolean _dryRun = false;
 
-  @CommandLine.Option(names = {"-reassignInstances"}, 
+  @CommandLine.Option(names = {"-reassignInstances"},
       description = "Whether to reassign instances before reassigning segments (false by default)")
   private boolean _reassignInstances = false;
 
-  @CommandLine.Option(names = {"-includeConsuming"}, 
+  @CommandLine.Option(names = {"-includeConsuming"},
       description = "Whether to reassign CONSUMING segments for real-time table (false by default)")
   private boolean _includeConsuming = false;
 
-  @CommandLine.Option(names = {"-bootstrap"}, 
+  @CommandLine.Option(names = {"-bootstrap"},
       description = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign"
           + " all segments in a round-robin fashion as if adding new segments to an empty table, false by default)")
   private boolean _bootstrap = false;
 
-  @CommandLine.Option(names = {"-downtime"}, 
+  @CommandLine.Option(names = {"-downtime"},
       description = "Whether to allow downtime for the rebalance (false by default)")
   private boolean _downtime = false;
 
-  @CommandLine.Option(names = {"-minAvailableReplicas"}, 
+  @CommandLine.Option(names = {"-minAvailableReplicas"},
       description = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum "
           + "number of replicas allowed to be unavailable if value is negative (1 by default)")
   private int _minAvailableReplicas = 1;
 
-  @CommandLine.Option(names = {"-bestEfforts"}, 
+  @CommandLine.Option(names = {"-bestEfforts"},
       description = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract"
           + " cannot be achieved, false by default)")
   private boolean _bestEfforts = false;

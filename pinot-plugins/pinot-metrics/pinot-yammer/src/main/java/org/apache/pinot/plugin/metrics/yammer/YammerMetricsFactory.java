@@ -34,7 +34,6 @@ public class YammerMetricsFactory implements PinotMetricsFactory {
 
   @Override
   public void init(PinotConfiguration metricsConfiguration) {
-
   }
 
   @Override

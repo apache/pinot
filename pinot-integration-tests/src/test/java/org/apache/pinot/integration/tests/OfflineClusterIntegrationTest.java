@@ -190,7 +190,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       // creation failure if both calls entered ProcessNewSegment. In/such cases ensure that we upload all the
       // segments again/to ensure that the data is setup correctly.
       assertTrue(e.getMessage().contains("Another segment upload is in progress for segment") || e.getMessage()
-          .contains("Failed to create ZK metadata for segment"));
+          .contains("Failed to create ZK metadata for segment"), e.getMessage());
       uploadSegments(getTableName(), _tarDir);
     }
 

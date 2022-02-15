@@ -187,7 +187,8 @@ public class PinotSegmentUploadDownloadRestletResource {
   }
 
   private SuccessResponse uploadSegment(@Nullable String tableName, TableType tableType, FormDataMultiPart multiPart,
-      boolean enableParallelPushProtection, HttpHeaders headers, Request request, boolean moveSegmentToFinalLocation) {
+      boolean enableParallelPushProtection, HttpHeaders headers, Request request, boolean moveSegmentToFinalLocation,
+      boolean allowRefresh) {
     String uploadTypeStr = null;
     String crypterClassNameInHeader = null;
     String downloadUri = null;
@@ -301,7 +302,7 @@ public class PinotSegmentUploadDownloadRestletResource {
 
       // Zk operations
       completeZkOperations(enableParallelPushProtection, headers, finalSegmentFile, tableNameWithType, segmentMetadata,
-          segmentName, zkDownloadUri, moveSegmentToFinalLocation, crypterClassName);
+          segmentName, zkDownloadUri, moveSegmentToFinalLocation, crypterClassName, allowRefresh);
 
       return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + tableNameWithType);
     } catch (WebApplicationException e) {
@@ -380,6 +381,11 @@ public class PinotSegmentUploadDownloadRestletResource {
     }
     LOGGER.info("Downloading segment from {} to {} for table {}", currentSegmentLocationURI, destFile.getAbsolutePath(),
         tableName);
+    URI uri = new URI(currentSegmentLocationURI);
+    if (uri.getScheme().equalsIgnoreCase("file")) {
+      throw new ControllerApplicationException(LOGGER, "Unsupported URI: " + currentSegmentLocationURI,
+          Response.Status.BAD_REQUEST);
+    }
     SegmentFetcherFactory.fetchSegmentToLocal(currentSegmentLocationURI, destFile);
   }
 
@@ -391,7 +397,7 @@ public class PinotSegmentUploadDownloadRestletResource {
 
   private void completeZkOperations(boolean enableParallelPushProtection, HttpHeaders headers, File uploadedSegmentFile,
       String tableNameWithType, SegmentMetadata segmentMetadata, String segmentName, String zkDownloadURI,
-      boolean moveSegmentToFinalLocation, String crypter)
+      boolean moveSegmentToFinalLocation, String crypter, boolean allowRefresh)
       throws Exception {
     String basePath = ControllerFilePathProvider.getInstance().getDataDirURI().toString();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
@@ -399,7 +405,7 @@ public class PinotSegmentUploadDownloadRestletResource {
     ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
     zkOperator
         .completeSegmentOperations(tableNameWithType, segmentMetadata, finalSegmentLocationURI, uploadedSegmentFile,
-            enableParallelPushProtection, headers, zkDownloadURI, moveSegmentToFinalLocation, crypter);
+            enableParallelPushProtection, headers, zkDownloadURI, moveSegmentToFinalLocation, crypter, allowRefresh);
   }
 
   private void decryptFile(String crypterClassName, File tempEncryptedFile, File tempDecryptedFile) {
@@ -431,12 +437,14 @@ public class PinotSegmentUploadDownloadRestletResource {
       @DefaultValue("OFFLINE") String tableType,
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false")
       @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION)
-          boolean enableParallelPushProtection, @Context HttpHeaders headers, @Context Request request,
-      @Suspended final AsyncResponse asyncResponse) {
+          boolean enableParallelPushProtection,
+      @ApiParam(value = "Whether to refresh if the segment already exists") @DefaultValue("true")
+      @QueryParam(FileUploadDownloadClient.QueryParameters.ALLOW_REFRESH) boolean allowRefresh,
+      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(
           uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), null, enableParallelPushProtection,
-              headers, request, false));
+              headers, request, false, allowRefresh));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -462,12 +470,14 @@ public class PinotSegmentUploadDownloadRestletResource {
       @DefaultValue("OFFLINE") String tableType,
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false")
       @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION)
-          boolean enableParallelPushProtection, @Context HttpHeaders headers, @Context Request request,
-      @Suspended final AsyncResponse asyncResponse) {
+          boolean enableParallelPushProtection,
+      @ApiParam(value = "Whether to refresh if the segment already exists") @DefaultValue("true")
+      @QueryParam(FileUploadDownloadClient.QueryParameters.ALLOW_REFRESH) boolean allowRefresh,
+      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(
           uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), multiPart, enableParallelPushProtection,
-              headers, request, true));
+              headers, request, true, allowRefresh));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -495,12 +505,14 @@ public class PinotSegmentUploadDownloadRestletResource {
       @DefaultValue("OFFLINE") String tableType,
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false")
       @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION)
-          boolean enableParallelPushProtection, @Context HttpHeaders headers, @Context Request request,
-      @Suspended final AsyncResponse asyncResponse) {
+          boolean enableParallelPushProtection,
+      @ApiParam(value = "Whether to refresh if the segment already exists") @DefaultValue("true")
+      @QueryParam(FileUploadDownloadClient.QueryParameters.ALLOW_REFRESH) boolean allowRefresh,
+      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(
           uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), null, enableParallelPushProtection,
-              headers, request, true));
+              headers, request, true, allowRefresh));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -526,12 +538,14 @@ public class PinotSegmentUploadDownloadRestletResource {
       @DefaultValue("OFFLINE") String tableType,
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false")
       @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION)
-          boolean enableParallelPushProtection, @Context HttpHeaders headers, @Context Request request,
-      @Suspended final AsyncResponse asyncResponse) {
+          boolean enableParallelPushProtection,
+      @ApiParam(value = "Whether to refresh if the segment already exists") @DefaultValue("true")
+      @QueryParam(FileUploadDownloadClient.QueryParameters.ALLOW_REFRESH) boolean allowRefresh,
+      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(
           uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), multiPart, enableParallelPushProtection,
-              headers, request, true));
+              headers, request, true, allowRefresh));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }

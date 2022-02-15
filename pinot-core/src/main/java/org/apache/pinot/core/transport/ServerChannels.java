@@ -57,7 +57,8 @@ public class ServerChannels {
   public static final String CHANNEL_LOCK_TIMEOUT_MSG = "Timeout while acquiring channel lock";
   private final QueryRouter _queryRouter;
   private final BrokerMetrics _brokerMetrics;
-  private final TSerializer _serializer;
+  // TSerializer currently is not thread safe, must be put into a ThreadLocal.
+  private final ThreadLocal<TSerializer> _threadLocalTSerializer;
   private final ConcurrentHashMap<ServerRoutingInstance, ServerChannel> _serverToChannelMap = new ConcurrentHashMap<>();
   private final EventLoopGroup _eventLoopGroup = new NioEventLoopGroup();
   private final TlsConfig _tlsConfig;
@@ -84,7 +85,7 @@ public class ServerChannels {
     _brokerMetrics = brokerMetrics;
     _tlsConfig = tlsConfig;
     try {
-      _serializer = new TSerializer(new TCompactProtocol.Factory());
+      _serializer = ThreadLocal.withInitial(() -> new TSerializer(new TCompactProtocol.Factory()));
     } catch (TTransportException e) {
       throw new RuntimeException("Failed to initialize Thrift Serializer", e);
     }
@@ -93,7 +94,7 @@ public class ServerChannels {
   public void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
       ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest, long timeoutMs)
       throws Exception {
-    byte[] requestBytes = _serializer.serialize(instanceRequest);
+    byte[] requestBytes = _threadLocalTSerializer.get().serialize(instanceRequest);
     _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new)
         .sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes, timeoutMs);
   }

@@ -16,33 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.function;
+package org.apache.pinot.tools.streams;
 
-import org.apache.pinot.segment.spi.AggregationFunctionType;
+import com.fasterxml.jackson.databind.JsonNode;
 
 
-/**
- * Place where all functions are registered.
- */
-public class FunctionDefinitionRegistry {
-  private FunctionDefinitionRegistry() {
+class RSVP {
+  private final String _eventId;
+  private final String _rsvpId;
+  private final JsonNode _payload;
+
+  RSVP(String eventId, String rsvpId, JsonNode payload) {
+    _eventId = eventId;
+    _rsvpId = rsvpId;
+    _payload = payload;
   }
 
-  public static boolean isAggFunc(String functionName) {
-    try {
-      AggregationFunctionType.getAggregationFunctionType(functionName);
-      return true;
-    } catch (IllegalArgumentException e) {
-      return false;
-    }
+  public String getEventId() {
+    return _eventId;
   }
 
-  public static boolean isTransformFunc(String functionName) {
-    try {
-      TransformFunctionType.getTransformFunctionType(functionName);
-      return true;
-    } catch (IllegalArgumentException e) {
-      return false;
-    }
+  public String getRsvpId() {
+    return _rsvpId;
+  }
+
+  public JsonNode getPayload() {
+    return _payload;
   }
 }

@@ -155,11 +155,11 @@ public class PinotConfigurationTest {
     // Tests that config.paths properties provided through environment variables are available.
     Assert.assertEquals(configuration.getProperty("controller.timeout"), "config-path-2-timeout");
 
-    // Tests a priority of a property available in both config files of a config.paths array. 
+    // Tests a priority of a property available in both config files of a config.paths array.
     Assert.assertEquals(configuration.getProperty("controller.config-paths-multi-value-test-1"),
         "config-path-2-config-paths-multi-value-test-1");
 
-    // Tests properties provided through the last config file of a config.paths array. 
+    // Tests properties provided through the last config file of a config.paths array.
     Assert.assertEquals(configuration.getProperty("controller.config-paths-multi-value-test-2"),
         "config-path-3-config-paths-multi-value-test-2");
 
@@ -203,7 +203,7 @@ public class PinotConfigurationTest {
     Assert.assertEquals(pinotConfiguration.getProperty("config.property.2"), "val2");
     Assert.assertEquals(pinotConfiguration.getProperty("config.property.3"), "val3");
 
-    // Asserts no error occurs when no configuration is provided in the spec. 
+    // Asserts no error occurs when no configuration is provided in the spec.
     new PinotConfiguration(new PinotFSSpec());
   }
 

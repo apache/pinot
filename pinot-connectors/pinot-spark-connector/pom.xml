@@ -69,12 +69,22 @@
               <groupId>com.thoughtworks.paranamer</groupId>
               <artifactId>paranamer</artifactId>
             </exclusion>
+            <exclusion>
+              <groupId>org.scala-lang</groupId>
+              <artifactId>scala-library</artifactId>
+            </exclusion>
           </exclusions>
         </dependency>
         <dependency>
           <groupId>org.scala-lang.modules</groupId>
           <artifactId>scala-xml_${scala.compat.version}</artifactId>
           <version>${scalaxml.version}</version>
+          <exclusions>
+            <exclusion>
+              <groupId>org.scala-lang</groupId>
+              <artifactId>scala-library</artifactId>
+            </exclusion>
+          </exclusions>
         </dependency>
         <dependency>
           <groupId>org.apache.spark</groupId>
@@ -98,17 +108,33 @@
               <groupId>org.scala-lang.modules</groupId>
               <artifactId>scala-xml_${scala.compat.version}</artifactId>
             </exclusion>
+            <exclusion>
+              <groupId>org.scala-lang</groupId>
+              <artifactId>scala-library</artifactId>
+            </exclusion>
           </exclusions>
         </dependency>
         <dependency>
           <groupId>io.circe</groupId>
           <artifactId>circe-parser_${scala.compat.version}</artifactId>
           <version>${circe.version}</version>
+          <exclusions>
+            <exclusion>
+              <groupId>org.scala-lang</groupId>
+              <artifactId>scala-library</artifactId>
+            </exclusion>
+          </exclusions>
         </dependency>
         <dependency>
           <groupId>io.circe</groupId>
           <artifactId>circe-generic_${scala.compat.version}</artifactId>
           <version>${circe.version}</version>
+          <exclusions>
+            <exclusion>
+              <groupId>org.scala-lang</groupId>
+              <artifactId>scala-library</artifactId>
+            </exclusion>
+          </exclusions>
         </dependency>
         <dependency>
           <groupId>org.scala-lang</groupId>
@@ -126,6 +152,10 @@
             <exclusion>
               <groupId>org.scala-lang.modules</groupId>
               <artifactId>scala-xml_${scala.compat.version}</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.scala-lang</groupId>
+              <artifactId>scala-library</artifactId>
             </exclusion>
           </exclusions>
         </dependency>

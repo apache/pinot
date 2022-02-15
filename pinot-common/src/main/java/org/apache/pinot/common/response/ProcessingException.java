@@ -216,7 +216,6 @@ public class ProcessingException extends org.apache.thrift.TException implements
         setMessage((java.lang.String)value);
       }
       break;
-
     }
   }
 
@@ -228,7 +227,6 @@ public class ProcessingException extends org.apache.thrift.TException implements
 
     case MESSAGE:
       return getMessage();
-
     }
     throw new java.lang.IllegalStateException();
   }
@@ -450,7 +448,6 @@ public class ProcessingException extends org.apache.thrift.TException implements
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
-
   }
 
   private static class ProcessingExceptionTupleSchemeFactory implements org.apache.thrift.scheme.SchemeFactory {

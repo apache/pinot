@@ -193,8 +193,7 @@ public class PluginManager {
       Collection<File> jarFiles = FileUtils.listFiles(
           new File(pluginsDirectory),
           new String[]{JAR_FILE_EXTENSION},
-          true
-      );
+          true);
       List<String> pluginsToLoad = null;
       if (!StringUtils.isEmpty(pluginsInclude)) {
         pluginsToLoad = Arrays.asList(pluginsInclude.split(";"));
@@ -226,7 +225,6 @@ public class PluginManager {
   }
 
   private void initRecordReaderClassMap() {
-
   }
 
   /**

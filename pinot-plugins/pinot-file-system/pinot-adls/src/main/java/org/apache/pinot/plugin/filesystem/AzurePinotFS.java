@@ -61,7 +61,6 @@ public class AzurePinotFS extends BasePinotFS {
   public static final String CLIENT_SECRET = "clientSecret";
 
   public AzurePinotFS() {
-
   }
 
   @VisibleForTesting

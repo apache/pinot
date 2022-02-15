@@ -20,6 +20,7 @@ package org.apache.pinot.core.plan;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +57,11 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
  */
 @SuppressWarnings("rawtypes")
 public class AggregationPlanNode implements PlanNode {
+  private static final EnumSet<AggregationFunctionType> DICTIONARY_BASED_FUNCTIONS =
+      EnumSet.of(AggregationFunctionType.MIN, AggregationFunctionType.MAX, AggregationFunctionType.MINMAXRANGE,
+          AggregationFunctionType.DISTINCTCOUNT, AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT,
+          AggregationFunctionType.DISTINCTCOUNTSMARTHLL);
+
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;
 
@@ -92,7 +98,8 @@ public class AggregationPlanNode implements PlanNode {
       BaseFilterOperator mainPredicateFilterOperator, TransformOperator mainTransformOperator, int numTotalDocs) {
     Map<FilterContext, Pair<List<AggregationFunction>, TransformOperator>> filterContextToAggFuncsMap = new HashMap<>();
     List<AggregationFunction> nonFilteredAggregationFunctions = new ArrayList<>();
-    List<Pair<AggregationFunction, FilterContext>> aggregationFunctions = _queryContext.getFilteredAggregations();
+    List<Pair<AggregationFunction, FilterContext>> aggregationFunctions =
+        _queryContext.getFilteredAggregationFunctions();
 
     // For each aggregation function, check if the aggregation function is a filtered agg.
     // If it is, populate the corresponding filter operator and corresponding transform operator
@@ -228,16 +235,11 @@ public class AggregationPlanNode implements PlanNode {
 
   /**
    * Returns {@code true} if the given aggregations can be solved with dictionary, {@code false} otherwise.
-   * <p>Aggregations supported: MIN, MAX, MIN_MAX_RANGE, DISTINCT_COUNT, SEGMENT_PARTITIONED_DISTINCT_COUNT
    */
   private static boolean isFitForDictionaryBasedPlan(AggregationFunction[] aggregationFunctions,
       IndexSegment indexSegment) {
     for (AggregationFunction aggregationFunction : aggregationFunctions) {
-      AggregationFunctionType functionType = aggregationFunction.getType();
-      if (functionType != AggregationFunctionType.MIN && functionType != AggregationFunctionType.MAX
-          && functionType != AggregationFunctionType.MINMAXRANGE
-          && functionType != AggregationFunctionType.DISTINCTCOUNT
-          && functionType != AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT) {
+      if (!DICTIONARY_BASED_FUNCTIONS.contains(aggregationFunction.getType())) {
         return false;
       }
       ExpressionContext argument = (ExpressionContext) aggregationFunction.getInputExpressions().get(0);

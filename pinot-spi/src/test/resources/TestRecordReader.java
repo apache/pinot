@@ -68,6 +68,5 @@ public class TestRecordReader implements RecordReader {
   }
 
   public void close() {
-
   }
 }

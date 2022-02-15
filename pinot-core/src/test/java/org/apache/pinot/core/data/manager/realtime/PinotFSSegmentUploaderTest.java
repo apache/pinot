@@ -93,7 +93,6 @@ public class PinotFSSegmentUploaderTest {
 
     @Override
     public void init(PinotConfiguration config) {
-
     }
 
     @Override

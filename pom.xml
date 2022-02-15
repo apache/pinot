@@ -129,7 +129,6 @@
     <hk2.version>2.5.0</hk2.version>
     <swagger.version>1.5.16</swagger.version>
     <hadoop.version>2.7.0</hadoop.version>
-    <scala.version>2.13.3</scala.version>
     <antlr.version>4.6</antlr.version>
     <jsonpath.version>2.7.0</jsonpath.version>
     <quartz.version>2.3.2</quartz.version>
@@ -919,28 +918,6 @@
         <artifactId>hadoop-mapreduce-client-core</artifactId>
         <version>${hadoop.version}</version>
         <scope>provided</scope>
-      </dependency>
-
-      <!-- Scala -->
-      <dependency>
-        <groupId>org.scala-lang</groupId>
-        <artifactId>scala-library</artifactId>
-        <version>${scala.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.scala-lang</groupId>
-        <artifactId>scala-reflect</artifactId>
-        <version>${scala.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.scala-lang</groupId>
-        <artifactId>scala-compiler</artifactId>
-        <version>${scala.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.scala-lang</groupId>
-        <artifactId>scala-scalap</artifactId>
-        <version>${scala.version}</version>
       </dependency>
 
       <!-- Metrics -->
@@ -1822,6 +1799,7 @@
             <exclude>**/*.iml</exclude>
             <exclude>**/maven-eclipse.xml</exclude>
             <exclude>**/.settings/**</exclude>
+            <exclude>**/.project</exclude>
             <exclude>.externalToolBuilders/**</exclude>
 
             <!-- Docker and Kubernetes (not part of the distribution) -->
@@ -1834,8 +1812,11 @@
             <!-- Github template files -->
             <exclude>.github/*.md</exclude>
 
-	      <!-- MISC -->
-	      <exclude>**/.factorypath</exclude>
+            <!-- Test output -->
+            <exclude>**/test-output/**</exclude>
+            
+            <!-- MISC -->
+            <exclude>**/.factorypath</exclude>
           </excludes>
         </configuration>
       </plugin>

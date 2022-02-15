@@ -312,6 +312,25 @@ public class TableConfigUtilsTest {
             new TransformConfig("transformedCol", "Groovy({x+y}, x, y)")), null)).build();
     TableConfigUtils.validate(tableConfig, schema);
 
+    // invalid transform config since Groovy is disabled
+    try {
+      TableConfigUtils.validate(tableConfig, schema, null, true);
+      Assert.fail("Should fail when Groovy functions disabled but found in transform config");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+
+    // invalid filter config since Groovy is disabled
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
+            new IngestionConfig(null, null, new FilterConfig("Groovy({timestamp > 0}, timestamp)"), null, null))
+        .build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema, null, true);
+      Assert.fail("Should fail when Groovy functions disabled but found in filter config");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+
     // null transform column name
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
         new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig(null, "reverse(anotherCol)")),
@@ -1229,7 +1248,7 @@ public class TableConfigUtilsTest {
       Assert.assertTrue(e.getMessage().contains("RealtimeToOfflineTask doesn't support upsert table"));
     }
     // validate that TASK config will be skipped with skip string.
-    TableConfigUtils.validate(tableConfig, schema, "TASK,UPSERT");
+    TableConfigUtils.validate(tableConfig, schema, "TASK,UPSERT", false);
 
     // invalid period
     HashMap<String, String> invalidPeriodConfig = new HashMap<>(realtimeToOfflineTaskConfig);

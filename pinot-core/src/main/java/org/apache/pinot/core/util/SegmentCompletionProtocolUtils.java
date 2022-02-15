@@ -24,7 +24,7 @@ import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 
 
 /**
- * Util methods related to low level consumers' segment completion protocols. 
+ * Util methods related to low level consumers' segment completion protocols.
  */
 public class SegmentCompletionProtocolUtils {
   private SegmentCompletionProtocolUtils() {

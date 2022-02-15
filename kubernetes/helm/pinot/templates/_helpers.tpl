@@ -55,8 +55,10 @@ Match Selector labels
 */}}
 {{- define "pinot.matchLabels" -}}
 app: {{ include "pinot.name" . }}
-chart: {{ include "pinot.chart" . }}
 release: {{ .Release.Name }}
+{{- range $key, $value := .Values.additionalMatchLabels }}
+{{ $key }}: {{ $value }}
+{{- end }}
 {{- end }}
 
 {{/*

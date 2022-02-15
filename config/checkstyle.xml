@@ -261,4 +261,24 @@
   <module name="SuppressionFilter">
     <property name="file" value="${config_loc}/suppressions.xml"/>
   </module>
+
+  <module name="NewlineAtEndOfFile">
+    <property name="lineSeparator" value="lf" />
+  </module>
+  <module name="RegexpMultiline">
+    <property name="format" value="\r" />
+    <property name="message" value="Line contains carriage return" />
+  </module>
+  <module name="RegexpMultiline">
+    <property name="format" value=" \n" />
+    <property name="message" value="Line has trailing whitespace" />
+  </module>
+  <module name="RegexpMultiline">
+    <property name="format" value="\n\n\Z" />
+    <property name="message" value="Blank line before end of file" />
+  </module>
+  <module name="RegexpMultiline">
+    <property name="format" value="\n\n\s*\}" />
+    <property name="message" value="Blank line before closing brace" />
+  </module>
 </module>

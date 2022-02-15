@@ -28,5 +28,4 @@ import org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder;
  */
 @Deprecated
 public class KafkaJSONMessageDecoder extends JSONMessageDecoder {
-
 }

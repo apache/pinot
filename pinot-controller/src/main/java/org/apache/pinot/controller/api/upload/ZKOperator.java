@@ -60,7 +60,8 @@ public class ZKOperator {
 
   public void completeSegmentOperations(String tableNameWithType, SegmentMetadata segmentMetadata,
       URI finalSegmentLocationURI, File currentSegmentLocation, boolean enableParallelPushProtection,
-      HttpHeaders headers, String zkDownloadURI, boolean moveSegmentToFinalLocation, String crypter)
+      HttpHeaders headers, String zkDownloadURI, boolean moveSegmentToFinalLocation, String crypter,
+      boolean allowRefresh)
       throws Exception {
     String segmentName = segmentMetadata.getName();
     ZNRecord segmentMetadataZNRecord =
@@ -77,6 +78,17 @@ public class ZKOperator {
       processNewSegment(segmentMetadata, finalSegmentLocationURI, currentSegmentLocation, zkDownloadURI, headers,
           crypter, tableNameWithType, segmentName, moveSegmentToFinalLocation, enableParallelPushProtection);
       return;
+    }
+
+    // We reach here if a segment with the same name already exists.
+
+    if (!allowRefresh) {
+      // We cannot perform this check up-front in UploadSegment API call. If a segment doesn't exist during the check
+      // done up-front but ends up getting created before the check here, we could incorrectly refresh an existing
+      // segment.
+      throw new ControllerApplicationException(LOGGER,
+          "Segment: " + segmentName + " already exists in table: " + tableNameWithType + ". Refresh not permitted.",
+          Response.Status.CONFLICT);
     }
 
     // TODO Allow segment refreshing for realtime tables.

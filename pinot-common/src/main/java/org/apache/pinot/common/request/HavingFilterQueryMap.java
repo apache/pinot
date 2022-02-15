@@ -186,7 +186,6 @@ public class HavingFilterQueryMap implements org.apache.thrift.TBase<HavingFilte
         setFilterQueryMap((java.util.Map<java.lang.Integer,HavingFilterQuery>)value);
       }
       break;
-
     }
   }
 
@@ -195,7 +194,6 @@ public class HavingFilterQueryMap implements org.apache.thrift.TBase<HavingFilte
     switch (field) {
     case FILTER_QUERY_MAP:
       return getFilterQueryMap();
-
     }
     throw new java.lang.IllegalStateException();
   }
@@ -394,7 +392,6 @@ public class HavingFilterQueryMap implements org.apache.thrift.TBase<HavingFilte
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
-
   }
 
   private static class HavingFilterQueryMapTupleSchemeFactory implements org.apache.thrift.scheme.SchemeFactory {

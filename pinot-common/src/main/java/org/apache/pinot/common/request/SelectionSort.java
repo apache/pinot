@@ -210,7 +210,6 @@ public class SelectionSort implements org.apache.thrift.TBase<SelectionSort, Sel
         setIsAsc((java.lang.Boolean)value);
       }
       break;
-
     }
   }
 
@@ -222,7 +221,6 @@ public class SelectionSort implements org.apache.thrift.TBase<SelectionSort, Sel
 
     case IS_ASC:
       return isIsAsc();
-
     }
     throw new java.lang.IllegalStateException();
   }
@@ -446,7 +444,6 @@ public class SelectionSort implements org.apache.thrift.TBase<SelectionSort, Sel
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
-
   }
 
   private static class SelectionSortTupleSchemeFactory implements org.apache.thrift.scheme.SchemeFactory {

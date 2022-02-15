@@ -161,7 +161,6 @@ public class DataSource implements org.apache.thrift.TBase<DataSource, DataSourc
         setTableName((java.lang.String)value);
       }
       break;
-
     }
   }
 
@@ -170,7 +169,6 @@ public class DataSource implements org.apache.thrift.TBase<DataSource, DataSourc
     switch (field) {
     case TABLE_NAME:
       return getTableName();
-
     }
     throw new java.lang.IllegalStateException();
   }
@@ -348,7 +346,6 @@ public class DataSource implements org.apache.thrift.TBase<DataSource, DataSourc
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
-
   }
 
   private static class DataSourceTupleSchemeFactory implements org.apache.thrift.scheme.SchemeFactory {

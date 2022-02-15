@@ -31,7 +31,6 @@ public class PinotMeta {
   private Map<String, List<String>> _dataSchema = new HashMap<>();
 
   public PinotMeta() {
-
   }
 
   public PinotMeta(List<List<Object>> rows, Map<String, List<String>> dataSchema) {

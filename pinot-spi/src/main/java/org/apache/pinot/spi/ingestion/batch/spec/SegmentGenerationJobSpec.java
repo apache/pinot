@@ -60,7 +60,8 @@ public class SegmentGenerationJobSpec implements Serializable {
   private String _excludeFileNamePattern;
 
   /**
-   * Root directory of output segments, expected to have scheme configured in PinotFS.
+   * Root directory of output segments, expected to have scheme configured in PinotFS. Note that this
+   * is the input directory for jobs that push segments to the Pinot cluster.
    */
   private String _outputDirURI;
 

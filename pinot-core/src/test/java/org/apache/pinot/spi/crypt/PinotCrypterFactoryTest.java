@@ -58,12 +58,10 @@ public class PinotCrypterFactoryTest {
 
     @Override
     public void encrypt(File decryptedFile, File encryptedFile) {
-
     }
 
     @Override
     public void decrypt(File encryptedFile, File decryptedFile) {
-
     }
   }
 }

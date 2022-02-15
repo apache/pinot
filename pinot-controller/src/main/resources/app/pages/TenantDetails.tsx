@@ -468,14 +468,14 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
           </Grid>
           <Tooltip title="Uncompressed size of all data segments"  arrow placement="top-start">
           <Grid item xs={2}>
-            <strong>Reported Size:</strong> {tableSummary.reportedSize}
+            <strong>Reported Size:</strong> {Utils.formatBytes(tableSummary.reportedSize)}
           </Grid>
           </Tooltip>
           <Grid item xs={2}></Grid>
           <Tooltip title="Estimated size of all data segments, in case any servers are not reachable for actual size" arrow placement="top-start">
             <Grid item xs={2}>
               <strong>Estimated Size: </strong>
-              {tableSummary.estimatedSize}
+              {Utils.formatBytes(tableSummary.estimatedSize)}
             </Grid>
           </Tooltip>
           <Grid item xs={2}></Grid>

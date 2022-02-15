@@ -34,7 +34,6 @@ class ZstandardCompressor implements ChunkCompressor {
   static final ZstandardCompressor INSTANCE = new ZstandardCompressor();
 
   private ZstandardCompressor() {
-
   }
 
   @Override

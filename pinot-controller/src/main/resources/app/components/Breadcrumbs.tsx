@@ -95,7 +95,7 @@ const BreadcrumbsComponent = ({ ...props }) => {
     const breadcrumbs = [getClickableLabel(breadcrumbNameMap['/'], '/')];
     const paramsKeys = _.keys(props.match.params);
     if(paramsKeys.length){
-      const {tenantName, tableName, segmentName, instanceName, schemaName} = props.match.params;
+      const {tenantName, tableName, segmentName, instanceName, schemaName, query} = props.match.params;
       if((tenantName || instanceName) && tableName){
         breadcrumbs.push(
           getClickableLabel(
@@ -128,7 +128,7 @@ const BreadcrumbsComponent = ({ ...props }) => {
           getClickableLabel('Schemas', '/tables')
         );
       }
-      breadcrumbs.push(getLabel(segmentName || tableName || tenantName || instanceName || schemaName));
+      breadcrumbs.push(getLabel(segmentName || tableName || tenantName || instanceName || schemaName || 'Query Console'));
     } else {
       breadcrumbs.push(getLabel(breadcrumbNameMap[location.pathname]));
     }

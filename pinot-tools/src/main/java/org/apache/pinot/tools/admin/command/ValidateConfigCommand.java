@@ -66,14 +66,14 @@ public class ValidateConfigCommand extends AbstractBaseCommand implements Comman
   @CommandLine.Option(names = {"-tableConfig"}, required = false, description = "Validate the table config")
   private boolean _validateTableConfig;
 
-  @CommandLine.Option(names = {"-tableNames"}, required = false, 
+  @CommandLine.Option(names = {"-tableNames"}, required = false,
       description = "Space separated table names to be validated (default to validate ALL)")
   private String _tableNames;
 
   @CommandLine.Option(names = {"-schema"}, required = false, description = "Validate the schema")
   private boolean _validateSchema;
 
-  @CommandLine.Option(names = {"-schemaNames"}, required = false, 
+  @CommandLine.Option(names = {"-schemaNames"}, required = false,
       description = "Space separated schema names to be validated (default to validate ALL)")
   private String _schemaNames;
 

@@ -249,7 +249,6 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
 
   public BrokerRequest() {
     this.limit = 0;
-
   }
 
   /**
@@ -348,7 +347,6 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
     this.pinotQuery = null;
     this.orderBy = null;
     this.limit = 0;
-
   }
 
   @org.apache.thrift.annotation.Nullable
@@ -1010,7 +1008,6 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
         setLimit((java.lang.Integer)value);
       }
       break;
-
     }
   }
 
@@ -1073,7 +1070,6 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
 
     case LIMIT:
       return getLimit();
-
     }
     throw new java.lang.IllegalStateException();
   }
@@ -2253,7 +2249,6 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
-
   }
 
   private static class BrokerRequestTupleSchemeFactory implements org.apache.thrift.scheme.SchemeFactory {

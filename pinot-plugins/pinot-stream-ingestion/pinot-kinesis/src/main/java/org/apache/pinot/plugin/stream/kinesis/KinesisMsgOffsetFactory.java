@@ -31,7 +31,6 @@ public class KinesisMsgOffsetFactory implements StreamPartitionMsgOffsetFactory 
 
   @Override
   public void init(StreamConfig streamConfig) {
-
   }
 
   @Override

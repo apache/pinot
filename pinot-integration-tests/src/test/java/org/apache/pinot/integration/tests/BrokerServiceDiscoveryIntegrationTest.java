@@ -59,8 +59,8 @@ public class BrokerServiceDiscoveryIntegrationTest extends BaseClusterIntegratio
     startController();
     startBrokers(1);
     startServers(1);
-
   }
+
   @AfterClass
   public void tearDown()
           throws Exception {

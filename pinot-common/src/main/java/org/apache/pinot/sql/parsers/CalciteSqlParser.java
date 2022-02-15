@@ -49,7 +49,6 @@ import org.apache.calcite.sql.parser.babel.SqlBabelParserImpl;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.function.FunctionDefinitionRegistry;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -247,10 +246,8 @@ public class CalciteSqlParser {
     Function functionCall = expression.getFunctionCall();
     if (functionCall != null) {
       String operator = functionCall.getOperator();
-      try {
-        AggregationFunctionType.getAggregationFunctionType(operator);
+      if (AggregationFunctionType.isAggregationFunction(operator)) {
         return true;
-      } catch (IllegalArgumentException e) {
       }
       if (functionCall.getOperandsSize() > 0) {
         for (Expression operand : functionCall.getOperands()) {
@@ -593,7 +590,7 @@ public class CalciteSqlParser {
       } else if (columnExpression.getType() == ExpressionType.FUNCTION) {
         Function functionCall = columnExpression.getFunctionCall();
         String function = functionCall.getOperator();
-        if (FunctionDefinitionRegistry.isAggFunc(function)) {
+        if (AggregationFunctionType.isAggregationFunction(function)) {
           throw new SqlCompilationException(
               "Syntax error: Use of DISTINCT with aggregation functions is not supported");
         }
