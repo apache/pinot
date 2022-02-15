@@ -84,11 +84,13 @@ public class ServerChannels {
     _queryRouter = queryRouter;
     _brokerMetrics = brokerMetrics;
     _tlsConfig = tlsConfig;
-    try {
-      _threadLocalTSerializer = ThreadLocal.withInitial(() -> new TSerializer(new TCompactProtocol.Factory()));
-    } catch (TTransportException e) {
-      throw new RuntimeException("Failed to initialize Thrift Serializer", e);
-    }
+    _threadLocalTSerializer = ThreadLocal.withInitial(() -> {
+      try {
+        return new TSerializer(new TCompactProtocol.Factory());
+      } catch (TTransportException e) {
+        throw new RuntimeException("Failed to initialize Thrift Serializer", e);
+      }
+    });
   }
 
   public void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
