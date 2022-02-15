@@ -52,11 +52,11 @@ public class NotDocIdIteratorTest {
     assertEquals(notDocIdIterator.advance(1), 2);
     assertEquals(notDocIdIterator.next(), 3);
     assertEquals(notDocIdIterator.next(), 5);
-    assertEquals(notDocIdIterator.advance(7), 8);
-    assertEquals(notDocIdIterator.advance(13), 14);
-    assertEquals(notDocIdIterator.next(), 16);
+    assertEquals(notDocIdIterator.advance(7), 7);
+    assertEquals(notDocIdIterator.advance(13), 13);
+    assertEquals(notDocIdIterator.next(), 14);
     assertEquals(notDocIdIterator.advance(18), 19);
-    assertEquals(notDocIdIterator.advance(21), 22);
+    assertEquals(notDocIdIterator.advance(21), 21);
     assertEquals(notDocIdIterator.advance(26), Constants.EOF);
 
     notDocIdIterator = new NotDocIdIterator(new RangelessBitmapDocIdIterator(bitmap1), 25);

@@ -44,54 +44,23 @@ public class NotDocIdIterator implements BlockDocIdIterator {
   @Override
   public int next() {
     while (_nextDocId == _nextNonMatchingDocId) {
-      _nextDocId = _nextNonMatchingDocId + 1;
-
-      int nextMatchingDocId = _childDocIdIterator.next();
-
-      if (nextMatchingDocId == Constants.EOF) {
-        _nextNonMatchingDocId = _numDocs;
-      } else {
-        _nextNonMatchingDocId = nextMatchingDocId;
-      }
+      _nextDocId++;
+      int nextNonMatchingDocId = _childDocIdIterator.next();
+      _nextNonMatchingDocId = nextNonMatchingDocId == Constants.EOF ? _numDocs : nextNonMatchingDocId;
     }
-
     if (_nextDocId >= _numDocs) {
       return Constants.EOF;
     }
-
     return _nextDocId++;
   }
 
   @Override
   public int advance(int targetDocId) {
-    if (targetDocId == Constants.EOF || targetDocId > _numDocs) {
-      return Constants.EOF;
+    _nextDocId = targetDocId;
+    if (targetDocId > _nextNonMatchingDocId) {
+      int nextNonMatchingDocId = _childDocIdIterator.advance(targetDocId);
+      _nextNonMatchingDocId = nextNonMatchingDocId == Constants.EOF ? _numDocs : nextNonMatchingDocId;
     }
-
-    if (targetDocId < _nextDocId) {
-      return _nextDocId;
-    }
-
-    _nextDocId = targetDocId + 1;
-
-    int upperLimit = findUpperLimitGreaterThanDocId(targetDocId);
-
-    if (upperLimit == Constants.EOF) {
-      _nextNonMatchingDocId = _numDocs;
-    } else {
-      _nextNonMatchingDocId = upperLimit;
-    }
-
-    return _nextDocId++;
-  }
-
-  private int findUpperLimitGreaterThanDocId(int currentDocId) {
-    int result = _childDocIdIterator.advance(currentDocId);
-
-    while (result <= currentDocId && result != Constants.EOF) {
-      result = _childDocIdIterator.next();
-    }
-
-    return result;
+    return next();
   }
 }
