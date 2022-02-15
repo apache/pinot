@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -63,6 +64,13 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
  */
 public class LookupTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "lookUp";
+
+  private static final byte[] EMPTY_BYTES = new byte[0];
+  private static final int[] EMPTY_INTS = new int[0];
+  private static final long[] EMPTY_LONGS = new long[0];
+  private static final float[] EMPTY_FLOATS = new float[0];
+  private static final double[] EMPTY_DOUBLES = new double[0];
+  private static final String[] EMPTY_STRINGS = new String[0];
 
   private String _dimColumnName;
   private final List<String> _joinKeys = new ArrayList<>();
@@ -155,7 +163,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @FunctionalInterface
   private interface ValueAcceptor {
-    void accept(int index, Object value);
+    void accept(int index, @Nullable Object value);
   }
 
   private void lookup(ProjectionBlock projectionBlock, ValueAcceptor valueAcceptor) {
@@ -368,36 +376,48 @@ public class LookupTransformFunction extends BaseTransformFunction {
   private void setBytesSV(int index, Object value) {
     if (value instanceof byte[]) {
       _byteValuesSV[index] = (byte[]) value;
+    } else {
+      _byteValuesSV[index] = EMPTY_BYTES;
     }
   }
 
   private void setIntMV(int index, Object value) {
     if (value instanceof int[]) {
       _intValuesMV[index] = (int[]) value;
+    } else {
+      _intValuesMV[index] = EMPTY_INTS;
     }
   }
 
   private void setLongMV(int index, Object value) {
     if (value instanceof long[]) {
       _longValuesMV[index] = (long[]) value;
+    } else {
+      _longValuesMV[index] = EMPTY_LONGS;
     }
   }
 
   private void setFloatMV(int index, Object value) {
     if (value instanceof float[]) {
       _floatValuesMV[index] = (float[]) value;
+    } else {
+      _floatValuesMV[index] = EMPTY_FLOATS;
     }
   }
 
   private void setDoubleMV(int index, Object value) {
     if (value instanceof double[]) {
       _doubleValuesMV[index] = (double[]) value;
+    } else {
+      _doubleValuesMV[index] = EMPTY_DOUBLES;
     }
   }
 
   private void setStringMV(int index, Object value) {
     if (value instanceof String[]) {
       _stringValuesMV[index] = (String[]) value;
+    } else {
+      _stringValuesMV[index] = EMPTY_STRINGS;
     }
   }
 }
