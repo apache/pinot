@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests;
 
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -27,10 +28,11 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+
 /**
  * Integration test that starts one broker with auto-discovered echo service and test it
  */
-public class BrokerServiceDiscoveryIntegrationTest extends BaseClusterIntegrationTestSet {
+public class ControllerServiceDiscoveryIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String TENANT_NAME = "TestTenant";
 
   @Override
@@ -43,6 +45,14 @@ public class BrokerServiceDiscoveryIntegrationTest extends BaseClusterIntegratio
     return TENANT_NAME;
   }
 
+  @Override
+  public Map<String, Object> getDefaultControllerConfiguration() {
+    Map<String, Object> retVal = super.getDefaultControllerConfiguration();
+    retVal.put(CommonConstants.Controller.CONTROLLER_SERVICE_AUTO_DISCOVERY, true);
+    return retVal;
+  }
+
+  @Override
   protected PinotConfiguration getDefaultBrokerConfiguration() {
     PinotConfiguration config = new PinotConfiguration();
     config.setProperty(CommonConstants.Broker.BROKER_SERVICE_AUTO_DISCOVERY, true);
@@ -60,7 +70,6 @@ public class BrokerServiceDiscoveryIntegrationTest extends BaseClusterIntegratio
     startBrokers(1);
     startServers(1);
   }
-
   @AfterClass
   public void tearDown()
           throws Exception {
@@ -73,9 +82,11 @@ public class BrokerServiceDiscoveryIntegrationTest extends BaseClusterIntegratio
   }
 
   @Test
-  public void testBrokerExtraEndpointsAutoLoaded()
+  public void testControllerExtraEndpointsAutoLoaded()
       throws Exception {
-    String response = sendGetRequest(_brokerBaseApiUrl + "/test/echo/doge");
+    String response = sendGetRequest(_controllerBaseApiUrl + "/test/echo/doge");
+    Assert.assertEquals(response, "doge");
+    response = sendGetRequest(_brokerBaseApiUrl + "/test/echo/doge");
     Assert.assertEquals(response, "doge");
   }
 }
