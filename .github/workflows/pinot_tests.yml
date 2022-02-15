@@ -51,6 +51,21 @@ jobs:
         env:
           MAVEN_OPTS: -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25 -Dmaven.wagon.http.retryHandler.count=3 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
         run: .github/workflows/scripts/.pinot_linter.sh
+  special-test:
+    runs-on: ubuntu-latest
+    name: Pinot Stress Test for Specific test 
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up JDK 11
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Stress Test
+        env:
+          MAVEN_OPTS: -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25 -Dmaven.wagon.http.retryHandler.count=3 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
+          STRESS_TEST_MODULE: pinot-controller
+          STRESS_TEST_TARGET: SKIP
+        run: .github/workflows/scripts/.pinot_stress_test.sh
   unit-test:
     runs-on: ubuntu-latest
     strategy:
