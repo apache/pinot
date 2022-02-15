@@ -64,11 +64,11 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
   @CommandLine.Option(names = {"-zkAddress"}, required = false, description = "Address of Zookeeper.")
   private String _zkAddress = "localhost:2181";
 
-  @CommandLine.Option(names = {"-outputFormat"}, required = false, 
+  @CommandLine.Option(names = {"-outputFormat"}, required = false,
       description = "Data format to produce to Kafka, supported: json(default) and avro")
   private String _outputFormat = "json";
 
-  @CommandLine.Option(names = {"-millisBetweenMessages"}, required = false, 
+  @CommandLine.Option(names = {"-millisBetweenMessages"}, required = false,
       description = "Delay in milliseconds between messages (default 1000 ms)")
   private String _millisBetweenMessages = "1000";
 

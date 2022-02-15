@@ -288,7 +288,6 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
         setExpressions((java.util.List<java.lang.String>)value);
       }
       break;
-
     }
   }
 
@@ -303,7 +302,6 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
 
     case EXPRESSIONS:
       return getExpressions();
-
     }
     throw new java.lang.IllegalStateException();
   }
@@ -611,7 +609,6 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
-
   }
 
   private static class GroupByTupleSchemeFactory implements org.apache.thrift.scheme.SchemeFactory {

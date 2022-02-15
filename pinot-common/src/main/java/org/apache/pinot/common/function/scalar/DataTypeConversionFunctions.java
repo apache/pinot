@@ -30,7 +30,6 @@ import org.apache.pinot.spi.utils.BytesUtils;
  */
 public class DataTypeConversionFunctions {
   private DataTypeConversionFunctions() {
-
   }
 
   /**

@@ -16,25 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.client;
+package org.apache.pinot.tools.streams;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.pinot.client.controller.PinotControllerTransport;
-import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
 
 
-public class DummyPinotControllerTransport extends PinotControllerTransport {
+class RSVP {
+  private final String _eventId;
+  private final String _rsvpId;
+  private final JsonNode _payload;
 
-  @Override
-  public ControllerTenantBrokerResponse getBrokersFromController(String controllerAddress, String tenant) {
-    try {
-      String jsonString = "[{\"instanceName\": \"dummy\", \"host\" : \"dummy\", \"port\" : 8000}]";
-      ObjectMapper objectMapper = new ObjectMapper();
-      JsonNode dummyBrokerJsonResponse = objectMapper.readTree(jsonString);
-      return ControllerTenantBrokerResponse.fromJson(dummyBrokerJsonResponse);
-    } catch (Exception e) {
-    }
-    return ControllerTenantBrokerResponse.empty();
+  RSVP(String eventId, String rsvpId, JsonNode payload) {
+    _eventId = eventId;
+    _rsvpId = rsvpId;
+    _payload = payload;
+  }
+
+  public String getEventId() {
+    return _eventId;
+  }
+
+  public String getRsvpId() {
+    return _rsvpId;
+  }
+
+  public JsonNode getPayload() {
+    return _payload;
   }
 }

@@ -384,7 +384,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
                 forwardIndexCreator.putString((String) columnValueToIndex);
               } else if (columnValueToIndex instanceof byte[]) {
                 forwardIndexCreator.putBytes((byte[]) columnValueToIndex);
-              } 
+              }
               break;
             default:
               throw new IllegalStateException();

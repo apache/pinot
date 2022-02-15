@@ -36,14 +36,14 @@ public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implemen
   @CommandLine.Option(names = {"-personalAccessToken"}, required = true, description = "GitHub personal access token.")
   private String _personalAccessToken;
 
-  @CommandLine.Option(names = {"-kafkaBrokerList"}, 
+  @CommandLine.Option(names = {"-kafkaBrokerList"},
       description = "Kafka broker list of the kafka cluster to produce events.")
   private String _kafkaBrokerList = KafkaStarterUtils.DEFAULT_KAFKA_BROKER;
 
   @CommandLine.Option(names = {"-topic"}, required = true, description = "Name of kafka topic to publish events.")
   private String _topic;
 
-  @CommandLine.Option(names = {"-eventType"}, 
+  @CommandLine.Option(names = {"-eventType"},
       description = "Type of GitHub event. Supported types - pullRequestMergedEvent")
   private String _eventType = PULL_REQUEST_MERGED_EVENT_TYPE;
 
@@ -105,7 +105,8 @@ public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implemen
     PluginManager.get().init();
     if (PULL_REQUEST_MERGED_EVENT_TYPE.equals(_eventType)) {
       PullRequestMergedEventsStream pullRequestMergedEventsStream =
-          new PullRequestMergedEventsStream(_schemaFile, _topic, _kafkaBrokerList, _personalAccessToken);
+          new PullRequestMergedEventsStream(_schemaFile, _topic, _personalAccessToken,
+              PullRequestMergedEventsStream.getKafkaStreamDataProducer(_kafkaBrokerList));
       pullRequestMergedEventsStream.execute();
     } else {
       throw new UnsupportedOperationException("Event type " + _eventType + " is unsupported");

@@ -44,7 +44,7 @@ public final class FSTTraversal {
    *
    * @param reuse The {@link MatchResult} to reuse.
    * @param sequence Input sequence to look for in the automaton.
-   * @param start Start index in the sequence array. 
+   * @param start Start index in the sequence array.
    * @param length Length of the byte sequence, must be at least 1.
    * @param node The node to start traversal from, typically the {@linkplain FST#getRootNode() root node}.
    *
@@ -96,7 +96,7 @@ public final class FSTTraversal {
    * <code>sequence</code> and starting at node <code>node</code>.
    *
    * @param sequence Input sequence to look for in the automaton.
-   * @param start Start index in the sequence array. 
+   * @param start Start index in the sequence array.
    * @param length Length of the byte sequence, must be at least 1.
    * @param node The node to start traversal from, typically the {@linkplain FST#getRootNode() root node}.
    *

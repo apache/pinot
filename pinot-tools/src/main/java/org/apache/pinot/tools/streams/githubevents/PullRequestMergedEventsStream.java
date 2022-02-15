@@ -61,10 +61,9 @@ public class PullRequestMergedEventsStream {
 
   private StreamDataProducer _producer;
 
-  public PullRequestMergedEventsStream(String schemaFilePath, String topicName, String kafkaBrokerList,
-      String personalAccessToken)
+  public PullRequestMergedEventsStream(String schemaFilePath, String topicName, String personalAccessToken,
+      StreamDataProducer producer)
       throws Exception {
-
     _service = Executors.newFixedThreadPool(2);
     try {
       File pinotSchema;
@@ -83,12 +82,21 @@ public class PullRequestMergedEventsStream {
     }
     _topicName = topicName;
     _gitHubAPICaller = new GitHubAPICaller(personalAccessToken);
+    _producer = producer;
+  }
 
+  public static StreamDataProducer getKafkaStreamDataProducer()
+      throws Exception {
+    return getKafkaStreamDataProducer(KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
+  }
+
+  public static StreamDataProducer getKafkaStreamDataProducer(String kafkaBrokerList)
+      throws Exception {
     Properties properties = new Properties();
     properties.put("metadata.broker.list", kafkaBrokerList);
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
     properties.put("request.required.acks", "1");
-    _producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
+    return StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
   }
 
   public static void main(String[] args)
@@ -97,8 +105,7 @@ public class PullRequestMergedEventsStream {
     String schemaFile = args[1];
     String topic = "pullRequestMergedEvent";
     PullRequestMergedEventsStream stream =
-        new PullRequestMergedEventsStream(schemaFile, topic, KafkaStarterUtils.DEFAULT_KAFKA_BROKER,
-            personalAccessToken);
+        new PullRequestMergedEventsStream(schemaFile, topic, personalAccessToken, getKafkaStreamDataProducer());
     stream.execute();
   }
 

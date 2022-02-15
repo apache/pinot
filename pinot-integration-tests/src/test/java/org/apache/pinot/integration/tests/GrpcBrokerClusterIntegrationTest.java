@@ -105,7 +105,7 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
 
     startController(properties);
 
-    startBrokers(1, DEFAULT_BROKER_PORT, getZkUrl(), 
+    startBrokers(1, DEFAULT_BROKER_PORT, getZkUrl(),
         Collections.singletonMap(CommonConstants.Broker.BROKER_REQUEST_HANDLER_TYPE, "grpc"));
 
     // Enable gRPC server

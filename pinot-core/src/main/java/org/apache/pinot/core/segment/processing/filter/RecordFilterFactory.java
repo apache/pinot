@@ -27,7 +27,6 @@ import com.google.common.base.Preconditions;
 public final class RecordFilterFactory {
 
   private RecordFilterFactory() {
-
   }
 
   public enum RecordFilterType {

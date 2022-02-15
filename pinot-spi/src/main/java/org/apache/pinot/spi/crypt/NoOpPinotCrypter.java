@@ -34,7 +34,6 @@ public class NoOpPinotCrypter implements PinotCrypter {
 
   @Override
   public void init(PinotConfiguration config) {
-
   }
 
   @Override

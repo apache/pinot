@@ -51,7 +51,7 @@ import org.glassfish.jersey.server.ResourceConfig;
 
 
 /**
- * Utility class that generates Http {@link ListenerConfig} instances 
+ * Utility class that generates Http {@link ListenerConfig} instances
  * based on the properties provided by a property namespace in {@link PinotConfiguration}.
  */
 public final class ListenerConfigUtil {
@@ -72,7 +72,7 @@ public final class ListenerConfigUtil {
    * @param config property holders for controller configuration
    * @param namespace property namespace to extract from
    *
-   * @return List of {@link ListenerConfig} for which http listeners 
+   * @return List of {@link ListenerConfig} for which http listeners
    * should be created.
    */
   public static List<ListenerConfig> buildListenerConfigs(PinotConfiguration config, String namespace,

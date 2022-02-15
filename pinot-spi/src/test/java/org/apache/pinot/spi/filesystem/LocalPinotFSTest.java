@@ -210,7 +210,6 @@ public class LocalPinotFSTest {
       localPinotFS.length(firstTempDir.toURI());
       fail();
     } catch (IllegalArgumentException e) {
-
     }
   }
 }

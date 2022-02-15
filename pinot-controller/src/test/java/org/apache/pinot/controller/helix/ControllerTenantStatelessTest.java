@@ -117,7 +117,6 @@ public class ControllerTenantStatelessTest extends ControllerTest {
       sendGetRequest(_controllerRequestURLBuilder.forServerTenantGet("doesn't_exist"));
       Assert.fail();
     } catch (Exception e) {
-
     }
   }
 

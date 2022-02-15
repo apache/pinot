@@ -34,7 +34,7 @@ public interface FSTSerializer {
    *
    * @param fst The automaton to serialize.
    * @param os The output stream to serialize to.
-   * @param <T> A subclass of {@link OutputStream}, returned for chaining. 
+   * @param <T> A subclass of {@link OutputStream}, returned for chaining.
    * @return Returns <code>T</code> for chaining.
    * @throws IOException Rethrown if an I/O error occurs.
    */

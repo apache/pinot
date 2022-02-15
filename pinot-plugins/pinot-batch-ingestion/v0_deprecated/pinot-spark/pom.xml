@@ -385,6 +385,14 @@
           <groupId>commons-pool</groupId>
           <artifactId>commons-pool</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>org.scala-lang</groupId>
+          <artifactId>scala-library</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.scala-lang</groupId>
+          <artifactId>scala-reflect</artifactId>
+        </exclusion>
       </exclusions>
       <scope>test</scope>
     </dependency>
@@ -435,6 +443,17 @@
       <artifactId>scala-xml_${scala.binary.version}</artifactId>
       <version>1.0.6</version>
       <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.scala-lang</groupId>
+          <artifactId>scala-library</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.scala-lang</groupId>
+      <artifactId>scala-reflect</artifactId>
+      <version>${scala.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>
@@ -452,6 +471,10 @@
         <exclusion>
           <groupId>org.apache.curator</groupId>
           <artifactId>curator-recipes</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.scala-lang</groupId>
+          <artifactId>scala-library</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -488,6 +511,10 @@
           <groupId>org.apache.orc</groupId>
           <artifactId>orc-core</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>org.scala-lang</groupId>
+          <artifactId>scala-reflect</artifactId>
+        </exclusion>
       </exclusions>
       <scope>test</scope>
     </dependency>
@@ -503,6 +530,14 @@
         <exclusion>
           <groupId>org.objenesis</groupId>
           <artifactId>objenesis</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.scala-lang</groupId>
+          <artifactId>scala-library</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.scala-lang</groupId>
+          <artifactId>scala-reflect</artifactId>
         </exclusion>
       </exclusions>
       <scope>test</scope>

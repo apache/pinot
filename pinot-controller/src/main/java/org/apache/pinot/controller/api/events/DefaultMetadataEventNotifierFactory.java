@@ -28,6 +28,5 @@ public class DefaultMetadataEventNotifierFactory extends MetadataEventNotifierFa
   }
 
   public void init(PinotConfiguration configuration) {
-
   }
 }

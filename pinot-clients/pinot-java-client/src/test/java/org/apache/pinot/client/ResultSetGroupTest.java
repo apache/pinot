@@ -185,7 +185,6 @@ public class ResultSetGroupTest {
     @Override
     public void close()
         throws PinotClientException {
-
     }
   }
 

@@ -83,7 +83,6 @@ public class PreparedStatementTest {
     @Override
     public void close()
         throws PinotClientException {
-
     }
   }
 

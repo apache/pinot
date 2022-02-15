@@ -73,7 +73,6 @@ public class PinotAppConfigs {
   @JsonCreator
   @SuppressWarnings("unused")
   public PinotAppConfigs() {
-
   }
 
   public PinotAppConfigs(PinotConfiguration pinotConfig) {

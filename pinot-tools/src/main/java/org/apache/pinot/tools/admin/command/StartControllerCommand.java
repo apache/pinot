@@ -51,7 +51,7 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
   @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "host name for controller.")
   private String _controllerHost;
 
-  @CommandLine.Option(names = {"-controllerPort"}, required = false, 
+  @CommandLine.Option(names = {"-controllerPort"}, required = false,
       description = "Port number to start the controller at.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
@@ -168,7 +168,6 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
 
   @Override
   public void cleanup() {
-
   }
 
   @Override

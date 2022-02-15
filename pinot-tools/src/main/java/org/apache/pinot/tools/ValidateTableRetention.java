@@ -31,11 +31,11 @@ public class ValidateTableRetention extends AbstractBaseCommand implements Comma
   @CommandLine.Option(names = {"-clusterName"}, required = true, description = "Pinot cluster name")
   private String _clusterName;
 
-  @CommandLine.Option(names = {"-tableNamePattern"}, required = false, 
+  @CommandLine.Option(names = {"-tableNamePattern"}, required = false,
       description = "Optional table name pattern trigger to add inverted index, default: null (match any table name)")
   private String _tableNamePattern = null;
 
-  @CommandLine.Option(names = {"-durationInDaysThreshold"}, required = false, 
+  @CommandLine.Option(names = {"-durationInDaysThreshold"}, required = false,
       description = "Optional duration in days threshold to log a warning for table with too large retention time,"
           + " default: " + TableRetentionValidator.DEFAULT_DURATION_IN_DAYS_THRESHOLD)
   private long _durationInDaysThreshold = TableRetentionValidator.DEFAULT_DURATION_IN_DAYS_THRESHOLD;

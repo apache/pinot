@@ -167,7 +167,6 @@ public class Identifier implements org.apache.thrift.TBase<Identifier, Identifie
         setName((java.lang.String)value);
       }
       break;
-
     }
   }
 
@@ -176,7 +175,6 @@ public class Identifier implements org.apache.thrift.TBase<Identifier, Identifie
     switch (field) {
     case NAME:
       return getName();
-
     }
     throw new java.lang.IllegalStateException();
   }
@@ -354,7 +352,6 @@ public class Identifier implements org.apache.thrift.TBase<Identifier, Identifie
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
-
   }
 
   private static class IdentifierTupleSchemeFactory implements org.apache.thrift.scheme.SchemeFactory {

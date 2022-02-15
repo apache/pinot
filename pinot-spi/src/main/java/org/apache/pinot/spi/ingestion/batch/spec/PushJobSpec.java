@@ -48,6 +48,22 @@ public class PushJobSpec implements Serializable {
   private String _segmentUriPrefix;
   private String _segmentUriSuffix;
 
+  /**
+   * Segments to push file name pattern, supported glob pattern.
+   * Sample usage:
+   *    'glob:2022/*.tar.gz' will include all segments under _outputDirURI/2022/, but not sub directories;
+   *    'glob:**\/stats_*.tar.gz' will include all the segments starting with "stats_" under _outputDirURI recursively.
+   */
+  private String _pushFileNamePattern;
+
+  public String getPushFileNamePattern() {
+    return _pushFileNamePattern;
+  }
+
+  public void setPushFileNamePattern(String pushFileNamePattern) {
+    _pushFileNamePattern = pushFileNamePattern;
+  }
+
   public String getSegmentUriPrefix() {
     return _segmentUriPrefix;
   }

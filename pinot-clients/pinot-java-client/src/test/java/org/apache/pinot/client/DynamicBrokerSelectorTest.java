@@ -131,5 +131,4 @@ public class DynamicBrokerSelectorTest {
 
     Mockito.verify(_mockZkClient, times(1)).close();
   }
-
 }

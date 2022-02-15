@@ -99,7 +99,6 @@ public class PulsarStreamLevelConsumer implements StreamLevelConsumer {
 
   @Override
   public void commit() {
-
   }
 
   @Override

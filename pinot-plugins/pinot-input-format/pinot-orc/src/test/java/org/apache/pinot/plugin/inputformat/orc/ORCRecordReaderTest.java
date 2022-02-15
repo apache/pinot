@@ -1,5 +1,4 @@
 package org.apache.pinot.plugin.inputformat.orc;
-
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,7 +17,6 @@ package org.apache.pinot.plugin.inputformat.orc;
  * specific language governing permissions and limitations
  * under the License.
  */
-
 import java.io.File;
 import java.util.List;
 import java.util.Map;
