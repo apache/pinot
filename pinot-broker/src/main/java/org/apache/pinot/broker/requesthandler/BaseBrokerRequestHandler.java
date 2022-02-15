@@ -2023,6 +2023,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         || !QueryOptionsUtils.isResponseFormatSQL(queryOptions)) {
       throw new IllegalStateException("SQL query should always have response format and group-by mode set to SQL");
     }
+
+    if (pinotQuery.getDataSource().getSubquery() != null) {
+      validateRequest(pinotQuery.getDataSource().getSubquery(), queryResponseLimit);
+    }
   }
 
   /**
