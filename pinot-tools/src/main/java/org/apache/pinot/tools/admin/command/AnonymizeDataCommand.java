@@ -40,7 +40,7 @@ public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Co
           + "whether the tool should extract the filter columns, generate data or generate queries")
   private String _action;
 
-  @CommandLine.Option(names = {"-inputSegmentsDir"}, 
+  @CommandLine.Option(names = {"-inputSegmentsDir"},
       description = "Absolute path of directory containing Pinot table segments")
   private String _inputSegmentsDir;
 
@@ -54,7 +54,7 @@ public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Co
   @CommandLine.Option(names = {"-tableName"}, description = "Table name to use for generating queries")
   private String _tableName;
 
-  @CommandLine.Option(names = {"-queryDir"}, 
+  @CommandLine.Option(names = {"-queryDir"},
       description = "Absolute path of directory containing the original query file and where the generated query file"
           + " will be written into")
   private String _queryDir;

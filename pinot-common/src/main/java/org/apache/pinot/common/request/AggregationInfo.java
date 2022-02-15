@@ -327,7 +327,6 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
         setExpressions((java.util.List<java.lang.String>)value);
       }
       break;
-
     }
   }
 
@@ -345,7 +344,6 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
 
     case EXPRESSIONS:
       return getExpressions();
-
     }
     throw new java.lang.IllegalStateException();
   }
@@ -706,7 +704,6 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
-
   }
 
   private static class AggregationInfoTupleSchemeFactory implements org.apache.thrift.scheme.SchemeFactory {

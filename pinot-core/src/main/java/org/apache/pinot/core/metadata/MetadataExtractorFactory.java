@@ -31,7 +31,6 @@ public class MetadataExtractorFactory {
 
   // Prevent factory from being instantiated
   private MetadataExtractorFactory() {
-
   }
 
   public static MetadataExtractor create(String metadataClassName) {

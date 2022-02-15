@@ -78,7 +78,7 @@ public class BenchmarkFilteredAggregations extends BaseQueriesTest {
   private int _numRows;
   @Param("0")
   int _intBaseValue;
-  
+
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
 

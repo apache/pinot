@@ -29,7 +29,6 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 public class MutableFSTUtils {
 
   private MutableFSTUtils() {
-
   }
 
   public static boolean fstEquals(Object thisFstObj,

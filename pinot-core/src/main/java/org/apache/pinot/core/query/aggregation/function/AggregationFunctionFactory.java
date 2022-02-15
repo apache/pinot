@@ -165,13 +165,12 @@ public class AggregationFunctionFactory {
                 throw new IllegalArgumentException("Third argument of lastWithTime Function should be literal."
                     + " The function can be used as lastWithTime(dataColumn, timeColumn, 'dataType')");
               }
-              FieldSpec.DataType fieldDataType
-                  = FieldSpec.DataType.valueOf(dataType.getLiteral().toUpperCase());
+              FieldSpec.DataType fieldDataType = FieldSpec.DataType.valueOf(dataType.getLiteral().toUpperCase());
               switch (fieldDataType) {
                 case BOOLEAN:
                 case INT:
-                  return new LastIntValueWithTimeAggregationFunction(
-                      firstArgument, timeCol, fieldDataType == FieldSpec.DataType.BOOLEAN);
+                  return new LastIntValueWithTimeAggregationFunction(firstArgument, timeCol,
+                      fieldDataType == FieldSpec.DataType.BOOLEAN);
                 case LONG:
                   return new LastLongValueWithTimeAggregationFunction(firstArgument, timeCol);
                 case FLOAT:
@@ -199,6 +198,8 @@ public class AggregationFunctionFactory {
             return new DistinctCountHLLAggregationFunction(arguments);
           case DISTINCTCOUNTRAWHLL:
             return new DistinctCountRawHLLAggregationFunction(arguments);
+          case DISTINCTCOUNTSMARTHLL:
+            return new DistinctCountSmartHLLAggregationFunction(arguments);
           case FASTHLL:
             return new FastHLLAggregationFunction(firstArgument);
           case DISTINCTCOUNTTHETASKETCH:

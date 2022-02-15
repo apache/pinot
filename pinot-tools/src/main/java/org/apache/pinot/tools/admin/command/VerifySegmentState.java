@@ -43,7 +43,7 @@ public class VerifySegmentState extends AbstractBaseCommand implements Command {
   @CommandLine.Option(names = {"-clusterName"}, required = true, description = "Helix cluster name")
   String _clusterName;
 
-  @CommandLine.Option(names = {"-tablePrefix"}, required = false, 
+  @CommandLine.Option(names = {"-tablePrefix"}, required = false,
       description = "Table name prefix. (Ex: myTable, my or myTable_OFFLINE)")
   String _tablePrefix = "";
 

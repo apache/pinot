@@ -37,7 +37,7 @@ public class PluginClassLoader extends URLClassLoader {
   public PluginClassLoader(URL[] urls, ClassLoader parent) {
     super(urls, parent);
     _classLoader = PluginClassLoader.class.getClassLoader();
-    
+
     /**
      * ClassLoader in java9+ does not extend URLClassLoader.
      * If the class is not found in the parent classloader,
@@ -53,7 +53,6 @@ public class PluginClassLoader extends URLClassLoader {
         //this should never happen
         ExceptionUtils.rethrow(e);
       }
-      
       _addUrlMethod.setAccessible(true);
     }
 

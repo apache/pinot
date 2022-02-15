@@ -200,7 +200,6 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
     this.limit = 10;
 
     this.offset = 0;
-
   }
 
   /**
@@ -723,7 +722,6 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
         setExplain((java.lang.Boolean)value);
       }
       break;
-
     }
   }
 
@@ -765,7 +763,6 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
 
     case EXPLAIN:
       return isExplain();
-
     }
     throw new java.lang.IllegalStateException();
   }
@@ -1571,7 +1568,6 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
-
   }
 
   private static class PinotQueryTupleSchemeFactory implements org.apache.thrift.scheme.SchemeFactory {

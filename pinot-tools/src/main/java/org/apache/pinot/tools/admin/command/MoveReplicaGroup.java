@@ -88,7 +88,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
       description = "Zookeeper cluster path(Ex: /pinot")
   private String _zkPath;
 
-  @CommandLine.Option(names = {"-exec"}, required = false, 
+  @CommandLine.Option(names = {"-exec"}, required = false,
       description = "Execute replica group move. dryRun(default) if not specified")
   private boolean _exec = false;
 
@@ -121,7 +121,6 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
 
   @Override
   public void cleanup() {
-
   }
 
   public boolean execute()

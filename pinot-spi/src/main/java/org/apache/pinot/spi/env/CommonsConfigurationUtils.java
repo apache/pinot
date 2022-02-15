@@ -49,8 +49,8 @@ public abstract class CommonsConfigurationUtils {
     try {
       PropertiesConfiguration propertiesConfiguration = new PropertiesConfiguration();
 
-      // Commons Configuration 1.10 does not support file path containing '%'. 
-      // Explicitly providing the input stream on load bypasses the problem. 
+      // Commons Configuration 1.10 does not support file path containing '%'.
+      // Explicitly providing the input stream on load bypasses the problem.
       propertiesConfiguration.setFile(file);
       if (file.exists()) {
         propertiesConfiguration.load(new FileInputStream(file));

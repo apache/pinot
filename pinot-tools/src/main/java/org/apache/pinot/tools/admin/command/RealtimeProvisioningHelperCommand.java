@@ -59,36 +59,36 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   @CommandLine.Option(names = {"-tableConfigFile"}, required = true)
   private String _tableConfigFile;
 
-  @CommandLine.Option(names = {"-numPartitions"}, required = true, 
+  @CommandLine.Option(names = {"-numPartitions"}, required = true,
       description = "number of stream partitions for the table")
   private int _numPartitions;
 
-  @CommandLine.Option(names = {"-retentionHours"}, 
+  @CommandLine.Option(names = {"-retentionHours"},
       description = "Number of recent hours queried most often" + "\n\t(-pushFrequency is ignored)")
   private int _retentionHours;
 
-  @CommandLine.Option(names = {"-pushFrequency"}, 
+  @CommandLine.Option(names = {"-pushFrequency"},
       description = "Frequency with which offline table pushes happen, if this is a hybrid table"
           + "\n\t(hourly,daily,weekly,monthly). Do not specify if realtime-only table")
   private String _pushFrequency;
 
-  @CommandLine.Option(names = {"-numHosts"}, 
+  @CommandLine.Option(names = {"-numHosts"},
       description = "number of hosts as comma separated values (default 2,4,6,8,10,12,14,16)")
   private String _numHosts = "2,4,6,8,10,12,14,16";
 
-  @CommandLine.Option(names = {"-numHours"}, 
+  @CommandLine.Option(names = {"-numHours"},
       description = "number of hours to consume as comma separated values (default 2,3,4,5,6,7,8,9,10,11,12)")
   private String _numHours = "2,3,4,5,6,7,8,9,10,11,12";
 
-  @CommandLine.Option(names = {"-sampleCompletedSegmentDir"}, required = false, 
+  @CommandLine.Option(names = {"-sampleCompletedSegmentDir"}, required = false,
       description = "Consume from the topic for n hours and provide the path of the segment dir after it completes")
   private String _sampleCompletedSegmentDir;
 
-  @CommandLine.Option(names = {"-schemaWithMetadataFile"}, required = false, 
+  @CommandLine.Option(names = {"-schemaWithMetadataFile"}, required = false,
       description = "Schema file with extra information on each column describing characteristics of data")
   private String _schemaWithMetadataFile;
 
-  @CommandLine.Option(names = {"-numRows"}, required = false, 
+  @CommandLine.Option(names = {"-numRows"}, required = false,
       description = "Number of rows to be generated based on schema with metadata file")
   private int _numRows;
 
@@ -96,7 +96,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
       + "ingested on any one stream partition (assumed all partitions are uniform)")
   private int _ingestionRate;
 
-  @CommandLine.Option(names = {"-maxUsableHostMemory"}, required = false, 
+  @CommandLine.Option(names = {"-maxUsableHostMemory"}, required = false,
       description = "Maximum memory per host that can be used for pinot data (e.g. 250G, 100M). Default 48g")
   private String _maxUsableHostMemory = "48G";
 

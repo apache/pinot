@@ -113,7 +113,6 @@ public class BootstrapTableCommand extends AbstractBaseAdminCommand implements C
 
   @Override
   public void cleanup() {
-
   }
 
   @Override

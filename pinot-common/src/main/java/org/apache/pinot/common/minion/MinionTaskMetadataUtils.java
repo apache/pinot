@@ -33,7 +33,6 @@ import org.apache.zookeeper.data.Stat;
 public final class MinionTaskMetadataUtils {
 
   private MinionTaskMetadataUtils() {
-
   }
 
   /**

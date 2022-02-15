@@ -30,7 +30,6 @@ public class ChunkCompressorFactory {
 
   // Private constructor to avoid object instantiation
   private ChunkCompressorFactory() {
-
   }
 
   /**

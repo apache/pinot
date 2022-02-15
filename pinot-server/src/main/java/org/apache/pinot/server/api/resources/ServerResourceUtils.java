@@ -32,7 +32,6 @@ public class ServerResourceUtils {
 
   // Disable instantiation.
   private ServerResourceUtils() {
-
   }
 
   public static TableDataManager checkGetTableDataManager(ServerInstance serverInstance, String tableName) {

@@ -56,7 +56,6 @@ public class OffsetCriteria {
   private String _offsetString;
 
   private OffsetCriteria() {
-
   }
 
   private void setOffsetType(OffsetType offsetType) {

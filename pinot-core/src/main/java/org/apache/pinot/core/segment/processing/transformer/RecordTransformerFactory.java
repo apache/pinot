@@ -23,7 +23,6 @@ package org.apache.pinot.core.segment.processing.transformer;
  */
 public final class RecordTransformerFactory {
   private RecordTransformerFactory() {
-
   }
 
   /**

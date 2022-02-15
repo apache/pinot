@@ -232,7 +232,6 @@ public class Function implements org.apache.thrift.TBase<Function, Function._Fie
         setOperands((java.util.List<Expression>)value);
       }
       break;
-
     }
   }
 
@@ -244,7 +243,6 @@ public class Function implements org.apache.thrift.TBase<Function, Function._Fie
 
     case OPERANDS:
       return getOperands();
-
     }
     throw new java.lang.IllegalStateException();
   }
@@ -490,7 +488,6 @@ public class Function implements org.apache.thrift.TBase<Function, Function._Fie
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
-
   }
 
   private static class FunctionTupleSchemeFactory implements org.apache.thrift.scheme.SchemeFactory {

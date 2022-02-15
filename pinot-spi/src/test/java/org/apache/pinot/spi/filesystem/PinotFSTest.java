@@ -145,13 +145,11 @@ public class PinotFSTest {
     @Override
     public void copyToLocalFile(URI srcUri, File dstFile)
         throws Exception {
-
     }
 
     @Override
     public void copyFromLocalFile(File srcFile, URI dstUri)
         throws Exception {
-
     }
 
     @Override

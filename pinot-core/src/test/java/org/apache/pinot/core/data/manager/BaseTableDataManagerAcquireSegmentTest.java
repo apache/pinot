@@ -268,7 +268,6 @@ public class BaseTableDataManagerAcquireSegmentTest {
     try {
       Thread.sleep(runTimeSec * 1000);
     } catch (InterruptedException e) {
-
     }
     _closing = true;
 

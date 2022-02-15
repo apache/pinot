@@ -51,14 +51,14 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
   @CommandLine.Option(names = {"-serverPort"}, required = false, description = "Port number to start the server at.")
   private int _serverPort = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
 
-  @CommandLine.Option(names = {"-serverAdminPort"}, required = false, 
+  @CommandLine.Option(names = {"-serverAdminPort"}, required = false,
       description = "Port number to serve the server admin API at.")
   private int _serverAdminPort = CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
 
   @CommandLine.Option(names = {"-dataDir"}, required = false, description = "Path to directory containing data.")
   private String _dataDir = PinotConfigUtils.TMP_DIR + "data/pinotServerData";
 
-  @CommandLine.Option(names = {"-segmentDir"}, required = false, 
+  @CommandLine.Option(names = {"-segmentDir"}, required = false,
       description = "Path to directory containing segments.")
   private String _segmentDir = PinotConfigUtils.TMP_DIR + "data/pinotSegments";
 
@@ -176,7 +176,6 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
 
   @Override
   public void cleanup() {
-
   }
 
   @Override

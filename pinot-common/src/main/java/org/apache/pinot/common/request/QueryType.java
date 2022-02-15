@@ -330,7 +330,6 @@ public class QueryType implements org.apache.thrift.TBase<QueryType, QueryType._
         setHasHaving((java.lang.Boolean)value);
       }
       break;
-
     }
   }
 
@@ -351,7 +350,6 @@ public class QueryType implements org.apache.thrift.TBase<QueryType, QueryType._
 
     case HAS_HAVING:
       return isHasHaving();
-
     }
     throw new java.lang.IllegalStateException();
   }
@@ -701,7 +699,6 @@ public class QueryType implements org.apache.thrift.TBase<QueryType, QueryType._
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
-
   }
 
   private static class QueryTypeTupleSchemeFactory implements org.apache.thrift.scheme.SchemeFactory {

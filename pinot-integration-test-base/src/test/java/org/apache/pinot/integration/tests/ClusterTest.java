@@ -361,7 +361,6 @@ public abstract class ClusterTest extends ControllerTest {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-
   }
 
   protected void stopMinion() {
