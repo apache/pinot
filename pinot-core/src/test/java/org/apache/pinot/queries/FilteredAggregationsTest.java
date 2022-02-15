@@ -299,6 +299,20 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     testQuery(filterQuery, nonFilterQuery);
   }
 
+  @Test
+  public void testMixedAggregationsOfSameType() {
+    String filterQuery = "SELECT SUM(INT_COL), SUM(INT_COL) FILTER(WHERE INT_COL > 25000) AS total_sum FROM MyTable";
+    String nonFilterQuery =
+        "SELECT SUM(INT_COL), SUM(CASE WHEN INT_COL > 25000 THEN INT_COL ELSE 0 END) AS total_sum FROM MyTable";
+    testQuery(filterQuery, nonFilterQuery);
+
+    filterQuery = "SELECT SUM(INT_COL), SUM(INT_COL) FILTER(WHERE INT_COL < 5000) AS total_sum, "
+        + "SUM(INT_COL) FILTER(WHERE INT_COL > 12345) AS total_sum2 FROM MyTable";
+    nonFilterQuery = "SELECT SUM(INT_COL), SUM(CASE WHEN INT_COL < 5000 THEN INT_COL ELSE 0 END) AS total_sum, "
+        + "SUM(CASE WHEN INT_COL > 12345 THEN INT_COL ELSE 0 END) AS total_sum2 FROM MyTable";
+    testQuery(filterQuery, nonFilterQuery);
+  }
+
   @Test(expectedExceptions = IllegalStateException.class)
   public void testGroupBySupport() {
     String filterQuery = "SELECT MIN(INT_COL) FILTER(WHERE NO_INDEX_COL > 2), MAX(INT_COL) FILTER(WHERE INT_COL > 2) "

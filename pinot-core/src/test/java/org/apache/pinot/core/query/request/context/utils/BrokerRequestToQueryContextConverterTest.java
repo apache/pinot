@@ -39,6 +39,8 @@ import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.MinAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.SumAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.testng.annotations.Test;
@@ -579,16 +581,140 @@ public class BrokerRequestToQueryContextConverterTest {
 
   @Test
   public void testFilteredAggregations() {
-    String query = "SELECT COUNT(*) FILTER(WHERE foo > 5), COUNT(*) FILTER(WHERE foo < 6) FROM testTable WHERE bar > 0";
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
-    List<Pair<AggregationFunction, FilterContext>> filteredAggregationList =
-        queryContext.getFilteredAggregationFunctions();
-    assertNotNull(filteredAggregationList);
-    assertEquals(filteredAggregationList.size(), 2);
-    assertTrue(filteredAggregationList.get(0).getLeft() instanceof CountAggregationFunction);
-    assertEquals(filteredAggregationList.get(0).getRight().toString(), "foo > '5'");
-    assertTrue(filteredAggregationList.get(1).getLeft() instanceof CountAggregationFunction);
-    assertEquals(filteredAggregationList.get(1).getRight().toString(), "foo < '6'");
+    {
+      String query =
+          "SELECT COUNT(*) FILTER(WHERE foo > 5), COUNT(*) FILTER(WHERE foo < 6) FROM testTable WHERE bar > 0";
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
+
+      AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
+      assertNotNull(aggregationFunctions);
+      assertEquals(aggregationFunctions.length, 2);
+      assertTrue(aggregationFunctions[0] instanceof CountAggregationFunction);
+      assertTrue(aggregationFunctions[1] instanceof CountAggregationFunction);
+
+      List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions =
+          queryContext.getFilteredAggregationFunctions();
+      assertNotNull(filteredAggregationFunctions);
+      assertEquals(filteredAggregationFunctions.size(), 2);
+      assertTrue(filteredAggregationFunctions.get(0).getLeft() instanceof CountAggregationFunction);
+      assertEquals(filteredAggregationFunctions.get(0).getRight().toString(), "foo > '5'");
+      assertTrue(filteredAggregationFunctions.get(1).getLeft() instanceof CountAggregationFunction);
+      assertEquals(filteredAggregationFunctions.get(1).getRight().toString(), "foo < '6'");
+
+      Map<FunctionContext, Integer> aggregationIndexMap = queryContext.getAggregationFunctionIndexMap();
+      assertNotNull(aggregationIndexMap);
+      assertEquals(aggregationIndexMap.size(), 1);
+      for (Map.Entry<FunctionContext, Integer> entry : aggregationIndexMap.entrySet()) {
+        FunctionContext aggregation = entry.getKey();
+        int index = entry.getValue();
+        assertEquals(aggregation.toString(), "count(*)");
+        assertTrue(index == 0 || index == 1);
+      }
+
+      Map<Pair<FunctionContext, FilterContext>, Integer> filteredAggregationsIndexMap =
+          queryContext.getFilteredAggregationsIndexMap();
+      assertNotNull(filteredAggregationsIndexMap);
+      assertEquals(filteredAggregationsIndexMap.size(), 2);
+      for (Map.Entry<Pair<FunctionContext, FilterContext>, Integer> entry : filteredAggregationsIndexMap.entrySet()) {
+        Pair<FunctionContext, FilterContext> pair = entry.getKey();
+        FunctionContext aggregation = pair.getLeft();
+        FilterContext filter = pair.getRight();
+        int index = entry.getValue();
+        assertEquals(aggregation.toString(), "count(*)");
+        switch (index) {
+          case 0:
+            assertEquals(filter.toString(), "foo > '5'");
+            break;
+          case 1:
+            assertEquals(filter.toString(), "foo < '6'");
+            break;
+          default:
+            fail();
+            break;
+        }
+      }
+    }
+
+    {
+      String query =
+          "SELECT SUM(salary), SUM(salary) FILTER(WHERE salary IS NOT NULL), MIN(salary), MIN(salary) FILTER(WHERE "
+              + "salary > 50000) FROM testTable WHERE bar > 0";
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
+
+      AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
+      assertNotNull(aggregationFunctions);
+      assertEquals(aggregationFunctions.length, 4);
+      assertTrue(aggregationFunctions[0] instanceof SumAggregationFunction);
+      assertTrue(aggregationFunctions[1] instanceof SumAggregationFunction);
+      assertTrue(aggregationFunctions[2] instanceof MinAggregationFunction);
+      assertTrue(aggregationFunctions[3] instanceof MinAggregationFunction);
+
+      List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions =
+          queryContext.getFilteredAggregationFunctions();
+      assertNotNull(filteredAggregationFunctions);
+      assertEquals(filteredAggregationFunctions.size(), 4);
+      assertTrue(filteredAggregationFunctions.get(0).getLeft() instanceof SumAggregationFunction);
+      assertNull(filteredAggregationFunctions.get(0).getRight());
+      assertTrue(filteredAggregationFunctions.get(1).getLeft() instanceof SumAggregationFunction);
+      assertEquals(filteredAggregationFunctions.get(1).getRight().toString(), "salary IS NOT NULL");
+      assertTrue(filteredAggregationFunctions.get(2).getLeft() instanceof MinAggregationFunction);
+      assertNull(filteredAggregationFunctions.get(2).getRight());
+      assertTrue(filteredAggregationFunctions.get(3).getLeft() instanceof MinAggregationFunction);
+      assertEquals(filteredAggregationFunctions.get(3).getRight().toString(), "salary > '50000'");
+
+      Map<FunctionContext, Integer> aggregationIndexMap = queryContext.getAggregationFunctionIndexMap();
+      assertNotNull(aggregationIndexMap);
+      assertEquals(aggregationIndexMap.size(), 2);
+      for (Map.Entry<FunctionContext, Integer> entry : aggregationIndexMap.entrySet()) {
+        FunctionContext aggregation = entry.getKey();
+        int index = entry.getValue();
+        switch (index) {
+          case 0:
+          case 1:
+            assertEquals(aggregation.toString(), "sum(salary)");
+            break;
+          case 2:
+          case 3:
+            assertEquals(aggregation.toString(), "min(salary)");
+            break;
+          default:
+            fail();
+            break;
+        }
+      }
+
+      Map<Pair<FunctionContext, FilterContext>, Integer> filteredAggregationsIndexMap =
+          queryContext.getFilteredAggregationsIndexMap();
+      assertNotNull(filteredAggregationsIndexMap);
+      assertEquals(filteredAggregationsIndexMap.size(), 4);
+      for (Map.Entry<Pair<FunctionContext, FilterContext>, Integer> entry : filteredAggregationsIndexMap.entrySet()) {
+        Pair<FunctionContext, FilterContext> pair = entry.getKey();
+        FunctionContext aggregation = pair.getLeft();
+        FilterContext filter = pair.getRight();
+        int index = entry.getValue();
+        switch (index) {
+          case 0:
+            assertEquals(aggregation.toString(), "sum(salary)");
+            assertNull(filter);
+            break;
+          case 1:
+            assertEquals(aggregation.toString(), "sum(salary)");
+            assertEquals(filter.toString(), "salary IS NOT NULL");
+            break;
+          case 2:
+            assertEquals(aggregation.toString(), "min(salary)");
+            assertNull(filter);
+            break;
+          case 3:
+            assertEquals(aggregation.toString(), "min(salary)");
+            assertEquals(filter.toString(), "salary > '50000'");
+            break;
+          default:
+            fail();
+            break;
+        }
+      }
+    }
   }
 
   @Test
