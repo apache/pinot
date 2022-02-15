@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicHeader;
@@ -96,17 +97,18 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       throws Exception {
     // Update the segment lineage to indicate that the segment replacement is in progress.
     Map<String, String> configs = pinotTaskConfig.getConfigs();
-    String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
-    String inputSegmentNames = configs.get(MinionConstants.SEGMENT_NAME_KEY);
-    String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
-    String authToken = configs.get(MinionConstants.AUTH_TOKEN);
     String replaceSegmentsString = configs.get(MinionConstants.ENABLE_REPLACE_SEGMENTS_KEY);
     boolean replaceSegmentsEnabled = Boolean.parseBoolean(replaceSegmentsString);
 
     Map<String, Object> uploadContext = new HashMap<>();
     if (replaceSegmentsEnabled) {
+      String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
+      String inputSegmentNames = configs.get(MinionConstants.SEGMENT_NAME_KEY);
+      String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
+      String authToken = configs.get(MinionConstants.AUTH_TOKEN);
       List<String> segmentsFrom =
-          Arrays.stream(inputSegmentNames.split(",")).map(String::trim).collect(Collectors.toList());
+          Arrays.stream(StringUtils.split(inputSegmentNames, MinionConstants.SEGMENT_NAME_SEPARATOR)).map(String::trim)
+              .collect(Collectors.toList());
       List<String> segmentsTo =
           segmentConversionResults.stream().map(SegmentConversionResult::getSegmentName).collect(Collectors.toList());
       String lineageEntryId = SegmentConversionUtils.startSegmentReplace(tableNameWithType, uploadURL,
@@ -120,14 +122,13 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       throws Exception {
     // Update the segment lineage to indicate that the segment replacement is done.
     Map<String, String> configs = pinotTaskConfig.getConfigs();
-    String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
-    String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
-    String authToken = configs.get(MinionConstants.AUTH_TOKEN);
     String replaceSegmentsString = configs.get(MinionConstants.ENABLE_REPLACE_SEGMENTS_KEY);
     boolean replaceSegmentsEnabled = Boolean.parseBoolean(replaceSegmentsString);
-
     if (replaceSegmentsEnabled) {
       String lineageEntryId = (String) uploadContext.get(UPLOAD_CONTEXT_LINEAGE_ENTRY_ID);
+      String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
+      String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
+      String authToken = configs.get(MinionConstants.AUTH_TOKEN);
       SegmentConversionUtils
           .endSegmentReplace(tableNameWithType, uploadURL, lineageEntryId, _minionConf.getEndReplaceSegmentsTimeoutMs(),
               authToken);
@@ -218,7 +219,6 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         File convertedTarredSegmentFile = tarredSegmentFiles.get(i);
         SegmentConversionResult segmentConversionResult = segmentConversionResults.get(i);
         String resultSegmentName = segmentConversionResult.getSegmentName();
-        LOGGER.info("Uploading segment: {}", resultSegmentName);
 
         // Set segment ZK metadata custom map modifier into HTTP header to modify the segment ZK metadata
         SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier =
@@ -244,7 +244,6 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         if (!FileUtils.deleteQuietly(convertedTarredSegmentFile)) {
           LOGGER.warn("Failed to delete tarred converted segment: {}", convertedTarredSegmentFile.getAbsolutePath());
         }
-        LOGGER.info("Uploaded segment: {}", resultSegmentName);
       }
 
       postUploadSegments(pinotTaskConfig, uploadContext);
