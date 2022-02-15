@@ -713,7 +713,7 @@ public class CalciteSqlParser {
         }
         if ((functionNode.getFunctionQuantifier() != null) && ("DISTINCT".equals(
             functionNode.getFunctionQuantifier().toString()))) {
-          functionName = "DISTINCTCOUNT";
+          functionName = "DISTINCT" + functionName;
         }
         break;
       default:
