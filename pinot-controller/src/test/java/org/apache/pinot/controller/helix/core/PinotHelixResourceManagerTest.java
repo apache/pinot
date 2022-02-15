@@ -451,12 +451,19 @@ public class PinotHelixResourceManagerTest {
 
   @Test
   public void testSegmentReplacement()
-      throws IOException {
+      throws Exception {
     // Create broker tenant on 1 Brokers
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 1, 0, 0);
     PinotResourceManagerResponse response =
         ControllerTestUtils.getHelixResourceManager().createBrokerTenant(brokerTenant);
     Assert.assertTrue(response.isSuccessful());
+
+    testSegmentReplacementRegular();
+    testSegmentReplacementForRefresh();
+  }
+
+  private void testSegmentReplacementRegular()
+      throws IOException {
 
     // Create the table
     TableConfig tableConfig =
@@ -666,14 +673,8 @@ public class PinotHelixResourceManagerTest {
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId4).getState(), LineageEntryState.COMPLETED);
   }
 
-  @Test
-  public void testSegmentReplacementForRefresh()
+  private void testSegmentReplacementForRefresh()
       throws IOException, InterruptedException {
-    // Create broker tenant on 1 Brokers
-    Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 1, 0, 0);
-    PinotResourceManagerResponse response =
-        ControllerTestUtils.getHelixResourceManager().createBrokerTenant(brokerTenant);
-    Assert.assertTrue(response.isSuccessful());
 
     // Create the table
     TableConfig tableConfig =
@@ -893,6 +894,7 @@ public class PinotHelixResourceManagerTest {
     do {
       if (ControllerTestUtils.getHelixResourceManager().getSegmentsFor(tableNameWithType, false).size()
           == expectedNumSegmentsAfterDelete) {
+        System.out.println("segment deleted after " + (System.currentTimeMillis() - endTimeMs + timeOutInMillis));
         return;
       } else {
         Thread.sleep(500L);
