@@ -75,7 +75,7 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
   private final QueryContext _queryContext;
 
   private final int _limitForAggregatedResult;
-  private final int _limitForGapfilledResult;
+  private int _limitForGapfilledResult;
 
   private final DateTimeGranularitySpec _dateTimeGranularity;
   private final DateTimeFormatSpec _dateTimeFormatter;
@@ -528,9 +528,11 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
       }
       if (timeCol == bucketTime) {
         if (postGapfillFilterHandler == null || postGapfillFilterHandler.isMatch(previous)) {
-          bucketedResult.add(resultRow);
           if (bucketedResult.size() >= _limitForGapfilledResult) {
+            _limitForGapfilledResult = 0;
             break;
+          } else {
+            bucketedResult.add(resultRow);
           }
         }
         Key key = constructGroupKeys(resultRow);
@@ -561,11 +563,17 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
       }
 
       if (postGapfillFilterHandler == null || postGapfillFilterHandler.isMatch(gapfillRow)) {
-        bucketedResult.add(gapfillRow);
-        if (bucketedResult.size() > _limitForGapfilledResult) {
+        if (bucketedResult.size() >= _limitForGapfilledResult) {
           break;
+        } else {
+          bucketedResult.add(gapfillRow);
         }
       }
+    }
+    if (_limitForGapfilledResult > _groupByKeys.size()) {
+      _limitForGapfilledResult -= _groupByKeys.size();
+    } else {
+      _limitForGapfilledResult = 0;
     }
     return previous;
   }
