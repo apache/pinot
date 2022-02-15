@@ -83,20 +83,24 @@ public abstract class BaseBinaryGeoTransformFunction extends BaseTransformFuncti
     if (_intResults == null) {
       _intResults = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
-    byte[][] firstValues = _firstArgument != null ? _firstArgument.transformToBytesValuesSV(projectionBlock) : null;
-    byte[][] secondValues = _secondArgument != null ? _secondArgument.transformToBytesValuesSV(projectionBlock) : null;
-    if (firstValues == null && secondValues == null) {
+    byte[][] firstValues;
+    byte[][] secondValues;
+    if (_firstArgument == null && _secondArgument == null) {
       _intResults = new int[Math.min(projectionBlock.getNumDocs(), DocIdSetPlanNode.MAX_DOC_PER_CALL)];
       Arrays.fill(_intResults, transformGeometryToInt(_firstLiteral, _secondLiteral));
-    } else if (firstValues == null) {
+    } else if (_firstArgument == null) {
+      secondValues = _secondArgument.transformToBytesValuesSV(projectionBlock);
       for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
         _intResults[i] = transformGeometryToInt(_firstLiteral, GeometrySerializer.deserialize(secondValues[i]));
       }
-    } else if (secondValues == null) {
+    } else if (_secondArgument == null) {
+      firstValues = _firstArgument.transformToBytesValuesSV(projectionBlock);
       for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
         _intResults[i] = transformGeometryToInt(GeometrySerializer.deserialize(firstValues[i]), _secondLiteral);
       }
     } else {
+      firstValues = _firstArgument.transformToBytesValuesSV(projectionBlock);
+      secondValues = _secondArgument.transformToBytesValuesSV(projectionBlock);
       for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
         _intResults[i] = transformGeometryToInt(GeometrySerializer.deserialize(firstValues[i]),
             GeometrySerializer.deserialize(secondValues[i]));
@@ -109,20 +113,24 @@ public abstract class BaseBinaryGeoTransformFunction extends BaseTransformFuncti
     if (_doubleResults == null) {
       _doubleResults = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
-    byte[][] firstValues = _firstArgument != null ? _firstArgument.transformToBytesValuesSV(projectionBlock) : null;
-    byte[][] secondValues = _secondArgument != null ? _secondArgument.transformToBytesValuesSV(projectionBlock) : null;
-    if (firstValues == null && secondValues == null) {
+    byte[][] firstValues;
+    byte[][] secondValues;
+    if (_firstArgument == null && _secondArgument == null) {
       _doubleResults = new double[Math.min(projectionBlock.getNumDocs(), DocIdSetPlanNode.MAX_DOC_PER_CALL)];
       Arrays.fill(_doubleResults, transformGeometryToDouble(_firstLiteral, _secondLiteral));
-    } else if (firstValues == null) {
+    } else if (_firstArgument == null) {
+      secondValues = _secondArgument.transformToBytesValuesSV(projectionBlock);
       for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
         _doubleResults[i] = transformGeometryToDouble(_firstLiteral, GeometrySerializer.deserialize(secondValues[i]));
       }
-    } else if (secondValues == null) {
+    } else if (_secondArgument == null) {
+      firstValues = _firstArgument.transformToBytesValuesSV(projectionBlock);
       for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
         _doubleResults[i] = transformGeometryToDouble(GeometrySerializer.deserialize(firstValues[i]), _secondLiteral);
       }
     } else {
+      firstValues = _firstArgument.transformToBytesValuesSV(projectionBlock);
+      secondValues = _secondArgument.transformToBytesValuesSV(projectionBlock);
       for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
         _doubleResults[i] = transformGeometryToDouble(GeometrySerializer.deserialize(firstValues[i]),
             GeometrySerializer.deserialize(secondValues[i]));
