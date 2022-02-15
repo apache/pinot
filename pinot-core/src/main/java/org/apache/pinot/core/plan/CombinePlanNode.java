@@ -166,7 +166,10 @@ public class CombinePlanNode implements PlanNode {
     if (QueryContextUtils.isAggregationQuery(_queryContext)) {
       if (gapfillType == GapfillUtils.GapfillType.AggregateGapfillAggregate) {
         _queryContext.getSubQueryContext().getSubQueryContext().setEndTimeMs(_queryContext.getEndTimeMs());
-        return new GroupByOrderByCombineOperator(operators, _queryContext.getSubQueryContext().getSubQueryContext(), _executorService);
+        return new GroupByOrderByCombineOperator(
+            operators,
+            _queryContext.getSubQueryContext().getSubQueryContext(),
+            _executorService);
       } else if (gapfillType == GapfillUtils.GapfillType.AggregateGapfill) {
         _queryContext.getSubQueryContext().setEndTimeMs(_queryContext.getEndTimeMs());
         return new GroupByOrderByCombineOperator(operators, _queryContext.getSubQueryContext(), _executorService);

@@ -323,7 +323,7 @@ public class QueryContext {
   }
 
   public void setGapfillType(GapfillUtils.GapfillType gapfillType) {
-    this._gapfillType = gapfillType;
+    _gapfillType = gapfillType;
   }
 
   public int getNumGroupsLimit() {
