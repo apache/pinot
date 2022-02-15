@@ -71,5 +71,4 @@ public class PreAggregateGapfillFilterHandler implements ValueExtractorFactory {
       return new ColumnValueExtractor(_indexes.get(expression.getFunction().toString()), _dataSchema);
     }
   }
-
 }

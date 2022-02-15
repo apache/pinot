@@ -3190,5 +3190,4 @@ public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
     _indexSegment.destroy();
     FileUtils.deleteDirectory(INDEX_DIR);
   }
-
 }
