@@ -26,6 +26,7 @@ import java.util.List;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.core.api.ServiceAutoDiscoveryFeature;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -51,7 +52,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     packages(RESOURCE_PACKAGE);
     property(PINOT_CONFIGURATION, brokerConf);
     if (brokerConf.getProperty(CommonConstants.Broker.BROKER_SERVICE_AUTO_DISCOVERY, false)) {
-      register(BrokerServiceAutoDiscoveryFeature.class);
+      register(ServiceAutoDiscoveryFeature.class);
     }
     register(new AbstractBinder() {
       @Override

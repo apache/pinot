@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.integration.tests;
+package org.apache.pinot.core.api;
 
 import javax.inject.Singleton;
 import org.jvnet.hk2.annotations.Service;
 
 @Service
 @Singleton
-public class BrokerTestAutoLoadedService {
+public class AutoLoadedServiceForTest {
     public String echo(String echoText) {
         return echoText;
     }

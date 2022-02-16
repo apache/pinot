@@ -65,4 +65,8 @@ public class FixedIntArray {
   public int hashCode() {
     return Arrays.hashCode(_value);
   }
+
+  public FixedIntArray clone() {
+    return new FixedIntArray(Arrays.copyOf(_value, _value.length));
+  }
 }

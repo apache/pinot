@@ -19,18 +19,9 @@
 package org.apache.pinot.core.geospatial.transform.function;
 
 import com.google.common.base.Preconditions;
-import java.util.List;
-import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
-import org.apache.pinot.core.operator.transform.function.LiteralTransformFunction;
-import org.apache.pinot.core.operator.transform.function.TransformFunction;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
-import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
 
@@ -40,43 +31,16 @@ import org.locationtech.jts.geom.Point;
  * cartesian minimum distance (based on spatial ref) between two geometries in projected units. For geography, returns
  * the great-circle distance in meters between two SphericalGeography points. Note that g1, g2 shall have the same type.
  */
-public class StDistanceFunction extends BaseTransformFunction {
+public class StDistanceFunction extends BaseBinaryGeoTransformFunction {
   private static final float MIN_LATITUDE = -90;
   private static final float MAX_LATITUDE = 90;
   private static final float MIN_LONGITUDE = -180;
   private static final float MAX_LONGITUDE = 180;
   public static final String FUNCTION_NAME = "ST_Distance";
-  private TransformFunction _firstArgument;
-  private TransformFunction _secondArgument;
-  private double[] _results;
 
   @Override
   public String getName() {
     return FUNCTION_NAME;
-  }
-
-  @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    Preconditions
-        .checkArgument(arguments.size() == 2, "2 arguments are required for transform function: %s", getName());
-    TransformFunction transformFunction = arguments.get(0);
-    Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
-        "First argument must be single-valued for transform function: %s", getName());
-    Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES
-        || transformFunction instanceof LiteralTransformFunction,
-        "The first argument must be of type BYTES , but was %s",
-            transformFunction.getResultMetadata().getDataType()
-        );
-    _firstArgument = transformFunction;
-    transformFunction = arguments.get(1);
-    Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
-        "Second argument must be single-valued for transform function: %s", getName());
-    Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES
-        || transformFunction instanceof LiteralTransformFunction,
-        "The second argument must be of type BYTES , but was %s",
-            transformFunction.getResultMetadata().getDataType()
-        );
-    _secondArgument = transformFunction;
   }
 
   @Override
@@ -86,25 +50,19 @@ public class StDistanceFunction extends BaseTransformFunction {
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_results == null) {
-      _results = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    return transformGeometryToDoubleValuesSV(projectionBlock);
+  }
+
+  @Override
+  public double transformGeometryToDouble(Geometry firstGeometry, Geometry secondGeometry) {
+    if (GeometryUtils.isGeography(firstGeometry) != GeometryUtils.isGeography(secondGeometry)) {
+      throw new RuntimeException("The first and second arguments shall either all be geometry or all geography");
     }
-    byte[][] firstValues = _firstArgument.transformToBytesValuesSV(projectionBlock);
-    byte[][] secondValues = _secondArgument.transformToBytesValuesSV(projectionBlock);
-    for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      Geometry firstGeometry = GeometrySerializer.deserialize(firstValues[i]);
-      Geometry secondGeometry = GeometrySerializer.deserialize(secondValues[i]);
-      if (GeometryUtils.isGeography(firstGeometry) != GeometryUtils.isGeography(secondGeometry)) {
-        throw new RuntimeException("The first and second arguments shall either all be geometry or all geography");
-      }
-      if (GeometryUtils.isGeography(firstGeometry)) {
-        _results[i] = sphericalDistance(firstGeometry, secondGeometry);
-      } else {
-        _results[i] =
-            firstGeometry.isEmpty() || secondGeometry.isEmpty() ? Double.NaN : firstGeometry.distance(secondGeometry);
-      }
+    if (GeometryUtils.isGeography(firstGeometry)) {
+      return sphericalDistance(firstGeometry, secondGeometry);
+    } else {
+      return firstGeometry.isEmpty() || secondGeometry.isEmpty() ? Double.NaN : firstGeometry.distance(secondGeometry);
     }
-    return _results;
   }
 
   private static void checkLatitude(double latitude) {
