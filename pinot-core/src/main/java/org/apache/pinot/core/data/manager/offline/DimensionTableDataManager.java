@@ -34,7 +34,6 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
 /**
@@ -75,9 +74,11 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
   @SuppressWarnings("rawtypes")
   private static final AtomicReferenceFieldUpdater<DimensionTableDataManager, Map> UPDATER =
       AtomicReferenceFieldUpdater.newUpdater(DimensionTableDataManager.class, Map.class, "_lookupTable");
-  private volatile Map<PrimaryKey, GenericRow> _lookupTable = new HashMap<>();
+  private volatile Map<JoinKey, GenericRow> _lookupTable = new HashMap<>();
   private Schema _tableSchema;
   private List<String> _primaryKeyColumns;
+  private FieldSpec.DataType[] _keySignature;
+  private boolean _hasVariableWidthKeys = false;
 
   @Override
   protected void doInit() {
@@ -86,6 +87,19 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     // dimension tables should always have schemas with primary keys
     _tableSchema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
     _primaryKeyColumns = _tableSchema.getPrimaryKeyColumns();
+    initKeySignature();
+  }
+
+  private void initKeySignature() {
+    _keySignature = new FieldSpec.DataType[_primaryKeyColumns.size()];
+    for (int i = 0; i < _primaryKeyColumns.size(); i++) {
+      FieldSpec.DataType dataType = _tableSchema.getFieldSpecFor(_primaryKeyColumns.get(i)).getDataType()
+          .getStoredType();
+      if (!dataType.isFixedWidth()) {
+        _hasVariableWidthKeys = true;
+      }
+      _keySignature[i] = dataType;
+    }
   }
 
   @Override
@@ -113,13 +127,21 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     }
   }
 
+  public FieldSpec.DataType[] getKeySignature() {
+    return _keySignature;
+  }
+
+  public boolean hasVariableWidthKeys() {
+    return _hasVariableWidthKeys;
+  }
+
   /**
    * `loadLookupTable()` reads contents of the DimensionTable into _lookupTable HashMap for fast lookup.
    */
   private void loadLookupTable()
       throws Exception {
-    Map<PrimaryKey, GenericRow> snapshot;
-    Map<PrimaryKey, GenericRow> replacement;
+    Map<JoinKey, GenericRow> snapshot;
+    Map<JoinKey, GenericRow> replacement;
     do {
       snapshot = _lookupTable;
       replacement = new HashMap<>(snapshot.size());
@@ -127,7 +149,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     } while (!UPDATER.compareAndSet(this, snapshot, replacement));
   }
 
-  private void populate(Map<PrimaryKey, GenericRow> map)
+  private void populate(Map<JoinKey, GenericRow> map)
       throws Exception {
     List<SegmentDataManager> segmentManagers = acquireAllSegments();
     try {
@@ -137,7 +159,12 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
             indexSegment.getSegmentMetadata().getIndexDir())) {
           while (reader.hasNext()) {
             GenericRow row = reader.next();
-            map.put(row.getPrimaryKey(_primaryKeyColumns), row);
+            JoinKey joinKey = _hasVariableWidthKeys ? new VariableWidthJoinKey(_keySignature.length)
+                : new FixedWidthJoinKey(_keySignature);
+            for (int col = 0; col < _keySignature.length; col++) {
+              joinKey.set(_keySignature[col], row.getValue(_primaryKeyColumns.get(col)));
+            }
+            map.put(joinKey, row);
           }
         }
       }
@@ -148,8 +175,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     }
   }
 
-  public GenericRow lookupRowByPrimaryKey(PrimaryKey pk) {
-    return _lookupTable.get(pk);
+  public GenericRow lookupRowByPrimaryKey(JoinKey key) {
+    return _lookupTable.get(key);
   }
 
   public FieldSpec getColumnFieldSpec(String columnName) {

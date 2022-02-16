@@ -40,7 +40,6 @@ import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -147,13 +146,13 @@ public class DimensionTableDataManagerTest {
     DimensionTableDataManager mgr = makeTestableManager();
 
     // try fetching data BEFORE loading segment
-    GenericRow resp = mgr.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
+    GenericRow resp = mgr.lookupRowByPrimaryKey(toJoinKey("SF"));
     Assert.assertNull(resp, "Response should be null if no segment is loaded");
 
     mgr.addSegment(_indexDir, _indexLoadingConfig);
 
     // Confirm table is loaded and available for lookup
-    resp = mgr.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
+    resp = mgr.lookupRowByPrimaryKey(toJoinKey("SF"));
     Assert.assertNotNull(resp, "Should return response after segment load");
     Assert.assertEquals(resp.getValue("teamName"), "San Francisco Giants");
 
@@ -174,7 +173,15 @@ public class DimensionTableDataManagerTest {
     String segmentName = segMgr.getSegmentName();
     mgr.removeSegment(segmentName);
     // confirm table is cleaned up
-    resp = mgr.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
+    resp = mgr.lookupRowByPrimaryKey(toJoinKey("SF"));
     Assert.assertNull(resp, "Response should be null if no segment is loaded");
+  }
+
+  private static JoinKey toJoinKey(String... params) {
+    VariableWidthJoinKey joinKey = new VariableWidthJoinKey(params.length);
+    for (String param : params) {
+      joinKey.set(param);
+    }
+    return joinKey;
   }
 }

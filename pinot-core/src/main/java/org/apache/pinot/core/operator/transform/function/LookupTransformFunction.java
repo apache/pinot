@@ -24,14 +24,14 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
+import org.apache.pinot.core.data.manager.offline.FixedWidthJoinKey;
+import org.apache.pinot.core.data.manager.offline.VariableWidthJoinKey;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.PrimaryKey;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
@@ -74,11 +74,11 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   private String _dimColumnName;
   private final List<String> _joinKeys = new ArrayList<>();
-  private final List<FieldSpec> _joinValueFieldSpecs = new ArrayList<>();
   private final List<TransformFunction> _joinValueFunctions = new ArrayList<>();
 
   private DimensionTableDataManager _dataManager;
   private FieldSpec _lookupColumnFieldSpec;
+  private DataType[] _keySignature;
 
   private int _nullIntValue;
   private long _nullLongValue;
@@ -139,7 +139,6 @@ public class LookupTransformFunction extends BaseTransformFunction {
       FieldSpec pkColumnSpec = _dataManager.getColumnFieldSpec(joinKey);
       Preconditions.checkArgument(pkColumnSpec != null, "Primary key column doesn't exist in dimension table: %s:%s",
           dimTableName, joinKey);
-      _joinValueFieldSpecs.add(pkColumnSpec);
     }
 
     List<String> tablePrimaryKeyColumns = _dataManager.getPrimaryKeyColumns();
@@ -153,6 +152,8 @@ public class LookupTransformFunction extends BaseTransformFunction {
       _nullFloatValue = ((Number) defaultNullValue).floatValue();
       _nullDoubleValue = ((Number) defaultNullValue).intValue();
     }
+
+    _keySignature = _dataManager.getKeySignature();
   }
 
   @Override
@@ -168,10 +169,9 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   private void lookup(ProjectionBlock projectionBlock, ValueAcceptor valueAcceptor) {
     int numPkColumns = _joinKeys.size();
-    int numDocuments = projectionBlock.getNumDocs();
     Object[] pkColumns = new Object[numPkColumns];
     for (int c = 0; c < numPkColumns; c++) {
-      DataType storedType = _joinValueFieldSpecs.get(c).getDataType().getStoredType();
+      DataType storedType = _keySignature[c];
       TransformFunction tf = _joinValueFunctions.get(c);
       switch (storedType) {
         case INT:
@@ -196,30 +196,66 @@ public class LookupTransformFunction extends BaseTransformFunction {
           throw new IllegalStateException("Unknown column type for primary key");
       }
     }
+    if (_dataManager.hasVariableWidthKeys()) {
+      lookupWithVariableWidthKey(projectionBlock, pkColumns, valueAcceptor);
+    } else {
+      lookupWithFixedWidthKey(projectionBlock, pkColumns, valueAcceptor);
+    }
+  }
 
-    Object[] pkValues = new Object[numPkColumns];
-    PrimaryKey primaryKey = new PrimaryKey(pkValues);
-    for (int i = 0; i < numDocuments; i++) {
+  private void lookupWithFixedWidthKey(ProjectionBlock projectionBlock, Object[] pkColumns,
+      ValueAcceptor valueAcceptor) {
+    FixedWidthJoinKey joinKey = new FixedWidthJoinKey(_keySignature);
+    for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
       // prepare pk
-      for (int c = 0; c < numPkColumns; c++) {
+      for (int c = 0; c < _keySignature.length; c++) {
         if (pkColumns[c] instanceof int[]) {
-          pkValues[c] = ((int[]) pkColumns[c])[i];
+          joinKey.set(((int[]) pkColumns[c])[i]);
         } else if (pkColumns[c] instanceof long[]) {
-          pkValues[c] = ((long[]) pkColumns[c])[i];
+          joinKey.set(((long[]) pkColumns[c])[i]);
         } else if (pkColumns[c] instanceof String[]) {
-          pkValues[c] = ((String[]) pkColumns[c])[i];
+          joinKey.set(((String[]) pkColumns[c])[i]);
         } else if (pkColumns[c] instanceof float[]) {
-          pkValues[c] = ((float[]) pkColumns[c])[i];
+          joinKey.set(((float[]) pkColumns[c])[i]);
         } else if (pkColumns[c] instanceof double[]) {
-          pkValues[c] = ((double[]) pkColumns[c])[i];
+          joinKey.set(((double[]) pkColumns[c])[i]);
         } else if (pkColumns[c] instanceof byte[][]) {
-          pkValues[c] = new ByteArray(((byte[][]) pkColumns[c])[i]);
+          joinKey.set(((byte[][]) pkColumns[c])[i]);
         }
       }
       // lookup
-      GenericRow row = _dataManager.lookupRowByPrimaryKey(primaryKey);
+      GenericRow row = _dataManager.lookupRowByPrimaryKey(joinKey);
       Object value = row == null ? null : row.getValue(_dimColumnName);
       valueAcceptor.accept(i, value);
+      joinKey.reset();
+    }
+  }
+
+  private void lookupWithVariableWidthKey(ProjectionBlock projectionBlock, Object[] pkColumns,
+      ValueAcceptor valueAcceptor) {
+    VariableWidthJoinKey joinKey = new VariableWidthJoinKey(_keySignature.length);
+    for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
+      // prepare pk
+      for (int c = 0; c < _keySignature.length; c++) {
+        if (pkColumns[c] instanceof int[]) {
+          joinKey.set(((int[]) pkColumns[c])[i]);
+        } else if (pkColumns[c] instanceof long[]) {
+          joinKey.set(((long[]) pkColumns[c])[i]);
+        } else if (pkColumns[c] instanceof String[]) {
+          joinKey.set(((String[]) pkColumns[c])[i]);
+        } else if (pkColumns[c] instanceof float[]) {
+          joinKey.set(((float[]) pkColumns[c])[i]);
+        } else if (pkColumns[c] instanceof double[]) {
+          joinKey.set(((double[]) pkColumns[c])[i]);
+        } else if (pkColumns[c] instanceof byte[][]) {
+          joinKey.set(((byte[][]) pkColumns[c])[i]);
+        }
+      }
+      // lookup
+      GenericRow row = _dataManager.lookupRowByPrimaryKey(joinKey);
+      Object value = row == null ? null : row.getValue(_dimColumnName);
+      valueAcceptor.accept(i, value);
+      joinKey.reset();
     }
   }
 
