@@ -1183,12 +1183,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private boolean isDisableGroovy(@Nullable TableConfig offlineTableConfig, @Nullable TableConfig realtimeTableConfig) {
     Boolean offlineTableDisableGroovyQuery = null;
     if (offlineTableConfig != null && offlineTableConfig.getQueryConfig() != null) {
-      offlineTableDisableGroovyQuery = offlineTableConfig.getQueryConfig().getDisableGroovyQuery();
+      offlineTableDisableGroovyQuery = offlineTableConfig.getQueryConfig().getDisableGroovy();
     }
 
     Boolean realtimeTableDisableGroovyQuery = null;
     if (realtimeTableConfig != null && realtimeTableConfig.getQueryConfig() != null) {
-      realtimeTableDisableGroovyQuery = realtimeTableConfig.getQueryConfig().getDisableGroovyQuery();
+      realtimeTableDisableGroovyQuery = realtimeTableConfig.getQueryConfig().getDisableGroovy();
     }
 
     if (offlineTableDisableGroovyQuery == null && realtimeTableDisableGroovyQuery == null) {
@@ -1196,8 +1196,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     // If offline or online table config disables Groovy, then Groovy should be disabled
-    return (offlineTableDisableGroovyQuery == null ? false : offlineTableDisableGroovyQuery) || (
-        realtimeTableDisableGroovyQuery == null ? false : realtimeTableDisableGroovyQuery);
+    return Boolean.TRUE.equals(offlineTableDisableGroovyQuery) || Boolean.TRUE.equals(realtimeTableDisableGroovyQuery);
   }
 
   /**

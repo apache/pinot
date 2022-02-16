@@ -38,14 +38,14 @@ public class QueryConfig extends BaseJsonConfig {
   private final Long _timeoutMs;
 
   // Table config override for disable Groovy broker property
-  private final Boolean _disableQueryGroovy;
+  private final Boolean _disableGroovy;
 
   @JsonCreator
   public QueryConfig(@JsonProperty("timeoutMs") @Nullable Long timeoutMs,
-      @JsonProperty("disableQueryGroovy") @Nullable Boolean disableQueryGroovy) {
+      @JsonProperty("disableGroovy") @Nullable Boolean disableGroovy) {
     Preconditions.checkArgument(timeoutMs == null || timeoutMs > 0, "Invalid 'timeoutMs': %s", timeoutMs);
     _timeoutMs = timeoutMs;
-    _disableQueryGroovy = disableQueryGroovy;
+    _disableGroovy = disableGroovy;
   }
 
   @Nullable
@@ -56,8 +56,8 @@ public class QueryConfig extends BaseJsonConfig {
 
 
   @Nullable
-  @JsonProperty("disableQueryGroovy")
-  public Boolean getDisableGroovyQuery() {
-    return _disableQueryGroovy;
+  @JsonProperty("disableGroovy")
+  public Boolean getDisableGroovy() {
+    return _disableGroovy;
   }
 }

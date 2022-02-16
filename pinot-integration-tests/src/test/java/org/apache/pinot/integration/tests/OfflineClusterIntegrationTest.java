@@ -861,23 +861,35 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testDisableGroovyQueryTableConfigOverride()
       throws Exception {
+    String groovyQuery = "SELECT GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', "
+        + "'arg0 + arg1', FlightNum, Origin) FROM myTable";
     TableConfig tableConfig = getOfflineTableConfig();
-    tableConfig.setQueryConfig(new QueryConfig(5L, Boolean.TRUE));
+    tableConfig.setQueryConfig(new QueryConfig(null, true));
     updateTableConfig(tableConfig);
 
-    reloadOfflineTable(getTableName());
-    try {
-      postSqlQuery("SELECT GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', "
-          + "'arg0 + arg1', FlightNum, Origin) FROM myTable");
-      fail("Failed to reject Groovy query with table override");
-    } catch (Exception e) {
-      // expected
-    }
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        postSqlQuery(groovyQuery);
+        return false;
+      } catch (Exception e) {
+        // expected
+        return true;
+      }
+    }, 60_000L, "Failed to reject Groovy query with table override");
 
     // Remove query config
     tableConfig.setQueryConfig(null);
     updateTableConfig(tableConfig);
-    reloadOfflineTable(getTableName());
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        postSqlQuery(groovyQuery);
+        // Query should not throw exception
+        return true;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 60_000L, "Failed to accept Groovy query without query table config override");
   }
 
   private void reloadWithExtraColumns()
