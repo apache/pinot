@@ -24,7 +24,9 @@ import java.util.concurrent.ExecutionException;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.*;
+import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
+import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.NOOP_RATE_LIMITER;
+import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.RateLimiterImpl;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
