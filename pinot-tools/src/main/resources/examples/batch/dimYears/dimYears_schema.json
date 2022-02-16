@@ -1,0 +1,16 @@
+{
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "year"
+    },
+    {
+      "dataType": "STRING",
+      "name": "decade"
+    }
+  ],
+  "schemaName": "dimYears",
+  "primaryKeyColumns": [
+    "year"
+  ]
+}

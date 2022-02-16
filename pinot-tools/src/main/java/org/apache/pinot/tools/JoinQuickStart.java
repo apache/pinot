@@ -76,12 +76,31 @@ public class JoinQuickStart extends QuickStartBase {
     resource = classLoader.getResource("examples/batch/dimBaseballTeams/ingestionJobSpec.yaml");
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, ingestionJobSpecFile);
-    QuickstartTableRequest dimTableRequest = new QuickstartTableRequest(dimBaseballTeamsBaseDir.getAbsolutePath());
+    QuickstartTableRequest dimBaseballTeamsTableRequest =
+        new QuickstartTableRequest(dimBaseballTeamsBaseDir.getAbsolutePath());
+
+    // years dim table
+    File dimYearsBaseDir = new File(quickstartTmpDir, "dimYears");
+    schemaFile = new File(dimYearsBaseDir, "dimYears_schema.json");
+    tableConfigFile = new File(dimYearsBaseDir, "dimYears_offline_table_config.json");
+    ingestionJobSpecFile = new File(dimYearsBaseDir, "ingestionJobSpec.yaml");
+    classLoader = Quickstart.class.getClassLoader();
+    resource = classLoader.getResource("examples/batch/dimYears/dimYears_schema.json");
+    Preconditions.checkNotNull(resource);
+    FileUtils.copyURLToFile(resource, schemaFile);
+    resource = classLoader.getResource("examples/batch/dimYears/dimYears_offline_table_config.json");
+    Preconditions.checkNotNull(resource);
+    FileUtils.copyURLToFile(resource, tableConfigFile);
+    resource = classLoader.getResource("examples/batch/dimYears/ingestionJobSpec.yaml");
+    Preconditions.checkNotNull(resource);
+    FileUtils.copyURLToFile(resource, ingestionJobSpecFile);
+    QuickstartTableRequest dimYearsTableRequest = new QuickstartTableRequest(dimYearsBaseDir.getAbsolutePath());
 
     File tempDir = new File(quickstartTmpDir, "tmp");
     FileUtils.forceMkdir(tempDir);
     QuickstartRunner runner =
-        new QuickstartRunner(Lists.newArrayList(request, dimTableRequest), 1, 1, 3, 0, tempDir, getConfigOverrides());
+        new QuickstartRunner(Lists.newArrayList(request, dimBaseballTeamsTableRequest, dimYearsTableRequest), 1, 1, 3,
+            0, tempDir, getConfigOverrides());
 
     printStatus(Quickstart.Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
     runner.startAll();
@@ -119,6 +138,14 @@ public class JoinQuickStart extends QuickStartBase {
     printStatus(Quickstart.Color.YELLOW, "Baseball Stats with joined team names");
     printStatus(Quickstart.Color.CYAN, "Query : " + q3);
     printStatus(Quickstart.Color.YELLOW, prettyPrintResponse(runner.runQuery(q3)));
+    printStatus(Quickstart.Color.GREEN, "***************************************************");
+
+    String q4 =
+        "select lookup('dimYears', 'decade', 'year', yearID) as decade, playerName,count(*) as cnt from baseballStats "
+            + "group by playerName, decade order by cnt desc";
+    printStatus(Quickstart.Color.YELLOW, "Baseball Stats with joined decades");
+    printStatus(Quickstart.Color.CYAN, "Query : " + q4);
+    printStatus(Quickstart.Color.YELLOW, prettyPrintResponse(runner.runQuery(q4)));
     printStatus(Quickstart.Color.GREEN, "***************************************************");
 
     printStatus(Quickstart.Color.GREEN,
