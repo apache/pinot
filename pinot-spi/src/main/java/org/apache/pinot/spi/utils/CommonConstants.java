@@ -442,6 +442,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_INSTANCE_ID = "pinot.controller.instance.id";
     public static final String CONFIG_OF_CONTROLLER_QUERY_REWRITER_CLASS_NAMES =
         "pinot.controller.query.rewriter.class.names";
+    //Set to true to load all services tagged and compiled with hk2-metadata-generator. Default to False
+    public static final String CONTROLLER_SERVICE_AUTO_DISCOVERY = "pinot.controller.service.auto.discovery";
   }
 
   public static class Minion {

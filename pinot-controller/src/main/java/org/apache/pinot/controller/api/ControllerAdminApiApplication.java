@@ -28,6 +28,7 @@ import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AuthenticationFilter;
+import org.apache.pinot.core.api.ServiceAutoDiscoveryFeature;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -57,6 +58,9 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     packages(_controllerResourcePackages);
     // TODO See ControllerResponseFilter
 //    register(new LoggingFeature());
+    if (conf.getProperty(CommonConstants.Controller.CONTROLLER_SERVICE_AUTO_DISCOVERY, false)) {
+      register(ServiceAutoDiscoveryFeature.class);
+    }
     register(JacksonFeature.class);
     register(MultiPartFeature.class);
     registerClasses(io.swagger.jaxrs.listing.ApiListingResource.class);
