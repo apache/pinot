@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.util;
+package org.apache.pinot.common.utils;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
@@ -42,8 +42,7 @@ import org.apache.commons.httpclient.params.HttpConnectionParams;
 import org.apache.commons.httpclient.protocol.Protocol;
 import org.apache.commons.httpclient.protocol.ProtocolSocketFactory;
 import org.apache.commons.lang.StringUtils;
-import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.core.transport.TlsConfig;
+import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 

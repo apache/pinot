@@ -35,7 +35,6 @@ import org.apache.pinot.tools.streams.MeetupRsvpStream;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 
 import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
-import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
 public class PartialUpsertQuickStart extends QuickStartBase {
