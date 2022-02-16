@@ -96,7 +96,7 @@ public class PinotHelixResourceManagerTest {
 
   private static final int CONNECTION_TIMEOUT_IN_MILLISECOND = 10_000;
   private static final int MAXIMUM_NUMBER_OF_CONTROLLER_INSTANCES = 10;
-  private static final long TIMEOUT_IN_MS = 10_000L;
+  private static final long TIMEOUT_IN_MS = 60_000L;
 
   @BeforeClass
   public void setUp()
@@ -894,7 +894,6 @@ public class PinotHelixResourceManagerTest {
     do {
       if (ControllerTestUtils.getHelixResourceManager().getSegmentsFor(tableNameWithType, false).size()
           == expectedNumSegmentsAfterDelete) {
-        System.out.println("segment deleted after " + (System.currentTimeMillis() - endTimeMs + timeOutInMillis));
         return;
       } else {
         Thread.sleep(500L);
