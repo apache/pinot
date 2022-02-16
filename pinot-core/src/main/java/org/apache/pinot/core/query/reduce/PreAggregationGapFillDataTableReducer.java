@@ -661,8 +661,7 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
             AggregationFunctionFactory.getAggregationFunction(functionContext, _queryContext);
         GroupByResultHolder groupByResultHolder =
             aggregationFunction.createGroupByResultHolder(_groupByKeys.size(), _groupByKeys.size());
-        aggregationFunction
-            .aggregateGroupBySV(bucketedRows.size(), groupKeyArray, groupByResultHolder, blockValSetMap);
+        aggregationFunction.aggregateGroupBySV(bucketedRows.size(), groupKeyArray, groupByResultHolder, blockValSetMap);
         for (int j = 0; j < groupKeyIndexes.size(); j++) {
           Object [] row = aggregatedResult.get(j);
           row[i] = aggregationFunction.extractGroupByResult(groupByResultHolder, j);
