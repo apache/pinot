@@ -88,7 +88,8 @@ import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.FixedIntArray;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.roaringbitmap.IntIterator;
+import org.roaringbitmap.BatchIterator;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -911,11 +912,15 @@ public class MutableSegmentImpl implements MutableSegment {
     // Re-order documents using the inverted index
     RealtimeInvertedIndexReader invertedIndex = indexContainer._invertedIndex;
     int[] docIds = new int[_numDocsIndexed];
+    int[] batch = new int[256];
     int docIdIndex = 0;
     for (int dictId : dictIds) {
-      IntIterator intIterator = invertedIndex.getDocIds(dictId).getIntIterator();
-      while (intIterator.hasNext()) {
-        docIds[docIdIndex++] = intIterator.next();
+      MutableRoaringBitmap bitmap = invertedIndex.getDocIds(dictId);
+      BatchIterator iterator = bitmap.getBatchIterator();
+      while (iterator.hasNext()) {
+        int limit = iterator.nextBatch(batch);
+        System.arraycopy(batch, 0, docIds, docIdIndex, limit);
+        docIdIndex += limit;
       }
     }
 
