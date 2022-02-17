@@ -21,6 +21,8 @@ package org.apache.pinot.segment.spi.partition;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 
 /**
  * Implementation of {@link Byte array partitioner}
@@ -40,8 +42,8 @@ public class ByteArrayPartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public int getPartition(Object valueIn) {
-    return abs(Arrays.hashCode(valueIn.toString().getBytes())) % _numPartitions;
+  public int getPartition(Object value) {
+    return abs(Arrays.hashCode(value.toString().getBytes(UTF_8))) % _numPartitions;
   }
 
   @Override
