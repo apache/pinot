@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
@@ -44,6 +45,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.util.TestUtils;
 import org.joda.time.DateTime;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -307,8 +309,8 @@ public class SegmentDeletionManagerTest {
     // create table segment files.
     Set<String> segments = new HashSet<>(segmentsThatShouldBeDeleted());
     createTableAndSegmentFiles(tempDir, segmentsThatShouldBeDeleted());
-    File tableDir = new File(tempDir.getAbsolutePath() + File.separator + TABLE_NAME);
-    File deletedTableDir = new File(tempDir.getAbsolutePath() + File.separator + "Deleted_Segments"
+    final File tableDir = new File(tempDir.getAbsolutePath() + File.separator + TABLE_NAME);
+    final File deletedTableDir = new File(tempDir.getAbsolutePath() + File.separator + "Deleted_Segments"
         + File.separator + TABLE_NAME);
 
     // delete the segments instantly.
@@ -318,21 +320,30 @@ public class SegmentDeletionManagerTest {
     when(mockTableConfig.getValidationConfig()).thenReturn(mockValidationConfig);
     deletionManager.deleteSegments(TABLE_NAME, segments, mockTableConfig);
 
-    // Sleep 3 second to ensure the async delete actually kicked in.
-    Thread.sleep(3000L);
-    Assert.assertEquals(tableDir.listFiles().length, 0);
-    Assert.assertTrue(!deletedTableDir.exists() || deletedTableDir.listFiles().length == 0);
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        Assert.assertEquals(tableDir.listFiles().length, 0);
+        Assert.assertTrue(!deletedTableDir.exists() || deletedTableDir.listFiles().length == 0);
+        return true;
+      } catch (Throwable t) {
+        return false;
+      }
+    }, 2000L, 10_000L, "Unable to verify table deletion with retention");
 
-    // create table segment files
+    // create table segment files again to test default retention.
     createTableAndSegmentFiles(tempDir, segmentsThatShouldBeDeleted());
     // delete the segments with default retention
     deletionManager.deleteSegments(TABLE_NAME, segments);
 
-    // Sleep 3 second to ensure the async delete actually kicked in.
-    Thread.sleep(3000L);
-    tableDir = new File(tempDir.getAbsolutePath() + File.separator + TABLE_NAME);
-    Assert.assertEquals(tableDir.listFiles().length, 0);
-    Assert.assertEquals(deletedTableDir.listFiles().length, segments.size());
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        Assert.assertEquals(tableDir.listFiles().length, 0);
+        Assert.assertEquals(deletedTableDir.listFiles().length, segments.size());
+        return true;
+      } catch (Throwable t) {
+        return false;
+      }
+    }, 2000L, 10_000L, "Unable to verify table deletion with retention");
   }
 
   public void createTableAndSegmentFiles(File tempDir, List<String> segmentIds)
@@ -369,28 +380,24 @@ public class SegmentDeletionManagerTest {
       super(null, helixAdmin, CLUSTER_NAME, propertyStore, 0);
     }
 
-    FakeDeletionManager(String localDiskDir, HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore) {
-      super(localDiskDir, helixAdmin, CLUSTER_NAME, propertyStore, 0);
-    }
-
     FakeDeletionManager(String localDiskDir, HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore, int
         deletedSegmentsRetentionInDays) {
       super(localDiskDir, helixAdmin, CLUSTER_NAME, propertyStore, deletedSegmentsRetentionInDays);
     }
 
     public void deleteSegmentsFromPropertyStoreAndLocal(String tableName, Collection<String> segments) {
-      super.deleteSegmentFromPropertyStoreAndLocal(tableName, segments, 0, 0L);
+      super.deleteSegmentFromPropertyStoreAndLocal(tableName, segments, 0L, 0L);
     }
 
     @Override
-    protected void removeSegmentFromStore(String tableName, String segmentId, long deletedSegmentsRetentionMs,
-        boolean usedDefaultClusterRetention) {
+    protected void removeSegmentFromStore(String tableName, String segmentId,
+        @Nullable Long deletedSegmentsRetentionMs) {
       _segmentsRemovedFromStore.add(segmentId);
     }
 
     @Override
     protected void deleteSegmentsWithDelay(String tableName, Collection<String> segmentIds,
-        long deletedSegmentsRetentionMs, long deletionDelaySeconds) {
+        @Nullable Long deletedSegmentsRetentionMs, long deletionDelaySeconds) {
       _segmentsToRetry.addAll(segmentIds);
     }
   }

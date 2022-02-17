@@ -33,6 +33,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
@@ -60,7 +61,7 @@ public class SegmentDeletionManager {
   private static final long DEFAULT_DELETION_DELAY_SECONDS = 2L;
 
   // Retention date format will be written as suffix to deleted segments under `Deleted_Segments` folder. for example:
-  // `Deleted_Segments/myTable/myTable_mySegment_0__RETENTION_UNTIL__20220202_120000` to indicate that this segment
+  // `Deleted_Segments/myTable/myTable_mySegment_0__RETENTION_UNTIL__202202021200` to indicate that this segment
   // file will be permanently deleted after Feb 2nd 2022 12PM.
   private static final String DELETED_SEGMENTS = "Deleted_Segments";
   private static final String RETENTION_UNTIL_SEPARATOR = "__RETENTION_UNTIL__";
@@ -106,13 +107,13 @@ public class SegmentDeletionManager {
   }
 
   public void deleteSegments(String tableName, Collection<String> segmentIds,
-      TableConfig tableConfig) {
-    long deletedSegmentsRetentionMs = getRetentionMsFromTableConfig(tableConfig);
+      @Nullable TableConfig tableConfig) {
+    Long deletedSegmentsRetentionMs = getRetentionMsFromTableConfig(tableConfig);
     deleteSegmentsWithDelay(tableName, segmentIds, deletedSegmentsRetentionMs, DEFAULT_DELETION_DELAY_SECONDS);
   }
 
   protected void deleteSegmentsWithDelay(String tableName, Collection<String> segmentIds,
-      long deletedSegmentsRetentionMs, long deletionDelaySeconds) {
+      Long deletedSegmentsRetentionMs, long deletionDelaySeconds) {
     _executorService.schedule(new Runnable() {
       @Override
       public void run() {
@@ -123,7 +124,7 @@ public class SegmentDeletionManager {
   }
 
   protected synchronized void deleteSegmentFromPropertyStoreAndLocal(String tableName, Collection<String> segmentIds,
-      long deletedSegmentsRetentionMs, long deletionDelay) {
+      Long deletedSegmentsRetentionMs, long deletionDelay) {
     // Check if segment got removed from ExternalView or IdealState
     ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, tableName);
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
@@ -190,32 +191,29 @@ public class SegmentDeletionManager {
   }
 
   public void removeSegmentsFromStore(String tableNameWithType, List<String> segments) {
-    removeSegmentsFromStore(tableNameWithType, segments, _defaultDeletedSegmentsRetentionMs, true);
+    removeSegmentsFromStore(tableNameWithType, segments, null);
   }
 
   public void removeSegmentsFromStore(String tableNameWithType, List<String> segments,
-      long deletedSegmentsRetentionMs) {
-    removeSegmentsFromStore(tableNameWithType, segments, deletedSegmentsRetentionMs, false);
-  }
-
-  public void removeSegmentsFromStore(String tableNameWithType, List<String> segments,
-      long deletedSegmentsRetentionMs, boolean usedDefaultClusterRetention) {
+      @Nullable Long deletedSegmentsRetentionMs) {
     for (String segment : segments) {
-      removeSegmentFromStore(tableNameWithType, segment, deletedSegmentsRetentionMs, usedDefaultClusterRetention);
+      removeSegmentFromStore(tableNameWithType, segment, deletedSegmentsRetentionMs);
     }
   }
 
   protected void removeSegmentFromStore(String tableNameWithType, String segmentId,
-      long deletedSegmentsRetentionMs, boolean usedDefaultClusterRetention) {
+      @Nullable Long deletedSegmentsRetentionMs) {
     // Ignore HLC segments as they are not stored in Pinot FS
     if (SegmentName.isHighLevelConsumerSegmentName(segmentId)) {
       return;
     }
     if (_dataDir != null) {
+      long retentionMs = deletedSegmentsRetentionMs == null
+          ? _defaultDeletedSegmentsRetentionMs : deletedSegmentsRetentionMs;
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       URI fileToDeleteURI = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
       PinotFS pinotFS = PinotFSFactory.create(fileToDeleteURI.getScheme());
-      if (deletedSegmentsRetentionMs <= 0) {
+      if (retentionMs <= 0) {
         // delete the segment file instantly if retention is set to zero
         try {
           if (pinotFS.delete(fileToDeleteURI, true)) {
@@ -228,7 +226,7 @@ public class SegmentDeletionManager {
         }
       } else {
         // move the segment file to deleted segments first and let retention manager handler the deletion
-        String deletedFileName = usedDefaultClusterRetention ? URIUtils.encode(segmentId)
+        String deletedFileName = deletedSegmentsRetentionMs == null ? URIUtils.encode(segmentId)
             : getDeletedSegmentFileName(URIUtils.encode(segmentId), deletedSegmentsRetentionMs);
         URI deletedSegmentMoveDestURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS, rawTableName, deletedFileName);
         try {
@@ -332,19 +330,17 @@ public class SegmentDeletionManager {
     return lastModifiedTime + _defaultDeletedSegmentsRetentionMs;
   }
 
-  private long getRetentionMsFromTableConfig(TableConfig tableConfig) {
-    long retentionMs = _defaultDeletedSegmentsRetentionMs;
+  private static Long getRetentionMsFromTableConfig(@Nullable TableConfig tableConfig) {
     if (tableConfig != null) {
       SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
       if (!StringUtils.isEmpty(validationConfig.getDeletedSegmentsRetentionPeriod())) {
         try {
-          retentionMs = TimeUtils.convertPeriodToMillis(validationConfig.getDeletedSegmentsRetentionPeriod());
+          return TimeUtils.convertPeriodToMillis(validationConfig.getDeletedSegmentsRetentionPeriod());
         } catch (Exception e) {
-          LOGGER.warn("Unable to parse deleted segment retention config for table {}, using to default: {} ms",
-              tableConfig.getTableName(), _defaultDeletedSegmentsRetentionMs, e);
+          LOGGER.warn("Unable to parse deleted segment retention config for table {}", tableConfig.getTableName(), e);
         }
       }
     }
-    return retentionMs;
+    return null;
   }
 }
