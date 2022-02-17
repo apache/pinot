@@ -56,8 +56,7 @@ public class PinotTableInstances {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List table instances", notes = "List instances of the given table")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Table not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
   public String getTableInstances(
@@ -125,12 +124,12 @@ public class PinotTableInstances {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List the brokers serving a table", notes = "List live brokers of the given table based on EV")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 404, message = "Table not found"),
-      @ApiResponse(code = 500, message = "Internal server error")})
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public List<String> getLiveBrokersForTable(
-      @ApiParam(value = "Table name (with or without type)", required = true)
-      @PathParam("tableName") String tableName) {
+      @ApiParam(value = "Table name (with or without type)", required = true) @PathParam("tableName")
+          String tableName) {
     if (TableNameBuilder.getTableTypeFromTableName(tableName) != null) {
       return _pinotHelixResourceManager.getLiveBrokersForTable(tableName);
     }
@@ -139,24 +138,19 @@ public class PinotTableInstances {
     boolean hasOfflineTable = _pinotHelixResourceManager.hasOfflineTable(tableName);
     boolean hasRealtimeTable = _pinotHelixResourceManager.hasRealtimeTable(tableName);
     if (hasOfflineTable && hasRealtimeTable) {
-      Set<String> offlineBrokers = new HashSet<>(_pinotHelixResourceManager.getLiveBrokersForTable(
-              TableNameBuilder.OFFLINE.tableNameWithType(tableName)));
-      return _pinotHelixResourceManager.getLiveBrokersForTable(
-              TableNameBuilder.REALTIME.tableNameWithType(tableName))
-              .stream()
-              .filter(offlineBrokers::contains)
-              .collect(Collectors.toList());
+      Set<String> offlineBrokers = new HashSet<>(
+          _pinotHelixResourceManager.getLiveBrokersForTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName)));
+      return _pinotHelixResourceManager.getLiveBrokersForTable(TableNameBuilder.REALTIME.tableNameWithType(tableName))
+          .stream().filter(offlineBrokers::contains).collect(Collectors.toList());
     } else if (hasOfflineTable) {
-      return _pinotHelixResourceManager.getLiveBrokersForTable(
-              TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+      return _pinotHelixResourceManager.getLiveBrokersForTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
     } else if (hasRealtimeTable) {
-      return _pinotHelixResourceManager.getLiveBrokersForTable(
-              TableNameBuilder.REALTIME.tableNameWithType(tableName));
+      return _pinotHelixResourceManager.getLiveBrokersForTable(TableNameBuilder.REALTIME.tableNameWithType(tableName));
     }
     return new ArrayList<>();
   }
 
   public void setPinotHelixResourceManager(PinotHelixResourceManager pinotHelixResourceManager) {
-      _pinotHelixResourceManager = pinotHelixResourceManager;
+    _pinotHelixResourceManager = pinotHelixResourceManager;
   }
 }
