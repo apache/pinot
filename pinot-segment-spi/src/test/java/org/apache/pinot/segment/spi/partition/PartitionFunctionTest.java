@@ -174,8 +174,16 @@ public class PartitionFunctionTest {
 
       testBasicProperties(partitionFunction, functionName, expectedNumPartitions);
 
+      // Test Integer values
       for (int j = 0; j < 1000; j++) {
         Integer value = random.nextInt();
+        assertEquals(partitionFunction.getPartition(value),
+            Math.abs(value.toString().hashCode()) % expectedNumPartitions);
+      }
+
+      // Test Double values represented as String.
+      for (int j = 0; j < 1000; j++) {
+        String value = String.valueOf(random.nextDouble());
         assertEquals(partitionFunction.getPartition(value), Math.abs(value.hashCode()) % expectedNumPartitions);
       }
     }
