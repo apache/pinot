@@ -39,8 +39,8 @@ public class QueryContextUtils {
    * Returns {@code true} if the given query is a selection query, {@code false} otherwise.
    */
   public static boolean isSelectionQuery(QueryContext query) {
-    if (query.getGapfillType() == GapfillUtils.GapfillType.GapfillAggregate
-        || query.getGapfillType() == GapfillUtils.GapfillType.GapfillSelect) {
+    if (query.getGapfillType() == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE
+        || query.getGapfillType() == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
       return isSelectionOnlyQuery(query.getSubQueryContext());
     } else {
       return query.getAggregationFunctions() == null;
@@ -61,10 +61,10 @@ public class QueryContextUtils {
    */
   public static boolean isAggregationQuery(QueryContext query) {
     GapfillUtils.GapfillType gapfillType = query.getGapfillType();
-    if (gapfillType == GapfillUtils.GapfillType.AggregateGapfill
-        || gapfillType == GapfillUtils.GapfillType.AggregateGapfillAggregate) {
+    if (gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL
+        || gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL_AGGREGATE) {
       return true;
-    } else if (gapfillType != GapfillUtils.GapfillType.None) {
+    } else if (gapfillType != GapfillUtils.GapfillType.NONE) {
       return false;
     } else {
       AggregationFunction[] aggregationFunctions = query.getAggregationFunctions();

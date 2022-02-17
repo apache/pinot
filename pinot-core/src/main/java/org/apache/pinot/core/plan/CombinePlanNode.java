@@ -162,15 +162,15 @@ public class CombinePlanNode implements PlanNode {
       // Streaming query (only support selection only)
       return new StreamingSelectionOnlyCombineOperator(operators, _queryContext, _executorService, _streamObserver);
     }
-    GapfillUtils.GapfillType gapfillType = GapfillUtils.getGapfillType(_queryContext);
+    GapfillUtils.GapfillType gapfillType = _queryContext.getGapfillType();
     if (QueryContextUtils.isAggregationQuery(_queryContext)) {
-      if (gapfillType == GapfillUtils.GapfillType.AggregateGapfillAggregate) {
+      if (gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL_AGGREGATE) {
         _queryContext.getSubQueryContext().getSubQueryContext().setEndTimeMs(_queryContext.getEndTimeMs());
         return new GroupByOrderByCombineOperator(
             operators,
             _queryContext.getSubQueryContext().getSubQueryContext(),
             _executorService);
-      } else if (gapfillType == GapfillUtils.GapfillType.AggregateGapfill) {
+      } else if (gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL) {
         _queryContext.getSubQueryContext().setEndTimeMs(_queryContext.getEndTimeMs());
         return new GroupByOrderByCombineOperator(operators, _queryContext.getSubQueryContext(), _executorService);
       } else if (_queryContext.getGroupByExpressions() == null) {
@@ -191,7 +191,7 @@ public class CombinePlanNode implements PlanNode {
         // Selection order-by
         return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService);
       }
-    } else if (gapfillType != GapfillUtils.GapfillType.None) {
+    } else if (gapfillType != GapfillUtils.GapfillType.NONE) {
         return new SelectionOnlyCombineOperator(operators, _queryContext, _executorService);
     } else {
       assert QueryContextUtils.isDistinctQuery(_queryContext);

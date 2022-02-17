@@ -95,7 +95,8 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     _queryContext = queryContext;
     _gapfillType = queryContext.getGapfillType();
     _limitForAggregatedResult = queryContext.getLimit();
-    if (_gapfillType == GapfillUtils.GapfillType.AggregateGapfill || _gapfillType == GapfillUtils.GapfillType.Gapfill) {
+    if (_gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL
+        || _gapfillType == GapfillUtils.GapfillType.GAP_FILL) {
       _limitForGapfilledResult = queryContext.getLimit();
     } else {
       _limitForGapfilledResult = queryContext.getSubQueryContext().getLimit();
@@ -138,9 +139,9 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
 
   private void replaceColumnNameWithAlias(DataSchema dataSchema) {
     QueryContext queryContext;
-    if (_gapfillType == GapfillUtils.GapfillType.AggregateGapfillAggregate) {
+    if (_gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL_AGGREGATE) {
       queryContext = _queryContext.getSubQueryContext().getSubQueryContext();
-    } else if (_gapfillType == GapfillUtils.GapfillType.Gapfill) {
+    } else if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL) {
       queryContext = _queryContext;
     } else {
       queryContext = _queryContext.getSubQueryContext();
@@ -330,9 +331,9 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     }
 
     List<Object[]> sortedRawRows;
-    if (_gapfillType == GapfillUtils.GapfillType.GapfillAggregate
-        || _gapfillType == GapfillUtils.GapfillType.Gapfill
-        || _gapfillType == GapfillUtils.GapfillType.GapfillSelect) {
+    if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE
+        || _gapfillType == GapfillUtils.GapfillType.GAP_FILL
+        || _gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
       sortedRawRows = mergeAndSort(dataTableMap.values(), dataSchema);
     } else {
       try {
@@ -350,11 +351,11 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
       validateGroupByForOuterQuery();
     }
 
-    if (_gapfillType == GapfillUtils.GapfillType.GapfillAggregate
-        || _gapfillType == GapfillUtils.GapfillType.Gapfill
-        || _gapfillType == GapfillUtils.GapfillType.GapfillSelect) {
+    if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE
+        || _gapfillType == GapfillUtils.GapfillType.GAP_FILL
+        || _gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
       List<Object[]> gapfilledRows = gapFillAndAggregate(sortedRawRows, resultTableSchema, dataSchema);
-      if (_gapfillType == GapfillUtils.GapfillType.GapfillSelect) {
+      if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
         List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(_queryContext, dataSchema);
         resultRows = new ArrayList<>(gapfilledRows.size());
 
@@ -399,7 +400,7 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
 
   private void extractFinalAggregationResults(Object[] row) {
     AggregationFunction[] aggregationFunctions;
-    if (_gapfillType == GapfillUtils.GapfillType.AggregateGapfill) {
+    if (_gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL) {
       aggregationFunctions = _queryContext.getSubQueryContext().getAggregationFunctions();
     } else {
       aggregationFunctions = _queryContext.getSubQueryContext().getSubQueryContext().getAggregationFunctions();
@@ -413,7 +414,7 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
 
   private void setupColumnTypeForAggregatedColum(ColumnDataType[] columnDataTypes) {
     AggregationFunction[] aggregationFunctions;
-    if (_gapfillType == GapfillUtils.GapfillType.AggregateGapfill) {
+    if (_gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL) {
       aggregationFunctions = _queryContext.getSubQueryContext().getAggregationFunctions();
     } else {
       aggregationFunctions = _queryContext.getSubQueryContext().getSubQueryContext().getAggregationFunctions();
@@ -428,7 +429,7 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
    * Constructs the DataSchema for the ResultTable.
    */
   private DataSchema getResultTableDataSchema(DataSchema dataSchema) {
-    if (_gapfillType == GapfillUtils.GapfillType.Gapfill) {
+    if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL) {
       return dataSchema;
     }
 

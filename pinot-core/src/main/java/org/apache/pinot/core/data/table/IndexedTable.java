@@ -67,7 +67,7 @@ public abstract class IndexedTable extends BaseTable {
     _resultSize = resultSize;
 
     List<ExpressionContext> groupByExpressions;
-    if (queryContext.getGapfillType() != GapfillUtils.GapfillType.None) {
+    if (queryContext.getGapfillType() != GapfillUtils.GapfillType.NONE) {
       groupByExpressions = GapfillUtils.getGroupByExpressions(queryContext);
     } else {
       groupByExpressions = queryContext.getGroupByExpressions();

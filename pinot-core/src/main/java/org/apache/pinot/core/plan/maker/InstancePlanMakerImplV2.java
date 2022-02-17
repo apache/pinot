@@ -229,16 +229,16 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public PlanNode makeSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
     GapfillUtils.GapfillType gapfillType = queryContext.getGapfillType();
     if (QueryContextUtils.isAggregationQuery(queryContext)) {
-      if (gapfillType == GapfillUtils.GapfillType.AggregateGapfill) {
+      if (gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL) {
         queryContext = queryContext.getSubQueryContext();
-      } else if (gapfillType == GapfillUtils.GapfillType.AggregateGapfillAggregate) {
+      } else if (gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL_AGGREGATE) {
         queryContext = queryContext.getSubQueryContext().getSubQueryContext();
       }
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
       if (groupByExpressions != null) {
         // Aggregation group-by query
         if (QueryOptionsUtils.isGroupByModeSQL(queryContext.getQueryOptions())
-            || gapfillType != GapfillUtils.GapfillType.None) {
+            || gapfillType != GapfillUtils.GapfillType.NONE) {
           return new AggregationGroupByOrderByPlanNode(indexSegment, queryContext);
         }
         return new AggregationGroupByPlanNode(indexSegment, queryContext);
@@ -247,7 +247,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         return new AggregationPlanNode(indexSegment, queryContext);
       }
     } else if (QueryContextUtils.isSelectionQuery(queryContext)) {
-      if (gapfillType != GapfillUtils.GapfillType.None) {
+      if (gapfillType != GapfillUtils.GapfillType.NONE) {
         return new GapfillSelectionPlanNode(indexSegment, queryContext);
       } else {
         return new SelectionPlanNode(indexSegment, queryContext);

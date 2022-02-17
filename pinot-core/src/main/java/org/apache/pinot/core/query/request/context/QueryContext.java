@@ -137,7 +137,7 @@ public class QueryContext {
     _queryOptions = queryOptions;
     _debugOptions = debugOptions;
     _brokerRequest = brokerRequest;
-    _gapfillType = GapfillUtils.GapfillType.None;
+    _gapfillType = GapfillUtils.GapfillType.NONE;
   }
 
   /**

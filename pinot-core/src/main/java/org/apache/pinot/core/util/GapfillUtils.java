@@ -43,17 +43,17 @@ public class GapfillUtils {
 
   public enum GapfillType {
     // one sql query with gapfill only
-    Gapfill,
+    GAP_FILL,
     // gapfill as subquery, the outer query may have the filter
-    GapfillSelect,
+    GAP_FILL_SELECT,
     // gapfill as subquery, the outer query has the aggregation
-    GapfillAggregate,
+    GAP_FILL_AGGREGATE,
     // aggregation as subqery, the outer query is gapfill
-    AggregateGapfill,
+    AGGREGATE_GAP_FILL,
     // aggegration as second nesting subquery, gapfill as fist nesting subquery, different aggregation as outer query
-    AggregateGapfillAggregate,
+    AGGREGATE_GAP_FILL_AGGREGATE,
     // no gapfill at all.
-    None
+    NONE
   }
 
   private GapfillUtils() {
@@ -173,29 +173,29 @@ public class GapfillUtils {
       if (isGapfill(queryContext)) {
         Preconditions.checkArgument(queryContext.getAggregationFunctions() == null,
             "Aggregation and Gapfill can not be in the same sql statement.");
-        return GapfillType.Gapfill;
+        return GapfillType.GAP_FILL;
       } else {
-        return GapfillType.None;
+        return GapfillType.NONE;
       }
     } else if (isGapfill(queryContext)) {
       Preconditions.checkArgument(queryContext.getSubQueryContext().getAggregationFunctions() != null,
           "Select and Gapfill should be in the same sql statement.");
       Preconditions.checkArgument(queryContext.getSubQueryContext().getSubQueryContext() == null,
           "There is no three levels nesting sql when the outer query is gapfill.");
-      return GapfillType.AggregateGapfill;
+      return GapfillType.AGGREGATE_GAP_FILL;
     } else if (isGapfill(queryContext.getSubQueryContext())) {
       if (queryContext.getAggregationFunctions() == null) {
-        return GapfillType.GapfillSelect;
+        return GapfillType.GAP_FILL_SELECT;
       } else if (queryContext.getSubQueryContext().getSubQueryContext() == null) {
-        return GapfillType.GapfillAggregate;
+        return GapfillType.GAP_FILL_AGGREGATE;
       } else {
         Preconditions
             .checkArgument(queryContext.getSubQueryContext().getSubQueryContext().getAggregationFunctions() != null,
                 "Select cannot happen before gapfill.");
-        return GapfillType.AggregateGapfillAggregate;
+        return GapfillType.AGGREGATE_GAP_FILL_AGGREGATE;
       }
     } else {
-      return GapfillType.None;
+      return GapfillType.NONE;
     }
   }
 
@@ -209,12 +209,12 @@ public class GapfillUtils {
   }
 
   public static ExpressionContext getGapfillExpressionContext(QueryContext queryContext) {
-    GapfillType gapfillType = getGapfillType(queryContext);
-    if (gapfillType == GapfillType.AggregateGapfill || gapfillType == GapfillType.Gapfill) {
+    GapfillType gapfillType = queryContext.getGapfillType();
+    if (gapfillType == GapfillType.AGGREGATE_GAP_FILL || gapfillType == GapfillType.GAP_FILL) {
       return findGapfillExpressionContext(queryContext);
-    } else if (gapfillType == GapfillType.GapfillAggregate
-        || gapfillType == GapfillType.AggregateGapfillAggregate
-        || gapfillType == GapfillType.GapfillSelect) {
+    } else if (gapfillType == GapfillType.GAP_FILL_AGGREGATE
+        || gapfillType == GapfillType.AGGREGATE_GAP_FILL_AGGREGATE
+        || gapfillType == GapfillType.GAP_FILL_SELECT) {
       return findGapfillExpressionContext(queryContext.getSubQueryContext());
     } else {
       return null;
