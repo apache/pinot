@@ -79,6 +79,9 @@ COPY bin ${PINOT_HOME}/bin
 COPY etc ${PINOT_HOME}/etc
 COPY examples ${PINOT_HOME}/examples
 
+# Download jmx_prometheus_javaagent
+RUN wget https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.16.1/jmx_prometheus_javaagent-0.16.1.jar -O ${PINOT_HOME}/etc/jmx_prometheus_javaagent/jmx_prometheus_javaagent-0.16.1.jar
+
 # expose ports for controller/broker/server/admin
 EXPOSE 9000 8099 8098 8097 8096
 
