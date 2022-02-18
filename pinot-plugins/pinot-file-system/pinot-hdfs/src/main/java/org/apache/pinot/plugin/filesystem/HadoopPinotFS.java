@@ -115,7 +115,7 @@ public class HadoopPinotFS extends BasePinotFS {
           }
         } else if (sourceFile.isDirectory()) {
           try {
-            copy(sourceFilePath.toUri(), new Path(target, sourceFilePath.getName()).toUri());
+            copyDir(sourceFilePath.toUri(), new Path(target, sourceFilePath.getName()).toUri());
           } catch (FileNotFoundException e) {
             LOGGER.warn("Not found directory {}, skipping copying it...", sourceFilePath, e);
           }

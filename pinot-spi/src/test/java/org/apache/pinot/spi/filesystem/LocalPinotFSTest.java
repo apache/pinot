@@ -205,13 +205,15 @@ public class LocalPinotFSTest {
       // Expected.
     }
 
-    // Check that directory only copy worked
+    // Check that directory only copy doesn't work with default 'copy'
     try {
-      localPinotFS.copyDir(firstTempDir.toURI(), secondTempDir.toURI());
+      localPinotFS.copy(firstTempDir.toURI(), secondTempDir.toURI());
       fail();
-    } catch (IOException e) {
+    } catch (UnsupportedOperationException e) {
       // expected.
     }
+
+    // Copying directory works with 'copyDir'
     localPinotFS.copyDir(firstTempDir.toURI(), secondTempDir.toURI());
     Assert.assertTrue(localPinotFS.exists(secondTempDir.toURI()));
 
