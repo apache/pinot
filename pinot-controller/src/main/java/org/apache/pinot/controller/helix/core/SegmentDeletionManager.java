@@ -103,12 +103,16 @@ public class SegmentDeletionManager {
   }
 
   public void deleteSegments(String tableName, Collection<String> segmentIds) {
-    deleteSegments(tableName, segmentIds, null);
+    deleteSegments(tableName, segmentIds, (Long) null);
   }
 
   public void deleteSegments(String tableName, Collection<String> segmentIds,
       @Nullable TableConfig tableConfig) {
-    Long deletedSegmentsRetentionMs = getRetentionMsFromTableConfig(tableConfig);
+    deleteSegments(tableName, segmentIds, getRetentionMsFromTableConfig(tableConfig));
+  }
+
+  public void deleteSegments(String tableName, Collection<String> segmentIds,
+      @Nullable Long deletedSegmentsRetentionMs) {
     deleteSegmentsWithDelay(tableName, segmentIds, deletedSegmentsRetentionMs, DEFAULT_DELETION_DELAY_SECONDS);
   }
 
