@@ -34,13 +34,16 @@ public class SegmentConfig {
 
   private final int _maxNumRecordsPerSegment;
   private final String _segmentNamePrefix;
+  private final String _segmentNamePostfix;
 
   @JsonCreator
   private SegmentConfig(@JsonProperty(value = "maxNumRecordsPerSegment", required = true) int maxNumRecordsPerSegment,
-      @JsonProperty("segmentNamePrefix") @Nullable String segmentNamePrefix) {
+      @JsonProperty("segmentNamePrefix") @Nullable String segmentNamePrefix,
+      @JsonProperty("segmentNamePostfix") @Nullable String segmentNamePostfix) {
     Preconditions.checkState(maxNumRecordsPerSegment > 0, "Max num records per segment must be > 0");
     _maxNumRecordsPerSegment = maxNumRecordsPerSegment;
     _segmentNamePrefix = segmentNamePrefix;
+    _segmentNamePostfix = segmentNamePostfix;
   }
 
   /**
@@ -55,12 +58,18 @@ public class SegmentConfig {
     return _segmentNamePrefix;
   }
 
+  @Nullable
+  public String getSegmentNamePostfix() {
+    return _segmentNamePostfix;
+  }
+
   /**
    * Builder for SegmentConfig
    */
   public static class Builder {
     private int _maxNumRecordsPerSegment = DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT;
     private String _segmentNamePrefix;
+    private String _segmentNamePostfix;
 
     public Builder setMaxNumRecordsPerSegment(int maxNumRecordsPerSegment) {
       _maxNumRecordsPerSegment = maxNumRecordsPerSegment;
@@ -72,15 +81,21 @@ public class SegmentConfig {
       return this;
     }
 
+    public Builder setSegmentNamePostfix(String segmentNamePostfix) {
+      _segmentNamePostfix = segmentNamePostfix;
+      return this;
+    }
+
     public SegmentConfig build() {
       Preconditions.checkState(_maxNumRecordsPerSegment > 0, "Max num records per segment must be > 0");
-      return new SegmentConfig(_maxNumRecordsPerSegment, _segmentNamePrefix);
+      return new SegmentConfig(_maxNumRecordsPerSegment, _segmentNamePrefix, _segmentNamePostfix);
     }
   }
 
   @Override
   public String toString() {
-    return "SegmentConfig{" + "_maxNumRecordsPerSegment=" + _maxNumRecordsPerSegment + ", _segmentNamePrefix='"
-        + _segmentNamePrefix + '\'' + '}';
+    return String
+        .format("SegmentConfig{_maxNumRecordsPerSegment=%d, _segmentNamePrefix='%s', _segmentNamePostfix='%s'}",
+            _maxNumRecordsPerSegment, _segmentNamePrefix, _segmentNamePostfix);
   }
 }
