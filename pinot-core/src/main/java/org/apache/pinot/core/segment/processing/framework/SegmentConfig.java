@@ -94,8 +94,10 @@ public class SegmentConfig {
 
   @Override
   public String toString() {
-    return String
-        .format("SegmentConfig{_maxNumRecordsPerSegment=%d, _segmentNamePrefix='%s', _segmentNamePostfix='%s'}",
-            _maxNumRecordsPerSegment, _segmentNamePrefix, _segmentNamePostfix);
+    return "SegmentConfig{" +
+        "_maxNumRecordsPerSegment=" + _maxNumRecordsPerSegment +
+        ", _segmentNamePrefix='" + _segmentNamePrefix + '\'' +
+        ", _segmentNamePostfix='" + _segmentNamePostfix + '\'' +
+        '}';
   }
 }
