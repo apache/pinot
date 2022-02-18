@@ -28,7 +28,7 @@ keywords:
   - presto
 home: https://github.com/prestodb/presto
 sources:
-  - https://github.com/apache/incubator-pinot/tree/master/kubernetes/helm
+  - https://github.com/apache/pinot/tree/master/kubernetes/helm
 maintainers:
   - name: pinot-dev
     email: dev@pinot.apache.org

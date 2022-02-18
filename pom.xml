@@ -95,7 +95,7 @@
   </mailingLists>
 
   <scm>
-    <developerConnection>scm:git:git@github.com:apache/incubator-pinot.git</developerConnection>
+    <developerConnection>scm:git:git@github.com:apache/pinot.git</developerConnection>
     <tag>HEAD</tag>
   </scm>
 
