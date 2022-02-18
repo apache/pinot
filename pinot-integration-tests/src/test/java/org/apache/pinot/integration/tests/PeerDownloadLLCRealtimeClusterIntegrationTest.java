@@ -291,7 +291,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     public boolean copy(URI srcUri, URI dstUri)
         throws IOException {
       try {
-        return _localPinotFS.copy(new URI(_basePath + srcUri.getPath()), new URI(_basePath + dstUri.getPath()));
+        return _localPinotFS.copyDir(new URI(_basePath + srcUri.getPath()), new URI(_basePath + dstUri.getPath()));
       } catch (URISyntaxException e) {
         throw new IllegalArgumentException(e.getMessage());
       }

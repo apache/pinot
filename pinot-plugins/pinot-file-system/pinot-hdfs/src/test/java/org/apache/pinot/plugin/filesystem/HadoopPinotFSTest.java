@@ -42,7 +42,7 @@ public class HadoopPinotFSTest {
       hadoopFS.touch(new Path(baseURI.getPath(), "src/dir/2").toUri());
       String[] srcFiles = hadoopFS.listFiles(new Path(baseURI.getPath(), "src").toUri(), true);
       Assert.assertEquals(srcFiles.length, 3);
-      hadoopFS.copy(new Path(baseURI.getPath(), "src").toUri(), new Path(baseURI.getPath(), "dest").toUri());
+      hadoopFS.copyDir(new Path(baseURI.getPath(), "src").toUri(), new Path(baseURI.getPath(), "dest").toUri());
       Assert.assertTrue(hadoopFS.exists(new Path(baseURI.getPath(), "dest").toUri()));
       Assert.assertTrue(hadoopFS.exists(new Path(baseURI.getPath(), "dest/dir").toUri()));
       Assert.assertTrue(hadoopFS.exists(new Path(baseURI.getPath(), "dest/dir/1").toUri()));

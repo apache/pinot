@@ -88,10 +88,25 @@ public interface PinotFS extends Closeable, Serializable {
       throws IOException;
 
   /**
-   * Does the actual behavior of move in each FS.
+   * Copies the file from the src to dst. The original file is retained. If the dst has parent directories
+   * that haven't been created, this method will create all the necessary parent directories. If dst already exists,
+   * this will overwrite the existing file in the path.
+   *
+   * Note: In Pinot we recommend the full paths of both src and dst be specified.
+   * For example, if a file /a/b/c is copied to a file /x/y/z, the directory /a/b still exists containing the file 'c'.
+   * The dst file /x/y/z will contain the contents of 'c'.
+   * @param srcUri URI of the original file
+   * @param dstUri URI of the final file location
+   * @return true if copy is successful
+   * @throws IOException on IO failure
    */
-  boolean doMove(URI srcUri, URI dstUri)
-      throws IOException;
+  default boolean copy(URI srcUri, URI dstUri)
+      throws IOException {
+    if (isDirectory(srcUri)) {
+      throw new UnsupportedOperationException("Recursive copy not supported");
+    }
+    return copyDir(srcUri, dstUri);
+  }
 
   /**
    * Copies the file or directory from the src to dst. The original file is retained. If the dst has parent directories
@@ -108,8 +123,10 @@ public interface PinotFS extends Closeable, Serializable {
    * @return true if copy is successful
    * @throws IOException on IO failure
    */
-  boolean copy(URI srcUri, URI dstUri)
-      throws IOException;
+  default boolean copyDir(URI srcUri, URI dstUri)
+      throws IOException {
+    throw new UnsupportedOperationException("Recursive copy not supported");
+  }
 
   /**
    * Checks whether the file or directory at the provided location exists.
@@ -162,6 +179,7 @@ public interface PinotFS extends Closeable, Serializable {
       throws Exception {
     throw new UnsupportedOperationException("Recursive copy not supported");
   }
+
   /**
    * The src file is on the local disk. Add it to filesystem at the given dst name and the source is kept intact
    * afterwards.

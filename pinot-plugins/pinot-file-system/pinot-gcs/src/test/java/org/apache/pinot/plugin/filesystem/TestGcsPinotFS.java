@@ -211,7 +211,7 @@ public class TestGcsPinotFS {
 
     // Test copy directory -> directory
     GcsUri gcsDirectoryUriCopy = createTempDirectoryGcsUri();
-    _pinotFS.copy(gcsDirectoryUri.getUri(), gcsDirectoryUriCopy.getUri());
+    _pinotFS.copyDir(gcsDirectoryUri.getUri(), gcsDirectoryUriCopy.getUri());
 
     Set<GcsUri> expectedElementsCopy = new HashSet<>();
     String directoryName = Paths.get(gcsDirectoryUri.getPath()).getFileName().toString();

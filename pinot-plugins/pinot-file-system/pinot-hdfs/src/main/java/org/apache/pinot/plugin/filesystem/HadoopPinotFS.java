@@ -97,7 +97,7 @@ public class HadoopPinotFS extends BasePinotFS {
    * need to create a new configuration and filesystem. Keeps files if copy/move is partial.
    */
   @Override
-  public boolean copy(URI srcUri, URI dstUri)
+  public boolean copyDir(URI srcUri, URI dstUri)
       throws IOException {
     Path source = new Path(srcUri);
     Path target = new Path(dstUri);

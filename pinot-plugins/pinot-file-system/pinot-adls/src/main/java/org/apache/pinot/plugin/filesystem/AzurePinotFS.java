@@ -107,8 +107,12 @@ public class AzurePinotFS extends BasePinotFS {
   }
 
   @Override
-  public boolean copy(URI srcUri, URI dstUri)
+  public boolean copyDir(URI srcUri, URI dstUri)
       throws IOException {
+    if (isDirectory(srcUri)) {
+      throw new UnsupportedOperationException("Azure FS doesn't support directory recursive copy!");
+    }
+
     if (exists(dstUri)) {
       delete(dstUri, true);
     }
@@ -126,9 +130,8 @@ public class AzurePinotFS extends BasePinotFS {
       inputStream.close();
       outputStream.close();
     } catch (IOException e) {
-      LOGGER
-          .error("Exception encountered during copy, input: '{}', output: '{}'.", srcUri.toString(), dstUri.toString(),
-              e);
+      LOGGER.error("Exception encountered during copy, input: '{}', output: '{}'.", srcUri, dstUri, e);
+      return false;
     }
     return true;
   }
