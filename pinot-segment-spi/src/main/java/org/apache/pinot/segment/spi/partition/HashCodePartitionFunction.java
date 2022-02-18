@@ -57,7 +57,8 @@ public class HashCodePartitionFunction implements PartitionFunction {
     return NAME;
   }
 
-  private int abs(int n) {
+  // NOTE: This matches the Utils.abs() in Kafka
+  private static int abs(int n) {
     return (n == Integer.MIN_VALUE) ? 0 : Math.abs(n);
   }
 }
