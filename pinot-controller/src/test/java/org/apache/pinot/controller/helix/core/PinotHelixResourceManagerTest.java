@@ -44,6 +44,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
@@ -904,7 +905,7 @@ public class PinotHelixResourceManagerTest {
 
   @Test
   public void testGetLiveBrokersForTable()
-      throws IOException {
+      throws IOException, TableNotFoundException {
     // Create broker tenant
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 2, 0, 0);
     PinotResourceManagerResponse response =
@@ -939,6 +940,20 @@ public class PinotHelixResourceManagerTest {
     for (String broker: liveBrokersForTable) {
       Assert.assertTrue(broker.startsWith("Broker_localhost"));
     }
+
+    // Test retrieving the live broker for table without table-type suffix.
+    liveBrokersForTable =
+        ControllerTestUtils.getHelixResourceManager().getLiveBrokersForTable(TABLE_NAME);
+    Assert.assertEquals(liveBrokersForTable.size(), 2);
+
+    // Test retrieving the live broker for table with non-existent table-type.
+    try {
+      ControllerTestUtils.getHelixResourceManager().getLiveBrokersForTable(REALTIME_TABLE_NAME);
+      Assert.fail("Method call above should have failed");
+    } catch (TableNotFoundException tableNotFoundException) {
+      Assert.assertTrue(tableNotFoundException.getMessage().contains(REALTIME_TABLE_NAME));
+    }
+
     // Delete the table
     ControllerTestUtils.getHelixResourceManager().deleteOfflineTable(TABLE_NAME);
     // Clean up.

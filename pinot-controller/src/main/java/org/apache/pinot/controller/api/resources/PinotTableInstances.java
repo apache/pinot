@@ -25,11 +25,7 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -37,11 +33,12 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
+import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 @Api(tags = Constants.TABLE_TAG)
@@ -124,30 +121,18 @@ public class PinotTableInstances {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List the brokers serving a table", notes = "List live brokers of the given table based on EV")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "Table not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
   public List<String> getLiveBrokersForTable(
-      @ApiParam(value = "Table name (with or without type)", required = true) @PathParam("tableName")
-          String tableName) {
-    if (TableNameBuilder.getTableTypeFromTableName(tableName) != null) {
+      @ApiParam(value = "Table name (with or without type)", required = true)
+      @PathParam("tableName") String tableName) {
+    try {
       return _pinotHelixResourceManager.getLiveBrokersForTable(tableName);
+    } catch (TableNotFoundException tableNotFoundException) {
+      throw new WebApplicationException(String.format("Table=%s not found", tableName), 404);
     }
-    // If table doesn't have table-type suffix, then we return the intersection
-    // of brokers for both realtime and offline table-types.
-    boolean hasOfflineTable = _pinotHelixResourceManager.hasOfflineTable(tableName);
-    boolean hasRealtimeTable = _pinotHelixResourceManager.hasRealtimeTable(tableName);
-    if (hasOfflineTable && hasRealtimeTable) {
-      Set<String> offlineBrokers = new HashSet<>(
-          _pinotHelixResourceManager.getLiveBrokersForTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName)));
-      return _pinotHelixResourceManager.getLiveBrokersForTable(TableNameBuilder.REALTIME.tableNameWithType(tableName))
-          .stream().filter(offlineBrokers::contains).collect(Collectors.toList());
-    } else if (hasOfflineTable) {
-      return _pinotHelixResourceManager.getLiveBrokersForTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
-    } else if (hasRealtimeTable) {
-      return _pinotHelixResourceManager.getLiveBrokersForTable(TableNameBuilder.REALTIME.tableNameWithType(tableName));
-    }
-    return new ArrayList<>();
   }
 
   public void setPinotHelixResourceManager(PinotHelixResourceManager pinotHelixResourceManager) {
