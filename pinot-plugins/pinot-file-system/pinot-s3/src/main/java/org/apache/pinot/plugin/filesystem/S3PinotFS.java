@@ -363,7 +363,7 @@ public class S3PinotFS extends BasePinotFS {
   @Override
   public boolean doMove(URI srcUri, URI dstUri)
       throws IOException {
-    if (copy(srcUri, dstUri)) {
+    if (copyDir(srcUri, dstUri)) {
       return delete(srcUri, true);
     }
     return false;
