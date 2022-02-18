@@ -133,7 +133,7 @@ public class SegmentPartitionTest {
     for (int i = 0; i < 10; i++) {
       String partitionColumn = "column_" + i;
       String partitionFunction = "function_" + i;
-      expectedMap.put(partitionColumn, new ColumnPartitionConfig(partitionFunction, i + 1));
+      expectedMap.put(partitionColumn, new ColumnPartitionConfig(partitionFunction, i + 1, null));
     }
 
     SegmentPartitionConfig expectedConfig = new SegmentPartitionConfig(expectedMap);
@@ -195,7 +195,7 @@ public class SegmentPartitionTest {
     Map<String, ColumnPartitionConfig> partitionFunctionMap = new HashMap<>();
 
     partitionFunctionMap
-        .put(PARTITIONED_COLUMN_NAME, new ColumnPartitionConfig(PARTITION_FUNCTION_NAME, NUM_PARTITIONS));
+        .put(PARTITIONED_COLUMN_NAME, new ColumnPartitionConfig(PARTITION_FUNCTION_NAME, NUM_PARTITIONS, null));
 
     SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(partitionFunctionMap);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);

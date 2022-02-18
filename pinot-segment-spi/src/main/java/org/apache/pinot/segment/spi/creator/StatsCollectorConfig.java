@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.creator;
 
 import com.google.common.base.Preconditions;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -74,6 +75,10 @@ public class StatsCollectorConfig {
   public int getNumPartitions(String column) {
     return (_segmentPartitionConfig != null) ? _segmentPartitionConfig.getNumPartitions(column)
         : SegmentPartitionConfig.INVALID_NUM_PARTITIONS;
+  }
+
+  public Map<String, String> getFunctionConfig(String column) {
+    return (_segmentPartitionConfig != null) ? _segmentPartitionConfig.getFunctionConfig(column) : null;
   }
 
   public Schema getSchema() {
