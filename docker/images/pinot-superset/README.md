@@ -21,14 +21,14 @@
 
 # Superset
 
-Docker image for [Superset](https://github.com/apache/incubator-superset) with Pinot integration.
+Docker image for [Superset](https://github.com/apache/superset) with Pinot integration.
 
 
 ## How to build
 
-Pinot Superset image is built on top of [apache/incubator-superset](https://hub.docker.com/r/apache/incubator-superset) with Pinotdb driver.
+Pinot Superset image is built on top of [apache/superset](https://hub.docker.com/r/apache/superset) with Pinotdb driver.
 
-Below command will build Superset image based on `apache/incubator-superset:0.37` then tag it as `apachepinot/pinot-superset:0.37`.
+Below command will build Superset image based on `apache/superset:0.37` then tag it as `apachepinot/pinot-superset:0.37`.
 
 ```bash
 docker build --build-arg SUPERSET_IMAGE_TAG=0.37 --tag apachepinot/pinot-superset:0.37 .
@@ -42,7 +42,7 @@ docker push apachepinot/pinot-superset:0.37
 
 ## Configuration
 
-Follow the [instructions](https://superset.incubator.apache.org/installation.html#configuration) provided by Apache Superset for writing your own `superset_config.py`.
+Follow the [instructions](https://superset.apache.org/installation.html#configuration) provided by Apache Superset for writing your own `superset_config.py`.
 
 Place this file in a local directory and mount this directory to `/etc/superset` inside the container. This location is included in the image's `PYTHONPATH`. Mounting this file to a different location is possible, but it will need to be in the `PYTHONPATH`.
 
