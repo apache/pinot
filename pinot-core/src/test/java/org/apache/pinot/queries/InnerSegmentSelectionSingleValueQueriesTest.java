@@ -340,6 +340,58 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
   }
 
   @Test
+  public void testSelectStarOrderBySortedColumn() {
+      // column5 is sorted
+    String query = "SELECT * " + " FROM testTable" + " ORDER BY column5 LIMIT 10";
+
+    // Test query without filter
+    BaseOperator<IntermediateResultsBlock> selectionOrderByOperator = getOperatorForPqlQuery(query);
+    IntermediateResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
+    ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
+    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
+    // 10 * (1 order-by columns + 1 docId column) + 10 * (10 non-order-by columns)
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 120L);
+    Assert.assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
+    DataSchema selectionDataSchema = resultsBlock.getDataSchema();
+    Map<String, Integer> columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
+
+    Assert.assertEquals(getVirtualColumns(selectionDataSchema), 0);
+    Assert.assertEquals(selectionDataSchema.size(), 11);
+    Assert.assertTrue(columnIndexMap.containsKey("column5"));
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column5")),
+            DataSchema.ColumnDataType.STRING);
+    PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
+    Assert.assertEquals(selectionResult.size(), 10);
+    Object[] lastRow = selectionResult.peek();
+    Assert.assertEquals(lastRow.length, 11);
+    Assert.assertEquals((lastRow[columnIndexMap.get("column5")]), "gFuH");
+
+    // Test query with filter
+    selectionOrderByOperator = getOperatorForPqlQueryWithFilter(query);
+    resultsBlock = selectionOrderByOperator.nextBlock();
+    executionStatistics = selectionOrderByOperator.getExecutionStatistics();
+    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10);
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 84134L);
+    // 6129 * (2 order-by columns + 1 docId column) + 10 * (9 non-order-by columns)
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 120);
+    Assert.assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
+    selectionDataSchema = resultsBlock.getDataSchema();
+    columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
+
+    Assert.assertEquals(getVirtualColumns(selectionDataSchema), 0);
+    Assert.assertEquals(selectionDataSchema.size(), 11);
+    Assert.assertTrue(columnIndexMap.containsKey("column5"));
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column5")),
+            DataSchema.ColumnDataType.STRING);
+    selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
+    Assert.assertEquals(selectionResult.size(), 10);
+    lastRow = selectionResult.peek();
+    Assert.assertEquals(lastRow.length, 11);
+    Assert.assertEquals((lastRow[columnIndexMap.get("column5")]), "gFuH");
+  }
+
+  @Test
   public void testSelectStarOrderByLargeOffsetLimit() {
     String query = "SELECT * " + " FROM testTable" + ORDER_BY + " LIMIT 5000, 7000";
 

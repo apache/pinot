@@ -82,6 +82,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
   private final int _numRowsToKeep;
   private final PriorityQueue<Object[]> _rows;
 
+  private int _numOrderByColsPreSorted = 0;
   private int _numDocsScanned = 0;
   private long _numEntriesScannedPostFilter = 0;
 
@@ -103,6 +104,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     _numRowsToKeep = queryContext.getOffset() + queryContext.getLimit();
     _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
         getComparator());
+     pruneOrderByColumns();
   }
 
   @Override
@@ -115,6 +117,31 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       }
     }
     return stringBuilder.append(')').toString();
+  }
+
+  private void pruneOrderByColumns() {
+    // Order by col1, col2 limit k will take all the n matching rows
+    // and add it to a priority queue of size k.
+    // This is nlogk operation which can be quite expensive for a large n.
+    // This function, prunes out any order by clause that matches columns sorting order.
+    // In the above example, if the docs are already sorted by both col1, col2 then there is no need for any
+    // sorting at all (only limit is needed).
+    //
+    // This function just tracks the columns that are already sorted. If all them are sorted already, we can
+    // use that info to short circuit the looping.
+    int numOrderByExpressions = _orderByExpressions.size();
+    for (int i = 0; i < numOrderByExpressions; i++) {
+      OrderByExpressionContext expressionContext = _orderByExpressions.get(0);
+      if (!expressionContext.getExpression().getType().equals(ExpressionContext.Type.IDENTIFIER)
+         || !expressionContext.isAsc()) {
+        return;
+      }
+      String column = expressionContext.getExpression().getIdentifier();
+      if (!_indexSegment.getDataSource(column).getDataSourceMetadata().isSorted()) {
+        return;
+      }
+      _numOrderByColsPreSorted++;
+    }
   }
 
   private Comparator<Object[]> getComparator() {
@@ -180,11 +207,49 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    if (_expressions.size() == _orderByExpressions.size()) {
+  if (_numOrderByColsPreSorted == _orderByExpressions.size()) {
+    return computeAllPreSorted();
+  } else if (_expressions.size() == _orderByExpressions.size()) {
       return computeAllOrdered();
     } else {
       return computePartiallyOrdered();
     }
+  }
+
+  private IntermediateResultsBlock computeAllPreSorted() {
+    int numExpressions = _expressions.size();
+
+    // Fetch all the expressions and insert them into the priority queue
+    BlockValSet[] blockValSets = new BlockValSet[numExpressions];
+    int numColumnsProjected = _transformOperator.getNumColumnsProjected();
+    TransformBlock transformBlock;
+    while (_numDocsScanned < _numRowsToKeep
+           && (transformBlock = _transformOperator.nextBlock()) != null) {
+      for (int i = 0; i < numExpressions; i++) {
+        ExpressionContext expression = _expressions.get(i);
+        blockValSets[i] = transformBlock.getBlockValueSet(expression);
+      }
+      RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
+      int numDocsFetched = transformBlock.getNumDocs();
+      for (int i = 0; i < numDocsFetched && (_numDocsScanned < _numRowsToKeep); i++) {
+        SelectionOperatorUtils.addToPriorityQueue(blockValueFetcher.getRow(i), _rows, _numRowsToKeep);
+        _numDocsScanned++;
+      }
+    }
+    _numEntriesScannedPostFilter += _numDocsScanned * numColumnsProjected;
+
+    // Create the data schema
+    String[] columnNames = new String[numExpressions];
+    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
+    for (int i = 0; i < numExpressions; i++) {
+      columnNames[i] = _expressions.get(i).toString();
+      TransformResultMetadata expressionMetadata = _orderByExpressionMetadata[i];
+      columnDataTypes[i] =
+          DataSchema.ColumnDataType.fromDataType(expressionMetadata.getDataType(), expressionMetadata.isSingleValue());
+    }
+    DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
+
+    return new IntermediateResultsBlock(dataSchema, _rows);
   }
 
   /**
