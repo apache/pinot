@@ -161,12 +161,18 @@ public class MergeTaskUtilsTest {
     Map<String, String> taskConfig = new HashMap<>();
     taskConfig.put(MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, "10000");
     taskConfig.put(MergeTask.SEGMENT_NAME_PREFIX_KEY, "myPrefix");
+    taskConfig.put(MergeTask.SEGMENT_NAME_POSTFIX_KEY, "myPostfix");
     SegmentConfig segmentConfig = MergeTaskUtils.getSegmentConfig(taskConfig);
     assertEquals(segmentConfig.getMaxNumRecordsPerSegment(), 10000);
     assertEquals(segmentConfig.getSegmentNamePrefix(), "myPrefix");
+    assertEquals(segmentConfig.getSegmentNamePostfix(), "myPostfix");
+    assertEquals(segmentConfig.toString(),
+        "SegmentConfig{_maxNumRecordsPerSegment=10000, _segmentNamePrefix='myPrefix', "
+            + "_segmentNamePostfix='myPostfix'}");
 
     segmentConfig = MergeTaskUtils.getSegmentConfig(Collections.emptyMap());
     assertEquals(segmentConfig.getMaxNumRecordsPerSegment(), SegmentConfig.DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT);
     assertNull(segmentConfig.getSegmentNamePrefix());
+    assertNull(segmentConfig.getSegmentNamePostfix());
   }
 }
