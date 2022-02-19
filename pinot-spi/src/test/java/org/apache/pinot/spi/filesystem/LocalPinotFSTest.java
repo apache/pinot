@@ -209,7 +209,7 @@ public class LocalPinotFSTest {
     try {
       localPinotFS.copy(firstTempDir.toURI(), secondTempDir.toURI());
       fail();
-    } catch (UnsupportedOperationException e) {
+    } catch (IllegalArgumentException e) {
       // expected.
     }
 

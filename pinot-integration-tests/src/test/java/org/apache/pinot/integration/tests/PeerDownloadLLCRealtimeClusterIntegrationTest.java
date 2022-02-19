@@ -288,7 +288,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     }
 
     @Override
-    public boolean copy(URI srcUri, URI dstUri)
+    public boolean copyDir(URI srcUri, URI dstUri)
         throws IOException {
       try {
         return _localPinotFS.copyDir(new URI(_basePath + srcUri.getPath()), new URI(_basePath + dstUri.getPath()));

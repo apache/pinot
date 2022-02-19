@@ -109,6 +109,7 @@ public class AzurePinotFS extends BasePinotFS {
   @Override
   public boolean copyDir(URI srcUri, URI dstUri)
       throws IOException {
+    // TODO: support directory copy.
     if (isDirectory(srcUri)) {
       throw new UnsupportedOperationException("Azure FS doesn't support directory recursive copy!");
     }

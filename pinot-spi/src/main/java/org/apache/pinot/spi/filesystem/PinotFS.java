@@ -103,7 +103,7 @@ public interface PinotFS extends Closeable, Serializable {
   default boolean copy(URI srcUri, URI dstUri)
       throws IOException {
     if (isDirectory(srcUri)) {
-      throw new UnsupportedOperationException("Recursive copy not supported");
+      throw new IllegalArgumentException("Recursive copy not supported");
     }
     return copyDir(srcUri, dstUri);
   }
@@ -123,10 +123,8 @@ public interface PinotFS extends Closeable, Serializable {
    * @return true if copy is successful
    * @throws IOException on IO failure
    */
-  default boolean copyDir(URI srcUri, URI dstUri)
-      throws IOException {
-    throw new UnsupportedOperationException("Recursive copy not supported");
-  }
+  boolean copyDir(URI srcUri, URI dstUri)
+      throws IOException;
 
   /**
    * Checks whether the file or directory at the provided location exists.
