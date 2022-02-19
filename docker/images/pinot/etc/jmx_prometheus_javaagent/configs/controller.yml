@@ -1,5 +1,4 @@
 rules:
-# Pinot Controller
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.controller(\\w+)\"><>(\\w+)"
   name: "pinot_controller_$1_$2"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.helix\\.(\\w+)\"><>(\\w+)"

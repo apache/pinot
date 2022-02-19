@@ -1,5 +1,4 @@
 rules:
-# Pinot Minions
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.(\\w+)\"><>(\\w+)"
   name: "pinot_minion_$1_$2"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.(\\w+).(\\w+)\"><>(\\w+)"
