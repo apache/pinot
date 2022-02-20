@@ -12,6 +12,7 @@ import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.query.dispatch.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.slf4j.Logger;
@@ -40,7 +41,11 @@ public class QueryDispatcher {
         int port = serverInstance.getGrpcPort();
         DispatchClient client = getOrCreateDispatchClient(host, port);
         Worker.QueryResponse response = client.submit(Worker.QueryRequest.newBuilder()
-            .setSerializedQueryPlan(constructSerializedStageQueryRequest(queryPlan, stageId, serverInstance)).build());
+            .setQueryPlan(QueryPlanSerDeUtils.serialize(
+                constructDistributedQueryPlan(queryPlan, stageId, serverInstance)))
+            .putMetadata("SERVER_INSTANCE_HOST", serverInstance.getHostname())
+            .putMetadata("SERVER_INSTANCE_PORT", String.valueOf(serverInstance.getGrpcPort()))
+            .build());
         if (response.containsMetadata("ERROR")) {
           throw new RuntimeException(String.format("Unable to execute query plan at stage %s on server %s: ERROR: %s",
               stageId, serverInstance, response));
@@ -49,23 +54,9 @@ public class QueryDispatcher {
     }
   }
 
-  // construct a stage plan based on queryPlan and the particular stage, and the instance of the server;
-  public static ByteString constructSerializedStageQueryRequest(QueryPlan queryPlan, String stageId,
+  public static DistributedQueryPlan constructDistributedQueryPlan(QueryPlan queryPlan, String stageId,
       ServerInstance serverInstance) {
-    WorkerQueryRequest workerQueryRequest = constructStageQueryRequest(queryPlan, stageId, serverInstance);
-    try (ByteArrayOutputStream bs = new ByteArrayOutputStream();
-        ObjectOutputStream os = new ObjectOutputStream(bs)) {
-      os.writeObject(workerQueryRequest);
-      return ByteString.copyFrom(bs.toByteArray());
-    } catch (IOException e) {
-      LOGGER.error("Error when creating stage plan!");
-      throw new RuntimeException(e);
-    }
-  }
-
-  public static WorkerQueryRequest constructStageQueryRequest(QueryPlan queryPlan, String stageId,
-      ServerInstance serverInstance) {
-    return new WorkerQueryRequest(stageId, serverInstance, queryPlan.getQueryStageMap().get(stageId),
+    return new DistributedQueryPlan(stageId, serverInstance, queryPlan.getQueryStageMap().get(stageId),
             queryPlan.getStageMetadataMap());
   }
 

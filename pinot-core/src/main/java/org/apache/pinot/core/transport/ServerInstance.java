@@ -19,14 +19,13 @@
 package org.apache.pinot.core.transport;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.Serializable;
 import org.apache.commons.lang.StringUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 
 
-public class ServerInstance implements Serializable {
+public class ServerInstance {
   private static final char HOSTNAME_PORT_DELIMITER = '_';
 
   private final String _hostname;
@@ -70,7 +69,7 @@ public class ServerInstance implements Serializable {
   }
 
   @VisibleForTesting
-  protected ServerInstance(String hostname, int port) {
+  ServerInstance(String hostname, int port) {
     _hostname = hostname;
     _port = port;
     _grpcPort = -1;

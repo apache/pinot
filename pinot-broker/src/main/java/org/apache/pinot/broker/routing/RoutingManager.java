@@ -57,7 +57,6 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -503,6 +502,10 @@ public class RoutingManager implements ClusterChangeHandler {
     return routingEntry != null ? routingEntry.getQueryTimeoutMs() : null;
   }
 
+  public Map<String, ServerInstance> getEnabledServerInstanceMap() {
+    return new HashMap<>(_enabledServerInstanceMap);
+  }
+
   private static class RoutingEntry {
     final String _tableNameWithType;
     final SegmentPreSelector _segmentPreSelector;
@@ -601,42 +604,5 @@ public class RoutingManager implements ClusterChangeHandler {
         return new InstanceSelector.SelectionResult(Collections.emptyMap(), Collections.emptyList());
       }
     }
-
-    // only support offline segment
-    InstanceSelector.SelectionResult calculateRouting() {
-      Set<String> selectedSegments = _segmentSelector.select(null);
-      return _instanceSelector.select(null, new ArrayList<>(selectedSegments));
-    }
-  }
-
-  /**
-   * Returns the routing table (a map from server instance to list of segments hosted by the server, and a list of
-   * unavailable segments) based on the broker request, or {@code null} if the routing does not exist.
-   * <p>NOTE: The broker request should already have the table suffix (_OFFLINE or _REALTIME) appended.
-   */
-  @Nullable
-  public RoutingTable getRoutingTable(String tableName) {
-    String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
-    RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
-    if (routingEntry == null) {
-      return null;
-    }
-    InstanceSelector.SelectionResult selectionResult = routingEntry.calculateRouting();
-    Map<String, String> segmentToInstanceMap = selectionResult.getSegmentToInstanceMap();
-    Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = new HashMap<>();
-    for (Map.Entry<String, String> entry : segmentToInstanceMap.entrySet()) {
-      ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
-      if (serverInstance != null) {
-        serverInstanceToSegmentsMap.computeIfAbsent(serverInstance, k -> new ArrayList<>()).add(entry.getKey());
-      } else {
-        // Should not happen in normal case unless encountered unexpected exception when updating routing entries
-        _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.SERVER_MISSING_FOR_ROUTING, 1L);
-      }
-    }
-    return new RoutingTable(serverInstanceToSegmentsMap, selectionResult.getUnavailableSegments());
-  }
-
-  public Map<String, ServerInstance> getEnabledServerInstanceMap() {
-    return _enabledServerInstanceMap;
   }
 }

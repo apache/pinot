@@ -11,7 +11,9 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestUtils;
 import org.apache.pinot.query.dispatch.QueryDispatcher;
+import org.apache.pinot.query.dispatch.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.query.planner.QueryPlan;
+import org.apache.pinot.query.routing.WorkerInstance;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -35,7 +37,7 @@ public class QueryWorkerTest {
       QueryWorker workerService = new QueryWorker(availablePort, Mockito.mock(QueryRunner.class));
       workerService.start();
       _queryWorkerMap.put(availablePort, workerService);
-      _queryWorkerInstanceMap.put(availablePort, QueryEnvironmentTestUtils.getServerInstance(availablePort));
+      _queryWorkerInstanceMap.put(availablePort, new WorkerInstance("localhost", availablePort));
     }
 
     List<Integer> portList = Lists.newArrayList(_queryWorkerMap.keySet());
@@ -78,7 +80,8 @@ public class QueryWorkerTest {
     ServerInstance serverInstance = queryPlan.getStageMetadataMap().get(stageId).getServerInstances().get(0);
 
     return Worker.QueryRequest.newBuilder()
-        .setSerializedQueryPlan(QueryDispatcher.constructSerializedStageQueryRequest(queryPlan, stageId, serverInstance))
+        .setQueryPlan(QueryPlanSerDeUtils.serialize(
+            QueryDispatcher.constructDistributedQueryPlan(queryPlan, stageId, serverInstance)))
         .putMetadata("SERVER_INSTANCE_HOST", serverInstance.getHostname())
         .putMetadata("SERVER_INSTANCE_PORT", String.valueOf(serverInstance.getGrpcPort()))
         .build();

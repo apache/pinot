@@ -10,7 +10,7 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.trace.TraceRunnable;
-import org.apache.pinot.query.dispatch.WorkerQueryRequest;
+import org.apache.pinot.query.dispatch.DistributedQueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.nodes.JoinNode;
 import org.apache.pinot.query.planner.nodes.MailboxReceiveNode;
@@ -23,7 +23,6 @@ import org.apache.pinot.query.runtime.operator.BroadcastJoinOperator;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,7 +31,7 @@ import org.slf4j.LoggerFactory;
  * WorkerQueryExecutor is the v2 of the {@link org.apache.pinot.core.query.executor.QueryExecutor} API.
  *
  * It provides not only execution interface for {@link org.apache.pinot.core.query.request.ServerQueryRequest} but
- * also a more general {@link WorkerQueryRequest}.
+ * also a more general {@link DistributedQueryPlan}.
  */
 public class WorkerQueryExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkerQueryExecutor.class);
@@ -60,7 +59,7 @@ public class WorkerQueryExecutor {
   }
 
   // TODO: split this execution from PhysicalPlanner
-  public void processQuery(WorkerQueryRequest queryRequest, Map<String, String> requestMetadataMap,
+  public void processQuery(DistributedQueryPlan queryRequest, Map<String, String> requestMetadataMap,
       ExecutorService executorService) {
     String requestId = requestMetadataMap.get("RequestId");
     StageNode stageRoot = queryRequest.getStageRoot();

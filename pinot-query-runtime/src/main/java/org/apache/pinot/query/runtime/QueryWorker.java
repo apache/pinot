@@ -1,7 +1,6 @@
 package org.apache.pinot.query.runtime;
 
 import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
@@ -17,7 +16,8 @@ import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
-import org.apache.pinot.query.dispatch.WorkerQueryRequest;
+import org.apache.pinot.query.dispatch.DistributedQueryPlan;
+import org.apache.pinot.query.dispatch.serde.QueryPlanSerDeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,13 +61,10 @@ public class QueryWorker extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   @Override
   public void submit(Worker.QueryRequest request, StreamObserver<Worker.QueryResponse> responseObserver) {
     // Deserialize the request
-    WorkerQueryRequest workerQueryRequest;
+    DistributedQueryPlan distributedQueryPlan;
     Map<String, String> requestMetadataMap;
-    try (ByteArrayInputStream bs = new ByteArrayInputStream(request.getSerializedQueryPlan().toByteArray());
-        ObjectInputStream is = new ObjectInputStream(bs)) {
-      Object o = is.readObject();
-      Preconditions.checkState(o instanceof WorkerQueryRequest, "invalid worker query request object");
-      workerQueryRequest = (WorkerQueryRequest) o;
+    try {
+      distributedQueryPlan = QueryPlanSerDeUtils.deserialize(request.getQueryPlan());
       requestMetadataMap = request.getMetadataMap();
     } catch (Exception e) {
       LOGGER.error("Caught exception while deserializing the request: {}", request, e);
@@ -83,7 +80,7 @@ public class QueryWorker extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     // Process the query
     try {
       // TODO: break this into parsing and execution, so that responseObserver can return upon parsing complete.
-      _queryRunner.processQuery(workerQueryRequest, _executorService, requestMetadataMap);
+      _queryRunner.processQuery(distributedQueryPlan, _executorService, requestMetadataMap);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing request", e);
       throw new RuntimeException(e);

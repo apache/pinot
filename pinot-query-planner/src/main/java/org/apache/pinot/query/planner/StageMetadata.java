@@ -21,6 +21,7 @@ public class StageMetadata implements Serializable {
 
   public StageMetadata() {
     _scannedTables = new ArrayList<>();
+    _serverInstances = new ArrayList<>();
     _serverInstanceToSegmentsMap = new HashMap<>();
   }
 

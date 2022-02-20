@@ -17,9 +17,10 @@ import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestUtils;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.dispatch.QueryDispatcher;
-import org.apache.pinot.query.dispatch.WorkerQueryRequest;
+import org.apache.pinot.query.dispatch.DistributedQueryPlan;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.nodes.MailboxReceiveNode;
+import org.apache.pinot.query.routing.WorkerInstance;
 import org.apache.pinot.query.runtime.blocks.DataTableBlock;
 import org.apache.pinot.query.runtime.blocks.DataTableBlockUtils;
 import org.apache.pinot.query.runtime.mailbox.GrpcMailboxService;
@@ -69,8 +70,8 @@ public class QueryRunnerTest {
         _reducerGrpcPort, server1.getPort(), server2.getPort());
     server1.start();
     server2.start();
-    _servers.put(QueryEnvironmentTestUtils.getServerInstance(server1.getPort()), server1);
-    _servers.put(QueryEnvironmentTestUtils.getServerInstance(server2.getPort()), server2);
+    _servers.put(new WorkerInstance("localhost", server1.getPort()), server1);
+    _servers.put(new WorkerInstance("localhost", server2.getPort()), server2);
   }
 
   @AfterClass
@@ -89,14 +90,15 @@ public class QueryRunnerTest {
         "RequestId", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
 
     ServerInstance serverInstance = queryPlan.getStageMetadataMap().get(stageRoodId).getServerInstances().get(0);
-    WorkerQueryRequest workerQueryRequest = QueryDispatcher.constructStageQueryRequest(queryPlan, stageRoodId, serverInstance);
+    DistributedQueryPlan
+        distributedQueryPlan = QueryDispatcher.constructDistributedQueryPlan(queryPlan, stageRoodId, serverInstance);
 
     MailboxReceiveOperator mailboxReceiveOperator =
         createReduceStageOperator(queryPlan.getStageMetadataMap().get(stageRoodId).getServerInstances(),
             requestMetadataMap.get("RequestId"), stageRoodId, _reducerGrpcPort);
 
     // execute this single stage.
-    _servers.get(serverInstance).processQuery(workerQueryRequest, requestMetadataMap);
+    _servers.get(serverInstance).processQuery(distributedQueryPlan, requestMetadataMap);
 
     DataTableBlock dataTableBlock;
     // get the block back and it should have 5 rows
@@ -115,10 +117,11 @@ public class QueryRunnerTest {
     Map<String, String> requestMetadataMap = ImmutableMap.of("RequestId", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
 
     for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageRoodId).getServerInstances()) {
-      WorkerQueryRequest workerQueryRequest = QueryDispatcher.constructStageQueryRequest(queryPlan, stageRoodId, serverInstance);
+      DistributedQueryPlan
+          distributedQueryPlan = QueryDispatcher.constructDistributedQueryPlan(queryPlan, stageRoodId, serverInstance);
 
       // execute this single stage.
-      _servers.get(serverInstance).processQuery(workerQueryRequest, requestMetadataMap);
+      _servers.get(serverInstance).processQuery(distributedQueryPlan, requestMetadataMap);
     }
 
     MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(
@@ -154,8 +157,9 @@ public class QueryRunnerTest {
             requestMetadataMap.get("RequestId"), reduceNode.getSenderStageId(), _reducerGrpcPort);
       } else {
         for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
-          WorkerQueryRequest workerQueryRequest = QueryDispatcher.constructStageQueryRequest(queryPlan, stageId, serverInstance);
-          _servers.get(serverInstance).processQuery(workerQueryRequest, requestMetadataMap);
+          DistributedQueryPlan
+              distributedQueryPlan = QueryDispatcher.constructDistributedQueryPlan(queryPlan, stageId, serverInstance);
+          _servers.get(serverInstance).processQuery(distributedQueryPlan, requestMetadataMap);
         }
       }
     }
@@ -203,8 +207,9 @@ public class QueryRunnerTest {
             requestMetadataMap.get("RequestId"), reduceNode.getSenderStageId(), _reducerGrpcPort);
       } else {
         for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
-          WorkerQueryRequest workerQueryRequest = QueryDispatcher.constructStageQueryRequest(queryPlan, stageId, serverInstance);
-          _servers.get(serverInstance).processQuery(workerQueryRequest, requestMetadataMap);
+          DistributedQueryPlan
+              distributedQueryPlan = QueryDispatcher.constructDistributedQueryPlan(queryPlan, stageId, serverInstance);
+          _servers.get(serverInstance).processQuery(distributedQueryPlan, requestMetadataMap);
         }
       }
     }

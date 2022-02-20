@@ -12,10 +12,12 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.broker.routing.RoutingTable;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.helix.TableCache;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.planner.QueryPlan;
+import org.apache.pinot.query.routing.WorkerInstance;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
@@ -23,6 +25,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -68,9 +72,9 @@ public class QueryEnvironmentTestUtils {
   public static RoutingManager getMockRoutingManager(int port1, int port2) {
     String server1 = String.format("localhost_%d", port1);
     String server2 = String.format("localhost_%d", port2);
-    ServerInstance host1 = getServerInstance(port1);
-    ServerInstance host2 = getServerInstance(port2);
-    RoutingManager mock = mock(RoutingManager.class);
+    ServerInstance host1 = new WorkerInstance("localhost", port1);
+    ServerInstance host2 = new WorkerInstance("localhost", port2);
+
     RoutingTable rtA = mock(RoutingTable.class);
     when(rtA.getServerInstanceToSegmentsMap()).thenReturn(ImmutableMap.of(host1, SERVER1_SEGMENTS.get("a"),
         host2, SERVER2_SEGMENTS.get("a")));
@@ -79,9 +83,12 @@ public class QueryEnvironmentTestUtils {
     RoutingTable rtC = mock(RoutingTable.class);
     when(rtC.getServerInstanceToSegmentsMap()).thenReturn(ImmutableMap.of(host1, SERVER1_SEGMENTS.get("c"),
         host2, SERVER2_SEGMENTS.get("c")));
-    when(mock.getRoutingTable("a")).thenReturn(rtA);
-    when(mock.getRoutingTable("b")).thenReturn(rtB);
-    when(mock.getRoutingTable("c")).thenReturn(rtC);
+    Map<String, RoutingTable> mockRoutingTableMap = ImmutableMap.of("a", rtA, "b", rtB, "c", rtC);
+    RoutingManager mock = mock(RoutingManager.class);
+    when(mock.getRoutingTable(any())).thenAnswer(invocation -> {
+      BrokerRequest brokerRequest = invocation.getArgument(0);
+      return mockRoutingTableMap.get(brokerRequest.getQuerySource().getTableName());
+    });
     when(mock.getEnabledServerInstanceMap()).thenReturn(ImmutableMap.of(server1, host1, server2, host2));
     return mock;
   }
@@ -102,14 +109,5 @@ public class QueryEnvironmentTestUtils {
     } catch (IOException e) {
       throw new RuntimeException("Failed to find an available port to use", e);
     }
-  }
-
-  public static ServerInstance getServerInstance(int port) {
-    String server = String.format("localhost_%d", port);
-    InstanceConfig instanceConfig = InstanceConfig.toInstanceConfig(server);
-    ZNRecord znRecord = instanceConfig.getRecord();
-    Map<String, String> simpleFields = znRecord.getSimpleFields();
-    simpleFields.put(CommonConstants.Helix.Instance.GRPC_PORT_KEY, instanceConfig.getPort());
-    return new ServerInstance(instanceConfig);
   }
 }

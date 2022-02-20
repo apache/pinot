@@ -13,7 +13,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
-import org.apache.pinot.query.dispatch.WorkerQueryRequest;
+import org.apache.pinot.query.dispatch.DistributedQueryPlan;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.mailbox.GrpcMailboxService;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -169,7 +169,7 @@ public class QueryServerEnclosure {
     }
   }
 
-  public void processQuery(WorkerQueryRequest workerQueryRequest, Map<String, String> requestMetadataMap) {
-    _queryRunner.processQuery(workerQueryRequest, _testExecutor, requestMetadataMap);
+  public void processQuery(DistributedQueryPlan distributedQueryPlan, Map<String, String> requestMetadataMap) {
+    _queryRunner.processQuery(distributedQueryPlan, _testExecutor, requestMetadataMap);
   }
 }
