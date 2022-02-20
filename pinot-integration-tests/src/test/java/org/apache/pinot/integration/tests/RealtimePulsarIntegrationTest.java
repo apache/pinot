@@ -203,7 +203,6 @@ public class RealtimePulsarIntegrationTest extends BaseClusterIntegrationTestSet
           CompletableFuture<MessageId> fut = producer.sendAsync(line);
           fut.thenAccept(messageId -> {
             try {
-              System.out.println("NEXT_MESSAGE_ID: " + messageId);
               if (messageId != null) {
                 _totalRecordsPushedInStream++;
                 JsonNode data = JsonUtils.stringToJsonNode(ls);
