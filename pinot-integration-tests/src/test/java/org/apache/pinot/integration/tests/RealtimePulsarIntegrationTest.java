@@ -243,7 +243,7 @@ public class RealtimePulsarIntegrationTest extends BaseClusterIntegrationTestSet
   }
   
   @Test(enabled = true)
-  public void testRecords()
+  public void testConsumeFromEarliestOffset()
       throws Exception {
     Assert.assertNotEquals(_totalRecordsPushedInStream, 0);
 
@@ -304,7 +304,7 @@ public class RealtimePulsarIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test(enabled = true)
-  public void testRecordsDouble()
+  public void testConsumeFromStoredOffset()
       throws Exception {
     publishRecordsToPulsarTopic();
     waitForAllDocsLoadedPulsar(120000L);
