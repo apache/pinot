@@ -79,6 +79,10 @@
           <groupId>org.apache.commons</groupId>
           <artifactId>commons-math3</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>io.grpc</groupId>
+          <artifactId>grpc-core</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
