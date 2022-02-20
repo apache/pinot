@@ -1,0 +1,59 @@
+{
+  "schemaName": "demand",
+  "dimensionFieldSpecs": [
+    {
+      "name": "demand_uuid",
+      "singleValueField": true,
+      "dataType": "STRING",
+      "virtualColumnProvider": null,
+      "defaultNullValue": "null",
+      "transformFunction": null,
+      "maxLength" : 4096
+    },
+    {
+      "name": "geofence",
+      "singleValueField": true,
+      "dataType": "STRING",
+      "virtualColumnProvider": null,
+      "defaultNullValue": "null",
+      "transformFunction": null
+    }
+  ],
+  "metricFieldSpecs": [
+    {
+      "dataType": "DOUBLE",
+      "singleValueField": true,
+      "fieldSize": 8,
+      "derivedMetricType": null,
+      "name": "surge_multiplier",
+      "virtualColumnProvider": null,
+      "defaultNullValue": 0.0,
+      "transformFunction": null
+    }
+  ],
+  "dateTimeFieldSpecs": [
+  ],
+  "timeFieldSpec": {
+    "name": "timestamp",
+    "dataType": "LONG",
+    "singleValueField": true,
+    "incomingGranularitySpec": {
+      "name": "timestamp",
+      "dataType": "LONG",
+      "timeType": "MILLISECONDS",
+      "timeUnitSize": 1,
+      "timeFormat": "EPOCH"
+    },
+    "outgoingGranularitySpec": {
+      "name": "timestamp",
+      "dataType": "LONG",
+      "timeType": "MILLISECONDS",
+      "timeUnitSize": 1,
+      "timeFormat": "EPOCH"
+    },
+    "virtualColumnProvider": null,
+    "defaultNullValue": -9223372036854775808,
+    "transformFunction": null
+  },
+  "primaryKeyColumns" : [ "demand_uuid" ]
+}
