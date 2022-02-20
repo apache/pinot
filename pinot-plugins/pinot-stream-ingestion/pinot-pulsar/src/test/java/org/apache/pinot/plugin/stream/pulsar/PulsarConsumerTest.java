@@ -20,6 +20,8 @@ package org.apache.pinot.plugin.stream.pulsar;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
@@ -35,6 +37,7 @@ import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.Schema;
 import org.apache.pulsar.client.api.TopicMetadata;
+import org.apache.pulsar.client.impl.BatchMessageIdImpl;
 import org.apache.pulsar.client.impl.MessageIdImpl;
 import org.apache.pulsar.client.internal.DefaultImplementation;
 import org.testng.Assert;
@@ -47,13 +50,18 @@ public class PulsarConsumerTest {
 
   public static final String TABLE_NAME_WITH_TYPE = "tableName_REALTIME";
   public static final String TEST_TOPIC = "test-topic";
-  public static final int NUM_PARTITION = 1;
+  public static final String TEST_TOPIC_BATCH = "test-topic-batch";
   public static final String MESSAGE_PREFIX = "sample_msg";
-  public static final int NUM_RECORDS_PER_PARTITION = 1000;
   public static final String CLIENT_ID = "clientId";
+
+  public static final int NUM_PARTITION = 1;
+  public static final int NUM_RECORDS_PER_PARTITION = 1000;
+  public static final int BATCH_SIZE = 10;
+
   private PulsarClient _pulsarClient;
   private PulsarStandaloneCluster _pulsarStandaloneCluster;
   private HashMap<Integer, MessageId> _partitionToFirstMessageIdMap = new HashMap<>();
+  private HashMap<Integer, MessageId> _partitionToFirstMessageIdMapBatch = new HashMap<>();
 
   @BeforeClass
   public void setUp()
@@ -71,8 +79,10 @@ public class PulsarConsumerTest {
       _pulsarClient = PulsarClient.builder().serviceUrl(bootstrapServer).build();
 
       admin.topics().createPartitionedTopic(TEST_TOPIC, NUM_PARTITION);
+      admin.topics().createPartitionedTopic(TEST_TOPIC_BATCH, NUM_PARTITION);
 
       publishRecords();
+      publishRecordsBatch();
     } catch (Exception e) {
       if (_pulsarStandaloneCluster != null) {
         _pulsarStandaloneCluster.stop();
@@ -107,10 +117,37 @@ public class PulsarConsumerTest {
           _partitionToFirstMessageIdMap.put(partition, messageId);
         }
       }
+
+      producer.flush();
     }
   }
 
-  public StreamConfig getStreamConfig() {
+  public void publishRecordsBatch()
+      throws Exception {
+    for (int p = 0; p < NUM_PARTITION; p++) {
+      final int partition = p;
+      Producer<String> producer =
+          _pulsarClient.newProducer(Schema.STRING).topic(TEST_TOPIC_BATCH).messageRouter(new MessageRouter() {
+            @Override
+            public int choosePartition(Message<?> msg, TopicMetadata metadata) {
+              return partition;
+            }
+          }).batchingMaxMessages(BATCH_SIZE).batchingMaxPublishDelay(1, TimeUnit.SECONDS).create();
+
+      for (int i = 0; i < NUM_RECORDS_PER_PARTITION; i++) {
+        CompletableFuture<MessageId> messageIdCompletableFuture = producer.sendAsync(MESSAGE_PREFIX + "_" + i);
+        messageIdCompletableFuture.thenAccept(messageId -> {
+          if (!_partitionToFirstMessageIdMapBatch.containsKey(partition)) {
+            _partitionToFirstMessageIdMapBatch.put(partition, messageId);
+          }
+        });
+      }
+
+      producer.flush();
+    }
+  }
+
+  public StreamConfig getStreamConfig(String topicName) {
     String streamType = "pulsar";
     String streamPulsarBrokerList = "pulsar://localhost:" + _pulsarStandaloneCluster.getBrokerPort();
     String streamPulsarConsumerType = "simple";
@@ -119,7 +156,7 @@ public class PulsarConsumerTest {
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", streamType);
     streamConfigMap.put("stream.pulsar.consumer.type", streamPulsarConsumerType);
-    streamConfigMap.put("stream.pulsar.topic.name", TEST_TOPIC);
+    streamConfigMap.put("stream.pulsar.topic.name", topicName);
     streamConfigMap.put("stream.pulsar.bootstrap.servers", streamPulsarBrokerList);
     streamConfigMap.put("stream.pulsar.consumer.prop.auto.offset.reset", "smallest");
     streamConfigMap.put("stream.pulsar.consumer.factory.class.name", getPulsarConsumerFactoryName());
@@ -140,8 +177,10 @@ public class PulsarConsumerTest {
   public void testPartitionLevelConsumer()
       throws Exception {
 
-    final StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(getStreamConfig());
-    int numPartitions = new PulsarStreamMetadataProvider(CLIENT_ID, getStreamConfig()).fetchPartitionCount(10000);
+    final StreamConsumerFactory streamConsumerFactory =
+        StreamConsumerFactoryProvider.create(getStreamConfig(TEST_TOPIC));
+    int numPartitions =
+        new PulsarStreamMetadataProvider(CLIENT_ID, getStreamConfig(TEST_TOPIC)).fetchPartitionCount(10000);
 
     for (int partition = 0; partition < numPartitions; partition++) {
       PartitionGroupConsumptionStatus partitionGroupConsumptionStatus =
@@ -161,8 +200,9 @@ public class PulsarConsumerTest {
         totalMessagesReceived++;
       }
 
-      final MessageBatch messageBatch2 = consumer
-          .fetchMessages(new MessageIdStreamOffset(getMessageIdForPartitionAndIndex(partition, 500)), null, 10000);
+      final MessageBatch messageBatch2 =
+          consumer.fetchMessages(new MessageIdStreamOffset(getMessageIdForPartitionAndIndex(partition, 500)), null,
+              10000);
       Assert.assertEquals(messageBatch2.getMessageCount(), 500);
       for (int i = 0; i < messageBatch2.getMessageCount(); i++) {
         final byte[] msg = (byte[]) messageBatch2.getMessageAtIndex(i);
@@ -170,9 +210,59 @@ public class PulsarConsumerTest {
         totalMessagesReceived++;
       }
 
-      final MessageBatch messageBatch3 = consumer
-          .fetchMessages(new MessageIdStreamOffset(getMessageIdForPartitionAndIndex(partition, 10)),
+      final MessageBatch messageBatch3 =
+          consumer.fetchMessages(new MessageIdStreamOffset(getMessageIdForPartitionAndIndex(partition, 10)),
               new MessageIdStreamOffset(getMessageIdForPartitionAndIndex(partition, 35)), 10000);
+      Assert.assertEquals(messageBatch3.getMessageCount(), 25);
+      for (int i = 0; i < messageBatch3.getMessageCount(); i++) {
+        final byte[] msg = (byte[]) messageBatch3.getMessageAtIndex(i);
+        Assert.assertEquals(new String(msg), "sample_msg_" + (10 + i));
+      }
+
+      Assert.assertEquals(totalMessagesReceived, NUM_RECORDS_PER_PARTITION);
+    }
+  }
+
+  @Test
+  public void testPartitionLevelConsumerBatchMessages()
+      throws Exception {
+
+    final StreamConsumerFactory streamConsumerFactory =
+        StreamConsumerFactoryProvider.create(getStreamConfig(TEST_TOPIC_BATCH));
+    int numPartitions =
+        new PulsarStreamMetadataProvider(CLIENT_ID, getStreamConfig(TEST_TOPIC_BATCH)).fetchPartitionCount(10000);
+
+    for (int partition = 0; partition < numPartitions; partition++) {
+      PartitionGroupConsumptionStatus partitionGroupConsumptionStatus =
+          new PartitionGroupConsumptionStatus(partition, 1, new MessageIdStreamOffset(MessageId.earliest), null,
+              "CONSUMING");
+
+      int totalMessagesReceived = 0;
+
+      final PartitionGroupConsumer consumer =
+          streamConsumerFactory.createPartitionGroupConsumer(CLIENT_ID, partitionGroupConsumptionStatus);
+      final MessageBatch messageBatch1 = consumer.fetchMessages(new MessageIdStreamOffset(MessageId.earliest),
+          new MessageIdStreamOffset(getBatchMessageIdForPartitionAndIndex(partition, 500)), 10000);
+      Assert.assertEquals(messageBatch1.getMessageCount(), 500);
+      for (int i = 0; i < messageBatch1.getMessageCount(); i++) {
+        final byte[] msg = (byte[]) messageBatch1.getMessageAtIndex(i);
+        Assert.assertEquals(new String(msg), "sample_msg_" + i);
+        totalMessagesReceived++;
+      }
+
+      final MessageBatch messageBatch2 =
+          consumer.fetchMessages(new MessageIdStreamOffset(getBatchMessageIdForPartitionAndIndex(partition, 500)), null,
+              10000);
+      Assert.assertEquals(messageBatch2.getMessageCount(), 500);
+      for (int i = 0; i < messageBatch2.getMessageCount(); i++) {
+        final byte[] msg = (byte[]) messageBatch2.getMessageAtIndex(i);
+        Assert.assertEquals(new String(msg), "sample_msg_" + (500 + i));
+        totalMessagesReceived++;
+      }
+
+      final MessageBatch messageBatch3 =
+          consumer.fetchMessages(new MessageIdStreamOffset(getBatchMessageIdForPartitionAndIndex(partition, 10)),
+              new MessageIdStreamOffset(getBatchMessageIdForPartitionAndIndex(partition, 35)), 10000);
       Assert.assertEquals(messageBatch3.getMessageCount(), 25);
       for (int i = 0; i < messageBatch3.getMessageCount(); i++) {
         final byte[] msg = (byte[]) messageBatch3.getMessageAtIndex(i);
@@ -187,5 +277,12 @@ public class PulsarConsumerTest {
     MessageId startMessageIdRaw = _partitionToFirstMessageIdMap.get(partitionNum);
     MessageIdImpl startMessageId = MessageIdImpl.convertToMessageIdImpl(startMessageIdRaw);
     return DefaultImplementation.newMessageId(startMessageId.getLedgerId(), index, partitionNum);
+  }
+
+  public MessageId getBatchMessageIdForPartitionAndIndex(int partitionNum, int index) {
+    MessageId startMessageIdRaw = _partitionToFirstMessageIdMapBatch.get(partitionNum);
+    BatchMessageIdImpl startMessageId = (BatchMessageIdImpl) MessageIdImpl.convertToMessageIdImpl(startMessageIdRaw);
+    return new BatchMessageIdImpl(startMessageId.getLedgerId(), index / BATCH_SIZE, partitionNum, index % BATCH_SIZE,
+        startMessageId.getBatchSize(), startMessageId.getAcker());
   }
 }
