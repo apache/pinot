@@ -57,4 +57,8 @@ public class NotFilterOperator extends BaseFilterOperator {
   protected FilterBlock getNextBlock() {
     return new FilterBlock(new NotDocIdSet(_filterOperator.nextBlock().getBlockDocIdSet(), _numDocs));
   }
+
+  public Operator getChildFilterOperator() {
+    return _filterOperator;
+  }
 }

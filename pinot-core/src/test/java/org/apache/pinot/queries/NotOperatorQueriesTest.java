@@ -26,6 +26,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -174,34 +176,54 @@ public class NotOperatorQueriesTest extends BaseQueriesTest {
     }
   }
 
+  private void testOptimizedQueryHelper(String query, int expectedResultSize, List<Serializable[]> expectedResults) {
+    BrokerResponseNative brokerResponseNative = getBrokerResponseForOptimizedSqlQuery(query, null);
+    ResultTable resultTable = brokerResponseNative.getResultTable();
+    List<Object[]> results = resultTable.getRows();
+    Assert.assertEquals(results.size(), expectedResultSize);
+
+    if (expectedResults != null) {
+      for (int i = 0; i < expectedResults.size(); i++) {
+        Object[] actualRow = results.get(i);
+        Serializable[] expectedRow = expectedResults.get(i);
+        Assert.assertEquals(actualRow, expectedRow);
+      }
+    }
+  }
+
   @Test
   public void testLikeBasedNotOperator() {
     String query =
         "SELECT FIRST_INT_COL, SECOND_INT_COL FROM MyTable WHERE NOT REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') LIMIT "
             + "50000";
     testSelectionResults(query, 768, null);
+    testOptimizedQueryHelper(query, 1536, null);
 
     query = "SELECT FIRST_INT_COL, SECOND_INT_COL FROM MyTable WHERE NOT REGEXP_LIKE(DOMAIN_NAMES, 'www.sd.domain1.*') "
         + "LIMIT 50000";
     testSelectionResults(query, 768, null);
+    testOptimizedQueryHelper(query, 1536, null);
 
     query =
         "SELECT FIRST_INT_COL, SECOND_INT_COL FROM MyTable WHERE NOT REGEXP_LIKE(DOMAIN_NAMES, '.*domain1.*') LIMIT "
             + "50000";
     testSelectionResults(query, 512, null);
+    testOptimizedQueryHelper(query, 1024, null);
 
     query = "SELECT FIRST_INT_COL, SECOND_INT_COL FROM MyTable WHERE NOT REGEXP_LIKE(DOMAIN_NAMES, '.*domain.*') LIMIT "
         + "50000";
     testSelectionResults(query, 0, null);
+    testOptimizedQueryHelper(query, 0, null);
 
     query =
         "SELECT FIRST_INT_COL, SECOND_INT_COL FROM MyTable WHERE NOT REGEXP_LIKE(DOMAIN_NAMES, '.*com') LIMIT 50000";
     testSelectionResults(query, 768, null);
+    testOptimizedQueryHelper(query, 1536, null);
   }
 
   @Test
   public void testWeirdPredicates() {
-    String query = "SELECT FIRST_INT_COL, SECOND_INT_COL FROM MyTable WHERE NOT FIRST_INT_COL = 5 LIMIT " + "50000";
+    String query = "SELECT FIRST_INT_COL, SECOND_INT_COL FROM MyTable WHERE NOT FIRST_INT_COL = 5 LIMIT 50000";
     testSelectionResults(query, 1023, null);
 
     query = "SELECT FIRST_INT_COL, SECOND_INT_COL FROM MyTable WHERE NOT FIRST_INT_COL < 5 LIMIT " + "50000";

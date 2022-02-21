@@ -87,6 +87,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
     switch (kind) {
       case AND:
       case OR:
+      case NOT:
         // Recursively traverse the expression tree to find an operator node that can be rewritten.
         operands.forEach(operand -> optimize(operand, schema));
 
