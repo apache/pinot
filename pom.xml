@@ -95,7 +95,7 @@
   </mailingLists>
 
   <scm>
-    <developerConnection>scm:git:git@github.com:apache/incubator-pinot.git</developerConnection>
+    <developerConnection>scm:git:git@github.com:apache/pinot.git</developerConnection>
     <tag>HEAD</tag>
   </scm>
 
@@ -436,7 +436,7 @@
       <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>0.9.23</version>
+        <version>0.9.25</version>
       </dependency>
       <dependency>
         <groupId>com.101tec</groupId>

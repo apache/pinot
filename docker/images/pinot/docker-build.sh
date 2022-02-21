@@ -39,7 +39,7 @@ if [[ "$#" -gt 2 ]]
 then
   PINOT_GIT_URL=$3
 else
-  PINOT_GIT_URL="https://github.com/apache/incubator-pinot.git"
+  PINOT_GIT_URL="https://github.com/apache/pinot.git"
 fi
 
 if [[ "$#" -gt 3 ]]

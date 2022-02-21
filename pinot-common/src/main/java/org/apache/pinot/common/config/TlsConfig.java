@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.transport;
+package org.apache.pinot.common.config;
 
 import io.netty.handler.ssl.SslProvider;
 import java.security.KeyStore;

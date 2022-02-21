@@ -270,7 +270,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     // Set timeout as 5ms so that query will timeout
     TableConfig tableConfig = getOfflineTableConfig();
-    tableConfig.setQueryConfig(new QueryConfig(5L));
+    tableConfig.setQueryConfig(new QueryConfig(5L, null));
     updateTableConfig(tableConfig);
 
     // Wait for at most 1 minute for broker to receive and process the table config refresh message
@@ -667,7 +667,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Set query timeout
     long queryTimeout = 5000;
     TableConfig tableConfig = getOfflineTableConfig();
-    tableConfig.setQueryConfig(new QueryConfig(queryTimeout));
+    tableConfig.setQueryConfig(new QueryConfig(queryTimeout, null));
     updateTableConfig(tableConfig);
 
     long startTime = System.currentTimeMillis();
@@ -856,6 +856,40 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(queryResponse.get("selectionResults").get("columns").size(), 79);
 
     _tableSizeAfterRemovingIndex = getTableSize(getTableName());
+  }
+
+  @Test
+  public void testDisableGroovyQueryTableConfigOverride()
+      throws Exception {
+    String groovyQuery = "SELECT GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', "
+        + "'arg0 + arg1', FlightNum, Origin) FROM myTable";
+    TableConfig tableConfig = getOfflineTableConfig();
+    tableConfig.setQueryConfig(new QueryConfig(null, true));
+    updateTableConfig(tableConfig);
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        postSqlQuery(groovyQuery);
+        return false;
+      } catch (Exception e) {
+        // expected
+        return true;
+      }
+    }, 60_000L, "Failed to reject Groovy query with table override");
+
+    // Remove query config
+    tableConfig.setQueryConfig(null);
+    updateTableConfig(tableConfig);
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        postSqlQuery(groovyQuery);
+        // Query should not throw exception
+        return true;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 60_000L, "Failed to accept Groovy query without query table config override");
   }
 
   private void reloadWithExtraColumns()

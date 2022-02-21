@@ -20,7 +20,7 @@
 -->
 
 # docker-pinot-thirdeye
-This is a docker image of [Apache Thirdeye](https://github.com/apache/incubator-pinot/tree/master/thirdeye).
+This is a docker image of [Apache Thirdeye](https://github.com/apache/pinot/tree/master/thirdeye).
 
 ## How to build a docker image
 
@@ -40,11 +40,11 @@ The docker image is tagged as `[Docker Tag]`.
 
 `Git Branch`: The Pinot branch to build. Default is `master`.
 
-`Pinot Git URL`: The Pinot Git Repo to build, users can set it to their own fork. Please note that, the URL is `https://` based, not `git://`. Default is the Apache Repo: `https://github.com/apache/incubator-pinot.git`.
+`Pinot Git URL`: The Pinot Git Repo to build, users can set it to their own fork. Please note that, the URL is `https://` based, not `git://`. Default is the Apache Repo: `https://github.com/apache/pinot.git`.
 
 * Example of building and tagging a snapshot on your own fork:
 ```SHELL
-./docker-build.sh thirdeye:latest master https://github.com/apache/incubator-pinot.git
+./docker-build.sh thirdeye:latest master https://github.com/apache/pinot.git
 ```
 
 ## How to publish a docker image
@@ -65,7 +65,7 @@ Script `docker-build-and-push.sh` builds and publishes this docker image to your
 * Example of building and publishing a image to [apachepinot/thirdeye](https://cloud.docker.com/u/apachepinot/repository/docker/apachepinot/thirdeye) dockerHub repo.
 
 ```SHELL
-./docker-build-and-push.sh apachepinot/thirdeye:latest master https://github.com/apache/incubator-pinot.git
+./docker-build-and-push.sh apachepinot/thirdeye:latest master https://github.com/apache/pinot.git
 ```
 
 ## How to Run it

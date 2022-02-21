@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.transport;
 
+import org.apache.pinot.common.config.TlsConfig;
+
+
 /**
  * Provides configuration settings expected by an Http Server to
  * setup listeners for http and https protocols.
