@@ -73,12 +73,16 @@ public class MutableJsonIndex implements JsonIndexReader {
    */
   public void add(String jsonString)
       throws IOException {
-    List<Map<String, String>> flattenedRecords = JsonUtils.flatten(JsonUtils.stringToJsonNode(jsonString));
-    _writeLock.lock();
     try {
-      addFlattenedRecords(flattenedRecords);
+      List<Map<String, String>> flattenedRecords = JsonUtils.flatten(JsonUtils.stringToJsonNode(jsonString));
+      _writeLock.lock();
+      try {
+        addFlattenedRecords(flattenedRecords);
+      } finally {
+        _writeLock.unlock();
+      }
     } finally {
-      _writeLock.unlock();
+      _nextDocId++;
     }
   }
 
@@ -104,7 +108,6 @@ public class MutableJsonIndex implements JsonIndexReader {
       }
       _nextFlattenedDocId++;
     }
-    _nextDocId++;
   }
 
   @Override

@@ -21,7 +21,7 @@ package org.apache.pinot.tools.admin.command;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.core.util.TlsUtils;
+import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TlsSpec;

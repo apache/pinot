@@ -174,6 +174,11 @@ public class FilterPlanNode implements PlanNode {
           }
         }
         return FilterOperatorUtils.getOrFilterOperator(childFilterOperators, _numDocs, _queryContext.getDebugOptions());
+      case NOT:
+        childFilters = filter.getChildren();
+        assert childFilters.size() == 1;
+        BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilters.get(0));
+        return FilterOperatorUtils.getNotFilterOperator(childFilterOperator, _numDocs, null);
       case PREDICATE:
         Predicate predicate = filter.getPredicate();
         ExpressionContext lhs = predicate.getLhs();

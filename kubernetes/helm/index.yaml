@@ -25,7 +25,7 @@ entries:
       name: pinot-dev
     name: pinot
     sources:
-    - https://github.com/apache/incubator-pinot/tree/master/kubernetes/helm
+    - https://github.com/apache/pinot/tree/master/kubernetes/helm
     urls:
     - pinot-0.2.4.tgz
     version: 0.2.4
@@ -53,7 +53,7 @@ entries:
       name: pinot-dev
     name: pinot
     sources:
-    - https://github.com/apache/incubator-pinot/tree/master/kubernetes/helm
+    - https://github.com/apache/pinot/tree/master/kubernetes/helm
     urls:
     - pinot-0.2.3.tgz
     version: 0.2.3
@@ -81,7 +81,7 @@ entries:
       name: pinot-dev
     name: pinot
     sources:
-    - https://github.com/apache/incubator-pinot/tree/master/kubernetes/helm
+    - https://github.com/apache/pinot/tree/master/kubernetes/helm
     urls:
     - pinot-0.2.2.tgz
     version: 0.2.2
@@ -109,7 +109,7 @@ entries:
       name: pinot-dev
     name: pinot
     sources:
-    - https://github.com/apache/incubator-pinot/tree/master/kubernetes/helm
+    - https://github.com/apache/pinot/tree/master/kubernetes/helm
     urls:
     - pinot-0.2.1.tgz
     version: 0.2.1
@@ -137,7 +137,7 @@ entries:
       name: pinot-dev
     name: pinot
     sources:
-    - https://github.com/apache/incubator-pinot/tree/master/kubernetes/helm
+    - https://github.com/apache/pinot/tree/master/kubernetes/helm
     urls:
     - pinot-0.2.0.tgz
     version: 0.2.0
@@ -159,7 +159,7 @@ entries:
       name: pinot-dev
     name: presto
     sources:
-    - https://github.com/apache/incubator-pinot/tree/master/kubernetes/helm
+    - https://github.com/apache/pinot/tree/master/kubernetes/helm
     urls:
     - presto-0.2.1.tgz
     version: 0.2.1
@@ -180,7 +180,7 @@ entries:
       name: pinot-dev
     name: presto
     sources:
-    - https://github.com/apache/incubator-pinot/tree/master/kubernetes/helm
+    - https://github.com/apache/pinot/tree/master/kubernetes/helm
     urls:
     - presto-0.2.0.tgz
     version: 0.2.0

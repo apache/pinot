@@ -30,7 +30,7 @@ If your change is relatively minor, you can skip this step. If you are adding ne
 
 ### Create an issue for the change
 
-Create a Pinot issue [here](https://github.com/apache/incubator-pinot/issues) for the change you would like to make. Provide information on why the change is needed and how you plan to address it. Use the conversations on the issue as a way to validate assumptions and the right way to proceed. Be sure to review sections on [Backward and Forward compatibility changes](https://docs.pinot.apache.org/developers/developers-and-contributors/contribution-guidelines#backward-and-forward-compatibility-changes) and [External libraries](https://docs.pinot.apache.org/developers/developers-and-contributors/contribution-guidelines#external-libraries).
+Create a Pinot issue [here](https://github.com/apache/pinot/issues) for the change you would like to make. Provide information on why the change is needed and how you plan to address it. Use the conversations on the issue as a way to validate assumptions and the right way to proceed. Be sure to review sections on [Backward and Forward compatibility changes](https://docs.pinot.apache.org/developers/developers-and-contributors/contribution-guidelines#backward-and-forward-compatibility-changes) and [External libraries](https://docs.pinot.apache.org/developers/developers-and-contributors/contribution-guidelines#external-libraries).
 
 If you have a design document, please refer to the design documents in your Issue. You may even want to create multiple issues depending on the extent of your change.
 
@@ -73,7 +73,7 @@ Please ensure your code is adequately documented. Some things to consider for do
 
 #### Code Formatting
 * Ensure that the code you add is properly formatted as per the Pinot style-sheets.
-* Pinot's style-sheets can be found in ```incubator-pinot/config```.
+* Pinot's style-sheets can be found in ```pinot/config```.
 * For information on how to import the style-sheet into your IDE, refer [here](https://docs.pinot.apache.org/developers/developers-and-contributors/code-setup#setup-ide).
 
 #### Exceptions and Exception-Handling
@@ -181,7 +181,7 @@ $ git add <files required for the change>
 $ git commit -m "Meaningful oneliner for the change"
 $ git push origin <your issue branch>
 
-After this, create a PullRequest in `github <https://github.com/apache/incubator-pinot/pulls>`_. Include the following information in the description:
+After this, create a PullRequest in `github <https://github.com/apache/pinot/pulls>`_. Include the following information in the description:
 
   * The changes that are included in the PR.
 

@@ -27,7 +27,6 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.roaringbitmap.RangeBitmap;
-import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -109,11 +108,10 @@ public class BitSlicedRangeIndexReader implements RangeIndexReader<ImmutableRoar
   private ImmutableRoaringBitmap queryRangeBitmap(long min, long max, long columnMax) {
     RangeBitmap rangeBitmap = mapRangeBitmap();
     if (Long.compareUnsigned(max, columnMax) < 0) {
-      RoaringBitmap lte = rangeBitmap.lte(max);
       if (Long.compareUnsigned(min, 0) > 0) {
-        return rangeBitmap.gte(min, lte).toMutableRoaringBitmap();
+        return rangeBitmap.between(min, max).toMutableRoaringBitmap();
       }
-      return lte.toMutableRoaringBitmap();
+      return rangeBitmap.lte(max).toMutableRoaringBitmap();
     } else {
       if (Long.compareUnsigned(min, 0) > 0) {
         return rangeBitmap.gte(min).toMutableRoaringBitmap();
