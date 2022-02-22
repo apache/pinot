@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.index.metadata;
 
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -289,8 +290,15 @@ public class ColumnMetadataImpl implements ColumnMetadata {
         partitionFunctionConfigMap = new HashMap<>();
         Iterator<String> partitionFunctionConfigKeysIter = partitionFunctionConfig.getKeys();
         while (partitionFunctionConfigKeysIter.hasNext()) {
-          String key = partitionFunctionConfigKeysIter.next();
-          partitionFunctionConfigMap.put(key, partitionFunctionConfig.getString(key));
+          String functionConfigKey = partitionFunctionConfigKeysIter.next();
+          Object functionConfigValueObj = partitionFunctionConfig.getProperty(functionConfigKey);
+          String valueStr;
+          if (functionConfigValueObj instanceof List) {
+            valueStr = String.join(",", (List) functionConfigValueObj);
+          } else {
+            valueStr = functionConfigValueObj.toString();
+          }
+          partitionFunctionConfigMap.put(functionConfigKey, valueStr);
         }
       }
       PartitionFunction partitionFunction =
