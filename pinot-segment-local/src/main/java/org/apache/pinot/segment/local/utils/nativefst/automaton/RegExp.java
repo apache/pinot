@@ -275,7 +275,7 @@ public class RegExp {
    * Same as <code>toAutomaton(null)</code> (empty automaton map).
    */
   public Automaton toAutomaton() {
-    return toAutomatonAllowMutate(null, null, true);
+    return toAutomatonAllowMutate(null, null, false);
   }
 
   private Automaton toAutomatonAllowMutate(Map<String, Automaton> automata, AutomatonProvider automatonProvider,
