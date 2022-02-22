@@ -143,10 +143,10 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
   /**
    * Returns the {@link PartitionFunction}'s functionConfig for the column.
    *
-   * @return Function config for the column.
+   * @return Partition Function config for the column.
    */
   @Override
-  public Map<String, String> getFunctionConfig() {
+  public Map<String, String> getPartitionFunctionConfig() {
     return _functionConfig;
   }
 

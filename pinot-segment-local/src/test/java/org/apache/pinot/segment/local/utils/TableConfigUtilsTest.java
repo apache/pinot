@@ -871,7 +871,7 @@ public class TableConfigUtilsTest {
       // expected
     }
 
-    ColumnPartitionConfig columnPartitionConfig = new ColumnPartitionConfig("Murmur", 4, null);
+    ColumnPartitionConfig columnPartitionConfig = new ColumnPartitionConfig("Murmur", 4);
     Map<String, ColumnPartitionConfig> partitionConfigMap = new HashMap<>();
     partitionConfigMap.put("myCol2", columnPartitionConfig);
     SegmentPartitionConfig partitionConfig = new SegmentPartitionConfig(partitionConfigMap);

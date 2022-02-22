@@ -91,7 +91,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName(T).build();
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
-    columnPartitionConfigMap.put(M1, new ColumnPartitionConfig("Modulo", 2, null));
+    columnPartitionConfigMap.put(M1, new ColumnPartitionConfig("Modulo", 2));
     TableConfig tableConfigWithPartitioning =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_WITH_PARTITIONING).setTimeColumnName(T)
             .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap)).build();

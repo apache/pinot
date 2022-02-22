@@ -40,24 +40,28 @@ public class BoundedColumnValuePartitionFunction implements PartitionFunction {
   private static final int DEFAULT_PARTITION_ID = 0;
   private static final String NAME = "BoundedColumnValue";
   private static final String COLUMN_VALUES = "columnValues";
+  private static final String COLUMN_VALUES_DELIMITER = "columnValuesDelimiter";
+  private final int _numPartitions;
   private final Map<String, String> _functionConfig;
   private final String[] _values;
-  private final int _noOfValues;
 
-  public BoundedColumnValuePartitionFunction(Map<String, String> functionConfig) {
+  public BoundedColumnValuePartitionFunction(int numPartitions, Map<String, String> functionConfig) {
     Preconditions.checkArgument(functionConfig != null && functionConfig.size() > 0,
-        "functionConfig should be present, specified", functionConfig);
+        "'functionConfig' should be present, specified", functionConfig);
     Preconditions.checkState(functionConfig.get(COLUMN_VALUES) != null, "columnValues must be configured");
+    Preconditions.checkState(functionConfig.get(COLUMN_VALUES_DELIMITER) != null,
+        "'columnValuesDelimiter' must be configured");
     _functionConfig = functionConfig;
-    _values = functionConfig.get(COLUMN_VALUES).split("\\|");
-    _noOfValues = _values.length;
+    _values = functionConfig.get(COLUMN_VALUES).split(functionConfig.get(COLUMN_VALUES_DELIMITER));
+    Preconditions.checkState(_values.length == numPartitions,
+        "'numPartitions' must be equal to number of column values configured");
+    _numPartitions = numPartitions;
   }
 
   @Override
-  public int getPartition(Object valueIn) {
-    String value = valueIn instanceof String ? (String) valueIn : String.valueOf(valueIn);
-    for (int i = 0; i < _noOfValues; i++) {
-      if (_values[i].equalsIgnoreCase(value)) {
+  public int getPartition(Object value) {
+    for (int i = 0; i < _numPartitions; i++) {
+      if (_values[i].equalsIgnoreCase(value.toString())) {
         return i + 1;
       }
     }
@@ -77,7 +81,7 @@ public class BoundedColumnValuePartitionFunction implements PartitionFunction {
    */
   @Override
   public int getNumPartitions() {
-    return _noOfValues + 1;
+    return _numPartitions + 1;
   }
 
   @Override

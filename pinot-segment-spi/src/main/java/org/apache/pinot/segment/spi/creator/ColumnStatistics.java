@@ -99,7 +99,7 @@ public interface ColumnStatistics extends Serializable {
 
   int getNumPartitions();
 
-  Map<String, String> getFunctionConfig();
+  Map<String, String> getPartitionFunctionConfig();
 
   Set<Integer> getPartitions();
 }

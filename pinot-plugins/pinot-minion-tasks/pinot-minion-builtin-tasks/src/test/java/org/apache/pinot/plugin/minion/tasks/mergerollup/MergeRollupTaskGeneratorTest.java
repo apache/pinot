@@ -402,7 +402,7 @@ public class MergeRollupTaskGeneratorTest {
     TableConfig offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
             .setSegmentPartitionConfig(new SegmentPartitionConfig(
-                Collections.singletonMap("memberId", new ColumnPartitionConfig("murmur", 10, null))))
+                Collections.singletonMap("memberId", new ColumnPartitionConfig("murmur", 10))))
             .setTaskConfig(new TableTaskConfig(taskConfigsMap)).build();
 
     String segmentName1 = "testTable__1";

@@ -108,7 +108,7 @@ public class DefaultColumnStatistics implements ColumnStatistics {
   }
 
   @Override
-  public Map<String, String> getFunctionConfig() {
+  public Map<String, String> getPartitionFunctionConfig() {
     return null;
   }
 

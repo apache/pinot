@@ -135,7 +135,7 @@ public class PartitionerTest {
     }
     partitionerConfig =
         new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG)
-            .setColumnName("foo").setColumnPartitionConfig(new ColumnPartitionConfig("MURMUR", 3, null)).build();
+            .setColumnName("foo").setColumnPartitionConfig(new ColumnPartitionConfig("MURMUR", 3)).build();
     Partitioner partitioner = PartitionerFactory.getPartitioner(partitionerConfig);
     assertEquals(partitioner.getClass(), TableConfigPartitioner.class);
 

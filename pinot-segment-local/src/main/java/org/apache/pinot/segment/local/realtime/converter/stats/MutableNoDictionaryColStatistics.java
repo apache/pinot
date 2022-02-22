@@ -104,7 +104,7 @@ public class MutableNoDictionaryColStatistics implements ColumnStatistics {
   }
 
   @Override
-  public Map<String, String> getFunctionConfig() {
+  public Map<String, String> getPartitionFunctionConfig() {
     PartitionFunction partitionFunction = _dataSourceMetadata.getPartitionFunction();
     return partitionFunction != null ? partitionFunction.getFunctionConfig() : null;
   }

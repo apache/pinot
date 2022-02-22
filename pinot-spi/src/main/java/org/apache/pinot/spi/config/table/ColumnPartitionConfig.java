@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
@@ -30,13 +31,16 @@ public class ColumnPartitionConfig extends BaseJsonConfig {
   private final int _numPartitions;
   private final Map<String, String> _functionConfig;
 
+  public ColumnPartitionConfig(String functionName, int numPartitions) {
+    this(functionName, numPartitions, null);
+  }
+
   @JsonCreator
   public ColumnPartitionConfig(@JsonProperty(value = "functionName", required = true) String functionName,
-      @JsonProperty(value = "numPartitions", required = false) int numPartitions,
-      @JsonProperty(value = "functionConfig", required = false) Map<String, String> functionConfig) {
+      @JsonProperty(value = "numPartitions", required = true) int numPartitions,
+      @JsonProperty(value = "functionConfig") Map<String, String> functionConfig) {
     Preconditions.checkArgument(functionName != null, "'functionName' must be configured");
-    Preconditions.checkArgument(numPartitions > 0 || (functionConfig != null && functionConfig.size() > 0),
-            "'numPartitions' or 'functionConfig' must be configured");
+    Preconditions.checkArgument(numPartitions > 0, "'numPartitions' must be positive");
     _functionName = functionName;
     _numPartitions = numPartitions;
     _functionConfig = functionConfig;
@@ -56,6 +60,7 @@ public class ColumnPartitionConfig extends BaseJsonConfig {
    *
    * @return Partition function configuration.
    */
+  @Nullable
   public Map<String, String> getFunctionConfig() {
     return _functionConfig;
   }

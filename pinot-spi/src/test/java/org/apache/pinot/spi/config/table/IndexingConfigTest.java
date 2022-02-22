@@ -73,7 +73,7 @@ public class IndexingConfigTest {
     int numColumns = 5;
     Map<String, ColumnPartitionConfig> expectedColumnPartitionMap = new HashMap<>(5);
     for (int i = 0; i < numColumns; i++) {
-      expectedColumnPartitionMap.put("column_" + i, new ColumnPartitionConfig("function_" + i, i + 1, null));
+      expectedColumnPartitionMap.put("column_" + i, new ColumnPartitionConfig("function_" + i, i + 1));
     }
 
     SegmentPartitionConfig expectedPartitionConfig = new SegmentPartitionConfig(expectedColumnPartitionMap);

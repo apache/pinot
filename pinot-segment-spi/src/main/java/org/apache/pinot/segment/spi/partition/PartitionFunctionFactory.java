@@ -84,7 +84,7 @@ public class PartitionFunctionFactory {
         return new HashCodePartitionFunction(numPartitions);
 
       case BoundedColumnValue:
-        return new BoundedColumnValuePartitionFunction(functionConfig);
+        return new BoundedColumnValuePartitionFunction(numPartitions, functionConfig);
 
       default:
         throw new IllegalArgumentException("Illegal partition function name: " + functionName);

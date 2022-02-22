@@ -184,7 +184,7 @@ public class MutableColumnStatistics implements ColumnStatistics {
   }
 
   @Override
-  public Map<String, String> getFunctionConfig() {
+  public Map<String, String> getPartitionFunctionConfig() {
     PartitionFunction partitionFunction = _dataSource.getDataSourceMetadata().getPartitionFunction();
     return partitionFunction != null ? partitionFunction.getFunctionConfig() : null;
   }

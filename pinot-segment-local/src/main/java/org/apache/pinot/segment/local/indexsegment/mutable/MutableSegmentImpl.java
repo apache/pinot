@@ -423,7 +423,7 @@ public class MutableSegmentImpl implements MutableSegment {
   public SegmentPartitionConfig getSegmentPartitionConfig() {
     if (_partitionColumn != null) {
       return new SegmentPartitionConfig(Collections.singletonMap(_partitionColumn,
-          new ColumnPartitionConfig(_partitionFunction.getName(), _partitionFunction.getNumPartitions(), null)));
+          new ColumnPartitionConfig(_partitionFunction.getName(), _partitionFunction.getNumPartitions())));
     } else {
       return null;
     }

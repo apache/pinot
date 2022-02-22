@@ -115,6 +115,6 @@ public class ColumnIndexCreationInfo implements Serializable {
   }
 
   public Map<String, String> getPartitionFunctionConfig() {
-    return _columnStatistics.getFunctionConfig();
+    return _columnStatistics.getPartitionFunctionConfig();
   }
 }
