@@ -55,7 +55,7 @@ public class PartitionFunctionTest {
 
       String functionName = "MoDuLo";
       PartitionFunction partitionFunction =
-          PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions, null);
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, null);
 
       testBasicProperties(partitionFunction, functionName, numPartitions);
 
@@ -101,7 +101,7 @@ public class PartitionFunctionTest {
 
       String functionName = "mUrmur";
       PartitionFunction partitionFunction =
-          PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions, null);
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, null);
 
       testBasicProperties(partitionFunction, functionName, numPartitions);
 
@@ -132,7 +132,7 @@ public class PartitionFunctionTest {
 
       String functionName = "bYteArray";
       PartitionFunction partitionFunction =
-          PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions, null);
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, null);
 
       testBasicProperties(partitionFunction, functionName, numPartitions);
 
@@ -156,7 +156,7 @@ public class PartitionFunctionTest {
 
       String functionName = "HaShCoDe";
       PartitionFunction partitionFunction =
-          PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions, null);
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, null);
 
       testBasicProperties(partitionFunction, functionName, numPartitions);
 
@@ -185,8 +185,9 @@ public class PartitionFunctionTest {
     String functionName = "BOUndedColumNVaLUE";
     Map<String, String> functionConfig = new HashMap<>();
     functionConfig.put("columnValues", "Maths|english|Chemistry");
+    functionConfig.put("columnValuesDelimiter", "\\|");
     PartitionFunction partitionFunction =
-        PartitionFunctionFactory.getPartitionFunction(functionName, -1, functionConfig);
+        PartitionFunctionFactory.getPartitionFunction(functionName, 3, functionConfig);
     testBasicProperties(partitionFunction, functionName, 4, functionConfig);
     assertEquals(partitionFunction.getPartition("maths"), 1);
     assertEquals(partitionFunction.getPartition("English"), 2);
