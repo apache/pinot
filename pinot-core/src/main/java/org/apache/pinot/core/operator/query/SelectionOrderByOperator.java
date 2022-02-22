@@ -104,7 +104,6 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     _numRowsToKeep = queryContext.getOffset() + queryContext.getLimit();
     _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
         getComparator());
-     pruneOrderByColumns();
   }
 
   @Override
@@ -119,7 +118,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     return stringBuilder.append(')').toString();
   }
 
-  private void pruneOrderByColumns() {
+  private boolean isAllOrderByColumnsSorted() {
     // Order by col1, col2 limit k will take all the n matching rows
     // and add it to a priority queue of size k.
     // This is nlogk operation which can be quite expensive for a large n.
@@ -134,14 +133,14 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       OrderByExpressionContext expressionContext = _orderByExpressions.get(0);
       if (!expressionContext.getExpression().getType().equals(ExpressionContext.Type.IDENTIFIER)
          || !expressionContext.isAsc()) {
-        return;
+        return false;
       }
       String column = expressionContext.getExpression().getIdentifier();
       if (!_indexSegment.getDataSource(column).getDataSourceMetadata().isSorted()) {
-        return;
+        return false;
       }
-      _numOrderByColsPreSorted++;
     }
+    return true;
   }
 
   private Comparator<Object[]> getComparator() {
@@ -207,7 +206,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-  if (_numOrderByColsPreSorted == _orderByExpressions.size()) {
+  if (isAllOrderByColumnsSorted()) {
     return computeAllPreSorted();
   } else if (_expressions.size() == _orderByExpressions.size()) {
       return computeAllOrdered();
