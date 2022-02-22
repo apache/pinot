@@ -33,17 +33,22 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 @Api(tags = Constants.TABLE_TAG)
 @Path("/")
 public class PinotTableInstances {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableInstances.class);
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -53,7 +58,8 @@ public class PinotTableInstances {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List table instances", notes = "List instances of the given table")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "Table not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
   public String getTableInstances(
@@ -130,12 +136,8 @@ public class PinotTableInstances {
       @PathParam("tableName") String tableName) {
     try {
       return _pinotHelixResourceManager.getLiveBrokersForTable(tableName);
-    } catch (TableNotFoundException tableNotFoundException) {
-      throw new WebApplicationException(String.format("Table=%s not found", tableName), 404);
+    } catch (TableNotFoundException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
     }
-  }
-
-  public void setPinotHelixResourceManager(PinotHelixResourceManager pinotHelixResourceManager) {
-    _pinotHelixResourceManager = pinotHelixResourceManager;
   }
 }

@@ -3200,40 +3200,35 @@ public class PinotHelixResourceManager {
    */
   public List<String> getLiveBrokersForTable(String tableName)
       throws TableNotFoundException {
+    ExternalView ev = _helixDataAccessor.getProperty(_keyBuilder.externalView(Helix.BROKER_RESOURCE_INSTANCE));
+    if (ev == null) {
+      return new ArrayList<>();
+    }
     TableType inputTableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (inputTableType != null) {
       if (!hasTable(tableName)) {
         throw new TableNotFoundException(String.format("Table=%s not found", tableName));
       }
-      return getLiveBrokersForTable(tableName, inputTableType);
+      return getLiveBrokersForTable(ev, tableName);
     }
-    boolean hasOfflineTable = hasOfflineTable(tableName);
-    boolean hasRealtimeTable = hasRealtimeTable(tableName);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    boolean hasOfflineTable = hasTable(offlineTableName);
+    boolean hasRealtimeTable = hasTable(realtimeTableName);
     if (!hasOfflineTable && !hasRealtimeTable) {
       throw new TableNotFoundException(String.format("Table=%s not found", tableName));
     }
     if (hasOfflineTable && hasRealtimeTable) {
-      Set<String> offlineTables = new HashSet<>(getLiveBrokersForTable(tableName, TableType.OFFLINE));
-      return getLiveBrokersForTable(tableName, TableType.REALTIME).stream()
+      Set<String> offlineTables = new HashSet<>(getLiveBrokersForTable(ev, offlineTableName));
+      return getLiveBrokersForTable(ev, realtimeTableName).stream()
           .filter(offlineTables::contains)
           .collect(Collectors.toList());
     } else {
-      return getLiveBrokersForTable(tableName, hasOfflineTable ? TableType.OFFLINE : TableType.REALTIME);
+      return getLiveBrokersForTable(ev, hasOfflineTable ? offlineTableName : realtimeTableName);
     }
   }
 
-  /**
-   * Return the list of live brokers serving the corresponding table.
-   *  Each entry in the broker list is of the following format:
-   *  Broker_hostname_port
-   */
-  public List<String> getLiveBrokersForTable(String tableName, TableType tableType) {
-    String tableNameWithType = TableNameBuilder.forType(tableType)
-        .tableNameWithType(tableName);
-    ExternalView ev = _helixDataAccessor.getProperty(_keyBuilder.externalView(Helix.BROKER_RESOURCE_INSTANCE));
-    if (ev == null) {
-      return Collections.EMPTY_LIST;
-    }
+  private List<String> getLiveBrokersForTable(ExternalView ev, String tableNameWithType) {
     Map<String, String> brokerToStateMap = ev.getStateMap(tableNameWithType);
     List<String> hosts = new ArrayList<>();
     if (brokerToStateMap != null) {
