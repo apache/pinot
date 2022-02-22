@@ -16,36 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.pql.parsers.pql2.ast;
+package org.apache.pinot.core.operator.docidsets;
 
-public enum FilterKind {
-  AND,
-  OR,
-  NOT,
-  EQUALS,
-  NOT_EQUALS,
-  GREATER_THAN,
-  GREATER_THAN_OR_EQUAL,
-  LESS_THAN,
-  LESS_THAN_OR_EQUAL,
-  LIKE,
-  BETWEEN,
-  RANGE,
-  IN,
-  NOT_IN,
-  REGEXP_LIKE,
-  IS_NULL,
-  IS_NOT_NULL,
-  TEXT_MATCH,
-  JSON_MATCH;
+import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.NotDocIdIterator;
 
-  /**
-   * Helper method that returns true if the enum maps to a Range.
-   *
-   * @return True if the enum is of Range type, false otherwise.
-   */
-  public boolean isRange() {
-    return this == GREATER_THAN || this == GREATER_THAN_OR_EQUAL || this == LESS_THAN || this == LESS_THAN_OR_EQUAL
-        || this == BETWEEN || this == RANGE;
+
+public class NotDocIdSet implements FilterBlockDocIdSet {
+  private final FilterBlockDocIdSet _childDocIdSet;
+  private final int _numDocs;
+
+  public NotDocIdSet(FilterBlockDocIdSet childDocIdSet, int numDocs) {
+    _childDocIdSet = childDocIdSet;
+    _numDocs = numDocs;
+  }
+
+  @Override
+  public BlockDocIdIterator iterator() {
+    return new NotDocIdIterator(_childDocIdSet.iterator(), _numDocs);
+  }
+
+  @Override
+  public long getNumEntriesScannedInFilter() {
+    return _childDocIdSet.getNumEntriesScannedInFilter();
   }
 }

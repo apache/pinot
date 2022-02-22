@@ -37,9 +37,8 @@ public class HashCodePartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public int getPartition(Object valueIn) {
-    String value = valueIn instanceof String ? (String) valueIn : valueIn.toString();
-    return Math.abs(value.hashCode()) % _numPartitions;
+  public int getPartition(Object value) {
+    return abs(value.toString().hashCode()) % _numPartitions;
   }
 
   @Override
@@ -56,5 +55,10 @@ public class HashCodePartitionFunction implements PartitionFunction {
   @Override
   public String toString() {
     return NAME;
+  }
+
+  // NOTE: This matches the Utils.abs() in Kafka
+  private static int abs(int n) {
+    return (n == Integer.MIN_VALUE) ? 0 : Math.abs(n);
   }
 }

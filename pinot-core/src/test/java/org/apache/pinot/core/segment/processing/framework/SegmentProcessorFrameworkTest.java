@@ -413,39 +413,40 @@ public class SegmentProcessorFrameworkTest {
 
     // Segment config
     config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setSegmentConfig(
-        new SegmentConfig.Builder().setMaxNumRecordsPerSegment(4).setSegmentNamePrefix("myPrefix").build()).build();
+        new SegmentConfig.Builder().setMaxNumRecordsPerSegment(4).setSegmentNamePrefix("myPrefix")
+            .setSegmentNamePostfix("myPostfix").build()).build();
     framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
     outputSegments = framework.process();
     assertEquals(outputSegments.size(), 3);
     outputSegments.sort(null);
     segmentMetadata = new SegmentMetadataImpl(outputSegments.get(0));
     assertEquals(segmentMetadata.getTotalDocs(), 4);
-    assertEquals(segmentMetadata.getName(), "myPrefix_1597719600000_1597795200000_0");
+    assertEquals(segmentMetadata.getName(), "myPrefix_1597719600000_1597795200000_myPostfix_0");
     segmentMetadata = new SegmentMetadataImpl(outputSegments.get(1));
     assertEquals(segmentMetadata.getTotalDocs(), 4);
-    assertEquals(segmentMetadata.getName(), "myPrefix_1597802400000_1597878000000_1");
+    assertEquals(segmentMetadata.getName(), "myPrefix_1597802400000_1597878000000_myPostfix_1");
     segmentMetadata = new SegmentMetadataImpl(outputSegments.get(2));
     assertEquals(segmentMetadata.getTotalDocs(), 2);
-    assertEquals(segmentMetadata.getName(), "myPrefix_1597881600000_1597892400000_2");
+    assertEquals(segmentMetadata.getName(), "myPrefix_1597881600000_1597892400000_myPostfix_2");
     FileUtils.cleanDirectory(workingDir);
     rewindRecordReaders(_singleSegment);
 
     config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfigSegmentNameGeneratorEnabled)
         .setSchema(_schema).setSegmentConfig(new SegmentConfig.Builder().setMaxNumRecordsPerSegment(4)
-            .setSegmentNamePrefix("myPrefix").build()).build();
+            .setSegmentNamePrefix("myPrefix").setSegmentNamePostfix("myPostfix").build()).build();
     framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
     outputSegments = framework.process();
     assertEquals(outputSegments.size(), 3);
     outputSegments.sort(null);
     segmentMetadata = new SegmentMetadataImpl(outputSegments.get(0));
     assertEquals(segmentMetadata.getTotalDocs(), 4);
-    assertEquals(segmentMetadata.getName(), "myPrefix_2020-08-18_2020-08-19_0");
+    assertEquals(segmentMetadata.getName(), "myPrefix_2020-08-18_2020-08-19_myPostfix_0");
     segmentMetadata = new SegmentMetadataImpl(outputSegments.get(1));
     assertEquals(segmentMetadata.getTotalDocs(), 4);
-    assertEquals(segmentMetadata.getName(), "myPrefix_2020-08-19_2020-08-19_1");
+    assertEquals(segmentMetadata.getName(), "myPrefix_2020-08-19_2020-08-19_myPostfix_1");
     segmentMetadata = new SegmentMetadataImpl(outputSegments.get(2));
     assertEquals(segmentMetadata.getTotalDocs(), 2);
-    assertEquals(segmentMetadata.getName(), "myPrefix_2020-08-20_2020-08-20_2");
+    assertEquals(segmentMetadata.getName(), "myPrefix_2020-08-20_2020-08-20_myPostfix_2");
     FileUtils.cleanDirectory(workingDir);
     rewindRecordReaders(_singleSegment);
   }

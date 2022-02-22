@@ -133,6 +133,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.BrokerResourc
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
@@ -694,20 +695,32 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, tableNameWithType);
   }
 
+  public synchronized PinotResourceManagerResponse deleteSegments(String tableNameWithType, List<String> segmentNames) {
+    return deleteSegments(tableNameWithType, segmentNames, null);
+  }
+
   /**
    * Delete a list of segments from ideal state and remove them from the local storage.
    *
    * @param tableNameWithType Table name with type suffix
    * @param segmentNames List of names of segment to be deleted
+   * @param retentionPeriod The retention period of the deleted segments.
    * @return Request response
    */
-  public synchronized PinotResourceManagerResponse deleteSegments(String tableNameWithType, List<String> segmentNames) {
+  public synchronized PinotResourceManagerResponse deleteSegments(String tableNameWithType, List<String> segmentNames,
+      @Nullable String retentionPeriod) {
     try {
       LOGGER.info("Trying to delete segments: {} from table: {} ", segmentNames, tableNameWithType);
       Preconditions.checkArgument(TableNameBuilder.isTableResource(tableNameWithType),
           "Table name: %s is not a valid table name with type suffix", tableNameWithType);
       HelixHelper.removeSegmentsFromIdealState(_helixZkManager, tableNameWithType, segmentNames);
-      _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames);
+      if (retentionPeriod != null) {
+        _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames,
+            TimeUtils.convertPeriodToMillis(retentionPeriod));
+      } else {
+        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+        _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames, tableConfig);
+      }
       return PinotResourceManagerResponse.success("Segment " + segmentNames + " deleted");
     } catch (final Exception e) {
       LOGGER.error("Caught exception while deleting segment: {} from table: {}", segmentNames, tableNameWithType, e);

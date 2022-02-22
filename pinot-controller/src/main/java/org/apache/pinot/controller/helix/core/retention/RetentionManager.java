@@ -64,17 +64,13 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RetentionManager.class);
 
-  private final int _deletedSegmentsRetentionInDays;
-
   public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics) {
     super("RetentionManager", config.getRetentionControllerFrequencyInSeconds(),
         config.getRetentionManagerInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
         controllerMetrics);
-    _deletedSegmentsRetentionInDays = config.getDeletedSegmentsRetentionInDays();
 
-    LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}, deletedSegmentsRetentionInDays: {}",
-        getIntervalInSeconds(), _deletedSegmentsRetentionInDays);
+    LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}", getIntervalInSeconds());
   }
 
   @Override
@@ -97,8 +93,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
   @Override
   protected void postprocess() {
-    LOGGER.info("Removing aged (more than {} days) deleted segments for all tables", _deletedSegmentsRetentionInDays);
-    _pinotHelixResourceManager.getSegmentDeletionManager().removeAgedDeletedSegments(_deletedSegmentsRetentionInDays);
+    LOGGER.info("Removing aged deleted segments for all tables");
+    _pinotHelixResourceManager.getSegmentDeletionManager().removeAgedDeletedSegments();
   }
 
   private void manageRetentionForTable(TableConfig tableConfig) {
