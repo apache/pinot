@@ -206,9 +206,9 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-  if (isAllOrderByColumnsSorted()) {
-    return computeAllPreSorted();
-  } else if (_expressions.size() == _orderByExpressions.size()) {
+    if (isAllOrderByColumnsSorted()) {
+      return computeAllPreSorted();
+    } else if (_expressions.size() == _orderByExpressions.size()) {
       return computeAllOrdered();
     } else {
       return computePartiallyOrdered();
