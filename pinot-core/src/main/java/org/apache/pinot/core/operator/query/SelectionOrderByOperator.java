@@ -82,7 +82,6 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
   private final int _numRowsToKeep;
   private final PriorityQueue<Object[]> _rows;
 
-  private int _numOrderByColsPreSorted = 0;
   private int _numDocsScanned = 0;
   private long _numEntriesScannedPostFilter = 0;
 
@@ -118,20 +117,22 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     return stringBuilder.append(')').toString();
   }
 
+  /**
+   *  This function checks whether all columns in order by clause are pre-sorted.
+   *  This is used to optimize order by limit clauses.
+   *  For eg:
+   *  A query like "select * from table order by col1, col2 limit 10"
+   *  will take all the n matching rows and add it to a priority queue of size 10.
+   *  This is nlogk operation which can be quite expensive for a large n.
+   *  In the above example, if the docs in the segment are already sorted by col1 and col2 then there is no need for
+   *  sorting at all (only limit is needed).
+   * @return true is all columns in order by clause are sorted . False otherwise
+   */
   private boolean isAllOrderByColumnsSorted() {
-    // Order by col1, col2 limit k will take all the n matching rows
-    // and add it to a priority queue of size k.
-    // This is nlogk operation which can be quite expensive for a large n.
-    // This function, prunes out any order by clause that matches columns sorting order.
-    // In the above example, if the docs are already sorted by both col1, col2 then there is no need for any
-    // sorting at all (only limit is needed).
-    //
-    // This function just tracks the columns that are already sorted. If all them are sorted already, we can
-    // use that info to short circuit the looping.
     int numOrderByExpressions = _orderByExpressions.size();
     for (int i = 0; i < numOrderByExpressions; i++) {
       OrderByExpressionContext expressionContext = _orderByExpressions.get(0);
-      if (!expressionContext.getExpression().getType().equals(ExpressionContext.Type.IDENTIFIER)
+      if (!(expressionContext.getExpression().getType() == ExpressionContext.Type.IDENTIFIER)
          || !expressionContext.isAsc()) {
         return false;
       }
