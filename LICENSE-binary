@@ -397,7 +397,7 @@ org.wildfly.openssl:wildfly-openssl:1.0.7.Final
 org.xerial.larray:larray-buffer:0.4.1
 org.xerial.larray:larray-mmap:0.4.1
 org.xerial.snappy:snappy-java:1.1.1.7
-org.yaml:snakeyaml:1.16
+org.yaml:snakeyaml:1.30
 software.amazon.awssdk:annotations:2.14.28
 software.amazon.awssdk:apache-client:2.14.28
 software.amazon.awssdk:arns:2.14.28
