@@ -81,15 +81,17 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
   private final TransformResultMetadata[] _orderByExpressionMetadata;
   private final int _numRowsToKeep;
   private final PriorityQueue<Object[]> _rows;
+  private final boolean _allOrderByColsPreSorted;
 
   private int _numDocsScanned = 0;
   private long _numEntriesScannedPostFilter = 0;
 
   public SelectionOrderByOperator(IndexSegment indexSegment, QueryContext queryContext,
-      List<ExpressionContext> expressions, TransformOperator transformOperator) {
+      List<ExpressionContext> expressions, TransformOperator transformOperator, boolean allOrderByColsPreSorted) {
     _indexSegment = indexSegment;
     _expressions = expressions;
     _transformOperator = transformOperator;
+    _allOrderByColsPreSorted = allOrderByColsPreSorted;
 
     _orderByExpressions = queryContext.getOrderByExpressions();
     assert _orderByExpressions != null;
@@ -115,33 +117,6 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       }
     }
     return stringBuilder.append(')').toString();
-  }
-
-  /**
-   *  This function checks whether all columns in order by clause are pre-sorted.
-   *  This is used to optimize order by limit clauses.
-   *  For eg:
-   *  A query like "select * from table order by col1, col2 limit 10"
-   *  will take all the n matching rows and add it to a priority queue of size 10.
-   *  This is nlogk operation which can be quite expensive for a large n.
-   *  In the above example, if the docs in the segment are already sorted by col1 and col2 then there is no need for
-   *  sorting at all (only limit is needed).
-   * @return true is all columns in order by clause are sorted . False otherwise
-   */
-  private boolean isAllOrderByColumnsSorted() {
-    int numOrderByExpressions = _orderByExpressions.size();
-    for (int i = 0; i < numOrderByExpressions; i++) {
-      OrderByExpressionContext expressionContext = _orderByExpressions.get(0);
-      if (!(expressionContext.getExpression().getType() == ExpressionContext.Type.IDENTIFIER)
-         || !expressionContext.isAsc()) {
-        return false;
-      }
-      String column = expressionContext.getExpression().getIdentifier();
-      if (!_indexSegment.getDataSource(column).getDataSourceMetadata().isSorted()) {
-        return false;
-      }
-    }
-    return true;
   }
 
   private Comparator<Object[]> getComparator() {
@@ -207,7 +182,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    if (isAllOrderByColumnsSorted()) {
+    if (_allOrderByColsPreSorted) {
       return computeAllPreSorted();
     } else if (_expressions.size() == _orderByExpressions.size()) {
       return computeAllOrdered();
