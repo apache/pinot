@@ -350,8 +350,8 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
-    // 10 * (1 order-by columns + 1 docId column) + 10 * (10 non-order-by columns)
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 120L);
+    // 10 * (1 order-by columns) + 10 * (10 non-order-by columns)
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 110L);
     Assert.assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
     DataSchema selectionDataSchema = resultsBlock.getDataSchema();
     Map<String, Integer> columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
@@ -374,7 +374,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 84134L);
     // 6129 * (2 order-by columns + 1 docId column) + 10 * (9 non-order-by columns)
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 120);
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 110);
     Assert.assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
     selectionDataSchema = resultsBlock.getDataSchema();
     columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
