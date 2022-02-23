@@ -124,14 +124,14 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     return createRecord("record", "doc", JsonIngestionFromAvroQueriesTest.class.getCanonicalName(), false, fields);
   }
 
-  public static GenericData.Record createRecordField(String k1, int v1, String k2, String v2) {
+  private static GenericData.Record createRecordField(String k1, int v1, String k2, String v2) {
     GenericData.Record record = new GenericData.Record(createRecordSchema());
     record.put(k1, v1);
     record.put(k2, v2);
     return record;
   }
 
-  protected void createInputFile()
+  private static void createInputFile()
       throws IOException {
     INDEX_DIR.mkdir();
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("eventsRecord", null, null, false);
@@ -169,10 +169,14 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     }
   }
 
-  protected RecordReader createRecordReader(Set<String> fieldsToRead)
+  private static RecordReader createRecordReader()
       throws IOException {
+    Set<String> set = new HashSet<>();
+    set.add(INT_COLUMN);
+    set.add(STRING_COLUMN);
+    set.add(JSON_COLUMN);
     AvroRecordReader avroRecordReader = new AvroRecordReader();
-    avroRecordReader.init(AVRO_DATA_FILE, fieldsToRead, null);
+    avroRecordReader.init(AVRO_DATA_FILE, set, null);
     return avroRecordReader;
   }
 
@@ -193,7 +197,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     segmentGeneratorConfig.setInputFilePath(AVRO_DATA_FILE.getPath());
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(segmentGeneratorConfig, createRecordReader(Set.of(INT_COLUMN, STRING_COLUMN, JSON_COLUMN)));
+    driver.init(segmentGeneratorConfig, createRecordReader());
     driver.build();
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
