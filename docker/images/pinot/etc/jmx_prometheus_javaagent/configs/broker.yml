@@ -1,0 +1,133 @@
+rules:
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+).authorization\"><>(\\w+)"
+  name: "pinot_broker_authorization_$2"
+  cache: true
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.documentsScanned\"><>(\\w+)"
+  name: "pinot_broker_documentsScanned_$2"
+  cache: true
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.entriesScannedInFilter\"><>(\\w+)"
+  name: "pinot_broker_entriesScannedInFilter_$2"
+  cache: true
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.entriesScannedPostFilter\"><>(\\w+)"
+  name: "pinot_broker_entriesScannedPostFilter_$2"
+  cache: true
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.freshnessLagMs\"><>(\\w+)"
+  name: "pinot_broker_freshnessLagMs_$2"
+  cache: true
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.queries\"><>(\\w+)"
+  name: "pinot_broker_queries_$2"
+  cache: true
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.queryExecution\"><>(\\w+)"
+  name: "pinot_broker_queryExecution_$2"
+  cache: true
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.queryRouting\"><>(\\w+)"
+  name: "pinot_broker_queryRouting_$2"
+  cache: true
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.reduce\"><>(\\w+)"
+  name: "pinot_broker_reduce_$2"
+  cache: true
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.requestCompilation\"><>(\\w+)"
+  name: "pinot_broker_requestCompilation_$2"
+  cache: true
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.scatterGather\"><>(\\w+)"
+  name: "pinot_broker_scatterGather_$2"
+  cache: true
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.totalServerResponseSize\"><>(\\w+)"
+  name: "pinot_broker_totalServerResponseSize_$2"
+  cache: true
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)_(\\w+).groupBySize\"><>(\\w+)"
+  name: "pinot_broker_groupBySize_$3"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)_(\\w+).noServingHostForSegment\"><>(\\w+)"
+  name: "pinot_broker_noServingHostForSegment_$3"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.healthcheck(\\w+)\"><>(\\w+)"
+  name: "pinot_broker_healthcheck_$1_$2"
+  cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.helix.(\\w+)\"><>(\\w+)"
+  name: "pinot_broker_helix_$1_$2"
+  cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.helixZookeeper(\\w+)\"><>(\\w+)"
+  name: "pinot_broker_helix_zookeeper_$1_$2"
+  cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.nettyConnection(\\w+)\"><>(\\w+)"
+  name: "pinot_broker_nettyConnection_$1_$2"
+  cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.clusterChangeCheck\"\"><>(\\w+)"
+  name: "pinot_broker_clusterChangeCheck_$1"
+  cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.proactiveClusterChangeCheck\"><>(\\w+)"
+  name: "pinot_broker_proactiveClusterChangeCheck_$1"
+  cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)Exceptions\"><>(\\w+)"
+  name: "pinot_broker_exceptions_$1_$2"
+  cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.routingTableUpdateTime\"><>(\\w+)"
+  name: "pinot_broker_routingTableUpdateTime_$1"
+  cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.brokerResponsesWithPartialServersResponded\"><>(\\w+)"
+  name: "pinot_broker_brokerResponsesWithPartialServersResponded_$2"
+  cache: true
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.brokerResponsesWithProcessingExceptions\"><>(\\w+)"
+  name: "pinot_broker_brokerResponsesWithProcessingExceptions_$2"
+  cache: true
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.brokerResponsesWithNumGroupsLimitReached\"><>(\\w+)"
+  name: "pinot_broker_brokerResponsesWithNumGroupsLimitReached_$2"
+  cache: true
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.queryQuotaExceeded\"><>(\\w+)"
+  name: "pinot_broker_queryQuotaExceeded_$2"
+  cache: true
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)_(\\w+).serverMissingForRouting\"><>(\\w+)"
+  name: "pinot_broker_serverMissingForRouting_$3"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.deserialization\"><>(\\w+)"
+  name: "pinot_broker_deserialization_$2"
+  cache: true
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.requestConnectionWait\"><>(\\w+)"
+  name: "pinot_broker_requestConnectionWait_$2"
+  cache: true
+  labels:
+    table: "$1"

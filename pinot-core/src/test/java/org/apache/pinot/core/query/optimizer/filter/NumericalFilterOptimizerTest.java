@@ -48,6 +48,12 @@ public class NumericalFilterOptimizerTest {
         "Expression(type:FUNCTION, functionCall:Function(operator:EQUALS, operands:[Expression(type:IDENTIFIER, "
             + "identifier:Identifier(name:intColumn)), Expression(type:LITERAL, literal:<Literal longValue:5>)]))");
 
+    // Test a query containing NOT operator
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE NOT intColumn = 5.0"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:NOT, operands:[Expression(type:FUNCTION, "
+            + "functionCall:Function(operator:EQUALS, operands:[Expression(type:IDENTIFIER, identifier:Identifier"
+            + "(name:intColumn)), Expression(type:LITERAL, literal:<Literal longValue:5>)]))]))");
+
     // Test int column equals invalid decimal value.
     Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn = 5.5"),
         "Expression(type:LITERAL, literal:<Literal boolValue:false>)");

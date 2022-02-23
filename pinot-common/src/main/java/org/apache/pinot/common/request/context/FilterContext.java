@@ -30,7 +30,7 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
  */
 public class FilterContext {
   public enum Type {
-    AND, OR, PREDICATE
+    AND, OR, NOT, PREDICATE
   }
 
   private final Type _type;

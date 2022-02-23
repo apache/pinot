@@ -28,7 +28,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 /**
- * Integration test that converts Avro data for 12 segments and runs queries against it.
+ * Integration test that starts one broker with auto-discovered echo service and test it
  */
 public class BrokerServiceDiscoveryIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String TENANT_NAME = "TestTenant";

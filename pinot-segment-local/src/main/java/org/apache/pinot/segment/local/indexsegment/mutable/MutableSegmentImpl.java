@@ -75,6 +75,7 @@ import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -88,7 +89,8 @@ import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.FixedIntArray;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.roaringbitmap.IntIterator;
+import org.roaringbitmap.BatchIterator;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -465,20 +467,19 @@ public class MutableSegmentImpl implements MutableSegment {
     _logger.info("Newly added columns: " + _newlyAddedColumnsFieldMap.toString());
   }
 
-  // NOTE: Okay for single-writer
-  @SuppressWarnings("NonAtomicOperationOnVolatileField")
   @Override
   public boolean index(GenericRow row, @Nullable RowMetadata rowMetadata)
       throws IOException {
     boolean canTakeMore;
+    int numDocsIndexed = _numDocsIndexed;
     if (isUpsertEnabled()) {
-      PartitionUpsertMetadataManager.RecordInfo recordInfo = getRecordInfo(row, _numDocsIndexed);
+      PartitionUpsertMetadataManager.RecordInfo recordInfo = getRecordInfo(row, numDocsIndexed);
       GenericRow updatedRow = _partitionUpsertMetadataManager.updateRecord(row, recordInfo);
       updateDictionary(updatedRow);
-      addNewRow(updatedRow);
+      addNewRow(numDocsIndexed, updatedRow);
       // Update number of documents indexed before handling the upsert metadata so that the record becomes queryable
       // once validated
-      canTakeMore = _numDocsIndexed++ < _capacity;
+      canTakeMore = numDocsIndexed++ < _capacity;
       _partitionUpsertMetadataManager.addRecord(this, recordInfo);
     } else {
       // Update dictionary first
@@ -488,17 +489,18 @@ public class MutableSegmentImpl implements MutableSegment {
       // docId, else this will return a new docId.
       int docId = getOrCreateDocId();
 
-      if (docId == _numDocsIndexed) {
+      if (docId == numDocsIndexed) {
         // New row
-        addNewRow(row);
+        addNewRow(numDocsIndexed, row);
         // Update number of documents indexed at last to make the latest row queryable
-        canTakeMore = _numDocsIndexed++ < _capacity;
+        canTakeMore = numDocsIndexed++ < _capacity;
       } else {
         assert _aggregateMetrics;
         aggregateMetrics(row, docId);
         canTakeMore = true;
       }
     }
+    _numDocsIndexed = numDocsIndexed;
 
     // Update last indexed time and latest ingestion time
     _lastIndexedTimeMs = System.currentTimeMillis();
@@ -527,7 +529,9 @@ public class MutableSegmentImpl implements MutableSegment {
       IndexContainer indexContainer = entry.getValue();
       Object value = row.getValue(column);
       MutableDictionary dictionary = indexContainer._dictionary;
-      if (dictionary != null) {
+      if (value == null) {
+        recordIndexingError("DICTIONARY");
+      } else if (dictionary != null) {
         if (indexContainer._fieldSpec.isSingleValueField()) {
           indexContainer._dictId = dictionary.index(value);
         } else {
@@ -541,13 +545,23 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
-  private void addNewRow(GenericRow row)
-      throws IOException {
-    int docId = _numDocsIndexed;
+  private void addNewRow(int docId, GenericRow row) {
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
       String column = entry.getKey();
       IndexContainer indexContainer = entry.getValue();
+
+      // Update the null value vector even if a null value is somehow produced
+      if (_nullHandlingEnabled && row.isNullValue(column)) {
+        indexContainer._nullValueVector.setNull(docId);
+      }
+
       Object value = row.getValue(column);
+      if (value == null) {
+        // the value should not be null unless something is broken upstream but this will lead to inappropriate reuse
+        // of the dictionary id if this somehow happens. An NPE here can corrupt indexes leading to incorrect query
+        // results, hence the extra care. A metric will already have been emitted when trying to update the dictionary.
+        continue;
+      }
       FieldSpec fieldSpec = indexContainer._fieldSpec;
       if (fieldSpec.isSingleValueField()) {
         // Single-value column
@@ -578,7 +592,11 @@ public class MutableSegmentImpl implements MutableSegment {
           // Update inverted index
           RealtimeInvertedIndexReader invertedIndex = indexContainer._invertedIndex;
           if (invertedIndex != null) {
-            invertedIndex.add(dictId, docId);
+            try {
+              invertedIndex.add(dictId, docId);
+            } catch (Exception e) {
+              recordIndexingError(FieldConfig.IndexType.INVERTED, e);
+            }
           }
         } else {
           // Single-value column with raw index
@@ -635,19 +653,31 @@ public class MutableSegmentImpl implements MutableSegment {
         // Update text index
         RealtimeLuceneTextIndexReader textIndex = indexContainer._textIndex;
         if (textIndex != null) {
-          textIndex.add((String) value);
+          try {
+            textIndex.add((String) value);
+          } catch (Exception e) {
+            recordIndexingError(FieldConfig.IndexType.TEXT, e);
+          }
         }
 
         // Update json index
         MutableJsonIndex jsonIndex = indexContainer._jsonIndex;
         if (jsonIndex != null) {
-          jsonIndex.add((String) value);
+          try {
+            jsonIndex.add((String) value);
+          } catch (Exception e) {
+            recordIndexingError(FieldConfig.IndexType.JSON, e);
+          }
         }
 
         // Update H3 index
         MutableH3Index h3Index = indexContainer._h3Index;
         if (h3Index != null) {
-          h3Index.add(GeometrySerializer.deserialize((byte[]) value));
+          try {
+            h3Index.add(GeometrySerializer.deserialize((byte[]) value));
+          } catch (Exception e) {
+            recordIndexingError(FieldConfig.IndexType.H3, e);
+          }
         }
       } else {
         // Multi-value column (always dictionary-encoded)
@@ -664,15 +694,30 @@ public class MutableSegmentImpl implements MutableSegment {
         RealtimeInvertedIndexReader invertedIndex = indexContainer._invertedIndex;
         if (invertedIndex != null) {
           for (int dictId : dictIds) {
-            invertedIndex.add(dictId, docId);
+            try {
+              invertedIndex.add(dictId, docId);
+            } catch (Exception e) {
+              recordIndexingError(FieldConfig.IndexType.INVERTED, e);
+            }
           }
         }
       }
+    }
+  }
 
-      // Update null value vector
-      if (_nullHandlingEnabled && row.isNullValue(column)) {
-        indexContainer._nullValueVector.setNull(docId);
-      }
+  private void recordIndexingError(FieldConfig.IndexType indexType, Exception exception) {
+    _logger.error("failed to index value with {}", indexType, exception);
+    if (_serverMetrics != null) {
+      String metricKeyName = _realtimeTableName + "-" + indexType + "-indexingError";
+      _serverMetrics.addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+    }
+  }
+
+  private void recordIndexingError(String indexType) {
+    _logger.error("failed to index value with {}", indexType);
+    if (_serverMetrics != null) {
+      String metricKeyName = _realtimeTableName + "-" + indexType + "-indexingError";
+      _serverMetrics.addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
     }
   }
 
@@ -899,7 +944,7 @@ public class MutableSegmentImpl implements MutableSegment {
   public int[] getSortedDocIdIterationOrderWithSortedColumn(String column) {
     IndexContainer indexContainer = _indexContainerMap.get(column);
     MutableDictionary dictionary = indexContainer._dictionary;
-
+    int numDocsIndexed = _numDocsIndexed;
     // Sort all values in the dictionary
     int numValues = dictionary.length();
     int[] dictIds = new int[numValues];
@@ -910,18 +955,22 @@ public class MutableSegmentImpl implements MutableSegment {
 
     // Re-order documents using the inverted index
     RealtimeInvertedIndexReader invertedIndex = indexContainer._invertedIndex;
-    int[] docIds = new int[_numDocsIndexed];
+    int[] docIds = new int[numDocsIndexed];
+    int[] batch = new int[256];
     int docIdIndex = 0;
     for (int dictId : dictIds) {
-      IntIterator intIterator = invertedIndex.getDocIds(dictId).getIntIterator();
-      while (intIterator.hasNext()) {
-        docIds[docIdIndex++] = intIterator.next();
+      MutableRoaringBitmap bitmap = invertedIndex.getDocIds(dictId);
+      BatchIterator iterator = bitmap.getBatchIterator();
+      while (iterator.hasNext()) {
+        int limit = iterator.nextBatch(batch);
+        System.arraycopy(batch, 0, docIds, docIdIndex, limit);
+        docIdIndex += limit;
       }
     }
 
     // Sanity check
-    Preconditions.checkState(_numDocsIndexed == docIdIndex,
-        "The number of documents indexed: %s is not equal to the number of sorted documents: %s", _numDocsIndexed,
+    Preconditions.checkState(numDocsIndexed == docIdIndex,
+        "The number of documents indexed: %s is not equal to the number of sorted documents: %s", numDocsIndexed,
         docIdIndex);
 
     return docIds;

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.broker;
+package org.apache.pinot.core.api;
 
 import java.io.IOException;
 import javax.inject.Inject;
@@ -30,6 +30,7 @@ import org.glassfish.hk2.utilities.ClasspathDescriptorFileFinder;
 import org.glassfish.hk2.utilities.DuplicatePostProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 /**
  * Auto scan and discovery classes annotated with Service tags. This enables the feature similar to Spring's
@@ -68,8 +69,8 @@ import org.slf4j.LoggerFactory;
  * pinot-integration-tests/src/main/java/org/apache/pinot/broker/integration/tests/BrokerTestAutoLoadedService.java
  * </code>
  */
-public class BrokerServiceAutoDiscoveryFeature implements Feature {
-    private static final Logger LOGGER = LoggerFactory.getLogger(BrokerServiceAutoDiscoveryFeature.class);
+public class ServiceAutoDiscoveryFeature implements Feature {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ServiceAutoDiscoveryFeature.class);
 
     @Inject
     ServiceLocator _serviceLocator;

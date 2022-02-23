@@ -21,10 +21,15 @@ package org.apache.pinot.perf;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.LongSupplier;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.queries.BaseQueriesTest;
@@ -55,38 +60,39 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
-import org.openjdk.jmh.infra.Blackhole;
 import org.openjdk.jmh.runner.Runner;
+import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
+
 
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Fork(1)
-@Warmup(iterations = 3, time = 10)
-@Measurement(iterations = 5, time = 10)
+@Warmup(iterations = 5, time = 1)
+@Measurement(iterations = 5, time = 1)
 @State(Scope.Benchmark)
-public class BenchmarkFilteredAggregations extends BaseQueriesTest {
+public class BenchmarkQueries extends BaseQueriesTest {
+
+  public static void main(String[] args)
+      throws Exception {
+    ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkQueries.class.getSimpleName());
+    new Runner(opt.build()).run();
+  }
 
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "FilteredAggregationsTest");
   private static final String TABLE_NAME = "MyTable";
   private static final String FIRST_SEGMENT_NAME = "firstTestSegment";
   private static final String SECOND_SEGMENT_NAME = "secondTestSegment";
   private static final String INT_COL_NAME = "INT_COL";
+  private static final String RAW_INT_COL_NAME = "RAW_INT_COL";
+  private static final String RAW_STRING_COL_NAME = "RAW_STRING_COL";
   private static final String NO_INDEX_INT_COL_NAME = "NO_INDEX_INT_COL";
 
-  @Param("1500000")
-  private int _numRows;
-  @Param("0")
-  int _intBaseValue;
-
-  private IndexSegment _indexSegment;
-  private List<IndexSegment> _indexSegments;
-
-  public String _filteredQuery = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 123 AND INT_COL < 599999),"
+  public static final String FILTERED_QUERY = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 123 AND INT_COL < 599999),"
       + "MAX(INT_COL) FILTER(WHERE INT_COL > 123 AND INT_COL < 599999) "
       + "FROM MyTable WHERE NO_INDEX_INT_COL > 5 AND NO_INDEX_INT_COL < 1499999";
 
-  public String _nonFilteredQuery = "SELECT SUM("
+  public static final String NON_FILTERED_QUERY = "SELECT SUM("
       + "CASE "
       + "WHEN (INT_COL > 123 AND INT_COL < 599999) THEN INT_COL "
       + "ELSE 0 "
@@ -98,9 +104,31 @@ public class BenchmarkFilteredAggregations extends BaseQueriesTest {
       + "END) AS total_avg "
       + "FROM MyTable WHERE NO_INDEX_INT_COL > 5 AND NO_INDEX_INT_COL < 1499999";
 
+  public static final String SUM_QUERY = "SELECT SUM(RAW_INT_COL) FROM MyTable";
+
+  public static final String MULTI_GROUP_BY_WITH_RAW_QUERY = "SELECT RAW_INT_COL,INT_COL,COUNT(*) FROM MyTable "
+      + "GROUP BY RAW_INT_COL,INT_COL";
+
+  public static final String MULTI_GROUP_BY_WITH_RAW_QUERY_2 = "SELECT RAW_STRING_COL,RAW_INT_COL,INT_COL,COUNT(*) "
+      + "FROM MyTable GROUP BY RAW_STRING_COL,RAW_INT_COL,INT_COL";
+
+  @Param("1500000")
+  private int _numRows;
+  @Param({"EXP(0.001)", "EXP(0.5)", "EXP(0.999)"})
+  String _scenario;
+  @Param({
+      MULTI_GROUP_BY_WITH_RAW_QUERY, MULTI_GROUP_BY_WITH_RAW_QUERY_2, FILTERED_QUERY, NON_FILTERED_QUERY,
+      SUM_QUERY
+  })
+  String _query;
+  private IndexSegment _indexSegment;
+  private List<IndexSegment> _indexSegments;
+  private LongSupplier _supplier;
+
   @Setup
   public void setUp()
       throws Exception {
+    _supplier = Distribution.createLongSupplier(42, _scenario);
     FileUtils.deleteQuietly(INDEX_DIR);
 
     buildSegment(FIRST_SEGMENT_NAME);
@@ -128,16 +156,19 @@ public class BenchmarkFilteredAggregations extends BaseQueriesTest {
     }
 
     FileUtils.deleteQuietly(INDEX_DIR);
+    EXECUTOR_SERVICE.shutdownNow();
   }
 
   private List<GenericRow> createTestData(int numRows) {
+    Map<Integer, String> strings = new HashMap<>();
     List<GenericRow> rows = new ArrayList<>();
-
     for (int i = 0; i < numRows; i++) {
       GenericRow row = new GenericRow();
-      row.putField(INT_COL_NAME, _intBaseValue + i);
-      row.putField(NO_INDEX_INT_COL_NAME, _intBaseValue + i);
-
+      row.putField(INT_COL_NAME, (int) _supplier.getAsLong());
+      row.putField(NO_INDEX_INT_COL_NAME, (int) _supplier.getAsLong());
+      row.putField(RAW_INT_COL_NAME, (int) _supplier.getAsLong());
+      row.putField(RAW_STRING_COL_NAME,
+          strings.computeIfAbsent((int) _supplier.getAsLong(), k -> UUID.randomUUID().toString()));
       rows.add(row);
     }
     return rows;
@@ -149,10 +180,16 @@ public class BenchmarkFilteredAggregations extends BaseQueriesTest {
     List<FieldConfig> fieldConfigs = new ArrayList<>();
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInvertedIndexColumns(Arrays.asList(INT_COL_NAME)).setFieldConfigList(fieldConfigs).build();
+        .setInvertedIndexColumns(Collections.singletonList(INT_COL_NAME))
+        .setFieldConfigList(fieldConfigs)
+        .setNoDictionaryColumns(Arrays.asList(RAW_INT_COL_NAME, RAW_STRING_COL_NAME))
+        .build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(NO_INDEX_INT_COL_NAME, FieldSpec.DataType.INT)
-        .addSingleValueDimension(INT_COL_NAME, FieldSpec.DataType.INT).build();
+        .addSingleValueDimension(RAW_INT_COL_NAME, FieldSpec.DataType.INT)
+        .addSingleValueDimension(INT_COL_NAME, FieldSpec.DataType.INT)
+        .addSingleValueDimension(RAW_STRING_COL_NAME, FieldSpec.DataType.STRING)
+        .build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
@@ -166,18 +203,8 @@ public class BenchmarkFilteredAggregations extends BaseQueriesTest {
   }
 
   @Benchmark
-  public BrokerResponseNative testFilteredAggregations() {
-    return getBrokerResponseForSqlQuery(_filteredQuery);
-  }
-
-  @Benchmark
-  public BrokerResponseNative testNonFilteredAggregations(Blackhole blackhole) {
-    return getBrokerResponseForSqlQuery(_nonFilteredQuery);
-  }
-
-  public static void main(String[] args)
-      throws Exception {
-    new Runner(new OptionsBuilder().include(BenchmarkFilteredAggregations.class.getSimpleName()).build()).run();
+  public BrokerResponseNative query() {
+    return getBrokerResponseForSqlQuery(_query);
   }
 
   @Override

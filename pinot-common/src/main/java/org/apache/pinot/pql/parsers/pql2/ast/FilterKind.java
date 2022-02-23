@@ -21,6 +21,7 @@ package org.apache.pinot.pql.parsers.pql2.ast;
 public enum FilterKind {
   AND,
   OR,
+  NOT,
   EQUALS,
   NOT_EQUALS,
   GREATER_THAN,

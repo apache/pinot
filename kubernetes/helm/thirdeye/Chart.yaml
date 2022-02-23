@@ -9,9 +9,9 @@ keywords:
 - pinot
 - anomaly detection
 - rootcause analysis
-home: https://github.com/apache/incubator-pinot
+home: https://github.com/apache/pinot
 sources:
-- https://github.com/apache/incubator-pinot
+- https://github.com/apache/pinot
 maintainers:
 - name: Alexander Pucher
   email: alex@cortexdata.io

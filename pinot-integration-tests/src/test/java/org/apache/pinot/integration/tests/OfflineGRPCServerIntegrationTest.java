@@ -112,10 +112,14 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
     waitForAllDocsLoaded(600_000L);
   }
 
+  void setExtraServerConfigs(PinotConfiguration serverConfig) {
+  }
+
   protected void startServers() {
     // Enable gRPC server
     PinotConfiguration serverConfig = getDefaultServerConfiguration();
     serverConfig.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_GRPC_SERVER, true);
+    setExtraServerConfigs(serverConfig);
     startServer(serverConfig);
   }
 
@@ -146,10 +150,14 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
     }
   }
 
+  public GrpcQueryClient getGrpcQueryClient() {
+    return new GrpcQueryClient("localhost", CommonConstants.Server.DEFAULT_GRPC_PORT);
+  }
+
   @Test
   public void testGrpcQueryServer()
       throws Exception {
-    GrpcQueryClient queryClient = new GrpcQueryClient("localhost", CommonConstants.Server.DEFAULT_GRPC_PORT);
+    GrpcQueryClient queryClient = getGrpcQueryClient();
     String sql = "SELECT * FROM mytable_OFFLINE LIMIT 1000000";
     BrokerRequest brokerRequest = new Pql2Compiler().compileToBrokerRequest(sql);
     List<String> segments = _helixResourceManager.getSegmentsFor("mytable_OFFLINE", false);
@@ -161,12 +169,13 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
     requestBuilder.setEnableStreaming(true);
     testStreamingRequest(queryClient.submit(requestBuilder.setSql(sql).build()));
     testStreamingRequest(queryClient.submit(requestBuilder.setBrokerRequest(brokerRequest).build()));
+    queryClient.close();
   }
 
   @Test(dataProvider = "provideSqlTestCases")
   public void testQueryingGrpcServer(String sql)
       throws Exception {
-    GrpcQueryClient queryClient = new GrpcQueryClient("localhost", CommonConstants.Server.DEFAULT_GRPC_PORT);
+    GrpcQueryClient queryClient = getGrpcQueryClient();
     List<String> segments = _helixResourceManager.getSegmentsFor("mytable_OFFLINE", false);
 
     GrpcRequestBuilder requestBuilder = new GrpcRequestBuilder().setSegments(segments);
@@ -174,6 +183,7 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
 
     requestBuilder.setEnableStreaming(true);
     collectAndCompareResult(queryClient.submit(requestBuilder.setSql(sql).build()), dataTable);
+    queryClient.close();
   }
 
   @DataProvider(name = "provideSqlTestCases")
@@ -184,7 +194,8 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
     entries.add(new Object[]{"SELECT * FROM mytable_OFFLINE LIMIT 10000000"});
     entries.add(new Object[]{"SELECT * FROM mytable_OFFLINE WHERE DaysSinceEpoch > 16312 LIMIT 10000000"});
     entries.add(new Object[]{
-        "SELECT timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable_OFFLINE LIMIT 10000000"});
+        "SELECT timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable_OFFLINE LIMIT 10000000"
+    });
 
     // aggregate
     entries.add(new Object[]{"SELECT count(*) FROM mytable_OFFLINE"});
@@ -194,8 +205,10 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
     entries.add(new Object[]{"SELECT DISTINCTCOUNT(AirlineID) FROM mytable_OFFLINE GROUP BY Carrier"});
 
     // order by
-    entries.add(new Object[]{"SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') "
-        + "FROM mytable_OFFLINE ORDER BY DaysSinceEpoch limit 10000"});
+    entries.add(new Object[]{
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') "
+            + "FROM mytable_OFFLINE ORDER BY DaysSinceEpoch limit 10000"
+    });
 
     return entries.toArray(new Object[entries.size()][]);
   }

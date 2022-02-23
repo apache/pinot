@@ -16,15 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.integration.tests;
+package org.apache.pinot.core.operator.docidsets;
 
-import javax.inject.Singleton;
-import org.jvnet.hk2.annotations.Service;
+import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.NotDocIdIterator;
 
-@Service
-@Singleton
-public class BrokerTestAutoLoadedService {
-    public String echo(String echoText) {
-        return echoText;
-    }
+
+public class NotDocIdSet implements FilterBlockDocIdSet {
+  private final FilterBlockDocIdSet _childDocIdSet;
+  private final int _numDocs;
+
+  public NotDocIdSet(FilterBlockDocIdSet childDocIdSet, int numDocs) {
+    _childDocIdSet = childDocIdSet;
+    _numDocs = numDocs;
+  }
+
+  @Override
+  public BlockDocIdIterator iterator() {
+    return new NotDocIdIterator(_childDocIdSet.iterator(), _numDocs);
+  }
+
+  @Override
+  public long getNumEntriesScannedInFilter() {
+    return _childDocIdSet.getNumEntriesScannedInFilter();
+  }
 }
