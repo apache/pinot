@@ -56,7 +56,7 @@ public class SelectionPlanNode implements PlanNode {
       if (orderByExpressions == null) {
         // Selection only
         TransformOperator transformOperator = new TransformPlanNode(_indexSegment, _queryContext, expressions,
-              Math.min(limit + _queryContext.getOffset(), DocIdSetPlanNode.MAX_DOC_PER_CALL)).run();
+            Math.min(limit + _queryContext.getOffset(), DocIdSetPlanNode.MAX_DOC_PER_CALL)).run();
         return new SelectionOnlyOperator(_indexSegment, _queryContext, expressions, transformOperator);
       } else {
         if (isAllOrderByColumnsSorted(orderByExpressions)) { // no sorting needed
@@ -77,8 +77,8 @@ public class SelectionPlanNode implements PlanNode {
           }
           expressionsToTransform.add(ExpressionContext.forIdentifier(BuiltInVirtualColumn.DOCID));
           TransformOperator transformOperator =
-                  new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform,
-                          DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
+              new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform,
+                  DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
           return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, transformOperator, false);
         }
       }
@@ -104,8 +104,8 @@ public class SelectionPlanNode implements PlanNode {
     int numOrderByExpressions = orderByExpressions.size();
     for (int i = 0; i < numOrderByExpressions; i++) {
       OrderByExpressionContext expressionContext = orderByExpressions.get(0);
-      if (!(expressionContext.getExpression().getType() == ExpressionContext.Type.IDENTIFIER)
-              || !expressionContext.isAsc()) {
+      if (!(expressionContext.getExpression().getType() == ExpressionContext.Type.IDENTIFIER) || !expressionContext
+          .isAsc()) {
         return false;
       }
       String column = expressionContext.getExpression().getIdentifier();

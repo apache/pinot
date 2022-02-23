@@ -198,8 +198,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     BlockValSet[] blockValSets = new BlockValSet[numExpressions];
     int numColumnsProjected = _transformOperator.getNumColumnsProjected();
     TransformBlock transformBlock;
-    while (_numDocsScanned < _numRowsToKeep
-           && (transformBlock = _transformOperator.nextBlock()) != null) {
+    while (_numDocsScanned < _numRowsToKeep && (transformBlock = _transformOperator.nextBlock()) != null) {
       for (int i = 0; i < numExpressions; i++) {
         ExpressionContext expression = _expressions.get(i);
         blockValSets[i] = transformBlock.getBlockValueSet(expression);
