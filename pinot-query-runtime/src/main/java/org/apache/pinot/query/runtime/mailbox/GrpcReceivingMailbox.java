@@ -43,6 +43,11 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<MailboxContent> {
   }
 
   @Override
+  public boolean isInitialized() {
+    return _initializationLatch.getCount() <= 0;
+  }
+
+  @Override
   public boolean isClosed() {
     return _closureLatch.getCount() <= 0;
   }

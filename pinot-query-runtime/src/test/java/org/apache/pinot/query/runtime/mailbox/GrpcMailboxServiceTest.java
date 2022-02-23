@@ -7,6 +7,7 @@ import java.util.Map;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.query.runtime.blocks.DataTableBlock;
+import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -27,11 +28,14 @@ public class GrpcMailboxServiceTest extends GrpcMailboxServiceTestBase {
 
     // create mock object
     Mailbox.MailboxContent testContent = getTestMailboxContent(mailboxId);
-    Thread.sleep(100);
     sendingMailbox.send(testContent);
-    Thread.sleep(100);
-    Mailbox.MailboxContent receivedContent = receivingMailbox.receive();
 
+    // wait for receiving mailbox to be created.
+    TestUtils.waitForCondition(aVoid -> {
+      return receivingMailbox.isInitialized();
+    }, 5000L, "Receiving mailbox initialize failed!");
+
+    Mailbox.MailboxContent receivedContent = receivingMailbox.receive();
     Assert.assertEquals(receivedContent, testContent);
   }
 

@@ -24,6 +24,12 @@ public interface ReceivingMailbox<T> {
   T receive() throws Exception;
 
   /**
+   * Check if receiving mailbox is initialized.
+   * @return
+   */
+  boolean isInitialized();
+
+  /**
    * Check if mailbox is closed.
    * @return
    */

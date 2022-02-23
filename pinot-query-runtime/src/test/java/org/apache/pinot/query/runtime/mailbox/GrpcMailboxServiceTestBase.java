@@ -5,6 +5,7 @@ import java.util.TreeMap;
 import org.apache.pinot.query.QueryEnvironmentTestUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
 
@@ -13,7 +14,7 @@ public abstract class GrpcMailboxServiceTestBase {
   protected TreeMap<Integer, GrpcMailboxService> _mailboxServices = new TreeMap<>();
 
   @BeforeClass
-  public void startUp()
+  public void setUp()
       throws Exception {
     for (int i = 0; i < MAILBOX_TEST_SIZE; i++) {
       int availablePort = QueryEnvironmentTestUtils.getAvailablePort();
@@ -24,6 +25,7 @@ public abstract class GrpcMailboxServiceTestBase {
     }
   }
 
+  @AfterClass
   public void tearDown() {
     for (GrpcMailboxService service : _mailboxServices.values()) {
       service.shutdown();
