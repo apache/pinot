@@ -56,17 +56,17 @@ public class SelectionPlanNode implements PlanNode {
       if (orderByExpressions == null) {
         // Selection only
         TransformOperator transformOperator = new TransformPlanNode(_indexSegment, _queryContext, expressions,
-            Math.min(limit, DocIdSetPlanNode.MAX_DOC_PER_CALL)).run();
+              Math.min(limit + _queryContext.getOffset(), DocIdSetPlanNode.MAX_DOC_PER_CALL)).run();
         return new SelectionOnlyOperator(_indexSegment, _queryContext, expressions, transformOperator);
       } else {
         if (isAllOrderByColumnsSorted(orderByExpressions)) { // no sorting needed
           TransformOperator transformOperator =
-                  new TransformPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
+              new TransformPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
           return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, transformOperator, true);
         } else if (orderByExpressions.size() == expressions.size()) { // Selection order-by
           // All output expressions are ordered
           TransformOperator transformOperator =
-                  new TransformPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
+              new TransformPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
           return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, transformOperator, false);
         } else {
           // Not all output expressions are ordered, only fetch the order-by expressions and docId to avoid the
