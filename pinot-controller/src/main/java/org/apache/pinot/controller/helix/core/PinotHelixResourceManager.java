@@ -3191,8 +3191,7 @@ public class PinotHelixResourceManager {
    * 3. If the tableName doesn't have a type-suffix and there are both REALTIME
    *    and OFFLINE tables, then the intersection of the brokers for the two table-types
    *    would be returned. Intersection is taken since the method guarantees to return
-   *    brokers which can serve the given table. In case of no type provided, it returns
-   *    broker which can serve both table-types.
+   *    brokers which can serve the given table.
    *
    * @param tableName name of table with or without type suffix.
    * @return list of brokers serving the given table in the format: Broker_hostname_port.
