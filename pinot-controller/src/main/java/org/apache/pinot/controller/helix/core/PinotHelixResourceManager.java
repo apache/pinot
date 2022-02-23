@@ -2994,8 +2994,10 @@ public class PinotHelixResourceManager {
           // 2. Proactively delete the oldest data snapshot to make sure that we only keep at most 2 data snapshots
           //    at any time in case of REFRESH use case.
           if (forceCleanup) {
-            if (lineageEntry.getState() == LineageEntryState.IN_PROGRESS && !Collections
-                .disjoint(segmentsFrom, lineageEntry.getSegmentsFrom())) {
+            // TODO: Skip conflict checks for empty segmentsFrom for now. More conflict
+            //       checks over segmentsTo may be needed and added later.
+            if (lineageEntry.getState() == LineageEntryState.IN_PROGRESS && !segmentsFrom.isEmpty() && CollectionUtils
+                .isEqualCollection(segmentsFrom, lineageEntry.getSegmentsFrom())) {
               LOGGER.info(
                   "Detected the incomplete lineage entry with the same 'segmentsFrom'. Reverting the lineage "
                       + "entry to unblock the new segment protocol. tableNameWithType={}, entryId={}, segmentsFrom={}, "
