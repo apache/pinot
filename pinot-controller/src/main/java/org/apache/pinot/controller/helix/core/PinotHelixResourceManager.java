@@ -3202,7 +3202,7 @@ public class PinotHelixResourceManager {
       throws TableNotFoundException {
     ExternalView ev = _helixDataAccessor.getProperty(_keyBuilder.externalView(Helix.BROKER_RESOURCE_INSTANCE));
     if (ev == null) {
-      return new ArrayList<>();
+      throw new IllegalStateException("Failed to find external view for " + Helix.BROKER_RESOURCE_INSTANCE);
     }
     TableType inputTableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (inputTableType != null) {
@@ -3220,8 +3220,7 @@ public class PinotHelixResourceManager {
     }
     if (hasOfflineTable && hasRealtimeTable) {
       Set<String> offlineTables = new HashSet<>(getLiveBrokersForTable(ev, offlineTableName));
-      return getLiveBrokersForTable(ev, realtimeTableName).stream()
-          .filter(offlineTables::contains)
+      return getLiveBrokersForTable(ev, realtimeTableName).stream().filter(offlineTables::contains)
           .collect(Collectors.toList());
     } else {
       return getLiveBrokersForTable(ev, hasOfflineTable ? offlineTableName : realtimeTableName);

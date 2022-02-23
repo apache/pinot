@@ -108,8 +108,8 @@ public class PinotHelixResourceManagerTest {
     ControllerTestUtils.setupClusterAndValidate();
 
     // Create server tenant on all Servers
-    Tenant serverTenant = new Tenant(TenantRole.SERVER, SERVER_TENANT_NAME,
-        NUM_INSTANCES, NUM_OFFLINE_SERVER_INSTANCES, NUM_REALTIME_SERVER_INSTANCES);
+    Tenant serverTenant = new Tenant(TenantRole.SERVER, SERVER_TENANT_NAME, NUM_INSTANCES, NUM_OFFLINE_SERVER_INSTANCES,
+        NUM_REALTIME_SERVER_INSTANCES);
     ControllerTestUtils.getHelixResourceManager().createServerTenant(serverTenant);
 
     // Enable lead controller resource
@@ -941,13 +941,12 @@ public class PinotHelixResourceManagerTest {
     List<String> liveBrokersForTable =
         ControllerTestUtils.getHelixResourceManager().getLiveBrokersForTable(OFFLINE_TABLE_NAME);
     Assert.assertEquals(liveBrokersForTable.size(), 2);
-    for (String broker: liveBrokersForTable) {
+    for (String broker : liveBrokersForTable) {
       Assert.assertTrue(broker.startsWith("Broker_localhost"));
     }
 
     // Test retrieving the live broker for table without table-type suffix.
-    liveBrokersForTable =
-        ControllerTestUtils.getHelixResourceManager().getLiveBrokersForTable(TABLE_NAME);
+    liveBrokersForTable = ControllerTestUtils.getHelixResourceManager().getLiveBrokersForTable(TABLE_NAME);
     Assert.assertEquals(liveBrokersForTable.size(), 2);
 
     // Test retrieving the live broker for table with non-existent table-type.
@@ -960,15 +959,10 @@ public class PinotHelixResourceManagerTest {
 
     // Create the realtime table.
     ControllerTestUtils.addDummySchema(REALTIME_TABLE_NAME);
-    tableConfig = new TableConfigBuilder(TableType.REALTIME)
-        .setTableName(TABLE_NAME)
-        .setNumReplicas(ControllerTestUtils.MIN_NUM_REPLICAS)
-        .setBrokerTenant(BROKER_TENANT_NAME)
-        .setStreamConfigs(FakeStreamConfigUtils
-            .getDefaultHighLevelStreamConfigs()
-            .getStreamConfigsMap())
-        .setSchemaName(REALTIME_TABLE_NAME)
-        .setServerTenant(SERVER_TENANT_NAME).build();
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setNumReplicas(ControllerTestUtils.MIN_NUM_REPLICAS).setBrokerTenant(BROKER_TENANT_NAME)
+        .setStreamConfigs(FakeStreamConfigUtils.getDefaultHighLevelStreamConfigs().getStreamConfigsMap())
+        .setSchemaName(REALTIME_TABLE_NAME).setServerTenant(SERVER_TENANT_NAME).build();
     ControllerTestUtils.getHelixResourceManager().addTable(tableConfig);
     // Wait for EV to be updated with realtime table.
     TestUtils.waitForCondition(aVoid -> {
