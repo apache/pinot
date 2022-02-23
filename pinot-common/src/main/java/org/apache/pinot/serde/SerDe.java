@@ -24,6 +24,7 @@ import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TProtocolFactory;
+import org.apache.thrift.transport.TTransportException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,8 +48,13 @@ public class SerDe {
   private final TDeserializer _deserializer;
 
   public SerDe(TProtocolFactory factory) {
-    _serializer = new TSerializer(factory);
-    _deserializer = new TDeserializer(factory);
+    try {
+      _serializer = new TSerializer(factory);
+      _deserializer = new TDeserializer(factory);
+    } catch (TTransportException ttException) {
+      LOGGER.error("Unable to initialize Serde instance", ttException);
+      throw new RuntimeException("Unable to initialize Serde instance", ttException);
+    }
   }
 
   public byte[] serialize(@SuppressWarnings("rawtypes") TBase obj) {
