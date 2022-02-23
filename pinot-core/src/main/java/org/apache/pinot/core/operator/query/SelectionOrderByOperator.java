@@ -216,23 +216,13 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     String[] columnNames = new String[numExpressions];
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
     for (int i = 0; i < numExpressions; i++) {
-      columnNames[i] = _expressions.get(i).toString();
-    }
-
-    int numOrderByExpressions = _orderByExpressions.size();
-    for (int i = 0; i < numOrderByExpressions; i++) {
-      TransformResultMetadata expressionMetadata = _orderByExpressionMetadata[i];
+      ExpressionContext expression = _expressions.get(i);
+      columnNames[i] = expression.toString();
+      TransformResultMetadata expressionMetadata = _transformOperator.getResultMetadata(expression);
       columnDataTypes[i] =
           DataSchema.ColumnDataType.fromDataType(expressionMetadata.getDataType(), expressionMetadata.isSingleValue());
     }
 
-    List<ExpressionContext> nonOrderByExpressions = _expressions.subList(numOrderByExpressions, numExpressions);
-    int numNonOrderByExpressions = nonOrderByExpressions.size();
-    for (int i = 0; i < numNonOrderByExpressions; i++) {
-      TransformResultMetadata expressionMetadata = _transformOperator.getResultMetadata(nonOrderByExpressions.get(i));
-      columnDataTypes[numOrderByExpressions + i] =
-          DataSchema.ColumnDataType.fromDataType(expressionMetadata.getDataType(), expressionMetadata.isSingleValue());
-    }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
     return new IntermediateResultsBlock(dataSchema, _rows);
