@@ -31,7 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/** This is copied from {@link HttpClient} in RTA-UMS project. */
+/** Common methods for HTTP clients */
 public abstract class HttpClient {
 
   public static final String HEADER_CONTENT_TYPE = "Content-Type";

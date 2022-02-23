@@ -32,7 +32,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/** This file is partially copied from RTAUMS gateway package */
 public class PinotControllerClient extends HttpClient {
 
   public enum TableType {

@@ -33,7 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class PinotConnectionUtils {
+public final class PinotConnectionUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotConnectionUtils.class);
 
   private PinotConnectionUtils() {
@@ -50,7 +50,6 @@ public class PinotConnectionUtils {
   }
 
   public static TableConfig getTableConfig(PinotControllerClient client, String tableName, String tableType) {
-    // TODO: add real-time table support
     String resp = null;
     TableConfig tableConfig = null;
     try {
