@@ -1671,6 +1671,17 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
+  public void testInvalidDistinctCountRewrite() {
+    String query = "SELECT sum(distinct bar) FROM foo";
+    try {
+      PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    } catch (Exception e) {
+      Assert.assertTrue(e instanceof SqlCompilationException);
+      Assert.assertEquals(e.getMessage(), "Function 'SUM' on DISTINCT is not supported.");
+    }
+  }
+
+  @Test
   public void testOrdinalsQueryRewrite() {
     String query = "SELECT foo, bar, count(*) FROM t GROUP BY 1, 2 ORDER BY 1, 2 DESC";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);

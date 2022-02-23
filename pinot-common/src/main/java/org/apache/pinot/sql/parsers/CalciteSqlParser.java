@@ -713,7 +713,12 @@ public class CalciteSqlParser {
         }
         if ((functionNode.getFunctionQuantifier() != null) && ("DISTINCT".equals(
             functionNode.getFunctionQuantifier().toString()))) {
-          functionName = "DISTINCT" + functionName;
+          if (AggregationFunctionType.COUNT.name().equals(functionName)) {
+            functionName = AggregationFunctionType.DISTINCTCOUNT.name();
+          } else if (AggregationFunctionType.isAggregationFunction(functionName)) {
+            // Aggregation function(other than COUNT) on DISTINCT is not supported, e.g. SUM(DISTINCT colA).
+            throw new SqlCompilationException("Function '" + functionName + "' on DISTINCT is not supported.");
+          }
         }
         break;
       default:
