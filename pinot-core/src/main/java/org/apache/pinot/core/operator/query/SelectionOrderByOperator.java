@@ -81,15 +81,17 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
   private final TransformResultMetadata[] _orderByExpressionMetadata;
   private final int _numRowsToKeep;
   private final PriorityQueue<Object[]> _rows;
+  private final boolean _allOrderByColsPreSorted;
 
   private int _numDocsScanned = 0;
   private long _numEntriesScannedPostFilter = 0;
 
   public SelectionOrderByOperator(IndexSegment indexSegment, QueryContext queryContext,
-      List<ExpressionContext> expressions, TransformOperator transformOperator) {
+      List<ExpressionContext> expressions, TransformOperator transformOperator, boolean allOrderByColsPreSorted) {
     _indexSegment = indexSegment;
     _expressions = expressions;
     _transformOperator = transformOperator;
+    _allOrderByColsPreSorted = allOrderByColsPreSorted;
 
     _orderByExpressions = queryContext.getOrderByExpressions();
     assert _orderByExpressions != null;
@@ -180,11 +182,50 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    if (_expressions.size() == _orderByExpressions.size()) {
+    if (_allOrderByColsPreSorted) {
+      return computeAllPreSorted();
+    } else if (_expressions.size() == _orderByExpressions.size()) {
       return computeAllOrdered();
     } else {
       return computePartiallyOrdered();
     }
+  }
+
+  private IntermediateResultsBlock computeAllPreSorted() {
+    int numExpressions = _expressions.size();
+
+    // Fetch all the expressions and insert them into the priority queue
+    BlockValSet[] blockValSets = new BlockValSet[numExpressions];
+    int numColumnsProjected = _transformOperator.getNumColumnsProjected();
+    TransformBlock transformBlock;
+    while (_numDocsScanned < _numRowsToKeep && (transformBlock = _transformOperator.nextBlock()) != null) {
+      for (int i = 0; i < numExpressions; i++) {
+        ExpressionContext expression = _expressions.get(i);
+        blockValSets[i] = transformBlock.getBlockValueSet(expression);
+      }
+      RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
+      int numDocsFetched = transformBlock.getNumDocs();
+      for (int i = 0; i < numDocsFetched && (_numDocsScanned < _numRowsToKeep); i++) {
+        SelectionOperatorUtils.addToPriorityQueue(blockValueFetcher.getRow(i), _rows, _numRowsToKeep);
+        _numDocsScanned++;
+      }
+    }
+    _numEntriesScannedPostFilter += _numDocsScanned * numColumnsProjected;
+
+    // Create the data schema
+    String[] columnNames = new String[numExpressions];
+    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
+    for (int i = 0; i < numExpressions; i++) {
+      ExpressionContext expression = _expressions.get(i);
+      columnNames[i] = expression.toString();
+      TransformResultMetadata expressionMetadata = _transformOperator.getResultMetadata(expression);
+      columnDataTypes[i] =
+          DataSchema.ColumnDataType.fromDataType(expressionMetadata.getDataType(), expressionMetadata.isSingleValue());
+    }
+
+    DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
+
+    return new IntermediateResultsBlock(dataSchema, _rows);
   }
 
   /**
