@@ -457,7 +457,7 @@ public class QueryContext {
     }
 
     public Builder setSubqueryContext(QueryContext subQueryContext) {
-      this._subQueryContext = subQueryContext;
+      _subQueryContext = subQueryContext;
       return this;
     }
 
