@@ -121,12 +121,9 @@ public class PinotControllerClientTest {
     Response response = mock(Response.class);
     MultivaluedMap<String, Object> headers = getRequestHeadersToPinot();
     String expectedFullURL = "http://localhost:9000/tables/demand?type=realtime";
-    final Map<String, Object> resEntity = new HashMap<>() {
-      {
-        put(PinotControllerClient.TableType.REALTIME.toString().toUpperCase(),
-            JsonUtils.stringToObject(fixture("fixtures/pinotTableConfigLowLevel.json"), TableConfig.class));
-      }
-    };
+    final Map<String, Object> resEntity = new HashMap<>();
+    resEntity.put(PinotControllerClient.TableType.REALTIME.toString().toUpperCase(),
+        JsonUtils.stringToObject(fixture("fixtures/pinotTableConfigLowLevel.json"), TableConfig.class));
 
     when(client.target(expectedFullURL)).thenReturn(target);
     when(target.request()).thenReturn(builder);
