@@ -135,8 +135,8 @@ public class SegmentConversionUtils {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     SSLContext sslContext = MinionContext.getInstance().getSSLContext();
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
-      URI uri =
-          FileUploadDownloadClient.getStartReplaceSegmentsURI(new URI(uploadURL), rawTableName, tableType.name(), forceCleanup);
+      URI uri = FileUploadDownloadClient
+          .getStartReplaceSegmentsURI(new URI(uploadURL), rawTableName, tableType.name(), forceCleanup);
       SimpleHttpResponse response =
           fileUploadDownloadClient.startReplaceSegments(uri, startReplaceSegmentsRequest, authToken);
       String responseString = response.getResponse();
