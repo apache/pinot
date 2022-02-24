@@ -141,14 +141,6 @@ public class CalciteSqlParser {
     // Compile Sql without OPTION statements.
     PinotQuery pinotQuery = compileSqlNodeToPinotQuery(sqlNode);
 
-    SqlSelect sqlSelect = getSelectNode(sqlNode);
-    if (sqlSelect != null) {
-      SqlNode fromNode = sqlSelect.getFrom();
-      if (fromNode != null && (fromNode instanceof SqlSelect || fromNode instanceof SqlOrderBy)) {
-        pinotQuery.getDataSource().setSubquery(compileSqlNodeToPinotQuery(fromNode));
-      }
-    }
-
     // Set Option statements to PinotQuery.
     setOptions(pinotQuery, options);
     return pinotQuery;
@@ -342,21 +334,6 @@ public class CalciteSqlParser {
     pinotQuery.setQueryOptions(options);
   }
 
-  private static SqlSelect getSelectNode(SqlNode sqlNode) {
-    SqlSelect selectNode = null;
-    if (sqlNode instanceof SqlOrderBy) {
-      // Store order-by info into the select sql node
-      SqlOrderBy orderByNode = (SqlOrderBy) sqlNode;
-      selectNode = (SqlSelect) orderByNode.query;
-      selectNode.setOrderBy(orderByNode.orderList);
-      selectNode.setFetch(orderByNode.fetch);
-      selectNode.setOffset(orderByNode.offset);
-    } else if (sqlNode instanceof SqlSelect) {
-      selectNode = (SqlSelect) sqlNode;
-    }
-    return selectNode;
-  }
-
   private static PinotQuery compileSqlNodeToPinotQuery(SqlNode sqlNode) {
     PinotQuery pinotQuery = new PinotQuery();
     if (sqlNode instanceof SqlExplain) {
@@ -365,7 +342,17 @@ public class CalciteSqlParser {
       pinotQuery.setExplain(true);
     }
 
-    SqlSelect selectNode = getSelectNode(sqlNode);
+    SqlSelect selectNode;
+    if (sqlNode instanceof SqlOrderBy) {
+      // Store order-by info into the select sql node
+      SqlOrderBy orderByNode = (SqlOrderBy) sqlNode;
+      selectNode = (SqlSelect) orderByNode.query;
+      selectNode.setOrderBy(orderByNode.orderList);
+      selectNode.setFetch(orderByNode.fetch);
+      selectNode.setOffset(orderByNode.offset);
+    } else {
+      selectNode = (SqlSelect) sqlNode;
+    }
 
     // SELECT
     if (selectNode.getModifierNode(SqlSelectKeyword.DISTINCT) != null) {

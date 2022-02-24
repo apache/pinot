@@ -56,7 +56,7 @@ public class BrokerRequestToQueryContextConverter {
   public static QueryContext convert(BrokerRequest brokerRequest) {
     QueryContext queryContext;
     if (brokerRequest.getPinotQuery() != null) {
-      queryContext = convertSQL(brokerRequest);
+      queryContext = convertSQL(brokerRequest.getPinotQuery(), brokerRequest);
     } else {
       queryContext = convertPQL(brokerRequest);
     }
@@ -64,22 +64,11 @@ public class BrokerRequestToQueryContextConverter {
     return queryContext;
   }
 
-  private static QueryContext convertSQL(BrokerRequest brokerRequest) {
-    QueryContext queryContext = convertSQL(brokerRequest.getPinotQuery(), brokerRequest);
-    if (brokerRequest.getPinotQuery().getDataSource().getSubquery() != null) {
-      queryContext.setSubQueryContext(
-          convertSQL(brokerRequest.getPinotQuery().getDataSource().getSubquery(), brokerRequest));
-      if (brokerRequest.getPinotQuery().getDataSource().getSubquery().getDataSource().getSubquery() != null) {
-        queryContext.getSubQueryContext().setSubQueryContext(
-            convertSQL(brokerRequest.getPinotQuery().getDataSource().getSubquery().getDataSource().getSubquery(),
-                brokerRequest)
-        );
-      }
-    }
-    return queryContext;
-  }
-
   private static QueryContext convertSQL(PinotQuery pinotQuery, BrokerRequest brokerRequest) {
+    QueryContext subQueryContext = null;
+    if (pinotQuery.getDataSource().getSubquery() != null) {
+      subQueryContext = convertSQL(pinotQuery.getDataSource().getSubquery(), brokerRequest);
+    }
     // SELECT
     List<ExpressionContext> selectExpressions;
     List<Expression> selectList = pinotQuery.getSelectList();
@@ -170,6 +159,7 @@ public class BrokerRequestToQueryContextConverter {
         .setGroupByExpressions(groupByExpressions).setOrderByExpressions(orderByExpressions)
         .setHavingFilter(havingFilter).setLimit(pinotQuery.getLimit()).setOffset(pinotQuery.getOffset())
         .setQueryOptions(pinotQuery.getQueryOptions()).setDebugOptions(pinotQuery.getDebugOptions())
+        .setSubqueryContext(subQueryContext)
         .setBrokerRequest(brokerRequest).build();
   }
 

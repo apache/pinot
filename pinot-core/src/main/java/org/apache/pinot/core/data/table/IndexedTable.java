@@ -67,14 +67,14 @@ public abstract class IndexedTable extends BaseTable {
     _resultSize = resultSize;
 
     List<ExpressionContext> groupByExpressions;
-    if (queryContext.getGapfillType() != GapfillUtils.GapfillType.NONE) {
+    if (queryContext.getGapfillType() != null) {
       groupByExpressions = GapfillUtils.getGroupByExpressions(queryContext);
     } else {
       groupByExpressions = queryContext.getGroupByExpressions();
     }
-    _aggregationFunctions = queryContext.getAggregationFunctions();
     assert groupByExpressions != null;
     _numKeyColumns = groupByExpressions.size();
+    _aggregationFunctions = queryContext.getAggregationFunctions();
     List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
     if (orderByExpressions != null) {
       // GROUP BY with ORDER BY

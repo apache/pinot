@@ -64,7 +64,7 @@ public class QueryContextUtils {
     if (gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL
         || gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL_AGGREGATE) {
       return true;
-    } else if (gapfillType != GapfillUtils.GapfillType.NONE) {
+    } else if (gapfillType != null) {
       return false;
     } else {
       AggregationFunction[] aggregationFunctions = query.getAggregationFunctions();

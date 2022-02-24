@@ -191,7 +191,7 @@ public class CombinePlanNode implements PlanNode {
         // Selection order-by
         return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService);
       }
-    } else if (gapfillType != GapfillUtils.GapfillType.NONE) {
+    } else if (gapfillType != null) {
         return new SelectionOnlyCombineOperator(operators, _queryContext, _executorService);
     } else {
       assert QueryContextUtils.isDistinctQuery(_queryContext);

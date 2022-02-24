@@ -86,7 +86,7 @@ public class QueryContext {
   // Keep the BrokerRequest to make incremental changes
   // TODO: Remove it once the whole query engine is using the QueryContext
   private final BrokerRequest _brokerRequest;
-  private QueryContext _subqueryContext;
+  private final QueryContext _subQueryContext;
 
   private final Function<Class<?>, Map<?, ?>> _sharedValues = MemoizedClassAssociation.of(ConcurrentHashMap::new);
 
@@ -124,7 +124,8 @@ public class QueryContext {
       @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
       @Nullable FilterContext havingFilter, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit,
       int offset, Map<String, String> queryOptions, @Nullable Map<String, String> debugOptions,
-      BrokerRequest brokerRequest) {
+      BrokerRequest brokerRequest,
+      QueryContext subQueryContext) {
     _tableName = tableName;
     _selectExpressions = selectExpressions;
     _aliasList = Collections.unmodifiableList(aliasList);
@@ -137,7 +138,8 @@ public class QueryContext {
     _queryOptions = queryOptions;
     _debugOptions = debugOptions;
     _brokerRequest = brokerRequest;
-    _gapfillType = GapfillUtils.GapfillType.NONE;
+    _gapfillType = null;
+    _subQueryContext = subQueryContext;
   }
 
   /**
@@ -193,13 +195,8 @@ public class QueryContext {
     return _orderByExpressions;
   }
 
-
-  public void setSubQueryContext(QueryContext subqueryContext) {
-    _subqueryContext = subqueryContext;
-  }
-
   public QueryContext getSubQueryContext() {
-    return _subqueryContext;
+    return _subQueryContext;
   }
 
   /**
@@ -397,6 +394,7 @@ public class QueryContext {
     private Map<String, String> _queryOptions;
     private Map<String, String> _debugOptions;
     private BrokerRequest _brokerRequest;
+    private QueryContext _subQueryContext;
 
     public Builder setTableName(String tableName) {
       _tableName = tableName;
@@ -458,6 +456,11 @@ public class QueryContext {
       return this;
     }
 
+    public Builder setSubqueryContext(QueryContext subQueryContext) {
+      this._subQueryContext = subQueryContext;
+      return this;
+    }
+
     public QueryContext build() {
       // TODO: Add validation logic here
 
@@ -466,7 +469,7 @@ public class QueryContext {
       }
       QueryContext queryContext =
           new QueryContext(_tableName, _selectExpressions, _aliasList, _filter, _groupByExpressions, _havingFilter,
-              _orderByExpressions, _limit, _offset, _queryOptions, _debugOptions, _brokerRequest);
+              _orderByExpressions, _limit, _offset, _queryOptions, _debugOptions, _brokerRequest, _subQueryContext);
 
       // Pre-calculate the aggregation functions and columns for the query
       generateAggregationFunctions(queryContext);

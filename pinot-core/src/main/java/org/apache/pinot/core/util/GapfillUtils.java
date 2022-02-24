@@ -51,9 +51,7 @@ public class GapfillUtils {
     // aggregation as subqery, the outer query is gapfill
     AGGREGATE_GAP_FILL,
     // aggegration as second nesting subquery, gapfill as fist nesting subquery, different aggregation as outer query
-    AGGREGATE_GAP_FILL_AGGREGATE,
-    // no gapfill at all.
-    NONE
+    AGGREGATE_GAP_FILL_AGGREGATE
   }
 
   private GapfillUtils() {
@@ -175,7 +173,7 @@ public class GapfillUtils {
             "Aggregation and Gapfill can not be in the same sql statement.");
         return GapfillType.GAP_FILL;
       } else {
-        return GapfillType.NONE;
+        return null;
       }
     } else if (isGapfill(queryContext)) {
       Preconditions.checkArgument(queryContext.getSubQueryContext().getAggregationFunctions() != null,
@@ -195,7 +193,7 @@ public class GapfillUtils {
         return GapfillType.AGGREGATE_GAP_FILL_AGGREGATE;
       }
     } else {
-      return GapfillType.NONE;
+      return null;
     }
   }
 

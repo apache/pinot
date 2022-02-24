@@ -237,8 +237,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
       if (groupByExpressions != null) {
         // Aggregation group-by query
-        if (QueryOptionsUtils.isGroupByModeSQL(queryContext.getQueryOptions())
-            || gapfillType != GapfillUtils.GapfillType.NONE) {
+        if (QueryOptionsUtils.isGroupByModeSQL(queryContext.getQueryOptions()) || gapfillType != null) {
           return new AggregationGroupByOrderByPlanNode(indexSegment, queryContext);
         }
         return new AggregationGroupByPlanNode(indexSegment, queryContext);
@@ -247,7 +246,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         return new AggregationPlanNode(indexSegment, queryContext);
       }
     } else if (QueryContextUtils.isSelectionQuery(queryContext)) {
-      if (gapfillType != GapfillUtils.GapfillType.NONE) {
+      if (gapfillType != null) {
         return new GapfillSelectionPlanNode(indexSegment, queryContext);
       } else {
         return new SelectionPlanNode(indexSegment, queryContext);
