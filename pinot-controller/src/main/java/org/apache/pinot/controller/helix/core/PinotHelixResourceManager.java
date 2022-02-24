@@ -3072,7 +3072,8 @@ public class PinotHelixResourceManager {
     return segmentLineageEntryId;
   }
 
-  // TODO: Add more conflict checks over segmentsTo later.
+  // TODO: Add more conflict checks over segmentsTo later. For example, for APPEND table,
+  //       if the new segments from 2 batch jobs are overlapping, we reject one of job.
   private static boolean isConflicted(List<String> segmentsFrom, LineageEntry lineageEntry, TableConfig tableConfig) {
     if (isRefreshTable(tableConfig)) {
       return CollectionUtils.isEqualCollection(segmentsFrom, lineageEntry.getSegmentsFrom());
