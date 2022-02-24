@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.reduce;
 
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.query.reduce.filter.RowMatcher;
+import org.apache.pinot.core.query.reduce.filter.RowMatcherFactory;
 
 
 /**
@@ -29,7 +30,7 @@ public class HavingFilterHandler {
   private final RowMatcher _rowMatcher;
 
   public HavingFilterHandler(FilterContext havingFilter, PostAggregationHandler postAggregationHandler) {
-    _rowMatcher = RowMatcher.getRowMatcher(havingFilter, postAggregationHandler);
+    _rowMatcher = RowMatcherFactory.getRowMatcher(havingFilter, postAggregationHandler);
   }
 
   /**

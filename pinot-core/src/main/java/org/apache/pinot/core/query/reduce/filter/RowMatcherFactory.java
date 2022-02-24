@@ -22,11 +22,23 @@ import org.apache.pinot.common.request.context.FilterContext;
 
 
 /**
- * Filter matcher for the rows.
+ * Factory for RowMatcher.
  */
-public interface RowMatcher {
+public interface RowMatcherFactory {
   /**
-   * Returns {@code true} if the given row matches the filter, {@code false} otherwise.
+   * Helper method to construct a RowMatcher based on the given filter.
    */
-  boolean isMatch(Object[] row);
+  public static RowMatcher getRowMatcher(FilterContext filter, ValueExtractorFactory valueExtractorFactory) {
+    switch (filter.getType()) {
+      case AND:
+        return new AndRowMatcher(filter.getChildren(), valueExtractorFactory);
+      case OR:
+        return new OrRowMatcher(filter.getChildren(), valueExtractorFactory);
+      case PREDICATE:
+        return new PredicateRowMatcher(filter.getPredicate(),
+            valueExtractorFactory.getValueExtractor(filter.getPredicate().getLhs()));
+      default:
+        throw new IllegalStateException();
+    }
+  }
 }

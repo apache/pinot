@@ -26,6 +26,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.reduce.filter.ColumnValueExtractor;
 import org.apache.pinot.core.query.reduce.filter.LiteralValueExtractor;
 import org.apache.pinot.core.query.reduce.filter.RowMatcher;
+import org.apache.pinot.core.query.reduce.filter.RowMatcherFactory;
 import org.apache.pinot.core.query.reduce.filter.ValueExtractor;
 import org.apache.pinot.core.query.reduce.filter.ValueExtractorFactory;
 import org.apache.pinot.core.util.GapfillUtils;
@@ -44,7 +45,7 @@ public class GapfillFilterHandler implements ValueExtractorFactory {
     for (int i = 0; i < _dataSchema.size(); i++) {
       _indexes.put(_dataSchema.getColumnName(i), i);
     }
-    _rowMatcher = RowMatcher.getRowMatcher(filter, this);
+    _rowMatcher = RowMatcherFactory.getRowMatcher(filter, this);
   }
 
   /**

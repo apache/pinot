@@ -31,7 +31,7 @@ public class OrRowMatcher implements RowMatcher {
     int numChildren = childFilters.size();
     _childMatchers = new RowMatcher[numChildren];
     for (int i = 0; i < numChildren; i++) {
-      _childMatchers[i] = RowMatcher.getRowMatcher(childFilters.get(i), valueExtractorFactory);
+      _childMatchers[i] = RowMatcherFactory.getRowMatcher(childFilters.get(i), valueExtractorFactory);
     }
   }
 
