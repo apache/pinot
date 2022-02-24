@@ -2878,13 +2878,13 @@ public class PinotHelixResourceManager {
           // By here, the lineage entry is either 'IN_PROGRESS' or 'COMPLETED'.
 
           // When 'forceCleanup' is enabled, we need to proactively clean up at the following cases:
-          // 1. Revert the lineage entry when we find the lineage entry with the same 'segmentFrom' values. This is
+          // 1. Revert the lineage entry when we find the lineage entry with overlapped 'segmentFrom' values. This is
           //    used to un-block the segment replacement protocol if the previous attempt failed in the middle.
           // 2. Proactively delete the oldest data snapshot to make sure that we only keep at most 2 data snapshots
           //    at any time in case of REFRESH use case.
           if (forceCleanup) {
-            if (lineageEntry.getState() == LineageEntryState.IN_PROGRESS && CollectionUtils
-                .isEqualCollection(segmentsFrom, lineageEntry.getSegmentsFrom())) {
+            if (lineageEntry.getState() == LineageEntryState.IN_PROGRESS && !Collections
+                .disjoint(segmentsFrom, lineageEntry.getSegmentsFrom())) {
               LOGGER.info(
                   "Detected the incomplete lineage entry with the same 'segmentsFrom'. Reverting the lineage "
                       + "entry to unblock the new segment protocol. tableNameWithType={}, entryId={}, segmentsFrom={}, "
