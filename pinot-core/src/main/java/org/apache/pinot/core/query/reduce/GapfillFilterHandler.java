@@ -31,14 +31,14 @@ import org.apache.pinot.core.query.reduce.filter.ValueExtractorFactory;
 import org.apache.pinot.core.util.GapfillUtils;
 
 /**
- * Handler for Filter clause of PreAggregateGapFill.
+ * Handler for Filter clause of GapFill.
  */
-public class PreAggregateGapfillFilterHandler implements ValueExtractorFactory {
+public class GapfillFilterHandler implements ValueExtractorFactory {
   private final RowMatcher _rowMatcher;
   private final DataSchema _dataSchema;
   private final Map<String, Integer> _indexes;
 
-  public PreAggregateGapfillFilterHandler(FilterContext filter, DataSchema dataSchema) {
+  public GapfillFilterHandler(FilterContext filter, DataSchema dataSchema) {
     _dataSchema = dataSchema;
     _indexes = new HashMap<>();
     for (int i = 0; i < _dataSchema.size(); i++) {

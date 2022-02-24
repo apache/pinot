@@ -53,7 +53,7 @@ import org.testng.annotations.Test;
 // TODO: Item 1. table alias for subquery in next PR
 // TODO: Item 2. Deprecate PostAggregateGapfill implementation in next PR
 @SuppressWarnings("rawtypes")
-public class PreAggregationGapfillQueriesTest extends BaseQueriesTest {
+public class GapfillQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "PostAggregationGapfillQueriesTest");
   private static final String RAW_TABLE_NAME = "parkingData";
   private static final String SEGMENT_NAME = "testSegment";

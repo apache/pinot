@@ -473,13 +473,13 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
       DataSchema dataSchema) {
     List<Object[]> result = new ArrayList<>();
 
-    PreAggregateGapfillFilterHandler postGapfillFilterHandler = null;
+    GapfillFilterHandler postGapfillFilterHandler = null;
     if (_queryContext.getSubQueryContext() != null && _queryContext.getFilter() != null) {
-      postGapfillFilterHandler = new PreAggregateGapfillFilterHandler(_queryContext.getFilter(), dataSchema);
+      postGapfillFilterHandler = new GapfillFilterHandler(_queryContext.getFilter(), dataSchema);
     }
-    PreAggregateGapfillFilterHandler postAggregateHavingFilterHandler = null;
+    GapfillFilterHandler postAggregateHavingFilterHandler = null;
     if (_queryContext.getHavingFilter() != null) {
-      postAggregateHavingFilterHandler = new PreAggregateGapfillFilterHandler(
+      postAggregateHavingFilterHandler = new GapfillFilterHandler(
           _queryContext.getHavingFilter(), dataSchemaForAggregatedResult);
     }
     Object[] previous = null;
@@ -509,7 +509,7 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
       Iterator<Object[]> sortedIterator,
       Object[] previous,
       DataSchema dataSchema,
-      PreAggregateGapfillFilterHandler postGapfillFilterHandler) {
+      GapfillFilterHandler postGapfillFilterHandler) {
     ColumnDataType[] resultColumnDataTypes = dataSchema.getColumnDataTypes();
     int numResultColumns = resultColumnDataTypes.length;
     Set<Key> keys = new HashSet<>(_groupByKeys);

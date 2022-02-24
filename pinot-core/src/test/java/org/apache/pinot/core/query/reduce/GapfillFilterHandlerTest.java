@@ -28,7 +28,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-public class PreAggregateGapfillFilterHandlerTest {
+public class GapfillFilterHandlerTest {
 
   @Test
   public void testFilter() {
@@ -36,10 +36,10 @@ public class PreAggregateGapfillFilterHandlerTest {
         .getQueryContextFromSQL("SELECT d1, d2 FROM testTable WHERE d2 > 5");
     DataSchema dataSchema =
         new DataSchema(new String[]{"d1", "d2"}, new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
-    PreAggregateGapfillFilterHandler preAggregateGapfillFilterHandler =
-        new PreAggregateGapfillFilterHandler(queryContext.getFilter(), dataSchema);
-    assertFalse(preAggregateGapfillFilterHandler.isMatch(new Object[]{1, 5L}));
-    assertTrue(preAggregateGapfillFilterHandler.isMatch(new Object[]{2, 10L}));
-    assertFalse(preAggregateGapfillFilterHandler.isMatch(new Object[]{3, 3L}));
+    GapfillFilterHandler gapfillFilterHandler =
+        new GapfillFilterHandler(queryContext.getFilter(), dataSchema);
+    assertFalse(gapfillFilterHandler.isMatch(new Object[]{1, 5L}));
+    assertTrue(gapfillFilterHandler.isMatch(new Object[]{2, 10L}));
+    assertFalse(gapfillFilterHandler.isMatch(new Object[]{3, 3L}));
   }
 }
