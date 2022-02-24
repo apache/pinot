@@ -36,8 +36,6 @@ public class RecordReaderUtils {
   private RecordReaderUtils() {
   }
 
-  public static final String GZIP_FILE_EXTENSION = ".gz";
-
   public static BufferedReader getBufferedReader(File dataFile)
       throws IOException {
     return new BufferedReader(new InputStreamReader(getInputStream(dataFile), StandardCharsets.UTF_8));
@@ -50,9 +48,12 @@ public class RecordReaderUtils {
 
   public static InputStream getInputStream(File dataFile)
       throws IOException {
-    if (dataFile.getName().endsWith(GZIP_FILE_EXTENSION)) {
-      return new GZIPInputStream(new FileInputStream(dataFile));
-    } else {
+    FileInputStream fileInputStream = new FileInputStream(dataFile);
+    try {
+      return new GZIPInputStream(fileInputStream);
+    } catch (Exception e) {
+      // NOTE: Cannot reuse the input stream because it might already be read.
+      fileInputStream.close();
       return new FileInputStream(dataFile);
     }
   }
