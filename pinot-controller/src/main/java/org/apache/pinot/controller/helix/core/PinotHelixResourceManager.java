@@ -2994,12 +2994,9 @@ public class PinotHelixResourceManager {
           // 2. Proactively delete the oldest data snapshot to make sure that we only keep at most 2 data snapshots
           //    at any time in case of REFRESH use case.
           if (forceCleanup) {
-            // TODO: Skip conflict checks for empty segmentsFrom for now. More conflict
-            //       checks over segmentsTo may be needed and added later.
-            if (lineageEntry.getState() == LineageEntryState.IN_PROGRESS && !segmentsFrom.isEmpty() && CollectionUtils
-                .isEqualCollection(segmentsFrom, lineageEntry.getSegmentsFrom())) {
-              LOGGER.info(
-                  "Detected the incomplete lineage entry with the same 'segmentsFrom'. Reverting the lineage "
+            if (lineageEntry.getState() == LineageEntryState.IN_PROGRESS && isConflicted(segmentsFrom, lineageEntry,
+                tableConfig)) {
+              LOGGER.info("Detected the incomplete lineage entry with the same 'segmentsFrom'. Reverting the lineage "
                       + "entry to unblock the new segment protocol. tableNameWithType={}, entryId={}, segmentsFrom={}, "
                       + "segmentsTo={}", tableNameWithType, entryId, lineageEntry.getSegmentsFrom(),
                   lineageEntry.getSegmentsTo());
@@ -3009,9 +3006,8 @@ public class PinotHelixResourceManager {
 
               // Add segments for proactive clean-up.
               segmentsToCleanUp.addAll(lineageEntry.getSegmentsTo());
-            } else if (lineageEntry.getState() == LineageEntryState.COMPLETED && IngestionConfigUtils
-                .getBatchSegmentIngestionType(tableConfig).equalsIgnoreCase("REFRESH") && CollectionUtils
-                .isEqualCollection(segmentsFrom, lineageEntry.getSegmentsTo())) {
+            } else if (lineageEntry.getState() == LineageEntryState.COMPLETED && isRefreshTable(tableConfig)
+                && CollectionUtils.isEqualCollection(segmentsFrom, lineageEntry.getSegmentsTo())) {
               // This part of code assumes that we only allow at most 2 data snapshots at a time by proactively
               // deleting the older snapshots (for REFRESH tables).
               //
@@ -3074,6 +3070,19 @@ public class PinotHelixResourceManager {
             + "segmentsTo = {}, segmentLineageEntryId = {})", tableNameWithType, segmentsFrom, segmentsTo,
         segmentLineageEntryId);
     return segmentLineageEntryId;
+  }
+
+  // TODO: Add more conflict checks over segmentsTo later.
+  private static boolean isConflicted(List<String> segmentsFrom, LineageEntry lineageEntry, TableConfig tableConfig) {
+    if (isRefreshTable(tableConfig)) {
+      return CollectionUtils.isEqualCollection(segmentsFrom, lineageEntry.getSegmentsFrom());
+    }
+    // For APPEND table, skip conflict checks if segmentsFrom is empty.
+    return !segmentsFrom.isEmpty() && CollectionUtils.isEqualCollection(segmentsFrom, lineageEntry.getSegmentsFrom());
+  }
+
+  private static boolean isRefreshTable(TableConfig tableConfig) {
+    return IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig).equalsIgnoreCase("REFRESH");
   }
 
   /**
