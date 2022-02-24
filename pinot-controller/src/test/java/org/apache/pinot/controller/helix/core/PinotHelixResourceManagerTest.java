@@ -677,8 +677,8 @@ public class PinotHelixResourceManagerTest {
         Arrays.asList("merged_t3_0", "merged_t3_1"));
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId4).getState(), LineageEntryState.COMPLETED);
 
-    // Empty segmentsFrom won't revert previous lineage with empty segmentsFrom
-    // Start new segment replacement since the above entry is reverted
+    // Check empty segmentsFrom won't revert previous lineage with empty segmentsFrom
+    // Start a new segment replacement with empty segmentsFrom.
     segmentsFrom = new ArrayList<>();
     segmentsTo = Arrays.asList("s7", "s8");
     String lineageEntryId5 = ControllerTestUtils.getHelixResourceManager()
@@ -694,10 +694,16 @@ public class PinotHelixResourceManagerTest {
     ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME,
         SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, "s7"), "downloadUrl");
 
-    // Force cleanup, skip checking conflict on empty 'segmentsFrom'.
+    // Start another new segment replacement with empty segmentsFrom,
+    // and check that previous lineages with empty segmentsFrom are not reverted.
     segmentsTo = Arrays.asList("s9", "s10");
-    ControllerTestUtils.getHelixResourceManager()
+    String lineageEntryId6 = ControllerTestUtils.getHelixResourceManager()
         .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo, true);
+    segmentLineage = SegmentLineageAccessHelper
+        .getSegmentLineage(ControllerTestUtils.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId5).getState(), LineageEntryState.IN_PROGRESS);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId6).getState(), LineageEntryState.IN_PROGRESS);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getState(), LineageEntryState.COMPLETED);
   }
 
   private void testSegmentReplacementForRefresh()
