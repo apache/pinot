@@ -933,7 +933,8 @@ public class PinotHelixResourceManagerTest {
 
     // Upload partial data
     ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, "s15"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, "s15"),
+        "downloadUrl");
 
     // Start another new segment replacement with empty segmentsFrom,
     // and check that previous lineages with empty segmentsFrom are reverted.
