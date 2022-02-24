@@ -3075,11 +3075,16 @@ public class PinotHelixResourceManager {
   // TODO: Add more conflict checks over segmentsTo later. For example, for APPEND table,
   //       if the new segments from 2 batch jobs are overlapping, we reject one of job.
   private static boolean isConflicted(List<String> segmentsFrom, LineageEntry lineageEntry, TableConfig tableConfig) {
-    if (isRefreshTable(tableConfig)) {
-      return CollectionUtils.isEqualCollection(segmentsFrom, lineageEntry.getSegmentsFrom());
+    if (!segmentsFrom.isEmpty()) {
+      // It's conflicted if there is any overlap between segmentsFrom.
+      return !Collections.disjoint(segmentsFrom, lineageEntry.getSegmentsFrom());
     }
-    // For APPEND table, skip conflict checks if segmentsFrom is empty.
-    return !segmentsFrom.isEmpty() && CollectionUtils.isEqualCollection(segmentsFrom, lineageEntry.getSegmentsFrom());
+    // For REFRESH table, it's conflicted if both segmentsFrom are empty.
+    if (isRefreshTable(tableConfig)) {
+      return lineageEntry.getSegmentsFrom().isEmpty();
+    }
+    // For APPEND table, no conflict upon empty segmentsFrom.
+    return false;
   }
 
   private static boolean isRefreshTable(TableConfig tableConfig) {
