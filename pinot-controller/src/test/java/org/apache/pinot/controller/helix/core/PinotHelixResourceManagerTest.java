@@ -205,7 +205,7 @@ public class PinotHelixResourceManagerTest {
     // Add new instance.
     Instance instance = new Instance("localhost", biggerRandomNumber, InstanceType.SERVER,
         Collections.singletonList(UNTAGGED_SERVER_INSTANCE), null, 0, 0, false);
-    ControllerTestUtils.getHelixResourceManager().addInstance(instance);
+    ControllerTestUtils.getHelixResourceManager().addInstance(instance, false);
 
     List<String> allInstances = ControllerTestUtils.getHelixResourceManager().getAllInstances();
     Assert.assertTrue(allInstances.contains(instanceName));
