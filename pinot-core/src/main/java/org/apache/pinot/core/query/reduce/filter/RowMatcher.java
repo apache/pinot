@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.query.reduce.filter;
 
-import org.apache.pinot.common.request.context.FilterContext;
-
 
 /**
  * Filter matcher for the rows.
