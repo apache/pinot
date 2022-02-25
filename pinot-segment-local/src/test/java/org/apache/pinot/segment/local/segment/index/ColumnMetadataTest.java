@@ -19,7 +19,12 @@
 package org.apache.pinot.segment.local.segment.index;
 
 import java.io.File;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
@@ -29,6 +34,9 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.segment.spi.partition.BoundedColumnValuePartitionFunction;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ReadMode;
@@ -173,5 +181,36 @@ public class ColumnMetadataTest {
     IndexSegment segment = ImmutableSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
     SegmentMetadata metadata = segment.getSegmentMetadata();
     verifySegmentAfterLoading(metadata);
+  }
+
+  @Test
+  public void testSegmentPartitionedWithBoundedColumnValue()
+      throws Exception {
+    // Build the Segment metadata.
+    SegmentGeneratorConfig config = createSegmentConfigWithoutCreator();
+    Map<String, String> functionConfig = new HashMap<>();
+    functionConfig.put("columnValues", "P,w,L");
+    functionConfig.put("columnValuesDelimiter", ",");
+    SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(
+        Collections.singletonMap("column3", new ColumnPartitionConfig("BoundedColumnValue", 4, functionConfig)));
+    config.setSegmentPartitionConfig(segmentPartitionConfig);
+    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    driver.init(config);
+    driver.build();
+
+    // Load segment metadata.
+    IndexSegment segment = ImmutableSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
+    SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
+    verifySegmentAfterLoading(segmentMetadata);
+    // Make sure we get null for creator name.
+    Assert.assertNull(segmentMetadata.getCreatorName());
+
+    // Verify segment partitioning metadata.
+    ColumnMetadata col3Meta = segmentMetadata.getColumnMetadataFor("column3");
+    Assert.assertNotNull(col3Meta.getPartitionFunction());
+    Assert.assertTrue(col3Meta.getPartitionFunction() instanceof BoundedColumnValuePartitionFunction);
+    Assert.assertEquals(col3Meta.getPartitionFunction().getNumPartitions(), 4);
+    Assert.assertEquals(col3Meta.getPartitionFunction().getFunctionConfig(), functionConfig);
+    Assert.assertEquals(col3Meta.getPartitions(), Stream.of(0, 1, 2, 3).collect(Collectors.toSet()));
   }
 }

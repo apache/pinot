@@ -712,7 +712,7 @@ public class PinotLLCRealtimeSegmentManager {
       ColumnPartitionConfig columnPartitionConfig = entry.getValue();
       ColumnPartitionMetadata columnPartitionMetadata =
           new ColumnPartitionMetadata(columnPartitionConfig.getFunctionName(), columnPartitionConfig.getNumPartitions(),
-              Collections.singleton(partitionId));
+              Collections.singleton(partitionId), columnPartitionConfig.getFunctionConfig());
       return new SegmentPartitionMetadata(Collections.singletonMap(entry.getKey(), columnPartitionMetadata));
     } else {
       LOGGER.warn(
@@ -731,7 +731,7 @@ public class PinotLLCRealtimeSegmentManager {
       if (partitionFunction != null) {
         ColumnPartitionMetadata columnPartitionMetadata =
             new ColumnPartitionMetadata(partitionFunction.getName(), partitionFunction.getNumPartitions(),
-                columnMetadata.getPartitions());
+                columnMetadata.getPartitions(), columnMetadata.getPartitionFunction().getFunctionConfig());
         return new SegmentPartitionMetadata(Collections.singletonMap(entry.getKey(), columnPartitionMetadata));
       }
     }

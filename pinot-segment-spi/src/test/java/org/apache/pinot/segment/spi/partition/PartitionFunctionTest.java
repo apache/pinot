@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.spi.partition;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
@@ -52,7 +54,8 @@ public class PartitionFunctionTest {
       int numPartitions = random.nextInt(MAX_NUM_PARTITIONS) + 1;
 
       String functionName = "MoDuLo";
-      PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions);
+      PartitionFunction partitionFunction =
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, null);
 
       testBasicProperties(partitionFunction, functionName, numPartitions);
 
@@ -97,7 +100,8 @@ public class PartitionFunctionTest {
       int numPartitions = random.nextInt(MAX_NUM_PARTITIONS) + 1;
 
       String functionName = "mUrmur";
-      PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions);
+      PartitionFunction partitionFunction =
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, null);
 
       testBasicProperties(partitionFunction, functionName, numPartitions);
 
@@ -127,7 +131,8 @@ public class PartitionFunctionTest {
       int numPartitions = random.nextInt(MAX_NUM_PARTITIONS) + 1;
 
       String functionName = "bYteArray";
-      PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions);
+      PartitionFunction partitionFunction =
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, null);
 
       testBasicProperties(partitionFunction, functionName, numPartitions);
 
@@ -150,7 +155,8 @@ public class PartitionFunctionTest {
       int numPartitions = random.nextInt(MAX_NUM_PARTITIONS) + 1;
 
       String functionName = "HaShCoDe";
-      PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions);
+      PartitionFunction partitionFunction =
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, null);
 
       testBasicProperties(partitionFunction, functionName, numPartitions);
 
@@ -174,14 +180,44 @@ public class PartitionFunctionTest {
     }
   }
 
+  @Test
+  public void testBoundedColumnValuePartitioner() {
+    String functionName = "BOUndedColumNVaLUE";
+    Map<String, String> functionConfig = new HashMap<>();
+    functionConfig.put("columnValues", "Maths|english|Chemistry");
+    functionConfig.put("columnValuesDelimiter", "|");
+    PartitionFunction partitionFunction =
+        PartitionFunctionFactory.getPartitionFunction(functionName, 4, functionConfig);
+    testBasicProperties(partitionFunction, functionName, 4, functionConfig);
+    assertEquals(partitionFunction.getPartition("maths"), 1);
+    assertEquals(partitionFunction.getPartition("English"), 2);
+    assertEquals(partitionFunction.getPartition("Chemistry"), 3);
+    assertEquals(partitionFunction.getPartition("Physics"), 0);
+  }
+
   private void testBasicProperties(PartitionFunction partitionFunction, String functionName, int numPartitions) {
+    testBasicProperties(partitionFunction, functionName, numPartitions, null);
+  }
+
+  private void testBasicProperties(PartitionFunction partitionFunction, String functionName, int numPartitions,
+      Map<String, String> functionConfig) {
     assertEquals(partitionFunction.getName().toLowerCase(), functionName.toLowerCase());
     assertEquals(partitionFunction.getNumPartitions(), numPartitions);
 
     JsonNode jsonNode = JsonUtils.objectToJsonNode(partitionFunction);
-    assertEquals(jsonNode.size(), 2);
+    assertEquals(jsonNode.size(), 3);
     assertEquals(jsonNode.get("name").asText().toLowerCase(), functionName.toLowerCase());
     assertEquals(jsonNode.get("numPartitions").asInt(), numPartitions);
+
+    JsonNode functionConfigNode = jsonNode.get("functionConfig");
+    if (functionConfig == null) {
+      assertTrue(functionConfigNode.isNull());
+    } else {
+      functionConfigNode.fields().forEachRemaining(nodeEntry -> {
+        assertTrue(functionConfig.containsKey(nodeEntry.getKey()));
+        assertEquals(nodeEntry.getValue().asText(), functionConfig.get(nodeEntry.getKey()));
+      });
+    }
   }
 
   /**

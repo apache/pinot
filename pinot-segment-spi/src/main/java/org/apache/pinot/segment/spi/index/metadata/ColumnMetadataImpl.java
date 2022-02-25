@@ -18,10 +18,15 @@
  */
 package org.apache.pinot.segment.spi.index.metadata;
 
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -279,8 +284,27 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     String partitionFunctionName = config.getString(Column.getKeyFor(column, Column.PARTITION_FUNCTION), null);
     if (partitionFunctionName != null) {
       int numPartitions = config.getInt(Column.getKeyFor(column, Column.NUM_PARTITIONS));
+      Map<String, String> partitionFunctionConfigMap = null;
+      Configuration partitionFunctionConfig = config.subset(Column.getKeyFor(column, Column.PARTITION_FUNCTION_CONFIG));
+      if (!partitionFunctionConfig.isEmpty()) {
+        partitionFunctionConfigMap = new HashMap<>();
+        Iterator<String> partitionFunctionConfigKeysIter = partitionFunctionConfig.getKeys();
+        while (partitionFunctionConfigKeysIter.hasNext()) {
+          String functionConfigKey = partitionFunctionConfigKeysIter.next();
+          Object functionConfigValueObj = partitionFunctionConfig.getProperty(functionConfigKey);
+          /*
+          A partition function config value can have comma and this value is read as a List from
+          PropertiesConfiguration.getProperty, Hence we need to rebuild original comma separated string value from
+          this list of values.
+           */
+          partitionFunctionConfigMap.put(functionConfigKey,
+              functionConfigValueObj instanceof List ? String.join(",", (List) functionConfigValueObj)
+                  : functionConfigValueObj.toString());
+        }
+      }
       PartitionFunction partitionFunction =
-          PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions);
+          PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions,
+              partitionFunctionConfigMap);
       builder.setPartitionFunction(partitionFunction);
       builder.setPartitions(
           ColumnPartitionMetadata.extractPartitions(config.getList(Column.getKeyFor(column, Column.PARTITION_VALUES))));

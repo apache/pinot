@@ -90,7 +90,7 @@ public class InstanceAssignmentTest {
     tableConfig.getValidationConfig()
         .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(partitionColumnName, numInstancesPerPartition));
     SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(
-        Collections.singletonMap(partitionColumnName, new ColumnPartitionConfig("Modulo", numPartitions)));
+        Collections.singletonMap(partitionColumnName, new ColumnPartitionConfig("Modulo", numPartitions, null)));
     tableConfig.getIndexingConfig().setSegmentPartitionConfig(segmentPartitionConfig);
 
     // Instances should be assigned to 3 replica-groups with a round-robin fashion, each with 3 instances, then these 3

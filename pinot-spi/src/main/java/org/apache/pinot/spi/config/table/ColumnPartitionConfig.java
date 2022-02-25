@@ -21,20 +21,29 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
 public class ColumnPartitionConfig extends BaseJsonConfig {
   private final String _functionName;
   private final int _numPartitions;
+  private final Map<String, String> _functionConfig;
+
+  public ColumnPartitionConfig(String functionName, int numPartitions) {
+    this(functionName, numPartitions, null);
+  }
 
   @JsonCreator
   public ColumnPartitionConfig(@JsonProperty(value = "functionName", required = true) String functionName,
-      @JsonProperty(value = "numPartitions", required = true) int numPartitions) {
+      @JsonProperty(value = "numPartitions", required = true) int numPartitions,
+      @JsonProperty(value = "functionConfig") @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(functionName != null, "'functionName' must be configured");
     Preconditions.checkArgument(numPartitions > 0, "'numPartitions' must be positive");
     _functionName = functionName;
     _numPartitions = numPartitions;
+    _functionConfig = functionConfig;
   }
 
   /**
@@ -44,6 +53,16 @@ public class ColumnPartitionConfig extends BaseJsonConfig {
    */
   public String getFunctionName() {
     return _functionName;
+  }
+
+  /**
+   * Returns the partition function configuration for the column.
+   *
+   * @return Partition function configuration.
+   */
+  @Nullable
+  public Map<String, String> getFunctionConfig() {
+    return _functionConfig;
   }
 
   /**
