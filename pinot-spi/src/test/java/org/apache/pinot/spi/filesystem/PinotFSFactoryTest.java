@@ -94,7 +94,7 @@ public class PinotFSFactoryTest {
     }
 
     @Override
-    public boolean copy(URI srcUri, URI dstUri)
+    public boolean copyDir(URI srcUri, URI dstUri)
         throws IOException {
       return true;
     }
