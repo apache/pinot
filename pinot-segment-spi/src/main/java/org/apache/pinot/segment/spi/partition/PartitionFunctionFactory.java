@@ -68,7 +68,7 @@ public class PartitionFunctionFactory {
   // The PartitionFunctionFactory should be able to support these default implementations, as well as instantiate
   // based on config
   public static PartitionFunction getPartitionFunction(String functionName, int numPartitions,
-                                                       Map<String, String> functionConfig) {
+      Map<String, String> functionConfig) {
     PartitionFunctionType function = PartitionFunctionType.fromString(functionName);
     switch (function) {
       case Modulo:

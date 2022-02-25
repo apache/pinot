@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -60,7 +61,7 @@ public class ColumnPartitionMetadata {
    * @param functionConfig Configuration required by partition function.
    */
   public ColumnPartitionMetadata(String functionName, int numPartitions, Set<Integer> partitions,
-                                 Map<String, String> functionConfig) {
+      @Nullable Map<String, String> functionConfig) {
     _functionName = functionName;
     _numPartitions = numPartitions;
     _partitions = partitions;

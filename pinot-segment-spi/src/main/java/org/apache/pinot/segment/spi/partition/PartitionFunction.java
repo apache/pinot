@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.partition;
 
 import java.io.Serializable;
 import java.util.Map;
+import javax.annotation.Nullable;
 
 
 /**
@@ -51,6 +52,7 @@ public interface PartitionFunction extends Serializable {
    */
   int getNumPartitions();
 
+  @Nullable
   default Map<String, String> getFunctionConfig() {
     return null;
   }

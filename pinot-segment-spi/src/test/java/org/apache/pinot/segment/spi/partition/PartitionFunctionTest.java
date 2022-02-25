@@ -185,9 +185,9 @@ public class PartitionFunctionTest {
     String functionName = "BOUndedColumNVaLUE";
     Map<String, String> functionConfig = new HashMap<>();
     functionConfig.put("columnValues", "Maths|english|Chemistry");
-    functionConfig.put("columnValuesDelimiter", "\\|");
+    functionConfig.put("columnValuesDelimiter", "|");
     PartitionFunction partitionFunction =
-        PartitionFunctionFactory.getPartitionFunction(functionName, 3, functionConfig);
+        PartitionFunctionFactory.getPartitionFunction(functionName, 4, functionConfig);
     testBasicProperties(partitionFunction, functionName, 4, functionConfig);
     assertEquals(partitionFunction.getPartition("maths"), 1);
     assertEquals(partitionFunction.getPartition("English"), 2);

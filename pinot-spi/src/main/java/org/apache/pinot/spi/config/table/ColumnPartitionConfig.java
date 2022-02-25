@@ -38,7 +38,7 @@ public class ColumnPartitionConfig extends BaseJsonConfig {
   @JsonCreator
   public ColumnPartitionConfig(@JsonProperty(value = "functionName", required = true) String functionName,
       @JsonProperty(value = "numPartitions", required = true) int numPartitions,
-      @JsonProperty(value = "functionConfig") Map<String, String> functionConfig) {
+      @JsonProperty(value = "functionConfig") @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(functionName != null, "'functionName' must be configured");
     Preconditions.checkArgument(numPartitions > 0, "'numPartitions' must be positive");
     _functionName = functionName;

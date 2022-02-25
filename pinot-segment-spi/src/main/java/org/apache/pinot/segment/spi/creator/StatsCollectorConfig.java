@@ -77,7 +77,8 @@ public class StatsCollectorConfig {
         : SegmentPartitionConfig.INVALID_NUM_PARTITIONS;
   }
 
-  public Map<String, String> getFunctionConfig(String column) {
+  @Nullable
+  public Map<String, String> getPartitionFunctionConfig(String column) {
     return (_segmentPartitionConfig != null) ? _segmentPartitionConfig.getFunctionConfig(column) : null;
   }
 

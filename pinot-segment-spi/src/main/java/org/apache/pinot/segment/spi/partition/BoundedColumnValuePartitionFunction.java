@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.partition;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 
 
 /**
@@ -29,12 +30,14 @@ import java.util.Map;
  *   "subject": {
  *     "functionName": "BoundedColumnValue",
  *     "functionConfig": {
- *       "columnValues": "Maths|English|Chemistry"
- *     }
+ *       "columnValues": "Maths|English|Chemistry",
+ *       "columnValuesDelimiter": "|"
+ *     },
+ *     "numPartitions": 4
  *   }
  * }
- * With this partition config on column "subject", partitionId would be 1 for Maths, 2 for English and so on.
- * partitionId would be "0" for all other values which is not configured but may occur.
+ * With this partition config on column "subject", partitionId would be 1 for Maths, 2 for English and 3 for Chemistry.
+ * partitionId would be "0" for all other values which may occur, therefore 'numPartitions' is set to 4.
  */
 public class BoundedColumnValuePartitionFunction implements PartitionFunction {
   private static final int DEFAULT_PARTITION_ID = 0;
@@ -52,15 +55,15 @@ public class BoundedColumnValuePartitionFunction implements PartitionFunction {
     Preconditions.checkState(functionConfig.get(COLUMN_VALUES_DELIMITER) != null,
         "'columnValuesDelimiter' must be configured");
     _functionConfig = functionConfig;
-    _values = functionConfig.get(COLUMN_VALUES).split(functionConfig.get(COLUMN_VALUES_DELIMITER));
-    Preconditions.checkState(_values.length == numPartitions,
-        "'numPartitions' must be equal to number of column values configured");
+    _values = StringUtils.split(functionConfig.get(COLUMN_VALUES), functionConfig.get(COLUMN_VALUES_DELIMITER));
+    Preconditions.checkState(numPartitions == _values.length + 1,
+        "'numPartitions' must just be one greater than number of column values configured");
     _numPartitions = numPartitions;
   }
 
   @Override
   public int getPartition(Object value) {
-    for (int i = 0; i < _numPartitions; i++) {
+    for (int i = 0; i < _numPartitions - 1; i++) {
       if (_values[i].equalsIgnoreCase(value.toString())) {
         return i + 1;
       }
@@ -74,14 +77,13 @@ public class BoundedColumnValuePartitionFunction implements PartitionFunction {
   }
 
   /**
-   * Returns number of column values configured plus one for default partitionId.
-   * NOTE: This value is not used to generate partitionId.
+   * Returns number of partitions configured for the column.
    *
    * @return Total number of partitions for the function.
    */
   @Override
   public int getNumPartitions() {
-    return _numPartitions + 1;
+    return _numPartitions;
   }
 
   @Override

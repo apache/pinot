@@ -292,13 +292,14 @@ public class ColumnMetadataImpl implements ColumnMetadata {
         while (partitionFunctionConfigKeysIter.hasNext()) {
           String functionConfigKey = partitionFunctionConfigKeysIter.next();
           Object functionConfigValueObj = partitionFunctionConfig.getProperty(functionConfigKey);
-          String valueStr;
-          if (functionConfigValueObj instanceof List) {
-            valueStr = String.join(",", (List) functionConfigValueObj);
-          } else {
-            valueStr = functionConfigValueObj.toString();
-          }
-          partitionFunctionConfigMap.put(functionConfigKey, valueStr);
+          /*
+          A partition function config value can have comma and this value is read as a List from
+          PropertiesConfiguration.getProperty, Hence we need to rebuild original comma separated string value from
+          this list of values.
+           */
+          partitionFunctionConfigMap.put(functionConfigKey,
+              functionConfigValueObj instanceof List ? String.join(",", (List) functionConfigValueObj)
+                  : functionConfigValueObj.toString());
         }
       }
       PartitionFunction partitionFunction =
