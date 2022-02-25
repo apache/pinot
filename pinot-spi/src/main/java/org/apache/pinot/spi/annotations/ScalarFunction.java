@@ -46,5 +46,13 @@ public @interface ScalarFunction {
 
   boolean enabled() default true;
 
+  @Deprecated
   String name() default "";
+
+  // A comma-separated function names to register in FunctionRegistry
+  String names() default "";
+
+  String alias() default "";
+
+  String returnType() default "";
 }

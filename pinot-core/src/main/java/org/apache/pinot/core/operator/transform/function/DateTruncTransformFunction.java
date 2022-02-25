@@ -28,6 +28,7 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.joda.time.DateTimeField;
 
 
@@ -119,8 +120,10 @@ public class DateTruncTransformFunction extends BaseTransformFunction {
     TimeZoneKey timeZoneKey = TimeZoneKey.getTimeZoneKey(timeZone);
 
     _field = DateTimeUtils.getTimestampField(DateTimeUtils.getChronology(timeZoneKey), unit);
-    _resultMetadata = LONG_SV_NO_DICTIONARY_METADATA;
     _outputTimeUnit = TimeUnit.valueOf(outputTimeUnitStr);
+    _resultMetadata = (valueArgument.getResultMetadata().getDataType() == FieldSpec.DataType.TIMESTAMP
+        && _inputTimeUnit == TimeUnit.MILLISECONDS && _outputTimeUnit == TimeUnit.MILLISECONDS)
+        ? TIMESTAMP_SV_NO_DICTIONARY_METADATA : LONG_SV_NO_DICTIONARY_METADATA;
   }
 
   @Override
@@ -137,8 +140,9 @@ public class DateTruncTransformFunction extends BaseTransformFunction {
     int length = projectionBlock.getNumDocs();
     long[] input = _mainTransformFunction.transformToLongValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
-      _longOutputTimes[i] = _outputTimeUnit
-          .convert(_field.roundFloor(TimeUnit.MILLISECONDS.convert(input[i], _inputTimeUnit)), TimeUnit.MILLISECONDS);
+      _longOutputTimes[i] =
+          _outputTimeUnit.convert(_field.roundFloor(TimeUnit.MILLISECONDS.convert(input[i], _inputTimeUnit)),
+              TimeUnit.MILLISECONDS);
     }
     return _longOutputTimes;
   }

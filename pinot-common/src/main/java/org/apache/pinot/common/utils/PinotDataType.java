@@ -487,7 +487,7 @@ public enum PinotDataType {
 
     @Override
     public Long toInternal(Object value) {
-      return ((Timestamp) value).getTime();
+      return value instanceof Timestamp ? ((Timestamp) value).getTime() : Long.parseLong(value.toString().trim());
     }
   },
 

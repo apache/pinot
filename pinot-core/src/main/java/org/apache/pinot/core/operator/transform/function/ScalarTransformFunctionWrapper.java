@@ -23,6 +23,7 @@ import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionUtils;
@@ -31,6 +32,7 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -75,9 +77,13 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     Class<?> resultClass = _functionInvoker.getResultClass();
     PinotDataType resultType = FunctionUtils.getParameterType(resultClass);
     if (resultType != null) {
-      _resultType = resultType;
+      String functionReturnType = functionInfo.getMethod().getAnnotation(ScalarFunction.class).returnType();
+      _resultType = (StringUtils.isEmpty(functionReturnType)) ? FunctionUtils.getParameterType(resultClass)
+          : PinotDataType.valueOf(functionReturnType);
+      DataType dataType = (StringUtils.isEmpty(functionReturnType)) ? FunctionUtils.getDataType(resultClass)
+          : DataType.valueOf(_resultType.name());
       _resultMetadata =
-          new TransformResultMetadata(FunctionUtils.getDataType(resultClass), _resultType.isSingleValue(), false);
+          new TransformResultMetadata(dataType, _resultType.isSingleValue(), false);
     } else {
       // Handle unrecognized result class with STRING
       _resultType = PinotDataType.STRING;

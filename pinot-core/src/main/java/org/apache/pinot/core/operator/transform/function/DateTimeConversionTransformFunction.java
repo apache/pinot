@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.transformer.datetime.BaseDateTimeTransformer;
@@ -31,6 +32,8 @@ import org.apache.pinot.core.operator.transform.transformer.datetime.SDFToSDFTra
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
@@ -107,13 +110,22 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
     }
     _mainTransformFunction = firstArgument;
 
+    String outputFormatStr = ((LiteralTransformFunction) arguments.get(2)).getLiteral();
     _dateTimeTransformer = DateTimeTransformerFactory
         .getDateTimeTransformer(((LiteralTransformFunction) arguments.get(1)).getLiteral(),
-            ((LiteralTransformFunction) arguments.get(2)).getLiteral(),
+            outputFormatStr,
             ((LiteralTransformFunction) arguments.get(3)).getLiteral());
     if (_dateTimeTransformer instanceof EpochToEpochTransformer
         || _dateTimeTransformer instanceof SDFToEpochTransformer) {
-      _resultMetadata = LONG_SV_NO_DICTIONARY_METADATA;
+      DateTimeFormatSpec outputTimeFormat = new DateTimeFormatSpec(outputFormatStr);
+      if (_mainTransformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.TIMESTAMP
+          && outputTimeFormat.getTimeFormat() == DateTimeFieldSpec.TimeFormat.EPOCH
+          && outputTimeFormat.getColumnUnit() == TimeUnit.MILLISECONDS
+      ) {
+        _resultMetadata = TIMESTAMP_SV_NO_DICTIONARY_METADATA;
+      } else {
+        _resultMetadata = LONG_SV_NO_DICTIONARY_METADATA;
+      }
     } else {
       _resultMetadata = STRING_SV_NO_DICTIONARY_METADATA;
     }

@@ -651,7 +651,8 @@ public class DateTimeFunctions {
    * @return truncated timeValue
    *
    */
-  @ScalarFunction
+  // This function name is registered by DateTruncTransformationFunction, so rename to dateTruncScalar.
+  @ScalarFunction(names = "dateTruncScalar", returnType = "TIMESTAMP")
   public static long dateTrunc(String unit, long timeValue, String inputTimeUnitStr, String timeZone,
       String outputTimeUnitStr) {
     TimeUnit inputTimeUnit = TimeUnit.valueOf(inputTimeUnitStr);
