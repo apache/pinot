@@ -1,13 +1,10 @@
-package org.apache.pinot.query.runtime;
+package org.apache.pinot.query.service;
 
-import com.google.common.base.Preconditions;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -16,20 +13,21 @@ import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
-import org.apache.pinot.query.dispatch.DistributedQueryPlan;
-import org.apache.pinot.query.dispatch.serde.QueryPlanSerDeUtils;
+import org.apache.pinot.query.runtime.plan.DistributedQueryPlan;
+import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
+import org.apache.pinot.query.runtime.QueryRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class QueryWorker extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
+public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcQueryServer.class);
 
   private final Server _server;
   private final QueryRunner _queryRunner;
   private final ExecutorService _executorService;
 
-  public QueryWorker(int port, QueryRunner queryRunner) {
+  public QueryServer(int port, QueryRunner queryRunner) {
     _server = ServerBuilder.forPort(port).addService(this).build();
     _executorService = Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
         new NamedThreadFactory("query_worker_on_" + port + "_port"));

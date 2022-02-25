@@ -1,11 +1,11 @@
-package org.apache.pinot.query.runtime.mailbox.channel;
+package org.apache.pinot.query.mailbox.channel;
 
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.proto.Mailbox;
-import org.apache.pinot.query.runtime.mailbox.GrpcMailboxService;
-import org.apache.pinot.query.runtime.mailbox.GrpcReceivingMailbox;
+import org.apache.pinot.query.mailbox.GrpcMailboxService;
+import org.apache.pinot.query.mailbox.GrpcReceivingMailbox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

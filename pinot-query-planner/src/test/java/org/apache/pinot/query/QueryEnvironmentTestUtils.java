@@ -8,12 +8,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.calcite.jdbc.CalciteSchemaBuilder;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.broker.routing.RoutingManager;
-import org.apache.pinot.broker.routing.RoutingTable;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.helix.TableCache;
+import org.apache.pinot.core.routing.RouteManager;
+import org.apache.pinot.core.routing.RouteTable;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.planner.QueryPlan;
@@ -23,10 +20,9 @@ import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -61,7 +57,7 @@ public class QueryEnvironmentTestUtils {
   }
 
   public static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2) {
-    RoutingManager routingManager = QueryEnvironmentTestUtils.getMockRoutingManager(port1, port2);
+    RouteManager routingManager = QueryEnvironmentTestUtils.getMockRoutingManager(port1, port2);
     return new QueryEnvironment(
         new TypeFactory(new TypeSystem()),
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(QueryEnvironmentTestUtils.mockTableCache())),
@@ -69,25 +65,25 @@ public class QueryEnvironmentTestUtils {
     );
   }
 
-  public static RoutingManager getMockRoutingManager(int port1, int port2) {
+  public static RouteManager getMockRoutingManager(int port1, int port2) {
     String server1 = String.format("localhost_%d", port1);
     String server2 = String.format("localhost_%d", port2);
     ServerInstance host1 = new WorkerInstance("localhost", port1);
     ServerInstance host2 = new WorkerInstance("localhost", port2);
 
-    RoutingTable rtA = mock(RoutingTable.class);
+    RouteTable rtA = mock(RouteTable.class);
     when(rtA.getServerInstanceToSegmentsMap()).thenReturn(ImmutableMap.of(host1, SERVER1_SEGMENTS.get("a"),
         host2, SERVER2_SEGMENTS.get("a")));
-    RoutingTable rtB = mock(RoutingTable.class);
+    RouteTable rtB = mock(RouteTable.class);
     when(rtB.getServerInstanceToSegmentsMap()).thenReturn(ImmutableMap.of(host1, SERVER1_SEGMENTS.get("b")));
-    RoutingTable rtC = mock(RoutingTable.class);
+    RouteTable rtC = mock(RouteTable.class);
     when(rtC.getServerInstanceToSegmentsMap()).thenReturn(ImmutableMap.of(host1, SERVER1_SEGMENTS.get("c"),
         host2, SERVER2_SEGMENTS.get("c")));
-    Map<String, RoutingTable> mockRoutingTableMap = ImmutableMap.of("a", rtA, "b", rtB, "c", rtC);
-    RoutingManager mock = mock(RoutingManager.class);
-    when(mock.getRoutingTable(any())).thenAnswer(invocation -> {
-      BrokerRequest brokerRequest = invocation.getArgument(0);
-      return mockRoutingTableMap.get(brokerRequest.getQuerySource().getTableName());
+    Map<String, RouteTable> mockRoutingTableMap = ImmutableMap.of("a", rtA, "b", rtB, "c", rtC);
+    RouteManager mock = mock(RouteManager.class);
+    when(mock.getRoutingTable(anyString())).thenAnswer(invocation -> {
+      String tableName = invocation.getArgument(0);
+      return mockRoutingTableMap.get(TableNameBuilder.extractRawTableName(tableName));
     });
     when(mock.getEnabledServerInstanceMap()).thenReturn(ImmutableMap.of(server1, host1, server2, host2));
     return mock;

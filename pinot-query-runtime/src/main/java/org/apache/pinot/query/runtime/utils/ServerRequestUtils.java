@@ -11,7 +11,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
-import org.apache.pinot.query.dispatch.DistributedQueryPlan;
+import org.apache.pinot.query.runtime.plan.DistributedQueryPlan;
 import org.apache.pinot.query.planner.nodes.CalcNode;
 import org.apache.pinot.query.planner.nodes.MailboxReceiveNode;
 import org.apache.pinot.query.planner.nodes.MailboxSendNode;

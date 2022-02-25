@@ -16,17 +16,16 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestUtils;
 import org.apache.pinot.query.QueryServerEnclosure;
-import org.apache.pinot.query.dispatch.QueryDispatcher;
-import org.apache.pinot.query.dispatch.DistributedQueryPlan;
+import org.apache.pinot.query.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.nodes.MailboxReceiveNode;
 import org.apache.pinot.query.routing.WorkerInstance;
 import org.apache.pinot.query.runtime.blocks.DataTableBlock;
 import org.apache.pinot.query.runtime.blocks.DataTableBlockUtils;
-import org.apache.pinot.query.runtime.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.query.runtime.plan.DistributedQueryPlan;
+import org.apache.pinot.query.service.QueryConfig;
+import org.apache.pinot.query.service.QueryDispatcher;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -60,10 +59,10 @@ public class QueryRunnerTest {
 
     _reducerGrpcPort = QueryEnvironmentTestUtils.getAvailablePort();
     Map<String, Object> reducerConfig = new HashMap<>();
-    reducerConfig.put(CommonConstants.Server.CONFIG_OF_GRPC_PORT, _reducerGrpcPort);
-    reducerConfig.put(CommonConstants.Server.CONFIG_OF_INSTANCE_ID,
-        String.format("Broker_localhost_%d", _reducerGrpcPort));
-    _mailboxService = new GrpcMailboxService(new PinotConfiguration(reducerConfig));
+    reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
+    reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME,
+        String.format("Broker_%s", QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME));
+    _mailboxService = new GrpcMailboxService(_reducerGrpcPort);
     _mailboxService.start();
 
     _queryEnvironment = QueryEnvironmentTestUtils.getQueryEnvironment(
@@ -79,6 +78,7 @@ public class QueryRunnerTest {
     for (QueryServerEnclosure server : _servers.values()) {
       server.shutDown();
     }
+    _mailboxService.shutdown();
   }
 
   @Test

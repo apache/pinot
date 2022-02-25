@@ -12,13 +12,15 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.query.dispatch.DistributedQueryPlan;
+import org.apache.pinot.query.mailbox.GrpcMailboxService;
+import org.apache.pinot.query.runtime.plan.DistributedQueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.nodes.MailboxSendNode;
 import org.apache.pinot.query.runtime.executor.WorkerQueryExecutor;
-import org.apache.pinot.query.runtime.mailbox.MailboxService;
+import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.utils.ServerRequestUtils;
+import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -27,43 +29,39 @@ import org.apache.pinot.spi.utils.CommonConstants;
  * QueryRunner accepts a query plan and runs it.
  */
 public class QueryRunner {
-  private static final String HOSTNAME_PORT_DELIMITER = "_";
-
   // This is a temporary before merging the 2 type of executor.
   private ServerQueryExecutorV1Impl _serverExecutor;
   private WorkerQueryExecutor _workerExecutor;
   private MailboxService<Mailbox.MailboxContent> _mailboxService;
-  private String _hostName;
+  private String _hostname;
   private int _port;
 
   /**
    * Initializes the query executor.
    * <p>Should be called only once and before calling any other method.
    */
-  public void init(PinotConfiguration config, InstanceDataManager instanceDataManager,
-      MailboxService<Mailbox.MailboxContent> mailboxService, ServerMetrics serverMetrics)
+  public void init(PinotConfiguration config, InstanceDataManager instanceDataManager, ServerMetrics serverMetrics)
       throws ConfigurationException {
-    String instanceId = config.getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID);
-    String hostAuthority =
-        instanceId.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE) ? instanceId.substring(
-            CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH) : instanceId;
-    String[] hostnameAndPort = StringUtils.split(hostAuthority, HOSTNAME_PORT_DELIMITER);
-    _hostName = hostnameAndPort[0];
-    _port = Integer.parseInt(hostnameAndPort[1]);
-    _mailboxService = mailboxService;
+    String instanceName = config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME);
+    _hostname = instanceName.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE) ? instanceName.substring(
+        CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH) : instanceName;
+    _port = config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, QueryConfig.DEFAULT_QUERY_RUNNER_PORT);
+    _mailboxService = new GrpcMailboxService(_port);
     _serverExecutor = new ServerQueryExecutorV1Impl();
     _serverExecutor.init(config, instanceDataManager, serverMetrics);
     _workerExecutor = new WorkerQueryExecutor();
-    _workerExecutor.init(config, serverMetrics, mailboxService, _hostName, _port);
+    _workerExecutor.init(config, serverMetrics, _mailboxService, _hostname, _port);
   }
 
   public void start() {
+    _mailboxService.start();
     _serverExecutor.start();
     _workerExecutor.start();
   }
 
   public void shutDown() {
     _workerExecutor.shutDown();
+    _serverExecutor.shutDown();
     _mailboxService.shutdown();
   }
 
@@ -83,7 +81,7 @@ public class QueryRunner {
       StageMetadata receivingStageMetadata = distributedQueryPlan.getMetadataMap().get(sendNode.getReceiverStageId());
       MailboxSendOperator mailboxSendOperator =
           new MailboxSendOperator(_mailboxService, dataTable, receivingStageMetadata.getServerInstances(),
-              sendNode.getExchangeType(), _hostName, _port, String.valueOf(serverQueryRequest.getRequestId()),
+              sendNode.getExchangeType(), _hostname, _port, String.valueOf(serverQueryRequest.getRequestId()),
               sendNode.getStageId());
       mailboxSendOperator.nextBlock();
     } else {

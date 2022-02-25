@@ -1,4 +1,4 @@
-package org.apache.pinot.query.dispatch;
+package org.apache.pinot.query.runtime.plan;
 
 import java.io.Serializable;
 import java.util.HashMap;

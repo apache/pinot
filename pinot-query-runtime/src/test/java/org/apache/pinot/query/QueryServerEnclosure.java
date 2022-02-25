@@ -13,9 +13,10 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
-import org.apache.pinot.query.dispatch.DistributedQueryPlan;
+import org.apache.pinot.query.runtime.plan.DistributedQueryPlan;
 import org.apache.pinot.query.runtime.QueryRunner;
-import org.apache.pinot.query.runtime.mailbox.GrpcMailboxService;
+import org.apache.pinot.query.mailbox.GrpcMailboxService;
+import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -59,14 +60,13 @@ public class QueryServerEnclosure {
   private static final int[] INT_FIELD_LIST = new int[]{1, 2, 42};
 
   private final ExecutorService _testExecutor;
-  private final int _grpcPort;
+  private final int _queryRunnerPort;
   private final Map<String, Object> _runnerConfig = new HashMap<>();
   private final Map<String, List<ImmutableSegment>> _segmentMap = new HashMap<>();
   private final InstanceDataManager _instanceDataManager;
   private final Map<String, TableDataManager> _tableDataManagers = new HashMap<>();
   private final Map<String, File> _indexDirs;
 
-  private GrpcMailboxService _mailboxService;
   private QueryRunner _queryRunner;
 
   public QueryServerEnclosure(List<String> tables, Map<String, File> indexDirs, Map<String, List<String>> segments) {
@@ -83,12 +83,13 @@ public class QueryServerEnclosure {
         _segmentMap.put(tableName, segmentList);
       }
       _instanceDataManager = mockInstanceDataManager();
-      _grpcPort = QueryEnvironmentTestUtils.getAvailablePort();
-      _runnerConfig.put(CommonConstants.Server.CONFIG_OF_GRPC_PORT, _grpcPort);
-      _runnerConfig.put(CommonConstants.Server.CONFIG_OF_INSTANCE_ID, String.format("Server_localhost_%d", _grpcPort));
+      _queryRunnerPort = QueryEnvironmentTestUtils.getAvailablePort();
+      _runnerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, _queryRunnerPort);
+      _runnerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME,
+          String.format("Server_%s", QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME));
       _queryRunner = new QueryRunner();
       _testExecutor = Executors.newFixedThreadPool(DEFAULT_EXECUTOR_THREAD_NUM, new NamedThreadFactory(
-          "test_query_server_enclosure_on_" + _grpcPort + "_port"));
+          "test_query_server_enclosure_on_" + _queryRunnerPort + "_port"));
     } catch (Exception e) {
       throw new RuntimeException("Test Failed!", e);
     }
@@ -147,20 +148,18 @@ public class QueryServerEnclosure {
   }
 
   public int getPort() {
-    return _grpcPort;
+    return _queryRunnerPort;
   }
 
   public void start() throws Exception {
     PinotConfiguration configuration = new PinotConfiguration(_runnerConfig);
-    _mailboxService = new GrpcMailboxService(configuration);
-    _mailboxService.start();
     _queryRunner = new QueryRunner();
-    _queryRunner.init(configuration, _instanceDataManager, _mailboxService, mockServiceMetrics());
+    _queryRunner.init(configuration, _instanceDataManager, mockServiceMetrics());
+    _queryRunner.start();
   }
 
   public void shutDown() {
     _queryRunner.shutDown();
-    _mailboxService.shutdown();
     for (Map.Entry<String, List<ImmutableSegment>> e : _segmentMap.entrySet()) {
       for (ImmutableSegment segment : e.getValue()) {
         segment.destroy();

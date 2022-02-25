@@ -1,4 +1,4 @@
-package org.apache.pinot.query.runtime.mailbox;
+package org.apache.pinot.query.mailbox;
 
 /**
  * Mailbox service that handles transfer for mailbox contents.
@@ -10,6 +10,8 @@ public interface MailboxService<T> {
   void start();
 
   void shutdown();
+
+  int getMailboxPort();
 
   ReceivingMailbox<T> getReceivingMailbox(String mailboxId);
 

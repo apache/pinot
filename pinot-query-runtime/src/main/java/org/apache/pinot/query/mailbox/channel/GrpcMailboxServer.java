@@ -1,4 +1,4 @@
-package org.apache.pinot.query.runtime.mailbox.channel;
+package org.apache.pinot.query.mailbox.channel;
 
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
@@ -7,7 +7,7 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
-import org.apache.pinot.query.runtime.mailbox.GrpcMailboxService;
+import org.apache.pinot.query.mailbox.GrpcMailboxService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

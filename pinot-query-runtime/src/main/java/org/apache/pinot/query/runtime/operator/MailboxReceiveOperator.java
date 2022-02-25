@@ -13,9 +13,9 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.runtime.blocks.DataTableBlock;
 import org.apache.pinot.query.runtime.blocks.DataTableBlockUtils;
-import org.apache.pinot.query.runtime.mailbox.MailboxService;
-import org.apache.pinot.query.runtime.mailbox.ReceivingMailbox;
-import org.apache.pinot.query.runtime.mailbox.StringMailboxIdentifier;
+import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.mailbox.ReceivingMailbox;
+import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

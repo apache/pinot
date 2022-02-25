@@ -20,10 +20,11 @@ package org.apache.pinot.broker.routing;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.core.routing.RouteTable;
 import org.apache.pinot.core.transport.ServerInstance;
 
 
-public class RoutingTable {
+public class RoutingTable implements RouteTable {
   private final Map<ServerInstance, List<String>> _serverInstanceToSegmentsMap;
   private final List<String> _unavailableSegments;
 
@@ -32,6 +33,7 @@ public class RoutingTable {
     _unavailableSegments = unavailableSegments;
   }
 
+  @Override
   public Map<ServerInstance, List<String>> getServerInstanceToSegmentsMap() {
     return _serverInstanceToSegmentsMap;
   }

@@ -1,4 +1,4 @@
-package org.apache.pinot.query.runtime.mailbox.channel;
+package org.apache.pinot.query.mailbox.channel;
 
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.ArrayBlockingQueue;

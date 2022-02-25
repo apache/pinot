@@ -1,4 +1,4 @@
-package org.apache.pinot.query.runtime;
+package org.apache.pinot.query.service;
 
 import com.google.common.collect.Lists;
 import io.grpc.ManagedChannelBuilder;
@@ -10,8 +10,8 @@ import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestUtils;
-import org.apache.pinot.query.dispatch.QueryDispatcher;
-import org.apache.pinot.query.dispatch.serde.QueryPlanSerDeUtils;
+import org.apache.pinot.query.runtime.QueryRunner;
+import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.routing.WorkerInstance;
 import org.mockito.Mockito;
@@ -21,9 +21,9 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class QueryWorkerTest {
+public class QueryServerTest {
   private int QUERY_WORKER_COUNT = 2;
-  private Map<Integer, QueryWorker> _queryWorkerMap = new HashMap<>();
+  private Map<Integer, QueryServer> _queryWorkerMap = new HashMap<>();
   private Map<Integer, ServerInstance> _queryWorkerInstanceMap = new HashMap<>();
 
   private QueryEnvironment _queryEnvironment;
@@ -34,7 +34,7 @@ public class QueryWorkerTest {
 
     for (int i = 0; i < QUERY_WORKER_COUNT; i++) {
       int availablePort = QueryEnvironmentTestUtils.getAvailablePort();
-      QueryWorker workerService = new QueryWorker(availablePort, Mockito.mock(QueryRunner.class));
+      QueryServer workerService = new QueryServer(availablePort, Mockito.mock(QueryRunner.class));
       workerService.start();
       _queryWorkerMap.put(availablePort, workerService);
       _queryWorkerInstanceMap.put(availablePort, new WorkerInstance("localhost", availablePort));
@@ -48,7 +48,7 @@ public class QueryWorkerTest {
 
   @AfterClass
   public void tearDown() {
-    for (QueryWorker worker : _queryWorkerMap.values()) {
+    for (QueryServer worker : _queryWorkerMap.values()) {
       worker.shutdown();
     }
   }

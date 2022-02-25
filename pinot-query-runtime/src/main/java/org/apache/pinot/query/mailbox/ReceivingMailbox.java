@@ -1,4 +1,4 @@
-package org.apache.pinot.query.runtime.mailbox;
+package org.apache.pinot.query.mailbox;
 
 /**
  * Mailbox is used to send and receive data.

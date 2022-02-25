@@ -12,7 +12,7 @@ import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.externalize.RelXmlWriter;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlNode;
-import org.apache.pinot.broker.routing.RoutingManager;
+import org.apache.pinot.core.routing.RouteManager;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.context.PlannerContext;
@@ -32,7 +32,7 @@ public class QueryEnvironmentTest {
   @BeforeClass
   public void setUp() {
     // the port doesn't matter as we are not actually making a server call.
-    RoutingManager routingManager = QueryEnvironmentTestUtils.getMockRoutingManager(1, 2);
+    RouteManager routingManager = QueryEnvironmentTestUtils.getMockRoutingManager(1, 2);
     _queryEnvironment = new QueryEnvironment(
         new TypeFactory(new TypeSystem()),
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(QueryEnvironmentTestUtils.mockTableCache())),

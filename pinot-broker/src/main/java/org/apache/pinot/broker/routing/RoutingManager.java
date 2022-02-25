@@ -54,12 +54,15 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.core.routing.RouteManager;
+import org.apache.pinot.core.routing.RouteTable;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,8 +85,9 @@ import org.slf4j.LoggerFactory;
  * TODO: Expose RoutingEntry class to get a consistent view in the broker request handler and save the redundant map
  *       lookups.
  */
-public class RoutingManager implements ClusterChangeHandler {
+public class RoutingManager implements ClusterChangeHandler, RouteManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(RoutingManager.class);
+  private static final CalciteSqlCompiler CALCITE_SQL_COMPILER = new CalciteSqlCompiler();
 
   private final BrokerMetrics _brokerMetrics;
   private final Map<String, RoutingEntry> _routingEntryMap = new ConcurrentHashMap<>();
@@ -502,10 +506,6 @@ public class RoutingManager implements ClusterChangeHandler {
     return routingEntry != null ? routingEntry.getQueryTimeoutMs() : null;
   }
 
-  public Map<String, ServerInstance> getEnabledServerInstanceMap() {
-    return new HashMap<>(_enabledServerInstanceMap);
-  }
-
   private static class RoutingEntry {
     final String _tableNameWithType;
     final SegmentPreSelector _segmentPreSelector;
@@ -604,5 +604,15 @@ public class RoutingManager implements ClusterChangeHandler {
         return new InstanceSelector.SelectionResult(Collections.emptyMap(), Collections.emptyList());
       }
     }
+  }
+
+  @Override
+  public Map<String, ServerInstance> getEnabledServerInstanceMap() {
+    return new HashMap<>(_enabledServerInstanceMap);
+  }
+
+  @Override
+  public RouteTable getRoutingTable(String tableName) {
+    return getRoutingTable(CALCITE_SQL_COMPILER.compileToBrokerRequest(String.format("SELECT * FROM %s", tableName)));
   }
 }

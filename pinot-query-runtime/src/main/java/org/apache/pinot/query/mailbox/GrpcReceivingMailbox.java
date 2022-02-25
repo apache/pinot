@@ -1,11 +1,10 @@
-package org.apache.pinot.query.runtime.mailbox;
+package org.apache.pinot.query.mailbox;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
-import org.apache.pinot.query.runtime.mailbox.channel.MailboxContentStreamObserver;
+import org.apache.pinot.query.mailbox.channel.MailboxContentStreamObserver;
 
 
 public class GrpcReceivingMailbox implements ReceivingMailbox<MailboxContent> {

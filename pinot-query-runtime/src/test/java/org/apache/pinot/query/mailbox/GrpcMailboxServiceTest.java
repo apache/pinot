@@ -1,4 +1,4 @@
-package org.apache.pinot.query.runtime.mailbox;
+package org.apache.pinot.query.mailbox;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
@@ -37,6 +37,9 @@ public class GrpcMailboxServiceTest extends GrpcMailboxServiceTestBase {
 
     Mailbox.MailboxContent receivedContent = receivingMailbox.receive();
     Assert.assertEquals(receivedContent, testContent);
+
+    // close the receiver will also close the sender.
+    receivingMailbox.close();
   }
 
   private Mailbox.MailboxContent getTestMailboxContent(String mailboxId) throws IOException {

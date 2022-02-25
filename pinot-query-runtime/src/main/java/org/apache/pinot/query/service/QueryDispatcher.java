@@ -1,10 +1,6 @@
-package org.apache.pinot.query.dispatch;
+package org.apache.pinot.query.service;
 
-import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannelBuilder;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectOutputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -12,7 +8,8 @@ import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.query.dispatch.serde.QueryPlanSerDeUtils;
+import org.apache.pinot.query.runtime.plan.DistributedQueryPlan;
+import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.slf4j.Logger;

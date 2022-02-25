@@ -1,9 +1,9 @@
-package org.apache.pinot.query.runtime.mailbox;
+package org.apache.pinot.query.mailbox;
 
 import io.grpc.ManagedChannel;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
-import org.apache.pinot.query.runtime.mailbox.channel.ChannelManager;
+import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -21,6 +21,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 public class GrpcMailboxService implements MailboxService<MailboxContent> {
   // channel manager
   private final ChannelManager _channelManager;
+  private final int _mailboxPort;
 
   // maintaining a list of registered mailboxes.
   private final ConcurrentHashMap<String, ReceivingMailbox<MailboxContent>> _receivingMailboxMap
@@ -28,8 +29,10 @@ public class GrpcMailboxService implements MailboxService<MailboxContent> {
   private final ConcurrentHashMap<String, SendingMailbox<MailboxContent>> _sendingMailboxMap
       = new ConcurrentHashMap<>();
 
-  public GrpcMailboxService(PinotConfiguration config) {
-    _channelManager = new ChannelManager(this, config);
+
+  public GrpcMailboxService(int mailboxPort) {
+    _mailboxPort = mailboxPort;
+    _channelManager = new ChannelManager(this);
   }
 
   @Override
@@ -40,6 +43,11 @@ public class GrpcMailboxService implements MailboxService<MailboxContent> {
   @Override
   public void shutdown() {
     _channelManager.shutdown();
+  }
+
+  @Override
+  public int getMailboxPort() {
+    return _mailboxPort;
   }
 
   /**

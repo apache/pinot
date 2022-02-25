@@ -1,8 +1,7 @@
-package org.apache.pinot.query.dispatch.serde;
+package org.apache.pinot.query.runtime.plan.serde;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
-import io.grpc.Status;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -14,7 +13,7 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.query.dispatch.DistributedQueryPlan;
+import org.apache.pinot.query.runtime.plan.DistributedQueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.nodes.StageNode;
 import org.apache.pinot.query.routing.WorkerInstance;
