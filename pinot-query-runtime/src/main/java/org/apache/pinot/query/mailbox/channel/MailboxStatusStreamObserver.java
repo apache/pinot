@@ -24,7 +24,7 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
   private static final int DEFAULT_MAILBOX_QUEUE_CAPACITY = 5;
   private static final long DEFAULT_MAILBOX_POLL_TIMEOUT = 1000L;
   private final AtomicInteger _bufferSize = new AtomicInteger(5);
-  private final AtomicBoolean _isRunning = new AtomicBoolean();
+  private final AtomicBoolean _isCompleted = new AtomicBoolean(false);
   private final ArrayBlockingQueue<Mailbox.MailboxContent> _sendingBuffer;
   private final ExecutorService _executorService;
 
@@ -44,23 +44,30 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
     } else {
       _bufferSize.set(1); // DEFAULT_AVAILABILITY;
     }
-  }
-
-  public void init(StreamObserver<Mailbox.MailboxContent> mailboxContentStreamObserver) {
-    this._mailboxContentStreamObserver = mailboxContentStreamObserver;
-    this._isRunning.set(true);
-    _executorService.submit(() -> {
-      while (_isRunning.get()) {
+    // if receiving end echo data receive finished. we finished via calling channel complete
+    if (mailboxStatus.getMetadataMap().containsKey("finished")) {
+      System.out.printf("onComplete %s, metadata: %s\n", mailboxStatus.getMailboxId(), mailboxStatus.getMetadataMap());
+      this._mailboxContentStreamObserver.onCompleted();
+    } else {
+      // TODO: check stream is not completed before sending data
+      // It should never be completed unless content is completed, however since within this class we can't know.
+      while (!_isCompleted.get()) {
         try {
           Mailbox.MailboxContent content = _sendingBuffer.poll(DEFAULT_MAILBOX_POLL_TIMEOUT, TimeUnit.MILLISECONDS);
           if (content != null) {
             this._mailboxContentStreamObserver.onNext(content);
+            break;
           }
         } catch (InterruptedException e) {
           LOGGER.error("Interrupted during mailbox content", e);
         }
       }
-    });
+    }
+  }
+
+  public void init(StreamObserver<Mailbox.MailboxContent> mailboxContentStreamObserver, Mailbox.MailboxContent data) {
+    this._mailboxContentStreamObserver = mailboxContentStreamObserver;
+    _mailboxContentStreamObserver.onNext(data);
   }
 
   public void offer(Mailbox.MailboxContent mailboxContent) {
@@ -69,7 +76,7 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
 
   @Override
   public void onError(Throwable e) {
-    this._isRunning.set(false);
+    this._isCompleted.set(true);
     this.shutdown();
     throw new RuntimeException(e);
   }
@@ -81,7 +88,7 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
 
   @Override
   public void onCompleted() {
-    this._isRunning.set(false);
+    this._isCompleted.set(true);
     this.shutdown();
   }
 }

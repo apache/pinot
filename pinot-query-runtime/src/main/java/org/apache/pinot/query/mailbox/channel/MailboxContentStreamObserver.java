@@ -3,6 +3,7 @@ package org.apache.pinot.query.mailbox.channel;
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.query.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.mailbox.GrpcReceivingMailbox;
@@ -20,6 +21,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxContentStreamObserver.class);
   private static final int DEFAULT_MAILBOX_QUEUE_CAPACITY = 5;
   private static final long DEFAULT_MAILBOX_POLL_TIMEOUT = 1000L;
+  private final AtomicBoolean _isCompleted = new AtomicBoolean(false);
   private final GrpcMailboxService _mailboxService;
   private final StreamObserver<Mailbox.MailboxStatus> _responseObserver;
   private ArrayBlockingQueue<Mailbox.MailboxContent> _receivingBuffer;
@@ -31,7 +33,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   }
 
   public Mailbox.MailboxContent poll() {
-    while (_receivingBuffer != null) {
+    while (!isCompleted()) {
       try {
         Mailbox.MailboxContent content = _receivingBuffer.poll(DEFAULT_MAILBOX_POLL_TIMEOUT, TimeUnit.MILLISECONDS);
         if (content != null) {
@@ -51,11 +53,13 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
     // when the receiving end receives a message. put it in the mailbox queue and returns the buffer available.
     int remainingCapacity = _receivingBuffer.remainingCapacity() - 1;
     _receivingBuffer.offer(mailboxContent);
-    Mailbox.MailboxStatus status = Mailbox.MailboxStatus.newBuilder()
-        .setMailboxId(mailboxContent.getMailboxId())
-        .putMetadata("buffer.size", String.valueOf(remainingCapacity))
-        .build();
-    // TODO: fix race condition for closing response observer before sending the response metadata.
+    Mailbox.MailboxStatus.Builder builder =
+        Mailbox.MailboxStatus.newBuilder().setMailboxId(mailboxContent.getMailboxId())
+            .putMetadata("buffer.size", String.valueOf(remainingCapacity));
+    if (mailboxContent.getMetadataMap().get("finished") != null) {
+      builder.putMetadata("finished", "true");
+    }
+    Mailbox.MailboxStatus status = builder.build();
     _responseObserver.onNext(status);
   }
 
@@ -66,8 +70,11 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
 
   @Override
   public void onCompleted() {
-    this._receivingBuffer.clear();
-    this._receivingBuffer = null;
+    this._isCompleted.set(true);
     this._responseObserver.onCompleted();
+  }
+
+  public boolean isCompleted() {
+    return this._isCompleted.get() && this._receivingBuffer.isEmpty();
   }
 }

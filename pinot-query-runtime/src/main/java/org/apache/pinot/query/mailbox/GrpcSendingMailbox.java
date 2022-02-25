@@ -22,11 +22,11 @@ public class GrpcSendingMailbox implements SendingMailbox<MailboxContent> {
     _initialized.set(false);
   }
 
-  public void init() throws UnsupportedOperationException {
+  public void init(MailboxContent data) throws UnsupportedOperationException {
     ManagedChannel channel = _mailboxService.getChannel(_mailboxId);
     PinotMailboxGrpc.PinotMailboxStub stub = PinotMailboxGrpc.newStub(channel);
     _statusStreamObserver = new MailboxStatusStreamObserver();
-    _statusStreamObserver.init(stub.open(_statusStreamObserver));
+    _statusStreamObserver.init(stub.open(_statusStreamObserver), data);
     _initialized.set(true);
   }
 
@@ -34,10 +34,12 @@ public class GrpcSendingMailbox implements SendingMailbox<MailboxContent> {
   public void send(MailboxContent data)
       throws UnsupportedOperationException {
     if (!_initialized.get()) {
-      init();
+      // initialization is special
+      init(data);
+    } else {
+      _statusStreamObserver.offer(data);
+      _totalMsgSent.incrementAndGet();
     }
-    _statusStreamObserver.offer(data);
-    _totalMsgSent.incrementAndGet();
   }
 
   @Override

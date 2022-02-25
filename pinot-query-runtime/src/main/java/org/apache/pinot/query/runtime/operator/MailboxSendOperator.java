@@ -143,7 +143,7 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
     Mailbox.MailboxContent.Builder builder = Mailbox.MailboxContent.newBuilder().setMailboxId(mailboxId)
         .setPayload(ByteString.copyFrom(new DataTableBlock(dataTable).toBytes()));
     if (isEndOfStream) {
-      builder.putMetadata("FINISHED", "TRUE");
+      builder.putMetadata("finished", "true");
     }
     return builder.build();
   }

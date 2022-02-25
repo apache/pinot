@@ -12,7 +12,6 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<MailboxContent> {
   private final GrpcMailboxService _mailboxService;
   private final String _mailboxId;
   private final CountDownLatch _initializationLatch;
-  private final CountDownLatch _closureLatch;
   private final AtomicInteger _totalMsgReceived = new AtomicInteger(0);
 
   private MailboxContentStreamObserver _contentStreamObserver;
@@ -21,7 +20,6 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<MailboxContent> {
     _mailboxService = mailboxService;
     _mailboxId = mailboxId;
     _initializationLatch = new CountDownLatch(1);
-    _closureLatch = new CountDownLatch(1);
   }
 
   public void init(MailboxContentStreamObserver streamObserver) {
@@ -48,15 +46,7 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<MailboxContent> {
 
   @Override
   public boolean isClosed() {
-    return _closureLatch.getCount() <= 0;
-  }
-
-  @Override
-  public void close() {
-    if (_closureLatch.getCount() > 0) {
-      _closureLatch.countDown();
-    }
-    _contentStreamObserver.onCompleted();
+    return isInitialized() && _contentStreamObserver.isCompleted();
   }
 
   // TODO: fix busy wait. This should be guarded by timeout.

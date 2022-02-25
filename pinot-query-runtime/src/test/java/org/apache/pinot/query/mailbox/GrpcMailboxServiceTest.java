@@ -38,14 +38,15 @@ public class GrpcMailboxServiceTest extends GrpcMailboxServiceTestBase {
     Mailbox.MailboxContent receivedContent = receivingMailbox.receive();
     Assert.assertEquals(receivedContent, testContent);
 
-    // close the receiver will also close the sender.
-    receivingMailbox.close();
+    TestUtils.waitForCondition(aVoid -> {
+      return receivingMailbox.isClosed();
+    }, 5000L, "Receiving mailbox is not closed properly!");
   }
 
   private Mailbox.MailboxContent getTestMailboxContent(String mailboxId) throws IOException {
     return Mailbox.MailboxContent.newBuilder()
         .setMailboxId(mailboxId)
-        .putAllMetadata(Map.of("key", "value"))
+        .putAllMetadata(Map.of("key", "value", "finished", "true"))
         .setPayload(ByteString.copyFrom(new DataTableBlock(DataTableBuilder.getEmptyDataTable()).toBytes()))
         .build();
   }

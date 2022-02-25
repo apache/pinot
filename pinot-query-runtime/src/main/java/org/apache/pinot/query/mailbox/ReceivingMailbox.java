@@ -34,9 +34,4 @@ public interface ReceivingMailbox<T> {
    * @return
    */
   boolean isClosed();
-
-  /**
-   * Declair a mailbox close.
-   */
-  void close();
 }

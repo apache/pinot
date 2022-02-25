@@ -75,9 +75,6 @@ public class MailboxReceiveOperator extends BaseOperator<DataTableBlock> {
             hasOpenedMailbox = true;
             Mailbox.MailboxContent mailboxContent = receivingMailbox.receive();
             if (mailboxContent != null) {
-              if (mailboxContent.getMetadataMap().get("FINISHED") != null) {
-                receivingMailbox.close();
-              }
               ByteBuffer byteBuffer = mailboxContent.getPayload().asReadOnlyByteBuffer();
               if (byteBuffer.hasRemaining()) {
                 DataTable dataTable = DataTableFactory.getDataTable(byteBuffer);
