@@ -79,9 +79,7 @@ public class GapfillSelectionPlanNode implements PlanNode {
   }
 
   private QueryContext getSelectQueryContext() {
-    if (_queryContext.getGapfillType() == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE) {
-      return _queryContext.getSubQueryContext();
-    } else if (_queryContext.getSubQueryContext() == null) {
+    if (_queryContext.getGapfillType() == GapfillUtils.GapfillType.GAP_FILL) {
       return _queryContext;
     } else {
       return _queryContext.getSubQueryContext();
