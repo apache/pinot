@@ -126,7 +126,8 @@ public class PartitionSegmentPruner implements SegmentPruner {
     }
 
     return new PartitionInfo(PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata.getFunctionName(),
-        columnPartitionMetadata.getNumPartitions()), columnPartitionMetadata.getPartitions());
+        columnPartitionMetadata.getNumPartitions(), columnPartitionMetadata.getFunctionConfig()),
+        columnPartitionMetadata.getPartitions());
   }
 
   @Override

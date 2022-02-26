@@ -28,7 +28,7 @@ import java.util.Map;
 public class PartitionFunctionFactory {
   // Enum for various partition functions to be added.
   public enum PartitionFunctionType {
-    Modulo, Murmur, ByteArray, HashCode;
+    Modulo, Murmur, ByteArray, HashCode, BoundedColumnValue;
     // Add more functions here.
 
     private static final Map<String, PartitionFunctionType> VALUE_MAP = new HashMap<>();
@@ -60,13 +60,15 @@ public class PartitionFunctionFactory {
    *
    * @param functionName Name of partition function
    * @param numPartitions Number of partitions.
+   * @param functionConfig The function configuration for given function.
    * @return Partition function
    */
   // TODO: introduce a way to inject custom partition function
   // a custom partition function could be used in the realtime stream partitioning or offline segment partitioning.
   // The PartitionFunctionFactory should be able to support these default implementations, as well as instantiate
   // based on config
-  public static PartitionFunction getPartitionFunction(String functionName, int numPartitions) {
+  public static PartitionFunction getPartitionFunction(String functionName, int numPartitions,
+      Map<String, String> functionConfig) {
     PartitionFunctionType function = PartitionFunctionType.fromString(functionName);
     switch (function) {
       case Modulo:
@@ -80,6 +82,9 @@ public class PartitionFunctionFactory {
 
       case HashCode:
         return new HashCodePartitionFunction(numPartitions);
+
+      case BoundedColumnValue:
+        return new BoundedColumnValuePartitionFunction(numPartitions, functionConfig);
 
       default:
         throw new IllegalArgumentException("Illegal partition function name: " + functionName);

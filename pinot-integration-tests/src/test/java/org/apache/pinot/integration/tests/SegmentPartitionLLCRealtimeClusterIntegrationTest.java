@@ -90,8 +90,8 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
 
     TableConfig tableConfig = createRealtimeTableConfig(_avroFiles.get(0));
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    indexingConfig.setSegmentPartitionConfig(
-        new SegmentPartitionConfig(Collections.singletonMap(PARTITION_COLUMN, new ColumnPartitionConfig("murmur", 2))));
+    indexingConfig.setSegmentPartitionConfig(new SegmentPartitionConfig(
+        Collections.singletonMap(PARTITION_COLUMN, new ColumnPartitionConfig("murmur", 2))));
     tableConfig.setRoutingConfig(
         new RoutingConfig(null, Collections.singletonList(RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE), null));
     addTableConfig(tableConfig);

@@ -35,7 +35,8 @@ public class TableConfigPartitioner implements Partitioner {
   public TableConfigPartitioner(String columnName, ColumnPartitionConfig columnPartitionConfig) {
     _column = columnName;
     _partitionFunction = PartitionFunctionFactory
-        .getPartitionFunction(columnPartitionConfig.getFunctionName(), columnPartitionConfig.getNumPartitions());
+        .getPartitionFunction(columnPartitionConfig.getFunctionName(), columnPartitionConfig.getNumPartitions(),
+                columnPartitionConfig.getFunctionConfig());
   }
 
   @Override

@@ -40,7 +40,7 @@ public class ColumnPartitionMetadataTest {
   @Test
   public void testSerDe()
       throws Exception {
-    ColumnPartitionMetadata expected = new ColumnPartitionMetadata(FUNCTION_NAME, NUM_PARTITIONS, PARTITIONS);
+    ColumnPartitionMetadata expected = new ColumnPartitionMetadata(FUNCTION_NAME, NUM_PARTITIONS, PARTITIONS, null);
     ColumnPartitionMetadata actual =
         JsonUtils.stringToObject(JsonUtils.objectToString(expected), ColumnPartitionMetadata.class);
     assertEquals(actual, expected);
@@ -49,7 +49,7 @@ public class ColumnPartitionMetadataTest {
   @Test
   public void testLegacyMetadataDeserialization()
       throws Exception {
-    ColumnPartitionMetadata expected = new ColumnPartitionMetadata(FUNCTION_NAME, NUM_PARTITIONS, PARTITIONS);
+    ColumnPartitionMetadata expected = new ColumnPartitionMetadata(FUNCTION_NAME, NUM_PARTITIONS, PARTITIONS, null);
     ColumnPartitionMetadata actual = JsonUtils.stringToObject(LEGACY_METADATA_JSON, ColumnPartitionMetadata.class);
     assertEquals(actual, expected);
   }

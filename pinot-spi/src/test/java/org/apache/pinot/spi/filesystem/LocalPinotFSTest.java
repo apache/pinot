@@ -205,11 +205,49 @@ public class LocalPinotFSTest {
       // Expected.
     }
 
+    // Check that directory only copy doesn't work with default 'copy'
+    try {
+      localPinotFS.copy(firstTempDir.toURI(), secondTempDir.toURI());
+      fail();
+    } catch (IllegalArgumentException e) {
+      // expected.
+    }
+
+    // Copying directory works with 'copyDir'
+    localPinotFS.copyDir(firstTempDir.toURI(), secondTempDir.toURI());
+    Assert.assertTrue(localPinotFS.exists(secondTempDir.toURI()));
+
+    // Copying directory with files to directory with files
+    File testFile = new File(firstTempDir, "testFile");
+    Assert.assertTrue(testFile.createNewFile(), "Could not create file " + testFile.getPath());
+    File newTestFile = new File(secondTempDir, "newTestFile");
+    Assert.assertTrue(newTestFile.createNewFile(), "Could not create file " + newTestFile.getPath());
+
+    localPinotFS.copyDir(firstTempDir.toURI(), secondTempDir.toURI());
+    Assert.assertEquals(localPinotFS.listFiles(secondTempDir.toURI(), false).length, 1);
+
+    // Copying directory with files under another directory.
+    File firstTempDirUnderSecondTempDir = new File(secondTempDir, firstTempDir.getName());
+    localPinotFS.copyDir(firstTempDir.toURI(), firstTempDirUnderSecondTempDir.toURI());
+    Assert.assertTrue(localPinotFS.exists(firstTempDirUnderSecondTempDir.toURI()));
+    // There're two files/directories under secondTempDir.
+    Assert.assertEquals(localPinotFS.listFiles(secondTempDir.toURI(), false).length, 2);
+    // The file under src directory also got copied under dst directory.
+    Assert.assertEquals(localPinotFS.listFiles(firstTempDirUnderSecondTempDir.toURI(), true).length, 1);
+
     // len of dir = exception
     try {
       localPinotFS.length(firstTempDir.toURI());
       fail();
     } catch (IllegalArgumentException e) {
+      // expected.
     }
+
+    Assert.assertTrue(testFile.exists());
+
+    localPinotFS.copyFromLocalFile(testFile, secondTestFileUri);
+    Assert.assertTrue(localPinotFS.exists(secondTestFileUri));
+    localPinotFS.copyToLocalFile(testFile.toURI(), new File(secondTestFileUri));
+    Assert.assertTrue(localPinotFS.exists(secondTestFileUri));
   }
 }

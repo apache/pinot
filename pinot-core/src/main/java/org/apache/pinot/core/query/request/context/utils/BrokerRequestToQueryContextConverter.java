@@ -112,11 +112,9 @@ public class BrokerRequestToQueryContextConverter {
 
     // WHERE
     FilterContext filter = null;
-    ExpressionContext filterExpressionContext = null;
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
-      filter = RequestContextUtils.getFilter(pinotQuery.getFilterExpression());
-      filterExpressionContext = RequestContextUtils.getExpression(filterExpression);
+      filter = RequestContextUtils.getFilter(filterExpression);
     }
 
     // GROUP BY

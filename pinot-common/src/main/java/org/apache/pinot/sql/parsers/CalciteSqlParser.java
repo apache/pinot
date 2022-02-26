@@ -564,7 +564,7 @@ public class CalciteSqlParser {
       case DESCENDING:
         SqlBasicCall basicCall = (SqlBasicCall) node;
         expression = RequestUtils.getFunctionExpression("DESC");
-        expression.getFunctionCall().addToOperands(toExpression(basicCall.getOperands()[0]));
+        expression.getFunctionCall().addToOperands(toExpression(basicCall.getOperandList().get(0)));
         break;
       case IDENTIFIER:
       default:
@@ -620,8 +620,9 @@ public class CalciteSqlParser {
         return RequestUtils.getLiteralExpression((SqlLiteral) node);
       case AS:
         SqlBasicCall asFuncSqlNode = (SqlBasicCall) node;
-        Expression leftExpr = toExpression(asFuncSqlNode.getOperands()[0]);
-        SqlNode aliasSqlNode = asFuncSqlNode.getOperands()[1];
+        List<SqlNode> operands = asFuncSqlNode.getOperandList();
+        Expression leftExpr = toExpression(operands.get(0));
+        SqlNode aliasSqlNode = operands.get(1);
         String aliasName;
         switch (aliasSqlNode.getKind()) {
           case IDENTIFIER:
@@ -715,14 +716,23 @@ public class CalciteSqlParser {
           compilePathExpression(functionName, functionNode, path);
           return RequestUtils.getIdentifierExpression(path.toString());
         }
+        if ((functionNode.getFunctionQuantifier() != null) && ("DISTINCT".equals(
+            functionNode.getFunctionQuantifier().toString()))) {
+          if (AggregationFunctionType.COUNT.name().equals(functionName)) {
+            functionName = AggregationFunctionType.DISTINCTCOUNT.name();
+          } else if (AggregationFunctionType.isAggregationFunction(functionName)) {
+            // Aggregation function(other than COUNT) on DISTINCT is not supported, e.g. SUM(DISTINCT colA).
+            throw new SqlCompilationException("Function '" + functionName + "' on DISTINCT is not supported.");
+          }
+        }
         break;
       default:
         functionName = functionKind.name();
         break;
     }
     // When there is no argument, set an empty list as the operands
-    SqlNode[] childNodes = functionNode.getOperands();
-    List<Expression> operands = new ArrayList<>(childNodes.length);
+    List<SqlNode> childNodes = functionNode.getOperandList();
+    List<Expression> operands = new ArrayList<>(childNodes.size());
     for (SqlNode childNode : childNodes) {
       if (childNode instanceof SqlNodeList) {
         for (SqlNode node : (SqlNodeList) childNode) {
@@ -759,14 +769,14 @@ public class CalciteSqlParser {
    * @param path String representation of path represented by DOT and/or ITEM function chain.
    */
   private static void compilePathExpression(String functionName, SqlBasicCall functionNode, StringBuffer path) {
-    SqlNode[] operands = functionNode.getOperands();
+    List<SqlNode> operands = functionNode.getOperandList();
 
     // Compile first operand of the function (either an identifier or another DOT and/or ITEM function).
-    SqlKind kind0 = operands[0].getKind();
+    SqlKind kind0 = operands.get(0).getKind();
     if (kind0 == SqlKind.IDENTIFIER) {
-      path.append(operands[0].toString());
+      path.append(operands.get(0).toString());
     } else if (kind0 == SqlKind.DOT || kind0 == SqlKind.OTHER_FUNCTION) {
-      SqlBasicCall function0 = (SqlBasicCall) operands[0];
+      SqlBasicCall function0 = (SqlBasicCall) operands.get(0);
       String name0 = function0.getOperator().getName();
       if (name0.equals("ITEM") || name0.equals("DOT")) {
         compilePathExpression(name0, function0, path);
@@ -778,11 +788,11 @@ public class CalciteSqlParser {
     }
 
     // Compile second operand of the function (either an identifier or literal).
-    SqlKind kind1 = operands[1].getKind();
+    SqlKind kind1 = operands.get(1).getKind();
     if (kind1 == SqlKind.IDENTIFIER) {
-      path.append(".").append(((SqlIdentifier) operands[1]).getSimple());
+      path.append(".").append(((SqlIdentifier) operands.get(1)).getSimple());
     } else if (kind1 == SqlKind.LITERAL) {
-      path.append("[").append(((SqlLiteral) operands[1]).toValue()).append("]");
+      path.append("[").append(((SqlLiteral) operands.get(1)).toValue()).append("]");
     } else {
       throw new SqlCompilationException("SELECT list item has bad path expression.");
     }
@@ -844,7 +854,7 @@ public class CalciteSqlParser {
    */
   private static Expression compileAndExpression(SqlBasicCall andNode) {
     List<Expression> operands = new ArrayList<>();
-    for (SqlNode childNode : andNode.getOperands()) {
+    for (SqlNode childNode : andNode.getOperandList()) {
       if (childNode.getKind() == SqlKind.AND) {
         Expression childAndExpression = compileAndExpression((SqlBasicCall) childNode);
         operands.addAll(childAndExpression.getFunctionCall().getOperands());
@@ -862,7 +872,7 @@ public class CalciteSqlParser {
    */
   private static Expression compileOrExpression(SqlBasicCall orNode) {
     List<Expression> operands = new ArrayList<>();
-    for (SqlNode childNode : orNode.getOperands()) {
+    for (SqlNode childNode : orNode.getOperandList()) {
       if (childNode.getKind() == SqlKind.OR) {
         Expression childAndExpression = compileOrExpression((SqlBasicCall) childNode);
         operands.addAll(childAndExpression.getFunctionCall().getOperands());

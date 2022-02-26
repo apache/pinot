@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
+import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -180,6 +181,12 @@ public class MutableColumnStatistics implements ColumnStatistics {
     } else {
       return 0;
     }
+  }
+
+  @Override
+  public Map<String, String> getPartitionFunctionConfig() {
+    PartitionFunction partitionFunction = _dataSource.getDataSourceMetadata().getPartitionFunction();
+    return partitionFunction != null ? partitionFunction.getFunctionConfig() : null;
   }
 
   @Override

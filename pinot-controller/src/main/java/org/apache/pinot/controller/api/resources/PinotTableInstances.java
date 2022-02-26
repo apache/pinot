@@ -34,14 +34,21 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 @Api(tags = Constants.TABLE_TAG)
 @Path("/")
 public class PinotTableInstances {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableInstances.class);
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -116,16 +123,21 @@ public class PinotTableInstances {
   }
 
   @GET
-  @Path("/tables/{tableNameWithType}/livebrokers")
+  @Path("/tables/{tableName}/livebrokers")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List the brokers serving a table", notes = "List live brokers of the given table based on EV")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 404, message = "Table not found"),
-      @ApiResponse(code = 500, message = "Internal server error")})
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
   public List<String> getLiveBrokersForTable(
-      @ApiParam(value = "Table name with type", required = true)
-      @PathParam("tableNameWithType") String tableNameWithType) {
-    return _pinotHelixResourceManager.getLiveBrokersForTable(tableNameWithType);
+      @ApiParam(value = "Table name (with or without type)", required = true)
+      @PathParam("tableName") String tableName) {
+    try {
+      return _pinotHelixResourceManager.getLiveBrokersForTable(tableName);
+    } catch (TableNotFoundException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
+    }
   }
 }

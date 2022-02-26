@@ -35,6 +35,7 @@ import org.apache.thrift.meta_data.FieldMetaData;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocol;
 import org.apache.thrift.transport.TIOStreamTransport;
+import org.apache.thrift.transport.TTransportException;
 
 
 /**
@@ -80,7 +81,11 @@ public class ThriftRecordReader implements RecordReader {
   private void init()
       throws IOException {
     _inputStream = RecordReaderUtils.getBufferedInputStream(_dataFile);
-    _tProtocol = new TBinaryProtocol(new TIOStreamTransport(_inputStream));
+    try {
+      _tProtocol = new TBinaryProtocol(new TIOStreamTransport(_inputStream));
+    } catch (TTransportException e) {
+      throw new IOException(e);
+    }
     _hasNext = hasMoreToRead();
   }
 

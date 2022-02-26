@@ -110,7 +110,8 @@ public class IntermediateSegment implements MutableSegment {
       _partitionColumn = segmentPartitionConfigColumnPartitionMap.keySet().iterator().next();
       _partitionFunction = PartitionFunctionFactory
           .getPartitionFunction(segmentPartitionConfig.getFunctionName(_partitionColumn),
-              segmentPartitionConfig.getNumPartitions(_partitionColumn));
+              segmentPartitionConfig.getNumPartitions(_partitionColumn),
+              segmentPartitionConfig.getFunctionConfig(_partitionColumn));
     } else {
       _partitionColumn = null;
       _partitionFunction = null;

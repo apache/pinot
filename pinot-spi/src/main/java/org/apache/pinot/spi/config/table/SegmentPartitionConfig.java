@@ -65,4 +65,10 @@ public class SegmentPartitionConfig extends BaseJsonConfig {
     ColumnPartitionConfig config = _columnPartitionMap.get(column);
     return (config != null) ? config.getNumPartitions() : INVALID_NUM_PARTITIONS;
   }
+
+  @Nullable
+  public Map<String, String> getFunctionConfig(String column) {
+    ColumnPartitionConfig config = _columnPartitionMap.get(column);
+    return (config != null) ? config.getFunctionConfig() : null;
+  }
 }

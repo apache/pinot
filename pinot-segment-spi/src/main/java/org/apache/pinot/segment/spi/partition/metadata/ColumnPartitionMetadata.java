@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.partition.metadata;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -27,8 +28,12 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -44,6 +49,7 @@ import org.apache.commons.lang3.StringUtils;
 public class ColumnPartitionMetadata {
   private final String _functionName;
   private final int _numPartitions;
+  private final Map<String, String> _functionConfig;
   private final Set<Integer> _partitions;
 
   /**
@@ -52,11 +58,14 @@ public class ColumnPartitionMetadata {
    * @param functionName Name of the partition function
    * @param numPartitions Number of total partitions for this column
    * @param partitions Set of partitions the column contains
+   * @param functionConfig Configuration required by partition function.
    */
-  public ColumnPartitionMetadata(String functionName, int numPartitions, Set<Integer> partitions) {
+  public ColumnPartitionMetadata(String functionName, int numPartitions, Set<Integer> partitions,
+      @Nullable Map<String, String> functionConfig) {
     _functionName = functionName;
     _numPartitions = numPartitions;
     _partitions = partitions;
+    _functionConfig = functionConfig;
   }
 
   public String getFunctionName() {
@@ -71,6 +80,10 @@ public class ColumnPartitionMetadata {
     return _partitions;
   }
 
+  public Map<String, String> getFunctionConfig() {
+    return _functionConfig;
+  }
+
   @Override
   public boolean equals(Object obj) {
     if (this == obj) {
@@ -78,15 +91,16 @@ public class ColumnPartitionMetadata {
     }
     if (obj instanceof ColumnPartitionMetadata) {
       ColumnPartitionMetadata that = (ColumnPartitionMetadata) obj;
-      return _functionName.equals(that._functionName) && _numPartitions == that._numPartitions && _partitions
-          .equals(that._partitions);
+      return _functionName.equals(that._functionName) && _numPartitions == that._numPartitions && _partitions.equals(
+          that._partitions) && Objects.equals(_functionConfig, that._functionConfig);
     }
     return false;
   }
 
   @Override
   public int hashCode() {
-    return 37 * 37 * _functionName.hashCode() + 37 * _numPartitions + _partitions.hashCode();
+    return 37 * 37 * _functionName.hashCode() + 37 * _numPartitions + _partitions.hashCode()
+        + Objects.hashCode(_functionConfig);
   }
 
   /**
@@ -134,6 +148,7 @@ public class ColumnPartitionMetadata {
   public static class ColumnPartitionMetadataDeserializer extends JsonDeserializer<ColumnPartitionMetadata> {
     private static final String FUNCTION_NAME_KEY = "functionName";
     private static final String NUM_PARTITIONS_KEY = "numPartitions";
+    private static final String FUNCTION_CONFIG_KEY = "functionConfig";
     private static final String PARTITIONS_KEY = "partitions";
 
     // DO NOT CHANGE: for backward-compatibility
@@ -158,8 +173,15 @@ public class ColumnPartitionMetadata {
           addRangeToPartitions(partitionRange, partitions);
         }
       }
+      Map<String, String> functionConfig = null;
+      if (jsonMetadata.has(FUNCTION_CONFIG_KEY)) {
+        functionConfig =
+            JsonUtils.jsonNodeToObject(jsonMetadata.get(FUNCTION_CONFIG_KEY), new TypeReference<Map<String, String>>() {
+            });
+      }
+
       return new ColumnPartitionMetadata(jsonMetadata.get(FUNCTION_NAME_KEY).asText(),
-          jsonMetadata.get(NUM_PARTITIONS_KEY).asInt(), partitions);
+          jsonMetadata.get(NUM_PARTITIONS_KEY).asInt(), partitions, functionConfig);
     }
   }
 }
