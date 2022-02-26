@@ -129,16 +129,14 @@ public class ThriftRecordExtractorTest extends AbstractRecordExtractorTest {
       thriftRecords.add(thriftRecord);
     }
 
-    BufferedOutputStream bufferedOut = new BufferedOutputStream(new FileOutputStream(_tempFile));
-    TBinaryProtocol binaryOut = new TBinaryProtocol(new TIOStreamTransport(bufferedOut));
-    for (ComplexTypes record : thriftRecords) {
-      try {
+    try (BufferedOutputStream bufferedOut = new BufferedOutputStream(new FileOutputStream(_tempFile))) {
+      TBinaryProtocol binaryOut = new TBinaryProtocol(new TIOStreamTransport(bufferedOut));
+      for (ComplexTypes record : thriftRecords) {
         record.write(binaryOut);
-      } catch (TException e) {
-        throw new IOException(e);
       }
+    } catch (TException e) {
+      throw new IOException(e);
     }
-    bufferedOut.close();
   }
 
   private Map<String, Object> createRecord1() {

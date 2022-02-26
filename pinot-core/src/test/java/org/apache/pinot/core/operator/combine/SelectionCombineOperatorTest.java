@@ -175,8 +175,8 @@ public class SelectionCombineOperatorTest {
     // Should early-terminate after processing the result of the first segment. Each thread should process at most 1
     // segment.
     long numDocsScanned = combineResult.getNumDocsScanned();
-    assertTrue(numDocsScanned >= NUM_RECORDS_PER_SEGMENT
-        && numDocsScanned <= CombineOperatorUtils.MAX_NUM_THREADS_PER_QUERY * NUM_RECORDS_PER_SEGMENT);
+    // result size is 10. Each thread scans atmost 10 docs
+    assertTrue(numDocsScanned <= 10 * CombineOperatorUtils.MAX_NUM_THREADS_PER_QUERY);
     assertEquals(combineResult.getNumEntriesScannedInFilter(), 0);
     assertEquals(combineResult.getNumEntriesScannedPostFilter(), numDocsScanned);
     assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);

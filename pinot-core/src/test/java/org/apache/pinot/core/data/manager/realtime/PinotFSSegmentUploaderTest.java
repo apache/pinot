@@ -114,7 +114,7 @@ public class PinotFSSegmentUploaderTest {
     }
 
     @Override
-    public boolean copy(URI srcUri, URI dstUri)
+    public boolean copyDir(URI srcUri, URI dstUri)
         throws IOException {
       return false;
     }

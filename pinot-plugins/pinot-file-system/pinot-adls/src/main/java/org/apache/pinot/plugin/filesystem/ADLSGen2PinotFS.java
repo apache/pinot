@@ -265,7 +265,7 @@ public class ADLSGen2PinotFS extends BasePinotFS {
    * @return true if move succeeds else false.
    */
   @Override
-  public boolean copy(URI srcUri, URI dstUri)
+  public boolean copyDir(URI srcUri, URI dstUri)
       throws IOException {
     LOGGER.debug("copy is called with srcUri='{}', dstUri='{}'", srcUri, dstUri);
     // If src and dst are the same, do nothing.

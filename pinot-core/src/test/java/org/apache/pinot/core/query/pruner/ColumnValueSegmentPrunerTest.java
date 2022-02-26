@@ -114,7 +114,7 @@ public class ColumnValueSegmentPrunerTest {
     DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
     when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);
     when(dataSourceMetadata.getPartitionFunction()).thenReturn(
-        PartitionFunctionFactory.getPartitionFunction("Modulo", 5));
+        PartitionFunctionFactory.getPartitionFunction("Modulo", 5, null));
     when(dataSourceMetadata.getPartitions()).thenReturn(Collections.singleton(2));
     when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
 

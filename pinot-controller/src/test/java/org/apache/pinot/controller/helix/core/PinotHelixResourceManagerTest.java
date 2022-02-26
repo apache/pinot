@@ -44,6 +44,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
@@ -53,6 +54,7 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -79,7 +81,9 @@ import static org.testng.Assert.fail;
 
 
 public class PinotHelixResourceManagerTest {
-  private static final int NUM_INSTANCES = 2;
+  private static final int NUM_REALTIME_SERVER_INSTANCES = 2;
+  private static final int NUM_OFFLINE_SERVER_INSTANCES = 2;
+  private static final int NUM_INSTANCES = NUM_REALTIME_SERVER_INSTANCES + NUM_OFFLINE_SERVER_INSTANCES;
   private static final String BROKER_TENANT_NAME = "rBrokerTenant";
   private static final String SERVER_TENANT_NAME = "rServerTenant";
   private static final String TABLE_NAME = "resourceTestTable";
@@ -104,7 +108,8 @@ public class PinotHelixResourceManagerTest {
     ControllerTestUtils.setupClusterAndValidate();
 
     // Create server tenant on all Servers
-    Tenant serverTenant = new Tenant(TenantRole.SERVER, SERVER_TENANT_NAME, NUM_INSTANCES, NUM_INSTANCES, 0);
+    Tenant serverTenant = new Tenant(TenantRole.SERVER, SERVER_TENANT_NAME, NUM_INSTANCES, NUM_OFFLINE_SERVER_INSTANCES,
+        NUM_REALTIME_SERVER_INSTANCES);
     ControllerTestUtils.getHelixResourceManager().createServerTenant(serverTenant);
 
     // Enable lead controller resource
@@ -904,7 +909,7 @@ public class PinotHelixResourceManagerTest {
 
   @Test
   public void testGetLiveBrokersForTable()
-      throws IOException {
+      throws IOException, TableNotFoundException {
     // Create broker tenant
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 2, 0, 0);
     PinotResourceManagerResponse response =
@@ -936,11 +941,70 @@ public class PinotHelixResourceManagerTest {
     List<String> liveBrokersForTable =
         ControllerTestUtils.getHelixResourceManager().getLiveBrokersForTable(OFFLINE_TABLE_NAME);
     Assert.assertEquals(liveBrokersForTable.size(), 2);
-    for (String broker: liveBrokersForTable) {
+    for (String broker : liveBrokersForTable) {
       Assert.assertTrue(broker.startsWith("Broker_localhost"));
     }
+
+    // Test retrieving the live broker for table without table-type suffix.
+    liveBrokersForTable = ControllerTestUtils.getHelixResourceManager().getLiveBrokersForTable(TABLE_NAME);
+    Assert.assertEquals(liveBrokersForTable.size(), 2);
+
+    // Test retrieving the live broker for table with non-existent table-type.
+    try {
+      ControllerTestUtils.getHelixResourceManager().getLiveBrokersForTable(REALTIME_TABLE_NAME);
+      Assert.fail("Method call above should have failed");
+    } catch (TableNotFoundException tableNotFoundException) {
+      Assert.assertTrue(tableNotFoundException.getMessage().contains(REALTIME_TABLE_NAME));
+    }
+
+    // Create the realtime table.
+    ControllerTestUtils.addDummySchema(REALTIME_TABLE_NAME);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setNumReplicas(ControllerTestUtils.MIN_NUM_REPLICAS).setBrokerTenant(BROKER_TENANT_NAME)
+        .setStreamConfigs(FakeStreamConfigUtils.getDefaultHighLevelStreamConfigs().getStreamConfigsMap())
+        .setSchemaName(REALTIME_TABLE_NAME).setServerTenant(SERVER_TENANT_NAME).build();
+    ControllerTestUtils.getHelixResourceManager().addTable(tableConfig);
+    // Wait for EV to be updated with realtime table.
+    TestUtils.waitForCondition(aVoid -> {
+      ExternalView externalView = ControllerTestUtils.getHelixResourceManager().getHelixAdmin()
+          .getResourceExternalView(ControllerTestUtils.getHelixClusterName(),
+              CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+      int onlineBrokersCnt = 0;
+      Map<String, String> brokerToStateMap = externalView.getStateMap(REALTIME_TABLE_NAME);
+      if (brokerToStateMap == null) {
+        return false;
+      }
+      for (Map.Entry<String, String> entry : brokerToStateMap.entrySet()) {
+        if ("ONLINE".equalsIgnoreCase(entry.getValue())) {
+          onlineBrokersCnt++;
+        }
+      }
+      return onlineBrokersCnt == 2;
+    }, TIMEOUT_IN_MS, "");
+
+    // Test retrieving using table name without type suffix.
+    liveBrokersForTable = ControllerTestUtils.getHelixResourceManager().getLiveBrokersForTable(TABLE_NAME);
+    Assert.assertEquals(liveBrokersForTable.size(), 2);
+
+    // Test case when table with given name doesn't exist.
+    String fakeNonExistentTableName = "fake_non_existent_table_name";
+    try {
+      ControllerTestUtils.getHelixResourceManager().getLiveBrokersForTable(fakeNonExistentTableName);
+      Assert.fail("Method call above should have failed");
+    } catch (TableNotFoundException tableNotFoundException) {
+      Assert.assertTrue(tableNotFoundException.getMessage().contains(fakeNonExistentTableName));
+    }
+
+    try {
+      ControllerTestUtils.getHelixResourceManager().getLiveBrokersForTable(fakeNonExistentTableName + "_OFFLINE");
+      Assert.fail("Method call above should have failed");
+    } catch (TableNotFoundException tableNotFoundException) {
+      Assert.assertTrue(tableNotFoundException.getMessage().contains(fakeNonExistentTableName + "_OFFLINE"));
+    }
+
     // Delete the table
     ControllerTestUtils.getHelixResourceManager().deleteOfflineTable(TABLE_NAME);
+    ControllerTestUtils.getHelixResourceManager().deleteRealtimeTable(TABLE_NAME);
     // Clean up.
     untagBrokers();
   }

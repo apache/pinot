@@ -45,6 +45,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TCompactProtocol;
+import org.apache.thrift.transport.TTransportException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,7 +60,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   // TODO: make it configurable
   private static final int SLOW_QUERY_LATENCY_THRESHOLD_MS = 100;
 
-  private final TDeserializer _deserializer = new TDeserializer(new TCompactProtocol.Factory());
+  private final TDeserializer _deserializer;
   private final QueryScheduler _queryScheduler;
   private final ServerMetrics _serverMetrics;
   private final AccessControl _accessControl;
@@ -69,6 +70,11 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     _queryScheduler = queryScheduler;
     _serverMetrics = serverMetrics;
     _accessControl = accessControl;
+    try {
+      _deserializer = new TDeserializer(new TCompactProtocol.Factory());
+    } catch (TTransportException e) {
+      throw new RuntimeException("Failed to initialize Thrift Deserializer", e);
+    }
   }
 
   @Override

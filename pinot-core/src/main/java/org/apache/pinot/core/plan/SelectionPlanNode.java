@@ -56,15 +56,18 @@ public class SelectionPlanNode implements PlanNode {
       if (orderByExpressions == null) {
         // Selection only
         TransformOperator transformOperator = new TransformPlanNode(_indexSegment, _queryContext, expressions,
-            Math.min(limit, DocIdSetPlanNode.MAX_DOC_PER_CALL)).run();
+            Math.min(limit + _queryContext.getOffset(), DocIdSetPlanNode.MAX_DOC_PER_CALL)).run();
         return new SelectionOnlyOperator(_indexSegment, _queryContext, expressions, transformOperator);
       } else {
-        // Selection order-by
-        if (orderByExpressions.size() == expressions.size()) {
+        if (isAllOrderByColumnsSorted(orderByExpressions)) { // no sorting needed
+          TransformOperator transformOperator =
+              new TransformPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
+          return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, transformOperator, true);
+        } else if (orderByExpressions.size() == expressions.size()) { // Selection order-by
           // All output expressions are ordered
           TransformOperator transformOperator =
               new TransformPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
-          return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, transformOperator);
+          return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, transformOperator, false);
         } else {
           // Not all output expressions are ordered, only fetch the order-by expressions and docId to avoid the
           // unnecessary data fetch
@@ -76,7 +79,7 @@ public class SelectionPlanNode implements PlanNode {
           TransformOperator transformOperator =
               new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform,
                   DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
-          return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, transformOperator);
+          return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, transformOperator, false);
         }
       }
     } else {
@@ -84,5 +87,32 @@ public class SelectionPlanNode implements PlanNode {
       TransformOperator transformOperator = new TransformPlanNode(_indexSegment, _queryContext, expressions, 0).run();
       return new EmptySelectionOperator(_indexSegment, expressions, transformOperator);
     }
+  }
+
+  /**
+   *  This function checks whether all columns in order by clause are pre-sorted.
+   *  This is used to optimize order by limit clauses.
+   *  For eg:
+   *  A query like "select * from table order by col1, col2 limit 10"
+   *  will take all the n matching rows and add it to a priority queue of size 10.
+   *  This is nlogk operation which can be quite expensive for a large n.
+   *  In the above example, if the docs in the segment are already sorted by col1 and col2 then there is no need for
+   *  sorting at all (only limit is needed).
+   * @return true is all columns in order by clause are sorted . False otherwise
+   */
+  private boolean isAllOrderByColumnsSorted(List<OrderByExpressionContext> orderByExpressions) {
+    int numOrderByExpressions = orderByExpressions.size();
+    for (int i = 0; i < numOrderByExpressions; i++) {
+      OrderByExpressionContext expressionContext = orderByExpressions.get(0);
+      if (!(expressionContext.getExpression().getType() == ExpressionContext.Type.IDENTIFIER) || !expressionContext
+          .isAsc()) {
+        return false;
+      }
+      String column = expressionContext.getExpression().getIdentifier();
+      if (!_indexSegment.getDataSource(column).getDataSourceMetadata().isSorted()) {
+        return false;
+      }
+    }
+    return true;
   }
 }

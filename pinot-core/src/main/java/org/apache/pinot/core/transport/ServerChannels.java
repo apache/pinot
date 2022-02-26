@@ -45,6 +45,7 @@ import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TCompactProtocol;
+import org.apache.thrift.transport.TTransportException;
 
 
 /**
@@ -58,8 +59,7 @@ public class ServerChannels {
   private final QueryRouter _queryRouter;
   private final BrokerMetrics _brokerMetrics;
   // TSerializer currently is not thread safe, must be put into a ThreadLocal.
-  private final ThreadLocal<TSerializer> _threadLocalTSerializer =
-      ThreadLocal.withInitial(() -> new TSerializer(new TCompactProtocol.Factory()));
+  private final ThreadLocal<TSerializer> _threadLocalTSerializer;
   private final ConcurrentHashMap<ServerRoutingInstance, ServerChannel> _serverToChannelMap = new ConcurrentHashMap<>();
   private final EventLoopGroup _eventLoopGroup = new NioEventLoopGroup();
   private final TlsConfig _tlsConfig;
@@ -85,6 +85,13 @@ public class ServerChannels {
     _queryRouter = queryRouter;
     _brokerMetrics = brokerMetrics;
     _tlsConfig = tlsConfig;
+    _threadLocalTSerializer = ThreadLocal.withInitial(() -> {
+      try {
+        return new TSerializer(new TCompactProtocol.Factory());
+      } catch (TTransportException e) {
+        throw new RuntimeException("Failed to initialize Thrift Serializer", e);
+      }
+    });
   }
 
   public void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
