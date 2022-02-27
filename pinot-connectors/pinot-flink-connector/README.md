@@ -39,7 +39,7 @@ srcDs.addSink(new PinotSinkFunction<>(new PinotRowRecordConverter(TEST_TYPE_INFO
 execEnv.execute();
 ```
 
-For more examples, please see `src/main/java/org/apache/pinot/connector/flink/QuickStart.java`
+For more examples, please see `src/main/java/org/apache/pinot/connector/flink/FlinkQuickStart.java`
 
 ## Notes for backfilling upsert table
  - To correctly partition the output segments by the primary key, the Flink job *must* also include the partitionBeyKey operator before the Sink operator
