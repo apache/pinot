@@ -23,19 +23,19 @@ import java.util.Map;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-public class PinotMapRecordConverter implements RecordConverter<Map> {
+public class PinotMapRecordConverter implements RecordConverter<Map<String, Object>> {
 
   @Override
-  public GenericRow convertToRow(Map value) {
+  public GenericRow convertToRow(Map<String, Object> value) {
     GenericRow row = new GenericRow();
-    for (Map.Entry<String, Object> entry : ((Map<String, Object>) value).entrySet()) {
+    for (Map.Entry<String, Object> entry : value.entrySet()) {
       row.putValue(entry.getKey(), entry.getValue());
     }
     return row;
   }
 
   @Override
-  public Map convertFromRow(GenericRow row) {
+  public Map<String, Object> convertFromRow(GenericRow row) {
     return new HashMap(row.getFieldToValueMap());
   }
 }

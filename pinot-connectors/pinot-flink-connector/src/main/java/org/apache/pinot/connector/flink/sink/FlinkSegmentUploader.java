@@ -48,14 +48,12 @@ import org.slf4j.LoggerFactory;
 public class FlinkSegmentUploader implements SegmentUploader {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FlinkSegmentUploader.class);
-  private final int _indexOfSubtask;
 
   private String _tableNameWithType;
   private BatchConfig _batchConfig;
   private BatchIngestionConfig _batchIngestionConfig;
 
-  public FlinkSegmentUploader(int indexOfSubtask) {
-    _indexOfSubtask = indexOfSubtask;
+  public FlinkSegmentUploader() {
   }
 
   @Override

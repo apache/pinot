@@ -142,7 +142,6 @@ public class FlinkSegmentWriter implements SegmentWriter {
     _reusableRecord = new GenericData.Record(_avroSchema);
 
     // Create tmp dir
-    // TODO staging Dir also need to be subtask separated otherwise there will be write conflict.
     _stagingDir = new File(FileUtils.getTempDirectory(),
         String.format("segment_writer_staging_%s_%d_%d", _tableNameWithType, _indexOfSubtask,
             System.currentTimeMillis()));

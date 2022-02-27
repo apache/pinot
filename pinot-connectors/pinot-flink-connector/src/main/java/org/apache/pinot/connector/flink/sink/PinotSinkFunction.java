@@ -39,12 +39,6 @@ import org.slf4j.LoggerFactory;
 /**
  * The sink function for Pinot.
  *
- * <p>This version of the sink function doesn't leverage {@link SegmentWriter} API's ability buffer
- * data and also share that data with checkpoint state. Instead it uses an internal buffer within
- * PinotSinkFunction for checkpoint.
- *
- * <p>This should change once we introduce FlinkPinotSegmentWriter
- *
  * @param <T> type of record supported
  */
 @SuppressWarnings("NullAway")
@@ -87,12 +81,9 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
   public void open(Configuration parameters)
       throws Exception {
     int indexOfSubtask = this.getRuntimeContext().getIndexOfThisSubtask();
-    // TODO improve segment uploader to use in-memory buffer then flush to tar file.
     _segmentWriter = new FlinkSegmentWriter(indexOfSubtask, getRuntimeContext().getMetricGroup());
     _segmentWriter.init(_tableConfig, _schema);
-    // TODO improve segment uploader to take in-memory tar
-    // TODO launch segment uploader as separate thread for uploading (non-blocking?)
-    _segmentUploader = new FlinkSegmentUploader(indexOfSubtask);
+    _segmentUploader = new FlinkSegmentUploader();
     _segmentUploader.init(_tableConfig);
     _segmentNumRecord = 0;
     _executor = Executors.newFixedThreadPool(_executorPoolSize);
