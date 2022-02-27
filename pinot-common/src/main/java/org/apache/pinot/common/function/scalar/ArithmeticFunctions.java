@@ -86,6 +86,11 @@ public class ArithmeticFunctions {
   }
 
   @ScalarFunction
+  public static double ceiling(double a) {
+    return Math.ceil(a);
+  }
+
+  @ScalarFunction
   public static double floor(double a) {
     return Math.floor(a);
   }
@@ -103,5 +108,26 @@ public class ArithmeticFunctions {
   @ScalarFunction
   public static double sqrt(double a) {
     return Math.sqrt(a);
+  }
+
+  @ScalarFunction
+  public static double sign(double a) {
+    return Math.signum(a);
+  }
+
+  @ScalarFunction
+  public static double pi() { return Math.PI; }
+
+  @ScalarFunction
+  public static double e() { return Math.E; }
+
+  @ScalarFunction
+  public static double power(double a, double b) {
+    return Math.pow(a, b);
+  }
+
+  @ScalarFunction
+  public static double log(double a) {
+    return Math.log10(a);
   }
 }

@@ -82,7 +82,7 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String substr(String input, int beginIndex) {
-    return input.substring(beginIndex);
+    return StringUtils.substring(input, beginIndex);
   }
 
   /**
@@ -100,7 +100,7 @@ public class StringFunctions {
     if (endIndex == -1) {
       return substr(input, beginIndex);
     }
-    return input.substring(beginIndex, endIndex);
+    return StringUtils.substring(input, beginIndex, endIndex);
   }
 
   /**
@@ -181,6 +181,24 @@ public class StringFunctions {
   @ScalarFunction
   public static String rtrim(String input) {
     return RTRIM.matcher(input).replaceAll("");
+  }
+
+  /**
+   * @param input
+   * @return trim spaces from right side of the string
+   */
+  @ScalarFunction
+  public static String leftSubStr(String input, int length) {
+    return StringUtils.left(input, length);
+  }
+
+  /**
+   * @param input
+   * @return trim spaces from right side of the string
+   */
+  @ScalarFunction
+  public static String rightSubStr(String input, int length) {
+    return StringUtils.right(input, length);
   }
 
   /**
@@ -293,7 +311,18 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static boolean startsWith(String input, String prefix) {
-    return input.startsWith(prefix);
+    return StringUtils.startsWith(input, prefix);
+  }
+
+  /**
+   * @see String#startsWith(String)
+   * @param input
+   * @param suffix substring to check if it is the prefix
+   * @return true if string starts with prefix, false o.w.
+   */
+  @ScalarFunction
+  public static boolean endsWith(String input, String suffix) {
+    return StringUtils.endsWith(input, suffix);
   }
 
   /**
@@ -363,6 +392,16 @@ public class StringFunctions {
   }
 
   /**
+   * @see StandardCharsets#UTF_8#encode(String)
+   * @param input
+   * @return bytes
+   */
+  @ScalarFunction
+  public static byte[] toAscii(String input) {
+    return input.getBytes(StandardCharsets.US_ASCII);
+  }
+
+  /**
    * see Normalizer#normalize(String, Form)
    * @param input
    * @return transforms string with NFC normalization form.
@@ -394,6 +433,45 @@ public class StringFunctions {
   public static String[] split(String input, String delimiter) {
     return StringUtils.split(input, delimiter);
   }
+
+  /**
+   * see String#split(String)
+   * @param input
+   * @param delimiter
+   * @return splits string on specified delimiter and returns an array.
+   */
+  @ScalarFunction
+  public static String split(String input, String delimiter, int index) {
+    String[] splitString = StringUtils.split(input, delimiter);
+    if(index < splitString.length){
+      return splitString[index];
+    } else {
+      return "null";
+    }
+  }
+
+  /**
+   * see String#split(String)
+   * @param input
+   * @param times
+   * @return splits string on specified delimiter and returns an array.
+   */
+  @ScalarFunction
+  public static String repeat(String input, int times) {
+    return StringUtils.repeat(input, times);
+  }
+
+  /**
+   * see String#split(String)
+   * @param input
+   * @param times
+   * @return splits string on specified delimiter and returns an array.
+   */
+  @ScalarFunction
+  public static String repeat(String input, String sep, int times) {
+    return StringUtils.repeat(input, sep, times);
+  }
+
 
   /**
    * see String#replaceAll(String, String)
