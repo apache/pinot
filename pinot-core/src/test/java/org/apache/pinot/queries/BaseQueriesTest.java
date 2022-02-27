@@ -210,8 +210,8 @@ public abstract class BaseQueriesTest {
     // Server side.
     queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     if (queryContext.getSubQueryContext() != null) {
-      queryContext.getSubQueryContext().setEndTimeMs(
-          System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+      queryContext.getSubQueryContext()
+          .setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     }
     Plan plan = planMaker.makeInstancePlan(getIndexSegments(), queryContext, EXECUTOR_SERVICE);
 
@@ -238,8 +238,8 @@ public abstract class BaseQueriesTest {
       Utils.rethrowException(e);
     }
 
-    BrokerResponseNative brokerResponse =
-        brokerReduceService.reduceOnDataTable(queryContext.getBrokerRequest(), dataTableMap,
+    BrokerResponseNative brokerResponse = brokerReduceService
+        .reduceOnDataTable(queryContext.getBrokerRequest(), dataTableMap,
             CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS, null);
     brokerReduceService.shutDown();
     return brokerResponse;

@@ -31,6 +31,7 @@ import org.apache.pinot.core.query.reduce.filter.ValueExtractor;
 import org.apache.pinot.core.query.reduce.filter.ValueExtractorFactory;
 import org.apache.pinot.core.util.GapfillUtils;
 
+
 /**
  * Handler for Filter clause of GapFill.
  */

@@ -24,6 +24,7 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
+
 /**
  * Predicate matcher.
  */

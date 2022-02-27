@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.reduce.filter;
 
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
+
 /**
  * Value extractor for a literal.
  */
@@ -27,19 +28,21 @@ public class LiteralValueExtractor implements ValueExtractor {
   final String _literal;
 
   public LiteralValueExtractor(String literal) {
-      _literal = literal;
-    }
+    _literal = literal;
+  }
+
   @Override
   public String getColumnName() {
-      return '\'' + _literal + '\'';
+    return '\'' + _literal + '\'';
   }
+
   @Override
   public ColumnDataType getColumnDataType() {
-      return ColumnDataType.STRING;
+    return ColumnDataType.STRING;
   }
 
   @Override
   public Object extract(Object[] row) {
-      return _literal;
-    }
+    return _literal;
+  }
 }

@@ -70,27 +70,26 @@ public class BrokerRequestToQueryContextConverter {
    * Do the validation for gapfill query.
    */
   private static void validateForGapfillQuery(QueryContext queryContext) {
-    if(queryContext.getGapfillType() == null) {
+    if (queryContext.getGapfillType() == null) {
       return;
     }
 
     ExpressionContext gapFillSelection = GapfillUtils.getGapfillExpressionContext(queryContext);
 
-    Preconditions.checkArgument(
-        gapFillSelection != null && gapFillSelection.getFunction() != null, "Gapfill Expression should be function.");
+    Preconditions.checkArgument(gapFillSelection != null && gapFillSelection.getFunction() != null,
+        "Gapfill Expression should be function.");
     List<ExpressionContext> args = gapFillSelection.getFunction().getArguments();
-    Preconditions.checkArgument(
-        args.size() > 5, "PreAggregateGapFill does not have correct number of arguments.");
-    Preconditions.checkArgument(
-        args.get(1).getLiteral() != null, "The second argument of PostAggregateGapFill should be TimeFormatter.");
-    Preconditions.checkArgument(
-        args.get(2).getLiteral() != null, "The third argument of PostAggregateGapFill should be start time.");
-    Preconditions.checkArgument(
-        args.get(3).getLiteral() != null, "The fourth argument of PostAggregateGapFill should be end time.");
-    Preconditions.checkArgument(
-        args.get(4).getLiteral() != null, "The fifth argument of PostAggregateGapFill should be time bucket size.");
+    Preconditions.checkArgument(args.size() > 5, "PreAggregateGapFill does not have correct number of arguments.");
+    Preconditions.checkArgument(args.get(1).getLiteral() != null,
+        "The second argument of PostAggregateGapFill should be TimeFormatter.");
+    Preconditions.checkArgument(args.get(2).getLiteral() != null,
+        "The third argument of PostAggregateGapFill should be start time.");
+    Preconditions.checkArgument(args.get(3).getLiteral() != null,
+        "The fourth argument of PostAggregateGapFill should be end time.");
+    Preconditions.checkArgument(args.get(4).getLiteral() != null,
+        "The fifth argument of PostAggregateGapFill should be time bucket size.");
 
-    if(queryContext.getAggregationFunctions() == null) {
+    if (queryContext.getAggregationFunctions() == null) {
       return;
     }
 
@@ -217,8 +216,7 @@ public class BrokerRequestToQueryContextConverter {
         .setGroupByExpressions(groupByExpressions).setOrderByExpressions(orderByExpressions)
         .setHavingFilter(havingFilter).setLimit(pinotQuery.getLimit()).setOffset(pinotQuery.getOffset())
         .setQueryOptions(pinotQuery.getQueryOptions()).setDebugOptions(pinotQuery.getDebugOptions())
-        .setSubqueryContext(subQueryContext)
-        .setBrokerRequest(brokerRequest).build();
+        .setSubqueryContext(subQueryContext).setBrokerRequest(brokerRequest).build();
   }
 
   private static QueryContext convertPQL(BrokerRequest brokerRequest) {

@@ -68,18 +68,13 @@ import org.apache.pinot.spi.utils.ByteArray;
  * </ul>
  */
 public class SelectionOperatorUtils {
-  private SelectionOperatorUtils() {
-  }
-
   public static final ExpressionContext IDENTIFIER_STAR = ExpressionContext.forIdentifier("*");
   public static final int MAX_ROW_HOLDER_INITIAL_CAPACITY = 10_000;
-
   private static final String INT_PATTERN = "##########";
   private static final String LONG_PATTERN = "####################";
   private static final String FLOAT_PATTERN = "#########0.0####";
   private static final String DOUBLE_PATTERN = "###################0.0#########";
   private static final DecimalFormatSymbols DECIMAL_FORMAT_SYMBOLS = DecimalFormatSymbols.getInstance(Locale.US);
-
   private static final ThreadLocal<DecimalFormat> THREAD_LOCAL_INT_FORMAT =
       ThreadLocal.withInitial(() -> new DecimalFormat(INT_PATTERN, DECIMAL_FORMAT_SYMBOLS));
   private static final ThreadLocal<DecimalFormat> THREAD_LOCAL_LONG_FORMAT =
@@ -88,6 +83,8 @@ public class SelectionOperatorUtils {
       ThreadLocal.withInitial(() -> new DecimalFormat(FLOAT_PATTERN, DECIMAL_FORMAT_SYMBOLS));
   private static final ThreadLocal<DecimalFormat> THREAD_LOCAL_DOUBLE_FORMAT =
       ThreadLocal.withInitial(() -> new DecimalFormat(DOUBLE_PATTERN, DECIMAL_FORMAT_SYMBOLS));
+  private SelectionOperatorUtils() {
+  }
 
   /**
    * Extracts the expressions from a selection query, expands {@code 'SELECT *'} to all physical columns if applies.

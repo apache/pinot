@@ -41,19 +41,6 @@ public class GapfillUtils {
   private static final String TIME_SERIES_ON = "timeSeriesOn";
   private static final int STARTING_INDEX_OF_OPTIONAL_ARGS_FOR_PRE_AGGREGATE_GAP_FILL = 5;
 
-  public enum GapfillType {
-    // one sql query with gapfill only
-    GAP_FILL,
-    // gapfill as subquery, the outer query may have the filter
-    GAP_FILL_SELECT,
-    // gapfill as subquery, the outer query has the aggregation
-    GAP_FILL_AGGREGATE,
-    // aggregation as subqery, the outer query is gapfill
-    AGGREGATE_GAP_FILL,
-    // aggegration as second nesting subquery, gapfill as fist nesting subquery, different aggregation as outer query
-    AGGREGATE_GAP_FILL_AGGREGATE
-  }
-
   private GapfillUtils() {
   }
 
@@ -101,11 +88,6 @@ public class GapfillUtils {
     }
 
     return TIME_SERIES_ON.equalsIgnoreCase(canonicalizeFunctionName(expressionContext.getFunction().getFunctionName()));
-  }
-
-  static public enum FillType {
-    FILL_DEFAULT_VALUE,
-    FILL_PREVIOUS_VALUE,
   }
 
   /**
@@ -210,8 +192,7 @@ public class GapfillUtils {
     GapfillType gapfillType = queryContext.getGapfillType();
     if (gapfillType == GapfillType.AGGREGATE_GAP_FILL || gapfillType == GapfillType.GAP_FILL) {
       return findGapfillExpressionContext(queryContext);
-    } else if (gapfillType == GapfillType.GAP_FILL_AGGREGATE
-        || gapfillType == GapfillType.AGGREGATE_GAP_FILL_AGGREGATE
+    } else if (gapfillType == GapfillType.GAP_FILL_AGGREGATE || gapfillType == GapfillType.AGGREGATE_GAP_FILL_AGGREGATE
         || gapfillType == GapfillType.GAP_FILL_SELECT) {
       return findGapfillExpressionContext(queryContext.getSubQueryContext());
     } else {
@@ -242,8 +223,7 @@ public class GapfillUtils {
   }
 
   public static List<ExpressionContext> getGroupByExpressions(QueryContext queryContext) {
-    ExpressionContext gapFillSelection =
-        GapfillUtils.getGapfillExpressionContext(queryContext);
+    ExpressionContext gapFillSelection = GapfillUtils.getGapfillExpressionContext(queryContext);
     if (gapFillSelection == null) {
       return null;
     }
@@ -253,5 +233,22 @@ public class GapfillUtils {
     groupByExpressions.add(gapFillSelection.getFunction().getArguments().get(0));
     groupByExpressions.addAll(timeseriesOn.getFunction().getArguments());
     return groupByExpressions;
+  }
+
+  public enum GapfillType {
+    // one sql query with gapfill only
+    GAP_FILL,
+    // gapfill as subquery, the outer query may have the filter
+    GAP_FILL_SELECT,
+    // gapfill as subquery, the outer query has the aggregation
+    GAP_FILL_AGGREGATE,
+    // aggregation as subqery, the outer query is gapfill
+    AGGREGATE_GAP_FILL,
+    // aggegration as second nesting subquery, gapfill as fist nesting subquery, different aggregation as outer query
+    AGGREGATE_GAP_FILL_AGGREGATE
+  }
+
+  public enum FillType {
+    FILL_DEFAULT_VALUE, FILL_PREVIOUS_VALUE,
   }
 }

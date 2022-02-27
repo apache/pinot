@@ -66,6 +66,7 @@ import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 
+
 /**
  * Helper class to reduce and set gap fill results into the BrokerResponseNative
  */
@@ -76,21 +77,19 @@ public class GapFillDataTableReducer implements DataTableReducer {
   private final QueryContext _queryContext;
 
   private final int _limitForAggregatedResult;
-  private int _limitForGapfilledResult;
-
   private final DateTimeGranularitySpec _dateTimeGranularity;
   private final DateTimeFormatSpec _dateTimeFormatter;
   private final long _startMs;
   private final long _endMs;
   private final long _timeBucketSize;
-
   private final List<Integer> _groupByKeyIndexes;
-  private boolean [] _isGroupBySelections;
   private final Set<Key> _groupByKeys;
   private final Map<Key, Object[]> _previousByGroupKey;
   private final Map<String, ExpressionContext> _fillExpressions;
   private final List<ExpressionContext> _timeSeries;
   private final GapfillUtils.GapfillType _gapfillType;
+  private int _limitForGapfilledResult;
+  private boolean[] _isGroupBySelections;
 
   GapFillDataTableReducer(QueryContext queryContext) {
     _queryContext = queryContext;
@@ -336,8 +335,7 @@ public class GapFillDataTableReducer implements DataTableReducer {
 
     List<Object[]> sortedRawRows;
     List<OrderByExpressionContext> orderByExpressionContexts = getOrderByExpressions();
-    if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE
-        || _gapfillType == GapfillUtils.GapfillType.GAP_FILL
+    if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE || _gapfillType == GapfillUtils.GapfillType.GAP_FILL
         || _gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
       sortedRawRows = mergeAndSort(dataTableMap.values(), dataSchema, orderByExpressionContexts);
     } else {
@@ -353,8 +351,7 @@ public class GapFillDataTableReducer implements DataTableReducer {
     List<Object[]> resultRows;
     replaceColumnNameWithAlias(dataSchema);
 
-    if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE
-        || _gapfillType == GapfillUtils.GapfillType.GAP_FILL
+    if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE || _gapfillType == GapfillUtils.GapfillType.GAP_FILL
         || _gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
       List<Object[]> gapfilledRows = gapFillAndAggregate(sortedRawRows, resultTableSchema, dataSchema);
       if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
@@ -436,8 +433,8 @@ public class GapFillDataTableReducer implements DataTableReducer {
     }
 
     int numOfColumns = _queryContext.getSelectExpressions().size();
-    String [] columnNames = new String[numOfColumns];
-    ColumnDataType [] columnDataTypes = new ColumnDataType[numOfColumns];
+    String[] columnNames = new String[numOfColumns];
+    ColumnDataType[] columnDataTypes = new ColumnDataType[numOfColumns];
     for (int i = 0; i < numOfColumns; i++) {
       ExpressionContext expressionContext = _queryContext.getSelectExpressions().get(i);
       if (GapfillUtils.isGapfill(expressionContext)) {
@@ -458,7 +455,7 @@ public class GapFillDataTableReducer implements DataTableReducer {
   }
 
   private Key constructGroupKeys(Object[] row) {
-    Object [] groupKeys = new Object[_groupByKeyIndexes.size()];
+    Object[] groupKeys = new Object[_groupByKeyIndexes.size()];
     for (int i = 0; i < _groupByKeyIndexes.size(); i++) {
       groupKeys[i] = row[_groupByKeyIndexes.get(i)];
     }
@@ -470,8 +467,7 @@ public class GapFillDataTableReducer implements DataTableReducer {
     return epoch / sz * sz;
   }
 
-  private List<Object[]> gapFillAndAggregate(List<Object[]> sortedRows,
-      DataSchema dataSchemaForAggregatedResult,
+  private List<Object[]> gapFillAndAggregate(List<Object[]> sortedRows, DataSchema dataSchemaForAggregatedResult,
       DataSchema dataSchema) {
     List<Object[]> result = new ArrayList<>();
 
@@ -481,8 +477,8 @@ public class GapFillDataTableReducer implements DataTableReducer {
     }
     GapfillFilterHandler postAggregateHavingFilterHandler = null;
     if (_queryContext.getHavingFilter() != null) {
-      postAggregateHavingFilterHandler = new GapfillFilterHandler(
-          _queryContext.getHavingFilter(), dataSchemaForAggregatedResult);
+      postAggregateHavingFilterHandler =
+          new GapfillFilterHandler(_queryContext.getHavingFilter(), dataSchemaForAggregatedResult);
     }
     Object[] previous = null;
     Iterator<Object[]> sortedIterator = sortedRows.iterator();
@@ -506,12 +502,8 @@ public class GapFillDataTableReducer implements DataTableReducer {
     return result;
   }
 
-  private Object[] gapfill(long bucketTime,
-      List<Object[]> bucketedResult,
-      Iterator<Object[]> sortedIterator,
-      Object[] previous,
-      DataSchema dataSchema,
-      GapfillFilterHandler postGapfillFilterHandler) {
+  private Object[] gapfill(long bucketTime, List<Object[]> bucketedResult, Iterator<Object[]> sortedIterator,
+      Object[] previous, DataSchema dataSchema, GapfillFilterHandler postGapfillFilterHandler) {
     ColumnDataType[] resultColumnDataTypes = dataSchema.getColumnDataTypes();
     int numResultColumns = resultColumnDataTypes.length;
     Set<Key> keys = new HashSet<>(_groupByKeys);
@@ -581,7 +573,6 @@ public class GapFillDataTableReducer implements DataTableReducer {
     return previous;
   }
 
-
   private List<Object[]> aggregateGapfilledData(List<Object[]> bucketedRows, DataSchema dataSchema) {
     List<ExpressionContext> groupbyExpressions = _queryContext.getGroupByExpressions();
     Preconditions.checkArgument(groupbyExpressions != null, "No GroupBy Clause.");
@@ -594,7 +585,7 @@ public class GapFillDataTableReducer implements DataTableReducer {
     int[] groupKeyArray = new int[bucketedRows.size()];
     List<Object[]> aggregatedResult = new ArrayList<>();
     for (int i = 0; i < bucketedRows.size(); i++) {
-      Object [] bucketedRow = bucketedRows.get(i);
+      Object[] bucketedRow = bucketedRows.get(i);
       List<Object> groupKey = new ArrayList<>(groupbyExpressions.size());
       for (ExpressionContext groupbyExpression : groupbyExpressions) {
         int columnIndex = indexes.get(groupbyExpression.toString());
@@ -633,7 +624,7 @@ public class GapFillDataTableReducer implements DataTableReducer {
             aggregationFunction.createGroupByResultHolder(_groupByKeys.size(), _groupByKeys.size());
         aggregationFunction.aggregateGroupBySV(bucketedRows.size(), groupKeyArray, groupByResultHolder, blockValSetMap);
         for (int j = 0; j < groupKeyIndexes.size(); j++) {
-          Object [] row = aggregatedResult.get(j);
+          Object[] row = aggregatedResult.get(j);
           row[i] = aggregationFunction.extractGroupByResult(groupByResultHolder, j);
           row[i] = aggregationFunction.extractFinalResult(row[i]);
         }
@@ -644,9 +635,8 @@ public class GapFillDataTableReducer implements DataTableReducer {
 
   private Object getFillValue(int columnIndex, String columnName, Object key, ColumnDataType dataType) {
     ExpressionContext expressionContext = _fillExpressions.get(columnName);
-    if (expressionContext != null
-        && expressionContext.getFunction() != null
-        && GapfillUtils.isFill(expressionContext)) {
+    if (expressionContext != null && expressionContext.getFunction() != null && GapfillUtils
+        .isFill(expressionContext)) {
       List<ExpressionContext> args = expressionContext.getFunction().getArguments();
       if (args.get(1).getLiteral() == null) {
         throw new UnsupportedOperationException("Wrong Sql.");
@@ -676,12 +666,12 @@ public class GapFillDataTableReducer implements DataTableReducer {
    *
    * @return flexible {@link Comparator} for selection rows.
    */
-  private Comparator<Object[]> getTypeCompatibleComparator(
-      List<OrderByExpressionContext> orderByExpressions, DataSchema dataSchema) {
+  private Comparator<Object[]> getTypeCompatibleComparator(List<OrderByExpressionContext> orderByExpressions,
+      DataSchema dataSchema) {
     ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
 
     Map<String, Integer> indexes = new HashMap<>();
-    String [] columnNames = dataSchema.getColumnNames();
+    String[] columnNames = dataSchema.getColumnNames();
     for (int i = 0; i < columnNames.length; i++) {
       indexes.put(columnNames[i], i);
     }
@@ -756,9 +746,9 @@ public class GapFillDataTableReducer implements DataTableReducer {
    */
   private List<Object[]> mergeAndSort(Collection<DataTable> dataTables, DataSchema dataSchema,
       List<OrderByExpressionContext> orderByExpressionContexts) {
-    PriorityQueue<Object[]> rows = new PriorityQueue<>(Math.min(_limitForAggregatedResult,
-        SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
-        getTypeCompatibleComparator(orderByExpressionContexts, dataSchema));
+    PriorityQueue<Object[]> rows =
+        new PriorityQueue<>(Math.min(_limitForAggregatedResult, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
+            getTypeCompatibleComparator(orderByExpressionContexts, dataSchema));
 
     for (DataTable dataTable : dataTables) {
       int numRows = dataTable.getNumberOfRows();
@@ -778,9 +768,9 @@ public class GapFillDataTableReducer implements DataTableReducer {
 
   private List<Object[]> mergeAndSort(IndexedTable indexedTable, DataSchema dataSchema,
       List<OrderByExpressionContext> orderByExpressionContexts) {
-    PriorityQueue<Object[]> rows = new PriorityQueue<>(Math.min(_limitForAggregatedResult,
-        SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
-        getTypeCompatibleComparator(orderByExpressionContexts, dataSchema));
+    PriorityQueue<Object[]> rows =
+        new PriorityQueue<>(Math.min(_limitForAggregatedResult, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
+            getTypeCompatibleComparator(orderByExpressionContexts, dataSchema));
 
     Iterator<Record> iterator = indexedTable.iterator();
     while (iterator.hasNext()) {

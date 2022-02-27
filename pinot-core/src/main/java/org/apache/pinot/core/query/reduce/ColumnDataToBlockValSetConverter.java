@@ -28,12 +28,12 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
- * As for Pre-Aggregate Gapfilling Function, all raw data will be retrieved
- * from the pinot server and merged on the pinot broker. The data will be in
- * {@link DataTable} format.
- * As part of Pre-Aggregate Gapfilling Function execution plan, the aggregation
- * function will work on the merged data on pinot broker. The aggregation
- * function only takes the {@link BlockValSet} format.
+ * As for Gapfilling Function, all raw data will be retrieved from the pinot
+ * server and merged on the pinot broker. The data will be in {@link DataTable}
+ * format.
+ * As part of Gapfilling Function execution plan, the aggregation function will
+ * work on the merged data on pinot broker. The aggregation function only takes
+ * the {@link BlockValSet} format.
  * This is the Helper class to convert the data from {@link DataTable} to the
  * block of values {@link BlockValSet} which used as input to the aggregation
  * function.
@@ -45,8 +45,8 @@ public class ColumnDataToBlockValSetConverter implements BlockValSet {
   private final List<Object[]> _rows;
   private final int _columnIndex;
 
-  public ColumnDataToBlockValSetConverter(
-      DataSchema.ColumnDataType columnDataType, List<Object[]> rows, int columnIndex) {
+  public ColumnDataToBlockValSetConverter(DataSchema.ColumnDataType columnDataType, List<Object[]> rows,
+      int columnIndex) {
     _dataType = columnDataType.toDataType();
     _rows = rows;
     _columnIndex = columnIndex;
@@ -76,7 +76,7 @@ public class ColumnDataToBlockValSetConverter implements BlockValSet {
   @Override
   public int[] getIntValuesSV() {
     if (_dataType == FieldSpec.DataType.INT) {
-      int [] result = new int[_rows.size()];
+      int[] result = new int[_rows.size()];
       for (int i = 0; i < result.length; i++) {
         result[i] = (Integer) _rows.get(i)[_columnIndex];
       }
@@ -88,7 +88,7 @@ public class ColumnDataToBlockValSetConverter implements BlockValSet {
   @Override
   public long[] getLongValuesSV() {
     if (_dataType == FieldSpec.DataType.LONG) {
-      long [] result = new long[_rows.size()];
+      long[] result = new long[_rows.size()];
       for (int i = 0; i < result.length; i++) {
         result[i] = (Long) _rows.get(i)[_columnIndex];
       }
@@ -100,7 +100,7 @@ public class ColumnDataToBlockValSetConverter implements BlockValSet {
   @Override
   public float[] getFloatValuesSV() {
     if (_dataType == FieldSpec.DataType.FLOAT) {
-      float [] result = new float[_rows.size()];
+      float[] result = new float[_rows.size()];
       for (int i = 0; i < result.length; i++) {
         result[i] = (Float) _rows.get(i)[_columnIndex];
       }
@@ -112,13 +112,13 @@ public class ColumnDataToBlockValSetConverter implements BlockValSet {
   @Override
   public double[] getDoubleValuesSV() {
     if (_dataType == FieldSpec.DataType.DOUBLE) {
-      double [] result = new double[_rows.size()];
+      double[] result = new double[_rows.size()];
       for (int i = 0; i < result.length; i++) {
         result[i] = (Double) _rows.get(i)[_columnIndex];
       }
       return result;
     } else if (_dataType == FieldSpec.DataType.INT) {
-      double [] result = new double[_rows.size()];
+      double[] result = new double[_rows.size()];
       for (int i = 0; i < result.length; i++) {
         result[i] = ((Integer) _rows.get(i)[_columnIndex]).doubleValue();
       }
@@ -130,7 +130,7 @@ public class ColumnDataToBlockValSetConverter implements BlockValSet {
   @Override
   public String[] getStringValuesSV() {
     if (_dataType == FieldSpec.DataType.STRING) {
-      String [] result = new String[_rows.size()];
+      String[] result = new String[_rows.size()];
       for (int i = 0; i < result.length; i++) {
         result[i] = (String) _rows.get(i)[_columnIndex];
       }

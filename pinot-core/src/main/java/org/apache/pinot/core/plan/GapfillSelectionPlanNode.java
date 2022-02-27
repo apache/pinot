@@ -70,8 +70,8 @@ public class GapfillSelectionPlanNode implements PlanNode {
     Preconditions.checkArgument(expressions != null, "GroupByExpressions should not be null.");
     Set<ExpressionContext> expressionContextSet = new HashSet<>(expressions);
 
-    List<ExpressionContext> selectionExpressions
-        = SelectionOperatorUtils.extractExpressions(queryContext, _indexSegment);
+    List<ExpressionContext> selectionExpressions =
+        SelectionOperatorUtils.extractExpressions(queryContext, _indexSegment);
     for (ExpressionContext expressionContext : selectionExpressions) {
       if (!GapfillUtils.isGapfill(expressionContext) && !expressionContextSet.contains(expressionContext)) {
         expressions.add(expressionContext);

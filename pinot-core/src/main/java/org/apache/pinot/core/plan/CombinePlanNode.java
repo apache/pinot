@@ -133,8 +133,8 @@ public class CombinePlanNode implements PlanNode {
       // Get all results
       try {
         for (Future future : futures) {
-          List<Operator> ops = (List<Operator>) future.get(_queryContext.getEndTimeMs() - System.currentTimeMillis(),
-              TimeUnit.MILLISECONDS);
+          List<Operator> ops = (List<Operator>) future
+              .get(_queryContext.getEndTimeMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
           operators.addAll(ops);
         }
       } catch (Exception e) {
@@ -166,9 +166,7 @@ public class CombinePlanNode implements PlanNode {
     if (QueryContextUtils.isAggregationQuery(_queryContext)) {
       if (gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL_AGGREGATE) {
         _queryContext.getSubQueryContext().getSubQueryContext().setEndTimeMs(_queryContext.getEndTimeMs());
-        return new GroupByOrderByCombineOperator(
-            operators,
-            _queryContext.getSubQueryContext().getSubQueryContext(),
+        return new GroupByOrderByCombineOperator(operators, _queryContext.getSubQueryContext().getSubQueryContext(),
             _executorService);
       } else if (gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL) {
         _queryContext.getSubQueryContext().setEndTimeMs(_queryContext.getEndTimeMs());
@@ -192,7 +190,7 @@ public class CombinePlanNode implements PlanNode {
         return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService);
       }
     } else if (gapfillType != null) {
-        return new SelectionOnlyCombineOperator(operators, _queryContext, _executorService);
+      return new SelectionOnlyCombineOperator(operators, _queryContext, _executorService);
     } else {
       assert QueryContextUtils.isDistinctQuery(_queryContext);
       return new DistinctCombineOperator(operators, _queryContext, _executorService);

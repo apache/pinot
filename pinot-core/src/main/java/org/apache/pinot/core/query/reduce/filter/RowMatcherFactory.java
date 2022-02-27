@@ -28,7 +28,7 @@ public interface RowMatcherFactory {
   /**
    * Helper method to construct a RowMatcher based on the given filter.
    */
-  public static RowMatcher getRowMatcher(FilterContext filter, ValueExtractorFactory valueExtractorFactory) {
+  static RowMatcher getRowMatcher(FilterContext filter, ValueExtractorFactory valueExtractorFactory) {
     switch (filter.getType()) {
       case AND:
         return new AndRowMatcher(filter.getChildren(), valueExtractorFactory);

@@ -32,12 +32,11 @@ public class GapfillFilterHandlerTest {
 
   @Test
   public void testFilter() {
-    QueryContext queryContext = QueryContextConverterUtils
-        .getQueryContextFromSQL("SELECT d1, d2 FROM testTable WHERE d2 > 5");
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContextFromSQL("SELECT d1, d2 FROM testTable WHERE d2 > 5");
     DataSchema dataSchema =
         new DataSchema(new String[]{"d1", "d2"}, new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
-    GapfillFilterHandler gapfillFilterHandler =
-        new GapfillFilterHandler(queryContext.getFilter(), dataSchema);
+    GapfillFilterHandler gapfillFilterHandler = new GapfillFilterHandler(queryContext.getFilter(), dataSchema);
     assertFalse(gapfillFilterHandler.isMatch(new Object[]{1, 5L}));
     assertTrue(gapfillFilterHandler.isMatch(new Object[]{2, 10L}));
     assertFalse(gapfillFilterHandler.isMatch(new Object[]{3, 3L}));

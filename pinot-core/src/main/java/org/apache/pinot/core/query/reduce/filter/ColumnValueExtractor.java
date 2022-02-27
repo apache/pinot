@@ -23,8 +23,8 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
 /**
-  * Value extractor for a non-post-aggregation column (group-by expression or aggregation).
-  */
+ * Value extractor for a non-post-aggregation column (group-by expression or aggregation).
+ */
 public class ColumnValueExtractor implements ValueExtractor {
   private final int _index;
   private final DataSchema _dataSchema;

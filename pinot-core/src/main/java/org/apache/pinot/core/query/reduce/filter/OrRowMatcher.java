@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.reduce.filter;
 import java.util.List;
 import org.apache.pinot.common.request.context.FilterContext;
 
+
 /**
  * OR filter matcher.
  */

@@ -64,9 +64,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class CalciteSqlParser {
-  private CalciteSqlParser() {
-  }
-
+  public static final List<QueryRewriter> QUERY_REWRITERS = new ArrayList<>(QueryRewriterFactory.getQueryRewriters());
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlParser.class);
 
   /** Lexical policy similar to MySQL with ANSI_QUOTES option enabled. (To be
@@ -81,9 +79,6 @@ public class CalciteSqlParser {
   private static final SqlParser.Config PARSER_CONFIG =
       SqlParser.configBuilder().setLex(PINOT_LEX).setConformance(SqlConformanceEnum.BABEL)
           .setParserFactory(SqlBabelParserImpl.FACTORY).build();
-
-  public static final List<QueryRewriter> QUERY_REWRITERS = new ArrayList<>(QueryRewriterFactory.getQueryRewriters());
-
   // To Keep the backward compatibility with 'OPTION' Functionality in PQL, which is used to
   // provide more hints for query processing.
   //
@@ -96,6 +91,9 @@ public class CalciteSqlParser {
   //   `OPTION (<k1> = <v1>) OPTION (<k2> = <v2>) OPTION (<k3> = <v3>)`
   private static final Pattern OPTIONS_REGEX_PATTEN =
       Pattern.compile("option\\s*\\(([^\\)]+)\\)", Pattern.CASE_INSENSITIVE);
+
+  private CalciteSqlParser() {
+  }
 
   /**
    * Checks for the presence of semicolon in the sql query and modifies the query accordingly
@@ -161,7 +159,7 @@ public class CalciteSqlParser {
       if (isAggregateExpression(selectExpression)) {
         aggregateExprCount++;
       } else if (hasGroupByClause && expressionOutsideGroupByList(selectExpression, groupByExprs)) {
-          throw new SqlCompilationException(
+        throw new SqlCompilationException(
             "'" + RequestUtils.prettyPrint(selectExpression) + "' should appear in GROUP BY clause.");
       }
     }
@@ -287,8 +285,8 @@ public class CalciteSqlParser {
         identifiers.add(expression.getIdentifier().getName());
       } else if (expression.getFunctionCall() != null) {
         if (excludeAs && expression.getFunctionCall().getOperator().equalsIgnoreCase("AS")) {
-          identifiers.addAll(
-              extractIdentifiers(Arrays.asList(expression.getFunctionCall().getOperands().get(0)), true));
+          identifiers
+              .addAll(extractIdentifiers(Arrays.asList(expression.getFunctionCall().getOperands().get(0)), true));
           continue;
         } else {
           identifiers.addAll(extractIdentifiers(expression.getFunctionCall().getOperands(), excludeAs));
@@ -716,8 +714,8 @@ public class CalciteSqlParser {
           compilePathExpression(functionName, functionNode, path);
           return RequestUtils.getIdentifierExpression(path.toString());
         }
-        if ((functionNode.getFunctionQuantifier() != null) && ("DISTINCT".equals(
-            functionNode.getFunctionQuantifier().toString()))) {
+        if ((functionNode.getFunctionQuantifier() != null) && ("DISTINCT"
+            .equals(functionNode.getFunctionQuantifier().toString()))) {
           if (AggregationFunctionType.COUNT.name().equals(functionName)) {
             functionName = AggregationFunctionType.DISTINCTCOUNT.name();
           } else if (AggregationFunctionType.isAggregationFunction(functionName)) {

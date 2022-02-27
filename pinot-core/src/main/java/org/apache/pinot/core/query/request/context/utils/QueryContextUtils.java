@@ -68,8 +68,8 @@ public class QueryContextUtils {
       return false;
     } else {
       AggregationFunction[] aggregationFunctions = query.getAggregationFunctions();
-      return aggregationFunctions != null
-          && (aggregationFunctions.length != 1 || !(aggregationFunctions[0] instanceof DistinctAggregationFunction));
+      return aggregationFunctions != null && (aggregationFunctions.length != 1
+          || !(aggregationFunctions[0] instanceof DistinctAggregationFunction));
     }
   }
 
@@ -109,7 +109,6 @@ public class QueryContextUtils {
       }
     }
   }
-
 
   /** Collect aggregation functions from an ExpressionContext. */
   public static void collectPostAggregations(ExpressionContext expression, Set<String> postAggregations) {
