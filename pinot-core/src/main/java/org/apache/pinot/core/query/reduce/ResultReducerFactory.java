@@ -46,7 +46,7 @@ public final class ResultReducerFactory {
 
     AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
     if (queryContext.getGapfillType() != null) {
-      return new PreAggregationGapFillDataTableReducer(queryContext);
+      return new GapFillDataTableReducer(queryContext);
     } else if (aggregationFunctions == null) {
       // Selection query
       return new SelectionDataTableReducer(queryContext);

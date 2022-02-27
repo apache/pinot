@@ -67,10 +67,10 @@ import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 
 /**
- * Helper class to reduce and set Aggregation results into the BrokerResponseNative
+ * Helper class to reduce and set gap fill results into the BrokerResponseNative
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
+public class GapFillDataTableReducer implements DataTableReducer {
   private static final int MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE = 2; // TBD, find a better value.
 
   private final QueryContext _queryContext;
@@ -92,7 +92,7 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
   private final List<ExpressionContext> _timeSeries;
   private final GapfillUtils.GapfillType _gapfillType;
 
-  PreAggregationGapFillDataTableReducer(QueryContext queryContext) {
+  GapFillDataTableReducer(QueryContext queryContext) {
     _queryContext = queryContext;
     _gapfillType = queryContext.getGapfillType();
     _limitForAggregatedResult = queryContext.getLimit();
@@ -105,19 +105,7 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
 
     ExpressionContext gapFillSelection = GapfillUtils.getGapfillExpressionContext(queryContext);
 
-    Preconditions.checkArgument(
-        gapFillSelection != null && gapFillSelection.getFunction() != null, "Gapfill Expression should be function.");
     List<ExpressionContext> args = gapFillSelection.getFunction().getArguments();
-    Preconditions.checkArgument(
-        args.size() > 5, "PreAggregateGapFill does not have correct number of arguments.");
-    Preconditions.checkArgument(
-        args.get(1).getLiteral() != null, "The second argument of PostAggregateGapFill should be TimeFormatter.");
-    Preconditions.checkArgument(
-        args.get(2).getLiteral() != null, "The third argument of PostAggregateGapFill should be start time.");
-    Preconditions.checkArgument(
-        args.get(3).getLiteral() != null, "The fourth argument of PostAggregateGapFill should be end time.");
-    Preconditions.checkArgument(
-        args.get(4).getLiteral() != null, "The fifth argument of PostAggregateGapFill should be time bucket size.");
 
     _dateTimeFormatter = new DateTimeFormatSpec(args.get(1).getLiteral());
     _dateTimeGranularity = new DateTimeGranularitySpec(args.get(4).getLiteral());
@@ -364,9 +352,6 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     }
     List<Object[]> resultRows;
     replaceColumnNameWithAlias(dataSchema);
-    if (_queryContext.getAggregationFunctions() != null) {
-      validateGroupByForOuterQuery();
-    }
 
     if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE
         || _gapfillType == GapfillUtils.GapfillType.GAP_FILL
@@ -596,39 +581,6 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     return previous;
   }
 
-  /**
-   * Make sure that the outer query has the group by clause and the group by clause has the time bucket.
-   */
-  private void validateGroupByForOuterQuery() {
-    List<ExpressionContext> groupbyExpressions = _queryContext.getGroupByExpressions();
-    Preconditions.checkArgument(groupbyExpressions != null, "No GroupBy Clause.");
-    List<ExpressionContext> innerSelections = _queryContext.getSubQueryContext().getSelectExpressions();
-    String timeBucketCol = null;
-    List<String> strAlias = _queryContext.getSubQueryContext().getAliasList();
-    for (int i = 0; i < innerSelections.size(); i++) {
-      ExpressionContext innerSelection = innerSelections.get(i);
-      if (GapfillUtils.isGapfill(innerSelection)) {
-        if (strAlias.get(i) != null) {
-          timeBucketCol = strAlias.get(i);
-        } else {
-          timeBucketCol = innerSelection.getFunction().getArguments().get(0).toString();
-        }
-        break;
-      }
-    }
-
-    Preconditions.checkArgument(timeBucketCol != null, "No Group By timebucket.");
-
-    boolean findTimeBucket = false;
-    for (ExpressionContext groupbyExp : groupbyExpressions) {
-      if (timeBucketCol.equals(groupbyExp.toString())) {
-        findTimeBucket = true;
-        break;
-      }
-    }
-
-    Preconditions.checkArgument(findTimeBucket, "No Group By timebucket.");
-  }
 
   private List<Object[]> aggregateGapfilledData(List<Object[]> bucketedRows, DataSchema dataSchema) {
     List<ExpressionContext> groupbyExpressions = _queryContext.getGroupByExpressions();
