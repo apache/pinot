@@ -41,7 +41,7 @@ public class QueryContextUtils {
   public static boolean isSelectionQuery(QueryContext query) {
     if (query.getGapfillType() == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE
         || query.getGapfillType() == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
-      return isSelectionOnlyQuery(query.getSubQueryContext());
+      return query.getSubQueryContext().getAggregationFunctions() == null;
     } else {
       return query.getAggregationFunctions() == null;
     }

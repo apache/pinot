@@ -39,6 +39,7 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -298,6 +299,21 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     return indexedTable;
   }
 
+  private List<OrderByExpressionContext> getOrderByExpressions() {
+    if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL) {
+      // one sql query with gapfill only
+      return _queryContext.getOrderByExpressions();
+    } else if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT
+        || _gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE
+        || _gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL) {
+      // gapfill as subquery, the outer query may have the filter
+      return _queryContext.getSubQueryContext().getOrderByExpressions();
+    } else { //AGGREGATE_GAP_FILL_AGGREGATE
+      // aggegration as second nesting subquery, gapfill as fist nesting subquery, different aggregation as outer query
+      return _queryContext.getSubQueryContext().getSubQueryContext().getOrderByExpressions();
+    }
+  }
+
   /**
    * Here are three things that happen
    * 1. Sort the result sets from all pinot servers based on timestamp
@@ -331,14 +347,15 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     }
 
     List<Object[]> sortedRawRows;
+    List<OrderByExpressionContext> orderByExpressionContexts = getOrderByExpressions();
     if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE
         || _gapfillType == GapfillUtils.GapfillType.GAP_FILL
         || _gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
-      sortedRawRows = mergeAndSort(dataTableMap.values(), dataSchema);
+      sortedRawRows = mergeAndSort(dataTableMap.values(), dataSchema, orderByExpressionContexts);
     } else {
       try {
         IndexedTable indexedTable = getIndexedTable(dataSchema, dataTableMap.values(), reducerContext);
-        sortedRawRows = mergeAndSort(indexedTable, dataSchema);
+        sortedRawRows = mergeAndSort(indexedTable, dataSchema, orderByExpressionContexts);
       } catch (TimeoutException e) {
         brokerResponseNative.getProcessingExceptions()
             .add(new QueryProcessingException(QueryException.BROKER_TIMEOUT_ERROR_CODE, e.getMessage()));
@@ -702,41 +719,94 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
   }
 
   /**
-   * Helper method to get the type-compatible {@link Comparator} based on the timestamp.
+   * Helper method to get the type-compatible {@link Comparator} for selection rows. (Inter segment)
+   * <p>Type-compatible comparator allows compatible types to compare with each other.
    *
-   * @return flexible {@link Comparator} based on the timestamp.
+   * @return flexible {@link Comparator} for selection rows.
    */
-  private Comparator<Object[]> getTypeCompatibleComparator(DataSchema dataSchema) {
+  private Comparator<Object[]> getTypeCompatibleComparator(
+      List<OrderByExpressionContext> orderByExpressions, DataSchema dataSchema) {
     ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
 
+    Map<String, Integer> indexes = new HashMap<>();
+    String [] columnNames = dataSchema.getColumnNames();
+    for (int i = 0; i < columnNames.length; i++) {
+      indexes.put(columnNames[i], i);
+    }
+
+    // Compare all single-value columns
+    int numOrderByExpressions = orderByExpressions == null ? 0 : orderByExpressions.size();
+    List<Integer> valueIndexList = new ArrayList<>(numOrderByExpressions);
+    for (int i = 0; i < numOrderByExpressions; i++) {
+      OrderByExpressionContext orderByExpressionContext = orderByExpressions.get(i);
+      ExpressionContext expressionContext = orderByExpressionContext.getExpression();
+      int index = indexes.get(expressionContext.toString());
+      if (!columnDataTypes[index].isArray()) {
+        valueIndexList.add(indexes.get(expressionContext.toString()));
+      }
+    }
+
+    int numValuesToCompare = valueIndexList.size();
+    int[] valueIndices = new int[numValuesToCompare];
+    boolean[] isNumber = new boolean[numValuesToCompare];
+    // Use multiplier -1 or 1 to control ascending/descending order
+    int[] multipliers = new int[numValuesToCompare];
+    for (int i = 0; i < numValuesToCompare; i++) {
+      int valueIndex = valueIndexList.get(i);
+      valueIndices[i] = valueIndex;
+      isNumber[i] = columnDataTypes[valueIndex].isNumber();
+      multipliers[i] = orderByExpressions.get(i).isAsc() ? 1 : -1;
+    }
+
     return (o1, o2) -> {
-      Object v1 = o1[0];
-      Object v2 = o2[0];
+      int timeBucket = valueIndices.length == 0 ? 0 : valueIndices[0];
+      Object v1 = o1[timeBucket];
+      Object v2 = o2[timeBucket];
       int result;
-      if (columnDataTypes[0].isNumber()) {
+      if (columnDataTypes[timeBucket].isNumber()) {
         result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
       } else {
         long timeCol1 = _dateTimeFormatter.fromFormatToMillis(String.valueOf(v1));
         long timeCol2 = _dateTimeFormatter.fromFormatToMillis(String.valueOf(v2));
         if (timeCol1 < timeCol2) {
-          return -1;
+          result = -1;
         } else if (timeCol1 == timeCol2) {
-          return 0;
+          result = 0;
         } else {
-          return 1;
+          result = 1;
         }
       }
-      return result;
+
+      if (result != 0) {
+        return result;
+      }
+
+      for (int i = 1; i < numValuesToCompare; i++) {
+        int index = valueIndices[i];
+        v1 = o1[index];
+        v2 = o2[index];
+        if (isNumber[i]) {
+          result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
+        } else {
+          //noinspection unchecked
+          result = ((Comparable) v1).compareTo(v2);
+        }
+        if (result != 0) {
+          return result * multipliers[i];
+        }
+      }
+      return 0;
     };
   }
 
   /**
    * Merge all result tables from different pinot servers and sort the rows based on timebucket.
    */
-  private List<Object[]> mergeAndSort(Collection<DataTable> dataTables, DataSchema dataSchema) {
+  private List<Object[]> mergeAndSort(Collection<DataTable> dataTables, DataSchema dataSchema,
+      List<OrderByExpressionContext> orderByExpressionContexts) {
     PriorityQueue<Object[]> rows = new PriorityQueue<>(Math.min(_limitForAggregatedResult,
         SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
-        getTypeCompatibleComparator(dataSchema));
+        getTypeCompatibleComparator(orderByExpressionContexts, dataSchema));
 
     for (DataTable dataTable : dataTables) {
       int numRows = dataTable.getNumberOfRows();
@@ -754,10 +824,11 @@ public class PreAggregationGapFillDataTableReducer implements DataTableReducer {
     return sortedRows;
   }
 
-  private List<Object[]> mergeAndSort(IndexedTable indexedTable, DataSchema dataSchema) {
+  private List<Object[]> mergeAndSort(IndexedTable indexedTable, DataSchema dataSchema,
+      List<OrderByExpressionContext> orderByExpressionContexts) {
     PriorityQueue<Object[]> rows = new PriorityQueue<>(Math.min(_limitForAggregatedResult,
         SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
-        getTypeCompatibleComparator(dataSchema));
+        getTypeCompatibleComparator(orderByExpressionContexts, dataSchema));
 
     Iterator<Record> iterator = indexedTable.iterator();
     while (iterator.hasNext()) {

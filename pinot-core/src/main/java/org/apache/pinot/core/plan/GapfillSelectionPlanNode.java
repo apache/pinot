@@ -23,8 +23,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.query.EmptySelectionOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -34,8 +36,8 @@ import org.apache.pinot.segment.spi.IndexSegment;
 
 
 /**
- * The <code>PreAggGapFillSelectionPlanNode</code> class provides the execution
- * plan for pre-aggregate gapfill query on a single segment.
+ * The <code>GapfillSelectionPlanNode</code> class provides the execution plan for gapfill selection query on a single
+ * segment.
  */
 public class GapfillSelectionPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
@@ -48,11 +50,15 @@ public class GapfillSelectionPlanNode implements PlanNode {
 
   @Override
   public Operator<IntermediateResultsBlock> run() {
-    int limit = _queryContext.getLimit();
-
     QueryContext queryContext = getSelectQueryContext();
-    Preconditions.checkArgument(queryContext.getOrderByExpressions() == null,
-        "The gapfill query should not have orderby expression.");
+    int limit = queryContext.getLimit();
+
+    if (limit == 0) {
+      List<ExpressionContext> expressions = SelectionOperatorUtils.extractExpressions(queryContext, _indexSegment);
+      // Empty selection (LIMIT 0)
+      TransformOperator transformOperator = new TransformPlanNode(_indexSegment, queryContext, expressions, 0).run();
+      return new EmptySelectionOperator(_indexSegment, expressions, transformOperator);
+    }
 
     ExpressionContext gapFillSelection = GapfillUtils.getGapfillExpressionContext(_queryContext);
     Preconditions.checkArgument(gapFillSelection != null, "PreAggregate Gapfill Expression is expected.");
@@ -70,6 +76,17 @@ public class GapfillSelectionPlanNode implements PlanNode {
       if (!GapfillUtils.isGapfill(expressionContext) && !expressionContextSet.contains(expressionContext)) {
         expressions.add(expressionContext);
         expressionContextSet.add(expressionContext);
+      }
+    }
+
+    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+    if (orderByExpressions != null) {
+      for (OrderByExpressionContext orderByExpression : orderByExpressions) {
+        ExpressionContext expression = orderByExpression.getExpression();
+        if (!expressionContextSet.contains(expression)) {
+          expressionContextSet.add(expression);
+          expressions.add(expression);
+        }
       }
     }
 
