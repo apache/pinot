@@ -125,15 +125,7 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
   @Override
   public void snapshotState(FunctionSnapshotContext functionSnapshotContext)
       throws Exception {
-    // TODO: not supported yet
-    LOG.error("snapshotState is invoked in Pinot sink");
-    // clear and flush.
-    flush();
-    // snapshot state:
-    // 1. should only work on the boundary of segment uploader.
-    // 2. segmentwriter state should be preserved.
-    // 3.
-    // ...
+    throw new UnsupportedOperationException("snapshotState is invoked in Pinot sink");
   }
 
   @Override
