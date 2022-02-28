@@ -31,7 +31,6 @@ import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 
 
 /**
@@ -73,11 +72,10 @@ public class SelectionPlanNode implements PlanNode {
         } else {
           // Not all output expressions are ordered, only fetch the order-by expressions and docId to avoid the
           // unnecessary data fetch
-          List<ExpressionContext> expressionsToTransform = new ArrayList<>(orderByExpressions.size() + 1);
+          List<ExpressionContext> expressionsToTransform = new ArrayList<>(orderByExpressions.size());
           for (OrderByExpressionContext orderByExpression : orderByExpressions) {
             expressionsToTransform.add(orderByExpression.getExpression());
           }
-          expressionsToTransform.add(ExpressionContext.forIdentifier(BuiltInVirtualColumn.DOCID));
           TransformOperator transformOperator =
               new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform,
                   DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
