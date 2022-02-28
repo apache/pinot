@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.filter.predicate;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -64,6 +65,7 @@ public class RegexpLikePredicateEvaluatorFactory {
   private static final int PATTERN_FLAG = Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE;
 
   private static final class DictionaryBasedRegexpLikePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
+    private final Matcher _matcher;
     final Pattern _pattern;
     final Dictionary _dictionary;
     int[] _matchingDictIds;
@@ -72,11 +74,12 @@ public class RegexpLikePredicateEvaluatorFactory {
       super(regexpLikePredicate);
       _pattern = Pattern.compile(regexpLikePredicate.getValue(), PATTERN_FLAG);
       _dictionary = dictionary;
+      _matcher = _pattern.matcher("");
     }
 
     @Override
     public boolean applySV(int dictId) {
-      return _pattern.matcher(_dictionary.getStringValue(dictId)).find();
+      return _matcher.reset(_dictionary.getStringValue(dictId)).find();
     }
 
     @Override
