@@ -224,10 +224,9 @@ public class SegmentMapperTest {
         new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setPartitionerConfigs(
             Arrays.asList(
                 new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
-                    .setColumnName("campaign").build(), new PartitionerConfig.Builder()
-                    .setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG)
-                    .setColumnName("clicks").setColumnPartitionConfig(new ColumnPartitionConfig("Modulo", 3)).build()))
-            .build();
+                    .setColumnName("campaign").build(), new PartitionerConfig.Builder().setPartitionerType(
+                        PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG).setColumnName("clicks")
+                    .setColumnPartitionConfig(new ColumnPartitionConfig("Modulo", 3, null)).build())).build();
     Map<String, List<Object[]>> expectedRecords4 = new HashMap<>();
     for (Object[] record : outputData) {
       String partition = "0_" + record[0] + "_" + ((int) record[1] % 3);

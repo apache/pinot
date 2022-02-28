@@ -83,9 +83,9 @@ public class LocalPinotFS extends BasePinotFS {
   }
 
   @Override
-  public boolean copy(URI srcUri, URI dstUri)
+  public boolean copyDir(URI srcUri, URI dstUri)
       throws IOException {
-    copy(toFile(srcUri), toFile(dstUri), false);
+    copy(toFile(srcUri), toFile(dstUri), true);
     return true;
   }
 
@@ -182,7 +182,7 @@ public class LocalPinotFS extends BasePinotFS {
         FileUtils.copyDirectory(srcFile, dstFile);
       } else {
         // Throws Exception on failure
-        throw new IOException(srcFile.getAbsolutePath() + " is a directory");
+        throw new IOException(srcFile.getAbsolutePath() + " is a directory and recursive copy is not enabled.");
       }
     } else {
       // Will create parent directories, throws Exception on failure

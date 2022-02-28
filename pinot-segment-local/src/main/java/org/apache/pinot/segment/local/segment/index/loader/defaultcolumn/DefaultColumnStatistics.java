@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader.defaultcolumn;
 
+import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
@@ -104,6 +105,11 @@ public class DefaultColumnStatistics implements ColumnStatistics {
   @Override
   public int getNumPartitions() {
     return 0;
+  }
+
+  @Override
+  public Map<String, String> getPartitionFunctionConfig() {
+    return null;
   }
 
   @Override

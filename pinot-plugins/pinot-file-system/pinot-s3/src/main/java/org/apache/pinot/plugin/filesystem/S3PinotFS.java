@@ -363,14 +363,14 @@ public class S3PinotFS extends BasePinotFS {
   @Override
   public boolean doMove(URI srcUri, URI dstUri)
       throws IOException {
-    if (copy(srcUri, dstUri)) {
+    if (copyDir(srcUri, dstUri)) {
       return delete(srcUri, true);
     }
     return false;
   }
 
   @Override
-  public boolean copy(URI srcUri, URI dstUri)
+  public boolean copyDir(URI srcUri, URI dstUri)
       throws IOException {
     LOGGER.info("Copying uri {} to uri {}", srcUri, dstUri);
     Preconditions.checkState(exists(srcUri), "Source URI '%s' does not exist", srcUri);

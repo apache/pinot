@@ -122,14 +122,14 @@ public class GcsPinotFS extends BasePinotFS {
     GcsUri srcGcsUri = new GcsUri(srcUri);
     GcsUri dstGcsUri = new GcsUri(dstUri);
     if (copy(srcGcsUri, dstGcsUri)) {
-      // Only delete if all files were successfully moved
+      // Only delete if all files were successfully copied
       return delete(srcGcsUri, true);
     }
     return false;
   }
 
   @Override
-  public boolean copy(URI srcUri, URI dstUri)
+  public boolean copyDir(URI srcUri, URI dstUri)
       throws IOException {
     LOGGER.info("Copying uri {} to uri {}", srcUri, dstUri);
     return copy(new GcsUri(srcUri), new GcsUri(dstUri));
@@ -414,9 +414,11 @@ public class GcsPinotFS extends BasePinotFS {
     if (srcUri.equals(dstUri)) {
       return true;
     }
+    // copy directly if source is a single file.
     if (!existsDirectory(srcUri)) {
       return copyFile(srcUri, dstUri);
     }
+    // copy directory
     if (srcUri.hasSubpath(dstUri) || dstUri.hasSubpath(srcUri)) {
       throw new IOException(String.format("Cannot copy from or to a subdirectory: '%s' -> '%s'", srcUri, dstUri));
     }

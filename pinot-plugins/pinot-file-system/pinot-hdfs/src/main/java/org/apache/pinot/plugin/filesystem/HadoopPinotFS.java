@@ -97,7 +97,7 @@ public class HadoopPinotFS extends BasePinotFS {
    * need to create a new configuration and filesystem. Keeps files if copy/move is partial.
    */
   @Override
-  public boolean copy(URI srcUri, URI dstUri)
+  public boolean copyDir(URI srcUri, URI dstUri)
       throws IOException {
     Path source = new Path(srcUri);
     Path target = new Path(dstUri);
@@ -115,7 +115,7 @@ public class HadoopPinotFS extends BasePinotFS {
           }
         } else if (sourceFile.isDirectory()) {
           try {
-            copy(sourceFilePath.toUri(), new Path(target, sourceFilePath.getName()).toUri());
+            copyDir(sourceFilePath.toUri(), new Path(target, sourceFilePath.getName()).toUri());
           } catch (FileNotFoundException e) {
             LOGGER.warn("Not found directory {}, skipping copying it...", sourceFilePath, e);
           }

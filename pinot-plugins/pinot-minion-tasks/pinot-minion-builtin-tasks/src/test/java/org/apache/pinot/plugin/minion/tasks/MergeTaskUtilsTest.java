@@ -86,9 +86,8 @@ public class MergeTaskUtilsTest {
   @Test
   public void testGetPartitionerConfigs() {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable")
-        .setSegmentPartitionConfig(
-            new SegmentPartitionConfig(Collections.singletonMap("memberId", new ColumnPartitionConfig("murmur", 10))))
-        .build();
+        .setSegmentPartitionConfig(new SegmentPartitionConfig(
+            Collections.singletonMap("memberId", new ColumnPartitionConfig("murmur", 10)))).build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("memberId", DataType.LONG).build();
     Map<String, String> taskConfig = Collections.emptyMap();
 

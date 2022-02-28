@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
@@ -50,6 +51,7 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
   protected int _maxLengthOfMultiValues = 0;
   private PartitionFunction _partitionFunction;
   private final int _numPartitions;
+  private final Map<String, String> _functionConfig;
   private final Set<Integer> _partitions;
 
   public AbstractColumnStatisticsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
@@ -58,8 +60,9 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
 
     String partitionFunctionName = statsCollectorConfig.getPartitionFunctionName(column);
     int numPartitions = statsCollectorConfig.getNumPartitions(column);
+    _functionConfig = statsCollectorConfig.getPartitionFunctionConfig(column);
     _partitionFunction = (partitionFunctionName != null) ? PartitionFunctionFactory
-        .getPartitionFunction(partitionFunctionName, numPartitions) : null;
+        .getPartitionFunction(partitionFunctionName, numPartitions, _functionConfig) : null;
 
     _numPartitions = statsCollectorConfig.getNumPartitions(column);
     if (_partitionFunction != null) {
@@ -135,6 +138,16 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
    */
   public int getNumPartitions() {
     return _numPartitions;
+  }
+
+  /**
+   * Returns the {@link PartitionFunction}'s functionConfig for the column.
+   *
+   * @return Partition Function config for the column.
+   */
+  @Nullable
+  public Map<String, String> getPartitionFunctionConfig() {
+    return _functionConfig;
   }
 
   /**

@@ -46,5 +46,7 @@ public @interface ScalarFunction {
 
   boolean enabled() default true;
 
-  String name() default "";
+  // If empty, FunctionsRegistry registers the method name as function name;
+  // If not empty, FunctionsRegistry only registers the function names specified here, the method name is ignored.
+  String[] names() default {};
 }

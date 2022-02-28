@@ -343,7 +343,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
       if (stagingDirURI != null) {
         LOGGER.info("Trying to copy segment tars from staging directory: [{}] to output directory [{}]", stagingDirURI,
             outputDirURI);
-        outputDirFS.copy(stagingDirURI, outputDirURI);
+        outputDirFS.copyDir(stagingDirURI, outputDirURI);
       }
     } finally {
       if (stagingDirURI != null) {

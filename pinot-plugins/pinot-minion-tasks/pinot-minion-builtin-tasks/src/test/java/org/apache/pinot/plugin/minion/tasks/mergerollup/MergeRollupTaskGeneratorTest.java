@@ -411,20 +411,20 @@ public class MergeRollupTaskGeneratorTest {
     String segmentName4 = "testTable__4";
     SegmentZKMetadata metadata1 =
         getSegmentZKMetadata(segmentName1, 86_400_000L, 90_000_000L, TimeUnit.MILLISECONDS, null);
-    metadata1.setPartitionMetadata(new SegmentPartitionMetadata(
-        Collections.singletonMap("memberId", new ColumnPartitionMetadata("murmur", 10, Collections.singleton(0)))));
+    metadata1.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap("memberId",
+        new ColumnPartitionMetadata("murmur", 10, Collections.singleton(0), null))));
     SegmentZKMetadata metadata2 =
         getSegmentZKMetadata(segmentName2, 86_400_000L, 100_000_000L, TimeUnit.MILLISECONDS, null);
-    metadata2.setPartitionMetadata(new SegmentPartitionMetadata(
-        Collections.singletonMap("memberId", new ColumnPartitionMetadata("murmur", 10, Collections.singleton(0)))));
+    metadata2.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap("memberId",
+        new ColumnPartitionMetadata("murmur", 10, Collections.singleton(0), null))));
     SegmentZKMetadata metadata3 =
         getSegmentZKMetadata(segmentName3, 86_400_000L, 110_000_000L, TimeUnit.MILLISECONDS, null);
-    metadata3.setPartitionMetadata(new SegmentPartitionMetadata(
-        Collections.singletonMap("memberId", new ColumnPartitionMetadata("murmur", 10, Collections.singleton(1)))));
+    metadata3.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap("memberId",
+        new ColumnPartitionMetadata("murmur", 10, Collections.singleton(1), null))));
     SegmentZKMetadata metadata4 =
         getSegmentZKMetadata(segmentName4, 90_000_000L, 110_000_000L, TimeUnit.MILLISECONDS, null);
-    metadata4.setPartitionMetadata(new SegmentPartitionMetadata(
-        Collections.singletonMap("memberId", new ColumnPartitionMetadata("murmur", 10, Collections.singleton(1)))));
+    metadata4.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap("memberId",
+        new ColumnPartitionMetadata("murmur", 10, Collections.singleton(1), null))));
     ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
     when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME))
         .thenReturn(Lists.newArrayList(metadata1, metadata2, metadata3, metadata4));
