@@ -124,6 +124,19 @@ public class BrokerRequestToQueryContextConverter {
     }
 
     Preconditions.checkArgument(findTimeBucket, "No Group By timebucket.");
+
+    if (queryContext.getGapfillType() == GapfillUtils.GapfillType.GAP_FILL) {
+      Preconditions.checkArgument(queryContext.getOrderByExpressions() != null, "Expected Order By for raw query.");
+    } else if (queryContext.getGapfillType() == GapfillUtils.GapfillType.GAP_FILL_SELECT
+        || queryContext.getGapfillType() == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE
+        || queryContext.getGapfillType() == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL) {
+      Preconditions.checkArgument(queryContext.getSubQueryContext().getOrderByExpressions() != null,
+          "Expected Order By for raw query.");
+    } else if (queryContext.getGapfillType() == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL_AGGREGATE) {
+      Preconditions
+          .checkArgument(queryContext.getSubQueryContext().getSubQueryContext().getOrderByExpressions() != null,
+              "Expected Order By for raw query.");
+    }
   }
 
   private static QueryContext convertSQL(PinotQuery pinotQuery, BrokerRequest brokerRequest) {
