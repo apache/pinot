@@ -43,6 +43,14 @@ public class StringPredicateFilterOptimizerTest {
     TestHelper.assertEqualsQuery("SELECT * FROM testTable WHERE strColumn1=strColumn2",
         "SELECT * FROM testTable WHERE strcmp(strColumn1,strColumn2) = 0", TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
 
+    // 'WHERE trim(strColumn1)=strColumn2' gets replaced with 'strcmp(trim(strColumn1), strColumn2) = 0'
+    TestHelper.assertEqualsQuery("SELECT * FROM testTable WHERE trim(strColumn1)=strColumn2",
+        "SELECT * FROM testTable WHERE strcmp(trim(strColumn1),strColumn2) = 0", TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
+
+    // 'WHERE strColumn1=trim(strColumn2)' gets replaced with 'strcmp(strColumn1, trim(strColumn2)) = 0'
+    TestHelper.assertEqualsQuery("SELECT * FROM testTable WHERE strColumn1=trim(strColumn2)",
+        "SELECT * FROM testTable WHERE strcmp(strColumn1,trim(strColumn2)) = 0", TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
+
     // 'WHERE strColumn1>strColumn2' gets replaced with 'strcmp(strColumn1, strColumn2) > 0'
     TestHelper.assertEqualsQuery("SELECT * FROM testTable WHERE strColumn1>strColumn2",
         "SELECT * FROM testTable WHERE strcmp(strColumn1,strColumn2) > 0", TABLE_CONFIG_WITHOUT_INDEX, SCHEMA);
