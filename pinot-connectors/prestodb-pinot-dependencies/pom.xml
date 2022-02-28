@@ -19,29 +19,55 @@
     under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
+
   <parent>
-    <artifactId>pinot-input-format</artifactId>
+    <artifactId>pinot-connectors</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>0.10.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
 
-  <artifactId>pinot-avro</artifactId>
-  <name>Pinot Avro</name>
+  <artifactId>prestodb-pinot-dependencies</artifactId>
+  <packaging>pom</packaging>
+  <name>PrestoDB Pinot Dependencies</name>
   <url>https://pinot.apache.org/</url>
   <properties>
-    <pinot.root>${basedir}/../../..</pinot.root>
-    <phase.prop>package</phase.prop>
+    <pinot.root>${basedir}/../..</pinot.root>
+    <jdk.version>8</jdk.version>
   </properties>
 
-  <dependencies>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-avro-base</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-  </dependencies>
+  <modules>
+    <module>pinot-spi-jdk8</module>
+    <module>pinot-common-jdk8</module>
+    <module>pinot-core-jdk8</module>
+    <module>pinot-segment-spi-jdk8</module>
+    <module>pinot-segment-local-jdk8</module>
+  </modules>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <configuration>
+            <skipMain>true</skipMain>
+            <skip>true</skip>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <configuration>
+            <forkCount>1</forkCount>
+            <reuseForks>true</reuseForks>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+
 </project>
