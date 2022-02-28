@@ -20,7 +20,7 @@
 import { AxiosResponse } from 'axios';
 import { TableData, Instances, Instance, Tenants, ClusterConfig, TableName, TableSize,
   IdealState, QueryTables, TableSchema, SQLResult, ClusterName, ZKGetList, ZKConfig, OperationResponse,
-  BrokerList, ServerList
+  BrokerList, ServerList, UserList, TableList, UserObject
 } from 'Models';
 
 const headers = {
@@ -173,3 +173,18 @@ export const authenticateUser = (authToken): Promise<AxiosResponse<OperationResp
 
 export const getSegmentDebugInfo = (tableName: string, tableType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`debug/tables/${tableName}?type=${tableType}&verbosity=10`);
+
+export const requestTable = (): Promise<AxiosResponse<TableList>> =>
+    baseApi.get(`/tables`);
+
+export const requestUserList = (): Promise<AxiosResponse<UserList>> =>
+    baseApi.get(`/users`);
+
+export const requestAddUser = (userObject: UserObject): Promise<AxiosResponse<any>> =>
+    baseApi.post('/users', JSON.stringify(userObject), {headers});
+
+export const requestDeleteUser = (userObject: UserObject): Promise<AxiosResponse<any>> =>
+    baseApi.delete(`/users/${userObject.username}?component=${userObject.component}`);
+
+export const requestUpdateUser = (userObject: UserObject, passwordChanged: boolean): Promise<AxiosResponse<any>> =>
+    baseApi.put(`/users/${userObject.username}?component=${userObject.component}&passwordChanged=${passwordChanged}`, JSON.stringify(userObject), {headers});

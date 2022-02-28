@@ -16,15 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.controller.api.exception;
 
- import { AuthWorkflow } from "Models";
-class app_state {
-  queryConsoleOnlyView: boolean;
-  authWorkflow: AuthWorkflow;
-  authToken: string | null;
-  columnNameSeparator: string = '#$%';
-  username: string;
-  role: string;
+public class UserAlreadyExistsException extends RuntimeException {
+    public UserAlreadyExistsException(String message) {
+        super(message);
+    }
+
+    public UserAlreadyExistsException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }
-
-export default new app_state();

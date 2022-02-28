@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.access;
 
+import org.apache.helix.HelixManager;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -29,6 +30,19 @@ public interface AccessControlFactory {
 
   default void init(PinotConfiguration configuration) {
   };
+
+  /**
+   * Extend the original init method to support Zookeeper BasicAuthAccessControlFactory.
+   * Because ZKBasicAuthAccessControlFactory needs to acquire users' info from HelixPropertyStore.
+   * The reason why passed helixManager param other than HelixPropertyStore is that
+   * HelixManager variable hasn't connected to Real Helix manager when invoke init method.
+   *
+   * @param configuration pinot configuration
+   * @param helixManager Helix Manager
+   */
+  default void init(PinotConfiguration configuration, HelixManager helixManager) {
+    init(configuration);
+  }
 
   AccessControl create();
 }

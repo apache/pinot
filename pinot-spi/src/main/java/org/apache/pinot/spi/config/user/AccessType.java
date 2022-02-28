@@ -16,15 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.spi.config.user;
 
- import { AuthWorkflow } from "Models";
-class app_state {
-  queryConsoleOnlyView: boolean;
-  authWorkflow: AuthWorkflow;
-  authToken: string | null;
-  columnNameSeparator: string = '#$%';
-  username: string;
-  role: string;
+public enum AccessType {
+    CREATE, READ, UPDATE, DELETE
 }
-
-export default new app_state();
