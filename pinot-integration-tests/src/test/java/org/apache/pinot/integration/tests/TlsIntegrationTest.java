@@ -68,19 +68,19 @@ import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_TOKEN;
 
 
 public class TlsIntegrationTest extends BaseClusterIntegrationTest {
-  private static final String PASSWORD = "changeit";
-  private static final char[] PASSWORD_CHAR = PASSWORD.toCharArray();
-  private static final Header CLIENT_HEADER = new BasicHeader("Authorization", AUTH_TOKEN);
+  protected static final String PASSWORD = "changeit";
+  protected static final char[] PASSWORD_CHAR = PASSWORD.toCharArray();
+  protected static final Header CLIENT_HEADER = new BasicHeader("Authorization", AUTH_TOKEN);
 
-  private static final int EXTERNAL_CONTROLLER_PORT = DEFAULT_CONTROLLER_PORT + 1;
-  private static final int EXTERNAL_BROKER_PORT = DEFAULT_BROKER_PORT + 1;
-  private static final String PKCS_12 = "PKCS12";
-  private static final String JKS = "JKS";
+  protected static final int EXTERNAL_CONTROLLER_PORT = DEFAULT_CONTROLLER_PORT + 1;
+  protected static final int EXTERNAL_BROKER_PORT = DEFAULT_BROKER_PORT + 1;
+  protected static final String PKCS_12 = "PKCS12";
+  protected static final String JKS = "JKS";
 
-  private final URL _tlsStoreEmptyPKCS12 = TlsIntegrationTest.class.getResource("/empty.p12");
-  private final URL _tlsStoreEmptyJKS = TlsIntegrationTest.class.getResource("/empty.jks");
-  private final URL _tlsStorePKCS12 = TlsIntegrationTest.class.getResource("/tlstest.p12");
-  private final URL _tlsStoreJKS = TlsIntegrationTest.class.getResource("/tlstest.jks");
+  protected final URL _tlsStoreEmptyPKCS12 = TlsIntegrationTest.class.getResource("/empty.p12");
+  protected final URL _tlsStoreEmptyJKS = TlsIntegrationTest.class.getResource("/empty.jks");
+  protected final URL _tlsStorePKCS12 = TlsIntegrationTest.class.getResource("/tlstest.p12");
+  protected final URL _tlsStoreJKS = TlsIntegrationTest.class.getResource("/tlstest.jks");
 
   @BeforeClass
   public void setUp()
@@ -106,6 +106,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
 
     // Push data into Kafka
     pushAvroIntoKafka(avroFiles);
+    Thread.sleep(10_000L);
     waitForAllDocsLoaded(600_000L);
   }
 
@@ -377,7 +378,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
       try (CloseableHttpResponse response = client.execute(makeQueryBroker(EXTERNAL_BROKER_PORT))) {
         Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
         JsonNode resultTable = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("resultTable");
-        Assert.assertTrue(resultTable.get("rows").get(0).get(0).longValue() > 100000);
+        verifyRows(resultTable);
       }
     }
   }
@@ -402,7 +403,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
       try (CloseableHttpResponse response = client.execute(makeQueryBroker(DEFAULT_BROKER_PORT))) {
         Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
         JsonNode resultTable = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("resultTable");
-        Assert.assertTrue(resultTable.get("rows").get(0).get(0).longValue() > 100000);
+        verifyRows(resultTable);
       }
     }
   }
@@ -439,12 +440,12 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     try (CloseableHttpClient client = makeClient(JKS, _tlsStoreJKS, _tlsStoreJKS)) {
       HttpPost request = new HttpPost("https://localhost:" + EXTERNAL_CONTROLLER_PORT + "/sql");
       request.addHeader(CLIENT_HEADER);
-      request.setEntity(new StringEntity("{\"sql\":\"SELECT count(*) FROM mytable\"}"));
+      request.setEntity(new StringEntity("{\"sql\":\"" + getCountQueryString() + "\"}"));
 
       try (CloseableHttpResponse response = client.execute(request)) {
         Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
         JsonNode resultTable = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("resultTable");
-        Assert.assertTrue(resultTable.get("rows").get(0).get(0).longValue() > 100000);
+        verifyRows(resultTable);
       }
     }
   }
@@ -452,10 +453,10 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testRealtimeSegmentUploadDownload()
       throws Exception {
-    final Request query = new Request("sql", "SELECT count(*) FROM " + getTableName());
+    final Request query = new Request("sql", getCountQueryString());
 
     ResultSetGroup resultBeforeOffline = getPinotConnection().execute(query);
-    Assert.assertTrue(resultBeforeOffline.getResultSet(0).getLong(0) > 0);
+    verifyRows(resultBeforeOffline);
 
     // schedule offline segment generation
     Assert.assertNotNull(_controllerStarter.getTaskManager().scheduleTasks());
@@ -469,7 +470,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
               .map(s -> s.get("OFFLINE")).findFirst().get();
       Assert.assertFalse(currentOfflineSegments.isEmpty());
       return currentOfflineSegments;
-    }, 30000);
+    }, 60000);
 
     // Verify constant row count
     ResultSetGroup resultAfterOffline = getPinotConnection().execute(query);
@@ -484,7 +485,22 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
-  private static CloseableHttpClient makeClient(String keyStoreType, URL keyStoreUrl, URL trustStoreUrl) {
+  // The gRPC request handler may not support aggregation yet, so the derived tests may need other query
+  protected String getCountQueryString() {
+    return "SELECT count(*) FROM " + getTableName();
+  }
+
+  // The gRPC request handler may not support aggregation yet, so the derived tests may need other ways to verify
+  protected void verifyRows(JsonNode resultTable) {
+    Assert.assertTrue(resultTable.get("rows").get(0).get(0).longValue() > 100000);
+  }
+
+  // The gRPC request handler may not support aggregation yet, so the derived tests may need other ways to verify
+  protected void verifyRows(ResultSetGroup resultSetGroup) {
+    Assert.assertTrue(resultSetGroup.getResultSet(0).getLong(0) > 0);
+  }
+
+  protected static CloseableHttpClient makeClient(String keyStoreType, URL keyStoreUrl, URL trustStoreUrl) {
     try {
       SSLContextBuilder sslContextBuilder = SSLContextBuilder.create();
       sslContextBuilder.setKeyStoreType(keyStoreType);
@@ -496,17 +512,17 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
-  private static HttpGet makeGetTables(int port) {
+  protected static HttpGet makeGetTables(int port) {
     HttpGet request = new HttpGet("https://localhost:" + port + "/tables");
     request.addHeader(CLIENT_HEADER);
     return request;
   }
 
-  private static HttpPost makeQueryBroker(int port)
+  protected HttpPost makeQueryBroker(int port)
       throws UnsupportedEncodingException {
     HttpPost request = new HttpPost("https://localhost:" + port + "/query/sql");
     request.addHeader(CLIENT_HEADER);
-    request.setEntity(new StringEntity("{\"sql\":\"SELECT count(*) FROM mytable\"}"));
+    request.setEntity(new StringEntity("{\"sql\":\"" + getCountQueryString() + "\"}"));
     return request;
   }
 

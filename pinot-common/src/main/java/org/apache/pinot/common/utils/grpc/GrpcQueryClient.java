@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils.grpc;
 
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
@@ -91,6 +92,8 @@ public class GrpcQueryClient {
     public static final String GRPC_TLS_PREFIX = "tls";
     public static final String CONFIG_USE_PLAIN_TEXT = "usePlainText";
     public static final String CONFIG_MAX_INBOUND_MESSAGE_BYTES_SIZE = "maxInboundMessageSizeBytes";
+    public static final String DEFAULT_NAMESPACE = "";
+    private static final String DEFAULT_USE_PLAIN_TEXT = "true";
     // Default max message size to 128MB
     public static final int DEFAULT_MAX_INBOUND_MESSAGE_BYTES_SIZE = 128 * 1024 * 1024;
 
@@ -98,6 +101,7 @@ public class GrpcQueryClient {
     private final boolean _usePlainText;
     private final TlsConfig _tlsConfig;
     private final PinotConfiguration _pinotConfig;
+    private final String _namespace;
 
     public Config() {
       this(DEFAULT_MAX_INBOUND_MESSAGE_BYTES_SIZE, true);
@@ -109,11 +113,33 @@ public class GrpcQueryClient {
     }
 
     public Config(Map<String, Object> configMap) {
+      this(configMap, DEFAULT_NAMESPACE);
+    }
+
+    public Config(Map<String, Object> configMap, String namespace) {
+      this(configMap, namespace, null);
+    }
+
+    public Config(Map<String, Object> configMap, TlsConfig tlsConfig) {
+      this(configMap, DEFAULT_NAMESPACE, tlsConfig);
+    }
+
+    public Config(Map<String, Object> configMap, String namespace, TlsConfig tlsConfig) {
+      _namespace = namespace;
       _pinotConfig = new PinotConfiguration(configMap);
       _maxInboundMessageSizeBytes =
-          _pinotConfig.getProperty(CONFIG_MAX_INBOUND_MESSAGE_BYTES_SIZE, DEFAULT_MAX_INBOUND_MESSAGE_BYTES_SIZE);
-      _usePlainText = Boolean.valueOf(configMap.get(CONFIG_USE_PLAIN_TEXT).toString());
-      _tlsConfig = TlsUtils.extractTlsConfig(_pinotConfig, GRPC_TLS_PREFIX);
+          _pinotConfig.getProperty(withNamespace(CONFIG_MAX_INBOUND_MESSAGE_BYTES_SIZE),
+              DEFAULT_MAX_INBOUND_MESSAGE_BYTES_SIZE);
+      if (configMap.containsKey(withNamespace(CONFIG_USE_PLAIN_TEXT))) {
+        _usePlainText = Boolean.parseBoolean(configMap.get(withNamespace(CONFIG_USE_PLAIN_TEXT)).toString());
+      } else {
+        _usePlainText = tlsConfig == null;
+      }
+      if (tlsConfig == null) {
+        _tlsConfig = TlsUtils.extractTlsConfig(_pinotConfig, withNamespace(GRPC_TLS_PREFIX));
+      } else {
+        _tlsConfig = tlsConfig;
+      }
     }
 
     // Allow get customized configs.
@@ -135,6 +161,10 @@ public class GrpcQueryClient {
 
     public PinotConfiguration getPinotConfig() {
       return _pinotConfig;
+    }
+
+    private String withNamespace(String configKey) {
+      return Strings.isNullOrEmpty(_namespace) ? configKey : _namespace + "." + configKey;
     }
   }
 }

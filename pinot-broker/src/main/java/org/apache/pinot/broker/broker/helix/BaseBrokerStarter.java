@@ -245,19 +245,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         .equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
       LOGGER.info("Starting Grpc BrokerRequestHandler.");
       _brokerRequestHandler =
-          new GrpcBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory, queryQuotaManager,
-              tableCache, _brokerMetrics, null);
+          new GrpcBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
+              queryQuotaManager, tableCache, _brokerMetrics, tlsDefaults);
     } else { // default request handler type, e.g. netty
       LOGGER.info("Starting Netty BrokerRequestHandler.");
-      if (_brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false)) {
-        _brokerRequestHandler =
-            new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
-                queryQuotaManager, tableCache, _brokerMetrics, nettyDefaults, tlsDefaults);
-      } else {
-        _brokerRequestHandler =
-            new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
-                queryQuotaManager, tableCache, _brokerMetrics, nettyDefaults, null);
-      }
+      _brokerRequestHandler =
+          new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
+              queryQuotaManager, tableCache, _brokerMetrics, tlsDefaults);
     }
 
     LOGGER.info("Starting broker admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));

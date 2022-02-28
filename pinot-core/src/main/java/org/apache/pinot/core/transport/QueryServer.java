@@ -45,6 +45,8 @@ import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.util.OsCheck;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AllowAllAccessFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -52,6 +54,7 @@ import org.apache.pinot.server.access.AllowAllAccessFactory;
  * Brokers.
  */
 public class QueryServer {
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryServer.class);
   private final int _port;
   private final QueryScheduler _queryScheduler;
   private final ServerMetrics _serverMetrics;
@@ -84,7 +87,7 @@ public class QueryServer {
    * @param serverMetrics server metrics
    * @param nettyConfig configurations for netty library
    * @param tlsConfig TLS/SSL config
-   * @param accessControlFactory access control factory for netty channel
+   * @param accessControl access control factory for netty channel
    */
   public QueryServer(int port, QueryScheduler queryScheduler, ServerMetrics serverMetrics, NettyConfig nettyConfig,
       TlsConfig tlsConfig,
@@ -129,6 +132,7 @@ public class QueryServer {
                       new InstanceRequestHandler(_queryScheduler, _serverMetrics, _accessControl));
             }
           }).bind(_port).sync().channel();
+      LOGGER.info("Binding QueryServer to port {}, NioServerSocketChannel, plain text: {}", _port, _tlsConfig == null);
     } catch (Exception e) {
       // Shut down immediately
       _workerGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
@@ -154,7 +158,7 @@ public class QueryServer {
       if (_tlsConfig.isClientAuthEnabled()) {
         sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
       }
-
+      LOGGER.info("Attaching SSL Handler with config {}", _tlsConfig);
       ch.pipeline().addLast("ssl", sslContextBuilder.build().newHandler(ch.alloc()));
     } catch (Exception e) {
       throw new RuntimeException(e);

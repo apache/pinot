@@ -152,7 +152,6 @@ public abstract class ClusterTest extends ControllerTest {
     properties.put(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     properties.put(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
     properties.put(Broker.CONFIG_OF_BROKER_HOSTNAME, LOCAL_HOST);
-
     PinotConfiguration configuration = new PinotConfiguration(properties);
     overrideBrokerConf(configuration);
 
