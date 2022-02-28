@@ -29,6 +29,7 @@ import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
+import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -132,6 +133,12 @@ public class StringPredicateFilterOptimizer implements StatementOptimizer {
     Method[] methods = StringFunctions.class.getDeclaredMethods();
     for (Method method : methods) {
       if (method.getReturnType() == String.class) {
+        if (method.isAnnotationPresent(ScalarFunction.class)) {
+          ScalarFunction annotation = method.getAnnotation(ScalarFunction.class);
+          for (String name : annotation.names()) {
+            set.add(name.toUpperCase());
+          }
+        }
         set.add(method.getName().toUpperCase());
       }
     }
