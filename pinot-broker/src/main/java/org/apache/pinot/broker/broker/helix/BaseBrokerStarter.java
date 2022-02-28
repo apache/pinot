@@ -43,6 +43,7 @@ import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManage
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.GrpcBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.WorkerQueryRequestHandler;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.NettyConfig;
@@ -251,8 +252,17 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_TLS_PREFIX);
     NettyConfig nettyDefaults = NettyConfig.extractNettyConfig(_brokerConf, Broker.BROKER_NETTY_PREFIX);
 
-    if (_brokerConf.getProperty(Broker.BROKER_REQUEST_HANDLER_TYPE, Broker.DEFAULT_BROKER_REQUEST_HANDLER_TYPE)
-        .equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
+    String brokerRequestHandlerType =
+        _brokerConf.getProperty(Broker.BROKER_REQUEST_HANDLER_TYPE, Broker.DEFAULT_BROKER_REQUEST_HANDLER_TYPE);
+    if (brokerRequestHandlerType.equalsIgnoreCase(Broker.MULTI_STAGE_BROKER_REQUEST_HANDLER_TYPE)) {
+      LOGGER.info("Starting Multi-stage BrokerRequestHandler.");
+      // multi-stage request handler uses both Netty and GRPC ports.
+      // worker requires both the "Netty port" for protocol transport; and "GRPC port" for mailbox transport.
+      // TODO: decouple protocol and engine selection.
+      _brokerRequestHandler =
+          new WorkerQueryRequestHandler(_brokerConf, _routingManager, _accessControlFactory, queryQuotaManager,
+              tableCache, _brokerMetrics, null);
+    } else if (brokerRequestHandlerType.equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
       LOGGER.info("Starting Grpc BrokerRequestHandler.");
       _brokerRequestHandler =
           new GrpcBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory, queryQuotaManager,

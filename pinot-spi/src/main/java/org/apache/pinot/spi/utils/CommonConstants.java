@@ -221,6 +221,7 @@ public class CommonConstants {
     public static final String BROKER_REQUEST_HANDLER_TYPE = "pinot.broker.request.handler.type";
     public static final String NETTY_BROKER_REQUEST_HANDLER_TYPE = "netty";
     public static final String GRPC_BROKER_REQUEST_HANDLER_TYPE = "grpc";
+    public static final String MULTI_STAGE_BROKER_REQUEST_HANDLER_TYPE = "multi_stage";
     public static final String DEFAULT_BROKER_REQUEST_HANDLER_TYPE = NETTY_BROKER_REQUEST_HANDLER_TYPE;
 
     public static final String BROKER_TLS_PREFIX = "pinot.broker.tls";
@@ -320,6 +321,9 @@ public class CommonConstants {
     public static final boolean DEFAULT_SWAGGER_SERVER_ENABLED = true;
     public static final String CONFIG_OF_ADMIN_API_PORT = "pinot.server.adminapi.port";
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
+
+    public static final String CONFIG_OF_MULTI_STAGE_SERVER_ENABLED = "pinot.server.multi_stage.enabled";
+    public static final boolean DEFAULT_MULTI_STAGE_SERVER_ENABLED = false;
 
     public static final String CONFIG_OF_SEGMENT_FORMAT_VERSION = "pinot.server.instance.segment.format.version";
     public static final String CONFIG_OF_ENABLE_SPLIT_COMMIT = "pinot.server.instance.enable.split.commit";

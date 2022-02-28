@@ -39,6 +39,7 @@ import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.conf.ServerConf;
+import org.apache.pinot.server.worker.WorkerQueryServer;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -62,6 +63,8 @@ public class ServerInstance {
   private final QueryServer _nettyTlsQueryServer;
   private final GrpcQueryServer _grpcQueryServer;
   private final AccessControl _accessControl;
+
+  private final WorkerQueryServer _workerQueryServer;
 
   private boolean _started = false;
 
@@ -102,30 +105,42 @@ public class ServerInstance {
       serverConf.getPinotConfig().subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_ACCESS_CONTROL), helixManager);
     _accessControl = accessControlFactory.create();
 
-    if (serverConf.isNettyServerEnabled()) {
-      int nettyPort = serverConf.getNettyPort();
-      LOGGER.info("Initializing Netty query server on port: {}", nettyPort);
-      _nettyQueryServer = new QueryServer(nettyPort, _queryScheduler, _serverMetrics, nettyConfig);
-    } else {
+    if (serverConf.isMultiStageServerEnabled()) {
+      // WorkerQueryServer initialization
+      // because worker requires both the "Netty port" for protocol transport; and "GRPC port" for mailbox transport,
+      // we can't enable any of the other 2 servers
+      // TODO: decouple server protocol and engine type.
+      _workerQueryServer = new WorkerQueryServer(serverConf.getPinotConfig(), _instanceDataManager, _serverMetrics);
       _nettyQueryServer = null;
-    }
-
-    if (serverConf.isNettyTlsServerEnabled()) {
-      int nettySecPort = serverConf.getNettyTlsPort();
-      LOGGER.info("Initializing TLS-secured Netty query server on port: {}", nettySecPort);
-      _nettyTlsQueryServer =
-          new QueryServer(nettySecPort, _queryScheduler, _serverMetrics, nettyConfig, tlsConfig, _accessControl);
-    } else {
       _nettyTlsQueryServer = null;
-    }
-    if (serverConf.isEnableGrpcServer()) {
-      int grpcPort = serverConf.getGrpcPort();
-      LOGGER.info("Initializing gRPC query server on port: {}", grpcPort);
-      _grpcQueryServer = new GrpcQueryServer(grpcPort,
-          serverConf.isGrpcTlsServerEnabled() ? TlsUtils.extractTlsConfig(serverConf.getPinotConfig(),
-              CommonConstants.Server.SERVER_GRPCTLS_PREFIX) : null, _queryExecutor, _serverMetrics, _accessControl);
-    } else {
       _grpcQueryServer = null;
+    } else {
+      _workerQueryServer = null;
+      if (serverConf.isNettyServerEnabled()) {
+        int nettyPort = serverConf.getNettyPort();
+        LOGGER.info("Initializing Netty query server on port: {}", nettyPort);
+        _nettyQueryServer = new QueryServer(nettyPort, _queryScheduler, _serverMetrics, nettyConfig);
+      } else {
+        _nettyQueryServer = null;
+      }
+
+      if (serverConf.isNettyTlsServerEnabled()) {
+        int nettySecPort = serverConf.getNettyTlsPort();
+        LOGGER.info("Initializing TLS-secured Netty query server on port: {}", nettySecPort);
+        _nettyTlsQueryServer =
+            new QueryServer(nettySecPort, _queryScheduler, _serverMetrics, nettyConfig, tlsConfig, _accessControl);
+      } else {
+        _nettyTlsQueryServer = null;
+      }
+      if (serverConf.isEnableGrpcServer()) {
+        int grpcPort = serverConf.getGrpcPort();
+        LOGGER.info("Initializing gRPC query server on port: {}", grpcPort);
+        _grpcQueryServer = new GrpcQueryServer(grpcPort,
+            serverConf.isGrpcTlsServerEnabled() ? TlsUtils.extractTlsConfig(serverConf.getPinotConfig(),
+                CommonConstants.Server.SERVER_GRPCTLS_PREFIX) : null, _queryExecutor, _serverMetrics, _accessControl);
+      } else {
+        _grpcQueryServer = null;
+      }
     }
 
     LOGGER.info("Initializing transform functions");
@@ -171,6 +186,10 @@ public class ServerInstance {
       LOGGER.info("Starting gRPC query server");
       _grpcQueryServer.start();
     }
+    if (_workerQueryServer != null) {
+      LOGGER.info("Starting worker query server");
+      _workerQueryServer.start();
+    }
 
     _started = true;
     LOGGER.info("Finish starting server instance");
@@ -195,6 +214,10 @@ public class ServerInstance {
     if (_nettyQueryServer != null) {
       LOGGER.info("Shutting down Netty query server");
       _nettyQueryServer.shutDown();
+    }
+    if (_workerQueryServer != null) {
+      LOGGER.info("Shutting down worker query server");
+      _workerQueryServer.shutDown();
     }
     LOGGER.info("Shutting down query scheduler");
     _queryScheduler.stop();

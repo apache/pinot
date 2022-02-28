@@ -1612,7 +1612,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       RequestContext requestContext)
       throws Exception;
 
-  private static void augmentStatistics(RequestContext statistics, BrokerResponse response) {
+  protected static void augmentStatistics(RequestContext statistics, BrokerResponse response) {
     statistics.setTotalDocs(response.getTotalDocs());
     statistics.setNumDocsScanned(response.getNumDocsScanned());
     statistics.setNumEntriesScannedInFilter(response.getNumEntriesScannedInFilter());
