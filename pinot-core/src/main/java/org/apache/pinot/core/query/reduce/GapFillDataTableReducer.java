@@ -22,14 +22,11 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
@@ -39,7 +36,6 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
-import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -82,6 +78,7 @@ public class GapFillDataTableReducer implements DataTableReducer {
   private final long _startMs;
   private final long _endMs;
   private final long _timeBucketSize;
+  private final int _numOfTimeBuckets;
   private final List<Integer> _groupByKeyIndexes;
   private final Set<Key> _groupByKeys;
   private final Map<Key, Object[]> _previousByGroupKey;
@@ -113,6 +110,7 @@ public class GapFillDataTableReducer implements DataTableReducer {
     String end = args.get(3).getLiteral();
     _endMs = truncate(_dateTimeFormatter.fromFormatToMillis(end));
     _timeBucketSize = _dateTimeGranularity.granularityToMillis();
+    _numOfTimeBuckets = (int) ((_endMs - _startMs) / _timeBucketSize);
 
     _fillExpressions = GapfillUtils.getFillExpressions(gapFillSelection);
 
@@ -122,6 +120,10 @@ public class GapFillDataTableReducer implements DataTableReducer {
 
     ExpressionContext timeseriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);
     _timeSeries = timeseriesOn.getFunction().getArguments();
+  }
+
+  private int findBucketIndex(long time) {
+    return (int) ((time - _startMs) / _timeBucketSize);
   }
 
   private void replaceColumnNameWithAlias(DataSchema dataSchema) {
@@ -289,21 +291,6 @@ public class GapFillDataTableReducer implements DataTableReducer {
     return indexedTable;
   }
 
-  private List<OrderByExpressionContext> getOrderByExpressions() {
-    if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL) {
-      // one sql query with gapfill only
-      return _queryContext.getOrderByExpressions();
-    } else if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT
-        || _gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE
-        || _gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL) {
-      // gapfill as subquery, the outer query may have the filter
-      return _queryContext.getSubQueryContext().getOrderByExpressions();
-    } else { //AGGREGATE_GAP_FILL_AGGREGATE
-      // aggegration as second nesting subquery, gapfill as fist nesting subquery, different aggregation as outer query
-      return _queryContext.getSubQueryContext().getSubQueryContext().getOrderByExpressions();
-    }
-  }
-
   /**
    * Here are three things that happen
    * 1. Sort the result sets from all pinot servers based on timestamp
@@ -336,15 +323,14 @@ public class GapFillDataTableReducer implements DataTableReducer {
       _groupByKeyIndexes.add(index);
     }
 
-    List<Object[]> sortedRawRows;
-    List<OrderByExpressionContext> orderByExpressionContexts = getOrderByExpressions();
+    List<Object[]>[] timeBucketedRawRows;
     if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE || _gapfillType == GapfillUtils.GapfillType.GAP_FILL
         || _gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
-      sortedRawRows = mergeAndSort(dataTableMap.values(), dataSchema, orderByExpressionContexts);
+      timeBucketedRawRows = putRawRowsIntoTimeBucket(dataTableMap.values());
     } else {
       try {
         IndexedTable indexedTable = getIndexedTable(dataSchema, dataTableMap.values(), reducerContext);
-        sortedRawRows = mergeAndSort(indexedTable, dataSchema, orderByExpressionContexts);
+        timeBucketedRawRows = putRawRowsIntoTimeBucket(indexedTable);
       } catch (TimeoutException e) {
         brokerResponseNative.getProcessingExceptions()
             .add(new QueryProcessingException(QueryException.BROKER_TIMEOUT_ERROR_CODE, e.getMessage()));
@@ -356,7 +342,7 @@ public class GapFillDataTableReducer implements DataTableReducer {
 
     if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE || _gapfillType == GapfillUtils.GapfillType.GAP_FILL
         || _gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
-      List<Object[]> gapfilledRows = gapFillAndAggregate(sortedRawRows, resultTableSchema, dataSchema);
+      List<Object[]> gapfilledRows = gapFillAndAggregate(timeBucketedRawRows, resultTableSchema, dataSchema);
       if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
         List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(_queryContext, dataSchema);
         resultRows = new ArrayList<>(gapfilledRows.size());
@@ -389,13 +375,18 @@ public class GapFillDataTableReducer implements DataTableReducer {
     } else {
       this.setupColumnTypeForAggregatedColum(dataSchema.getColumnDataTypes());
       ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
-      for (Object[] row : sortedRawRows) {
-        extractFinalAggregationResults(row);
-        for (int i = 0; i < columnDataTypes.length; i++) {
-          row[i] = columnDataTypes[i].convert(row[i]);
+      for (List<Object[]> rawRowsForTimeBucket : timeBucketedRawRows) {
+        if (rawRowsForTimeBucket == null) {
+          continue;
+        }
+        for (Object[] row : rawRowsForTimeBucket) {
+          extractFinalAggregationResults(row);
+          for (int i = 0; i < columnDataTypes.length; i++) {
+            row[i] = columnDataTypes[i].convert(row[i]);
+          }
         }
       }
-      resultRows = gapFillAndAggregate(sortedRawRows, resultTableSchema, dataSchema);
+      resultRows = gapFillAndAggregate(timeBucketedRawRows, resultTableSchema, dataSchema);
     }
     brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, resultRows));
   }
@@ -470,8 +461,8 @@ public class GapFillDataTableReducer implements DataTableReducer {
     return epoch / sz * sz;
   }
 
-  private List<Object[]> gapFillAndAggregate(List<Object[]> sortedRows, DataSchema dataSchemaForAggregatedResult,
-      DataSchema dataSchema) {
+  private List<Object[]> gapFillAndAggregate(List<Object[]>[] timeBucketedRawRows,
+      DataSchema dataSchemaForAggregatedResult, DataSchema dataSchema) {
     List<Object[]> result = new ArrayList<>();
 
     GapfillFilterHandler postGapfillFilterHandler = null;
@@ -483,11 +474,9 @@ public class GapFillDataTableReducer implements DataTableReducer {
       postAggregateHavingFilterHandler =
           new GapfillFilterHandler(_queryContext.getHavingFilter(), dataSchemaForAggregatedResult);
     }
-    Object[] previous = null;
-    Iterator<Object[]> sortedIterator = sortedRows.iterator();
     for (long time = _startMs; time < _endMs; time += _timeBucketSize) {
-      List<Object[]> bucketedResult = new ArrayList<>();
-      previous = gapfill(time, bucketedResult, sortedIterator, previous, dataSchema, postGapfillFilterHandler);
+      int index = findBucketIndex(time);
+      List<Object[]> bucketedResult = gapfill(time, timeBucketedRawRows[index], dataSchema, postGapfillFilterHandler);
       if (_queryContext.getAggregationFunctions() == null) {
         result.addAll(bucketedResult);
       } else if (bucketedResult.size() > 0) {
@@ -505,42 +494,36 @@ public class GapFillDataTableReducer implements DataTableReducer {
     return result;
   }
 
-  private Object[] gapfill(long bucketTime, List<Object[]> bucketedResult, Iterator<Object[]> sortedIterator,
-      Object[] previous, DataSchema dataSchema, GapfillFilterHandler postGapfillFilterHandler) {
+  private List<Object[]> gapfill(long bucketTime, List<Object[]> rawRowsForBucket, DataSchema dataSchema,
+      GapfillFilterHandler postGapfillFilterHandler) {
+    List<Object[]> bucketedResult = new ArrayList<>();
     ColumnDataType[] resultColumnDataTypes = dataSchema.getColumnDataTypes();
     int numResultColumns = resultColumnDataTypes.length;
     Set<Key> keys = new HashSet<>(_groupByKeys);
-    if (previous == null && sortedIterator.hasNext()) {
-      previous = sortedIterator.next();
-    }
 
-    while (previous != null) {
-      Object[] resultRow = previous;
-      for (int i = 0; i < resultColumnDataTypes.length; i++) {
-        resultRow[i] = resultColumnDataTypes[i].format(resultRow[i]);
-      }
-
-      long timeCol = _dateTimeFormatter.fromFormatToMillis(String.valueOf(resultRow[0]));
-      if (timeCol > bucketTime) {
-        break;
-      }
-      if (timeCol == bucketTime) {
-        if (postGapfillFilterHandler == null || postGapfillFilterHandler.isMatch(previous)) {
-          if (bucketedResult.size() >= _limitForGapfilledResult) {
-            _limitForGapfilledResult = 0;
-            break;
-          } else {
-            bucketedResult.add(resultRow);
-          }
+    if (rawRowsForBucket != null) {
+      for (Object[] resultRow : rawRowsForBucket) {
+        for (int i = 0; i < resultColumnDataTypes.length; i++) {
+          resultRow[i] = resultColumnDataTypes[i].format(resultRow[i]);
         }
-        Key key = constructGroupKeys(resultRow);
-        keys.remove(key);
-        _previousByGroupKey.put(key, resultRow);
-      }
-      if (sortedIterator.hasNext()) {
-        previous = sortedIterator.next();
-      } else {
-        previous = null;
+
+        long timeCol = _dateTimeFormatter.fromFormatToMillis(String.valueOf(resultRow[0]));
+        if (timeCol > bucketTime) {
+          break;
+        }
+        if (timeCol == bucketTime) {
+          if (postGapfillFilterHandler == null || postGapfillFilterHandler.isMatch(resultRow)) {
+            if (bucketedResult.size() >= _limitForGapfilledResult) {
+              _limitForGapfilledResult = 0;
+              break;
+            } else {
+              bucketedResult.add(resultRow);
+            }
+          }
+          Key key = constructGroupKeys(resultRow);
+          keys.remove(key);
+          _previousByGroupKey.put(key, resultRow);
+        }
       }
     }
 
@@ -573,7 +556,7 @@ public class GapFillDataTableReducer implements DataTableReducer {
     } else {
       _limitForGapfilledResult = 0;
     }
-    return previous;
+    return bucketedResult;
   }
 
   private List<Object[]> aggregateGapfilledData(List<Object[]> bucketedRows, DataSchema dataSchema) {
@@ -664,128 +647,44 @@ public class GapFillDataTableReducer implements DataTableReducer {
   }
 
   /**
-   * Helper method to get the type-compatible {@link Comparator} for selection rows. (Inter segment)
-   * <p>Type-compatible comparator allows compatible types to compare with each other.
-   *
-   * @return flexible {@link Comparator} for selection rows.
-   */
-  private Comparator<Object[]> getTypeCompatibleComparator(List<OrderByExpressionContext> orderByExpressions,
-      DataSchema dataSchema) {
-    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
-
-    Map<String, Integer> indexes = new HashMap<>();
-    String[] columnNames = dataSchema.getColumnNames();
-    for (int i = 0; i < columnNames.length; i++) {
-      indexes.put(columnNames[i], i);
-    }
-
-    // Compare all single-value columns
-    int numOrderByExpressions = orderByExpressions == null ? 0 : orderByExpressions.size();
-    List<Integer> valueIndexList = new ArrayList<>(numOrderByExpressions);
-    for (int i = 0; i < numOrderByExpressions; i++) {
-      OrderByExpressionContext orderByExpressionContext = orderByExpressions.get(i);
-      ExpressionContext expressionContext = orderByExpressionContext.getExpression();
-      int index = indexes.get(expressionContext.toString());
-      if (!columnDataTypes[index].isArray()) {
-        valueIndexList.add(indexes.get(expressionContext.toString()));
-      }
-    }
-
-    int numValuesToCompare = valueIndexList.size();
-    int[] valueIndices = new int[numValuesToCompare];
-    boolean[] isNumber = new boolean[numValuesToCompare];
-    // Use multiplier -1 or 1 to control ascending/descending order
-    int[] multipliers = new int[numValuesToCompare];
-    for (int i = 0; i < numValuesToCompare; i++) {
-      int valueIndex = valueIndexList.get(i);
-      valueIndices[i] = valueIndex;
-      isNumber[i] = columnDataTypes[valueIndex].isNumber();
-      multipliers[i] = orderByExpressions.get(i).isAsc() ? 1 : -1;
-    }
-
-    return (o1, o2) -> {
-      int timeBucket = valueIndices.length == 0 ? 0 : valueIndices[0];
-      Object v1 = o1[timeBucket];
-      Object v2 = o2[timeBucket];
-      int result;
-      if (columnDataTypes[timeBucket].isNumber()) {
-        result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
-      } else {
-        long timeCol1 = _dateTimeFormatter.fromFormatToMillis(String.valueOf(v1));
-        long timeCol2 = _dateTimeFormatter.fromFormatToMillis(String.valueOf(v2));
-        if (timeCol1 < timeCol2) {
-          result = -1;
-        } else if (timeCol1 == timeCol2) {
-          result = 0;
-        } else {
-          result = 1;
-        }
-      }
-
-      if (result != 0) {
-        return result;
-      }
-
-      for (int i = 1; i < numValuesToCompare; i++) {
-        int index = valueIndices[i];
-        v1 = o1[index];
-        v2 = o2[index];
-        if (isNumber[i]) {
-          result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
-        } else {
-          //noinspection unchecked
-          result = ((Comparable) v1).compareTo(v2);
-        }
-        if (result != 0) {
-          return result * multipliers[i];
-        }
-      }
-      return 0;
-    };
-  }
-
-  /**
    * Merge all result tables from different pinot servers and sort the rows based on timebucket.
    */
-  private List<Object[]> mergeAndSort(Collection<DataTable> dataTables, DataSchema dataSchema,
-      List<OrderByExpressionContext> orderByExpressionContexts) {
-    PriorityQueue<Object[]> rows =
-        new PriorityQueue<>(Math.min(_limitForAggregatedResult, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
-            getTypeCompatibleComparator(orderByExpressionContexts, dataSchema));
+  private List<Object[]>[] putRawRowsIntoTimeBucket(Collection<DataTable> dataTables) {
+    List<Object[]>[] bucketedItems = new List[_numOfTimeBuckets];
 
     for (DataTable dataTable : dataTables) {
       int numRows = dataTable.getNumberOfRows();
       for (int rowId = 0; rowId < numRows; rowId++) {
         Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
-        rows.add(row);
+        String timeCol = row[0] instanceof Long ? ((Long) row[0]).toString() : (String) row[0];
+        long timeBucket = _dateTimeFormatter.fromFormatToMillis(timeCol);
+        int index = findBucketIndex(timeBucket);
+        if (bucketedItems[index] == null) {
+          bucketedItems[index] = new ArrayList<>();
+        }
+        bucketedItems[index].add(row);
+        _groupByKeys.add(constructGroupKeys(row));
       }
     }
-    LinkedList<Object[]> sortedRows = new LinkedList<>();
-    while (!rows.isEmpty()) {
-      Object[] row = rows.poll();
-      sortedRows.add(row);
-      _groupByKeys.add(constructGroupKeys(row));
-    }
-    return sortedRows;
+    return bucketedItems;
   }
 
-  private List<Object[]> mergeAndSort(IndexedTable indexedTable, DataSchema dataSchema,
-      List<OrderByExpressionContext> orderByExpressionContexts) {
-    PriorityQueue<Object[]> rows =
-        new PriorityQueue<>(Math.min(_limitForAggregatedResult, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
-            getTypeCompatibleComparator(orderByExpressionContexts, dataSchema));
+  private List<Object[]>[] putRawRowsIntoTimeBucket(IndexedTable indexedTable) {
+    List<Object[]>[] bucketedItems = new List[_numOfTimeBuckets];
 
     Iterator<Record> iterator = indexedTable.iterator();
     while (iterator.hasNext()) {
-      rows.add(iterator.next().getValues());
-    }
-
-    LinkedList<Object[]> sortedRows = new LinkedList<>();
-    while (!rows.isEmpty()) {
-      Object[] row = rows.poll();
-      sortedRows.add(row);
+      Object[] row = iterator.next().getValues();
+      String timeCol = row[0] instanceof Long ? ((Long) row[0]).toString() : (String) row[0];
+      long timeBucket = _dateTimeFormatter.fromFormatToMillis(timeCol);
+      int index = findBucketIndex(timeBucket);
+      if (bucketedItems[index] == null) {
+        bucketedItems[index] = new ArrayList<>();
+      }
+      bucketedItems[index].add(row);
       _groupByKeys.add(constructGroupKeys(row));
     }
-    return sortedRows;
+
+    return bucketedItems;
   }
 }
