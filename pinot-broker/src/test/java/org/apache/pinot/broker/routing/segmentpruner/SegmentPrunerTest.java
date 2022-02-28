@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
@@ -72,13 +74,15 @@ public class SegmentPrunerTest extends ControllerTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = "testTable_OFFLINE";
   private static final String REALTIME_TABLE_NAME = "testTable_REALTIME";
-  private static final String PARTITION_COLUMN = "memberId";
+  private static final String PARTITION_COLUMN_1 = "memberId";
+  private static final String PARTITION_COLUMN_2 = "memberName";
   private static final String TIME_COLUMN = "timeColumn";
   private static final String SDF_PATTERN = "yyyyMMdd";
 
   private static final String QUERY_1 = "SELECT * FROM testTable";
   private static final String QUERY_2 = "SELECT * FROM testTable where memberId = 0";
   private static final String QUERY_3 = "SELECT * FROM testTable where memberId IN (1, 2)";
+  private static final String QUERY_4 = "SELECT * FROM testTable where memberId = 0 AND memberName='xyz'";
 
   private static final String QUERY_5 = "SELECT * FROM testTable where timeColumn = 40";
   private static final String QUERY_6 = "SELECT * FROM testTable where timeColumn BETWEEN 20 AND 30";
@@ -148,18 +152,22 @@ public class SegmentPrunerTest extends ControllerTest {
     assertEquals(segmentPruners.size(), 0);
 
     // Partition-aware segment pruner should be returned
-    columnPartitionConfigMap.put(PARTITION_COLUMN, new ColumnPartitionConfig("Modulo", 5));
+    columnPartitionConfigMap.put(PARTITION_COLUMN_1, new ColumnPartitionConfig("Modulo", 5));
     segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
     assertEquals(segmentPruners.size(), 1);
     assertTrue(segmentPruners.get(0) instanceof PartitionSegmentPruner);
 
-    // Do not allow multiple partition columns
-    columnPartitionConfigMap.put("anotherPartitionColumn", new ColumnPartitionConfig("Modulo", 5));
+    // Multiple partition columns
+    columnPartitionConfigMap.put(PARTITION_COLUMN_2, new ColumnPartitionConfig("Modulo", 5));
     segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
-    assertEquals(segmentPruners.size(), 0);
+    assertEquals(segmentPruners.size(), 1);
+    assertTrue(segmentPruners.get(0) instanceof PartitionSegmentPruner);
+    PartitionSegmentPruner partitionSegmentPruner = (PartitionSegmentPruner) segmentPruners.get(0);
+    assertEquals(partitionSegmentPruner.getPartitionColumns(),
+        Stream.of(PARTITION_COLUMN_1, PARTITION_COLUMN_2).collect(Collectors.toSet()));
 
     // Should be backward-compatible with legacy config
-    columnPartitionConfigMap.remove("anotherPartitionColumn");
+    columnPartitionConfigMap.remove(PARTITION_COLUMN_1);
     when(routingConfig.getSegmentPrunerTypes()).thenReturn(null);
     segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
     assertEquals(segmentPruners.size(), 0);
@@ -234,8 +242,8 @@ public class SegmentPrunerTest extends ControllerTest {
     assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
 
     // When streamIngestionConfig is configured with Kinesis streaming, EmptySegmentPruner should be returned.
-    when(streamIngestionConfig.getStreamConfigMaps()).thenReturn(Collections.singletonList(
-        Collections.singletonMap(StreamConfigProperties.STREAM_TYPE, KINESIS_STREAM_TYPE)));
+    when(streamIngestionConfig.getStreamConfigMaps()).thenReturn(
+        Collections.singletonList(Collections.singletonMap(StreamConfigProperties.STREAM_TYPE, KINESIS_STREAM_TYPE)));
     when(indexingConfig.getStreamConfigs()).thenReturn(
         Collections.singletonMap(StreamConfigProperties.STREAM_TYPE, KINESIS_STREAM_TYPE));
     segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
@@ -253,12 +261,13 @@ public class SegmentPrunerTest extends ControllerTest {
     BrokerRequest brokerRequest1 = compiler.compileToBrokerRequest(QUERY_1);
     BrokerRequest brokerRequest2 = compiler.compileToBrokerRequest(QUERY_2);
     BrokerRequest brokerRequest3 = compiler.compileToBrokerRequest(QUERY_3);
+    BrokerRequest brokerRequest4 = compiler.compileToBrokerRequest(QUERY_4);
     // NOTE: Ideal state and external view are not used in the current implementation
     IdealState idealState = Mockito.mock(IdealState.class);
     ExternalView externalView = Mockito.mock(ExternalView.class);
 
-    PartitionSegmentPruner segmentPruner =
-        new PartitionSegmentPruner(OFFLINE_TABLE_NAME, PARTITION_COLUMN, _propertyStore);
+    PartitionSegmentPruner segmentPruner = new PartitionSegmentPruner(OFFLINE_TABLE_NAME,
+        Stream.of(PARTITION_COLUMN_1, PARTITION_COLUMN_2).collect(Collectors.toSet()), _propertyStore);
     Set<String> onlineSegments = new HashSet<>();
     segmentPruner.init(idealState, externalView, onlineSegments);
     assertEquals(segmentPruner.prune(brokerRequest1, Collections.emptySet()), Collections.emptySet());
@@ -327,6 +336,28 @@ public class SegmentPrunerTest extends ControllerTest {
         new HashSet<>(Collections.singletonList(segment1)));
     assertEquals(segmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1))),
         new HashSet<>(Arrays.asList(segment0, segment1)));
+
+    // Multi-column partitioned segment.
+    String segment2 = "segment2";
+    onlineSegments.add(segment2);
+    Map<String, ColumnPartitionMetadata> columnPartitionMetadataMap = new HashMap<>();
+    columnPartitionMetadataMap.put(PARTITION_COLUMN_1,
+        new ColumnPartitionMetadata("Modulo", 4, Collections.singleton(0), null));
+    Map<String, String> partitionColumn2FunctionConfig = new HashMap<>();
+    partitionColumn2FunctionConfig.put("columnValues", "xyz|abc");
+    partitionColumn2FunctionConfig.put("columnValuesDelimiter", "|");
+    columnPartitionMetadataMap.put(PARTITION_COLUMN_2,
+        new ColumnPartitionMetadata("BoundedColumnValue", 3, Collections.singleton(1), partitionColumn2FunctionConfig));
+    setSegmentZKPartitionMetadata(OFFLINE_TABLE_NAME, segment2, columnPartitionMetadataMap);
+    segmentPruner.onAssignmentChange(idealState, externalView, onlineSegments);
+    assertEquals(segmentPruner.prune(brokerRequest1, new HashSet<>(Arrays.asList(segment0, segment1))),
+        new HashSet<>(Arrays.asList(segment0, segment1)));
+    assertEquals(segmentPruner.prune(brokerRequest2, new HashSet<>(Arrays.asList(segment0, segment1))),
+        new HashSet<>(Collections.singletonList(segment1)));
+    assertEquals(segmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1))),
+        new HashSet<>(Arrays.asList(segment0, segment1)));
+    assertEquals(segmentPruner.prune(brokerRequest4, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
+        new HashSet<>(Arrays.asList(segment1, segment2)));
   }
 
   @Test(dataProvider = "compilerProvider")
@@ -648,8 +679,15 @@ public class SegmentPrunerTest extends ControllerTest {
   private void setSegmentZKPartitionMetadata(String tableNameWithType, String segment, String partitionFunction,
       int numPartitions, int partitionId) {
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segment);
-    segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap(PARTITION_COLUMN,
+    segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap(PARTITION_COLUMN_1,
         new ColumnPartitionMetadata(partitionFunction, numPartitions, Collections.singleton(partitionId), null))));
+    ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);
+  }
+
+  private void setSegmentZKPartitionMetadata(String tableNameWithType, String segment,
+      Map<String, ColumnPartitionMetadata> columnPartitionMap) {
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segment);
+    segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(columnPartitionMap));
     ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);
   }
 
