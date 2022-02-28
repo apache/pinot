@@ -121,7 +121,6 @@ public class GapFillDataTableReducer implements DataTableReducer {
     _groupByKeys = new HashSet<>();
 
     ExpressionContext timeseriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);
-    Preconditions.checkArgument(timeseriesOn != null, "The TimeSeriesOn expressions should be specified.");
     _timeSeries = timeseriesOn.getFunction().getArguments();
   }
 

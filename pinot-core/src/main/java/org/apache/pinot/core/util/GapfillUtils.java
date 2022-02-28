@@ -179,7 +179,7 @@ public class GapfillUtils {
     }
   }
 
-  private static ExpressionContext findGapfillExpressionContext(QueryContext queryContext) {
+  public static ExpressionContext findGapfillExpressionContext(QueryContext queryContext) {
     for (ExpressionContext expressionContext : queryContext.getSelectExpressions()) {
       if (isGapfill(expressionContext)) {
         return expressionContext;
@@ -220,6 +220,19 @@ public class GapfillUtils {
       }
     }
     return fillExpressions;
+  }
+
+  public static List<ExpressionContext> findGroupByExpressions(QueryContext queryContext) {
+    ExpressionContext gapFillSelection = GapfillUtils.findGapfillExpressionContext(queryContext);
+    if (gapFillSelection == null) {
+      return null;
+    }
+    List<ExpressionContext> groupByExpressions = new ArrayList<>();
+
+    ExpressionContext timeseriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);
+    groupByExpressions.add(gapFillSelection.getFunction().getArguments().get(0));
+    groupByExpressions.addAll(timeseriesOn.getFunction().getArguments());
+    return groupByExpressions;
   }
 
   public static List<ExpressionContext> getGroupByExpressions(QueryContext queryContext) {

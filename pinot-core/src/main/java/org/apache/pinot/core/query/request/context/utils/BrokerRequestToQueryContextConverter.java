@@ -89,6 +89,9 @@ public class BrokerRequestToQueryContextConverter {
     Preconditions.checkArgument(args.get(4).getLiteral() != null,
         "The fifth argument of PostAggregateGapFill should be time bucket size.");
 
+    ExpressionContext timeseriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);
+    Preconditions.checkArgument(timeseriesOn != null, "The TimeSeriesOn expressions should be specified.");
+
     if (queryContext.getAggregationFunctions() == null) {
       return;
     }

@@ -229,6 +229,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   @Override
   public PlanNode makeSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
+
     GapfillUtils.GapfillType gapfillType = queryContext.getGapfillType();
     if (QueryContextUtils.isAggregationQuery(queryContext)) {
       if (gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL) {
@@ -248,7 +249,10 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         return new AggregationPlanNode(indexSegment, queryContext);
       }
     } else if (QueryContextUtils.isSelectionQuery(queryContext)) {
-      if (gapfillType != null) {
+      if (gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT
+          || gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE) {
+        return new GapfillSelectionPlanNode(indexSegment, queryContext.getSubQueryContext());
+      } else if (gapfillType == GapfillUtils.GapfillType.GAP_FILL) {
         return new GapfillSelectionPlanNode(indexSegment, queryContext);
       } else {
         return new SelectionPlanNode(indexSegment, queryContext);

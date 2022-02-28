@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.plan;
 
-import com.google.common.base.Preconditions;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -50,7 +49,7 @@ public class GapfillSelectionPlanNode implements PlanNode {
 
   @Override
   public Operator<IntermediateResultsBlock> run() {
-    QueryContext queryContext = getSelectQueryContext();
+    QueryContext queryContext = _queryContext;
     int limit = queryContext.getLimit();
 
     if (limit == 0) {
@@ -60,14 +59,7 @@ public class GapfillSelectionPlanNode implements PlanNode {
       return new EmptySelectionOperator(_indexSegment, expressions, transformOperator);
     }
 
-    ExpressionContext gapFillSelection = GapfillUtils.getGapfillExpressionContext(_queryContext);
-    Preconditions.checkArgument(gapFillSelection != null, "PreAggregate Gapfill Expression is expected.");
-
-    ExpressionContext timeSeriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);
-    Preconditions.checkArgument(timeSeriesOn != null, "TimeSeriesOn Expression is expected.");
-
-    List<ExpressionContext> expressions = GapfillUtils.getGroupByExpressions(_queryContext);
-    Preconditions.checkArgument(expressions != null, "GroupByExpressions should not be null.");
+    List<ExpressionContext> expressions = GapfillUtils.findGroupByExpressions(_queryContext);
     Set<ExpressionContext> expressionContextSet = new HashSet<>(expressions);
 
     List<ExpressionContext> selectionExpressions =
@@ -93,13 +85,5 @@ public class GapfillSelectionPlanNode implements PlanNode {
     TransformOperator transformOperator = new TransformPlanNode(_indexSegment, queryContext, expressions,
         Math.min(limit, DocIdSetPlanNode.MAX_DOC_PER_CALL)).run();
     return new SelectionOnlyOperator(_indexSegment, queryContext, expressions, transformOperator);
-  }
-
-  private QueryContext getSelectQueryContext() {
-    if (_queryContext.getGapfillType() == GapfillUtils.GapfillType.GAP_FILL) {
-      return _queryContext;
-    } else {
-      return _queryContext.getSubQueryContext();
-    }
   }
 }

@@ -184,10 +184,22 @@ public class CombinePlanNode implements PlanNode {
     } else if (QueryContextUtils.isSelectionQuery(_queryContext)) {
       if (_queryContext.getLimit() == 0 || _queryContext.getOrderByExpressions() == null) {
         // Selection only
-        return new SelectionOnlyCombineOperator(operators, _queryContext, _executorService);
+        if (gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE
+            || gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
+          _queryContext.getSubQueryContext().setEndTimeMs(_queryContext.getEndTimeMs());
+          return new SelectionOnlyCombineOperator(operators, _queryContext.getSubQueryContext(), _executorService);
+        } else {
+          return new SelectionOnlyCombineOperator(operators, _queryContext, _executorService);
+        }
       } else {
         // Selection order-by
-        return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService);
+        if (gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE
+            || gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
+          _queryContext.getSubQueryContext().setEndTimeMs(_queryContext.getEndTimeMs());
+          return new SelectionOrderByCombineOperator(operators, _queryContext.getSubQueryContext(), _executorService);
+        } else {
+          return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService);
+        }
       }
     } else if (gapfillType != null) {
       return new SelectionOnlyCombineOperator(operators, _queryContext, _executorService);

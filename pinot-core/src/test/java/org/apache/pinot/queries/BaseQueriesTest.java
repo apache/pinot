@@ -209,10 +209,6 @@ public abstract class BaseQueriesTest {
   private BrokerResponseNative getBrokerResponse(QueryContext queryContext, PlanMaker planMaker) {
     // Server side.
     queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
-    if (queryContext.getSubQueryContext() != null) {
-      queryContext.getSubQueryContext()
-          .setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
-    }
     Plan plan = planMaker.makeInstancePlan(getIndexSegments(), queryContext, EXECUTOR_SERVICE);
 
     BrokerRequest brokerRequest = queryContext.getBrokerRequest();
