@@ -19,6 +19,7 @@
 package org.apache.pinot.common.request.context.predicate;
 
 import java.util.Objects;
+import java.util.regex.Pattern;
 import org.apache.pinot.common.request.context.ExpressionContext;
 
 
@@ -28,6 +29,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 public class RegexpLikePredicate implements Predicate {
   private final ExpressionContext _lhs;
   private final String _value;
+  private Pattern _pattern = null;
 
   public RegexpLikePredicate(ExpressionContext lhs, String value) {
     _lhs = lhs;
@@ -46,6 +48,13 @@ public class RegexpLikePredicate implements Predicate {
 
   public String getValue() {
     return _value;
+  }
+
+  public Pattern getPattern() {
+    if (_pattern == null) {
+      _pattern = Pattern.compile(_value, Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE);
+    }
+    return _pattern;
   }
 
   @Override
