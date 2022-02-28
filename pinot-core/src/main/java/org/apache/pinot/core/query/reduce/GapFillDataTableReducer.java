@@ -175,31 +175,35 @@ public class GapFillDataTableReducer implements DataTableReducer {
   private IndexedTable getIndexedTable(DataSchema dataSchema, Collection<DataTable> dataTablesToReduce,
       DataTableReducerContext reducerContext)
       throws TimeoutException {
+    QueryContext queryContext = _queryContext.getSubQueryContext();
+    if (_queryContext.getGapfillType() == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL_AGGREGATE) {
+      queryContext = queryContext.getSubQueryContext();
+    }
     long start = System.currentTimeMillis();
     int numDataTables = dataTablesToReduce.size();
 
     // Get the number of threads to use for reducing.
     // In case of single reduce thread, fall back to SimpleIndexedTable to avoid redundant locking/unlocking calls.
     int numReduceThreadsToUse = getNumReduceThreadsToUse(numDataTables, reducerContext.getMaxReduceThreadsPerQuery());
-    int limit = _queryContext.getLimit();
+    int limit = queryContext.getLimit();
     // TODO: Make minTrimSize configurable
     int trimSize = GroupByUtils.getTableCapacity(limit);
     // NOTE: For query with HAVING clause, use trimSize as resultSize to ensure the result accuracy.
     // TODO: Resolve the HAVING clause within the IndexedTable before returning the result
-    int resultSize = _queryContext.getHavingFilter() != null ? trimSize : limit;
+    int resultSize = queryContext.getHavingFilter() != null ? trimSize : limit;
     int trimThreshold = reducerContext.getGroupByTrimThreshold();
     IndexedTable indexedTable;
     if (numReduceThreadsToUse <= 1) {
-      indexedTable = new SimpleIndexedTable(dataSchema, _queryContext, resultSize, trimSize, trimThreshold);
+      indexedTable = new SimpleIndexedTable(dataSchema, queryContext, resultSize, trimSize, trimThreshold);
     } else {
       if (trimThreshold >= GroupByOrderByCombineOperator.MAX_TRIM_THRESHOLD) {
         // special case of trim threshold where it is set to max value.
         // there won't be any trimming during upsert in this case.
         // thus we can avoid the overhead of read-lock and write-lock
         // in the upsert method.
-        indexedTable = new UnboundedConcurrentIndexedTable(dataSchema, _queryContext, resultSize);
+        indexedTable = new UnboundedConcurrentIndexedTable(dataSchema, queryContext, resultSize);
       } else {
-        indexedTable = new ConcurrentIndexedTable(dataSchema, _queryContext, resultSize, trimSize, trimThreshold);
+        indexedTable = new ConcurrentIndexedTable(dataSchema, queryContext, resultSize, trimSize, trimThreshold);
       }
     }
 
@@ -336,11 +340,11 @@ public class GapFillDataTableReducer implements DataTableReducer {
     List<OrderByExpressionContext> orderByExpressionContexts = getOrderByExpressions();
     if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE || _gapfillType == GapfillUtils.GapfillType.GAP_FILL
         || _gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
-      sortedRawRows = mergeAndSort(dataTableMap.values(), dataSchema, orderByExpressionContexts);
+      sortedRawRows = getSortedRows(dataTableMap.values(), dataSchema, orderByExpressionContexts);
     } else {
       try {
         IndexedTable indexedTable = getIndexedTable(dataSchema, dataTableMap.values(), reducerContext);
-        sortedRawRows = mergeAndSort(indexedTable, dataSchema, orderByExpressionContexts);
+        sortedRawRows = getSortedRows(indexedTable);
       } catch (TimeoutException e) {
         brokerResponseNative.getProcessingExceptions()
             .add(new QueryProcessingException(QueryException.BROKER_TIMEOUT_ERROR_CODE, e.getMessage()));
@@ -743,7 +747,7 @@ public class GapFillDataTableReducer implements DataTableReducer {
   /**
    * Merge all result tables from different pinot servers and sort the rows based on timebucket.
    */
-  private List<Object[]> mergeAndSort(Collection<DataTable> dataTables, DataSchema dataSchema,
+  private List<Object[]> getSortedRows(Collection<DataTable> dataTables, DataSchema dataSchema,
       List<OrderByExpressionContext> orderByExpressionContexts) {
     PriorityQueue<Object[]> rows =
         new PriorityQueue<>(Math.min(_limitForAggregatedResult, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
@@ -765,23 +769,14 @@ public class GapFillDataTableReducer implements DataTableReducer {
     return sortedRows;
   }
 
-  private List<Object[]> mergeAndSort(IndexedTable indexedTable, DataSchema dataSchema,
-      List<OrderByExpressionContext> orderByExpressionContexts) {
-    PriorityQueue<Object[]> rows =
-        new PriorityQueue<>(Math.min(_limitForAggregatedResult, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
-            getTypeCompatibleComparator(orderByExpressionContexts, dataSchema));
-
+  private List<Object[]> getSortedRows(IndexedTable indexedTable) {
     Iterator<Record> iterator = indexedTable.iterator();
+    List<Object[]> sortedRow = new ArrayList<>();
     while (iterator.hasNext()) {
-      rows.add(iterator.next().getValues());
-    }
-
-    LinkedList<Object[]> sortedRows = new LinkedList<>();
-    while (!rows.isEmpty()) {
-      Object[] row = rows.poll();
-      sortedRows.add(row);
+      Object [] row = iterator.next().getValues();
+      sortedRow.add(row);
       _groupByKeys.add(constructGroupKeys(row));
     }
-    return sortedRows;
+    return sortedRow;
   }
 }

@@ -29,7 +29,6 @@ import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.util.GapfillUtils;
 
 
 /**
@@ -66,12 +65,7 @@ public abstract class IndexedTable extends BaseTable {
     _lookupMap = lookupMap;
     _resultSize = resultSize;
 
-    List<ExpressionContext> groupByExpressions;
-    if (queryContext.getGapfillType() != null) {
-      groupByExpressions = GapfillUtils.getGroupByExpressions(queryContext);
-    } else {
-      groupByExpressions = queryContext.getGroupByExpressions();
-    }
+    List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert groupByExpressions != null;
     _numKeyColumns = groupByExpressions.size();
     _aggregationFunctions = queryContext.getAggregationFunctions();
