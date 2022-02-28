@@ -340,11 +340,11 @@ public class GapFillDataTableReducer implements DataTableReducer {
     List<OrderByExpressionContext> orderByExpressionContexts = getOrderByExpressions();
     if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE || _gapfillType == GapfillUtils.GapfillType.GAP_FILL
         || _gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
-      sortedRawRows = getSortedRows(dataTableMap.values(), dataSchema, orderByExpressionContexts);
+      sortedRawRows = mergeAndSort(dataTableMap.values(), dataSchema, orderByExpressionContexts);
     } else {
       try {
         IndexedTable indexedTable = getIndexedTable(dataSchema, dataTableMap.values(), reducerContext);
-        sortedRawRows = getSortedRows(indexedTable);
+        sortedRawRows = mergeAndSort(indexedTable, dataSchema, orderByExpressionContexts);
       } catch (TimeoutException e) {
         brokerResponseNative.getProcessingExceptions()
             .add(new QueryProcessingException(QueryException.BROKER_TIMEOUT_ERROR_CODE, e.getMessage()));
@@ -747,7 +747,7 @@ public class GapFillDataTableReducer implements DataTableReducer {
   /**
    * Merge all result tables from different pinot servers and sort the rows based on timebucket.
    */
-  private List<Object[]> getSortedRows(Collection<DataTable> dataTables, DataSchema dataSchema,
+  private List<Object[]> mergeAndSort(Collection<DataTable> dataTables, DataSchema dataSchema,
       List<OrderByExpressionContext> orderByExpressionContexts) {
     PriorityQueue<Object[]> rows =
         new PriorityQueue<>(Math.min(_limitForAggregatedResult, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
@@ -769,14 +769,23 @@ public class GapFillDataTableReducer implements DataTableReducer {
     return sortedRows;
   }
 
-  private List<Object[]> getSortedRows(IndexedTable indexedTable) {
+  private List<Object[]> mergeAndSort(IndexedTable indexedTable, DataSchema dataSchema,
+      List<OrderByExpressionContext> orderByExpressionContexts) {
+    PriorityQueue<Object[]> rows =
+        new PriorityQueue<>(Math.min(_limitForAggregatedResult, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
+            getTypeCompatibleComparator(orderByExpressionContexts, dataSchema));
+
     Iterator<Record> iterator = indexedTable.iterator();
-    List<Object[]> sortedRow = new ArrayList<>();
     while (iterator.hasNext()) {
-      Object [] row = iterator.next().getValues();
-      sortedRow.add(row);
+      rows.add(iterator.next().getValues());
+    }
+
+    LinkedList<Object[]> sortedRows = new LinkedList<>();
+    while (!rows.isEmpty()) {
+      Object[] row = rows.poll();
+      sortedRows.add(row);
       _groupByKeys.add(constructGroupKeys(row));
     }
-    return sortedRow;
+    return sortedRows;
   }
 }
