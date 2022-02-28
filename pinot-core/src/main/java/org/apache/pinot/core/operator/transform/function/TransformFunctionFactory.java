@@ -165,6 +165,9 @@ public class TransformFunctionFactory {
           // tuple selection
           put(canonicalize(TransformFunctionType.LEAST.getName().toLowerCase()), LeastTransformFunction.class);
           put(canonicalize(TransformFunctionType.GREATEST.getName().toLowerCase()), GreatestTransformFunction.class);
+          put(canonicalize(TransformFunctionType.IS_NULL.getName().toLowerCase()), IsNullTransformFunction.class);
+          put(canonicalize(TransformFunctionType.IS_NOT_NULL.getName().toLowerCase()),
+              IsNotNullTransformFunction.class);
         }
       };
 
@@ -235,10 +238,9 @@ public class TransformFunctionFactory {
           if (functionInfo == null) {
             if (FunctionRegistry.containsFunction(functionName)) {
               throw new BadQueryRequestException(
-                String.format("Unsupported function: %s with %d parameters", functionName, numArguments));
+                  String.format("Unsupported function: %s with %d parameters", functionName, numArguments));
             } else {
-              throw new BadQueryRequestException(
-                String.format("Unsupported function: %s not found", functionName));
+              throw new BadQueryRequestException(String.format("Unsupported function: %s not found", functionName));
             }
           }
           transformFunction = new ScalarTransformFunctionWrapper(functionInfo);
@@ -259,8 +261,7 @@ public class TransformFunctionFactory {
         String columnName = expression.getIdentifier();
         return new IdentifierTransformFunction(columnName, dataSourceMap.get(columnName));
       case LITERAL:
-        return queryContext == null
-            ? new LiteralTransformFunction(expression.getLiteral())
+        return queryContext == null ? new LiteralTransformFunction(expression.getLiteral())
             : queryContext.getOrComputeSharedValue(LiteralTransformFunction.class, expression.getLiteral(),
                 LiteralTransformFunction::new);
       default:

@@ -55,6 +55,8 @@ public enum TransformFunctionType {
   LESS_THAN("less_than"),
   LESS_THAN_OR_EQUAL("less_than_or_equal"),
   IN("in"),
+  IS_NULL("is_null"),
+  IS_NOT_NULL("is_not_null"),
 
   AND("and"),
   OR("or"),
