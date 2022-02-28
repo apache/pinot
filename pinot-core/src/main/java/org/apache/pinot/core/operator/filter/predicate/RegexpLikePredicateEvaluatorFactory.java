@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -62,19 +61,17 @@ public class RegexpLikePredicateEvaluatorFactory {
     return new RawValueBasedRegexpLikePredicateEvaluator(regexpLikePredicate);
   }
 
-  private static final int PATTERN_FLAG = Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE;
-
   private static final class DictionaryBasedRegexpLikePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
-    private final Matcher _matcher;
-    final Pattern _pattern;
+    // Reuse matcher to avoid excessive allocation. This is safe to do because the evaluator is always used
+    // within the scope of a single thread.
+    final Matcher _matcher;
     final Dictionary _dictionary;
     int[] _matchingDictIds;
 
     public DictionaryBasedRegexpLikePredicateEvaluator(RegexpLikePredicate regexpLikePredicate, Dictionary dictionary) {
       super(regexpLikePredicate);
-      _pattern = Pattern.compile(regexpLikePredicate.getValue(), PATTERN_FLAG);
       _dictionary = dictionary;
-      _matcher = _pattern.matcher("");
+      _matcher = regexpLikePredicate.getPattern().matcher("");
     }
 
     @Override
@@ -99,11 +96,13 @@ public class RegexpLikePredicateEvaluatorFactory {
   }
 
   private static final class RawValueBasedRegexpLikePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
-    final Pattern _pattern;
+    // Reuse matcher to avoid excessive allocation. This is safe to do because the evaluator is always used
+    // within the scope of a single thread.
+    final Matcher _matcher;
 
     public RawValueBasedRegexpLikePredicateEvaluator(RegexpLikePredicate regexpLikePredicate) {
       super(regexpLikePredicate);
-      _pattern = Pattern.compile(regexpLikePredicate.getValue(), PATTERN_FLAG);
+      _matcher = regexpLikePredicate.getPattern().matcher("");
     }
 
     @Override
@@ -113,7 +112,7 @@ public class RegexpLikePredicateEvaluatorFactory {
 
     @Override
     public boolean applySV(String value) {
-      return _pattern.matcher(value).find();
+      return _matcher.reset(value).find();
     }
   }
 }
