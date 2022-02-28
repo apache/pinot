@@ -4,6 +4,8 @@ package org.apache.pinot.query.service;
  * Configuration for setting up query runtime.
  */
 public class QueryConfig {
+  public static final String KEY_OF_QUERY_SERVER_PORT = "pinot.query.server.port";
+  public static final int DEFAULT_QUERY_SERVER_PORT = -1;
 
   public static final String KEY_OF_QUERY_RUNNER_HOSTNAME = "pinot.query.runner.hostname";
   public static final String DEFAULT_QUERY_RUNNER_HOSTNAME = "localhost";

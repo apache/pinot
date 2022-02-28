@@ -50,11 +50,12 @@ public class QueryPlanSerDeUtils {
 
   private static ServerInstance stringToInstance(String serverInstanceString) {
     String[] s = StringUtils.split(serverInstanceString, '_');
-    return new WorkerInstance(s[0], Integer.parseInt(s[1]));
+    return new WorkerInstance(s[0], Integer.parseInt(s[1]), Integer.parseInt(s[2]));
   }
 
   private static String instanceToString(ServerInstance serverInstance) {
-    return StringUtils.join(serverInstance.getHostname(), '_', serverInstance.getGrpcPort());
+    return StringUtils.join(serverInstance.getHostname(), '_', serverInstance.getPort(),
+        '_', serverInstance.getGrpcPort());
   }
 
   private static Worker.StagePlan stageRootToStagePlan(StageNode stageRoot) {

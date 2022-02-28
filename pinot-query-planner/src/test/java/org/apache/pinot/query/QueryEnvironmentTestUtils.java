@@ -68,8 +68,10 @@ public class QueryEnvironmentTestUtils {
   public static RouteManager getMockRoutingManager(int port1, int port2) {
     String server1 = String.format("localhost_%d", port1);
     String server2 = String.format("localhost_%d", port2);
-    ServerInstance host1 = new WorkerInstance("localhost", port1);
-    ServerInstance host2 = new WorkerInstance("localhost", port2);
+    // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.
+    // this is only use for test identifier purpose.
+    ServerInstance host1 = new WorkerInstance("localhost", port1, port1);
+    ServerInstance host2 = new WorkerInstance("localhost", port2, port2);
 
     RouteTable rtA = mock(RouteTable.class);
     when(rtA.getServerInstanceToSegmentsMap()).thenReturn(ImmutableMap.of(host1, SERVER1_SEGMENTS.get("a"),

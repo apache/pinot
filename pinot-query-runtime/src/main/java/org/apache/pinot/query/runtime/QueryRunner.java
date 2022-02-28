@@ -40,17 +40,20 @@ public class QueryRunner {
    * Initializes the query executor.
    * <p>Should be called only once and before calling any other method.
    */
-  public void init(PinotConfiguration config, InstanceDataManager instanceDataManager, ServerMetrics serverMetrics)
-      throws ConfigurationException {
+  public void init(PinotConfiguration config, InstanceDataManager instanceDataManager, ServerMetrics serverMetrics) {
     String instanceName = config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME);
     _hostname = instanceName.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE) ? instanceName.substring(
         CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH) : instanceName;
     _port = config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, QueryConfig.DEFAULT_QUERY_RUNNER_PORT);
-    _mailboxService = new GrpcMailboxService(_port);
-    _serverExecutor = new ServerQueryExecutorV1Impl();
-    _serverExecutor.init(config, instanceDataManager, serverMetrics);
-    _workerExecutor = new WorkerQueryExecutor();
-    _workerExecutor.init(config, serverMetrics, _mailboxService, _hostname, _port);
+    try {
+      _mailboxService = new GrpcMailboxService(_hostname, _port);
+      _serverExecutor = new ServerQueryExecutorV1Impl();
+      _serverExecutor.init(config, instanceDataManager, serverMetrics);
+      _workerExecutor = new WorkerQueryExecutor();
+      _workerExecutor.init(config, serverMetrics, _mailboxService, _hostname, _port);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   public void start() {

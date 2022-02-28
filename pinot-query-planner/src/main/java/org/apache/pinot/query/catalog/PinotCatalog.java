@@ -11,6 +11,7 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.SchemaVersion;
 import org.apache.calcite.schema.Table;
 import org.apache.pinot.common.utils.helix.TableCache;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
@@ -26,7 +27,8 @@ public class PinotCatalog implements Schema {
 
   @Override
   public Table getTable(String name) {
-    return new PinotTable(_tableCache.getSchema(name));
+    String tableName = TableNameBuilder.extractRawTableName(name);
+    return new PinotTable(_tableCache.getSchema(tableName));
   }
 
   @Override

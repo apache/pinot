@@ -13,10 +13,13 @@ import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 
 public class JoinNode extends AbstractStageNode {
   private final JoinRelType _joinType;
-  private final RelDataType _leftRowType;
-  private final RelDataType _rightRowType;
   private final int _leftOperandIndex;
   private final int _rightOperandIndex;
+  private final FieldSelectionKeySelector _leftFieldSelectionKeySelector;
+  private final FieldSelectionKeySelector _rightFieldSelectionKeySelector;
+
+  private transient final RelDataType _leftRowType;
+  private transient final RelDataType _rightRowType;
 
   public JoinNode(LogicalJoin node, String currentStageId) {
     super(currentStageId);
@@ -30,6 +33,8 @@ public class JoinNode extends AbstractStageNode {
     _rightRowType = node.getRight().getRowType();
     _leftOperandIndex = ((RexInputRef) joinCondition.getOperands().get(0)).getIndex();
     _rightOperandIndex = ((RexInputRef) joinCondition.getOperands().get(1)).getIndex();
+    _leftFieldSelectionKeySelector = new FieldSelectionKeySelector(_leftOperandIndex);
+    _rightFieldSelectionKeySelector = new FieldSelectionKeySelector(_rightOperandIndex - _leftRowType.getFieldNames().size());
   }
 
   public JoinRelType getJoinType() {
@@ -53,11 +58,11 @@ public class JoinNode extends AbstractStageNode {
   }
 
   public FieldSelectionKeySelector getLeftJoinKeySelector() {
-    return new FieldSelectionKeySelector(_leftOperandIndex);
+    return _leftFieldSelectionKeySelector;
   }
 
 
   public FieldSelectionKeySelector getRightJoinKeySelector() {
-    return new FieldSelectionKeySelector(_rightOperandIndex - _leftRowType.getFieldNames().size());
+    return _rightFieldSelectionKeySelector;
   }
 }

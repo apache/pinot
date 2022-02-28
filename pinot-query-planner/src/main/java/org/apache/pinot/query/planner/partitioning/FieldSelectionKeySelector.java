@@ -1,6 +1,9 @@
 package org.apache.pinot.query.planner.partitioning;
 
-public class FieldSelectionKeySelector implements KeySelector<Object[], Object> {
+import java.io.Serializable;
+
+
+public class FieldSelectionKeySelector implements KeySelector<Object[], Object>, Serializable {
 
   private int _columnIndex;
 

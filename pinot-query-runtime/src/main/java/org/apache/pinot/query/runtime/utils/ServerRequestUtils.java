@@ -29,7 +29,7 @@ public class ServerRequestUtils {
   public static ServerQueryRequest constructServerQueryRequest(DistributedQueryPlan distributedQueryPlan,
       Map<String, String> requestMetadataMap) {
     InstanceRequest instanceRequest = new InstanceRequest();
-    instanceRequest.setRequestId(Long.parseLong(requestMetadataMap.get("RequestId")));
+    instanceRequest.setRequestId(Long.parseLong(requestMetadataMap.get("REQUEST_ID")));
     instanceRequest.setBrokerId("unknown");
     instanceRequest.setEnableTrace(false);
     instanceRequest.setSearchSegments(distributedQueryPlan.getMetadataMap().get(distributedQueryPlan.getStageId())

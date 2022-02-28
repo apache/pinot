@@ -15,7 +15,7 @@ public abstract class GrpcMailboxServiceTestBase {
       throws Exception {
     for (int i = 0; i < MAILBOX_TEST_SIZE; i++) {
       int availablePort = QueryEnvironmentTestUtils.getAvailablePort();
-      GrpcMailboxService grpcMailboxService = new GrpcMailboxService(availablePort);
+      GrpcMailboxService grpcMailboxService = new GrpcMailboxService("localhost", availablePort);
       grpcMailboxService.start();
       _mailboxServices.put(availablePort, grpcMailboxService);
     }

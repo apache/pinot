@@ -21,6 +21,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 public class GrpcMailboxService implements MailboxService<MailboxContent> {
   // channel manager
   private final ChannelManager _channelManager;
+  private final String _hostname;
   private final int _mailboxPort;
 
   // maintaining a list of registered mailboxes.
@@ -30,7 +31,8 @@ public class GrpcMailboxService implements MailboxService<MailboxContent> {
       = new ConcurrentHashMap<>();
 
 
-  public GrpcMailboxService(int mailboxPort) {
+  public GrpcMailboxService(String hostname, int mailboxPort) {
+    _hostname = hostname;
     _mailboxPort = mailboxPort;
     _channelManager = new ChannelManager(this);
   }
@@ -43,6 +45,11 @@ public class GrpcMailboxService implements MailboxService<MailboxContent> {
   @Override
   public void shutdown() {
     _channelManager.shutdown();
+  }
+
+  @Override
+  public String getHostname() {
+    return _hostname;
   }
 
   @Override

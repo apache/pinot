@@ -22,9 +22,9 @@ import org.testng.annotations.Test;
 
 
 public class QueryServerTest {
-  private int QUERY_WORKER_COUNT = 2;
-  private Map<Integer, QueryServer> _queryWorkerMap = new HashMap<>();
-  private Map<Integer, ServerInstance> _queryWorkerInstanceMap = new HashMap<>();
+  private int QUERY_SERVER_COUNT = 2;
+  private Map<Integer, QueryServer> _queryServerMap = new HashMap<>();
+  private Map<Integer, ServerInstance> _queryServerInstanceMap = new HashMap<>();
 
   private QueryEnvironment _queryEnvironment;
 
@@ -32,15 +32,17 @@ public class QueryServerTest {
   public void setUp()
       throws Exception {
 
-    for (int i = 0; i < QUERY_WORKER_COUNT; i++) {
+    for (int i = 0; i < QUERY_SERVER_COUNT; i++) {
       int availablePort = QueryEnvironmentTestUtils.getAvailablePort();
-      QueryServer workerService = new QueryServer(availablePort, Mockito.mock(QueryRunner.class));
-      workerService.start();
-      _queryWorkerMap.put(availablePort, workerService);
-      _queryWorkerInstanceMap.put(availablePort, new WorkerInstance("localhost", availablePort));
+      QueryServer queryServer = new QueryServer(availablePort, Mockito.mock(QueryRunner.class));
+      queryServer.start();
+      _queryServerMap.put(availablePort, queryServer);
+      // this only test the QueryServer functionality so the server port can be the same as the mailbox port.
+      // this is only use for test identifier purpose.
+      _queryServerInstanceMap.put(availablePort, new WorkerInstance("localhost", availablePort, availablePort));
     }
 
-    List<Integer> portList = Lists.newArrayList(_queryWorkerMap.keySet());
+    List<Integer> portList = Lists.newArrayList(_queryServerMap.keySet());
 
     // reducer port doesn't matter, we are testing the worker instance not GRPC.
     _queryEnvironment = QueryEnvironmentTestUtils.getQueryEnvironment(1, portList.get(0), portList.get(1));
@@ -48,7 +50,7 @@ public class QueryServerTest {
 
   @AfterClass
   public void tearDown() {
-    for (QueryServer worker : _queryWorkerMap.values()) {
+    for (QueryServer worker : _queryServerMap.values()) {
       worker.shutdown();
     }
   }
@@ -83,7 +85,7 @@ public class QueryServerTest {
         .setQueryPlan(QueryPlanSerDeUtils.serialize(
             QueryDispatcher.constructDistributedQueryPlan(queryPlan, stageId, serverInstance)))
         .putMetadata("SERVER_INSTANCE_HOST", serverInstance.getHostname())
-        .putMetadata("SERVER_INSTANCE_PORT", String.valueOf(serverInstance.getGrpcPort()))
+        .putMetadata("SERVER_INSTANCE_PORT", String.valueOf(serverInstance.getPort()))
         .build();
   }
 }

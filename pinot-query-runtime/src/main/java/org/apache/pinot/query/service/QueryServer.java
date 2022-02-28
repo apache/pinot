@@ -1,5 +1,6 @@
 package org.apache.pinot.query.service;
 
+import io.grpc.Context;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
@@ -75,13 +76,19 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     responseObserver.onNext(Worker.QueryResponse.newBuilder().putMetadata("OK", "OK").build());
     responseObserver.onCompleted();
 
-    // Process the query
-    try {
-      // TODO: break this into parsing and execution, so that responseObserver can return upon parsing complete.
-      _queryRunner.processQuery(distributedQueryPlan, _executorService, requestMetadataMap);
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while processing request", e);
-      throw new RuntimeException(e);
-    }
+    // start a new GRPC ctx has all the values as the current context, but won't be cancelled
+    Context ctx = Context.current().fork();
+    // Set ctx as the current context within the Runnable can start asynchronous work here that will not
+    // be cancelled when submit returns
+    ctx.run(() -> {
+      // Process the query
+      try {
+        // TODO: break this into parsing and execution, so that responseObserver can return upon parsing complete.
+        _queryRunner.processQuery(distributedQueryPlan, _executorService, requestMetadataMap);
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while processing request", e);
+        throw new RuntimeException(e);
+      }
+    });
   }
 }

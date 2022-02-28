@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
 public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.MailboxStatus> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxStatusStreamObserver.class);
   private static final int DEFAULT_MAILBOX_QUEUE_CAPACITY = 5;
-  private static final long DEFAULT_MAILBOX_POLL_TIMEOUT = 1000L;
+  private static final long DEFAULT_MAILBOX_POLL_TIMEOUT_MS = 1000L;
   private final AtomicInteger _bufferSize = new AtomicInteger(5);
   private final AtomicBoolean _isCompleted = new AtomicBoolean(false);
   private final ArrayBlockingQueue<Mailbox.MailboxContent> _sendingBuffer;
@@ -46,14 +46,13 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
     }
     // if receiving end echo data receive finished. we finished via calling channel complete
     if (mailboxStatus.getMetadataMap().containsKey("finished")) {
-      System.out.printf("onComplete %s, metadata: %s\n", mailboxStatus.getMailboxId(), mailboxStatus.getMetadataMap());
       this._mailboxContentStreamObserver.onCompleted();
     } else {
       // TODO: check stream is not completed before sending data
       // It should never be completed unless content is completed, however since within this class we can't know.
       while (!_isCompleted.get()) {
         try {
-          Mailbox.MailboxContent content = _sendingBuffer.poll(DEFAULT_MAILBOX_POLL_TIMEOUT, TimeUnit.MILLISECONDS);
+          Mailbox.MailboxContent content = _sendingBuffer.poll(DEFAULT_MAILBOX_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS);
           if (content != null) {
             this._mailboxContentStreamObserver.onNext(content);
             break;

@@ -16,16 +16,16 @@ public class WorkerInstance extends ServerInstance {
     super(instanceConfig);
   }
 
-  public WorkerInstance(String hostname, int port) {
-    super(toInstanceConfig(hostname, port));
+  public WorkerInstance(String hostname, int serverPort, int mailboxPort) {
+    super(toInstanceConfig(hostname, serverPort, mailboxPort));
   }
 
-  private static InstanceConfig toInstanceConfig(String hostname, int port) {
-    String server = String.format("%s_%d", hostname, port);
+  private static InstanceConfig toInstanceConfig(String hostname, int serverPort, int mailboxPort) {
+    String server = String.format("%s_%d", hostname, serverPort);
     InstanceConfig instanceConfig = InstanceConfig.toInstanceConfig(server);
     ZNRecord znRecord = instanceConfig.getRecord();
     Map<String, String> simpleFields = znRecord.getSimpleFields();
-    simpleFields.put(CommonConstants.Helix.Instance.GRPC_PORT_KEY, instanceConfig.getPort());
+    simpleFields.put(CommonConstants.Helix.Instance.GRPC_PORT_KEY, String.valueOf(mailboxPort));
     return instanceConfig;
   }
 }

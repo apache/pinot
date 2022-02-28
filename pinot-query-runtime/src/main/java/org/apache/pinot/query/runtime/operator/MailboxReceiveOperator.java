@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 
 public class MailboxReceiveOperator extends BaseOperator<DataTableBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxReceiveOperator.class);
+  private static final long DEFAULT_TIMEOUT_NANO = 10_000_000_000L;
 
   private final MailboxService<Mailbox.MailboxContent> _mailboxService;
   private final RelDistribution.Type _exchangeType;
@@ -64,7 +65,8 @@ public class MailboxReceiveOperator extends BaseOperator<DataTableBlock> {
     // TODO: do a round robin check against all MailboxContentStreamObservers and find which one that has data.
     boolean hasOpenedMailbox = true;
     DataSchema dataSchema = null;
-    while (hasOpenedMailbox) {
+    long timeoutWatermark = System.nanoTime() + DEFAULT_TIMEOUT_NANO;
+    while (hasOpenedMailbox && System.nanoTime() < timeoutWatermark) {
       hasOpenedMailbox = false;
       for (ServerInstance sendingInstance : _sendingStageInstances) {
         try {
@@ -89,6 +91,9 @@ public class MailboxReceiveOperator extends BaseOperator<DataTableBlock> {
           LOGGER.error(String.format("Error receiving data from mailbox %s", sendingInstance), e);
         }
       }
+    }
+    if (System.nanoTime() >= timeoutWatermark) {
+      LOGGER.error("Timed out after polling mailboxes: {}", _sendingStageInstances);
     }
     // TODO: we need to at least return one data table with schema if there's no error.
     // we need to condition this on whether there's already things being returned or not.

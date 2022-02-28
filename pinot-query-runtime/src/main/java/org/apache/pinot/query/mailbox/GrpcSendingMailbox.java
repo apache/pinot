@@ -1,6 +1,7 @@
 package org.apache.pinot.query.mailbox;
 
 import io.grpc.ManagedChannel;
+import io.grpc.stub.StreamObserver;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;

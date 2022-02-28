@@ -43,6 +43,7 @@ public class QueryRunnerTest {
   private static final File INDEX_DIR_S2_C = new File(FileUtils.getTempDirectory(), "QueryRunnerTest_server2_tableC");
 
   private QueryEnvironment _queryEnvironment;
+  private String _reducerHostname;
   private int _reducerGrpcPort;
   private Map<ServerInstance, QueryServerEnclosure> _servers = new HashMap<>();
   private GrpcMailboxService _mailboxService;
@@ -58,19 +59,21 @@ public class QueryRunnerTest {
             QueryEnvironmentTestUtils.SERVER2_SEGMENTS);
 
     _reducerGrpcPort = QueryEnvironmentTestUtils.getAvailablePort();
+    _reducerHostname = String.format("Broker_%s", QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME);
     Map<String, Object> reducerConfig = new HashMap<>();
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
-    reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME,
-        String.format("Broker_%s", QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME));
-    _mailboxService = new GrpcMailboxService(_reducerGrpcPort);
+    reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
+    _mailboxService = new GrpcMailboxService(_reducerHostname, _reducerGrpcPort);
     _mailboxService.start();
 
     _queryEnvironment = QueryEnvironmentTestUtils.getQueryEnvironment(
         _reducerGrpcPort, server1.getPort(), server2.getPort());
     server1.start();
     server2.start();
-    _servers.put(new WorkerInstance("localhost", server1.getPort()), server1);
-    _servers.put(new WorkerInstance("localhost", server2.getPort()), server2);
+    // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.
+    // this is only use for test identifier purpose.
+    _servers.put(new WorkerInstance("localhost", server1.getPort(), server1.getPort()), server1);
+    _servers.put(new WorkerInstance("localhost", server2.getPort(), server2.getPort()), server2);
   }
 
   @AfterClass
@@ -87,7 +90,7 @@ public class QueryRunnerTest {
     QueryPlan queryPlan = _queryEnvironment.sqlQuery("SELECT * FROM b");
     String stageRoodId = QueryEnvironmentTestUtils.getTestStageByServerCount(queryPlan, 1);
     Map<String, String> requestMetadataMap = ImmutableMap.of(
-        "RequestId", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
+        "REQUEST_ID", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
 
     ServerInstance serverInstance = queryPlan.getStageMetadataMap().get(stageRoodId).getServerInstances().get(0);
     DistributedQueryPlan
@@ -95,7 +98,7 @@ public class QueryRunnerTest {
 
     MailboxReceiveOperator mailboxReceiveOperator =
         createReduceStageOperator(queryPlan.getStageMetadataMap().get(stageRoodId).getServerInstances(),
-            requestMetadataMap.get("RequestId"), stageRoodId, _reducerGrpcPort);
+            requestMetadataMap.get("REQUEST_ID"), stageRoodId, _reducerGrpcPort);
 
     // execute this single stage.
     _servers.get(serverInstance).processQuery(distributedQueryPlan, requestMetadataMap);
@@ -114,7 +117,7 @@ public class QueryRunnerTest {
       throws Exception {
     QueryPlan queryPlan = _queryEnvironment.sqlQuery("SELECT * FROM a");
     String stageRoodId = QueryEnvironmentTestUtils.getTestStageByServerCount(queryPlan, 2);
-    Map<String, String> requestMetadataMap = ImmutableMap.of("RequestId", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
+    Map<String, String> requestMetadataMap = ImmutableMap.of("REQUEST_ID", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
 
     for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageRoodId).getServerInstances()) {
       DistributedQueryPlan
@@ -126,7 +129,7 @@ public class QueryRunnerTest {
 
     MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(
         queryPlan.getStageMetadataMap().get(stageRoodId).getServerInstances(),
-        requestMetadataMap.get("RequestId"), stageRoodId, _reducerGrpcPort);
+        requestMetadataMap.get("REQUEST_ID"), stageRoodId, _reducerGrpcPort);
 
     int count = 0;
     int rowCount = 0;
@@ -147,14 +150,14 @@ public class QueryRunnerTest {
   public void testJoin()
       throws Exception {
     QueryPlan queryPlan = _queryEnvironment.sqlQuery("SELECT * FROM a JOIN b on a.col1 = b.col2");
-    Map<String, String> requestMetadataMap = ImmutableMap.of("RequestId", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
+    Map<String, String> requestMetadataMap = ImmutableMap.of("REQUEST_ID", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
     MailboxReceiveOperator mailboxReceiveOperator = null;
     for (String stageId : queryPlan.getStageMetadataMap().keySet()) {
       if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
         MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(stageId);
         mailboxReceiveOperator = createReduceStageOperator(
             queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
-            requestMetadataMap.get("RequestId"), reduceNode.getSenderStageId(), _reducerGrpcPort);
+            requestMetadataMap.get("REQUEST_ID"), reduceNode.getSenderStageId(), _reducerGrpcPort);
       } else {
         for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
           DistributedQueryPlan
@@ -197,14 +200,14 @@ public class QueryRunnerTest {
       throws Exception {
     QueryPlan queryPlan = _queryEnvironment.sqlQuery("SELECT * FROM a JOIN b ON a.col1 = b.col2 "
         + "JOIN c ON a.col3 = c.col3");
-    Map<String, String> requestMetadataMap = ImmutableMap.of("RequestId", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
+    Map<String, String> requestMetadataMap = ImmutableMap.of("REQUEST_ID", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
     MailboxReceiveOperator mailboxReceiveOperator = null;
     for (String stageId : queryPlan.getStageMetadataMap().keySet()) {
       if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
         MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(stageId);
         mailboxReceiveOperator = createReduceStageOperator(
             queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
-            requestMetadataMap.get("RequestId"), reduceNode.getSenderStageId(), _reducerGrpcPort);
+            requestMetadataMap.get("REQUEST_ID"), reduceNode.getSenderStageId(), _reducerGrpcPort);
       } else {
         for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
           DistributedQueryPlan

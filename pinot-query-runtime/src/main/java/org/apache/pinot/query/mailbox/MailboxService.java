@@ -11,6 +11,8 @@ public interface MailboxService<T> {
 
   void shutdown();
 
+  String getHostname();
+
   int getMailboxPort();
 
   ReceivingMailbox<T> getReceivingMailbox(String mailboxId);
