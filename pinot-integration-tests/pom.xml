@@ -37,6 +37,7 @@
     <localstack-utils.version>0.2.19</localstack-utils.version>
     <awaitility.version>3.0.0</awaitility.version>
     <aws.sdk.version>2.14.28</aws.sdk.version>
+    <rocketmq.version>4.9.0</rocketmq.version>
   </properties>
 
   <build>
@@ -385,6 +386,34 @@
       <groupId>org.glassfish.hk2</groupId>
       <artifactId>hk2-metadata-generator</artifactId>
       <version>${hk2.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-rocketmq</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.rocketmq</groupId>
+      <artifactId>rocketmq-namesrv</artifactId>
+      <version>${rocketmq.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.rocketmq</groupId>
+      <artifactId>rocketmq-broker</artifactId>
+      <version>${rocketmq.version}</version>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>com.beust</groupId>
+          <artifactId>jcommander</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>net.java.dev.jna</groupId>
+          <artifactId>jna</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
   </dependencies>
 </project>
