@@ -24,9 +24,9 @@ import java.time.Duration;
 import java.util.Collections;
 import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.pinot.spi.stream.ConsumerPartitionStatus;
-import org.apache.pinot.spi.stream.PartitionLagInfo;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.PartitionLagInfo;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -87,11 +87,12 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       return partitionLagInfo;
     } else {
       LOGGER.warn("Unable to compute partition lag for {}", _topicPartition.toString());
-      return PartitionLagInfo.EMPTY();
+      return PartitionLagInfo.empty();
     }
   }
 
-  private String computeOffsetLag(StreamPartitionMsgOffset currentOffset, StreamPartitionMsgOffset latestUpstreamOffset) {
+  private String computeOffsetLag(StreamPartitionMsgOffset currentOffset,
+      StreamPartitionMsgOffset latestUpstreamOffset) {
     long offsetDiff = ((LongMsgOffset) latestUpstreamOffset).getOffset() - ((LongMsgOffset) currentOffset).getOffset();
     return String.valueOf(offsetDiff);
   }

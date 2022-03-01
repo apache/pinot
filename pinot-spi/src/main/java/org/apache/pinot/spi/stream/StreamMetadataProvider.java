@@ -90,6 +90,6 @@ public interface StreamMetadataProvider extends Closeable {
 
   default PartitionLagInfo computePartitionLagInfo(ConsumerPartitionStatus currentConsumerStatus,
       ConsumerPartitionStatus upstreamStatus) {
-    return PartitionLagInfo.EMPTY();
+    return PartitionLagInfo.empty();
   }
 }

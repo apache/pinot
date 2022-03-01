@@ -134,8 +134,8 @@ public class PullRequestMergedEventsStream {
     String schemaFile = args[1];
     String kafkaBrokerList = args[2];
     String topic = "pullRequestMergedEvents";
-    PullRequestMergedEventsStream stream =
-        new PullRequestMergedEventsStream(schemaFile, topic, personalAccessToken, getKafkaStreamDataProducer(kafkaBrokerList));
+    PullRequestMergedEventsStream stream = new PullRequestMergedEventsStream(schemaFile, topic, personalAccessToken,
+        getKafkaStreamDataProducer(kafkaBrokerList));
     stream.execute();
   }
 

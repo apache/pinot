@@ -144,8 +144,4 @@ public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implemen
     }
     return true;
   }
-
-  public static void main(String[] args) {
-
-  }
 }
