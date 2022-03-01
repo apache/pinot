@@ -44,13 +44,18 @@ public class ComplexTypeConfig extends BaseJsonConfig {
   @JsonPropertyDescription("The mode of converting collection to JSON string")
   private final CollectionNotUnnestedToJson _collectionNotUnnestedToJson;
 
+  @JsonPropertyDescription("The leaf field name is kept if true instead of the full unnested delimiter joined name")
+  private final Boolean _useLeafFieldName;
+
   @JsonCreator
   public ComplexTypeConfig(@JsonProperty("fieldsToUnnest") @Nullable List<String> fieldsToUnnest,
       @JsonProperty("delimiter") @Nullable String delimiter,
-      @JsonProperty("collectionNotUnnestedToJson") @Nullable CollectionNotUnnestedToJson collectionNotUnnestedToJson) {
+      @JsonProperty("collectionNotUnnestedToJson") @Nullable CollectionNotUnnestedToJson collectionNotUnnestedToJson,
+                           @JsonProperty("useLeafFieldName") @Nullable Boolean useLeafFieldName) {
     _fieldsToUnnest = fieldsToUnnest;
     _delimiter = delimiter;
     _collectionNotUnnestedToJson = collectionNotUnnestedToJson;
+    _useLeafFieldName = useLeafFieldName;
   }
 
   @Nullable
@@ -66,5 +71,10 @@ public class ComplexTypeConfig extends BaseJsonConfig {
   @Nullable
   public CollectionNotUnnestedToJson getCollectionNotUnnestedToJson() {
     return _collectionNotUnnestedToJson;
+  }
+
+  @Nullable
+  public Boolean getUseLeafFieldName() {
+    return _useLeafFieldName;
   }
 }

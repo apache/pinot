@@ -326,6 +326,11 @@ public final class IngestionUtils {
     for (String field : fieldsToRead) {
       result.add(StringUtils.split(field, delimiter)[0]);
     }
+    if (complexTypeConfig.getFieldsToUnnest() != null) {
+      for (String field : complexTypeConfig.getFieldsToUnnest()) {
+        result.add(StringUtils.split(field, delimiter)[0]);
+      }
+    }
     return result;
   }
 

@@ -89,25 +89,28 @@ public class ComplexTypeTransformer implements RecordTransformer {
   private final List<String> _fieldsToUnnest;
   private final String _delimiter;
   private final ComplexTypeConfig.CollectionNotUnnestedToJson _collectionNotUnnestedToJson;
+  private final Boolean _useLeafFieldName;
 
   public ComplexTypeTransformer(TableConfig tableConfig) {
-    this(parseFieldsToUnnest(tableConfig), parseDelimiter(tableConfig), parseCollectionNotUnnestedToJson(tableConfig));
+    this(parseFieldsToUnnest(tableConfig), parseDelimiter(tableConfig),
+            parseCollectionNotUnnestedToJson(tableConfig), parseUseLeafFieldName(tableConfig));
   }
 
   @VisibleForTesting
   ComplexTypeTransformer(List<String> fieldsToUnnest, String delimiter) {
-    this(fieldsToUnnest, delimiter, DEFAULT_COLLECTION_TO_JSON_MODE);
+    this(fieldsToUnnest, delimiter, DEFAULT_COLLECTION_TO_JSON_MODE, false);
   }
 
   @VisibleForTesting
   ComplexTypeTransformer(List<String> fieldsToUnnest, String delimiter,
-      ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson) {
+      ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson, Boolean useLeafFieldName) {
     _fieldsToUnnest = new ArrayList<>(fieldsToUnnest);
     _delimiter = delimiter;
     _collectionNotUnnestedToJson = collectionNotUnnestedToJson;
     // the unnest fields are sorted to achieve the topological sort of the collections, so that the parent collection
     // (e.g. foo) is unnested before the child collection (e.g. foo.bar)
     Collections.sort(_fieldsToUnnest);
+    _useLeafFieldName = useLeafFieldName;
   }
 
   private static List<String> parseFieldsToUnnest(TableConfig tableConfig) {
@@ -146,6 +149,15 @@ public class ComplexTypeTransformer implements RecordTransformer {
       return tableConfig.getIngestionConfig().getComplexTypeConfig().getCollectionNotUnnestedToJson();
     } else {
       return DEFAULT_COLLECTION_TO_JSON_MODE;
+    }
+  }
+
+  private static boolean parseUseLeafFieldName(TableConfig tableConfig) {
+    if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getComplexTypeConfig() != null
+            && tableConfig.getIngestionConfig().getComplexTypeConfig().getUseLeafFieldName() != null) {
+      return tableConfig.getIngestionConfig().getComplexTypeConfig().getUseLeafFieldName();
+    } else {
+      return false;
     }
   }
 
@@ -395,6 +407,9 @@ public class ComplexTypeTransformer implements RecordTransformer {
   }
 
   private String concat(String left, String right) {
+    if (_useLeafFieldName) {
+      return right;
+    }
     return String.join(_delimiter, left, right);
   }
 }

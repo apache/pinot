@@ -296,7 +296,8 @@ public class ComplexTypeTransformerTest {
     // {
     //   "array":"[1,2]"
     // }
-    transformer = new ComplexTypeTransformer(Arrays.asList(), ".", ComplexTypeConfig.CollectionNotUnnestedToJson.ALL);
+    transformer = new ComplexTypeTransformer(Arrays.asList(), ".",
+            ComplexTypeConfig.CollectionNotUnnestedToJson.ALL, false);
     genericRow = new GenericRow();
     array = new Object[]{1, 2};
     genericRow.putValue("array", array);
@@ -341,7 +342,8 @@ public class ComplexTypeTransformerTest {
     array1[0] = ImmutableMap.of("b", "v1");
     map.put("array1", array1);
     genericRow.putValue("t", map);
-    transformer = new ComplexTypeTransformer(Arrays.asList(), ".", ComplexTypeConfig.CollectionNotUnnestedToJson.NONE);
+    transformer = new ComplexTypeTransformer(Arrays.asList(), ".",
+            ComplexTypeConfig.CollectionNotUnnestedToJson.NONE, false);
     transformer.transform(genericRow);
     Assert.assertTrue(ComplexTypeTransformer.isArray(genericRow.getValue("t.array1")));
   }
