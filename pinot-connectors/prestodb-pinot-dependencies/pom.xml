@@ -46,6 +46,7 @@
     <module>pinot-core-jdk8</module>
     <module>pinot-segment-spi-jdk8</module>
     <module>pinot-segment-local-jdk8</module>
+    <module>presto-pinot-driver</module>
   </modules>
 
 

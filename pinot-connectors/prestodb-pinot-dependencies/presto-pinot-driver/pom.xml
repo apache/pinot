@@ -24,9 +24,10 @@
     <packaging>jar</packaging>
 
     <parent>
-        <artifactId>pinot-connectors</artifactId>
+        <artifactId>prestodb-pinot-dependencies</artifactId>
         <groupId>org.apache.pinot</groupId>
         <version>0.10.0-SNAPSHOT</version>
+        <relativePath>..</relativePath>
     </parent>
 
     <name>Presto Pinot Driver</name>
@@ -34,7 +35,7 @@
     <artifactId>presto-pinot-driver</artifactId>
 
     <properties>
-        <pinot.root>${basedir}/../..</pinot.root>
+        <pinot.root>${basedir}/../../..</pinot.root>
         <shadeBase>org.apache.pinot.\$internal</shadeBase>
         <jdk.version>8</jdk.version>
     </properties>
