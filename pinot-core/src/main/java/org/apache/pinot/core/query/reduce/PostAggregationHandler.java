@@ -54,9 +54,6 @@ public class PostAggregationHandler implements ValueExtractorFactory {
     _filteredAggregationsIndexMap = queryContext.getFilteredAggregationsIndexMap();
     assert _filteredAggregationsIndexMap != null;
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
-    if (groupByExpressions == null) {
-      groupByExpressions = GapfillUtils.getGroupByExpressions(queryContext);
-    }
     if (groupByExpressions != null) {
       _numGroupByExpressions = groupByExpressions.size();
       _groupByExpressionIndexMap = new HashMap<>();

@@ -109,7 +109,7 @@ public class DataSource implements org.apache.thrift.TBase<DataSource, DataSourc
     tmpMap.put(_Fields.TABLE_NAME, new org.apache.thrift.meta_data.FieldMetaData("tableName", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
     tmpMap.put(_Fields.SUBQUERY, new org.apache.thrift.meta_data.FieldMetaData("subquery", org.apache.thrift.TFieldRequirementType.OPTIONAL,
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRUCT        , "PinotQuery")));
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRUCT, "PinotQuery")));
     metaDataMap = java.util.Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(DataSource.class, metaDataMap);
   }

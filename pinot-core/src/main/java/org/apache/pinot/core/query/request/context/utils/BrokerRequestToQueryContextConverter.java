@@ -55,15 +55,14 @@ public class BrokerRequestToQueryContextConverter {
    * Converts the given {@link BrokerRequest} into a {@link QueryContext}.
    */
   public static QueryContext convert(BrokerRequest brokerRequest) {
-    QueryContext queryContext;
     if (brokerRequest.getPinotQuery() != null) {
-      queryContext = convertSQL(brokerRequest.getPinotQuery(), brokerRequest);
+      QueryContext queryContext = convertSQL(brokerRequest.getPinotQuery(), brokerRequest);
+      queryContext.setGapfillType(GapfillUtils.getGapfillType(queryContext));
+      validateForGapfillQuery(queryContext);
+      return queryContext;
     } else {
-      queryContext = convertPQL(brokerRequest);
+      return convertPQL(brokerRequest);
     }
-    queryContext.setGapfillType(GapfillUtils.getGapfillType(queryContext));
-    validateForGapfillQuery(queryContext);
-    return queryContext;
   }
 
   /**
