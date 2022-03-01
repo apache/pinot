@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import java.util.Collections;
 import java.util.Map;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -25,6 +26,7 @@ import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.io.writer.impl.MmapMemoryManager;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
+import org.apache.pinot.spi.stream.PartitionLagInfo;
 import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 
 
@@ -57,4 +59,8 @@ public abstract class RealtimeSegmentDataManager extends SegmentDataManager {
   public abstract long getLastConsumedTimestamp();
 
   public abstract Map<String, String> getPartitionToUpstreamLatest();
+
+  public Map<String, PartitionLagInfo> computeConsumerLagInfo() {
+    return Collections.emptyMap();
+  }
 }

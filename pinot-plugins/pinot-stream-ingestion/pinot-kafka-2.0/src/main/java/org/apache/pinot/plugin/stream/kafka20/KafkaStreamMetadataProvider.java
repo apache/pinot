@@ -23,16 +23,21 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.Collections;
 import org.apache.kafka.common.errors.TimeoutException;
+import org.apache.pinot.spi.stream.ConsumerPartitionStatus;
+import org.apache.pinot.spi.stream.PartitionLagInfo;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.TransientConsumerException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHandler
     implements StreamMetadataProvider {
+  private static final Logger LOGGER = LoggerFactory.getLogger(KafkaStreamMetadataProvider.class);
 
   public KafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig) {
     this(clientId, streamConfig, Integer.MIN_VALUE);
@@ -70,6 +75,25 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     } catch (TimeoutException e) {
       throw new TransientConsumerException(e);
     }
+  }
+
+  @Override
+  public PartitionLagInfo computePartitionLagInfo(ConsumerPartitionStatus currentConsumerStatus,
+      ConsumerPartitionStatus upstreamStatus) {
+    if (currentConsumerStatus != null && upstreamStatus != null) {
+      PartitionLagInfo partitionLagInfo = new PartitionLagInfo();
+      partitionLagInfo.setOffsetLag(computeOffsetLag(currentConsumerStatus.getMsgOffset(),
+          upstreamStatus.getMsgOffset()));
+      return partitionLagInfo;
+    } else {
+      LOGGER.warn("Unable to compute partition lag for {}", _topicPartition.toString());
+      return PartitionLagInfo.EMPTY();
+    }
+  }
+
+  private String computeOffsetLag(StreamPartitionMsgOffset currentOffset, StreamPartitionMsgOffset latestUpstreamOffset) {
+    long offsetDiff = ((LongMsgOffset) latestUpstreamOffset).getOffset() - ((LongMsgOffset) currentOffset).getOffset();
+    return String.valueOf(offsetDiff);
   }
 
   @Override

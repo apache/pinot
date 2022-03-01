@@ -71,6 +71,8 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.ConsumerPartitionStatus;
+import org.apache.pinot.spi.stream.PartitionLagInfo;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
@@ -827,6 +829,22 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       StreamPartitionMsgOffset partitionUpstreamLatest =
           metadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, /*maxWaitTimeMs*/5000);
       return Collections.singletonMap(String.valueOf(_partitionGroupId), partitionUpstreamLatest.toString());
+    } catch (Exception e) {
+      _segmentLogger.warn("Cannot fetch latest stream offset for clientId {} and partitionGroupId {}", _clientId,
+          _partitionGroupId);
+      return Collections.emptyMap();
+    }
+  }
+
+  @Override
+  public Map<String, PartitionLagInfo> computeConsumerLagInfo() {
+    try (StreamMetadataProvider metadataProvider = _streamConsumerFactory
+        .createPartitionMetadataProvider(_clientId, _partitionGroupId)) {
+      StreamPartitionMsgOffset partitionUpstreamLatest =
+          metadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, /*maxWaitTimeMs*/5000);
+      PartitionLagInfo partitionLagInfo = metadataProvider.computePartitionLagInfo(
+          new ConsumerPartitionStatus(_currentOffset), new ConsumerPartitionStatus(partitionUpstreamLatest));
+      return Collections.singletonMap(String.valueOf(_partitionGroupId), partitionLagInfo);
     } catch (Exception e) {
       _segmentLogger.warn("Cannot fetch latest stream offset for clientId {} and partitionGroupId {}", _clientId,
           _partitionGroupId);

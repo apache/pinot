@@ -87,4 +87,7 @@ public interface StreamMetadataProvider extends Closeable {
     }
     return newPartitionGroupMetadataList;
   }
+
+  PartitionLagInfo computePartitionLagInfo(ConsumerPartitionStatus currentConsumerStatus,
+      ConsumerPartitionStatus upstreamStatus);
 }
