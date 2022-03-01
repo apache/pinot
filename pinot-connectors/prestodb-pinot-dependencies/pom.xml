@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0"?>
 <!--
 
     Licensed to the Apache Software Foundation (ASF) under one
@@ -19,25 +19,53 @@
     under the License.
 
 -->
-
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
+
   <parent>
-    <artifactId>pinot</artifactId>
+    <artifactId>pinot-connectors</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>0.10.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
-  <artifactId>pinot-segment-spi</artifactId>
-  <name>Pinot Segment Service Provider Interface</name>
+
+  <artifactId>prestodb-pinot-dependencies</artifactId>
+  <packaging>pom</packaging>
+  <name>PrestoDB Pinot Dependencies</name>
   <url>https://pinot.apache.org/</url>
   <properties>
-    <pinot.root>${basedir}/..</pinot.root>
+    <pinot.root>${basedir}/../..</pinot.root>
+    <jdk.version>8</jdk.version>
   </properties>
+
+  <modules>
+    <module>pinot-spi-jdk8</module>
+    <module>pinot-common-jdk8</module>
+    <module>pinot-core-jdk8</module>
+    <module>pinot-segment-spi-jdk8</module>
+    <module>pinot-segment-local-jdk8</module>
+    <module>presto-pinot-driver</module>
+  </modules>
+
 
   <build>
     <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-install-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <artifactId>maven-surefire-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+      </plugin>
       <plugin>
         <artifactId>maven-jar-plugin</artifactId>
         <executions>
@@ -48,47 +76,6 @@
           </execution>
         </executions>
       </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-      </plugin>
     </plugins>
   </build>
-
-  <dependencies>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-spi</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.roaringbitmap</groupId>
-      <artifactId>RoaringBitmap</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>it.unimi.dsi</groupId>
-      <artifactId>fastutil</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.locationtech.jts</groupId>
-      <artifactId>jts-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.xerial.larray</groupId>
-      <artifactId>larray-mmap</artifactId>
-    </dependency>
-
-    <!-- test -->
-    <dependency>
-      <groupId>org.testng</groupId>
-      <artifactId>testng</artifactId>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.mockito</groupId>
-      <artifactId>mockito-core</artifactId>
-      <scope>test</scope>
-    </dependency>
-
-  </dependencies>
 </project>

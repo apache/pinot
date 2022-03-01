@@ -23,49 +23,36 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
+
   <parent>
-    <artifactId>pinot</artifactId>
+    <artifactId>prestodb-pinot-dependencies</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>0.10.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
-  <artifactId>pinot-segment-local</artifactId>
-  <name>Pinot local segment implementations</name>
+
+  <artifactId>pinot-segment-local-jdk8</artifactId>
+  <name>Pinot local segment implementations JDK 8</name>
   <url>https://pinot.apache.org/</url>
   <properties>
-    <pinot.root>${basedir}/..</pinot.root>
+    <pinot.root>${basedir}/../../..</pinot.root>
   </properties>
 
-  <build>
-    <plugins>
-      <plugin>
-        <artifactId>maven-jar-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>test-jar</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-      </plugin>
-    </plugins>
-  </build>
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-spi</artifactId>
+      <artifactId>pinot-spi-jdk8</artifactId>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-common</artifactId>
+      <artifactId>pinot-common-jdk8</artifactId>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-segment-spi</artifactId>
+      <artifactId>pinot-segment-spi-jdk8</artifactId>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>org.xerial.larray</groupId>
@@ -139,7 +126,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-spi</artifactId>
+      <artifactId>pinot-spi-jdk8</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
@@ -147,12 +134,11 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-yammer</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-common</artifactId>
+      <artifactId>pinot-common-jdk8</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
       <scope>test</scope>

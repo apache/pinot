@@ -22,41 +22,21 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
+
   <parent>
-    <artifactId>pinot</artifactId>
+    <artifactId>prestodb-pinot-dependencies</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>0.10.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
-  <artifactId>pinot-spi</artifactId>
-  <name>Pinot Service Provider Interface</name>
+
+  <artifactId>pinot-spi-jdk8</artifactId>
+  <name>Pinot Service Provider Interface JDK 8</name>
   <url>https://pinot.apache.org/</url>
   <properties>
-    <pinot.root>${basedir}/..</pinot.root>
+    <pinot.root>${basedir}/../../..</pinot.root>
   </properties>
 
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <configuration>
-          <forkCount>1</forkCount>
-          <reuseForks>true</reuseForks>
-        </configuration>
-      </plugin>
-      <plugin>
-        <artifactId>maven-jar-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>test-jar</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-    </plugins>
-  </build>
   <dependencies>
     <dependency>
       <groupId>commons-configuration</groupId>
@@ -150,39 +130,4 @@
       <artifactId>reflections</artifactId>
     </dependency>
   </dependencies>
-  <profiles>
-    <profile>
-      <id>build-shaded-jar</id>
-      <activation>
-        <activeByDefault>false</activeByDefault>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <artifactId>maven-shade-plugin</artifactId>
-            <executions>
-              <execution>
-                <phase>package</phase>
-                <goals>
-                  <goal>shade</goal>
-                </goals>
-                <configuration>
-                  <relocations>
-                    <relocation>
-                      <pattern>com.google.common.base</pattern>
-                      <shadedPattern>shaded.com.google.common.base</shadedPattern>
-                    </relocation>
-                    <relocation>
-                      <pattern>com.fasterxml.jackson</pattern>
-                      <shadedPattern>shaded.com.fasterxml.jackson</shadedPattern>
-                    </relocation>
-                  </relocations>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-  </profiles>
 </project>

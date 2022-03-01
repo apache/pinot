@@ -22,37 +22,21 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
+
   <parent>
-    <artifactId>pinot</artifactId>
+    <artifactId>prestodb-pinot-dependencies</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>0.10.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
-  <artifactId>pinot-core</artifactId>
-  <name>Pinot Core</name>
+
+  <artifactId>pinot-core-jdk8</artifactId>
+  <name>Pinot Core JDK 8</name>
   <url>https://pinot.apache.org/</url>
   <properties>
-    <pinot.root>${basedir}/..</pinot.root>
+    <pinot.root>${basedir}/../../..</pinot.root>
   </properties>
 
-  <build>
-    <plugins>
-      <plugin>
-        <artifactId>maven-jar-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>test-jar</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-      </plugin>
-    </plugins>
-  </build>
   <dependencies>
     <dependency>
       <groupId>com.uber</groupId>
@@ -64,19 +48,23 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-spi</artifactId>
+      <artifactId>pinot-spi-jdk8</artifactId>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-segment-spi</artifactId>
+      <artifactId>pinot-common-jdk8</artifactId>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-segment-local</artifactId>
+      <artifactId>pinot-segment-spi-jdk8</artifactId>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-common</artifactId>
+      <artifactId>pinot-segment-local-jdk8</artifactId>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>joda-time</groupId>
@@ -187,14 +175,14 @@
     <!-- test -->
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-common</artifactId>
+      <artifactId>pinot-common-jdk8</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-segment-local</artifactId>
+      <artifactId>pinot-segment-local-jdk8</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
@@ -234,7 +222,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-spi</artifactId>
+      <artifactId>pinot-spi-jdk8</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
