@@ -21,11 +21,10 @@ package org.apache.pinot.core.query.reduce;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -111,14 +110,16 @@ public class StreamingReduceService extends BaseReduceService {
       ExecutionStatsAggregator aggregator) throws Exception {
     int cnt = 0;
     Future[] futures = new Future[serverResponseMap.size()];
-    CountDownLatch countDownLatch = new CountDownLatch(serverResponseMap.size());
-
+    // based on consensus on https://stackoverflow.com/questions/19348248/waiting-on-a-list-of-future
+    // mostly because we need to handle and transfer the exception in threads into caller thread.
+    ExecutorCompletionService<Void> countDownHelper = new ExecutorCompletionService<>(executorService);
     for (Map.Entry<ServerRoutingInstance, Iterator<Server.ServerResponse>> entry: serverResponseMap.entrySet()) {
-      futures[cnt++] = executorService.submit(() -> {
+      futures[cnt++] = countDownHelper.submit(() -> {
         Iterator<Server.ServerResponse> streamingResponses = entry.getValue();
         try {
           while (streamingResponses.hasNext()) {
             Server.ServerResponse streamingResponse = streamingResponses.next();
+            LOGGER.info("Streaming Response is {}", streamingResponse.toString());
             DataTable dataTable = DataTableFactory.getDataTable(streamingResponse.getPayload().asReadOnlyByteBuffer());
             // null dataSchema is a metadata-only block.
             if (dataTable.getDataSchema() != null) {
@@ -127,23 +128,24 @@ public class StreamingReduceService extends BaseReduceService {
               aggregator.aggregate(entry.getKey(), dataTable);
             }
           }
+          return null;
         } catch (Exception e) {
+          LOGGER.error("Unable to process streaming response. Failure occurred!", e);
           throw new RuntimeException("Unable to process streaming response. Failure occurred!", e);
-        } finally {
-          countDownLatch.countDown();
         }
       });
     }
-
-    try {
-      countDownLatch.await(reduceTimeOutMs, TimeUnit.MILLISECONDS);
-    } catch (InterruptedException e) {
-      for (Future future : futures) {
-        if (!future.isDone()) {
-          future.cancel(true);
+    for (int received = 0; received < futures.length; received++) {
+      try {
+        countDownHelper.take().get();
+      } catch (Exception ex) {
+        for (Future future : futures) {
+          if (!future.isDone()) {
+            future.cancel(true);
+          }
         }
+        throw new ExecutionException("Encountered exception when handling server response", ex);
       }
-      throw new TimeoutException("Timed out in broker reduce phase.");
     }
   }
 
