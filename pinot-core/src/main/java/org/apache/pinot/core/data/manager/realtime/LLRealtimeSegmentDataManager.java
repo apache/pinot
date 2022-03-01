@@ -820,6 +820,20 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return _lastLogTime;
   }
 
+  @Override
+  public Map<String, String> getPartitionToUpstreamLatest() {
+    try (StreamMetadataProvider metadataProvider = _streamConsumerFactory
+        .createPartitionMetadataProvider(_clientId, _partitionGroupId)) {
+      StreamPartitionMsgOffset partitionUpstreamLatest =
+          metadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, /*maxWaitTimeMs*/5000);
+      return Collections.singletonMap(String.valueOf(_partitionGroupId), partitionUpstreamLatest.toString());
+    } catch (Exception e) {
+      _segmentLogger.warn("Cannot fetch latest stream offset for clientId {} and partitionGroupId {}", _clientId,
+          _partitionGroupId);
+      return Collections.emptyMap();
+    }
+  }
+
   public StreamPartitionMsgOffset getCurrentOffset() {
     return _currentOffset;
   }

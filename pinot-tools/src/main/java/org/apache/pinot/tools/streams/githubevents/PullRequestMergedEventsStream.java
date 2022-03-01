@@ -132,9 +132,10 @@ public class PullRequestMergedEventsStream {
       throws Exception {
     String personalAccessToken = args[0];
     String schemaFile = args[1];
-    String topic = "pullRequestMergedEvent";
+    String kafkaBrokerList = args[2];
+    String topic = "pullRequestMergedEvents";
     PullRequestMergedEventsStream stream =
-        new PullRequestMergedEventsStream(schemaFile, topic, personalAccessToken, getKafkaStreamDataProducer());
+        new PullRequestMergedEventsStream(schemaFile, topic, personalAccessToken, getKafkaStreamDataProducer(kafkaBrokerList));
     stream.execute();
   }
 

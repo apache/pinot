@@ -55,4 +55,6 @@ public abstract class RealtimeSegmentDataManager extends SegmentDataManager {
   public abstract ConsumerState getConsumerState();
 
   public abstract long getLastConsumedTimestamp();
+
+  public abstract Map<String, String> getPartitionToUpstreamLatest();
 }

@@ -138,7 +138,8 @@ public class DebugResource {
       segmentConsumerInfo =
           new SegmentConsumerInfo(segmentName, realtimeSegmentDataManager.getConsumerState().toString(),
               realtimeSegmentDataManager.getLastConsumedTimestamp(),
-              realtimeSegmentDataManager.getPartitionToCurrentOffset());
+              realtimeSegmentDataManager.getPartitionToCurrentOffset(),
+              realtimeSegmentDataManager.getPartitionToUpstreamLatest());
     }
     return segmentConsumerInfo;
   }

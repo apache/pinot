@@ -429,6 +429,11 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   @Override
+  public Map<String, String> getPartitionToUpstreamLatest() {
+    return Collections.emptyMap();
+  }
+
+  @Override
   public String getSegmentName() {
     return _segmentName;
   }
