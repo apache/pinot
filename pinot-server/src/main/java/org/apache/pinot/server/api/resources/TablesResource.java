@@ -503,7 +503,8 @@ public class TablesResource {
               new SegmentConsumerInfo(segmentName, realtimeSegmentDataManager.getConsumerState().toString(),
                   realtimeSegmentDataManager.getLastConsumedTimestamp(),
                   realtimeSegmentDataManager.getPartitionToCurrentOffset(),
-                  realtimeSegmentDataManager.getPartitionToUpstreamLatest()));
+                  realtimeSegmentDataManager.getPartitionToUpstreamLatest(),
+                  realtimeSegmentDataManager.computeConsumerLagInfo()));
         }
       }
     } catch (Exception e) {

@@ -25,7 +25,7 @@
       "stream.kafka.zk.broker.url": "localhost:2181",
       "stream.kafka.broker.list": "localhost:9092",
       "realtime.segment.flush.threshold.time": "12h",
-      "realtime.segment.flush.threshold.size": "100000",
+      "realtime.segment.flush.threshold.size": "200",
       "stream.kafka.consumer.prop.auto.offset.reset": "smallest"
     }
   },

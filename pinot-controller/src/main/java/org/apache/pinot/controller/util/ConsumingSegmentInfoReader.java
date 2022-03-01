@@ -37,6 +37,7 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableStatus;
+import org.apache.pinot.spi.stream.PartitionLagInfo;
 import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -83,7 +84,8 @@ public class ConsumingSegmentInfoReader {
       for (SegmentConsumerInfo info : entry.getValue()) {
         consumingSegmentInfoMap.computeIfAbsent(info.getSegmentName(), k -> new ArrayList<>()).add(
             new ConsumingSegmentInfo(serverName, info.getConsumerState(), info.getLastConsumedTimestamp(),
-                info.getPartitionToOffsetMap(), info.getPartitionToUpstreamLatestMap()));
+                info.getPartitionToOffsetMap(), info.getPartitionToUpstreamLatestMap(),
+                info.getPartitionToLagInfoMap()));
       }
     }
     // Segments which are in CONSUMING state but found no consumer on the server
@@ -207,17 +209,21 @@ public class ConsumingSegmentInfoReader {
     public Map<String, String> _partitionToOffsetMap;
     @JsonProperty("partitionToUpstreamLatestMap")
     public Map<String, String> _partitionToUpstreamLatestMap;
+    @JsonProperty("partitionToLagInfoMap")
+    public Map<String, PartitionLagInfo> _partitionLagInfoMap;
 
     public ConsumingSegmentInfo(@JsonProperty("serverName") String serverName,
         @JsonProperty("consumerState") String consumerState,
         @JsonProperty("lastConsumedTimestamp") long lastConsumedTimestamp,
         @JsonProperty("partitionToOffsetMap") Map<String, String> partitionToOffsetMap,
-        @JsonProperty("partitionToUpstreamLatestMap") Map<String, String> partitionToUpstreamLatestMap) {
+        @JsonProperty("partitionToUpstreamLatestMap") Map<String, String> partitionToUpstreamLatestMap,
+        @JsonProperty("partitionToLagInfoMap") Map<String, PartitionLagInfo> partitionLagInfoMap) {
       _serverName = serverName;
       _consumerState = consumerState;
       _lastConsumedTimestamp = lastConsumedTimestamp;
       _partitionToOffsetMap = partitionToOffsetMap;
       _partitionToUpstreamLatestMap = partitionToUpstreamLatestMap;
+      _partitionLagInfoMap = partitionLagInfoMap;
     }
   }
 }

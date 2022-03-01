@@ -21,6 +21,7 @@ package org.apache.pinot.common.restlet.resources;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
+import org.apache.pinot.spi.stream.PartitionLagInfo;
 
 
 /**
@@ -33,18 +34,20 @@ public class SegmentConsumerInfo {
   private final long _lastConsumedTimestamp;
   private final Map<String, String> _partitionToOffsetMap;
   private final Map<String, String> _partitionToUpstreamLatestMap;
-
+  private final Map<String, PartitionLagInfo> _partitionToLagInfoMap;
 
   public SegmentConsumerInfo(@JsonProperty("segmentName") String segmentName,
       @JsonProperty("consumerState") String consumerState,
       @JsonProperty("lastConsumedTimestamp") long lastConsumedTimestamp,
       @JsonProperty("partitionToOffsetMap") Map<String, String> partitionToOffsetMap,
-      @JsonProperty("partitionToUpstreamLatestMap") Map<String, String> partitionToUpstreamLatestMap) {
+      @JsonProperty("partitionToUpstreamLatestMap") Map<String, String> partitionToUpstreamLatestMap,
+      @JsonProperty("partitionToLagInfoMap") Map<String, PartitionLagInfo> partitionToLagInfoMap) {
     _segmentName = segmentName;
     _consumerState = consumerState;
     _lastConsumedTimestamp = lastConsumedTimestamp;
     _partitionToOffsetMap = partitionToOffsetMap;
     _partitionToUpstreamLatestMap = partitionToUpstreamLatestMap;
+    _partitionToLagInfoMap = partitionToLagInfoMap;
   }
 
   public String getSegmentName() {
@@ -65,5 +68,9 @@ public class SegmentConsumerInfo {
 
   public Map<String, String> getPartitionToUpstreamLatestMap() {
     return _partitionToUpstreamLatestMap;
+  }
+
+  public Map<String, PartitionLagInfo> getPartitionToLagInfoMap() {
+    return _partitionToLagInfoMap;
   }
 }
