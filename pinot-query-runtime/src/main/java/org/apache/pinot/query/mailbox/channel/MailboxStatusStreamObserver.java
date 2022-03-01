@@ -25,52 +25,34 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
   private static final long DEFAULT_MAILBOX_POLL_TIMEOUT_MS = 1000L;
   private final AtomicInteger _bufferSize = new AtomicInteger(5);
   private final AtomicBoolean _isCompleted = new AtomicBoolean(false);
-  private final ArrayBlockingQueue<Mailbox.MailboxContent> _sendingBuffer;
-  private final ExecutorService _executorService;
 
   private StreamObserver<Mailbox.MailboxContent> _mailboxContentStreamObserver;
 
   public MailboxStatusStreamObserver() {
-    _sendingBuffer = new ArrayBlockingQueue<>(DEFAULT_MAILBOX_QUEUE_CAPACITY);
-    _executorService = Executors.newFixedThreadPool(1);
+  }
+
+  public void init(StreamObserver<Mailbox.MailboxContent> mailboxContentStreamObserver) {
+    this._mailboxContentStreamObserver = mailboxContentStreamObserver;
+  }
+
+  public void send(Mailbox.MailboxContent mailboxContent) {
+    _mailboxContentStreamObserver.onNext(mailboxContent);
+  }
+
+  public void complete() {
+    this._mailboxContentStreamObserver.onCompleted();
   }
 
   @Override
   public void onNext(Mailbox.MailboxStatus mailboxStatus) {
     // when received a mailbox status from the receiving end, sending end update the known buffer size available
     // so we can make better throughput send judgement. here is a simple example.
+    // TODO: this feedback info is not used to throttle the send speed. it is currently being discarded.
     if (mailboxStatus.getMetadataMap().containsKey("buffer.size")) {
       _bufferSize.set(Integer.parseInt(mailboxStatus.getMetadataMap().get("buffer.size")));
     } else {
-      _bufferSize.set(1); // DEFAULT_AVAILABILITY;
+      _bufferSize.set(DEFAULT_MAILBOX_QUEUE_CAPACITY); // DEFAULT_AVAILABILITY;
     }
-    // if receiving end echo data receive finished. we finished via calling channel complete
-    if (mailboxStatus.getMetadataMap().containsKey("finished")) {
-      this._mailboxContentStreamObserver.onCompleted();
-    } else {
-      // TODO: check stream is not completed before sending data
-      // It should never be completed unless content is completed, however since within this class we can't know.
-      while (!_isCompleted.get()) {
-        try {
-          Mailbox.MailboxContent content = _sendingBuffer.poll(DEFAULT_MAILBOX_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS);
-          if (content != null) {
-            this._mailboxContentStreamObserver.onNext(content);
-            break;
-          }
-        } catch (InterruptedException e) {
-          LOGGER.error("Interrupted during mailbox content", e);
-        }
-      }
-    }
-  }
-
-  public void init(StreamObserver<Mailbox.MailboxContent> mailboxContentStreamObserver, Mailbox.MailboxContent data) {
-    this._mailboxContentStreamObserver = mailboxContentStreamObserver;
-    _mailboxContentStreamObserver.onNext(data);
-  }
-
-  public void offer(Mailbox.MailboxContent mailboxContent) {
-    _sendingBuffer.offer(mailboxContent);
   }
 
   @Override
@@ -81,8 +63,6 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
   }
 
   private void shutdown() {
-    _sendingBuffer.clear();
-    _executorService.shutdown();
   }
 
   @Override

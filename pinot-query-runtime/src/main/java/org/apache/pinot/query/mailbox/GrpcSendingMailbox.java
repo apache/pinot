@@ -1,7 +1,6 @@
 package org.apache.pinot.query.mailbox;
 
 import io.grpc.ManagedChannel;
-import io.grpc.stub.StreamObserver;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
@@ -23,11 +22,11 @@ public class GrpcSendingMailbox implements SendingMailbox<MailboxContent> {
     _initialized.set(false);
   }
 
-  public void init(MailboxContent data) throws UnsupportedOperationException {
+  public void init() throws UnsupportedOperationException {
     ManagedChannel channel = _mailboxService.getChannel(_mailboxId);
     PinotMailboxGrpc.PinotMailboxStub stub = PinotMailboxGrpc.newStub(channel);
     _statusStreamObserver = new MailboxStatusStreamObserver();
-    _statusStreamObserver.init(stub.open(_statusStreamObserver), data);
+    _statusStreamObserver.init(stub.open(_statusStreamObserver));
     _initialized.set(true);
   }
 
@@ -36,16 +35,15 @@ public class GrpcSendingMailbox implements SendingMailbox<MailboxContent> {
       throws UnsupportedOperationException {
     if (!_initialized.get()) {
       // initialization is special
-      init(data);
-    } else {
-      _statusStreamObserver.offer(data);
-      _totalMsgSent.incrementAndGet();
+      init();
     }
+    _statusStreamObserver.send(data);
+    _totalMsgSent.incrementAndGet();
   }
 
   @Override
   public void complete() {
-    _statusStreamObserver.onCompleted();
+    _statusStreamObserver.complete();
   }
 
   @Override

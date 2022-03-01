@@ -135,7 +135,11 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
     String mailboxId = toMailboxId(serverInstance);
     SendingMailbox<Mailbox.MailboxContent> sendingMailbox =
         _mailboxService.getSendingMailbox(mailboxId);
-    sendingMailbox.send(toMailboxContent(mailboxId, dataTable, isEndOfStream));
+    Mailbox.MailboxContent mailboxContent = toMailboxContent(mailboxId, dataTable, isEndOfStream);
+    sendingMailbox.send(mailboxContent);
+    if (mailboxContent.getMetadataMap().containsKey("finished")) {
+      sendingMailbox.complete();
+    }
   }
 
   private Mailbox.MailboxContent toMailboxContent(String mailboxId, DataTable dataTable, boolean isEndOfStream)

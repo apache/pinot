@@ -38,6 +38,8 @@ public class GrpcMailboxServiceTest extends GrpcMailboxServiceTestBase {
     Mailbox.MailboxContent receivedContent = receivingMailbox.receive();
     Assert.assertEquals(receivedContent, testContent);
 
+    sendingMailbox.complete();
+
     TestUtils.waitForCondition(aVoid -> {
       return receivingMailbox.isClosed();
     }, 5000L, "Receiving mailbox is not closed properly!");
