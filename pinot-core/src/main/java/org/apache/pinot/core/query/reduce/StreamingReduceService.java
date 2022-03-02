@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -87,7 +88,7 @@ public class StreamingReduceService extends BaseReduceService {
     streamingReducer.init(dataTableReducerContext);
 
     try {
-      processIterativeServerResponse(streamingReducer, serverResponseMap, reduceTimeOutMs,
+      processIterativeServerResponse(streamingReducer, _reduceExecutorService, serverResponseMap, reduceTimeOutMs,
           aggregator);
     } catch (Exception e) {
       LOGGER.error("Unable to process streaming query response!", e);
@@ -105,7 +106,7 @@ public class StreamingReduceService extends BaseReduceService {
   }
 
   @VisibleForTesting
-  static void processIterativeServerResponse(StreamingReducer reducer,
+  static void processIterativeServerResponse(StreamingReducer reducer, ExecutorService executorService,
       Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> serverResponseMap, long reduceTimeOutMs,
       ExecutionStatsAggregator aggregator)
       throws Exception {
@@ -133,7 +134,7 @@ public class StreamingReduceService extends BaseReduceService {
           LOGGER.error("Unable to process streaming response. Failure occurred!", e);
           throw new RuntimeException("Unable to process streaming response. Failure occurred!", e);
         }
-      });
+      }, executorService);
     }
     CompletableFuture<Void> syncWaitPoint = CompletableFuture.allOf(futures);
     try {
