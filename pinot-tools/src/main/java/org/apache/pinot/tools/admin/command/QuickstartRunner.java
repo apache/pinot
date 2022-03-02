@@ -128,7 +128,9 @@ public class QuickstartRunner {
           .setClusterName(CLUSTER_NAME).setTenantIsolation(_enableTenantIsolation)
           .setDataDir(new File(_tempDir, DEFAULT_CONTROLLER_DIR + i).getAbsolutePath())
           .setConfigOverrides(_configOverrides);
-      controllerStarter.execute();
+      if (!controllerStarter.execute()) {
+        throw new RuntimeException("Failed to start Controller");
+      }
       _controllerPorts.add(DEFAULT_CONTROLLER_PORT + i);
     }
   }
@@ -141,7 +143,9 @@ public class QuickstartRunner {
           .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS)
           .setClusterName(CLUSTER_NAME)
           .setConfigOverrides(_configOverrides);
-      brokerStarter.execute();
+      if (!brokerStarter.execute()) {
+        throw new RuntimeException("Failed to start Broker");
+      }
       _brokerPorts.add(DEFAULT_BROKER_PORT + i);
     }
   }
@@ -156,7 +160,9 @@ public class QuickstartRunner {
           .setDataDir(new File(_tempDir, DEFAULT_SERVER_DATA_DIR + i).getAbsolutePath())
           .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath())
           .setConfigOverrides(_configOverrides);
-      serverStarter.execute();
+      if (!serverStarter.execute()) {
+        throw new RuntimeException("Failed to start Server");
+      }
     }
   }
 
@@ -168,7 +174,9 @@ public class QuickstartRunner {
           .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS)
           .setClusterName(CLUSTER_NAME)
           .setConfigOverrides(_configOverrides);
-      minionStarter.execute();
+      if (!minionStarter.execute()) {
+        throw new RuntimeException("Failed to start Minion");
+      }
     }
   }
 

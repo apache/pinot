@@ -192,17 +192,16 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
         }
       }
 
-      if (!startBootstrapServices()) {
-        return false;
+      if (startBootstrapServices()) {
+        String pidFile = ".pinotAdminService-" + System.currentTimeMillis() + ".pid";
+        savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
+        return true;
       }
-      String pidFile = ".pinotAdminService-" + System.currentTimeMillis() + ".pid";
-      savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
-      return true;
     } catch (Exception e) {
       LOGGER.error("Caught exception while starting pinot service, exiting.", e);
-      System.exit(-1);
-      return false;
     }
+    System.exit(-1);
+    return false;
   }
 
   private String startServiceManager() {
