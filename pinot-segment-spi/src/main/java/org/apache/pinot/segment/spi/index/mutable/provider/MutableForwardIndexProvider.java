@@ -16,12 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.index.reader;
+package org.apache.pinot.segment.spi.index.mutable.provider;
 
-public interface MutableTextIndexReader extends TextIndexReader {
-  /**
-   * Index the document
-   * @param document the document as a string
-   */
-  void add(String document);
+import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
+
+
+public interface MutableForwardIndexProvider {
+  MutableForwardIndex newIndex(MutableIndexContext.Forward context);
 }

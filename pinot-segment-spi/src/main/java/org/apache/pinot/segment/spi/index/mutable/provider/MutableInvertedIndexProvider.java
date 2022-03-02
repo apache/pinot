@@ -16,16 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.index.reader;
+package org.apache.pinot.segment.spi.index.mutable.provider;
 
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.apache.pinot.segment.spi.index.mutable.MutableInvertedIndex;
 
 
-public interface MutableInvertedIndexReader extends InvertedIndexReader<MutableRoaringBitmap> {
-  /**
-   * Add the docId to the posting list for the dictionary id.
-   * @param dictId dictionary id
-   * @param docId document id
-   */
-  void add(int dictId, int docId);
+public interface MutableInvertedIndexProvider {
+  MutableInvertedIndex newIndex(MutableIndexContext.Inverted context);
 }

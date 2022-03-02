@@ -99,7 +99,7 @@ public class RealtimeLuceneIndexRefreshState {
     private final String _segmentName;
     private final Lock _lock;
     private boolean _segmentDestroyed;
-    private final List<RealtimeLuceneTextIndexReader> _realtimeLuceneReaders;
+    private final List<RealtimeLuceneTextIndex> _realtimeLuceneReaders;
 
     public RealtimeLuceneReaders(String segmentName) {
       _segmentName = segmentName;
@@ -108,7 +108,7 @@ public class RealtimeLuceneIndexRefreshState {
       _realtimeLuceneReaders = new LinkedList<>();
     }
 
-    public void addReader(RealtimeLuceneTextIndexReader realtimeLuceneTextIndexReader) {
+    public void addReader(RealtimeLuceneTextIndex realtimeLuceneTextIndexReader) {
       _realtimeLuceneReaders.add(realtimeLuceneTextIndexReader);
     }
 
@@ -124,7 +124,7 @@ public class RealtimeLuceneIndexRefreshState {
       return _segmentName;
     }
 
-    public List<RealtimeLuceneTextIndexReader> getRealtimeLuceneReaders() {
+    public List<RealtimeLuceneTextIndex> getRealtimeLuceneReaders() {
       return _realtimeLuceneReaders;
     }
 

@@ -16,16 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.index.reader;
+package org.apache.pinot.segment.spi.index.mutable;
 
-import java.io.IOException;
+import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 
 
-public interface MutableJsonIndexReader extends JsonIndexReader {
+public interface MutableTextIndex extends TextIndexReader {
   /**
-   * Index a JSON document
-   * @param jsonString the JSON
+   * Index the document
+   * @param document the document as a string
    */
-  void add(String jsonString)
-      throws IOException;
+  void add(String document);
 }
