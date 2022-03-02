@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.dictionary;
 
-import org.apache.pinot.segment.spi.index.reader.MutableDictionary;
+import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
