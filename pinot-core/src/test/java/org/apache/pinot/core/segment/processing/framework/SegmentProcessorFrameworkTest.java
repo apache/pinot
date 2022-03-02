@@ -69,6 +69,7 @@ public class SegmentProcessorFrameworkTest {
   private TableConfig _tableConfig;
   private TableConfig _tableConfigNullValueEnabled;
   private TableConfig _tableConfigSegmentNameGeneratorEnabled;
+  private TableConfig _tableConfigWithFixedSegmentName;
 
   private Schema _schema;
   private Schema _schemaMV;
@@ -98,6 +99,9 @@ public class SegmentProcessorFrameworkTest {
     _tableConfigSegmentNameGeneratorEnabled =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("time").build();
     _tableConfigSegmentNameGeneratorEnabled.getIndexingConfig().setSegmentNameGeneratorType("normalizedDate");
+    _tableConfigWithFixedSegmentName =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("time").build();
+    _tableConfigWithFixedSegmentName.getIndexingConfig().setSegmentNameGeneratorType("fixed");
 
     _schema =
         new Schema.SchemaBuilder().setSchemaName("mySchema").addSingleValueDimension("campaign", DataType.STRING, "")
@@ -243,6 +247,19 @@ public class SegmentProcessorFrameworkTest {
     assertNotNull(timeNullValueVector);
     assertTrue(timeNullValueVector.getNullBitmap().isEmpty());
     assertEquals(segmentMetadata.getName(), "myTable_1597719600000_1597892400000_0");
+    segment.destroy();
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_singleSegment);
+
+    // Fixed segment name
+    config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfigWithFixedSegmentName).setSchema(_schema)
+        .setSegmentConfig(new SegmentConfig.Builder().setFixedSegmentName("myTable_segment_0001").build()).build();
+    framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
+    outputSegments = framework.process();
+    assertEquals(outputSegments.size(), 1);
+    segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
+    segmentMetadata = segment.getSegmentMetadata();
+    assertEquals(segmentMetadata.getName(), "myTable_segment_0001");
     segment.destroy();
     FileUtils.cleanDirectory(workingDir);
     rewindRecordReaders(_singleSegment);
@@ -431,9 +448,10 @@ public class SegmentProcessorFrameworkTest {
     FileUtils.cleanDirectory(workingDir);
     rewindRecordReaders(_singleSegment);
 
-    config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfigSegmentNameGeneratorEnabled)
-        .setSchema(_schema).setSegmentConfig(new SegmentConfig.Builder().setMaxNumRecordsPerSegment(4)
-            .setSegmentNamePrefix("myPrefix").setSegmentNamePostfix("myPostfix").build()).build();
+    config =
+        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfigSegmentNameGeneratorEnabled).setSchema(_schema)
+            .setSegmentConfig(new SegmentConfig.Builder().setMaxNumRecordsPerSegment(4).setSegmentNamePrefix("myPrefix")
+                .setSegmentNamePostfix("myPostfix").build()).build();
     framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
     outputSegments = framework.process();
     assertEquals(outputSegments.size(), 3);
