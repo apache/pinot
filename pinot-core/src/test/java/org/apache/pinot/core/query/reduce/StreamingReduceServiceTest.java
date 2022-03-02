@@ -54,7 +54,7 @@ public class StreamingReduceServiceTest {
     // here we hope to verify deeper to make sure the thrown exception is nested inside the exception
     assertTrue(verifyException(() -> {
           StreamingReduceService.processIterativeServerResponse(mock(StreamingReducer.class),
-              threadPoolService, ImmutableMap.of(routingInstance, mockedResponse),
+              ImmutableMap.of(routingInstance, mockedResponse),
               1000,
               mock(BaseReduceService.ExecutionStatsAggregator.class));
           return null;
@@ -83,7 +83,7 @@ public class StreamingReduceServiceTest {
     // here we hope to verify deeper to make sure the thrown exception is nested inside the exception
     assertTrue(verifyException(() -> {
           StreamingReduceService.processIterativeServerResponse(mock(StreamingReducer.class),
-              threadPoolService, ImmutableMap.of(routingInstance, mockedResponse),
+              ImmutableMap.of(routingInstance, mockedResponse),
               10,
               mock(BaseReduceService.ExecutionStatsAggregator.class));
           return null;
@@ -99,7 +99,7 @@ public class StreamingReduceServiceTest {
     try {
       verifyTarget.call();
     } catch (Exception ex) {
-      for (Throwable child = ex.getCause();
+      for (Throwable child = ex;
           child != null && child.getCause() != child && !exceptionVerified;
           child = child.getCause()) {
         if (verifyCause.apply(child)) {

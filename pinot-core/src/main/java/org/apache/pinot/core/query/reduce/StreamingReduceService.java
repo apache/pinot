@@ -22,12 +22,8 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorCompletionService;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -91,7 +87,7 @@ public class StreamingReduceService extends BaseReduceService {
     streamingReducer.init(dataTableReducerContext);
 
     try {
-      processIterativeServerResponse(streamingReducer, _reduceExecutorService, serverResponseMap, reduceTimeOutMs,
+      processIterativeServerResponse(streamingReducer, serverResponseMap, reduceTimeOutMs,
           aggregator);
     } catch (Exception e) {
       LOGGER.error("Unable to process streaming query response!", e);
@@ -109,16 +105,17 @@ public class StreamingReduceService extends BaseReduceService {
   }
 
   @VisibleForTesting
-  static void processIterativeServerResponse(StreamingReducer reducer, ExecutorService executorService,
+  static void processIterativeServerResponse(StreamingReducer reducer,
       Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> serverResponseMap, long reduceTimeOutMs,
-      ExecutionStatsAggregator aggregator) throws ExecutionException {
+      ExecutionStatsAggregator aggregator)
+      throws Exception {
     int cnt = 0;
-    Future<Void>[] futures = new Future[serverResponseMap.size()];
+    CompletableFuture<Void>[] futures = new CompletableFuture[serverResponseMap.size()];
     // based on ideas from on https://stackoverflow.com/questions/19348248/waiting-on-a-list-of-future
-    // mostly because we need to handle and transfer the exception in threads into caller thread.
-    ExecutorCompletionService<Void> countDownHelper = new ExecutorCompletionService<>(executorService);
-    for (Map.Entry<ServerRoutingInstance, Iterator<Server.ServerResponse>> entry: serverResponseMap.entrySet()) {
-      futures[cnt++] = countDownHelper.submit(() -> {
+    // and https://stackoverflow.com/questions/23301598/transform-java-future-into-a-completablefuture
+    // Future created via ExecutorService.submit() can be created by CompletableFuture.supplyAsync()
+    for (Map.Entry<ServerRoutingInstance, Iterator<Server.ServerResponse>> entry : serverResponseMap.entrySet()) {
+      futures[cnt++] = CompletableFuture.supplyAsync(() -> {
         Iterator<Server.ServerResponse> streamingResponses = entry.getValue();
         try {
           while (streamingResponses.hasNext()) {
@@ -138,22 +135,12 @@ public class StreamingReduceService extends BaseReduceService {
         }
       });
     }
-    for (int received = 0; received < futures.length; received++) {
-      try {
-        Future<Void> rpcCallHandle = countDownHelper.poll(reduceTimeOutMs, TimeUnit.MILLISECONDS);
-        if (rpcCallHandle == null) {
-          throw new TimeoutException("Failed to complete gRPC call within " + reduceTimeOutMs + "ms.");
-        }
-        // below will force the thread exception thrown into current thread
-        rpcCallHandle.get(reduceTimeOutMs, TimeUnit.MILLISECONDS);
-      } catch (Exception ex) {
-        for (Future future : futures) {
-          if (!future.isDone()) {
-            future.cancel(true);
-          }
-        }
-        throw new ExecutionException("Encountered exception when handling server response", ex);
-      }
+    CompletableFuture<Void> syncWaitPoint = CompletableFuture.allOf(futures);
+    try {
+      syncWaitPoint.get(reduceTimeOutMs, TimeUnit.MILLISECONDS);
+    } catch (Exception ex) {
+      syncWaitPoint.cancel(true);
+      throw ex;
     }
   }
 
