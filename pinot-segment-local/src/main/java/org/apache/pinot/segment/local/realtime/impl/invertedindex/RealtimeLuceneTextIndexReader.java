@@ -29,7 +29,7 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
-import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.segment.spi.index.reader.MutableTextIndexReader;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
  * Internally it uses {@link LuceneTextIndexCreator} for adding documents to the lucene index
  * as and when they are indexed by the consuming segment.
  */
-public class RealtimeLuceneTextIndexReader implements TextIndexReader {
+public class RealtimeLuceneTextIndexReader implements MutableTextIndexReader {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(RealtimeLuceneTextIndexReader.class);
 
   private final QueryParser _queryParser;
@@ -87,6 +87,7 @@ public class RealtimeLuceneTextIndexReader implements TextIndexReader {
   /**
    * Adds a new document.
    */
+  @Override
   public void add(String document) {
     _indexCreator.add(document);
   }

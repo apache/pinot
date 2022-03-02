@@ -48,7 +48,7 @@ import org.apache.pinot.segment.local.realtime.impl.geospatial.MutableH3Index;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeInvertedIndexReader;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexReader;
-import org.apache.pinot.segment.local.realtime.impl.json.MutableJsonIndex;
+import org.apache.pinot.segment.local.realtime.impl.json.MutableJsonIndexImpl;
 import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVector;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
@@ -70,7 +70,10 @@ import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
+import org.apache.pinot.segment.spi.index.reader.MutableJsonIndexReader;
+import org.apache.pinot.segment.spi.index.reader.MutableTextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
+import org.apache.pinot.segment.spi.index.reader.MutableInvertedIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
@@ -324,7 +327,7 @@ public class MutableSegmentImpl implements MutableSegment {
       }
 
       // Inverted index
-      RealtimeInvertedIndexReader invertedIndexReader =
+      MutableInvertedIndexReader invertedIndexReader =
           invertedIndexColumns.contains(column) ? new RealtimeInvertedIndexReader() : null;
 
       // Text index
@@ -340,7 +343,7 @@ public class MutableSegmentImpl implements MutableSegment {
       }
 
       // Json index
-      MutableJsonIndex jsonIndex = jsonIndexColumns.contains(column) ? new MutableJsonIndex() : null;
+      MutableJsonIndexReader jsonIndex = jsonIndexColumns.contains(column) ? new MutableJsonIndexImpl() : null;
 
       // H3 index
       MutableH3Index h3Index;
@@ -590,7 +593,7 @@ public class MutableSegmentImpl implements MutableSegment {
           forwardIndex.setDictId(docId, dictId);
 
           // Update inverted index
-          RealtimeInvertedIndexReader invertedIndex = indexContainer._invertedIndex;
+          MutableInvertedIndexReader invertedIndex = indexContainer._invertedIndex;
           if (invertedIndex != null) {
             try {
               invertedIndex.add(dictId, docId);
@@ -651,7 +654,7 @@ public class MutableSegmentImpl implements MutableSegment {
         }
 
         // Update text index
-        RealtimeLuceneTextIndexReader textIndex = indexContainer._textIndex;
+        MutableTextIndexReader textIndex = indexContainer._textIndex;
         if (textIndex != null) {
           try {
             textIndex.add((String) value);
@@ -661,7 +664,7 @@ public class MutableSegmentImpl implements MutableSegment {
         }
 
         // Update json index
-        MutableJsonIndex jsonIndex = indexContainer._jsonIndex;
+        MutableJsonIndexReader jsonIndex = indexContainer._jsonIndex;
         if (jsonIndex != null) {
           try {
             jsonIndex.add((String) value);
@@ -691,7 +694,7 @@ public class MutableSegmentImpl implements MutableSegment {
         indexContainer._forwardIndex.setDictIdMV(docId, dictIds);
 
         // Update inverted index
-        RealtimeInvertedIndexReader invertedIndex = indexContainer._invertedIndex;
+        MutableInvertedIndexReader invertedIndex = indexContainer._invertedIndex;
         if (invertedIndex != null) {
           for (int dictId : dictIds) {
             try {
@@ -954,7 +957,7 @@ public class MutableSegmentImpl implements MutableSegment {
     IntArrays.quickSort(dictIds, dictionary::compare);
 
     // Re-order documents using the inverted index
-    RealtimeInvertedIndexReader invertedIndex = indexContainer._invertedIndex;
+    MutableInvertedIndexReader invertedIndex = indexContainer._invertedIndex;
     int[] docIds = new int[numDocsIndexed];
     int[] batch = new int[256];
     int docIdIndex = 0;
@@ -1134,11 +1137,11 @@ public class MutableSegmentImpl implements MutableSegment {
     final NumValuesInfo _numValuesInfo;
     final MutableForwardIndex _forwardIndex;
     final MutableDictionary _dictionary;
-    final RealtimeInvertedIndexReader _invertedIndex;
+    final MutableInvertedIndexReader _invertedIndex;
     final RangeIndexReader _rangeIndex;
     final MutableH3Index _h3Index;
-    final RealtimeLuceneTextIndexReader _textIndex;
-    final MutableJsonIndex _jsonIndex;
+    final MutableTextIndexReader _textIndex;
+    final MutableJsonIndexReader _jsonIndex;
     final BloomFilterReader _bloomFilter;
     final MutableNullValueVector _nullValueVector;
 
@@ -1151,9 +1154,9 @@ public class MutableSegmentImpl implements MutableSegment {
 
     IndexContainer(FieldSpec fieldSpec, @Nullable PartitionFunction partitionFunction,
         @Nullable Set<Integer> partitions, NumValuesInfo numValuesInfo, MutableForwardIndex forwardIndex,
-        @Nullable MutableDictionary dictionary, @Nullable RealtimeInvertedIndexReader invertedIndex,
-        @Nullable RangeIndexReader rangeIndex, @Nullable RealtimeLuceneTextIndexReader textIndex,
-        @Nullable MutableJsonIndex jsonIndex, @Nullable MutableH3Index h3Index, @Nullable BloomFilterReader bloomFilter,
+        @Nullable MutableDictionary dictionary, @Nullable MutableInvertedIndexReader invertedIndex,
+        @Nullable RangeIndexReader rangeIndex, @Nullable MutableTextIndexReader textIndex,
+        @Nullable MutableJsonIndexReader jsonIndex, @Nullable MutableH3Index h3Index, @Nullable BloomFilterReader bloomFilter,
         @Nullable MutableNullValueVector nullValueVector) {
       _fieldSpec = fieldSpec;
       _partitionFunction = partitionFunction;
