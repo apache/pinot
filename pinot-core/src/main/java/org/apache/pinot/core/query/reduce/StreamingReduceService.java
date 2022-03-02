@@ -116,7 +116,7 @@ public class StreamingReduceService extends BaseReduceService {
     // and https://stackoverflow.com/questions/23301598/transform-java-future-into-a-completablefuture
     // Future created via ExecutorService.submit() can be created by CompletableFuture.supplyAsync()
     for (Map.Entry<ServerRoutingInstance, Iterator<Server.ServerResponse>> entry : serverResponseMap.entrySet()) {
-      futures[cnt++] = CompletableFuture.supplyAsync(() -> {
+      futures[cnt++] = CompletableFuture.runAsync(() -> {
         Iterator<Server.ServerResponse> streamingResponses = entry.getValue();
         try {
           while (streamingResponses.hasNext()) {
@@ -129,7 +129,6 @@ public class StreamingReduceService extends BaseReduceService {
               aggregator.aggregate(entry.getKey(), dataTable);
             }
           }
-          return null;
         } catch (Exception e) {
           LOGGER.error("Unable to process streaming response. Failure occurred!", e);
           throw new RuntimeException("Unable to process streaming response. Failure occurred!", e);
