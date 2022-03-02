@@ -1,6 +1,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
+import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -9,6 +10,7 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.roaringbitmap.PeekableIntIterator;
 
 
 public class IsNotNullTransformFunction extends BaseTransformFunction {
@@ -17,6 +19,7 @@ public class IsNotNullTransformFunction extends BaseTransformFunction {
   private TransformFunction _leftTransformFunction;
   private int[] _results;
   private Map<String, DataSource> _dataSourceMap = new HashMap<>();
+  private PeekableIntIterator _nullValueVectorIterator;
 
   @Override
   public String getName() {
@@ -33,6 +36,13 @@ public class IsNotNullTransformFunction extends BaseTransformFunction {
           "Only column names are supported in IS_NOT_NULL. Support for functions is planned for future release");
     }
     _dataSourceMap = dataSourceMap;
+    String columnName = ((IdentifierTransformFunction) _leftTransformFunction).getColumnName();
+    NullValueVectorReader nullValueVector = _dataSourceMap.get(columnName).getNullValueVector();
+    if (nullValueVector != null) {
+      _nullValueVectorIterator = nullValueVector.getNullBitmap().getIntIterator();
+    } else {
+      _nullValueVectorIterator = null;
+    }
   }
 
   @Override
@@ -48,20 +58,21 @@ public class IsNotNullTransformFunction extends BaseTransformFunction {
     }
 
     int[] docIds = projectionBlock.getDocIds();
-    String columnName = ((IdentifierTransformFunction) _leftTransformFunction).getColumnName();
-    NullValueVectorReader nullValueVector = _dataSourceMap.get(columnName).getNullValueVector();
 
-    if (nullValueVector != null) {
-      for (int idx = 0; idx < length; idx++) {
-        int docId = docIds[idx];
-        if (nullValueVector.isNull(docId)) {
-          _results[idx] = 0;
+    Arrays.fill(_results, 1);
+
+    if (_nullValueVectorIterator != null) {
+      int currentDocIdIndex = 0;
+      while (_nullValueVectorIterator.hasNext() & currentDocIdIndex < length) {
+        _nullValueVectorIterator.advanceIfNeeded(docIds[currentDocIdIndex]);
+        currentDocIdIndex = Arrays.binarySearch(docIds, currentDocIdIndex, length, _nullValueVectorIterator.next());
+        if (currentDocIdIndex >= 0) {
+          _results[currentDocIdIndex] = 0;
+          currentDocIdIndex++;
         } else {
-          _results[idx] = 1;
+          currentDocIdIndex = -currentDocIdIndex - 1;
         }
       }
-    } else {
-      Arrays.fill(_results, 1);
     }
 
     return _results;
