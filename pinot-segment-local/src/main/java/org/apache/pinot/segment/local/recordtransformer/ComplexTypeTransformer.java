@@ -89,28 +89,30 @@ public class ComplexTypeTransformer implements RecordTransformer {
   private final List<String> _fieldsToUnnest;
   private final String _delimiter;
   private final ComplexTypeConfig.CollectionNotUnnestedToJson _collectionNotUnnestedToJson;
-  private final Boolean _useLeafFieldName;
+  private final List<String> _prefixesToDropFromFields;
 
   public ComplexTypeTransformer(TableConfig tableConfig) {
     this(parseFieldsToUnnest(tableConfig), parseDelimiter(tableConfig),
-            parseCollectionNotUnnestedToJson(tableConfig), parseUseLeafFieldName(tableConfig));
+            parseCollectionNotUnnestedToJson(tableConfig), parsePrefixesToDropFromFields(tableConfig));
   }
 
   @VisibleForTesting
   ComplexTypeTransformer(List<String> fieldsToUnnest, String delimiter) {
-    this(fieldsToUnnest, delimiter, DEFAULT_COLLECTION_TO_JSON_MODE, false);
+    this(fieldsToUnnest, delimiter, DEFAULT_COLLECTION_TO_JSON_MODE, new ArrayList<>());
   }
 
   @VisibleForTesting
-  ComplexTypeTransformer(List<String> fieldsToUnnest, String delimiter,
-      ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson, Boolean useLeafFieldName) {
+  ComplexTypeTransformer(List<String> fieldsToUnnest,
+                         String delimiter,
+                         ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson,
+                         List<String> prefixesToDropFromFields) {
     _fieldsToUnnest = new ArrayList<>(fieldsToUnnest);
     _delimiter = delimiter;
     _collectionNotUnnestedToJson = collectionNotUnnestedToJson;
     // the unnest fields are sorted to achieve the topological sort of the collections, so that the parent collection
     // (e.g. foo) is unnested before the child collection (e.g. foo.bar)
     Collections.sort(_fieldsToUnnest);
-    _useLeafFieldName = useLeafFieldName;
+    _prefixesToDropFromFields = new ArrayList<>(prefixesToDropFromFields);
   }
 
   private static List<String> parseFieldsToUnnest(TableConfig tableConfig) {
@@ -152,12 +154,12 @@ public class ComplexTypeTransformer implements RecordTransformer {
     }
   }
 
-  private static boolean parseUseLeafFieldName(TableConfig tableConfig) {
+  private static List<String> parsePrefixesToDropFromFields(TableConfig tableConfig) {
     if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getComplexTypeConfig() != null
-            && tableConfig.getIngestionConfig().getComplexTypeConfig().getUseLeafFieldName() != null) {
-      return tableConfig.getIngestionConfig().getComplexTypeConfig().getUseLeafFieldName();
+            && tableConfig.getIngestionConfig().getComplexTypeConfig().getPrefixesToDropFromFields() != null) {
+      return tableConfig.getIngestionConfig().getComplexTypeConfig().getPrefixesToDropFromFields();
     } else {
-      return false;
+      return new ArrayList<>();
     }
   }
 
@@ -167,6 +169,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
     for (String collection : _fieldsToUnnest) {
       unnestCollection(record, collection);
     }
+    dropPrefixes(record);
     return record;
   }
 
@@ -291,6 +294,23 @@ public class ComplexTypeTransformer implements RecordTransformer {
     }
   }
 
+  /**
+   *
+   */
+  @VisibleForTesting
+  protected void dropPrefixes(GenericRow record) {
+    List<String> columns = new ArrayList<>(record.getFieldToValueMap().keySet());
+    for (String column : columns) {
+      for (String prefix : _prefixesToDropFromFields) {
+        if (column.startsWith(prefix)) {
+          Object value = record.removeValue(column);
+          String newName = column.substring(prefix.length());
+          record.putValue(newName, value);
+        }
+      }
+    }
+  }
+
   private boolean containPrimitives(Object[] value) {
     if (value.length == 0) {
       return true;
@@ -407,9 +427,6 @@ public class ComplexTypeTransformer implements RecordTransformer {
   }
 
   private String concat(String left, String right) {
-    if (_useLeafFieldName) {
-      return right;
-    }
     return String.join(_delimiter, left, right);
   }
 }

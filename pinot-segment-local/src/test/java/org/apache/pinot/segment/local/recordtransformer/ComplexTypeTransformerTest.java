@@ -31,6 +31,8 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer.DEFAULT_COLLECTION_TO_JSON_MODE;
+
 
 public class ComplexTypeTransformerTest {
   @Test
@@ -297,7 +299,7 @@ public class ComplexTypeTransformerTest {
     //   "array":"[1,2]"
     // }
     transformer = new ComplexTypeTransformer(Arrays.asList(), ".",
-            ComplexTypeConfig.CollectionNotUnnestedToJson.ALL, false);
+            ComplexTypeConfig.CollectionNotUnnestedToJson.ALL, Arrays.asList());
     genericRow = new GenericRow();
     array = new Object[]{1, 2};
     genericRow.putValue("array", array);
@@ -343,8 +345,36 @@ public class ComplexTypeTransformerTest {
     map.put("array1", array1);
     genericRow.putValue("t", map);
     transformer = new ComplexTypeTransformer(Arrays.asList(), ".",
-            ComplexTypeConfig.CollectionNotUnnestedToJson.NONE, false);
+            ComplexTypeConfig.CollectionNotUnnestedToJson.NONE, Arrays.asList());
     transformer.transform(genericRow);
     Assert.assertTrue(ComplexTypeTransformer.isArray(genericRow.getValue("t.array1")));
+  }
+
+  @Test
+  public void testPrefixesToDropFromFields() {
+    List<String> prefixesToDropFromFields = Arrays.asList("map1.");
+    ComplexTypeTransformer transformer = new ComplexTypeTransformer(new ArrayList<>(), ".",
+            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToDropFromFields);
+
+    // test flatten root-level tuples
+    GenericRow genericRow = new GenericRow();
+    genericRow.putValue("a", 1L);
+    Map<String, Object> map1 = new HashMap<>();
+    genericRow.putValue("map1", map1);
+    map1.put("b", "v");
+    Map<String, Object> innerMap1 = new HashMap<>();
+    innerMap1.put("aa", 2);
+    innerMap1.put("bb", "u");
+    map1.put("im1", innerMap1);
+    Map<String, Object> map2 = new HashMap<>();
+    map2.put("c", 3);
+    genericRow.putValue("map2", map2);
+
+    transformer.transform(genericRow);
+    Assert.assertEquals(genericRow.getValue("a"), 1L);
+    Assert.assertEquals(genericRow.getValue("b"), "v");
+    Assert.assertEquals(genericRow.getValue("im1.aa"), 2);
+    Assert.assertEquals(genericRow.getValue("im1.bb"), "u");
+    Assert.assertEquals(genericRow.getValue("map2.c"), 3);
   }
 }

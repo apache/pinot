@@ -279,11 +279,12 @@ public class TableConfigSerDeTest {
       List<Map<String, String>> batchConfigMaps = new ArrayList<>();
       batchConfigMaps.add(batchConfigMap);
       List<String> fieldsToUnnest = Arrays.asList("c1, c2");
+      List<String> prefixesToDropFromFields = new ArrayList<>();
       IngestionConfig ingestionConfig =
           new IngestionConfig(new BatchIngestionConfig(batchConfigMaps, "APPEND", "HOURLY"),
               new StreamIngestionConfig(streamConfigMaps), new FilterConfig("filterFunc(foo)"), transformConfigs,
               new ComplexTypeConfig(fieldsToUnnest, ".",
-                      ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE, false));
+                      ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE, prefixesToDropFromFields));
       TableConfig tableConfig = tableConfigBuilder.setIngestionConfig(ingestionConfig).build();
 
       checkIngestionConfig(tableConfig);
