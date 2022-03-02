@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
@@ -25,6 +26,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -105,12 +108,13 @@ public class StreamingReduceService extends BaseReduceService {
     return brokerResponseNative;
   }
 
-  private static void processIterativeServerResponse(StreamingReducer reducer, ExecutorService executorService,
+  @VisibleForTesting
+  static void processIterativeServerResponse(StreamingReducer reducer, ExecutorService executorService,
       Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> serverResponseMap, long reduceTimeOutMs,
-      ExecutionStatsAggregator aggregator) throws Exception {
+      ExecutionStatsAggregator aggregator) throws ExecutionException {
     int cnt = 0;
-    Future[] futures = new Future[serverResponseMap.size()];
-    // based on consensus on https://stackoverflow.com/questions/19348248/waiting-on-a-list-of-future
+    Future<Void>[] futures = new Future[serverResponseMap.size()];
+    // based on ideas from on https://stackoverflow.com/questions/19348248/waiting-on-a-list-of-future
     // mostly because we need to handle and transfer the exception in threads into caller thread.
     ExecutorCompletionService<Void> countDownHelper = new ExecutorCompletionService<>(executorService);
     for (Map.Entry<ServerRoutingInstance, Iterator<Server.ServerResponse>> entry: serverResponseMap.entrySet()) {
@@ -119,7 +123,6 @@ public class StreamingReduceService extends BaseReduceService {
         try {
           while (streamingResponses.hasNext()) {
             Server.ServerResponse streamingResponse = streamingResponses.next();
-            LOGGER.info("Streaming Response is {}", streamingResponse.toString());
             DataTable dataTable = DataTableFactory.getDataTable(streamingResponse.getPayload().asReadOnlyByteBuffer());
             // null dataSchema is a metadata-only block.
             if (dataTable.getDataSchema() != null) {
@@ -137,7 +140,12 @@ public class StreamingReduceService extends BaseReduceService {
     }
     for (int received = 0; received < futures.length; received++) {
       try {
-        countDownHelper.take().get();
+        Future<Void> rpcCallHandle = countDownHelper.poll(reduceTimeOutMs, TimeUnit.MILLISECONDS);
+        if (rpcCallHandle == null) {
+          throw new TimeoutException("Failed to complete gRPC call within " + reduceTimeOutMs + "ms.");
+        }
+        // below will force the thread exception thrown into current thread
+        rpcCallHandle.get(reduceTimeOutMs, TimeUnit.MILLISECONDS);
       } catch (Exception ex) {
         for (Future future : futures) {
           if (!future.isDone()) {
