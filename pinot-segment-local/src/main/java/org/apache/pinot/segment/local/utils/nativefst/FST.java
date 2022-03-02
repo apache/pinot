@@ -30,9 +30,9 @@ import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.utils.nativefst.builder.FSTSerializerImpl;
+import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 
 
 /**
