@@ -24,7 +24,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Function;
+import java.util.function.Predicate;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
@@ -44,11 +44,11 @@ public class StreamingReduceServiceTest {
     // simulate a thread exception in gRPC call and verify that the thread can transfer the exception
     Iterator<Server.ServerResponse> mockedResponse = (Iterator<Server.ServerResponse>) mock(Iterator.class);
     when(mockedResponse.hasNext()).thenReturn(true);
-    final String exceptionMessage = "Some exception";
-    final RuntimeException innerException = new RuntimeException(exceptionMessage);
+    String exceptionMessage = "Some exception";
+    RuntimeException innerException = new RuntimeException(exceptionMessage);
     when(mockedResponse.next()).thenThrow(innerException);
-    final ExecutorService threadPoolService = Executors.newFixedThreadPool(1);
-    final ServerRoutingInstance routingInstance =
+    ExecutorService threadPoolService = Executors.newFixedThreadPool(1);
+    ServerRoutingInstance routingInstance =
         new ServerRoutingInstance("localhost", 9527, TableType.OFFLINE, false);
     // supposedly we can use TestNG's annotation like @Test(expectedExceptions = { IOException.class }) to verify
     // here we hope to verify deeper to make sure the thrown exception is nested inside the exception
@@ -59,7 +59,7 @@ public class StreamingReduceServiceTest {
               1000,
               mock(BaseReduceService.ExecutionStatsAggregator.class));
           return null;
-        }, (cause) -> cause.getMessage().contains(exceptionMessage))
+        }, cause -> cause.getMessage().contains(exceptionMessage))
     );
   }
 
@@ -80,8 +80,8 @@ public class StreamingReduceServiceTest {
     final ExecutorService threadPoolService = Executors.newFixedThreadPool(1);
     final ServerRoutingInstance routingInstance =
         new ServerRoutingInstance("localhost", 9527, TableType.OFFLINE, false);
-    // supposedly we can use TestNG's annotation like @Test(expectedExceptions = { IOException.class }) to verify
-    // here we hope to verify deeper to make sure the thrown exception is nested inside the exception
+    //We cannot use TestNG's annotation like @Test(expectedExceptions = { IOException.class }) to verify
+    // because the Exception we hope to verify is nested inside the final exception.
     assertTrue(verifyException(() -> {
           StreamingReduceService.processIterativeServerResponse(mock(StreamingReducer.class),
               threadPoolService,
@@ -93,7 +93,7 @@ public class StreamingReduceServiceTest {
         (cause) -> cause instanceof TimeoutException));
   }
 
-  private static boolean verifyException(Callable<Void> verifyTarget, Function<Throwable, Boolean> verifyCause) {
+  private static boolean verifyException(Callable<Void> verifyTarget, Predicate<Throwable> verifyCause) {
     boolean exceptionVerified = false;
     if (verifyTarget == null || verifyCause == null) {
       throw new RuntimeException("verifyException method needs two non-null lambdas");
@@ -104,9 +104,7 @@ public class StreamingReduceServiceTest {
       for (Throwable child = ex;
           child != null && child.getCause() != child && !exceptionVerified;
           child = child.getCause()) {
-        if (verifyCause.apply(child)) {
-          exceptionVerified = true;
-        }
+        exceptionVerified = verifyCause.test(child);
       }
     }
     return exceptionVerified;
