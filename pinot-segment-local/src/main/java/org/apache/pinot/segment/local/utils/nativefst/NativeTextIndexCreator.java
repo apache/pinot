@@ -88,13 +88,14 @@ public class NativeTextIndexCreator implements TextIndexCreator {
       throws IOException {
     int dictId = 0;
     int numPostingLists = _postingListMap.size();
-    BitmapInvertedIndexWriter invertedIndexWriter = new BitmapInvertedIndexWriter(_invertedIndexFile,
-        numPostingLists);
+    try (BitmapInvertedIndexWriter invertedIndexWriter = new BitmapInvertedIndexWriter(_invertedIndexFile,
+        numPostingLists)) {
 
-    for (Map.Entry<String, RoaringBitmapWriter<RoaringBitmap>> entry : _postingListMap.entrySet()) {
-      byte[] byteArray = entry.getKey().getBytes(UTF_8);
-      _fstBuilder.add(byteArray, 0, byteArray.length, dictId++);
-      invertedIndexWriter.add(entry.getValue().get());
+      for (Map.Entry<String, RoaringBitmapWriter<RoaringBitmap>> entry : _postingListMap.entrySet()) {
+        byte[] byteArray = entry.getKey().getBytes(UTF_8);
+        _fstBuilder.add(byteArray, 0, byteArray.length, dictId++);
+        invertedIndexWriter.add(entry.getValue().get());
+      }
     }
 
     FST fst = _fstBuilder.complete();

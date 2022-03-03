@@ -76,41 +76,8 @@ public class NativeTextIndexCreatorTest {
       Assert.assertEquals(1, matchedDocIds[1]);
 
       matchedDocIds = reader.getDocIds("zoo.*").toArray();
-      Assert.assertEquals(2, matchedDocIds.length);
-      Assert.assertEquals(0, matchedDocIds[0]);
-      Assert.assertEquals(1, matchedDocIds[1]);
-    }
-  }
-
-  @Test
-  public void tesFooBar()
-      throws IOException {
-    String[] uniqueValues = new String[3];
-    uniqueValues[0] = "hello";
-    uniqueValues[1] = "foobar";
-    uniqueValues[2] = "zoobar";
-
-    try (NativeTextIndexCreator creator = new NativeTextIndexCreator("testFSTColumn", INDEX_DIR)) {
-      creator.add(uniqueValues, 3);
-      creator.seal();
-    }
-
-    File fstFile = new File(INDEX_DIR, "testFSTColumn" + NATIVE_TEXT_INDEX_FILE_EXTENSION);
-    try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(fstFile);
-        NativeTextIndexReader reader = new NativeTextIndexReader(dataBuffer, 3)) {
-
-      /*int[] matchedDictIds = reader.getDictIds("hello.*").toArray();
-      Assert.assertEquals(1, matchedDictIds.length);
-      Assert.assertEquals(1, matchedDictIds[0]);
-
-
-      int[] matchedDocIds = reader.getDocIds("hel.*").toArray();
       Assert.assertEquals(1, matchedDocIds.length);
-      Assert.assertEquals(0, matchedDocIds[0]);*/
-
-      int[] matchedDocIds = reader.getDocIds("zoo.*").toArray();
-      Assert.assertEquals(1, matchedDocIds.length);
-      Assert.assertEquals(1, matchedDocIds[0]);
+      Assert.assertEquals(3, matchedDocIds[0]);
     }
   }
 }

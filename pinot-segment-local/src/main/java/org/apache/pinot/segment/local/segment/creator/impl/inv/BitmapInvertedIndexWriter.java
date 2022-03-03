@@ -74,12 +74,6 @@ public final class BitmapInvertedIndexWriter implements Closeable {
     _offsetBuffer.putInt(_bytesWritten);
     bitmap.serialize(_bitmapBuffer);
     _bytesWritten += length;
-    int i = 0;
-
-    //TODO: atri
-    if (_bytesWritten == 70) {
-      _offsetBuffer.putInt(_bytesWritten);
-    }
   }
 
   public void add(byte[] bitmapBytes)
