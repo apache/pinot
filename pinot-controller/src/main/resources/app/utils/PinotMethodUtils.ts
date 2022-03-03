@@ -851,6 +851,25 @@ const getAccessTokenFromHashParams = () => {
   return accessToken;
 };
 
+const getURLWithoutAccessToken = (fallbackUrl = '/'): string => {
+  let prefix = '';
+  let url = location.hash.substring(1);
+  if (url.includes('access_token=')) {
+    if (url.startsWith('/')) {
+      prefix = '/';
+      url = url.substring(1);
+    }
+
+    url = url
+    .split('&')
+    .filter((fragment) => !fragment.includes('access_token='))
+    .join('&');
+  } else {
+    url = fallbackUrl;
+  }
+  return `${prefix}${url}`;
+};
+
 export default {
   getTenantsData,
   getAllInstances,
@@ -903,5 +922,6 @@ export default {
   getAuthInfo,
   getWellKnownOpenIdConfiguration,
   verifyAuth,
-  getAccessTokenFromHashParams
+  getAccessTokenFromHashParams,
+  getURLWithoutAccessToken
 };
