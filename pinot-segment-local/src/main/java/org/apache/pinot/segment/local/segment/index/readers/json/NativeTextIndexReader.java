@@ -72,7 +72,7 @@ public class NativeTextIndexReader implements TextIndexReader {
           if (matchingDocIds == null) {
             matchingDocIds = docIds.toMutableRoaringBitmap();
           } else {
-            matchingDocIds.and(docIds);
+            matchingDocIds.or(docIds);
           }
         }
       }
