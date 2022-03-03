@@ -67,8 +67,8 @@ public class QueryOptimizerTest {
   @Test
   public void testFlattenAndOrFilter() {
     String query =
-        "SELECT * FROM testTable WHERE ((int = 4 OR (long = 5 AND (float = 9 AND double = 7.5))) OR string = 'foo') "
-            + "OR bytes = 'abc'";
+        "SELECT * FROM testTable WHERE ((int = 4 OR "
+            + "(long = 5 AND (float = 9 AND double = 7.5))) OR string = 'foo') OR bytes = '20'";
 
     {
       BrokerRequest brokerRequest = PQL_COMPILER.compileToBrokerRequest(query);
@@ -80,7 +80,7 @@ public class QueryOptimizerTest {
       assertEquals(children.size(), 4);
       assertEquals(children.get(0).toString(), "int EQUALITY [4]");
       assertEquals(children.get(2).toString(), "string EQUALITY [foo]");
-      assertEquals(children.get(3).toString(), "bytes EQUALITY [abc]");
+      assertEquals(children.get(3).toString(), "bytes EQUALITY [20]");
 
       FilterQueryTree andFilter = children.get(1);
       assertEquals(andFilter.getOperator(), FilterOperator.AND);
@@ -97,11 +97,11 @@ public class QueryOptimizerTest {
     assertEquals(filterFunction.getOperator(), FilterKind.OR.name());
     List<Expression> children = filterFunction.getOperands();
     assertEquals(children.size(), 4);
-    assertEquals(children.get(0), getEqFilterExpression("int", 4));
+    assertEquals(children.get(1), getEqFilterExpression("int", 4));
     assertEquals(children.get(2), getEqFilterExpression("string", "foo"));
-    assertEquals(children.get(3), getEqFilterExpression("bytes", "abc"));
+    assertEquals(children.get(3), getEqFilterExpression("bytes", "20"));
 
-    Function secondChildFunction = children.get(1).getFunctionCall();
+    Function secondChildFunction = children.get(0).getFunctionCall();
     assertEquals(secondChildFunction.getOperator(), FilterKind.AND.name());
     List<Expression> secondChildChildren = secondChildFunction.getOperands();
     assertEquals(secondChildChildren.size(), 3);
@@ -318,6 +318,14 @@ public class QueryOptimizerTest {
         "SELECT * FROM testTable WHERE int > 20 OR int < 30");
     testQuery("SELECT * FROM testTable WHERE int > 10 AND int > 20 OR long < 30 AND long < 40",
         "SELECT * FROM testTable WHERE int > 20 OR long < 30");
+    testSQLQuery("SELECT * FROM testTable WHERE int > 10 OR int = 10",
+        "SELECT * FROM testTable WHERE int >= 10");
+    testSQLQuery("SELECT * FROM testTable WHERE int = 10 OR int > 10",
+        "SELECT * FROM testTable WHERE int >= 10");
+    testSQLQuery("SELECT * FROM testTable WHERE int = 10 OR int > 10 OR int > 20 OR int < 50",
+        "SELECT * FROM testTable WHERE int >= 10 OR int > 20 OR int < 50");
+    testSQLQuery("SELECT * FROM testTable WHERE (int > 10 AND int <= 100 OR int = 10 OR int > 10)",
+        "SELECT * FROM testTable WHERE (int > 10 AND int <= 100 OR int >= 10)");
 
     // Mixed
     testQuery(
@@ -333,6 +341,10 @@ public class QueryOptimizerTest {
     OPTIMIZER.optimize(expectedBrokerRequest, SCHEMA);
     compareBrokerRequest(actualBrokerRequest, expectedBrokerRequest);
 
+    testSQLQuery(actual, expected);
+  }
+
+  private static void testSQLQuery(String actual, String expected) {
     PinotQuery actualPinotQuery = CalciteSqlParser.compileToPinotQuery(actual);
     OPTIMIZER.optimize(actualPinotQuery, SCHEMA);
     // Also optimize the expected query because the expected range can only be generate via optimizer

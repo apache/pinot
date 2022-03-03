@@ -22,8 +22,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -187,8 +189,88 @@ public class MergeRangeFilterOptimizer implements FilterOptimizer {
         return filterExpression;
       }
     } else if (operator.equals(FilterKind.OR.name())) {
-      function.getOperands().replaceAll(c -> optimize(c, schema));
-      return filterExpression;
+      List<Expression> children = function.getOperands();
+      Map<String, Set<Range>> rangeMap = new HashMap<>();
+      List<Expression> equalityExpressions = new ArrayList<>();
+
+      List<Expression> newChildren = new ArrayList<>();
+      // Iterate over all the child filters to create and merge ranges
+      for (Expression child : children) {
+        Function childFunction = child.getFunctionCall();
+        FilterKind filterKind = FilterKind.valueOf(childFunction.getOperator());
+        assert !filterKind.name().equals(operator);
+        if (filterKind.isRange() || filterKind.equals(FilterKind.EQUALS)) {
+          List<Expression> operands = childFunction.getOperands();
+          Expression lhs = operands.get(0);
+          if (lhs.getType() != ExpressionType.IDENTIFIER) {
+            // Skip optimizing transform expression
+            newChildren.add(child);
+            continue;
+          }
+          String column = lhs.getIdentifier().getName();
+          FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+          if (fieldSpec == null || !fieldSpec.isSingleValueField()) {
+            // Skip optimizing multi-value column
+            // NOTE: We cannot optimize multi-value column because [0, 10] will match filter "col < 1 AND col > 9", but
+            //       not the merged one.
+            newChildren.add(child);
+            continue;
+          }
+          // Create a range and merge with current range if exists
+          DataType dataType = fieldSpec.getDataType();
+          if (filterKind.equals(FilterKind.EQUALS)) {
+            equalityExpressions.add(child);
+          } else {
+            Range range = getRange(filterKind, operands, dataType);
+            Set<Range> rangeSet = rangeMap.get(column);
+            if (rangeSet == null) {
+              rangeSet = new HashSet<>();
+            }
+            rangeSet.add(range);
+            rangeMap.put(column, rangeSet);
+          }
+        } else {
+          Expression optimizedChild = optimize(child, schema);
+          newChildren.add(optimizedChild);
+        }
+      }
+      for (Expression equalityExpression: equalityExpressions) {
+        List<Expression> operands = equalityExpression.getFunctionCall().getOperands();
+        Expression lhs = operands.get(0);
+        String column = lhs.getIdentifier().getName();
+        FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+        boolean isEqualityProcessed = false;
+        Comparable equalityValue = getComparable(operands.get(1), fieldSpec.getDataType());
+        if (rangeMap.containsKey(column)) {
+          Set<Range> possibleRanges = rangeMap.get(column);
+          for (Range range: possibleRanges) {
+            if (range.getLowerBound() != null && range.getLowerBound().equals(equalityValue)) {
+              isEqualityProcessed = true;
+              range.setLowerInclusive(true);
+            } else if (range.getUpperBound() != null && range.getUpperBound().equals(equalityValue)) {
+              isEqualityProcessed = true;
+              range.setUpperInclusive(true);
+            }
+          }
+          if (!isEqualityProcessed) {
+            newChildren.add(equalityExpression);
+          }
+        } else {
+          newChildren.add(equalityExpression);
+        }
+      }
+      for (Map.Entry<String, Set<Range>> entry : rangeMap.entrySet()) {
+        for (Range range: entry.getValue()) {
+          newChildren.add(getRangeFilterExpression(entry.getKey(), range));
+        }
+      }
+      if (newChildren.size() == 1) {
+        // Single range without other filters
+        return newChildren.get(0);
+      } else {
+        function.setOperands(newChildren);
+        return filterExpression;
+      }
     } else {
       return filterExpression;
     }
