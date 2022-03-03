@@ -69,15 +69,16 @@ public abstract class BaseChunkSVForwardIndexWriter implements Closeable {
    * @throws IOException if the file isn't found or can't be mapped
    */
   protected BaseChunkSVForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
-      int numDocsPerChunk, int chunkSize, int sizeOfEntry, int version, boolean fixed)
+      int numDocsPerChunk, long chunkSize, int sizeOfEntry, int version, boolean fixed)
       throws IOException {
     Preconditions.checkArgument(version == DEFAULT_VERSION || version == CURRENT_VERSION
         || (fixed && version == 4));
-    _chunkSize = chunkSize;
+    Preconditions.checkArgument(chunkSize <= Integer.MAX_VALUE, "chunk size limited to 2GB");
+    _chunkSize = (int) chunkSize;
     _chunkCompressor = ChunkCompressorFactory.getCompressor(compressionType);
     _headerEntryChunkOffsetSize = getHeaderEntryChunkOffsetSize(version);
     _dataOffset = writeHeader(compressionType, totalDocs, numDocsPerChunk, sizeOfEntry, version);
-    _chunkBuffer = ByteBuffer.allocateDirect(chunkSize);
+    _chunkBuffer = ByteBuffer.allocateDirect(_chunkSize);
     int maxCompressedChunkSize = _chunkCompressor.maxCompressedSize(_chunkSize); // may exceed original chunk size
     _compressedBuffer = ByteBuffer.allocateDirect(maxCompressedChunkSize);
     _dataFile = new RandomAccessFile(file, "rw").getChannel();
