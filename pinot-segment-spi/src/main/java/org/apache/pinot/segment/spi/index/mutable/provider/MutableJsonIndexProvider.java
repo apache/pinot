@@ -22,5 +22,5 @@ import org.apache.pinot.segment.spi.index.mutable.MutableJsonIndex;
 
 
 public interface MutableJsonIndexProvider {
-  MutableJsonIndex newIndex(MutableIndexContext.Json context);
+  MutableJsonIndex newJsonIndex(MutableIndexContext.Json context);
 }

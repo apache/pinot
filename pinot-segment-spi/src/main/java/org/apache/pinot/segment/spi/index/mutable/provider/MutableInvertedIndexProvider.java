@@ -22,5 +22,5 @@ import org.apache.pinot.segment.spi.index.mutable.MutableInvertedIndex;
 
 
 public interface MutableInvertedIndexProvider {
-  MutableInvertedIndex newIndex(MutableIndexContext.Inverted context);
+  MutableInvertedIndex newInvertedIndex(MutableIndexContext.Inverted context);
 }

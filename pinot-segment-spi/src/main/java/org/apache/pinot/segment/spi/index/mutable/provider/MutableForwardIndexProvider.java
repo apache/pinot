@@ -22,5 +22,5 @@ import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 
 
 public interface MutableForwardIndexProvider {
-  MutableForwardIndex newIndex(MutableIndexContext.Forward context);
+  MutableForwardIndex newForwardIndex(MutableIndexContext.Forward context);
 }

@@ -255,27 +255,27 @@ public class IndexingOverrides {
     }
 
     @Override
-    public MutableForwardIndex newIndex(MutableIndexContext.Forward context) {
+    public MutableForwardIndex newForwardIndex(MutableIndexContext.Forward context) {
       ensureMutableReaderPresent();
-      return MUTABLE_INDEX_DEFAULTS.newIndex(context);
+      return MUTABLE_INDEX_DEFAULTS.newForwardIndex(context);
     }
 
     @Override
-    public MutableInvertedIndex newIndex(MutableIndexContext.Inverted context) {
+    public MutableInvertedIndex newInvertedIndex(MutableIndexContext.Inverted context) {
       ensureMutableReaderPresent();
-      return MUTABLE_INDEX_DEFAULTS.newIndex(context);
+      return MUTABLE_INDEX_DEFAULTS.newInvertedIndex(context);
     }
 
     @Override
-    public MutableTextIndex newIndex(MutableIndexContext.Text context) {
+    public MutableTextIndex newTextIndex(MutableIndexContext.Text context) {
       ensureMutableReaderPresent();
-      return MUTABLE_INDEX_DEFAULTS.newIndex(context);
+      return MUTABLE_INDEX_DEFAULTS.newTextIndex(context);
     }
 
     @Override
-    public MutableJsonIndex newIndex(MutableIndexContext.Json context) {
+    public MutableJsonIndex newJsonIndex(MutableIndexContext.Json context) {
       ensureMutableReaderPresent();
-      return MUTABLE_INDEX_DEFAULTS.newIndex(context);
+      return MUTABLE_INDEX_DEFAULTS.newJsonIndex(context);
     }
 
     @Override

@@ -22,5 +22,5 @@ import org.apache.pinot.segment.spi.index.mutable.MutableTextIndex;
 
 
 public interface MutableTextIndexReaderProvider {
-  MutableTextIndex newIndex(MutableIndexContext.Text context);
+  MutableTextIndex newTextIndex(MutableIndexContext.Text context);
 }

@@ -235,10 +235,11 @@ public class MutableSegmentImpl implements MutableSegment {
     // Initialize for each column
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       String column = fieldSpec.getName();
-      boolean isRaw = isNoDictionaryColumn(noDictionaryColumns, invertedIndexColumns, fieldSpec, column);
+      boolean isDictionary = !isNoDictionaryColumn(noDictionaryColumns, invertedIndexColumns, fieldSpec, column);
       MutableIndexContext.Common context =
           MutableIndexContext.builder().withFieldSpec(fieldSpec).withMemoryManager(_memoryManager)
-              .withDictionary(!isRaw).withCapacity(_capacity).offHeap(_offHeap).withSegmentName(_segmentName).build();
+              .withDictionary(isDictionary).withCapacity(_capacity).offHeap(_offHeap).withSegmentName(_segmentName)
+              .build();
 
       // Partition info
       PartitionFunction partitionFunction = null;
@@ -260,11 +261,11 @@ public class MutableSegmentImpl implements MutableSegment {
       DataType storedType = fieldSpec.getDataType().getStoredType();
       boolean isFixedWidthColumn = storedType.isFixedWidth();
       MutableIndexProvider indexProvider = IndexingOverrides.getMutableIndexProvider();
-      MutableForwardIndex forwardIndex = indexProvider.newIndex(context.forForwardIndex(avgNumMultiValues));
+      MutableForwardIndex forwardIndex = indexProvider.newForwardIndex(context.forForwardIndex(avgNumMultiValues));
 
       // Dictionary-encoded column
       MutableDictionary dictionary = null;
-      if (!isRaw) {
+      if (isDictionary) {
         int dictionaryColumnSize =
             isFixedWidthColumn ? storedType.size() : _statsHistory.getEstimatedAvgColSize(column);
         // NOTE: preserve 10% buffer for cardinality to reduce the chance of re-sizing the dictionary
@@ -277,7 +278,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
       // Inverted index
       MutableInvertedIndex invertedIndexReader =
-          invertedIndexColumns.contains(column) ? indexProvider.newIndex(context.forInvertedIndex()) : null;
+          invertedIndexColumns.contains(column) ? indexProvider.newInvertedIndex(context.forInvertedIndex()) : null;
 
       // Text index
       RealtimeLuceneTextIndex textIndex;
@@ -296,7 +297,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
       // Json index
       MutableJsonIndex jsonIndex =
-          jsonIndexColumns.contains(column) ? indexProvider.newIndex(context.forJsonIndex()) : null;
+          jsonIndexColumns.contains(column) ? indexProvider.newJsonIndex(context.forJsonIndex()) : null;
 
       // H3 index
       // TODO consider making this overridable

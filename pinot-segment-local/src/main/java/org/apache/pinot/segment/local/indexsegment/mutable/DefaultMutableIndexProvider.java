@@ -45,7 +45,7 @@ public class DefaultMutableIndexProvider implements MutableIndexProvider {
   private static final int NODICT_VARIABLE_WIDTH_ESTIMATED_NUMBER_OF_VALUES_DEFAULT = 100_000;
 
   @Override
-  public MutableForwardIndex newIndex(MutableIndexContext.Forward context) {
+  public MutableForwardIndex newForwardIndex(MutableIndexContext.Forward context) {
     String column = context.getFieldSpec().getName();
     String segmentName = context.getSegmentName();
     FieldSpec.DataType storedType = context.getFieldSpec().getDataType().getStoredType();
@@ -88,17 +88,17 @@ public class DefaultMutableIndexProvider implements MutableIndexProvider {
   }
 
   @Override
-  public MutableInvertedIndex newIndex(MutableIndexContext.Inverted context) {
+  public MutableInvertedIndex newInvertedIndex(MutableIndexContext.Inverted context) {
     return new RealtimeInvertedIndex();
   }
 
   @Override
-  public MutableJsonIndex newIndex(MutableIndexContext.Json context) {
+  public MutableJsonIndex newJsonIndex(MutableIndexContext.Json context) {
     return new MutableJsonIndexImpl();
   }
 
   @Override
-  public MutableTextIndex newIndex(MutableIndexContext.Text context) {
+  public MutableTextIndex newTextIndex(MutableIndexContext.Text context) {
     return null;
   }
 
