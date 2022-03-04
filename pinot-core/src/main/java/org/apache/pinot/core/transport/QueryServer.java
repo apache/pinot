@@ -28,6 +28,7 @@ import io.netty.channel.epoll.EpollServerSocketChannel;
 import io.netty.channel.kqueue.KQueueEventLoopGroup;
 import io.netty.channel.kqueue.KQueueServerSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
@@ -59,8 +60,9 @@ public class QueryServer {
 
   private EventLoopGroup _bossGroup;
   private EventLoopGroup _workerGroup;
+  private Class<? extends ServerSocketChannel> _channelClass;
   private Channel _channel;
-  private Class _channelClass;
+
 
   /**
    * Create an unsecured server instance

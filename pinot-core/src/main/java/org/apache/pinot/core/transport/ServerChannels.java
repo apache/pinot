@@ -69,7 +69,7 @@ public class ServerChannels {
   private final ConcurrentHashMap<ServerRoutingInstance, ServerChannel> _serverToChannelMap = new ConcurrentHashMap<>();
   private final TlsConfig _tlsConfig;
   private EventLoopGroup _eventLoopGroup;
-  private Class _channelClass;
+  private Class<? extends SocketChannel> _channelClass;
 
   /**
    * Create an unsecured server channel
