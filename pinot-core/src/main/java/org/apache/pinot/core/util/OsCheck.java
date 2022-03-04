@@ -24,7 +24,7 @@ import java.util.Locale;
 public final class OsCheck {
 
   // cached result of OS detection
-  protected static OSType _detectedOS;
+  protected static final OSType _detectedOS;
 
   private OsCheck() {
   }
@@ -36,18 +36,6 @@ public final class OsCheck {
    * @return - the operating system detected
    */
   public static OSType getOperatingSystemType() {
-    if (_detectedOS == null) {
-      String os = System.getProperty("os.name", "generic").toLowerCase(Locale.ENGLISH);
-      if ((os.contains("mac")) || (os.contains("darwin"))) {
-        _detectedOS = OSType.MacOS;
-      } else if (os.contains("win")) {
-        _detectedOS = OSType.Windows;
-      } else if (os.contains("nux")) {
-        _detectedOS = OSType.Linux;
-      } else {
-        _detectedOS = OSType.Other;
-      }
-    }
     return _detectedOS;
   }
 
@@ -56,5 +44,19 @@ public final class OsCheck {
    */
   public enum OSType {
     Windows, MacOS, Linux, Other
+  }
+
+  static {
+    String os = System.getProperty("os.name", "generic").toLowerCase(Locale.ENGLISH);
+    System.out.println(os);
+    if ((os.contains("mac")) || (os.contains("darwin"))) {
+      _detectedOS = OSType.MacOS;
+    } else if (os.contains("win")) {
+      _detectedOS = OSType.Windows;
+    } else if (os.contains("linux")) {
+      _detectedOS = OSType.Linux;
+    } else {
+      _detectedOS = OSType.Other;
+    }
   }
 }
