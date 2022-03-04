@@ -35,7 +35,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <proto.version>3.11.4</proto.version>
+    <proto.version>3.19.2</proto.version>
     <phase.prop>package</phase.prop>
   </properties>
   <dependencies>
