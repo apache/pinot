@@ -26,6 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -64,7 +65,7 @@ public class QueryRouter {
   public QueryRouter(String brokerId, BrokerMetrics brokerMetrics) {
     _brokerId = brokerId;
     _brokerMetrics = brokerMetrics;
-    _serverChannels = new ServerChannels(this, brokerMetrics);
+    _serverChannels = new ServerChannels(this, brokerMetrics, null);
     _serverChannelsTls = null;
   }
 
@@ -75,12 +76,13 @@ public class QueryRouter {
    * @param brokerMetrics broker metrics
    * @param tlsConfig TLS config
    */
-  public QueryRouter(String brokerId, BrokerMetrics brokerMetrics, TlsConfig tlsConfig) {
+  public QueryRouter(String brokerId, BrokerMetrics brokerMetrics, NettyConfig nettyConfig, TlsConfig tlsConfig) {
     _brokerId = brokerId;
     _brokerMetrics = brokerMetrics;
-    _serverChannels = new ServerChannels(this, brokerMetrics);
+    _serverChannels = new ServerChannels(this, brokerMetrics, nettyConfig);
     _serverChannelsTls =
-        Optional.ofNullable(tlsConfig).map(conf -> new ServerChannels(this, brokerMetrics, conf)).orElse(null);
+        Optional.ofNullable(tlsConfig).map(conf -> new ServerChannels(this, brokerMetrics, nettyConfig, conf))
+            .orElse(null);
   }
 
   public AsyncQueryResponse submitQuery(long requestId, String rawTableName,

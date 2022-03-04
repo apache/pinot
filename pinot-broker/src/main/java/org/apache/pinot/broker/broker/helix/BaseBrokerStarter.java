@@ -45,6 +45,7 @@ import org.apache.pinot.broker.requesthandler.GrpcBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
 import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -238,6 +239,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     TableCache tableCache = new TableCache(_propertyStore, caseInsensitive);
     // Configure TLS for netty connection to server
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_TLS_PREFIX);
+    NettyConfig nettyDefaults = NettyConfig.extractNettyConfig(_brokerConf, Broker.BROKER_NETTY_PREFIX);
 
     if (_brokerConf.getProperty(Broker.BROKER_REQUEST_HANDLER_TYPE, Broker.DEFAULT_BROKER_REQUEST_HANDLER_TYPE)
         .equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
@@ -250,11 +252,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       if (_brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false)) {
         _brokerRequestHandler =
             new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
-                queryQuotaManager, tableCache, _brokerMetrics, tlsDefaults);
+                queryQuotaManager, tableCache, _brokerMetrics, nettyDefaults, tlsDefaults);
       } else {
         _brokerRequestHandler =
             new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
-                queryQuotaManager, tableCache, _brokerMetrics, null);
+                queryQuotaManager, tableCache, _brokerMetrics, nettyDefaults, null);
       }
     }
 

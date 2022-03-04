@@ -23,6 +23,10 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.epoll.EpollEventLoopGroup;
+import io.netty.channel.epoll.EpollServerSocketChannel;
+import io.netty.channel.kqueue.KQueueEventLoopGroup;
+import io.netty.channel.kqueue.KQueueServerSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -32,10 +36,12 @@ import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
+import org.apache.pinot.core.util.OsCheck;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AllowAllAccessFactory;
 
@@ -54,6 +60,7 @@ public class QueryServer {
   private EventLoopGroup _bossGroup;
   private EventLoopGroup _workerGroup;
   private Channel _channel;
+  private Class _channelClass;
 
   /**
    * Create an unsecured server instance
@@ -62,8 +69,8 @@ public class QueryServer {
    * @param queryScheduler query scheduler
    * @param serverMetrics server metrics
    */
-  public QueryServer(int port, QueryScheduler queryScheduler, ServerMetrics serverMetrics) {
-    this(port, queryScheduler, serverMetrics, null, new AllowAllAccessFactory().create());
+  public QueryServer(int port, QueryScheduler queryScheduler, ServerMetrics serverMetrics, NettyConfig nettyConfig) {
+    this(port, queryScheduler, serverMetrics, nettyConfig, null, new AllowAllAccessFactory().create());
   }
 
   /**
@@ -75,21 +82,33 @@ public class QueryServer {
    * @param tlsConfig TLS/SSL config
    * @param accessControlFactory access control factory for netty channel
    */
-  public QueryServer(int port, QueryScheduler queryScheduler, ServerMetrics serverMetrics, TlsConfig tlsConfig,
+  public QueryServer(int port, QueryScheduler queryScheduler, ServerMetrics serverMetrics, NettyConfig nettyConfig,
+      TlsConfig tlsConfig,
       AccessControl accessControl) {
     _port = port;
     _queryScheduler = queryScheduler;
     _serverMetrics = serverMetrics;
     _tlsConfig = tlsConfig;
     _accessControl = accessControl;
+    if (nettyConfig.isNativeTransportsEnabled() && OsCheck.getOperatingSystemType() == OsCheck.OSType.Linux) {
+      _bossGroup = new EpollEventLoopGroup();
+      _workerGroup = new EpollEventLoopGroup();
+      _channelClass = EpollServerSocketChannel.class;
+    } else if (nettyConfig.isNativeTransportsEnabled() && OsCheck.getOperatingSystemType() == OsCheck.OSType.MacOS) {
+      _bossGroup = new KQueueEventLoopGroup();
+      _workerGroup = new KQueueEventLoopGroup();
+      _channelClass = KQueueServerSocketChannel.class;
+    } else {
+      _bossGroup = new NioEventLoopGroup();
+      _workerGroup = new NioEventLoopGroup();
+      _channelClass = NioServerSocketChannel.class;
+    }
   }
 
   public void start() {
-    _bossGroup = new NioEventLoopGroup();
-    _workerGroup = new NioEventLoopGroup();
     try {
       ServerBootstrap serverBootstrap = new ServerBootstrap();
-      _channel = serverBootstrap.group(_bossGroup, _workerGroup).channel(NioServerSocketChannel.class)
+      _channel = serverBootstrap.group(_bossGroup, _workerGroup).channel(_channelClass)
           .option(ChannelOption.SO_BACKLOG, 128).childOption(ChannelOption.SO_KEEPALIVE, true)
           .childHandler(new ChannelInitializer<SocketChannel>() {
             @Override
