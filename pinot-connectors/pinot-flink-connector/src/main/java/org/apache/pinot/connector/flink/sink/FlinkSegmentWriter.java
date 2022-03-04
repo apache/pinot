@@ -189,11 +189,11 @@ public class FlinkSegmentWriter implements SegmentWriter {
    * <p>Successful completion of segment will return the segment URI, and the URI includes a
    * sequence id indicating the part number. The sequence id is initialized to 0 and each successful
    * flush will increment the sequence id by 1. The segment name will be in the format of
-   * tableName_indexOfSubTask_sequenceId (e.g. starbucksStores_1_0). The buffer will be reset and ready to accept further
-   * records via <code>collect()</code> If an exception is thrown, the buffer will not be reset and
-   * so, <code>flush()</code> can be invoked repeatedly in a retry loop. If a successful invocation
-   * is not achieved,<code>close()</code> followed by <code>init </code> will have to be called in
-   * order to reset the buffer and resume record writing.
+   * tableName_indexOfSubTask_sequenceId (e.g. starbucksStores_1_0). The buffer will be reset and
+   * ready to accept further records via <code>collect()</code> If an exception is thrown, the buffer
+   * will not be reset and so, <code>flush()</code> can be invoked repeatedly in a retry loop. If a
+   * successful invocation is not achieved,<code>close()</code> followed by <code>init </code> will
+   * have to be called in order to reset the buffer and resume record writing.
    *
    * @return URI of the generated segment
    * @throws IOException
