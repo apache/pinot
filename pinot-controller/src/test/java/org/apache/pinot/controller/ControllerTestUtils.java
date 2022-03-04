@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
@@ -50,13 +49,11 @@ import org.apache.helix.participant.statemachine.Transition;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
-import org.apache.pinot.common.utils.http.HttpUtils;
 import org.apache.pinot.controller.api.AccessControlTest;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
+import org.apache.pinot.controller.helix.ControllerRequestUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.tenant.Tenant;
-import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -74,8 +71,6 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.LEAD_CONTROLLER_R
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
 
 
 /**
@@ -101,7 +96,7 @@ public abstract class ControllerTestUtils {
   protected static int _controllerPort;
   protected static String _controllerBaseApiUrl;
 
-  protected static ControllerRequestURLBuilder _controllerRequestURLBuilder;
+  protected static ControllerRequestUtils _controllerRequestUtils;
   protected static String _controllerDataDir;
   protected static ControllerStarter _controllerStarter;
   protected static PinotHelixResourceManager _helixResourceManager;
@@ -150,7 +145,8 @@ public abstract class ControllerTestUtils {
 
     _controllerPort = Integer.parseInt(_controllerConfig.getControllerPort());
     _controllerBaseApiUrl = "http://localhost:" + _controllerPort;
-    _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
+    _controllerRequestUtils = ControllerRequestUtils.baseUrl(_controllerConfig.getHelixClusterName(),
+        _controllerBaseApiUrl);
     _controllerDataDir = _controllerConfig.getDataDir();
 
     _controllerStarter = new ControllerStarter();
@@ -442,7 +438,7 @@ public abstract class ControllerTestUtils {
 
   public static void addDummySchema(String tableName)
       throws IOException {
-    addSchema(createDummySchema(tableName));
+    _controllerRequestUtils.addSchema(createDummySchema(tableName));
   }
 
   /**
@@ -450,48 +446,27 @@ public abstract class ControllerTestUtils {
    */
   public static void addSchema(Schema schema)
       throws IOException {
-    String url = _controllerRequestURLBuilder.forSchemaCreate();
-    PostMethod postMethod = HttpUtils.sendMultipartPostRequest(url, schema.toSingleLineJsonString());
-    assertEquals(postMethod.getStatusCode(), 200);
+    _controllerRequestUtils.addSchema(schema);
   }
 
-  protected static Schema getSchema(String schemaName) {
-    Schema schema = _helixResourceManager.getSchema(schemaName);
-    assertNotNull(schema);
-    return schema;
+  protected static Schema getSchema(String schemaName)
+      throws IOException {
+    return _controllerRequestUtils.getSchema(schemaName);
   }
 
   protected static void addTableConfig(TableConfig tableConfig)
       throws IOException {
-    HttpUtils.sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
-  }
-
-  protected static String getBrokerTenantRequestPayload(String tenantName, int numBrokers) {
-    return new Tenant(TenantRole.BROKER, tenantName, numBrokers, 0, 0).toJsonString();
+    _controllerRequestUtils.addTableConfig(tableConfig);
   }
 
   public static void createBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
-    HttpUtils.sendPostRequest(_controllerRequestURLBuilder.forTenantCreate(),
-        getBrokerTenantRequestPayload(tenantName, numBrokers));
-  }
-
-  public static void updateBrokerTenant(String tenantName, int numBrokers)
-      throws IOException {
-    HttpUtils.sendPutRequest(_controllerRequestURLBuilder.forTenantCreate(),
-        getBrokerTenantRequestPayload(tenantName, numBrokers));
-  }
-
-  protected static String getServerTenantRequestPayload(String tenantName, int numOfflineServers,
-      int numRealtimeServers) {
-    return new Tenant(TenantRole.SERVER, tenantName, numOfflineServers + numRealtimeServers, numOfflineServers,
-        numRealtimeServers).toJsonString();
+    _controllerRequestUtils.createBrokerTenant(tenantName, numBrokers);
   }
 
   public static void createServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
       throws IOException {
-    HttpUtils.sendPostRequest(_controllerRequestURLBuilder.forTenantCreate(),
-        getServerTenantRequestPayload(tenantName, numOfflineServers, numRealtimeServers));
+    _controllerRequestUtils.createServerTenant(tenantName, numOfflineServers, numRealtimeServers);
   }
 
   public static void enableResourceConfigForLeadControllerResource(boolean enable) {
@@ -531,7 +506,7 @@ public abstract class ControllerTestUtils {
   }
 
   public static ControllerRequestURLBuilder getControllerRequestURLBuilder() {
-    return _controllerRequestURLBuilder;
+    return _controllerRequestUtils.getControllerRequestURLBuilder();
   }
 
   public static HelixAdmin getHelixAdmin() {
