@@ -23,6 +23,7 @@ import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.http.HttpUtils;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -57,7 +58,7 @@ public class ControllerInstanceToggleTest {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(
             ControllerTestUtils.MIN_NUM_REPLICAS).build();
-    ControllerTestUtils
+    HttpUtils
         .sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableCreate(),
             tableConfig.toJsonString());
     Assert.assertEquals(
@@ -117,7 +118,7 @@ public class ControllerInstanceToggleTest {
     }
 
     // Delete table
-    ControllerTestUtils
+    HttpUtils
         .sendDeleteRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableDelete(RAW_TABLE_NAME));
     Assert.assertEquals(
         ControllerTestUtils
@@ -131,7 +132,7 @@ public class ControllerInstanceToggleTest {
     // It may take time for an instance to toggle the state.
     TestUtils.waitForCondition(aVoid -> {
       try {
-        ControllerTestUtils
+        HttpUtils
             .sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forInstanceState(instanceName),
                 state);
       } catch (IOException ioe) {

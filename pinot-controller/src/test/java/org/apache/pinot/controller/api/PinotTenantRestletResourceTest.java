@@ -20,6 +20,7 @@ package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.http.HttpUtils;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -47,15 +48,15 @@ public class PinotTenantRestletResourceTest {
     // Check that no tables on tenant works
     String listTablesUrl =
         ControllerTestUtils.getControllerRequestURLBuilder().forTablesFromTenant(TagNameUtils.DEFAULT_TENANT_NAME);
-    JsonNode tableList = JsonUtils.stringToJsonNode(ControllerTestUtils.sendGetRequest(listTablesUrl));
+    JsonNode tableList = JsonUtils.stringToJsonNode(HttpUtils.sendGetRequest(listTablesUrl));
     assertEquals(tableList.get("tables").size(), 0);
 
     // Add a table
-    ControllerTestUtils.sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableCreate(),
+    HttpUtils.sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableCreate(),
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build().toJsonString());
 
     // There should be 1 table on the tenant
-    tableList = JsonUtils.stringToJsonNode(ControllerTestUtils.sendGetRequest(listTablesUrl));
+    tableList = JsonUtils.stringToJsonNode(HttpUtils.sendGetRequest(listTablesUrl));
     JsonNode tables = tableList.get("tables");
     assertEquals(tables.size(), 1);
 

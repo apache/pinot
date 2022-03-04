@@ -22,6 +22,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Map;
 import org.apache.helix.InstanceType;
+import org.apache.pinot.common.utils.http.HttpUtils;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
@@ -163,7 +164,7 @@ public class TableViewsTest {
 
   private TableViews.TableView getTableView(String tableName, String view, String tableType)
       throws Exception {
-    return JsonUtils.stringToObject(ControllerTestUtils
+    return JsonUtils.stringToObject(HttpUtils
             .sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableView(tableName, view,
                 tableType)),
         TableViews.TableView.class);

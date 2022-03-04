@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix;
 
 import java.io.IOException;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.http.HttpUtils;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -49,7 +50,7 @@ public class ControllerSentinelTestV2 {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNumReplicas(
             ControllerTestUtils.MIN_NUM_REPLICAS).build();
-    ControllerTestUtils
+    HttpUtils
         .sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableCreate(),
             tableConfig.toJsonString());
     Assert.assertEquals(
@@ -82,7 +83,7 @@ public class ControllerSentinelTestV2 {
     }
 
     // Delete table
-    ControllerTestUtils
+    HttpUtils
         .sendDeleteRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableDelete(TABLE_NAME));
     Assert.assertEquals(
         ControllerTestUtils

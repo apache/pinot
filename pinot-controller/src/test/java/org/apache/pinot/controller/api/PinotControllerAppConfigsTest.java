@@ -21,6 +21,7 @@ package org.apache.pinot.controller.api;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import org.apache.pinot.common.utils.PinotAppConfigs;
+import org.apache.pinot.common.utils.http.HttpUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.spi.utils.Obfuscator;
@@ -52,7 +53,7 @@ public class PinotControllerAppConfigsTest {
     PinotAppConfigs expected = new PinotAppConfigs(expectedControllerConf);
 
     String configsJson =
-        ControllerTestUtils.sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forAppConfigs());
+        HttpUtils.sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forAppConfigs());
     ObjectMapper mapper = new ObjectMapper();
     PinotAppConfigs actual = mapper.readValue(configsJson, PinotAppConfigs.class);
 

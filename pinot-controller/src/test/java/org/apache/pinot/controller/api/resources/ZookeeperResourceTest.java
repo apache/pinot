@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.common.utils.http.HttpUtils;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.codehaus.jackson.type.TypeReference;
 import org.testng.Assert;
@@ -57,12 +58,12 @@ public class ZookeeperResourceTest {
     String params =
         "path=" + path1 + "&data=" + URIUtils.encode(data) + "&expectedVersion=" + expectedVersion + "&accessOption="
             + accessOption;
-    String result = ControllerTestUtils.sendPutRequest(urlPut + "?" + params);
+    String result = HttpUtils.sendPutRequest(urlPut + "?" + params);
     Assert.assertTrue(result.toLowerCase().contains("successfully updated"));
 
     // validate zk/get results in correct data
     String urlGet = ControllerTestUtils.getControllerRequestURLBuilder().forZkGet(path1);
-    result = ControllerTestUtils.sendGetRequest(urlGet);
+    result = HttpUtils.sendGetRequest(urlGet);
 
     ZNRecord znRecord = ZookeeperResource.MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8), ZNRecord.class);
     Assert.assertEquals(znRecord.getId(), "QuickStartCluster");
@@ -70,7 +71,7 @@ public class ZookeeperResourceTest {
 
     // validate zk/getChildren in parent path
     urlGet = ControllerTestUtils.getControllerRequestURLBuilder().forZkGetChildren(path);
-    result = ControllerTestUtils.sendGetRequest(urlGet);
+    result = HttpUtils.sendGetRequest(urlGet);
 
     List<ZNRecord> recordList = ZookeeperResource.MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8),
         new TypeReference<List<ZNRecord>>() { });
@@ -98,7 +99,7 @@ public class ZookeeperResourceTest {
     try {
       params = "path=" + path2 + "&data=" + URIUtils.encode(largeData) + "&expectedVersion=" + expectedVersion
           + "&accessOption=" + accessOption;
-      ControllerTestUtils.sendPutRequest(urlPut + "?" + params);
+      HttpUtils.sendPutRequest(urlPut + "?" + params);
       Assert.fail("Should not get here, large payload");
     } catch (IOException e) {
       // Expected
@@ -108,12 +109,12 @@ public class ZookeeperResourceTest {
     params = "path=" + path2 + "&expectedVersion=" + expectedVersion + "&accessOption=" + accessOption;
     Map<String, String> headers = new HashMap<>();
     headers.put("Content-Type", "application/json");
-    result = ControllerTestUtils.sendPutRequest(urlPut + "?" + params, headers, largeData);
+    result = HttpUtils.sendPutRequest(urlPut + "?" + params, headers, largeData);
     Assert.assertTrue(result.toLowerCase().contains("successfully updated"));
 
     // validate that zk/getChildren return 2 items.
     urlGet = ControllerTestUtils.getControllerRequestURLBuilder().forZkGetChildren(path);
-    result = ControllerTestUtils.sendGetRequest(urlGet);
+    result = HttpUtils.sendGetRequest(urlGet);
 
     recordList = ZookeeperResource.MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8),
         new TypeReference<List<ZNRecord>>() { });

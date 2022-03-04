@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.api;
 
 import java.io.IOException;
+import org.apache.pinot.common.utils.http.HttpUtils;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -40,7 +41,7 @@ public class AccessControlTest {
   @Test
   public void testAccessDenied() {
     try {
-      ControllerTestUtils.sendGetRequest(
+      HttpUtils.sendGetRequest(
           ControllerTestUtils.getControllerRequestURLBuilder().forSegmentDownload(TABLE_NAME, "testSegment"));
     } catch (IOException e) {
       Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 403"));

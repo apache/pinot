@@ -21,6 +21,7 @@ package org.apache.pinot.controller.api.resources;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.utils.http.HttpUtils;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -49,7 +50,7 @@ public class PinotDummyExtraRestletResourceTest {
   public void testExtraDummyResourcePackages()
       throws Exception {
     String baseUrl = ControllerTestUtils.getControllerBaseApiUrl();
-    String resp = ControllerTestUtils.sendGetRequest(StringUtil.join("/", baseUrl, "testExtra"));
+    String resp = HttpUtils.sendGetRequest(StringUtil.join("/", baseUrl, "testExtra"));
     assertEquals(resp, "DummyMsg");
   }
 

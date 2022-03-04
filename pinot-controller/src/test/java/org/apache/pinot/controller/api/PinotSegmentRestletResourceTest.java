@@ -20,6 +20,7 @@ package org.apache.pinot.controller.api;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.common.utils.http.HttpUtils;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -92,7 +93,7 @@ public class PinotSegmentRestletResourceTest {
 
   private void checkCrcRequest(Map<String, SegmentMetadata> metadataTable, int expectedSize)
       throws Exception {
-    String crcMapStr = ControllerTestUtils.sendGetRequest(
+    String crcMapStr = HttpUtils.sendGetRequest(
         ControllerTestUtils.getControllerRequestURLBuilder().forListAllCrcInformationForTable(TABLE_NAME));
     Map<String, String> crcMap = JsonUtils.stringToObject(crcMapStr, Map.class);
     for (String segmentName : crcMap.keySet()) {

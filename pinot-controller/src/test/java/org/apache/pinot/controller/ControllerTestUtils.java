@@ -19,16 +19,8 @@
 package org.apache.pinot.controller;
 
 import com.google.common.base.Preconditions;
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -36,14 +28,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.PostMethod;
-import org.apache.commons.httpclient.methods.PutMethod;
-import org.apache.commons.httpclient.methods.multipart.MultipartRequestEntity;
-import org.apache.commons.httpclient.methods.multipart.Part;
-import org.apache.commons.httpclient.methods.multipart.StringPart;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
@@ -64,6 +50,7 @@ import org.apache.helix.participant.statemachine.Transition;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.http.HttpUtils;
 import org.apache.pinot.controller.api.AccessControlTest;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -464,7 +451,7 @@ public abstract class ControllerTestUtils {
   public static void addSchema(Schema schema)
       throws IOException {
     String url = _controllerRequestURLBuilder.forSchemaCreate();
-    PostMethod postMethod = sendMultipartPostRequest(url, schema.toSingleLineJsonString());
+    PostMethod postMethod = HttpUtils.sendMultipartPostRequest(url, schema.toSingleLineJsonString());
     assertEquals(postMethod.getStatusCode(), 200);
   }
 
@@ -476,7 +463,7 @@ public abstract class ControllerTestUtils {
 
   protected static void addTableConfig(TableConfig tableConfig)
       throws IOException {
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
+    HttpUtils.sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
   }
 
   protected static String getBrokerTenantRequestPayload(String tenantName, int numBrokers) {
@@ -485,13 +472,13 @@ public abstract class ControllerTestUtils {
 
   public static void createBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
-    sendPostRequest(_controllerRequestURLBuilder.forTenantCreate(),
+    HttpUtils.sendPostRequest(_controllerRequestURLBuilder.forTenantCreate(),
         getBrokerTenantRequestPayload(tenantName, numBrokers));
   }
 
   public static void updateBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
-    sendPutRequest(_controllerRequestURLBuilder.forTenantCreate(),
+    HttpUtils.sendPutRequest(_controllerRequestURLBuilder.forTenantCreate(),
         getBrokerTenantRequestPayload(tenantName, numBrokers));
   }
 
@@ -503,7 +490,7 @@ public abstract class ControllerTestUtils {
 
   public static void createServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
       throws IOException {
-    sendPostRequest(_controllerRequestURLBuilder.forTenantCreate(),
+    HttpUtils.sendPostRequest(_controllerRequestURLBuilder.forTenantCreate(),
         getServerTenantRequestPayload(tenantName, numOfflineServers, numRealtimeServers));
   }
 
@@ -515,129 +502,6 @@ public abstract class ControllerTestUtils {
       resourceConfig.putSimpleConfig(LEAD_CONTROLLER_RESOURCE_ENABLED_KEY, Boolean.toString(enable));
       configAccessor.setResourceConfig(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME, resourceConfig);
     }
-  }
-
-  public static String sendGetRequest(String urlString)
-      throws IOException {
-    return constructResponse(new URL(urlString).openStream());
-  }
-
-  public static String sendGetRequestRaw(String urlString)
-      throws IOException {
-    return IOUtils.toString(new URL(urlString).openStream());
-  }
-
-  public static String sendPostRequest(String urlString, String payload)
-      throws IOException {
-    return sendPostRequest(urlString, payload, Collections.EMPTY_MAP);
-  }
-
-  public static String sendPostRequest(String urlString, String payload, Map<String, String> headers)
-      throws IOException {
-    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
-    httpConnection.setRequestMethod("POST");
-    if (headers != null) {
-      for (String key : headers.keySet()) {
-        httpConnection.setRequestProperty(key, headers.get(key));
-      }
-    }
-
-    if (payload != null && !payload.isEmpty()) {
-      httpConnection.setDoOutput(true);
-      try (BufferedWriter writer = new BufferedWriter(
-          new OutputStreamWriter(httpConnection.getOutputStream(), StandardCharsets.UTF_8))) {
-        writer.write(payload, 0, payload.length());
-        writer.flush();
-      }
-    }
-
-    return constructResponse(httpConnection.getInputStream());
-  }
-
-  public static String sendPutRequest(String urlString, String payload)
-      throws IOException {
-    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
-    httpConnection.setDoOutput(true);
-    httpConnection.setRequestMethod("PUT");
-
-    try (BufferedWriter writer = new BufferedWriter(
-        new OutputStreamWriter(httpConnection.getOutputStream(), StandardCharsets.UTF_8))) {
-      writer.write(payload);
-      writer.flush();
-    }
-
-    return constructResponse(httpConnection.getInputStream());
-  }
-
-  public static String sendPutRequest(String urlString, Map<String, String> headers, String payload)
-      throws IOException {
-    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
-    httpConnection.setDoOutput(true);
-    httpConnection.setRequestMethod("PUT");
-    if (headers != null) {
-      for (Map.Entry<String, String> kv : headers.entrySet()) {
-        httpConnection.setRequestProperty(kv.getKey(), kv.getValue());
-      }
-    }
-
-    try (BufferedWriter writer = new BufferedWriter(
-        new OutputStreamWriter(httpConnection.getOutputStream(), StandardCharsets.UTF_8))) {
-      writer.write(payload);
-      writer.flush();
-    }
-
-    return constructResponse(httpConnection.getInputStream());
-  }
-
-  public static String sendPutRequest(String urlString)
-      throws IOException {
-    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
-    httpConnection.setDoOutput(true);
-    httpConnection.setRequestMethod("PUT");
-    return constructResponse(httpConnection.getInputStream());
-  }
-
-  public static String sendDeleteRequest(String urlString)
-      throws IOException {
-    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
-    httpConnection.setRequestMethod("DELETE");
-    httpConnection.connect();
-
-    return constructResponse(httpConnection.getInputStream());
-  }
-
-  private static String constructResponse(InputStream inputStream)
-      throws IOException {
-    try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-      StringBuilder responseBuilder = new StringBuilder();
-      String line;
-      while ((line = reader.readLine()) != null) {
-        responseBuilder.append(line);
-      }
-      return responseBuilder.toString();
-    }
-  }
-
-  public static PostMethod sendMultipartPostRequest(String url, String body)
-      throws IOException {
-    HttpClient httpClient = new HttpClient();
-    PostMethod postMethod = new PostMethod(url);
-    // our handlers ignore key...so we can put anything here
-    Part[] parts = {new StringPart("body", body)};
-    postMethod.setRequestEntity(new MultipartRequestEntity(parts, postMethod.getParams()));
-    httpClient.executeMethod(postMethod);
-    return postMethod;
-  }
-
-  public static PutMethod sendMultipartPutRequest(String url, String body)
-      throws IOException {
-    HttpClient httpClient = new HttpClient();
-    PutMethod putMethod = new PutMethod(url);
-    // our handlers ignore key...so we can put anything here
-    Part[] parts = {new StringPart("body", body)};
-    putMethod.setRequestEntity(new MultipartRequestEntity(parts, putMethod.getParams()));
-    httpClient.executeMethod(putMethod);
-    return putMethod;
   }
 
   /**
