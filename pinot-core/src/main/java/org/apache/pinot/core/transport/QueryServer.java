@@ -63,7 +63,6 @@ public class QueryServer {
   private Class<? extends ServerSocketChannel> _channelClass;
   private Channel _channel;
 
-
   /**
    * Create an unsecured server instance
    *
@@ -92,11 +91,13 @@ public class QueryServer {
     _serverMetrics = serverMetrics;
     _tlsConfig = tlsConfig;
     _accessControl = accessControl;
-    if (nettyConfig.isNativeTransportsEnabled() && OsCheck.getOperatingSystemType() == OsCheck.OSType.Linux) {
+    if (nettyConfig != null && nettyConfig.isNativeTransportsEnabled()
+        && OsCheck.getOperatingSystemType() == OsCheck.OSType.Linux) {
       _bossGroup = new EpollEventLoopGroup();
       _workerGroup = new EpollEventLoopGroup();
       _channelClass = EpollServerSocketChannel.class;
-    } else if (nettyConfig.isNativeTransportsEnabled() && OsCheck.getOperatingSystemType() == OsCheck.OSType.MacOS) {
+    } else if (nettyConfig != null && nettyConfig.isNativeTransportsEnabled()
+        && OsCheck.getOperatingSystemType() == OsCheck.OSType.MacOS) {
       _bossGroup = new KQueueEventLoopGroup();
       _workerGroup = new KQueueEventLoopGroup();
       _channelClass = KQueueServerSocketChannel.class;
