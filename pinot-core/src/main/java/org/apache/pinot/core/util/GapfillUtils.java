@@ -180,7 +180,7 @@ public class GapfillUtils {
     }
 
     queryContext.setGapfillType(gapfillType);
-    if(gapfillType == null) {
+    if (gapfillType == null) {
       return;
     }
 

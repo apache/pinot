@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.request.context.utils;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
