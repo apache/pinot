@@ -57,72 +57,11 @@ public class BrokerRequestToQueryContextConverter {
   public static QueryContext convert(BrokerRequest brokerRequest) {
     if (brokerRequest.getPinotQuery() != null) {
       QueryContext queryContext = convertSQL(brokerRequest.getPinotQuery(), brokerRequest);
-      queryContext.setGapfillType(GapfillUtils.getGapfillType(queryContext));
-      validateForGapfillQuery(queryContext);
+      GapfillUtils.setGapfillType(queryContext);
       return queryContext;
     } else {
       return convertPQL(brokerRequest);
     }
-  }
-
-  /**
-   * Do the validation for gapfill query.
-   */
-  private static void validateForGapfillQuery(QueryContext queryContext) {
-    if (queryContext.getGapfillType() == null) {
-      return;
-    }
-
-    ExpressionContext gapFillSelection = GapfillUtils.getGapfillExpressionContext(queryContext);
-
-    Preconditions.checkArgument(gapFillSelection != null && gapFillSelection.getFunction() != null,
-        "Gapfill Expression should be function.");
-    List<ExpressionContext> args = gapFillSelection.getFunction().getArguments();
-    Preconditions.checkArgument(args.size() > 5, "PreAggregateGapFill does not have correct number of arguments.");
-    Preconditions.checkArgument(args.get(1).getLiteral() != null,
-        "The second argument of PostAggregateGapFill should be TimeFormatter.");
-    Preconditions.checkArgument(args.get(2).getLiteral() != null,
-        "The third argument of PostAggregateGapFill should be start time.");
-    Preconditions.checkArgument(args.get(3).getLiteral() != null,
-        "The fourth argument of PostAggregateGapFill should be end time.");
-    Preconditions.checkArgument(args.get(4).getLiteral() != null,
-        "The fifth argument of PostAggregateGapFill should be time bucket size.");
-
-    ExpressionContext timeseriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);
-    Preconditions.checkArgument(timeseriesOn != null, "The TimeSeriesOn expressions should be specified.");
-
-    if (queryContext.getAggregationFunctions() == null) {
-      return;
-    }
-
-    List<ExpressionContext> groupbyExpressions = queryContext.getGroupByExpressions();
-    Preconditions.checkArgument(groupbyExpressions != null, "No GroupBy Clause.");
-    List<ExpressionContext> innerSelections = queryContext.getSubQueryContext().getSelectExpressions();
-    String timeBucketCol = null;
-    List<String> strAlias = queryContext.getSubQueryContext().getAliasList();
-    for (int i = 0; i < innerSelections.size(); i++) {
-      ExpressionContext innerSelection = innerSelections.get(i);
-      if (GapfillUtils.isGapfill(innerSelection)) {
-        if (strAlias.get(i) != null) {
-          timeBucketCol = strAlias.get(i);
-        } else {
-          timeBucketCol = innerSelection.getFunction().getArguments().get(0).toString();
-        }
-        break;
-      }
-    }
-
-    Preconditions.checkArgument(timeBucketCol != null, "No Group By timebucket.");
-
-    boolean findTimeBucket = false;
-    for (ExpressionContext groupbyExp : groupbyExpressions) {
-      if (timeBucketCol.equals(groupbyExp.toString())) {
-        findTimeBucket = true;
-        break;
-      }
-    }
-
-    Preconditions.checkArgument(findTimeBucket, "No Group By timebucket.");
   }
 
   private static QueryContext convertSQL(PinotQuery pinotQuery, BrokerRequest brokerRequest) {

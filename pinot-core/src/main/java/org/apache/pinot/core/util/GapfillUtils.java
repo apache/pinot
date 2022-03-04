@@ -148,35 +148,92 @@ public class GapfillUtils {
     return false;
   }
 
-  public static GapfillType getGapfillType(QueryContext queryContext) {
+  /**
+   * Get the gapfill type for queryContext. Also do the validation for gapfill request.
+   * @param queryContext
+   */
+  public static void setGapfillType(QueryContext queryContext) {
+    GapfillType gapfillType = null;
     if (queryContext.getSubQueryContext() == null) {
       if (isGapfill(queryContext)) {
         Preconditions.checkArgument(queryContext.getAggregationFunctions() == null,
             "Aggregation and Gapfill can not be in the same sql statement.");
-        return GapfillType.GAP_FILL;
-      } else {
-        return null;
+        gapfillType = GapfillType.GAP_FILL;
       }
     } else if (isGapfill(queryContext)) {
       Preconditions.checkArgument(queryContext.getSubQueryContext().getAggregationFunctions() != null,
           "Select and Gapfill should be in the same sql statement.");
       Preconditions.checkArgument(queryContext.getSubQueryContext().getSubQueryContext() == null,
           "There is no three levels nesting sql when the outer query is gapfill.");
-      return GapfillType.AGGREGATE_GAP_FILL;
+      gapfillType = GapfillType.AGGREGATE_GAP_FILL;
     } else if (isGapfill(queryContext.getSubQueryContext())) {
       if (queryContext.getAggregationFunctions() == null) {
-        return GapfillType.GAP_FILL_SELECT;
+        gapfillType = GapfillType.GAP_FILL_SELECT;
       } else if (queryContext.getSubQueryContext().getSubQueryContext() == null) {
-        return GapfillType.GAP_FILL_AGGREGATE;
+        gapfillType = GapfillType.GAP_FILL_AGGREGATE;
       } else {
         Preconditions
             .checkArgument(queryContext.getSubQueryContext().getSubQueryContext().getAggregationFunctions() != null,
                 "Select cannot happen before gapfill.");
-        return GapfillType.AGGREGATE_GAP_FILL_AGGREGATE;
+        gapfillType = GapfillType.AGGREGATE_GAP_FILL_AGGREGATE;
       }
-    } else {
-      return null;
     }
+
+    queryContext.setGapfillType(gapfillType);
+    if(gapfillType == null) {
+      return;
+    }
+
+    ExpressionContext gapFillSelection = GapfillUtils.getGapfillExpressionContext(queryContext);
+
+    Preconditions.checkArgument(gapFillSelection != null && gapFillSelection.getFunction() != null,
+        "Gapfill Expression should be function.");
+    List<ExpressionContext> args = gapFillSelection.getFunction().getArguments();
+    Preconditions.checkArgument(args.size() > 5, "PreAggregateGapFill does not have correct number of arguments.");
+    Preconditions.checkArgument(args.get(1).getLiteral() != null,
+        "The second argument of PostAggregateGapFill should be TimeFormatter.");
+    Preconditions.checkArgument(args.get(2).getLiteral() != null,
+        "The third argument of PostAggregateGapFill should be start time.");
+    Preconditions.checkArgument(args.get(3).getLiteral() != null,
+        "The fourth argument of PostAggregateGapFill should be end time.");
+    Preconditions.checkArgument(args.get(4).getLiteral() != null,
+        "The fifth argument of PostAggregateGapFill should be time bucket size.");
+
+    ExpressionContext timeseriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);
+    Preconditions.checkArgument(timeseriesOn != null, "The TimeSeriesOn expressions should be specified.");
+
+    if (queryContext.getAggregationFunctions() == null) {
+      return;
+    }
+
+    List<ExpressionContext> groupbyExpressions = queryContext.getGroupByExpressions();
+    Preconditions.checkArgument(groupbyExpressions != null, "No GroupBy Clause.");
+    List<ExpressionContext> innerSelections = queryContext.getSubQueryContext().getSelectExpressions();
+    String timeBucketCol = null;
+    List<String> strAlias = queryContext.getSubQueryContext().getAliasList();
+    for (int i = 0; i < innerSelections.size(); i++) {
+      ExpressionContext innerSelection = innerSelections.get(i);
+      if (GapfillUtils.isGapfill(innerSelection)) {
+        if (strAlias.get(i) != null) {
+          timeBucketCol = strAlias.get(i);
+        } else {
+          timeBucketCol = innerSelection.getFunction().getArguments().get(0).toString();
+        }
+        break;
+      }
+    }
+
+    Preconditions.checkArgument(timeBucketCol != null, "No Group By timebucket.");
+
+    boolean findTimeBucket = false;
+    for (ExpressionContext groupbyExp : groupbyExpressions) {
+      if (timeBucketCol.equals(groupbyExp.toString())) {
+        findTimeBucket = true;
+        break;
+      }
+    }
+
+    Preconditions.checkArgument(findTimeBucket, "No Group By timebucket.");
   }
 
   public static ExpressionContext findGapfillExpressionContext(QueryContext queryContext) {
