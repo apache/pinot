@@ -16,25 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.connector.flink.util;
+package org.apache.pinot.connector.flink.common;
 
-import java.io.File;
-import java.io.IOException;
-import javax.annotation.Nonnull;
-import org.apache.commons.io.FileUtils;
-import org.testng.Assert;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-public final class TestUtils {
+public class MapGenericRowConverter implements PinotGenericRowConverter<Map<String, Object>> {
 
-  private TestUtils() {
+  @Override
+  public GenericRow convertToRow(Map<String, Object> value) {
+    GenericRow row = new GenericRow();
+    for (Map.Entry<String, Object> entry : value.entrySet()) {
+      row.putValue(entry.getKey(), entry.getValue());
+    }
+    return row;
   }
 
-  public static void ensureDirectoriesExistAndEmpty(@Nonnull File... dirs)
-      throws IOException {
-    for (File dir : dirs) {
-      FileUtils.deleteDirectory(dir);
-      Assert.assertTrue(dir.mkdirs());
-    }
+  @Override
+  public Map<String, Object> convertFromRow(GenericRow row) {
+    return new HashMap(row.getFieldToValueMap());
   }
 }

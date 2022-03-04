@@ -27,7 +27,8 @@ import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
 import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
-import org.apache.pinot.connector.flink.common.RecordConverter;
+import org.apache.pinot.connector.flink.common.PinotGenericRowConverter;
+import org.apache.pinot.plugin.segmentuploader.SegmentUploaderDefault;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.segment.uploader.SegmentUploader;
@@ -54,7 +55,7 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
   private final long _segmentFlushMaxNumRecords;
   private final int _executorPoolSize;
 
-  private final RecordConverter<T> _recordConverter;
+  private final PinotGenericRowConverter<T> _recordConverter;
 
   private TableConfig _tableConfig;
   private Schema _schema;
@@ -64,11 +65,11 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
   private transient ExecutorService _executor;
   private transient long _segmentNumRecord;
 
-  public PinotSinkFunction(RecordConverter<T> recordConverter, TableConfig tableConfig, Schema schema) {
+  public PinotSinkFunction(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema) {
     this(recordConverter, tableConfig, schema, DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, DEFAULT_EXECUTOR_POOL_SIZE);
   }
 
-  public PinotSinkFunction(RecordConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
+  public PinotSinkFunction(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
       long segmentFlushMaxNumRecords, int executorPoolSize) {
     _recordConverter = recordConverter;
     _tableConfig = tableConfig;
@@ -83,7 +84,7 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
     int indexOfSubtask = this.getRuntimeContext().getIndexOfThisSubtask();
     _segmentWriter = new FlinkSegmentWriter(indexOfSubtask, getRuntimeContext().getMetricGroup());
     _segmentWriter.init(_tableConfig, _schema);
-    _segmentUploader = new FlinkSegmentUploader();
+    _segmentUploader = new SegmentUploaderDefault();
     _segmentUploader.init(_tableConfig);
     _segmentNumRecord = 0;
     _executor = Executors.newFixedThreadPool(_executorPoolSize);
@@ -108,8 +109,9 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
       }
     } catch (InterruptedException e) {
       _executor.shutdownNow();
+    } finally {
+      _segmentWriter.close();
     }
-    _segmentWriter.close();
   }
 
   @Override

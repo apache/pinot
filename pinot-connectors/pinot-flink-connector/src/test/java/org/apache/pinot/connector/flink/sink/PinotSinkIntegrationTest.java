@@ -24,7 +24,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.types.Row;
-import org.apache.pinot.connector.flink.common.PinotRowRecordConverter;
+import org.apache.pinot.connector.flink.common.FlinkRowGenericRowConverter;
 import org.apache.pinot.connector.flink.util.PinotTestBase;
 import org.apache.pinot.connector.flink.util.TestUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -67,8 +67,8 @@ public class PinotSinkIntegrationTest {
 
     TableConfig tableConfig = _testBase.createOfflineTableConfig();
     _testBase.addTableConfig(tableConfig);
-    srcDs.addSink(
-        new PinotSinkFunction<>(new PinotRowRecordConverter(_testBase.TEST_TYPE_INFO), tableConfig, _testBase.SCHEMA));
+    srcDs.addSink(new PinotSinkFunction<>(new FlinkRowGenericRowConverter(_testBase.TEST_TYPE_INFO), tableConfig,
+        _testBase.SCHEMA));
     execEnv.execute();
     Assert.assertEquals(getNumSegments(), 1);
     Assert.assertEquals(getTotalNumDocs(), 6);
@@ -85,8 +85,8 @@ public class PinotSinkIntegrationTest {
 
     TableConfig tableConfig = _testBase.createOfflineTableConfig();
     _testBase.addTableConfig(tableConfig);
-    srcDs.addSink(
-        new PinotSinkFunction<>(new PinotRowRecordConverter(_testBase.TEST_TYPE_INFO), tableConfig, _testBase.SCHEMA));
+    srcDs.addSink(new PinotSinkFunction<>(new FlinkRowGenericRowConverter(_testBase.TEST_TYPE_INFO), tableConfig,
+        _testBase.SCHEMA));
     execEnv.execute();
     Assert.assertEquals(getNumSegments(), 2);
     Assert.assertEquals(getTotalNumDocs(), 6);

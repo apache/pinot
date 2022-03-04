@@ -30,7 +30,7 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.types.Row;
-import org.apache.pinot.connector.flink.common.PinotRowRecordConverter;
+import org.apache.pinot.connector.flink.common.FlinkRowGenericRowConverter;
 import org.apache.pinot.connector.flink.http.PinotConnectionUtils;
 import org.apache.pinot.connector.flink.http.PinotControllerClient;
 import org.apache.pinot.connector.flink.sink.PinotSinkFunction;
@@ -82,7 +82,7 @@ public final class FlinkQuickStart {
     PinotControllerClient client = new PinotControllerClient();
     Schema schema = PinotConnectionUtils.getSchema(client, "starbucksStores");
     TableConfig tableConfig = PinotConnectionUtils.getTableConfig(client, "starbucksStores", "OFFLINE");
-    srcDs.addSink(new PinotSinkFunction<>(new PinotRowRecordConverter(TEST_TYPE_INFO), tableConfig, schema));
+    srcDs.addSink(new PinotSinkFunction<>(new FlinkRowGenericRowConverter(TEST_TYPE_INFO), tableConfig, schema));
     execEnv.execute();
   }
 }

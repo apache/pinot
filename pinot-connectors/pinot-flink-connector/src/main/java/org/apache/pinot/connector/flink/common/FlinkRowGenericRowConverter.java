@@ -18,24 +18,38 @@
  */
 package org.apache.pinot.connector.flink.common;
 
-import java.util.HashMap;
 import java.util.Map;
+import org.apache.flink.api.java.typeutils.RowTypeInfo;
+import org.apache.flink.types.Row;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-public class PinotMapRecordConverter implements RecordConverter<Map<String, Object>> {
+/** Converts {@link Row} type data into {@link GenericRow} format. */
+public class FlinkRowGenericRowConverter implements PinotGenericRowConverter<Row> {
+
+  private final RowTypeInfo _rowTypeInfo;
+  private final String[] _fieldNames;
+
+  public FlinkRowGenericRowConverter(RowTypeInfo rowTypeInfo) {
+    _rowTypeInfo = rowTypeInfo;
+    _fieldNames = rowTypeInfo.getFieldNames();
+  }
 
   @Override
-  public GenericRow convertToRow(Map<String, Object> value) {
+  public GenericRow convertToRow(Row value) {
     GenericRow row = new GenericRow();
-    for (Map.Entry<String, Object> entry : value.entrySet()) {
-      row.putValue(entry.getKey(), entry.getValue());
+    for (int i = 0; i < value.getArity(); i++) {
+      row.putValue(_fieldNames[i], value.getField(i));
     }
     return row;
   }
 
   @Override
-  public Map<String, Object> convertFromRow(GenericRow row) {
-    return new HashMap(row.getFieldToValueMap());
+  public Row convertFromRow(GenericRow row) {
+    Row value = new Row(_fieldNames.length);
+    for (Map.Entry<String, Object> e : row.getFieldToValueMap().entrySet()) {
+      value.setField(_rowTypeInfo.getFieldIndex(e.getKey()), e.getValue());
+    }
+    return value;
   }
 }

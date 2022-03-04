@@ -93,9 +93,9 @@ public class FlinkSegmentWriter implements SegmentWriter {
   private transient Counter _processedRecords;
   private transient volatile long _lastRecordProcessingTimeMs = 0;
 
-  public FlinkSegmentWriter(int indexOfSubtask, MetricGroup metricGrp) {
+  public FlinkSegmentWriter(int indexOfSubtask, MetricGroup metricGroup) {
     _indexOfSubtask = indexOfSubtask;
-    registerMetrics(metricGrp);
+    registerMetrics(metricGroup);
   }
 
   @Override

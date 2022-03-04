@@ -23,11 +23,11 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * Record converter that converts sink input format into Pinot {@link GenericRow}.
+ * Converter that converts sink input format into Pinot {@link GenericRow}.
  *
  * @param <T> supported sink input format.
  */
-public interface RecordConverter<T> extends Serializable {
+public interface PinotGenericRowConverter<T> extends Serializable {
 
   /**
    * Convert a flink generic type data content to Pinot segment table row.

@@ -33,27 +33,13 @@
   ],
   "dateTimeFieldSpecs": [
   ],
-  "timeFieldSpec": {
-    "name": "timestamp",
-    "dataType": "LONG",
-    "singleValueField": true,
-    "incomingGranularitySpec": {
+  "dateTimeFieldSpecs": [
+    {
       "name": "timestamp",
-      "dataType": "LONG",
-      "timeType": "MILLISECONDS",
-      "timeUnitSize": 1,
-      "timeFormat": "EPOCH"
-    },
-    "outgoingGranularitySpec": {
-      "name": "timestamp",
-      "dataType": "LONG",
-      "timeType": "MILLISECONDS",
-      "timeUnitSize": 1,
-      "timeFormat": "EPOCH"
-    },
-    "virtualColumnProvider": null,
-    "defaultNullValue": -9223372036854775808,
-    "transformFunction": null
-  },
+      "dataType": "INT",
+      "format": "1:DAYS:EPOCH",
+      "granularity": "1:DAYS"
+    }
+  ],
   "primaryKeyColumns" : [ "demand_uuid" ]
 }
