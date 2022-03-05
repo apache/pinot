@@ -370,7 +370,7 @@ public class CalciteSqlParser {
       dataSource.setTableName(fromNode.toString());
       pinotQuery.setDataSource(dataSource);
       if (fromNode instanceof SqlSelect || fromNode instanceof SqlOrderBy) {
-        pinotQuery.getDataSource().setSubquery(compileSqlNodeToPinotQuery(fromNode));
+        dataSource.setSubquery(compileSqlNodeToPinotQuery(fromNode));
       }
     }
     // WHERE

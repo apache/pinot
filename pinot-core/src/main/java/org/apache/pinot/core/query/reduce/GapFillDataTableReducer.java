@@ -656,8 +656,7 @@ public class GapFillDataTableReducer implements DataTableReducer {
       int numRows = dataTable.getNumberOfRows();
       for (int rowId = 0; rowId < numRows; rowId++) {
         Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
-        String timeCol = row[0] instanceof Long ? ((Long) row[0]).toString() : (String) row[0];
-        long timeBucket = _dateTimeFormatter.fromFormatToMillis(timeCol);
+        long timeBucket = _dateTimeFormatter.fromFormatToMillis(String.valueOf(row[0]));
         int index = findBucketIndex(timeBucket);
         if (bucketedItems[index] == null) {
           bucketedItems[index] = new ArrayList<>();
@@ -675,8 +674,7 @@ public class GapFillDataTableReducer implements DataTableReducer {
     Iterator<Record> iterator = indexedTable.iterator();
     while (iterator.hasNext()) {
       Object[] row = iterator.next().getValues();
-      String timeCol = row[0] instanceof Long ? ((Long) row[0]).toString() : (String) row[0];
-      long timeBucket = _dateTimeFormatter.fromFormatToMillis(timeCol);
+      long timeBucket = _dateTimeFormatter.fromFormatToMillis(String.valueOf(row[0]));
       int index = findBucketIndex(timeBucket);
       if (bucketedItems[index] == null) {
         bucketedItems[index] = new ArrayList<>();
