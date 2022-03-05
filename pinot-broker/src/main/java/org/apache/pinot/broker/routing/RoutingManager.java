@@ -302,11 +302,13 @@ public class RoutingManager implements ClusterChangeHandler {
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
 
-    IdealState idealState = getIdealState(getIdealStatePath(tableNameWithType));
+    String idealStatePath = getIdealStatePath(tableNameWithType);
+    IdealState idealState = getIdealState(idealStatePath);
     Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
     int idealStateVersion = idealState.getRecord().getVersion();
 
-    ExternalView externalView = getExternalView(getExternalViewPath(tableNameWithType));
+    String externalViewPath = getExternalViewPath(tableNameWithType);
+    ExternalView externalView = getExternalView(externalViewPath);
     int externalViewVersion;
     // NOTE: External view might be null for new created tables. In such case, create an empty one and set the version
     // to -1 to ensure the version does not match the next external view
@@ -379,9 +381,9 @@ public class RoutingManager implements ClusterChangeHandler {
     Long queryTimeoutMs = queryConfig != null ? queryConfig.getTimeoutMs() : null;
 
     RoutingEntry routingEntry =
-        new RoutingEntry(tableNameWithType, getExternalViewPath(tableNameWithType),
-            getIdealStatePath(tableNameWithType), segmentPreSelector, segmentSelector, segmentPruners, instanceSelector,
-            idealStateVersion, externalViewVersion, timeBoundaryManager, queryTimeoutMs);
+        new RoutingEntry(tableNameWithType, idealStatePath, externalViewPath, segmentPreSelector, segmentSelector,
+            segmentPruners, instanceSelector, idealStateVersion, externalViewVersion, timeBoundaryManager,
+            queryTimeoutMs);
     if (_routingEntryMap.put(tableNameWithType, routingEntry) == null) {
       LOGGER.info("Built routing for table: {}", tableNameWithType);
     } else {
@@ -512,8 +514,8 @@ public class RoutingManager implements ClusterChangeHandler {
 
   private static class RoutingEntry {
     final String _tableNameWithType;
-    final String _externalViewPath;
     final String _idealStatePath;
+    final String _externalViewPath;
     final SegmentPreSelector _segmentPreSelector;
     final SegmentSelector _segmentSelector;
     final List<SegmentPruner> _segmentPruners;
@@ -526,14 +528,14 @@ public class RoutingManager implements ClusterChangeHandler {
     // Time boundary manager is only available for the offline part of the hybrid table
     transient TimeBoundaryManager _timeBoundaryManager;
 
-    RoutingEntry(String tableNameWithType, String externalViewPath, String idealStatePath,
+    RoutingEntry(String tableNameWithType, String idealStatePath, String externalViewPath,
         SegmentPreSelector segmentPreSelector, SegmentSelector segmentSelector, List<SegmentPruner> segmentPruners,
         InstanceSelector instanceSelector, int lastUpdateIdealStateVersion, int lastUpdateExternalViewVersion,
         @Nullable TimeBoundaryManager timeBoundaryManager,
         @Nullable Long queryTimeoutMs) {
       _tableNameWithType = tableNameWithType;
-      _externalViewPath = externalViewPath;
       _idealStatePath = idealStatePath;
+      _externalViewPath = externalViewPath;
       _segmentPreSelector = segmentPreSelector;
       _segmentSelector = segmentSelector;
       _segmentPruners = segmentPruners;
