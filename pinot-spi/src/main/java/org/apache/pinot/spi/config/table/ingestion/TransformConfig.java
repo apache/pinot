@@ -35,11 +35,20 @@ public class TransformConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Transformation function string")
   private final String _transformFunction;
 
+  @JsonPropertyDescription("Whether to automatically rewrite query with this transform to column")
+  private final boolean _enableQueryRewrite;
+
   @JsonCreator
   public TransformConfig(@JsonProperty("columnName") String columnName,
-      @JsonProperty("transformFunction") String transformFunction) {
+      @JsonProperty("transformFunction") String transformFunction,
+      @JsonProperty("enableQueryRewrite") boolean enableQueryRewrite) {
     _columnName = columnName;
     _transformFunction = transformFunction;
+    _enableQueryRewrite = enableQueryRewrite;
+  }
+
+  public TransformConfig(String columnName, String transformFunction) {
+    this(columnName, transformFunction, false);
   }
 
   public String getColumnName() {
@@ -48,5 +57,9 @@ public class TransformConfig extends BaseJsonConfig {
 
   public String getTransformFunction() {
     return _transformFunction;
+  }
+
+  public boolean isEnableQueryRewrite() {
+    return _enableQueryRewrite;
   }
 }

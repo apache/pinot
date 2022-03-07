@@ -21,11 +21,13 @@ package org.apache.pinot.common.config.provider;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.I0Itec.zkclient.IZkChildListener;
@@ -34,17 +36,21 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.spi.config.provider.PinotConfigProvider;
 import org.apache.pinot.spi.config.provider.SchemaChangeListener;
 import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,8 +77,8 @@ public class TableCache implements PinotConfigProvider {
   private final boolean _caseInsensitive;
 
   private final ZkTableConfigChangeListener _zkTableConfigChangeListener = new ZkTableConfigChangeListener();
-  // Key is table name with type suffix, value is table config
-  private final Map<String, TableConfig> _tableConfigMap = new ConcurrentHashMap<>();
+  // Key is table name with type suffix, value is table config info
+  private final Map<String, TableConfigInfo> _tableConfigInfoMap = new ConcurrentHashMap<>();
   // Key is table name (with or without type suffix), value is schema name
   // It only stores table with schema name not matching the raw table name
   private final Map<String, String> _schemaNameMap = new ConcurrentHashMap<>();
@@ -149,12 +155,23 @@ public class TableCache implements PinotConfigProvider {
   }
 
   /**
+   * Returns a map from expression to derived column for the given table, or {@code null} if no derived column is
+   * configured for query rewrite.
+   */
+  @Nullable
+  public Map<Expression, String> getDerivedColumnMap(String tableNameWithType) {
+    TableConfigInfo tableConfigInfo = _tableConfigInfoMap.get(tableNameWithType);
+    return tableConfigInfo != null ? tableConfigInfo._derivedColumnMap : null;
+  }
+
+  /**
    * Returns the table config for the given table, or {@code null} if it does not exist.
    */
   @Nullable
   @Override
   public TableConfig getTableConfig(String tableNameWithType) {
-    return _tableConfigMap.get(tableNameWithType);
+    TableConfigInfo tableConfigInfo = _tableConfigInfoMap.get(tableNameWithType);
+    return tableConfigInfo != null ? tableConfigInfo._tableConfig : null;
   }
 
   @Override
@@ -211,7 +228,7 @@ public class TableCache implements PinotConfigProvider {
       throws IOException {
     TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);
     String tableNameWithType = tableConfig.getTableName();
-    _tableConfigMap.put(tableNameWithType, tableConfig);
+    _tableConfigInfoMap.put(tableNameWithType, new TableConfigInfo(tableConfig));
 
     String schemaName = tableConfig.getValidationConfig().getSchemaName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
@@ -231,7 +248,7 @@ public class TableCache implements PinotConfigProvider {
   private void removeTableConfig(String path) {
     _propertyStore.unsubscribeDataChanges(path, _zkTableConfigChangeListener);
     String tableNameWithType = path.substring(TABLE_CONFIG_PATH_PREFIX.length());
-    _tableConfigMap.remove(tableNameWithType);
+    _tableConfigInfoMap.remove(tableNameWithType);
     removeSchemaName(tableNameWithType);
     if (_caseInsensitive) {
       _tableNameMap.remove(tableNameWithType.toLowerCase());
@@ -330,7 +347,11 @@ public class TableCache implements PinotConfigProvider {
   }
 
   private List<TableConfig> getTableConfigs() {
-    return new ArrayList<>(_tableConfigMap.values());
+    List<TableConfig> tableConfigs = new ArrayList<>(_tableConfigInfoMap.size());
+    for (TableConfigInfo tableConfigInfo : _tableConfigInfoMap.values()) {
+      tableConfigs.add(tableConfigInfo._tableConfig);
+    }
+    return tableConfigs;
   }
 
   private void notifySchemaChangeListeners() {
@@ -361,7 +382,7 @@ public class TableCache implements PinotConfigProvider {
       // Only process new added table configs. Changed/removed table configs are handled by other callbacks.
       List<String> pathsToAdd = new ArrayList<>();
       for (String tableNameWithType : tableNamesWithType) {
-        if (!_tableConfigMap.containsKey(tableNameWithType)) {
+        if (!_tableConfigInfoMap.containsKey(tableNameWithType)) {
           pathsToAdd.add(TABLE_CONFIG_PATH_PREFIX + tableNameWithType);
         }
       }
@@ -433,6 +454,41 @@ public class TableCache implements PinotConfigProvider {
       String schemaName = path.substring(path.lastIndexOf('/') + 1);
       removeSchema(SCHEMA_PATH_PREFIX + schemaName);
       notifySchemaChangeListeners();
+    }
+  }
+
+  private static class TableConfigInfo {
+    final TableConfig _tableConfig;
+    final Map<Expression, String> _derivedColumnMap;
+
+    private TableConfigInfo(TableConfig tableConfig) {
+      _tableConfig = tableConfig;
+      IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+      if (ingestionConfig != null && CollectionUtils.isNotEmpty(ingestionConfig.getTransformConfigs())) {
+        Map<Expression, String> derivedColumnMap = new TreeMap<>();
+        for (TransformConfig transformConfig : ingestionConfig.getTransformConfigs()) {
+          if (transformConfig.isEnableQueryRewrite()) {
+            try {
+              Expression expression = CalciteSqlParser.compileToExpression(transformConfig.getTransformFunction());
+              derivedColumnMap.put(expression, transformConfig.getColumnName());
+            } catch (Exception e) {
+              LOGGER.warn("Caught exception while compiling ingestion transform: {} for table: {}",
+                  transformConfig.getTransformFunction(), tableConfig.getTableName());
+            }
+          }
+        }
+        int mapSize = derivedColumnMap.size();
+        if (mapSize == 0) {
+          _derivedColumnMap = null;
+        } else if (mapSize == 1) {
+          Map.Entry<Expression, String> entry = derivedColumnMap.entrySet().iterator().next();
+          _derivedColumnMap = Collections.singletonMap(entry.getKey(), entry.getValue());
+        } else {
+          _derivedColumnMap = derivedColumnMap;
+        }
+      } else {
+        _derivedColumnMap = null;
+      }
     }
   }
 

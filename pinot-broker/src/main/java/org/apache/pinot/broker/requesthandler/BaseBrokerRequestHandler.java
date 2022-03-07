@@ -377,25 +377,29 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (offlineTableName != null && realtimeTableName != null) {
       // Hybrid
       offlineBrokerRequest = getOfflineBrokerRequest(brokerRequest);
-      _queryOptimizer.optimize(offlineBrokerRequest.getPinotQuery(), _tableCache.getTableConfig(offlineTableName),
-          schema);
+      PinotQuery offlinePinotQuery = offlineBrokerRequest.getPinotQuery();
+      rewriteTransformToDerivedColumn(offlinePinotQuery, _tableCache.getDerivedColumnMap(offlineTableName));
+      _queryOptimizer.optimize(offlinePinotQuery, offlineTableConfig, schema);
       realtimeBrokerRequest = getRealtimeBrokerRequest(brokerRequest);
-      _queryOptimizer.optimize(realtimeBrokerRequest.getPinotQuery(), _tableCache.getTableConfig(realtimeTableName),
-          schema);
+      PinotQuery realtimePinotQuery = realtimeBrokerRequest.getPinotQuery();
+      rewriteTransformToDerivedColumn(realtimePinotQuery, _tableCache.getDerivedColumnMap(realtimeTableName));
+      _queryOptimizer.optimize(realtimePinotQuery, realtimeTableConfig, schema);
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.HYBRID);
       requestStatistics.setOfflineServerTenant(getServerTenant(offlineTableName));
       requestStatistics.setRealtimeServerTenant(getServerTenant(realtimeTableName));
     } else if (offlineTableName != null) {
       // OFFLINE only
       setTableName(brokerRequest, offlineTableName);
-      _queryOptimizer.optimize(pinotQuery, _tableCache.getTableConfig(offlineTableName), schema);
+      rewriteTransformToDerivedColumn(pinotQuery, _tableCache.getDerivedColumnMap(offlineTableName));
+      _queryOptimizer.optimize(pinotQuery, offlineTableConfig, schema);
       offlineBrokerRequest = brokerRequest;
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.OFFLINE);
       requestStatistics.setOfflineServerTenant(getServerTenant(offlineTableName));
     } else {
       // REALTIME only
       setTableName(brokerRequest, realtimeTableName);
-      _queryOptimizer.optimize(pinotQuery, _tableCache.getTableConfig(realtimeTableName), schema);
+      rewriteTransformToDerivedColumn(pinotQuery, _tableCache.getDerivedColumnMap(realtimeTableName));
+      _queryOptimizer.optimize(pinotQuery, offlineTableConfig, schema);
       realtimeBrokerRequest = brokerRequest;
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.REALTIME);
       requestStatistics.setRealtimeServerTenant(getServerTenant(realtimeTableName));
@@ -1433,6 +1437,48 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         handleDistinctCountBitmapOverride(operand);
       }
     }
+  }
+
+  private static void rewriteTransformToDerivedColumn(PinotQuery pinotQuery,
+      @Nullable Map<Expression, String> derivedColumnMap) {
+    if (derivedColumnMap == null) {
+      return;
+    }
+    pinotQuery.getSelectList().replaceAll(o -> rewriteTransformToDerivedColumn(o, derivedColumnMap));
+    Expression filterExpression = pinotQuery.getFilterExpression();
+    if (filterExpression != null) {
+      pinotQuery.setFilterExpression(rewriteTransformToDerivedColumn(filterExpression, derivedColumnMap));
+    }
+    List<Expression> groupByList = pinotQuery.getGroupByList();
+    if (groupByList != null) {
+      groupByList.replaceAll(o -> rewriteTransformToDerivedColumn(o, derivedColumnMap));
+    }
+    List<Expression> orderByList = pinotQuery.getOrderByList();
+    if (orderByList != null) {
+      for (Expression expression : orderByList) {
+        // NOTE: Order-by is always a Function with the ordering of the Expression
+        expression.getFunctionCall().getOperands()
+            .replaceAll(o -> rewriteTransformToDerivedColumn(o, derivedColumnMap));
+      }
+    }
+    Expression havingExpression = pinotQuery.getHavingExpression();
+    if (havingExpression != null) {
+      pinotQuery.setHavingExpression(rewriteTransformToDerivedColumn(havingExpression, derivedColumnMap));
+    }
+  }
+
+  private static Expression rewriteTransformToDerivedColumn(Expression expression,
+      Map<Expression, String> derivedColumnMap) {
+    Function function = expression.getFunctionCall();
+    if (function == null) {
+      return expression;
+    }
+    String derivedColumn = derivedColumnMap.get(expression);
+    if (derivedColumn != null) {
+      return RequestUtils.createIdentifierExpression(derivedColumn);
+    }
+    function.getOperands().replaceAll(o -> rewriteTransformToDerivedColumn(o, derivedColumnMap));
+    return expression;
   }
 
   /**

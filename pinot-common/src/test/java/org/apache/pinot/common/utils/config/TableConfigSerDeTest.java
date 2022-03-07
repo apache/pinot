@@ -249,8 +249,7 @@ public class TableConfigSerDeTest {
     {
       // with upsert config
       UpsertConfig upsertConfig =
-          new UpsertConfig(UpsertConfig.Mode.FULL, null, null, "comparison",
-              UpsertConfig.HashFunction.NONE);
+          new UpsertConfig(UpsertConfig.Mode.FULL, null, null, "comparison", UpsertConfig.HashFunction.NONE);
 
       TableConfig tableConfig = tableConfigBuilder.setUpsertConfig(upsertConfig).build();
 
@@ -269,7 +268,7 @@ public class TableConfigSerDeTest {
     {
       // With ingestion config
       List<TransformConfig> transformConfigs =
-          Lists.newArrayList(new TransformConfig("bar", "func(moo)"), new TransformConfig("zoo", "myfunc()"));
+          Lists.newArrayList(new TransformConfig("bar", "func(moo)"), new TransformConfig("zoo", "myfunc()", true));
       Map<String, String> batchConfigMap = new HashMap<>();
       batchConfigMap.put("batchType", "s3");
       Map<String, String> streamConfigMap = new HashMap<>();
@@ -456,8 +455,10 @@ public class TableConfigSerDeTest {
     assertEquals(transformConfigs.size(), 2);
     assertEquals(transformConfigs.get(0).getColumnName(), "bar");
     assertEquals(transformConfigs.get(0).getTransformFunction(), "func(moo)");
+    assertFalse(transformConfigs.get(0).isEnableQueryRewrite());
     assertEquals(transformConfigs.get(1).getColumnName(), "zoo");
     assertEquals(transformConfigs.get(1).getTransformFunction(), "myfunc()");
+    assertTrue(transformConfigs.get(1).isEnableQueryRewrite());
     assertNotNull(ingestionConfig.getBatchIngestionConfig());
     assertNotNull(ingestionConfig.getBatchIngestionConfig().getBatchConfigMaps());
     assertEquals(ingestionConfig.getBatchIngestionConfig().getBatchConfigMaps().size(), 1);

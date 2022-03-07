@@ -844,6 +844,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(queryResponse.get("selectionResults").get("columns").size(), 92);
 
     testNewAddedColumns();
+    testRewriteTransformToDerivedColumn();
 
     reloadWithMissingColumns();
     queryResponse = postQuery(SELECT_STAR_QUERY);
@@ -902,7 +903,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.setIngestionConfig(new IngestionConfig(null, null, null,
         Arrays.asList(new TransformConfig("NewAddedDerivedHoursSinceEpoch", "times(DaysSinceEpoch, 24)"),
-            new TransformConfig("NewAddedDerivedSecondsSinceEpoch", "times(times(DaysSinceEpoch, 24), 3600)"),
+            new TransformConfig("NewAddedDerivedSecondsSinceEpoch", "times(times(DaysSinceEpoch, 24), 3600)", true),
             new TransformConfig("NewAddedDerivedMVStringDimension", "split(DestCityName, ', ')")), null));
     updateTableConfig(tableConfig);
 
@@ -1086,6 +1087,19 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(groupByResult.get("group").get(1).asLong(), Long.MIN_VALUE);
     assertEquals((float) groupByResult.get("group").get(2).asDouble(), Float.NEGATIVE_INFINITY);
     assertEquals(groupByResult.get("group").get(3).asDouble(), Double.NEGATIVE_INFINITY);
+  }
+
+  private void testRewriteTransformToDerivedColumn()
+      throws Exception {
+    // NewAddedDerivedHoursSinceEpoch does not have query rewrite enabled
+    JsonNode response = postSqlQuery("SELECT COUNT(*) FROM mytable WHERE times(DaysSinceEpoch, 24) = 392232");
+    assertEquals(response.get("numSegmentsProcessed").asInt(), 12);
+    assertEquals(response.get("numEntriesScannedInFilter").asInt(), getCountStarResult());
+
+    // NewAddedDerivedSecondsSinceEpoch has query rewrite enabled
+    response = postSqlQuery("SELECT COUNT(*) FROM mytable WHERE times(times(DaysSinceEpoch, 24), 3600) = 1411862400");
+    assertEquals(response.get("numSegmentsProcessed").asInt(), 1);
+    assertEquals(response.get("numEntriesScannedInFilter").asInt(), 0);
   }
 
   @Test
@@ -1889,24 +1903,24 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   /** Test to make sure we are properly handling string comparisons in predicates. */
   @Test
   public void testStringComparisonInFilter()
-    throws Exception {
+      throws Exception {
     // compare two string columns.
     String query1 = "SELECT count(*) FROM mytable WHERE OriginState = DestState";
     String response1 = postSqlQuery(query1, _brokerBaseApiUrl).get("resultTable").toString();
-    assertEquals(response1, "{\"dataSchema\":{\"columnNames\":[\"count(*)\"],\"columnDataTypes\":[\"LONG\"]},"
-        + "\"rows\":[[14011]]}");
+    assertEquals(response1,
+        "{\"dataSchema\":{\"columnNames\":[\"count(*)\"],\"columnDataTypes\":[\"LONG\"]}," + "\"rows\":[[14011]]}");
 
     // compare string function with string column.
     String query2 = "SELECT count(*) FROM mytable WHERE trim(OriginState) = DestState";
     String response2 = postSqlQuery(query2, _brokerBaseApiUrl).get("resultTable").toString();
-    assertEquals(response2, "{\"dataSchema\":{\"columnNames\":[\"count(*)\"],\"columnDataTypes\":[\"LONG\"]},"
-        + "\"rows\":[[14011]]}");
+    assertEquals(response2,
+        "{\"dataSchema\":{\"columnNames\":[\"count(*)\"],\"columnDataTypes\":[\"LONG\"]}," + "\"rows\":[[14011]]}");
 
     // compare string function with string function.
     String query3 = "SELECT count(*) FROM mytable WHERE substr(OriginState, 0, 1) = substr(DestState, 0, 1)";
     String response3 = postSqlQuery(query3, _brokerBaseApiUrl).get("resultTable").toString();
-    assertEquals(response3, "{\"dataSchema\":{\"columnNames\":[\"count(*)\"],\"columnDataTypes\":[\"LONG\"]},"
-        + "\"rows\":[[19755]]}");
+    assertEquals(response3,
+        "{\"dataSchema\":{\"columnNames\":[\"count(*)\"],\"columnDataTypes\":[\"LONG\"]}," + "\"rows\":[[19755]]}");
   }
 
   @Test
@@ -1919,13 +1933,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testAggregateMetadataAPI()
       throws IOException {
-    JsonNode oneSVColumnResponse = JsonUtils
-        .stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=DestCityMarketID"));
+    JsonNode oneSVColumnResponse = JsonUtils.stringToJsonNode(
+        sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=DestCityMarketID"));
     // DestCityMarketID is a SV column
     validateMetadataResponse(oneSVColumnResponse, 1, 0);
 
-    JsonNode oneMVColumnResponse = JsonUtils
-        .stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=DivLongestGTimes"));
+    JsonNode oneMVColumnResponse = JsonUtils.stringToJsonNode(
+        sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=DivLongestGTimes"));
     // DivLongestGTimes is a MV column
     validateMetadataResponse(oneMVColumnResponse, 1, 1);
 
