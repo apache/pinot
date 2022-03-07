@@ -39,6 +39,7 @@
 
   <modules>
     <module>pinot-spark-connector</module>
+    <module>pinot-flink-connector</module>
   </modules>
 
   <profiles>
