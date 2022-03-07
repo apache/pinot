@@ -60,6 +60,7 @@ import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -1299,7 +1300,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
 
   /**
    * Test the reference counting mechanism of {@link SearcherManager}
-   * used by {@link org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexReader}
+   * used by {@link RealtimeLuceneTextIndex}
    * for near realtime text search.
    */
   @Test

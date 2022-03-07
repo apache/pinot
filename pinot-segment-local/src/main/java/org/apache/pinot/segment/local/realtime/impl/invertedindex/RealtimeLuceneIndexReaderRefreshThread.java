@@ -114,9 +114,9 @@ public class RealtimeLuceneIndexReaderRefreshThread implements Runnable {
             // if the segment hasn't yet been destroyed, refresh each
             // realtime reader (one per column with text index enabled)
             // for this segment.
-            List<RealtimeLuceneTextIndexReader> realtimeLuceneReaders =
+            List<RealtimeLuceneTextIndex> realtimeLuceneReaders =
                 realtimeReadersForSegment.getRealtimeLuceneReaders();
-            for (RealtimeLuceneTextIndexReader realtimeReader : realtimeLuceneReaders) {
+            for (RealtimeLuceneTextIndex realtimeReader : realtimeLuceneReaders) {
               if (_stopped) {
                 // exit
                 break;
