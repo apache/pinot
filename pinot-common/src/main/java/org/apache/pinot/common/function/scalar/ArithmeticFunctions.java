@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
@@ -129,5 +131,10 @@ public class ArithmeticFunctions {
   @ScalarFunction
   public static double log(double a) {
     return Math.log10(a);
+  }
+
+  @ScalarFunction(names = {"round_decimal"})
+  public static double roundDecimal(double a, int b) {
+    return BigDecimal.valueOf(a).setScale(b, RoundingMode.HALF_UP).doubleValue();
   }
 }

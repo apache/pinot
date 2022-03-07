@@ -732,28 +732,18 @@ public class DateTimeFunctions {
     }
   }
 
-  @ScalarFunction
+  @ScalarFunction(names = {"timestampAdd", "dateAdd"})
   public static long timestampAdd(String unit, int interval, long timestamp) {
     ISOChronology chronology = ISOChronology.getInstanceUTC();
     long millis = getTimestampField(chronology, unit).add(timestamp, interval);
     return millis;
   }
 
-  @ScalarFunction
+  @ScalarFunction(names = {"timestampDiff", "dateDiff"})
   public static long timestampDiff(String unit, long timestamp1, long timestamp2) {
     ISOChronology chronology = ISOChronology.getInstanceUTC();
     long millis = getTimestampField(chronology, unit).getDifferenceAsLong(timestamp1, timestamp2);
     return millis;
-  }
-
-  @ScalarFunction
-  public static long dateAdd(String unit, int interval, long date) {
-    return timestampAdd(unit, interval, date);
-  }
-
-  @ScalarFunction
-  public static long dateDiff(String unit, long date1, long date2) {
-    return timestampDiff(unit, date1, date2);
   }
 
   private static DateTimeField getTimestampField(ISOChronology chronology, String unit) {
