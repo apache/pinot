@@ -274,7 +274,7 @@ public class DateTimeFunctions {
    */
   @ScalarFunction
   public static long fromDateTime(String dateTimeString, String pattern) {
-    if(StringUtils.isEmpty(dateTimeString)){
+    if (StringUtils.isEmpty(dateTimeString)) {
       return 0;
     }
     return DateTimePatternHandler.parseDateTimeStringToEpochMillis(dateTimeString, pattern);
@@ -285,7 +285,7 @@ public class DateTimeFunctions {
    */
   @ScalarFunction
   public static long fromDateTime(String dateTimeString, String pattern, String timeZoneId) {
-    if(StringUtils.isEmpty(dateTimeString)){
+    if (StringUtils.isEmpty(dateTimeString)) {
       return 0;
     }
     return DateTimePatternHandler.parseDateTimeStringToEpochMillis(dateTimeString, pattern, timeZoneId);
@@ -733,31 +733,30 @@ public class DateTimeFunctions {
   }
 
   @ScalarFunction
-  public static long timestampAdd(String unit, int interval, long timestamp){
+  public static long timestampAdd(String unit, int interval, long timestamp) {
     ISOChronology chronology = ISOChronology.getInstanceUTC();
     long millis = getTimestampField(chronology, unit).add(timestamp, interval);
     return millis;
   }
 
   @ScalarFunction
-  public static long timestampDiff(String unit, long timestamp1,  long timestamp2){
+  public static long timestampDiff(String unit, long timestamp1, long timestamp2) {
     ISOChronology chronology = ISOChronology.getInstanceUTC();
     long millis = getTimestampField(chronology, unit).getDifferenceAsLong(timestamp1, timestamp2);
     return millis;
   }
 
   @ScalarFunction
-  public static long dateAdd(String unit, int interval, long date){
+  public static long dateAdd(String unit, int interval, long date) {
     return timestampAdd(unit, interval, date);
   }
 
   @ScalarFunction
-  public static long dateDiff(String unit, long date1,  long date2){
+  public static long dateDiff(String unit, long date1, long date2) {
     return timestampDiff(unit, date1, date2);
   }
 
-  private static DateTimeField getTimestampField(ISOChronology chronology, String unit)
-  {
+  private static DateTimeField getTimestampField(ISOChronology chronology, String unit) {
     switch (unit.toLowerCase()) {
       case "millisecond":
         return chronology.millisOfSecond();
@@ -778,10 +777,5 @@ public class DateTimeFunctions {
       default:
         throw new UnsupportedOperationException("Timeunit " + unit + " is not supported by Pinot");
     }
-  }
-
-  public static void main(String[] args) {
-    long out = timestampAdd("DAY", 1, fromDateTime("2004-07-09 10:17:35", "yyyy-MM-dd HH:mm:ss"));
-    System.out.println(toDateTime(out, "yyyy-MM-dd HH:mm:ss"));
   }
 }
