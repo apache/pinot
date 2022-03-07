@@ -28,6 +28,7 @@ import io.swagger.annotations.ApiResponses;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -84,14 +85,7 @@ public class ZookeeperResource {
 
     ZNRecord znRecord = _pinotHelixResourceManager.readZKData(path);
     if (znRecord != null) {
-      byte[] serializeBytes = _znRecordSerializer.serialize(znRecord);
-      if (GZipCompressionUtil.isCompressed(serializeBytes)) {
-        try {
-          serializeBytes = GZipCompressionUtil.uncompress(new ByteArrayInputStream(serializeBytes));
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
-      }
+      byte[] serializeBytes = serialize(znRecord);
       return new String(serializeBytes, StandardCharsets.UTF_8);
     }
     return null;
@@ -187,12 +181,45 @@ public class ZookeeperResource {
 
     path = validateAndNormalizeZKPath(path, true);
 
-    List<String> children = _pinotHelixResourceManager.getZKChildren(path);
+    List<String> children = _pinotHelixResourceManager.getZKChildNames(path);
     try {
       return JsonUtils.objectToString(children);
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  @GET
+  @Path("/zk/getChildren")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get all child znodes")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "ZK Path not found"),
+      @ApiResponse(code = 204, message = "No Content"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public String getChildren(
+      @ApiParam(value = "Zookeeper Path, must start with /", required = true) @QueryParam("path") String path) {
+
+    path = validateAndNormalizeZKPath(path, true);
+
+    List<ZNRecord> znRecords = _pinotHelixResourceManager.getZKChildren(path);
+    if (znRecords != null) {
+      List<String> resp = new ArrayList<>();
+      for (ZNRecord znRecord : znRecords) {
+        if (znRecord != null) {
+          byte[] serializeBytes = serialize(znRecord);
+          resp.add(new String(serializeBytes, StandardCharsets.UTF_8));
+        }
+      }
+      try {
+        return JsonUtils.objectToString(resp);
+      } catch (JsonProcessingException e) {
+        throw new RuntimeException(e);
+      }
+    }
+    return null;
   }
 
   @GET
@@ -240,6 +267,18 @@ public class ZookeeperResource {
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  private byte[] serialize(ZNRecord znRecord) {
+    byte[] serializeBytes = _znRecordSerializer.serialize(znRecord);
+    if (GZipCompressionUtil.isCompressed(serializeBytes)) {
+      try {
+        serializeBytes = GZipCompressionUtil.uncompress(new ByteArrayInputStream(serializeBytes));
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
+    return serializeBytes;
   }
 
   private String validateAndNormalizeZKPath(String path, boolean shouldExist) {
