@@ -63,16 +63,6 @@ public class QueryServer {
   private Class<? extends ServerSocketChannel> _channelClass;
   private Channel _channel;
 
-  /**
-   * Create an unsecured server instance
-   *
-   * @param port bind port
-   * @param queryScheduler query scheduler
-   * @param serverMetrics server metrics
-   */
-  public QueryServer(int port, QueryScheduler queryScheduler, ServerMetrics serverMetrics) {
-    this(port, queryScheduler, serverMetrics, null, null, new AllowAllAccessFactory().create());
-  }
 
   /**
    * Create an unsecured server instance

@@ -70,10 +70,26 @@ public class QueryRouter {
   }
 
   /**
+   * Create a query router with TLS config and default netty config for Presto
+   *
+   * @param brokerId broker id
+   * @param brokerMetrics broker metrics
+   */
+  public QueryRouter(String brokerId, BrokerMetrics brokerMetrics, TlsConfig tlsConfig) {
+    _brokerId = brokerId;
+    _brokerMetrics = brokerMetrics;
+    _serverChannels = new ServerChannels(this, brokerMetrics, null);
+    _serverChannelsTls =
+        Optional.ofNullable(tlsConfig).map(conf -> new ServerChannels(this, brokerMetrics, null, conf))
+            .orElse(null);
+  }
+
+  /**
    * Create a query router with TLS config
    *
    * @param brokerId broker id
    * @param brokerMetrics broker metrics
+   * @param nettyConfig configurations for netty library
    * @param tlsConfig TLS config
    */
   public QueryRouter(String brokerId, BrokerMetrics brokerMetrics, NettyConfig nettyConfig, TlsConfig tlsConfig) {
