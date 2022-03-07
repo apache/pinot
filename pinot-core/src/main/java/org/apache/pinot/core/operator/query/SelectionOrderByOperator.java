@@ -47,7 +47,6 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -210,7 +209,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
         _numDocsScanned++;
       }
     }
-    _numEntriesScannedPostFilter += _numDocsScanned * numColumnsProjected;
+    _numEntriesScannedPostFilter = (long) _numDocsScanned * numColumnsProjected;
 
     // Create the data schema
     String[] columnNames = new String[numExpressions];
@@ -249,8 +248,8 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
         SelectionOperatorUtils.addToPriorityQueue(blockValueFetcher.getRow(i), _rows, _numRowsToKeep);
       }
       _numDocsScanned += numDocsFetched;
-      _numEntriesScannedPostFilter += numDocsFetched * numColumnsProjected;
     }
+    _numEntriesScannedPostFilter = (long) _numDocsScanned * numColumnsProjected;
 
     // Create the data schema
     String[] columnNames = new String[numExpressions];
@@ -274,7 +273,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     int numOrderByExpressions = _orderByExpressions.size();
 
     // Fetch the order-by expressions and docIds and insert them into the priority queue
-    BlockValSet[] blockValSets = new BlockValSet[numOrderByExpressions + 1];
+    BlockValSet[] blockValSets = new BlockValSet[numOrderByExpressions];
     int numColumnsProjected = _transformOperator.getNumColumnsProjected();
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
@@ -282,20 +281,21 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
         ExpressionContext expression = _orderByExpressions.get(i).getExpression();
         blockValSets[i] = transformBlock.getBlockValueSet(expression);
       }
-      blockValSets[numOrderByExpressions] = transformBlock.getBlockValueSet(BuiltInVirtualColumn.DOCID);
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
       int numDocsFetched = transformBlock.getNumDocs();
+      int[] docIds = transformBlock.getDocIds();
       for (int i = 0; i < numDocsFetched; i++) {
         // NOTE: We pre-allocate the complete row so that we can fill up the non-order-by output expression values later
         //       without creating extra rows or re-constructing the priority queue. We can change the values in-place
         //       because the comparator only compare the values for the order-by expressions.
         Object[] row = new Object[numExpressions];
         blockValueFetcher.getRow(i, row, 0);
+        row[numOrderByExpressions] = docIds[i];
         SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
       }
       _numDocsScanned += numDocsFetched;
-      _numEntriesScannedPostFilter += numDocsFetched * numColumnsProjected;
     }
+    _numEntriesScannedPostFilter = (long) _numDocsScanned * numColumnsProjected;
 
     // Copy the rows (shallow copy so that any modification will also be reflected to the priority queue) into a list,
     // and store the document ids into a bitmap
@@ -340,7 +340,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       for (int i = 0; i < numDocsFetched; i++) {
         blockValueFetcher.getRow(i, rowList.get(rowBaseId + i), numOrderByExpressions);
       }
-      _numEntriesScannedPostFilter += numDocsFetched * numColumns;
+      _numEntriesScannedPostFilter += (long) numDocsFetched * numColumns;
       rowBaseId += numDocsFetched;
     }
 

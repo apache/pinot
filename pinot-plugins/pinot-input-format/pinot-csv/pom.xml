@@ -37,15 +37,6 @@
     <phase.prop>package</phase.prop>
   </properties>
 
-  <profiles>
-    <profile>
-      <id>presto-driver</id>
-      <properties>
-        <jdk.version>8</jdk.version>
-      </properties>
-    </profile>
-  </profiles>
-
   <dependencies>
     <dependency>
       <groupId>org.apache.commons</groupId>

@@ -25,6 +25,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.UUID;
+import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
@@ -39,54 +41,84 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+
 public class MultiValueVarByteRawIndexCreatorTest {
 
-  private static final String OUTPUT_DIR =
-      System.getProperty("java.io.tmpdir") + File.separator + "mvVarRawTest";
+  private static final File OUTPUT_DIR =
+      new File(FileUtils.getTempDirectory(), MultiValueVarByteRawIndexCreatorTest.class.getSimpleName());
 
   @BeforeClass
-  public void setup() throws Exception {
-    FileUtils.forceMkdir(new File(OUTPUT_DIR));
+  public void setup()
+      throws Exception {
+    FileUtils.forceMkdir(OUTPUT_DIR);
   }
 
-  @DataProvider(name = "compressionTypes")
-  public Object[][] compressionTypes() {
-    return Arrays.stream(ChunkCompressionType.values()).map(ct -> new Object[]{ct}).toArray(Object[][]::new);
+  @DataProvider
+  public Object[][] params() {
+    return Arrays.stream(ChunkCompressionType.values())
+        .flatMap(chunkCompressionType -> IntStream.of(10, 15, 20, 1000).boxed()
+            .flatMap(maxLength -> IntStream.range(1, 20).map(i -> i * 2 - 1).boxed()
+                .map(maxNumEntries -> new Object[]{chunkCompressionType, maxLength, maxNumEntries})))
+        .toArray(Object[][]::new);
   }
 
-  /**
-   * Clean up after test
-   */
   @AfterClass
   public void cleanup() {
-    FileUtils.deleteQuietly(new File(OUTPUT_DIR));
+    FileUtils.deleteQuietly(OUTPUT_DIR);
   }
 
-  @Test(dataProvider = "compressionTypes")
-  public void testMVString(ChunkCompressionType compressionType) throws IOException {
-    String column = "testCol";
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testOverflowElementCount()
+      throws IOException {
+    new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, ChunkCompressionType.PASS_THROUGH,
+        "column", 10000, DataType.STRING, 1, Integer.MAX_VALUE / 2);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testOverflowMaxLengthInBytes()
+      throws IOException {
+    // contrived to produce a positive chunk size > Integer.MAX_VALUE but not fail num elements checks
+    new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, ChunkCompressionType.PASS_THROUGH,
+        "column", 10000, DataType.STRING, Integer.MAX_VALUE - Integer.BYTES - 2 * Integer.BYTES, 2);
+  }
+
+  @Test(dataProvider = "params")
+  public void testMVString(ChunkCompressionType compressionType, int maxLength, int maxNumEntries)
+      throws IOException {
+    String column = "testCol-" + UUID.randomUUID();
     int numDocs = 1000;
-    int maxElements = 50;
-    int maxTotalLength = 500;
     File file = new File(OUTPUT_DIR, column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
-    file.delete();
-    MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(new File(OUTPUT_DIR),
-        compressionType, column, numDocs, DataType.STRING, maxTotalLength, maxElements);
     List<String[]> inputs = new ArrayList<>();
     Random random = new Random();
+    int maxTotalLength = 0;
+    int maxElements = 0;
     for (int i = 0; i < numDocs; i++) {
-      //int length = 1;
-      int length = random.nextInt(10);
-      String[] values = new String[length];
-      for (int j = 0; j < length; j++) {
+      int numEntries = random.nextInt(maxNumEntries + 1);
+      maxElements = Math.max(numEntries, maxElements);
+      String[] values = new String[numEntries];
+      int serializedLength = 0;
+      for (int j = 0; j < numEntries; j++) {
+        int length = random.nextInt(maxLength);
+        serializedLength += length;
         char[] value = new char[length];
-        Arrays.fill(value, 'a');
+        Arrays.fill(value, 'b');
+        if (value.length > 0) {
+          value[0] = 'a';
+        }
+        if (value.length > 1) {
+          value[value.length - 1] = 'c';
+        }
         values[j] = new String(value);
       }
+      maxTotalLength = Math.max(serializedLength, maxTotalLength);
       inputs.add(values);
-      creator.putStringMV(values);
     }
-    creator.close();
+    try (MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, compressionType,
+        column, numDocs, DataType.STRING, maxTotalLength, maxElements)) {
+      for (String[] input : inputs) {
+        creator.putStringMV(input);
+      }
+    }
 
     //read
     final PinotDataBuffer buffer = PinotDataBuffer
@@ -102,32 +134,43 @@ public class MultiValueVarByteRawIndexCreatorTest {
     }
   }
 
-  @Test(dataProvider = "compressionTypes")
-  public void testMVBytes(ChunkCompressionType compressionType) throws IOException {
-    String column = "testCol";
+  @Test(dataProvider = "params")
+  public void testMVBytes(ChunkCompressionType compressionType, int maxLength, int maxNumEntries)
+      throws IOException {
+    String column = "testCol-" + UUID.randomUUID();
     int numDocs = 1000;
-    int maxElements = 50;
-    int maxTotalLength = 500;
     File file = new File(OUTPUT_DIR, column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
-    file.delete();
-    MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(
-        new File(OUTPUT_DIR), compressionType, column, numDocs, DataType.BYTES,
-        maxTotalLength, maxElements);
     List<byte[][]> inputs = new ArrayList<>();
     Random random = new Random();
+    int maxTotalLength = 0;
+    int maxElements = 0;
     for (int i = 0; i < numDocs; i++) {
-      //int length = 1;
-      int length = random.nextInt(10);
-      byte[][] values = new byte[length][];
-      for (int j = 0; j < length; j++) {
-        char[] value = new char[length];
-        Arrays.fill(value, 'a');
-        values[j] = new String(value).getBytes();
+      int numEntries = random.nextInt(maxNumEntries);
+      maxElements = Math.max(numEntries, maxElements);
+      byte[][] values = new byte[numEntries][];
+      int serializedLength = 0;
+      for (int j = 0; j < numEntries; j++) {
+        int length = random.nextInt(maxLength);
+        serializedLength += length;
+        byte[] value = new byte[length];
+        Arrays.fill(value, (byte) 'b');
+        if (value.length > 0) {
+          value[0] = 'a';
+        }
+        if (value.length > 1) {
+          value[value.length - 1] = 'c';
+        }
+        values[j] = value;
       }
+      maxTotalLength = Math.max(serializedLength, maxTotalLength);
       inputs.add(values);
-      creator.putBytesMV(values);
     }
-    creator.close();
+    try (MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, compressionType,
+        column, numDocs, DataType.STRING, maxTotalLength, maxElements)) {
+      for (byte[][] input : inputs) {
+        creator.putBytesMV(input);
+      }
+    }
 
     //read
     final PinotDataBuffer buffer = PinotDataBuffer

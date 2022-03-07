@@ -243,8 +243,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         .equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
       LOGGER.info("Starting Grpc BrokerRequestHandler.");
       _brokerRequestHandler =
-          new GrpcBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
-              queryQuotaManager, tableCache, _brokerMetrics, null);
+          new GrpcBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory, queryQuotaManager,
+              tableCache, _brokerMetrics, null);
     } else { // default request handler type, e.g. netty
       LOGGER.info("Starting Netty BrokerRequestHandler.");
       if (_brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false)) {
@@ -310,7 +310,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
             new BrokerUserDefinedMessageHandlerFactory(_routingManager, queryQuotaManager));
     _participantHelixManager.connect();
-    updateInstanceConfigIfNeeded();
+    updateInstanceConfigAndBrokerResourceIfNeeded();
     _brokerMetrics.addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME,
         () -> _participantHelixManager.isConnected() ? 1L : 0L);
     _participantHelixManager.addPreConnectCallback(
@@ -323,18 +323,34 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     LOGGER.info("Finish starting Pinot broker");
   }
 
-  private void updateInstanceConfigIfNeeded() {
+  private void updateInstanceConfigAndBrokerResourceIfNeeded() {
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_participantHelixManager, _instanceId);
-    boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
-    updated |= HelixHelper.addDefaultTags(instanceConfig, () -> {
+    boolean instanceConfigUpdated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
+    boolean shouldUpdateBrokerResource = false;
+    String brokerTag = null;
+    List<String> instanceTags = instanceConfig.getTags();
+    if (instanceTags.isEmpty()) {
+      // This is a new broker (first time joining the cluster)
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
-        return Collections.singletonList(TagNameUtils.getBrokerTagForTenant(null));
+        brokerTag = TagNameUtils.getBrokerTagForTenant(null);
+        shouldUpdateBrokerResource = true;
       } else {
-        return Collections.singletonList(Helix.UNTAGGED_BROKER_INSTANCE);
+        brokerTag = Helix.UNTAGGED_BROKER_INSTANCE;
       }
-    });
-    if (updated) {
+      instanceConfig.addTag(brokerTag);
+      instanceConfigUpdated = true;
+    }
+    if (instanceConfigUpdated) {
       HelixHelper.updateInstanceConfig(_participantHelixManager, instanceConfig);
+    }
+    if (shouldUpdateBrokerResource) {
+      // Update broker resource to include the new broker
+      long startTimeMs = System.currentTimeMillis();
+      List<String> tablesAdded = new ArrayList<>();
+      HelixHelper.updateBrokerResource(_participantHelixManager, _instanceId, Collections.singletonList(brokerTag),
+          tablesAdded, null);
+      LOGGER.info("Updated broker resource for new joining broker: {} in {}ms, tables added: {}", _instanceId,
+          System.currentTimeMillis() - startTimeMs, tablesAdded);
     }
   }
 
@@ -365,8 +381,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
                 _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup),
             new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_participantHelixManager,
                 _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup),
-            new ServiceStatus.LifecycleServiceStatusCallback(this::isStarting, this::isShuttingDown)
-        )));
+            new ServiceStatus.LifecycleServiceStatusCallback(this::isStarting, this::isShuttingDown))));
   }
 
   @Override

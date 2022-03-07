@@ -39,10 +39,17 @@
 
   <modules>
     <module>pinot-spark-connector</module>
-    <module>presto-pinot-driver</module>
   </modules>
 
-  <dependencies>
-  </dependencies>
-
+  <profiles>
+    <profile>
+      <id>presto-driver</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <modules>
+        <module>prestodb-pinot-dependencies</module>
+      </modules>
+    </profile>
+  </profiles>
 </project>

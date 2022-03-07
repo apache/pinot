@@ -86,8 +86,9 @@ public class MergeTaskUtilsTest {
   @Test
   public void testGetPartitionerConfigs() {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable")
-        .setSegmentPartitionConfig(new SegmentPartitionConfig(
-            Collections.singletonMap("memberId", new ColumnPartitionConfig("murmur", 10)))).build();
+        .setSegmentPartitionConfig(
+            new SegmentPartitionConfig(Collections.singletonMap("memberId", new ColumnPartitionConfig("murmur", 10))))
+        .build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("memberId", DataType.LONG).build();
     Map<String, String> taskConfig = Collections.emptyMap();
 
@@ -161,17 +162,21 @@ public class MergeTaskUtilsTest {
     taskConfig.put(MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, "10000");
     taskConfig.put(MergeTask.SEGMENT_NAME_PREFIX_KEY, "myPrefix");
     taskConfig.put(MergeTask.SEGMENT_NAME_POSTFIX_KEY, "myPostfix");
+    taskConfig.put(MergeTask.FIXED_SEGMENT_NAME_KEY, "mySegment");
     SegmentConfig segmentConfig = MergeTaskUtils.getSegmentConfig(taskConfig);
     assertEquals(segmentConfig.getMaxNumRecordsPerSegment(), 10000);
     assertEquals(segmentConfig.getSegmentNamePrefix(), "myPrefix");
     assertEquals(segmentConfig.getSegmentNamePostfix(), "myPostfix");
+    assertEquals(segmentConfig.getSegmentNamePostfix(), "myPostfix");
+    assertEquals(segmentConfig.getFixedSegmentName(), "mySegment");
     assertEquals(segmentConfig.toString(),
         "SegmentConfig{_maxNumRecordsPerSegment=10000, _segmentNamePrefix='myPrefix', "
-            + "_segmentNamePostfix='myPostfix'}");
+            + "_segmentNamePostfix='myPostfix', _fixedSegmentName='mySegment'}");
 
     segmentConfig = MergeTaskUtils.getSegmentConfig(Collections.emptyMap());
     assertEquals(segmentConfig.getMaxNumRecordsPerSegment(), SegmentConfig.DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT);
     assertNull(segmentConfig.getSegmentNamePrefix());
     assertNull(segmentConfig.getSegmentNamePostfix());
+    assertNull(segmentConfig.getFixedSegmentName());
   }
 }
