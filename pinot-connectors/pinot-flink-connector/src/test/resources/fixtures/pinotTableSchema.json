@@ -32,8 +32,6 @@
     }
   ],
   "dateTimeFieldSpecs": [
-  ],
-  "dateTimeFieldSpecs": [
     {
       "name": "timestamp",
       "dataType": "INT",
