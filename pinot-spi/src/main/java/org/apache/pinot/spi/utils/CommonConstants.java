@@ -224,6 +224,7 @@ public class CommonConstants {
     public static final String DEFAULT_BROKER_REQUEST_HANDLER_TYPE = NETTY_BROKER_REQUEST_HANDLER_TYPE;
 
     public static final String BROKER_TLS_PREFIX = "pinot.broker.tls";
+    public static final String BROKER_NETTY_PREFIX = "pinot.broker.netty";
     public static final String BROKER_NETTYTLS_ENABLED = "pinot.broker.nettytls.enabled";
     //Set to true to load all services tagged and compiled with hk2-metadata-generator. Default to False
     public static final String BROKER_SERVICE_AUTO_DISCOVERY = "pinot.broker.service.auto.discovery";
@@ -365,6 +366,7 @@ public class CommonConstants {
     public static final String SERVER_TLS_PREFIX = "pinot.server.tls";
     public static final String SERVER_NETTYTLS_PREFIX = "pinot.server.nettytls";
     public static final String SERVER_GRPCTLS_PREFIX = "pinot.server.grpctls";
+    public static final String SERVER_NETTY_PREFIX = "pinot.server.netty";
 
     // The complete config key is pinot.server.instance.segment.store.uri
     public static final String CONFIG_OF_SEGMENT_STORE_URI = "segment.store.uri";
