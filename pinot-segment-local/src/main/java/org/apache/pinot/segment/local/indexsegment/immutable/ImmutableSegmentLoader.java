@@ -46,6 +46,8 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -156,7 +158,8 @@ public class ImmutableSegmentLoader {
     Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
     if (schema != null) {
       Set<String> columnsInMetadata = new HashSet<>(columnMetadataMap.keySet());
-      columnsInMetadata.removeIf(schema::hasColumn);
+      Set<String> extraIndexedColumns = extractIndexedColumns(indexLoadingConfig.getTableConfig());
+      columnsInMetadata.removeIf(col -> schema.hasColumn(col) || extraIndexedColumns.contains(col));
       if (!columnsInMetadata.isEmpty()) {
         LOGGER.info("Skip loading columns only exist in metadata but not in schema: {}", columnsInMetadata);
         for (String column : columnsInMetadata) {
@@ -208,6 +211,10 @@ public class ImmutableSegmentLoader {
         new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTreeIndexContainer);
     LOGGER.info("Successfully loaded segment: {} with SegmentDirectory", segmentName);
     return segment;
+  }
+
+  private static Set<String> extractIndexedColumns(TableConfig tableConfig) {
+    return TimestampIndexGranularity.extractTimestampIndexGranularityColumnNames(tableConfig);
   }
 
   /**

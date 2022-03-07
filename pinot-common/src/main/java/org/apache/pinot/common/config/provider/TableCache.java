@@ -44,6 +44,7 @@ import org.apache.pinot.spi.config.provider.SchemaChangeListener;
 import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -90,6 +91,8 @@ public class TableCache implements PinotConfigProvider {
   private final ZkSchemaChangeListener _zkSchemaChangeListener = new ZkSchemaChangeListener();
   // Key is schema name, value is schema info
   private final Map<String, SchemaInfo> _schemaInfoMap = new ConcurrentHashMap<>();
+
+  private final Map<String, Set<String>> _timestampIndexColumnsMap = new ConcurrentHashMap<>();
 
   public TableCache(ZkHelixPropertyStore<ZNRecord> propertyStore, boolean caseInsensitive) {
     _propertyStore = propertyStore;
@@ -184,6 +187,15 @@ public class TableCache implements PinotConfigProvider {
     return tableConfigInfo != null ? tableConfigInfo._tableConfig : null;
   }
 
+  /**
+   * Returns the timestamp index columns for the given table, or {@code null} if it does not exist.
+   */
+  @Nullable
+  public Set<String> getTimestampIndexColumns(String tableNameWithType) {
+    Set<String> timestampIndexColumns = _timestampIndexColumnsMap.get(tableNameWithType);
+    return timestampIndexColumns != null ? timestampIndexColumns : null;
+  }
+
   @Override
   public boolean registerTableConfigChangeListener(TableConfigChangeListener tableConfigChangeListener) {
     synchronized (_zkTableConfigChangeListener) {
@@ -239,6 +251,8 @@ public class TableCache implements PinotConfigProvider {
     TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);
     String tableNameWithType = tableConfig.getTableName();
     _tableConfigInfoMap.put(tableNameWithType, new TableConfigInfo(tableConfig));
+    _timestampIndexColumnsMap.put(tableNameWithType,
+        TimestampIndexGranularity.extractTimestampIndexGranularityColumnNames(tableConfig));
 
     String schemaName = tableConfig.getValidationConfig().getSchemaName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
@@ -264,6 +278,7 @@ public class TableCache implements PinotConfigProvider {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     _tableConfigInfoMap.remove(tableNameWithType);
     removeSchemaName(tableNameWithType);
+    _timestampIndexColumnsMap.remove(tableNameWithType);
     if (_caseInsensitive) {
       _tableNameMap.remove(tableNameWithType.toLowerCase());
       String lowerCaseRawTableName = rawTableName.toLowerCase();

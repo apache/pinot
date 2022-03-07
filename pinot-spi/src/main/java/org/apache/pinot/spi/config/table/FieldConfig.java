@@ -50,16 +50,17 @@ public class FieldConfig extends BaseJsonConfig {
   private final List<IndexType> _indexTypes;
   private final CompressionCodec _compressionCodec;
   private final Map<String, String> _properties;
+  private final TimestampConfig _timestampConfig;
 
   @Deprecated
   public FieldConfig(String name, EncodingType encodingType, IndexType indexType, CompressionCodec compressionCodec,
       Map<String, String> properties) {
-    this(name, encodingType, indexType, null, compressionCodec, properties);
+    this(name, encodingType, indexType, null, compressionCodec, null, properties);
   }
 
   public FieldConfig(String name, EncodingType encodingType, List<IndexType> indexTypes,
       CompressionCodec compressionCodec, Map<String, String> properties) {
-    this(name, encodingType, null, indexTypes, compressionCodec, properties);
+    this(name, encodingType, null, indexTypes, compressionCodec, null, properties);
   }
 
   @JsonCreator
@@ -68,6 +69,7 @@ public class FieldConfig extends BaseJsonConfig {
       @JsonProperty(value = "indexType") @Nullable IndexType indexType,
       @JsonProperty(value = "indexTypes") @Nullable List<IndexType> indexTypes,
       @JsonProperty(value = "compressionCodec") @Nullable CompressionCodec compressionCodec,
+      @JsonProperty(value = "timestampConfig") @Nullable TimestampConfig timestampConfig,
       @JsonProperty(value = "properties") @Nullable Map<String, String> properties) {
     Preconditions.checkArgument(name != null, "'name' must be configured");
     _name = name;
@@ -75,6 +77,7 @@ public class FieldConfig extends BaseJsonConfig {
     _indexTypes = indexTypes != null ? indexTypes : (
         indexType == null ? Lists.newArrayList() : Lists.newArrayList(indexType));
     _compressionCodec = compressionCodec;
+    _timestampConfig = timestampConfig;
     _properties = properties;
   }
 
@@ -85,7 +88,7 @@ public class FieldConfig extends BaseJsonConfig {
 
   // If null, there won't be any index
   public enum IndexType {
-    INVERTED, SORTED, TEXT, FST, H3, JSON, RANGE
+    INVERTED, SORTED, TEXT, FST, H3, JSON, TIMESTAMP, RANGE
   }
 
   public enum CompressionCodec {
@@ -113,6 +116,11 @@ public class FieldConfig extends BaseJsonConfig {
   @Nullable
   public CompressionCodec getCompressionCodec() {
     return _compressionCodec;
+  }
+
+  @Nullable
+  public TimestampConfig getTimestampConfig() {
+    return _timestampConfig;
   }
 
   @Nullable
