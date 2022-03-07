@@ -70,6 +70,18 @@ public class QueryServer {
    * @param queryScheduler query scheduler
    * @param serverMetrics server metrics
    */
+  public QueryServer(int port, QueryScheduler queryScheduler, ServerMetrics serverMetrics) {
+    this(port, queryScheduler, serverMetrics, null, null, new AllowAllAccessFactory().create());
+  }
+
+  /**
+   * Create an unsecured server instance
+   *
+   * @param port bind port
+   * @param queryScheduler query scheduler
+   * @param serverMetrics server metrics
+   * @param nettyConfig configurations for netty library
+   */
   public QueryServer(int port, QueryScheduler queryScheduler, ServerMetrics serverMetrics, NettyConfig nettyConfig) {
     this(port, queryScheduler, serverMetrics, nettyConfig, null, new AllowAllAccessFactory().create());
   }
@@ -80,6 +92,7 @@ public class QueryServer {
    * @param port bind port
    * @param queryScheduler query scheduler
    * @param serverMetrics server metrics
+   * @param nettyConfig configurations for netty library
    * @param tlsConfig TLS/SSL config
    * @param accessControlFactory access control factory for netty channel
    */
