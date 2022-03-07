@@ -47,6 +47,10 @@ public class ProjectionBlock implements Block {
     return _dataBlockCache.getNumDocs();
   }
 
+  public int[] getDocIds() {
+    return _dataBlockCache.getDocIds();
+  }
+
   public BlockValSet getBlockValueSet(String column) {
     return new ProjectionBlockValSet(_dataBlockCache, column, _dataSourceMap.get(column));
   }

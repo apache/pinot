@@ -81,6 +81,15 @@ public class DataBlockCache {
   }
 
   /**
+   * Returns the document ids within the current block.
+   *
+   * @return Document ids within the current block.
+   */
+  public int[] getDocIds() {
+    return _docIds;
+  }
+
+  /**
    * SINGLE-VALUED COLUMN API
    */
 

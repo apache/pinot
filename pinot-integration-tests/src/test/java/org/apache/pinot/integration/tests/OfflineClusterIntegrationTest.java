@@ -1886,6 +1886,29 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "[\"NO_MATCHING_SEGMENT\",1,0]]}");
   }
 
+  /** Test to make sure we are properly handling string comparisons in predicates. */
+  @Test
+  public void testStringComparisonInFilter()
+    throws Exception {
+    // compare two string columns.
+    String query1 = "SELECT count(*) FROM mytable WHERE OriginState = DestState";
+    String response1 = postSqlQuery(query1, _brokerBaseApiUrl).get("resultTable").toString();
+    assertEquals(response1, "{\"dataSchema\":{\"columnNames\":[\"count(*)\"],\"columnDataTypes\":[\"LONG\"]},"
+        + "\"rows\":[[14011]]}");
+
+    // compare string function with string column.
+    String query2 = "SELECT count(*) FROM mytable WHERE trim(OriginState) = DestState";
+    String response2 = postSqlQuery(query2, _brokerBaseApiUrl).get("resultTable").toString();
+    assertEquals(response2, "{\"dataSchema\":{\"columnNames\":[\"count(*)\"],\"columnDataTypes\":[\"LONG\"]},"
+        + "\"rows\":[[14011]]}");
+
+    // compare string function with string function.
+    String query3 = "SELECT count(*) FROM mytable WHERE substr(OriginState, 0, 1) = substr(DestState, 0, 1)";
+    String response3 = postSqlQuery(query3, _brokerBaseApiUrl).get("resultTable").toString();
+    assertEquals(response3, "{\"dataSchema\":{\"columnNames\":[\"count(*)\"],\"columnDataTypes\":[\"LONG\"]},"
+        + "\"rows\":[[19755]]}");
+  }
+
   @Test
   @Override
   public void testHardcodedServerPartitionedSqlQueries()

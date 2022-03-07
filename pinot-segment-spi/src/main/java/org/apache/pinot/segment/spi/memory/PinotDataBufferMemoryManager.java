@@ -16,10 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.io.readerwriter;
+package org.apache.pinot.segment.spi.memory;
 
 import java.io.Closeable;
-import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
 /**

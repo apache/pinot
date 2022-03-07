@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.fwd;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
@@ -76,6 +77,8 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
     //we will prepend the actual content with numElements and length array containing length of each element
     int maxLengthPrefixes = Integer.BYTES * maxNumberOfElements;
     int totalMaxLength = Integer.BYTES + maxRowLengthInBytes + maxLengthPrefixes;
+    Preconditions.checkArgument((maxLengthPrefixes | maxRowLengthInBytes | totalMaxLength | maxNumberOfElements) > 0,
+        "integer overflow detected");
     File file = new File(baseIndexDir,
         column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
     int numDocsPerChunk = Math.max(
