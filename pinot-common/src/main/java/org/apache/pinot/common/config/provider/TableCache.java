@@ -19,15 +19,14 @@
 package org.apache.pinot.common.config.provider;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.I0Itec.zkclient.IZkChildListener;
 import org.I0Itec.zkclient.IZkDataListener;
@@ -64,8 +63,9 @@ public class TableCache implements PinotConfigProvider {
   private static final String LOWER_CASE_OFFLINE_TABLE_SUFFIX = "_offline";
   private static final String LOWER_CASE_REALTIME_TABLE_SUFFIX = "_realtime";
 
-  private final Set<TableConfigChangeListener> _tableConfigChangeListeners = ConcurrentHashMap.newKeySet();
-  private final Set<SchemaChangeListener> _schemaChangeListeners = ConcurrentHashMap.newKeySet();
+  // NOTE: No need to use concurrent set because it is always accessed within the ZK change listener lock
+  private final Set<TableConfigChangeListener> _tableConfigChangeListeners = new HashSet<>();
+  private final Set<SchemaChangeListener> _schemaChangeListeners = new HashSet<>();
 
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final boolean _caseInsensitive;
@@ -158,10 +158,13 @@ public class TableCache implements PinotConfigProvider {
   }
 
   @Override
-  public List<TableConfig> registerTableConfigChangeListener(TableConfigChangeListener tableConfigChangeListener) {
+  public boolean registerTableConfigChangeListener(TableConfigChangeListener tableConfigChangeListener) {
     synchronized (_zkTableConfigChangeListener) {
-      _tableConfigChangeListeners.add(tableConfigChangeListener);
-      return Lists.newArrayList(_tableConfigMap.values());
+      boolean added = _tableConfigChangeListeners.add(tableConfigChangeListener);
+      if (added) {
+        tableConfigChangeListener.onChange(getTableConfigs());
+      }
+      return added;
     }
   }
 
@@ -177,10 +180,13 @@ public class TableCache implements PinotConfigProvider {
   }
 
   @Override
-  public List<Schema> registerSchemaChangeListener(SchemaChangeListener schemaChangeListener) {
+  public boolean registerSchemaChangeListener(SchemaChangeListener schemaChangeListener) {
     synchronized (_zkSchemaChangeListener) {
-      _schemaChangeListeners.add(schemaChangeListener);
-      return _schemaInfoMap.values().stream().map(s -> s._schema).collect(Collectors.toList());
+      boolean added = _schemaChangeListeners.add(schemaChangeListener);
+      if (added) {
+        schemaChangeListener.onChange(getSchemas());
+      }
+      return added;
     }
   }
 
@@ -315,15 +321,33 @@ public class TableCache implements PinotConfigProvider {
   }
 
   private void notifyTableConfigChangeListeners() {
-    for (TableConfigChangeListener tableConfigChangeListener : _tableConfigChangeListeners) {
-      tableConfigChangeListener.onChange(Lists.newArrayList(_tableConfigMap.values()));
+    if (!_tableConfigChangeListeners.isEmpty()) {
+      List<TableConfig> tableConfigs = getTableConfigs();
+      for (TableConfigChangeListener tableConfigChangeListener : _tableConfigChangeListeners) {
+        tableConfigChangeListener.onChange(tableConfigs);
+      }
     }
   }
 
+  private List<TableConfig> getTableConfigs() {
+    return new ArrayList<>(_tableConfigMap.values());
+  }
+
   private void notifySchemaChangeListeners() {
-    for (SchemaChangeListener schemaChangeListener : _schemaChangeListeners) {
-      schemaChangeListener.onChange(_schemaInfoMap.values().stream().map(s -> s._schema).collect(Collectors.toList()));
+    if (!_schemaChangeListeners.isEmpty()) {
+      List<Schema> schemas = getSchemas();
+      for (SchemaChangeListener schemaChangeListener : _schemaChangeListeners) {
+        schemaChangeListener.onChange(schemas);
+      }
     }
+  }
+
+  private List<Schema> getSchemas() {
+    List<Schema> schemas = new ArrayList<>(_schemaInfoMap.size());
+    for (SchemaInfo schemaInfo : _schemaInfoMap.values()) {
+      schemas.add(schemaInfo._schema);
+    }
+    return schemas;
   }
 
   private class ZkTableConfigChangeListener implements IZkChildListener, IZkDataListener {
