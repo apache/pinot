@@ -238,7 +238,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
             Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY, false);
     TableCache tableCache = new TableCache(_propertyStore, caseInsensitive);
     // Configure TLS for netty connection to server
-    TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_TLS_PREFIX);
+    TlsConfig tlsDefaults = null;
+    if (_brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false)) {
+      tlsDefaults = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_TLS_PREFIX);
+    }
     NettyConfig nettyDefaults = NettyConfig.extractNettyConfig(_brokerConf, Broker.BROKER_NETTY_PREFIX);
 
     if (_brokerConf.getProperty(Broker.BROKER_REQUEST_HANDLER_TYPE, Broker.DEFAULT_BROKER_REQUEST_HANDLER_TYPE)
@@ -251,7 +254,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       LOGGER.info("Starting Netty BrokerRequestHandler.");
       _brokerRequestHandler =
           new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
-              queryQuotaManager, tableCache, _brokerMetrics, tlsDefaults);
+              queryQuotaManager, tableCache, _brokerMetrics, nettyDefaults, tlsDefaults);
     }
 
     LOGGER.info("Starting broker admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
