@@ -45,15 +45,18 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   private final ZkClient _zkClient;
   private final ExternalViewReader _evReader;
   private final List<String> _brokerList;
-
-  public DynamicBrokerSelector(String zkServers) {
+  //The preferTlsPort will be mapped to client config in the future, when we support full TLS
+  public DynamicBrokerSelector(String zkServers, boolean preferTlsPort) {
     _zkClient = getZkClient(zkServers);
     _zkClient.setZkSerializer(new BytesPushThroughSerializer());
     _zkClient.waitUntilConnected(60, TimeUnit.SECONDS);
     _zkClient.subscribeDataChanges(ExternalViewReader.BROKER_EXTERNAL_VIEW_PATH, this);
-    _evReader = getEvReader(_zkClient);
+    _evReader = getEvReader(_zkClient, preferTlsPort);
     _brokerList = ImmutableList.of(zkServers);
     refresh();
+  }
+  public DynamicBrokerSelector(String zkServers) {
+    this(zkServers, false);
   }
 
   @VisibleForTesting
@@ -63,7 +66,12 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
 
   @VisibleForTesting
   protected ExternalViewReader getEvReader(ZkClient zkClient) {
-    return new ExternalViewReader(zkClient);
+    return getEvReader(zkClient, false);
+  }
+
+  @VisibleForTesting
+  protected ExternalViewReader getEvReader(ZkClient zkClient, boolean preferTlsPort) {
+    return new ExternalViewReader(zkClient, preferTlsPort);
   }
 
   private void refresh() {

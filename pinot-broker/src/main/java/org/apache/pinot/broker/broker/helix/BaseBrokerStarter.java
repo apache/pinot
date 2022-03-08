@@ -85,6 +85,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected String _zkServers;
   protected String _hostname;
   protected int _port;
+  protected int _tlsPort;
   protected String _instanceId;
   private volatile boolean _isStarting = false;
   private volatile boolean _isShuttingDown = false;
@@ -125,6 +126,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
               : NetUtils.getHostAddress();
     }
     _port = _listenerConfigs.get(0).getPort();
+    _tlsPort = ListenerConfigUtil.findLastTlsPort(_listenerConfigs, -1);
 
     _instanceId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY);
     if (_instanceId != null) {
@@ -328,6 +330,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   private void updateInstanceConfigAndBrokerResourceIfNeeded() {
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_participantHelixManager, _instanceId);
     boolean instanceConfigUpdated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
+    if (_tlsPort > 0) {
+      HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
+    }
     boolean shouldUpdateBrokerResource = false;
     String brokerTag = null;
     List<String> instanceTags = instanceConfig.getTags();
