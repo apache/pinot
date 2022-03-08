@@ -860,10 +860,28 @@ const getURLWithoutAccessToken = (fallbackUrl = '/'): string => {
       url = url.substring(1);
     }
 
-    url = url
-    .split('&')
-    .filter((fragment) => !fragment.includes('access_token='))
-    .join('&');
+    const urlSearchParams = new URLSearchParams(url);
+    urlSearchParams.delete('access_token');
+    const urlParams = [];
+
+    // Loop over to get all params with empty value
+    for (const [key, value] of urlSearchParams.entries()) {
+      if (!value) {
+        urlParams.push(key);
+      }
+    }
+
+    // Loop over to delete all params with empty value
+    for (const key of urlParams){
+        urlSearchParams.delete(key);
+    }
+
+    // Check if any param remains, prepend it to urlParam as string
+    if(urlSearchParams.toString()){
+      urlParams.unshift(urlSearchParams.toString());
+    }
+    
+    url = urlParams.join('&');
   } else {
     url = fallbackUrl;
   }
