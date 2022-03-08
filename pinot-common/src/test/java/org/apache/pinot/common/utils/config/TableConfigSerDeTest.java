@@ -189,7 +189,7 @@ public class TableConfigSerDeTest {
     }
     {
       // With query config
-      QueryConfig queryConfig = new QueryConfig(1000L, null);
+      QueryConfig queryConfig = new QueryConfig(1000L, true, Collections.singletonMap("func(a)", "b"));
       TableConfig tableConfig = tableConfigBuilder.setQueryConfig(queryConfig).build();
 
       checkQueryConfig(tableConfig);
@@ -249,8 +249,7 @@ public class TableConfigSerDeTest {
     {
       // with upsert config
       UpsertConfig upsertConfig =
-          new UpsertConfig(UpsertConfig.Mode.FULL, null, null, "comparison",
-              UpsertConfig.HashFunction.NONE);
+          new UpsertConfig(UpsertConfig.Mode.FULL, null, null, "comparison", UpsertConfig.HashFunction.NONE);
 
       TableConfig tableConfig = tableConfigBuilder.setUpsertConfig(upsertConfig).build();
 
@@ -444,6 +443,8 @@ public class TableConfigSerDeTest {
     QueryConfig queryConfig = tableConfig.getQueryConfig();
     assertNotNull(queryConfig);
     assertEquals(queryConfig.getTimeoutMs(), Long.valueOf(1000L));
+    assertEquals(queryConfig.getDisableGroovy(), Boolean.TRUE);
+    assertEquals(queryConfig.getExpressionOverrideMap(), Collections.singletonMap("func(a)", "b"));
   }
 
   private void checkIngestionConfig(TableConfig tableConfig) {
