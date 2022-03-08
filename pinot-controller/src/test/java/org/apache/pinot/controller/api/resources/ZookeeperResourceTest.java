@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api;
+package org.apache.pinot.controller.api.resources;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -26,9 +26,6 @@ import java.util.Map;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerTestUtils;
-import org.codehaus.jackson.map.DeserializationConfig;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.map.SerializationConfig;
 import org.codehaus.jackson.type.TypeReference;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -36,16 +33,6 @@ import org.testng.annotations.Test;
 
 
 public class ZookeeperResourceTest {
-  private static final ObjectMapper MAPPER = new ObjectMapper();
-
-  static {
-    MAPPER.configure(SerializationConfig.Feature.INDENT_OUTPUT, true);
-    MAPPER.configure(SerializationConfig.Feature.AUTO_DETECT_FIELDS, true);
-    MAPPER.configure(SerializationConfig.Feature.CAN_OVERRIDE_ACCESS_MODIFIERS, true);
-    MAPPER.configure(DeserializationConfig.Feature.AUTO_DETECT_FIELDS, true);
-    MAPPER.configure(DeserializationConfig.Feature.AUTO_DETECT_SETTERS, true);
-    MAPPER.configure(DeserializationConfig.Feature.FAIL_ON_UNKNOWN_PROPERTIES, true);
-  }
 
   @BeforeClass
   public void setUp()
@@ -77,7 +64,7 @@ public class ZookeeperResourceTest {
     String urlGet = ControllerTestUtils.getControllerRequestURLBuilder().forZkGet(path1);
     result = ControllerTestUtils.sendGetRequest(urlGet);
 
-    ZNRecord znRecord = MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8), ZNRecord.class);
+    ZNRecord znRecord = ZookeeperResource.MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8), ZNRecord.class);
     Assert.assertEquals(znRecord.getId(), "QuickStartCluster");
     Assert.assertEquals(znRecord.getSimpleField("key"), "value");
 
@@ -85,7 +72,7 @@ public class ZookeeperResourceTest {
     urlGet = ControllerTestUtils.getControllerRequestURLBuilder().forZkGetChildren(path);
     result = ControllerTestUtils.sendGetRequest(urlGet);
 
-    List<ZNRecord> recordList = MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8),
+    List<ZNRecord> recordList = ZookeeperResource.MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8),
         new TypeReference<List<ZNRecord>>() { });
     Assert.assertEquals(recordList.size(), 1);
     Assert.assertEquals(recordList.get(0), znRecord);
@@ -128,7 +115,7 @@ public class ZookeeperResourceTest {
     urlGet = ControllerTestUtils.getControllerRequestURLBuilder().forZkGetChildren(path);
     result = ControllerTestUtils.sendGetRequest(urlGet);
 
-    recordList = MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8),
+    recordList = ZookeeperResource.MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8),
         new TypeReference<List<ZNRecord>>() { });
     Assert.assertEquals(recordList.size(), 2);
   }

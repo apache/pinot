@@ -19,14 +19,13 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.common.base.Charsets;
+import com.google.common.annotations.VisibleForTesting;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -63,9 +62,11 @@ public class ZookeeperResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(ZookeeperResource.class);
 
   // Helix uses codehaus.jackson.map.ObjectMapper, hence we can't use pinot JsonUtils here.
-  private static final ObjectMapper MAPPER = new ObjectMapper();
+  @VisibleForTesting
+  static final ObjectMapper MAPPER = new ObjectMapper();
 
   static {
+    // Configuration should be identical to org.apache.helix.manager.zk.ZNRecordSerializer.
     MAPPER.configure(SerializationConfig.Feature.INDENT_OUTPUT, true);
     MAPPER.configure(SerializationConfig.Feature.AUTO_DETECT_FIELDS, true);
     MAPPER.configure(SerializationConfig.Feature.CAN_OVERRIDE_ACCESS_MODIFIERS, true);
@@ -94,8 +95,11 @@ public class ZookeeperResource {
 
     ZNRecord znRecord = _pinotHelixResourceManager.readZKData(path);
     if (znRecord != null) {
-      byte[] serializeBytes = serialize(znRecord);
-      return new String(serializeBytes, StandardCharsets.UTF_8);
+      try {
+        return MAPPER.writeValueAsString(znRecord);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
     } else {
       // TODO: should throw Not found exception, but need to fix how UI interpret the error
       return null;
@@ -159,7 +163,7 @@ public class ZookeeperResource {
     }
     ZNRecord znRecord;
     try {
-      znRecord = MAPPER.readValue(data.getBytes(Charsets.UTF_8), ZNRecord.class);
+      znRecord = MAPPER.readValue(data, ZNRecord.class);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Failed to deserialize the data", Response.Status.BAD_REQUEST,
           e);
@@ -218,7 +222,7 @@ public class ZookeeperResource {
 
     List<ZNRecord> znRecords = _pinotHelixResourceManager.getZKChildren(path);
     if (znRecords != null) {
-      List<ZNRecord> nonNullRecords = new ArrayList<>();
+      List<ZNRecord> nonNullRecords = new ArrayList<>(znRecords.size());
       for (ZNRecord znRecord : znRecords) {
         if (znRecord != null) {
           nonNullRecords.add(znRecord);
@@ -278,14 +282,6 @@ public class ZookeeperResource {
     try {
       return JsonUtils.objectToString(stat);
     } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  private byte[] serialize(ZNRecord znRecord) {
-    try {
-      return MAPPER.writeValueAsBytes(znRecord);
-    } catch (IOException e) {
       throw new RuntimeException(e);
     }
   }
