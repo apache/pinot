@@ -18,23 +18,34 @@
  */
 package org.apache.pinot.controller.api;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerTestUtils;
-import org.apache.pinot.spi.utils.JsonUtils;
+import org.codehaus.jackson.map.DeserializationConfig;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.map.SerializationConfig;
+import org.codehaus.jackson.type.TypeReference;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
 public class ZookeeperResourceTest {
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  static {
+    MAPPER.configure(SerializationConfig.Feature.INDENT_OUTPUT, true);
+    MAPPER.configure(SerializationConfig.Feature.AUTO_DETECT_FIELDS, true);
+    MAPPER.configure(SerializationConfig.Feature.CAN_OVERRIDE_ACCESS_MODIFIERS, true);
+    MAPPER.configure(DeserializationConfig.Feature.AUTO_DETECT_FIELDS, true);
+    MAPPER.configure(DeserializationConfig.Feature.AUTO_DETECT_SETTERS, true);
+    MAPPER.configure(DeserializationConfig.Feature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+  }
 
   @BeforeClass
   public void setUp()
@@ -43,13 +54,16 @@ public class ZookeeperResourceTest {
   }
 
   @Test
-  public void testZkPutData()
-      throws IOException {
+  public void testZookeeperDataEndpoints()
+      throws Exception {
     String urlPut = ControllerTestUtils.getControllerRequestURLBuilder().forZkPut();
     String path = "/zookeeper";
     int expectedVersion = -1;
     int accessOption = 1;
-    String data = "{\"id\" : \"QuickStartCluster\"," + "  \"data\" : { }\n" + "}";
+    String data = "{\"id\" : \"QuickStartCluster\","
+        + "\"simpleFields\" : { \"key\" : \"value\" }, "
+        + "\"mapFields\" : { },  "
+        + "\"listFields\" : { } }";
 
     // CASE 1: Send data in query params form using HTTP PUT
     String path1 = path + "/testCase1";
@@ -63,19 +77,18 @@ public class ZookeeperResourceTest {
     String urlGet = ControllerTestUtils.getControllerRequestURLBuilder().forZkGet(path1);
     result = ControllerTestUtils.sendGetRequest(urlGet);
 
-    ZNRecordSerializer znRecordSerializer = new ZNRecordSerializer();
-    Object deserialize = znRecordSerializer.deserialize(result.getBytes(StandardCharsets.UTF_8));
-    Assert.assertTrue(deserialize instanceof ZNRecord);
-    ZNRecord znRecord = (ZNRecord) deserialize;
+    ZNRecord znRecord = MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8), ZNRecord.class);
     Assert.assertEquals(znRecord.getId(), "QuickStartCluster");
+    Assert.assertEquals(znRecord.getSimpleField("key"), "value");
 
     // validate zk/getChildren in parent path
     urlGet = ControllerTestUtils.getControllerRequestURLBuilder().forZkGetChildren(path);
     result = ControllerTestUtils.sendGetRequest(urlGet);
 
-    List<String> recordList = JsonUtils.stringToObject(result, new TypeReference<List<String>>() { });
+    List<ZNRecord> recordList = MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8),
+        new TypeReference<List<ZNRecord>>() { });
     Assert.assertEquals(recordList.size(), 1);
-    Assert.assertEquals(znRecordSerializer.deserialize(recordList.get(0).getBytes(StandardCharsets.UTF_8)), znRecord);
+    Assert.assertEquals(recordList.get(0), znRecord);
 
     String lorem = "Loremipsumdolorsitametconsecteturadipisicingelitseddoeiusmod"
         + "temporincididuntutlaboreetdoloremagnaaliquaUtenimadminimveniam"
@@ -88,13 +101,15 @@ public class ZookeeperResourceTest {
     for (int i = 0; i < 5; i++) {
       lorem += lorem;
     }
-
-    String largeConfig = "{\n" + "  \"id\" : \"QuickStartCluster\",\n" + "  \"data\" : " + "\"" + lorem + "\"\n" + "}";
+    String largeData = "{\"id\" : \"QuickStartCluster\","
+        + "\"simpleFields\" : { \"key\" : \"" + lorem + "\" }, "
+        + "\"mapFields\" : { },  "
+        + "\"listFields\" : { } }";
 
     // CASE 2: Fail when sending large data in query params
     String path2 = path + "/testCase2";
     try {
-      params = "path=" + path2 + "&data=" + URIUtils.encode(largeConfig) + "&expectedVersion=" + expectedVersion
+      params = "path=" + path2 + "&data=" + URIUtils.encode(largeData) + "&expectedVersion=" + expectedVersion
           + "&accessOption=" + accessOption;
       ControllerTestUtils.sendPutRequest(urlPut + "?" + params);
       Assert.fail("Should not get here, large payload");
@@ -106,17 +121,15 @@ public class ZookeeperResourceTest {
     params = "path=" + path2 + "&expectedVersion=" + expectedVersion + "&accessOption=" + accessOption;
     Map<String, String> headers = new HashMap<>();
     headers.put("Content-Type", "application/json");
-    result = ControllerTestUtils.sendPutRequest(urlPut + "?" + params, headers, largeConfig);
+    result = ControllerTestUtils.sendPutRequest(urlPut + "?" + params, headers, largeData);
     Assert.assertTrue(result.toLowerCase().contains("successfully updated"));
 
     // validate that zk/getChildren return 2 items.
     urlGet = ControllerTestUtils.getControllerRequestURLBuilder().forZkGetChildren(path);
     result = ControllerTestUtils.sendGetRequest(urlGet);
 
-    recordList = JsonUtils.stringToObject(result, new TypeReference<List<String>>() { });
+    recordList = MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8),
+        new TypeReference<List<ZNRecord>>() { });
     Assert.assertEquals(recordList.size(), 2);
-    for (String record : recordList) {
-      Assert.assertTrue(znRecordSerializer.deserialize(record.getBytes(StandardCharsets.UTF_8)) instanceof ZNRecord);
-    }
   }
 }
