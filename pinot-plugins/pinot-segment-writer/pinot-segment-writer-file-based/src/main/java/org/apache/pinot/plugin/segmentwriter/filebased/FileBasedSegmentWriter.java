@@ -198,6 +198,7 @@ public class FileBasedSegmentWriter implements SegmentWriter {
       // Tar segment
       File segmentTarFile = getSegmentTarFile(_outputDirURI, segmentName);
       if (!_batchConfig.isOverwriteOutput() && segmentTarFile.exists()) {
+        // file exists, create a unique name with timestamp
         segmentTarFile = new File(_outputDirURI,
             String.format("%s_%d%s", segmentName, System.currentTimeMillis(), Constants.TAR_GZ_FILE_EXT));
       }
