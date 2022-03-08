@@ -31,7 +31,7 @@
   </parent>
 
   <artifactId>pinot-rocketmq</artifactId>
-  <name>Pinot Kinesis</name>
+  <name>Pinot RocketMQ</name>
   <url>https://pinot.apache.org/</url>
 
   <properties>

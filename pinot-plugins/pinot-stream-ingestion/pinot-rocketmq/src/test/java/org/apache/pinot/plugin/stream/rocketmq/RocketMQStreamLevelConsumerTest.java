@@ -41,6 +41,8 @@ import org.apache.rocketmq.common.consumer.ConsumeFromWhere;
 import org.apache.rocketmq.common.message.Message;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -48,6 +50,7 @@ import org.testng.annotations.Test;
 
 
 public class RocketMQStreamLevelConsumerTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(RocketMQStreamLevelConsumerTest.class);
 
   private static final long STABILIZE_SLEEP_DELAYS = 3000;
   private static final String TEST_TOPIC_1 = "foo";
@@ -63,7 +66,7 @@ public class RocketMQStreamLevelConsumerTest {
     _rocketmqCluster = new MiniRocketMQCluster("default_cluster", "default_broker");
     _rocketmqCluster.start();
     _namesrvAddress = _rocketmqCluster.getNamesrvAddress();
-    System.out.println("nameserver: " + _namesrvAddress);
+    LOGGER.info("nameserver: {}", _namesrvAddress);
     Thread.sleep(STABILIZE_SLEEP_DELAYS);
     _rocketmqCluster.initTopic(TEST_TOPIC_1, 1);
     _rocketmqCluster.initTopic(TEST_TOPIC_2, 2);
@@ -99,7 +102,11 @@ public class RocketMQStreamLevelConsumerTest {
   @AfterClass
   public void tearDown()
       throws Exception {
-    _rocketmqCluster.close();
+    try {
+      _rocketmqCluster.close();
+    } catch (Exception e) {
+      LOGGER.warn("Exception on close RocketMQCluster", e);
+    }
   }
 
   @Test
@@ -218,7 +225,8 @@ public class RocketMQStreamLevelConsumerTest {
     testConsumer(TEST_TOPIC_2);
   }
 
-  private void testConsumer(String topic) {
+  private void testConsumer(String topic)
+      throws Exception {
     String streamType = "rocketmq";
     String streamRocketMQNameServerAddress = _namesrvAddress;
     String streamRocketMQConsumerType = "highlevel";
@@ -264,40 +272,34 @@ public class RocketMQStreamLevelConsumerTest {
       StreamLevelConsumer
           consumer =
           streamConsumerFactory.createStreamLevelConsumer(clientId, tableNameWithType, null, streamConfig.getGroupId());
-      try {
-        consumer.start();
-      } catch (Exception e) {
-        e.printStackTrace();
-      }
+      consumer.start();
 
-      int errCount = 0;
-      List<GenericRow> rows = new ArrayList<>(numPartitions * NUM_MSG_PRODUCED_PER_PARTITION);
-      while (rows.size() < numPartitions * NUM_MSG_PRODUCED_PER_PARTITION) {
-        GenericRow consumedRow = new GenericRow();
-        consumedRow = consumer.next(consumedRow);
-        if (consumedRow != null) {
-          rows.add(consumedRow);
-          if (rows.size() % 20 == 0) {
-            consumer.commit();
+      try {
+        int errCount = 0;
+        List<GenericRow> rows = new ArrayList<>(numPartitions * NUM_MSG_PRODUCED_PER_PARTITION);
+        while (rows.size() < numPartitions * NUM_MSG_PRODUCED_PER_PARTITION) {
+          GenericRow consumedRow = new GenericRow();
+          consumedRow = consumer.next(consumedRow);
+          if (consumedRow != null) {
+            rows.add(consumedRow);
+            if (rows.size() % 20 == 0) {
+              consumer.commit();
+            }
+            Assert.assertTrue(((String) consumedRow.getValue("")).startsWith("sample_msg_"));
+          } else {
+            errCount++;
           }
-          Assert.assertTrue(((String) consumedRow.getValue("")).startsWith("sample_msg_"));
-        } else {
-          errCount++;
+          if (errCount >= 100) {
+            Assert.fail("too many errors when consuming messages. count: " + errCount);
+          }
         }
-        if (errCount >= 100) {
-          Assert.fail("too many errors when consuming messages. count: " + errCount);
-        }
-      }
-      consumer.commit();
+        consumer.commit();
 
-      Assert.assertEquals(rows.size(), numPartitions * NUM_MSG_PRODUCED_PER_PARTITION);
-      Assert.assertNull(consumer.next(new GenericRow()));
-
-      try {
-        metadataProvider.close();
+        Assert.assertNull(consumer.next(new GenericRow()));
+        Assert.assertEquals(rows.size(), numPartitions * NUM_MSG_PRODUCED_PER_PARTITION);
+      } finally {
         consumer.shutdown();
-      } catch (Exception e) {
-        e.printStackTrace();
+        metadataProvider.close();
       }
     }
   }

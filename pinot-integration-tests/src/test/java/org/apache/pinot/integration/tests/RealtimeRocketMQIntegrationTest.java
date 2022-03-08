@@ -338,8 +338,8 @@ public class RealtimeRocketMQIntegrationTest extends BaseClusterIntegrationTestS
     if (_rocketmqInstance != null) {
       try {
         _rocketmqInstance.close();
-      } catch (IOException e) {
-        e.printStackTrace();
+      } catch (Exception e) {
+        LOGGER.warn("Exception on close RocketMQCluster", e);
       }
     }
   }

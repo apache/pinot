@@ -21,12 +21,13 @@
       "name": "FlightNum"
     }
   ],
-  "timeFieldSpec": {
-    "incomingGranularitySpec": {
-      "timeType": "DAYS",
+  "dateTimeFieldSpecs": [
+    {
+      "name": "DaysSinceEpoch",
       "dataType": "INT",
-      "name": "DaysSinceEpoch"
+      "format": "1:DAYS:EPOCH",
+      "granularity": "1:DAYS"
     }
-  },
+  ],
   "schemaName": "mytable"
 }

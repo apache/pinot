@@ -31,7 +31,7 @@ import org.apache.pinot.spi.stream.StreamMetadataProvider;
 public class RocketMQConsumerFactory extends StreamConsumerFactory {
   @Override
   public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException("RocketMQ doesn't support partition level consumer");
   }
 
   @Override
@@ -42,7 +42,7 @@ public class RocketMQConsumerFactory extends StreamConsumerFactory {
 
   @Override
   public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException("RocketMQ doesn't support partition level consumer");
   }
 
   @Override
