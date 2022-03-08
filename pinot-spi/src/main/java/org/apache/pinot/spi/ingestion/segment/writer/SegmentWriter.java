@@ -19,11 +19,14 @@
 package org.apache.pinot.spi.ingestion.segment.writer;
 
 import java.io.Closeable;
+import java.io.File;
 import java.net.URI;
 import java.util.Map;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 
 
 /**
@@ -63,6 +66,27 @@ public interface SegmentWriter extends Closeable {
     for (GenericRow row : rowBatch) {
       collect(row);
     }
+  }
+
+  /**
+   * Sets the staging directory that stores the written segment files.
+   * @param tableConfig
+   */
+  default File setStagingDir(TableConfig tableConfig) {
+    return new File(FileUtils.getTempDirectory(),
+        String.format("segment_writer_staging_%s_%d", tableConfig.getTableName(), System.currentTimeMillis()));
+  }
+
+  default File getSegmentTarFile(String outputDir, String segmentName) {
+    return new File(outputDir, segmentName + Constants.TAR_GZ_FILE_EXT);
+  }
+
+  /**
+   * Gets the seq id to be assigned to the generated segment, default seq id is used if returned null.
+   * @return seq id to the generated segment.
+   */
+  default Integer getSeqId() {
+    return null;
   }
 
   /**

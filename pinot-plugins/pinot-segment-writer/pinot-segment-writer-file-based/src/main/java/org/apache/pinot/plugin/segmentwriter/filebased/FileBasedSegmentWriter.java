@@ -119,8 +119,7 @@ public class FileBasedSegmentWriter implements SegmentWriter {
     _reusableRecord = new GenericData.Record(_avroSchema);
 
     // Create tmp dir
-    _stagingDir = new File(FileUtils.getTempDirectory(),
-        String.format("segment_writer_staging_%s_%d", _tableNameWithType, System.currentTimeMillis()));
+    _stagingDir = setStagingDir(tableConfig);
     Preconditions.checkState(_stagingDir.mkdirs(), "Failed to create staging dir: %s", _stagingDir.getAbsolutePath());
 
     // Create buffer file
@@ -189,23 +188,18 @@ public class FileBasedSegmentWriter implements SegmentWriter {
       // Build segment
       SegmentGeneratorConfig segmentGeneratorConfig =
           IngestionUtils.generateSegmentGeneratorConfig(_tableConfig, _schema, batchIngestionConfig);
+      if (getSeqId() != null) {
+        segmentGeneratorConfig.setSequenceId(getSeqId());
+      }
+
       String segmentName = IngestionUtils.buildSegment(segmentGeneratorConfig);
       LOGGER.info("Successfully built segment: {} for table: {}", segmentName, _tableNameWithType);
 
       // Tar segment
-      File segmentTarFile = new File(_outputDirURI, segmentName + Constants.TAR_GZ_FILE_EXT);
-      if (segmentTarFile.exists()) {
-        if (!_batchConfig.isOverwriteOutput()) {
-          throw new IllegalArgumentException(String.format("Duplicate segment name generated '%s' in '%s', please "
-              + "adjust segment name generator config to avoid duplicates, or allow batch config overwrite",
-              segmentName, _outputDirURI));
-        } else {
-          LOGGER.warn(String.format("Duplicate segment name detected '%s' in file '%s', deleting old segment",
-              segmentName, segmentDir));
-          if (segmentTarFile.delete()) {
-            LOGGER.warn(String.format("Segment file deleted: '%s/%s'", _outputDirURI, segmentName));
-          }
-        }
+      File segmentTarFile = getSegmentTarFile(_outputDirURI, segmentName);
+      if (!_batchConfig.isOverwriteOutput() && segmentTarFile.exists()) {
+        segmentTarFile = new File(_outputDirURI,
+            String.format("%s_%d%s", segmentName, System.currentTimeMillis(), Constants.TAR_GZ_FILE_EXT));
       }
       TarGzCompressionUtils.createTarGzFile(new File(segmentDir, segmentName), segmentTarFile);
       LOGGER.info("Created segment tar: {} for segment: {} of table: {}", segmentTarFile.getAbsolutePath(), segmentName,
