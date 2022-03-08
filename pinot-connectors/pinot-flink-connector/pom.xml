@@ -94,7 +94,6 @@
       <groupId>org.apache.flink</groupId>
       <artifactId>flink-clients_${scala.version}</artifactId>
       <version>${flink.version}</version>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
