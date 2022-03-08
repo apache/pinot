@@ -44,6 +44,4 @@ public class ExtraInstanceConfig {
   public void setTlsPort(String tlsPort) {
     _proxy.getRecord().setSimpleField(PinotInstanceConfigProperty.PINOT_TLS_PORT.toString(), tlsPort);
   }
-
-
 }

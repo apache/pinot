@@ -151,7 +151,8 @@ public class ExternalViewReaderTest {
     configureData(_instanceConfigPlain, true);
     // Run the test
     final Map<String, List<String>> result = _externalViewReaderUnderTest.getTableToBrokersMap();
-    final Map<String, List<String>> expectedResult = ImmutableMap.of("field1", Arrays.asList("first.pug-pinot-broker-headless:8099"));
+    final Map<String, List<String>> expectedResult = ImmutableMap.of("field1",
+        Arrays.asList("first.pug-pinot-broker-headless:8099"));
     // Verify the results
     assertEquals(expectedResult, result);
   }
@@ -175,7 +176,8 @@ public class ExternalViewReaderTest {
   public void testGetBrokersMapByInstanceConfigTlsDefault() {
     configureData(_instanceConfigTls, false);
     final Map<String, List<String>> result = _externalViewReaderUnderTest.getTableToBrokersMap();
-    final Map<String, List<String>> expectedResult = ImmutableMap.of("field1", Arrays.asList("first.pug-pinot-broker-headless:8099"));
+    final Map<String, List<String>> expectedResult = ImmutableMap.of("field1",
+        Arrays.asList("first.pug-pinot-broker-headless:8099"));
     // Verify the results
     assertEquals(expectedResult, result);
   }
@@ -191,7 +193,8 @@ public class ExternalViewReaderTest {
     configureData(_instanceConfigPlain, false);
     // Run the test
     final Map<String, List<String>> result = _externalViewReaderUnderTest.getTableToBrokersMap();
-    final Map<String, List<String>> expectedResult = ImmutableMap.of("field1", Arrays.asList("first.pug-pinot-broker-headless:8099"));
+    final Map<String, List<String>> expectedResult = ImmutableMap.of("field1",
+        Arrays.asList("first.pug-pinot-broker-headless:8099"));
     // Verify the results
     assertEquals(expectedResult, result);
   }
@@ -207,7 +210,8 @@ public class ExternalViewReaderTest {
   public void testGetBrokersMapByInstanceConfigTls() {
     configureData(_instanceConfigTls, true);
     final Map<String, List<String>> result = _externalViewReaderUnderTest.getTableToBrokersMap();
-    final Map<String, List<String>> expectedResult = ImmutableMap.of("field1", Arrays.asList("first.pug-pinot-broker-headless:8090"));
+    final Map<String, List<String>> expectedResult = ImmutableMap.of("field1",
+        Arrays.asList("first.pug-pinot-broker-headless:8090"));
     // Verify the results
     assertEquals(expectedResult, result);
   }
