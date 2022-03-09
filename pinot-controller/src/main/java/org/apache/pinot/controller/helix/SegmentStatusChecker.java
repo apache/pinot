@@ -178,21 +178,17 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         // No online segments in ideal state
         continue;
       }
+      SegmentZKMetadata segmentZKMetadata =
+          _pinotHelixResourceManager.getSegmentZKMetadata(tableNameWithType, partitionName);
+      if (segmentZKMetadata != null
+          && segmentZKMetadata.getPushTime() > System.currentTimeMillis() - _waitForPushTimeSeconds * 1000) {
+        // Push is not finished yet, skip the segment
+        continue;
+      }
       nReplicasIdealMax = (idealState.getInstanceStateMap(partitionName).size() > nReplicasIdealMax) ? idealState
           .getInstanceStateMap(partitionName).size() : nReplicasIdealMax;
       if ((externalView == null) || (externalView.getStateMap(partitionName) == null)) {
         // No replicas for this segment
-        TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-        if ((tableType != null) && (tableType.equals(TableType.OFFLINE))) {
-          SegmentZKMetadata segmentZKMetadata =
-              _pinotHelixResourceManager.getSegmentZKMetadata(tableNameWithType, partitionName);
-
-          if (segmentZKMetadata != null
-              && segmentZKMetadata.getPushTime() > System.currentTimeMillis() - _waitForPushTimeSeconds * 1000) {
-            // push not yet finished, skip
-            continue;
-          }
-        }
         nOffline++;
         if (nOffline < MAX_OFFLINE_SEGMENTS_TO_LOG) {
           LOGGER.warn("Segment {} of table {} has no replicas", partitionName, tableNameWithType);
