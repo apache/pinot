@@ -20,10 +20,9 @@ package org.apache.pinot.common.utils;
 
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.ZNRecordSerializer;
-import org.apache.helix.manager.zk.client.HelixZkClient;
-import org.apache.helix.manager.zk.client.SharedZkClientFactory;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
+import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.slf4j.Logger;
@@ -48,10 +47,9 @@ public class ServiceStartableUtils {
    */
   public static void applyClusterConfig(PinotConfiguration instanceConfig, String zkAddress, String clusterName,
       ServiceRole serviceRole) {
-    HelixZkClient.ZkClientConfig zkClientConfig = new HelixZkClient.ZkClientConfig();
-    zkClientConfig.setZkSerializer(new ZNRecordSerializer()).setConnectInitTimeout(ZK_TIMEOUT_MS);
-    HelixZkClient zkClient = SharedZkClientFactory.getInstance()
-        .buildZkClient(new HelixZkClient.ZkConnectionConfig(zkAddress), zkClientConfig);
+
+    ZkClient zkClient = new ZkClient.Builder().setZkSerializer(new ZNRecordSerializer()).setZkServer(zkAddress)
+        .setConnectionTimeout(ZK_TIMEOUT_MS).build();
     zkClient.waitUntilConnected(ZK_TIMEOUT_MS, TimeUnit.MILLISECONDS);
 
     try {

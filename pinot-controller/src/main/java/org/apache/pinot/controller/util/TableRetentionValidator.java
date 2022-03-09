@@ -23,12 +23,11 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.helix.PropertyPathConfig;
-import org.apache.helix.PropertyType;
-import org.apache.helix.ZNRecord;
+import org.apache.helix.PropertyPathBuilder;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
-import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
@@ -77,8 +76,8 @@ public class TableRetentionValidator {
   public TableRetentionValidator(@Nonnull String zkAddress, @Nonnull String clusterName) {
     _clusterName = clusterName;
     _helixAdmin = new ZKHelixAdmin(zkAddress);
-    _propertyStore = new ZkHelixPropertyStore<>(zkAddress, new ZNRecordSerializer(),
-        PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, clusterName));
+    _propertyStore =
+        new ZkHelixPropertyStore<>(zkAddress, new ZNRecordSerializer(), PropertyPathBuilder.propertyStore(clusterName));
   }
 
   public void overrideDefaultSettings(@Nullable String tableNamePattern, long durationInDaysThreshold) {

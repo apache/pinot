@@ -32,19 +32,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import org.I0Itec.zkclient.ZkClient;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyPathBuilder;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.controller.rebalancer.strategy.CrushEdRebalanceStrategy;
 import org.apache.helix.controller.stages.ClusterDataCache;
-import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.MasterSlaveSMD;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
+import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.lineage.LineageEntryState;
@@ -1169,6 +1169,13 @@ public class PinotHelixResourceManagerTest {
   @Test
   public void testGetTableToLiveBrokersMapping()
       throws IOException {
+    // Wait for the preceding test to fully clean up.
+    TestUtils.waitForCondition(aVoid -> {
+      Map<String, List<InstanceInfo>> tableToBrokersMapping1 =
+          TEST_INSTANCE.getHelixResourceManager().getTableToLiveBrokersMapping();
+      return tableToBrokersMapping1.size() == 0;
+    }, TIMEOUT_IN_MS, "Timeout while waiting for the preceding test to fully clean up.");
+
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 2, 0, 0);
     PinotResourceManagerResponse response =
         TEST_INSTANCE.getHelixResourceManager().createBrokerTenant(brokerTenant);
@@ -1179,6 +1186,7 @@ public class PinotHelixResourceManagerTest {
         .setServerTenant(SERVER_TENANT_NAME).build();
     TEST_INSTANCE.getHelixResourceManager().addTable(tableConfig);
     // Introduce a wait here for the EV is updated with live brokers for a table.
+    int expectedOnlineBrokerCnt = 2;
     TestUtils.waitForCondition(aVoid -> {
       ExternalView externalView = TEST_INSTANCE.getHelixResourceManager().getHelixAdmin()
           .getResourceExternalView(TEST_INSTANCE.getHelixClusterName(),
@@ -1193,8 +1201,8 @@ public class PinotHelixResourceManagerTest {
           onlineBrokersCnt++;
         }
       }
-      return onlineBrokersCnt == 2;
-    }, TIMEOUT_IN_MS, "");
+      return onlineBrokersCnt == expectedOnlineBrokerCnt;
+    }, TIMEOUT_IN_MS, "Timeout while waiting for the number of online brokers to be: " + expectedOnlineBrokerCnt);
 
     Map<String, List<InstanceInfo>> tableToBrokersMapping =
         TEST_INSTANCE.getHelixResourceManager().getTableToLiveBrokersMapping();

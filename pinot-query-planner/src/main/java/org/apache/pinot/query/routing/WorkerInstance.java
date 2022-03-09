@@ -19,8 +19,8 @@
 package org.apache.pinot.query.routing;
 
 import java.util.Map;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.utils.CommonConstants;
 

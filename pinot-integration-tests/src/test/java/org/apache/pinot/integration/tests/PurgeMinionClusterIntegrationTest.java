@@ -215,8 +215,9 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     // 115545 Totals Rows
     // Expecting 87488 to the final time
     String sqlQuery = "SELECT count(*) FROM " + PURGE_FIRST_RUN_TABLE;
-    JsonNode expectedJson = postQuery(sqlQuery, _brokerBaseApiUrl);
-    assertTrue(expectedJson.toString().contains("\"rows\":[[87488]]"));
+    JsonNode actualJson = postQuery(sqlQuery, _brokerBaseApiUrl);
+    assertTrue(actualJson.toString().contains("\"rows\":[[87488]]"),
+        "Expected results to contain: \"rows\":[[87488]] but found: " + actualJson);
 
     // Drop the table
     dropOfflineTable(PURGE_FIRST_RUN_TABLE);
@@ -263,9 +264,10 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     // 115545 Totals Rows
     // Expecting 87488 to the final time
     String sqlQuery = "SELECT count(*) FROM " + PURGE_DELTA_PASSED_TABLE;
-    JsonNode expectedJson = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode actualJson = postQuery(sqlQuery, _brokerBaseApiUrl);
 
-    assertTrue(expectedJson.toString().contains("\"rows\":[[87488]]"));
+    assertTrue(actualJson.toString().contains("\"rows\":[[87488]]"),
+        "Expected results to contain: \"rows\":[[87488]] but found: " + actualJson);
 
     // Drop the table
     dropOfflineTable(PURGE_DELTA_PASSED_TABLE);
@@ -305,9 +307,10 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     // 115545 Totals Rows
     // Expecting 87488 to the final time
     String sqlQuery = "SELECT count(*) FROM " + PURGE_DELTA_NOT_PASSED_TABLE;
-    JsonNode expectedJson = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode actualJson = postQuery(sqlQuery, _brokerBaseApiUrl);
 
-    assertTrue(expectedJson.toString().contains("\"rows\":[[115545]]"));
+    assertTrue(actualJson.toString().contains("\"rows\":[[115545]]"),
+        "Expected results to contain: \"rows\":[[115545]] but found: " + actualJson);
 
     // Drop the table
     dropOfflineTable(PURGE_DELTA_NOT_PASSED_TABLE);

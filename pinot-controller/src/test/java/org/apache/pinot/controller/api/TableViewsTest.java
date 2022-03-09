@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api;
 
+import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Map;
@@ -77,7 +78,13 @@ public class TableViewsTest {
     long endTime = System.currentTimeMillis() + 10_000L;
     while (System.currentTimeMillis() < endTime) {
       Thread.sleep(100L);
-      TableViews.TableView tableView = getTableView(OFFLINE_TABLE_NAME, TableViews.EXTERNALVIEW, null);
+      TableViews.TableView tableView;
+      try {
+        tableView = getTableView(OFFLINE_TABLE_NAME, TableViews.EXTERNALVIEW, null);
+      } catch (IOException e) {
+        // Table may not be created yet.
+        continue;
+      }
       if ((tableView._offline == null) || (tableView._offline.size() != 1)) {
         continue;
       }
