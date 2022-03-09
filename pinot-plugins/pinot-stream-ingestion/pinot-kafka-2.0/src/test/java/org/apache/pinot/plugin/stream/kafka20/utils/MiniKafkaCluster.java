@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.Collections;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -31,7 +32,9 @@ import kafka.server.KafkaServer;
 import org.apache.commons.io.FileUtils;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.admin.RecordsToDelete;
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.utils.Time;
 import scala.Option;
 
@@ -111,5 +114,10 @@ public final class MiniKafkaCluster implements Closeable {
   public void deleteTopic(String topicName)
       throws ExecutionException, InterruptedException {
     _adminClient.deleteTopics(Collections.singletonList(topicName)).all().get();
+  }
+
+  public void deleteRecordsBeforeOffset(String topicName, int partitionId, long offset) {
+    _adminClient.deleteRecords(
+        Map.of(new TopicPartition(topicName, partitionId), RecordsToDelete.beforeOffset(offset)));
   }
 }
