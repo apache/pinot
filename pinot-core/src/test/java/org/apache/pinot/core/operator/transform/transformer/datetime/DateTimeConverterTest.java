@@ -218,7 +218,7 @@ public class DateTimeConverterTest {
           1523560598000L /* 20180412T19:16:38 */, 1524160502000L /* 20180419T17:55:02 */, 1522230205000L
           /* 20180328T09:43:25 */
       };
-      String[] expected = {"2018-04-10 00:00:00.000", "2018-04-15 00:00:00.000", "2018-03-25 00:00:00.000"};
+      String[] expected = {"2018-04-11 00:00:00.000", "2018-04-16 00:00:00.000", "2018-03-26 00:00:00.000"};
       entries.add(new Object[]{
           "1:MILLISECONDS:EPOCH", "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)",
           "5:DAYS", input, expected
@@ -356,7 +356,7 @@ public class DateTimeConverterTest {
       // Test conversion from simple date format to another simple date format (America/Denver timezone with 5 day
       // granualrity)
       String[] input = {"20180412T19:16:38", "20180419T17:55:02", "20180328T09:43:25"};
-      String[] expected = {"2018-04-10 00:00:00.000", "2018-04-15 00:00:00.000", "2018-03-25 00:00:00.000"};
+      String[] expected = {"2018-04-11 00:00:00.000", "2018-04-16 00:00:00.000", "2018-03-26 00:00:00.000"};
       entries.add(new Object[]{
           "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd'T'HH:mm:ss",
           "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "5:DAYS", input, expected
