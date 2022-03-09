@@ -27,6 +27,8 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.TlsUtils;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.data.manager.realtime.Server2ControllerSegmentUploader;
 import org.apache.pinot.core.util.SegmentCompletionProtocolUtils;
 import org.apache.pinot.pql.parsers.utils.Pair;
@@ -76,7 +78,8 @@ public class ServerSegmentCompletionProtocolHandler {
   }
 
   public ServerSegmentCompletionProtocolHandler(ServerMetrics serverMetrics, String tableNameWithType) {
-    _fileUploadDownloadClient = new FileUploadDownloadClient(_sslContext);
+    TlsUtils.setSslContext(_sslContext);
+    _fileUploadDownloadClient = new FileUploadDownloadClient();
     _serverMetrics = serverMetrics;
     _rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
   }
@@ -211,7 +214,7 @@ public class ServerSegmentCompletionProtocolHandler {
     SegmentCompletionProtocol.Response response;
     try {
       String responseStr = _fileUploadDownloadClient
-          .sendSegmentCompletionProtocolRequest(new URI(url), FileUploadDownloadClient.makeAuthHeader(_authToken), null,
+          .sendSegmentCompletionProtocolRequest(new URI(url), HttpClient.makeAuthHeader(_authToken), null,
               DEFAULT_OTHER_REQUESTS_TIMEOUT).getResponse();
       response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       LOGGER.info("Controller response {} for {}", response.toJsonString(), url);
@@ -236,7 +239,7 @@ public class ServerSegmentCompletionProtocolHandler {
     SegmentCompletionProtocol.Response response;
     try {
       String responseStr = _fileUploadDownloadClient
-          .uploadSegmentMetadataFiles(new URI(url), metadataFiles, FileUploadDownloadClient.makeAuthHeader(_authToken),
+          .uploadSegmentMetadataFiles(new URI(url), metadataFiles, HttpClient.makeAuthHeader(_authToken),
               null, _segmentUploadRequestTimeoutMs).getResponse();
       response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       LOGGER.info("Controller response {} for {}", response.toJsonString(), url);

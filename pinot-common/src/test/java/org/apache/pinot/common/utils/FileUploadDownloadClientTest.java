@@ -36,6 +36,7 @@ import org.apache.http.HttpStatus;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicHeader;
 import org.apache.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
@@ -107,7 +108,7 @@ public class FileUploadDownloadClientTest {
 
       SimpleHttpResponse response = fileUploadDownloadClient
           .sendSegmentUri(FileUploadDownloadClient.getUploadSegmentHttpURI(TEST_HOST, TEST_PORT), TEST_URI, headers,
-              params, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+              params, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
       Assert.assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
       Assert.assertEquals(response.getResponse(), "OK");
     }

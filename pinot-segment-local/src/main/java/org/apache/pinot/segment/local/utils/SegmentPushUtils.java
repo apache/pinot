@@ -41,6 +41,7 @@ import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -124,7 +125,7 @@ public class SegmentPushUtils implements Serializable {
           try (InputStream inputStream = fileSystem.open(tarFileURI)) {
             SimpleHttpResponse response =
                 FILE_UPLOAD_DOWNLOAD_CLIENT.uploadSegment(FileUploadDownloadClient.getUploadSegmentURI(controllerURI),
-                    segmentName, inputStream, FileUploadDownloadClient.makeAuthHeader(spec.getAuthToken()),
+                    segmentName, inputStream, HttpClient.makeAuthHeader(spec.getAuthToken()),
                     FileUploadDownloadClient.makeTableParam(tableName), tableName, tableType);
             LOGGER.info("Response for pushing table {} segment {} to location {} - {}: {}", tableName, segmentName,
                 controllerURI, response.getStatusCode(), response.getResponse());
@@ -181,9 +182,9 @@ public class SegmentPushUtils implements Serializable {
           try {
             SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT
                 .sendSegmentUri(FileUploadDownloadClient.getUploadSegmentURI(controllerURI), segmentUri,
-                    FileUploadDownloadClient.makeAuthHeader(spec.getAuthToken()),
+                    HttpClient.makeAuthHeader(spec.getAuthToken()),
                     FileUploadDownloadClient.makeTableParam(tableName),
-                    FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+                    HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
             LOGGER.info("Response for pushing table {} segment uri {} to location {} - {}: {}", tableName, segmentUri,
                 controllerURI, response.getStatusCode(), response.getResponse());
             return true;
@@ -259,12 +260,12 @@ public class SegmentPushUtils implements Serializable {
               headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, segmentUriPath));
               headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
                   FileUploadDownloadClient.FileUploadType.METADATA.toString()));
-              headers.addAll(FileUploadDownloadClient.makeAuthHeader(spec.getAuthToken()));
+              headers.addAll(HttpClient.makeAuthHeader(spec.getAuthToken()));
 
               SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT
                   .uploadSegmentMetadata(FileUploadDownloadClient.getUploadSegmentURI(controllerURI), segmentName,
                       segmentMetadataFile, headers, FileUploadDownloadClient.makeTableParam(tableName),
-                      FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+                      HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
               LOGGER.info("Response for pushing table {} segment {} to location {} - {}: {}", tableName, segmentName,
                   controllerURI, response.getStatusCode(), response.getResponse());
               return true;
