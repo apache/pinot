@@ -42,7 +42,7 @@
     <javax.servlet-api.version>3.1.0</javax.servlet-api.version>
     <javax.ws.rs-api.version>2.1</javax.ws.rs-api.version>
     <jersey-container-grizzly2-http.version>2.28</jersey-container-grizzly2-http.version>
-    <netty-io.version>4.1.74.Final</netty-io.version>
+    <netty-io.version>4.1.60.Final</netty-io.version>
     <simpleclient_common.version>0.8.1</simpleclient_common.version>
     <grpc-proto.version>1.12.0</grpc-proto.version>
     <grpc-context.version>1.14.0</grpc-context.version>
@@ -76,7 +76,11 @@
       <exclusions>
         <exclusion>
           <groupId>io.netty</groupId>
-          <artifactId>*</artifactId>
+          <artifactId>netty-transport-native-unix-common</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty-resolver</artifactId>
         </exclusion>
         <exclusion>
           <groupId>javax.ws.rs</groupId>
@@ -117,7 +121,7 @@
         </exclusion>
         <exclusion>
           <groupId>io.netty</groupId>
-          <artifactId>*</artifactId>
+          <artifactId>netty-resolver</artifactId>
         </exclusion>
         <exclusion>
           <groupId>javax.ws.rs</groupId>
@@ -134,6 +138,10 @@
         <exclusion>
           <groupId>io.grpc</groupId>
           <artifactId>grpc-context</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty-tcnative-boringssl-static</artifactId>
         </exclusion>
         <exclusion>
           <groupId>commons-codec</groupId>
@@ -208,6 +216,14 @@
           <artifactId>javax.servlet-api</artifactId>
         </exclusion>
         <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty-codec-socks</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty-transport-native-unix-common</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>jakarta.ws.rs</groupId>
           <artifactId>jakarta.ws.rs-api</artifactId>
         </exclusion>
@@ -253,36 +269,6 @@
     <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-resolver</artifactId>
-      <version>${netty-io.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-resolver-dns</artifactId>
-      <version>${netty-io.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-codec-socks</artifactId>
-      <version>${netty-io.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-codec-http</artifactId>
-      <version>${netty-io.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-transport-native-unix-common</artifactId>
-      <version>${netty-io.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-transport-native-epoll</artifactId>
-      <version>${netty-io.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-handler-proxy</artifactId>
       <version>${netty-io.version}</version>
     </dependency>
     <dependency>
@@ -374,6 +360,16 @@
       <groupId>com.github.ben-manes.caffeine</groupId>
       <artifactId>caffeine</artifactId>
       <version>${caffeine.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-codec-socks</artifactId>
+      <version>${netty-io.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-transport-native-unix-common</artifactId>
+      <version>${netty-io.version}</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
