@@ -65,7 +65,6 @@ public class TableConfigBuilder {
   private String _numReplicas = DEFAULT_NUM_REPLICAS;
   private String _timeColumnName;
   private String _timeType;
-  private boolean _allowNullTimeValue;
   private String _retentionTimeUnit;
   private String _retentionTimeValue;
   private String _deletedSegmentsRetentionPeriod = DEFAULT_DELETED_SEGMENTS_RETENTION_PERIOD;
@@ -152,11 +151,6 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setTimeType(String timeType) {
     _timeType = timeType;
-    return this;
-  }
-
-  public TableConfigBuilder setAllowNullTimeValue(boolean allowNullTimeValue) {
-    _allowNullTimeValue = allowNullTimeValue;
     return this;
   }
 
@@ -372,7 +366,6 @@ public class TableConfigBuilder {
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
     validationConfig.setTimeColumnName(_timeColumnName);
     validationConfig.setTimeType(_timeType);
-    validationConfig.setAllowNullTimeValue(_allowNullTimeValue);
     validationConfig.setRetentionTimeUnit(_retentionTimeUnit);
     validationConfig.setRetentionTimeValue(_retentionTimeValue);
     validationConfig.setDeletedSegmentsRetentionPeriod(_deletedSegmentsRetentionPeriod);
