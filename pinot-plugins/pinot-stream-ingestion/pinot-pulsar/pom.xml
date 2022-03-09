@@ -267,11 +267,6 @@
       <version>${jersey-container-grizzly2-http.version}</version>
     </dependency>
     <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-resolver</artifactId>
-      <version>${netty-io.version}</version>
-    </dependency>
-    <dependency>
       <groupId>io.prometheus</groupId>
       <artifactId>simpleclient_common</artifactId>
       <version>${simpleclient_common.version}</version>
@@ -285,11 +280,6 @@
       <groupId>io.grpc</groupId>
       <artifactId>grpc-context</artifactId>
       <version>${grpc-context.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-tcnative-boringssl-static</artifactId>
-      <version>${netty-tcnative.version}</version>
     </dependency>
     <dependency>
       <groupId>commons-codec</groupId>
