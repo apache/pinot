@@ -117,6 +117,10 @@ public class PinotTestBase extends BaseClusterIntegrationTest {
     super.addTableConfig(tableConfig);
   }
 
+  public TableConfig getOfflineTableConfig(String tableName) {
+    return super.getOfflineTableConfig(tableName);
+  }
+
   public ControllerRequestURLBuilder getControllerRequestURLBuilder() {
     return _controllerRequestURLBuilder;
   }

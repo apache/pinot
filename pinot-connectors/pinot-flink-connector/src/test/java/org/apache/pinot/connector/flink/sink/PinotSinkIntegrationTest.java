@@ -67,6 +67,14 @@ public class PinotSinkIntegrationTest {
 
     TableConfig tableConfig = _testBase.createOfflineTableConfig();
     _testBase.addTableConfig(tableConfig);
+    org.apache.pinot.util.TestUtils.waitForCondition(aVoid -> {
+      try {
+        return _testBase.getOfflineTableConfig(tableConfig.getTableName()) != null;
+      } catch (AssertionError e) {
+        // Swallow exceptions
+      }
+      return false;
+    }, 30_000L, "Failed to create table with configs - " + tableConfig);
     srcDs.addSink(new PinotSinkFunction<>(new FlinkRowGenericRowConverter(_testBase.TEST_TYPE_INFO), tableConfig,
         _testBase.SCHEMA));
     execEnv.execute();
@@ -85,6 +93,14 @@ public class PinotSinkIntegrationTest {
 
     TableConfig tableConfig = _testBase.createOfflineTableConfig();
     _testBase.addTableConfig(tableConfig);
+    org.apache.pinot.util.TestUtils.waitForCondition(aVoid -> {
+      try {
+        return _testBase.getOfflineTableConfig(tableConfig.getTableName()) != null;
+      } catch (AssertionError e) {
+        // Swallow exceptions
+      }
+      return false;
+    }, 30_000L, "Failed to create table with configs - " + tableConfig);
     srcDs.addSink(new PinotSinkFunction<>(new FlinkRowGenericRowConverter(_testBase.TEST_TYPE_INFO), tableConfig,
         _testBase.SCHEMA));
     execEnv.execute();
