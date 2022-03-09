@@ -51,6 +51,10 @@
           <groupId>io.netty</groupId>
           <artifactId>netty-transport-native-unix-common</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty-transport-native-kqueue</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
