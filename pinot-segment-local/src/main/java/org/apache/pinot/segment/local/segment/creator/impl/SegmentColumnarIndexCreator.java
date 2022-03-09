@@ -182,10 +182,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           .withMinValue((Comparable<?>) columnIndexCreationInfo.getMin())
           .withMaxValue((Comparable<?>) columnIndexCreationInfo.getMax())
           .withTotalNumberOfEntries(columnIndexCreationInfo.getTotalNumberOfEntries())
-          .withColumnIndexCreationInfo(columnIndexCreationInfo)
-          .sorted(columnIndexCreationInfo.isSorted())
-          .onHeap(segmentCreationSpec.isOnHeap())
-          .build();
+          .withColumnIndexCreationInfo(columnIndexCreationInfo).sorted(columnIndexCreationInfo.isSorted())
+          .onHeap(segmentCreationSpec.isOnHeap()).build();
       // Initialize forward index creator
       ChunkCompressionType chunkCompressionType =
           dictEnabledColumn ? null : getColumnCompressionType(segmentCreationSpec, fieldSpec);
@@ -216,7 +214,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
 
       if (textIndexColumns.contains(columnName)) {
-        _textIndexCreatorMap.put(columnName, _indexCreatorProvider.newTextIndexCreator(context.forTextIndex(true)));
+        _textIndexCreatorMap.put(columnName,
+            _indexCreatorProvider.newTextIndexCreator(context.forTextIndex(_config.getFSTIndexType(), true)));
       }
 
       if (fstIndexColumns.contains(columnName)) {

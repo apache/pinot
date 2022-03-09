@@ -44,6 +44,7 @@ public class FieldConfig extends BaseJsonConfig {
   public static final String TEXT_INDEX_NO_RAW_DATA = "noRawDataForTextIndex";
   public static final String TEXT_INDEX_RAW_VALUE = "rawValueForTextIndex";
   public static final String TEXT_INDEX_DEFAULT_RAW_VALUE = "n";
+  public static final String TEXT_INDEX_USE_NATIVE_INDEX = "useNativeIndex";
 
   private final String _name;
   private final EncodingType _encodingType;
