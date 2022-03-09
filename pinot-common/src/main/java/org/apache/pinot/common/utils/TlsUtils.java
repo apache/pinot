@@ -42,6 +42,7 @@ import org.apache.commons.httpclient.params.HttpConnectionParams;
 import org.apache.commons.httpclient.protocol.Protocol;
 import org.apache.commons.httpclient.protocol.ProtocolSocketFactory;
 import org.apache.commons.lang.StringUtils;
+import org.apache.http.ssl.SSLContexts;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -59,6 +60,8 @@ public final class TlsUtils {
   private static final String TRUSTSTORE_PATH = "truststore.path";
   private static final String TRUSTSTORE_PASSWORD = "truststore.password";
   private static final String SSL_PROVIDER = "ssl.provider";
+
+  private static SSLContext _defaultSSLContext = null;
 
   private TlsUtils() {
     // left blank
@@ -232,8 +235,7 @@ public final class TlsUtils {
       Protocol.registerProtocol("https",
           new Protocol(CommonConstants.HTTPS_PROTOCOL, new PinotProtocolSocketFactory(sc.getSocketFactory()), 443));
 
-      // FileUploadDownloadClient
-      FileUploadDownloadClient.installDefaultSSLContext(sc);
+      _defaultSSLContext = sc;
     } catch (GeneralSecurityException e) {
       throw new IllegalStateException("Could not initialize SSL support", e);
     }
@@ -253,6 +255,10 @@ public final class TlsUtils {
       return new URL("file://./" + storePath);
     }
     return inputUri.toURL();
+  }
+
+  public static SSLContext getDefaultSSLContext() {
+    return _defaultSSLContext != null ? _defaultSSLContext : SSLContexts.createDefault();
   }
 
   /**

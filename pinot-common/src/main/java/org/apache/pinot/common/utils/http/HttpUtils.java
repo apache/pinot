@@ -26,10 +26,12 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLConnection;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Map;
+import javax.net.ssl.HttpsURLConnection;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.PutMethod;
@@ -37,7 +39,7 @@ import org.apache.commons.httpclient.methods.multipart.MultipartRequestEntity;
 import org.apache.commons.httpclient.methods.multipart.Part;
 import org.apache.commons.httpclient.methods.multipart.StringPart;
 import org.apache.commons.io.IOUtils;
-
+import org.apache.pinot.common.utils.TlsUtils;
 
 public class HttpUtils {
   private HttpUtils() {
@@ -46,12 +48,12 @@ public class HttpUtils {
 
   public static String sendGetRequest(String urlString)
       throws IOException {
-    return constructResponse(new URL(urlString).openStream());
+    return constructResponse(open(urlString).getInputStream());
   }
 
   public static String sendGetRequestRaw(String urlString)
       throws IOException {
-    return IOUtils.toString(new URL(urlString).openStream(), Charset.defaultCharset());
+    return IOUtils.toString(open(urlString).getInputStream(), Charset.defaultCharset());
   }
 
   public static String sendPostRequest(String urlString, String payload)
@@ -61,7 +63,7 @@ public class HttpUtils {
 
   public static String sendPostRequest(String urlString, String payload, Map<String, String> headers)
       throws IOException {
-    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
+    HttpURLConnection httpConnection = open(urlString);
     httpConnection.setRequestMethod("POST");
     if (headers != null) {
       for (String key : headers.keySet()) {
@@ -83,7 +85,7 @@ public class HttpUtils {
 
   public static String sendPutRequest(String urlString, String payload)
       throws IOException {
-    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
+    HttpURLConnection httpConnection = open(urlString);
     httpConnection.setDoOutput(true);
     httpConnection.setRequestMethod("PUT");
 
@@ -98,7 +100,7 @@ public class HttpUtils {
 
   public static String sendPutRequest(String urlString, Map<String, String> headers, String payload)
       throws IOException {
-    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
+    HttpURLConnection httpConnection = open(urlString);
     httpConnection.setDoOutput(true);
     httpConnection.setRequestMethod("PUT");
     if (headers != null) {
@@ -118,7 +120,7 @@ public class HttpUtils {
 
   public static String sendPutRequest(String urlString)
       throws IOException {
-    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
+    HttpURLConnection httpConnection = open(urlString);
     httpConnection.setDoOutput(true);
     httpConnection.setRequestMethod("PUT");
     return constructResponse(httpConnection.getInputStream());
@@ -126,11 +128,25 @@ public class HttpUtils {
 
   public static String sendDeleteRequest(String urlString)
       throws IOException {
-    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
+    HttpURLConnection httpConnection = open(urlString);
     httpConnection.setRequestMethod("DELETE");
     httpConnection.connect();
 
     return constructResponse(httpConnection.getInputStream());
+  }
+
+  private static HttpURLConnection open(String urlString)
+      throws IOException {
+    URLConnection urlConnection = new URL(urlString).openConnection();
+    if (urlConnection instanceof HttpsURLConnection) {
+      HttpsURLConnection httpsConnection = (HttpsURLConnection) urlConnection;
+      httpsConnection.setSSLSocketFactory(TlsUtils.getDefaultSSLContext().getSocketFactory());
+      return httpsConnection;
+    } else if (urlConnection instanceof HttpURLConnection) {
+      return (HttpURLConnection) urlConnection;
+    } else {
+      throw new IllegalArgumentException("urlString must use HTTP/HTTPS protocol");
+    }
   }
 
   private static String constructResponse(InputStream inputStream)

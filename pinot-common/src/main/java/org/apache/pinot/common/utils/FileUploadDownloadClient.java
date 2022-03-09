@@ -63,7 +63,6 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
-import org.apache.http.ssl.SSLContexts;
 import org.apache.http.util.EntityUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
@@ -83,11 +82,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 @SuppressWarnings("unused")
 public class FileUploadDownloadClient implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(FileUploadDownloadClient.class);
-
-  /**
-   * optional default SSL context for FileUploadDownloadClient operations
-   */
-  public static SSLContext _defaultSSLContext;
 
   public static class CustomHeaders {
     public static final String UPLOAD_TYPE = "UPLOAD_TYPE";
@@ -139,7 +133,7 @@ public class FileUploadDownloadClient implements Closeable {
    * Construct the client with default settings.
    */
   public FileUploadDownloadClient() {
-    this(_defaultSSLContext);
+    this(null);
   }
 
   /**
@@ -149,7 +143,7 @@ public class FileUploadDownloadClient implements Closeable {
    */
   public FileUploadDownloadClient(@Nullable SSLContext sslContext) {
     if (sslContext == null) {
-      sslContext = _defaultSSLContext != null ? _defaultSSLContext : SSLContexts.createDefault();
+      sslContext = TlsUtils.getDefaultSSLContext();
     }
     // Set NoopHostnameVerifier to skip validating hostname when uploading/downloading segments.
     SSLConnectionSocketFactory csf = new SSLConnectionSocketFactory(sslContext, NoopHostnameVerifier.INSTANCE);
@@ -1221,15 +1215,6 @@ public class FileUploadDownloadClient implements Closeable {
   public void close()
       throws IOException {
     _httpClient.close();
-  }
-
-  /**
-   * Install a default SSLContext for all FileUploadDownloadClients instantiated.
-   *
-   * @param sslContext default ssl context
-   */
-  public static void installDefaultSSLContext(SSLContext sslContext) {
-    _defaultSSLContext = sslContext;
   }
 
   /**
