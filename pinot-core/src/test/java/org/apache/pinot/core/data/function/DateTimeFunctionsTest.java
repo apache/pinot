@@ -456,9 +456,12 @@ public class DateTimeFunctionsTest {
         "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "12:HOURS",
         "2018-04-11 00:00:00.000");
     // Test conversion from millis since epoch to simple date format (America/Denver timezone with 5 day granularity)
+    testDateTimeConvert(1519926205000L/* 20180301T09:43:25 */, "1:MILLISECONDS:EPOCH",
+        "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "5:DAYS",
+        "2018-03-01 00:00:00.000");
     testDateTimeConvert(1522230205000L/* 20180328T09:43:25 */, "1:MILLISECONDS:EPOCH",
         "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "5:DAYS",
-        "2018-03-25 00:00:00.000");
+        "2018-03-26 00:00:00.000");
     // Test conversion from millis since epoch to simple date format (America/Los_Angeles timezone with 1 day
     // granularity)
     testDateTimeConvert(1524013200000L/* 20180418T01:00:00 */, "1:MILLISECONDS:EPOCH",
@@ -507,7 +510,7 @@ public class DateTimeFunctionsTest {
     // granularity)
     testDateTimeConvert("20180328T09:43:25", "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd''T''HH:mm:ss",
         "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss" + ".SSS tz(America/Denver)", "5:DAYS",
-        "2018-03-25 00:00:00.000");
+        "2018-03-26 00:00:00.000");
     // Test conversion from simple date format to another simple date format (America/Los_Angeles timezone with 1 day
     // granularity)
     testDateTimeConvert("20180418T01:00:00", "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd''T''HH:mm:ss",

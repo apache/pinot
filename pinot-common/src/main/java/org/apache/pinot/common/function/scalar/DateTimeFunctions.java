@@ -703,7 +703,8 @@ public class DateTimeFunctions {
           dateTime = dateTime.withHourOfDay((dateTime.getHourOfDay() / size) * size).hourOfDay().roundFloorCopy();
           break;
         case DAYS:
-          dateTime = dateTime.withDayOfMonth((dateTime.getDayOfMonth() / size) * size).dayOfMonth().roundFloorCopy();
+          dateTime = dateTime.withDayOfMonth(((dateTime.getDayOfMonth() - 1) / size) * size + 1).dayOfMonth()
+              .roundFloorCopy();
           break;
         default:
           break;
