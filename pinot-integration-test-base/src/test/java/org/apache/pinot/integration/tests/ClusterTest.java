@@ -51,6 +51,7 @@ import org.apache.http.message.BasicNameValuePair;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.minion.MinionStarter;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
@@ -485,7 +486,7 @@ public abstract class ClusterTest extends ControllerTest {
     List<NameValuePair> parameters = Arrays.asList(tableNameValuePair);
     return fileUploadDownloadClient
         .uploadSegmentMetadata(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, headers, parameters,
-            fileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS).getStatusCode();
+            HttpClient.DEFAULT_SOCKET_TIMEOUT_MS).getStatusCode();
   }
 
   public static class AvroFileSchemaKafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {

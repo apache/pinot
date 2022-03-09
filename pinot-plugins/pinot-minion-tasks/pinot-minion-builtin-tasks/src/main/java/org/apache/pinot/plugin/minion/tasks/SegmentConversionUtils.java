@@ -35,6 +35,8 @@ import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.RoundRobinURIProvider;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.TlsUtils;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.spi.config.table.TableType;
@@ -83,7 +85,8 @@ public class SegmentConversionUtils {
 
     // Upload the segment with retry policy
     SSLContext sslContext = MinionContext.getInstance().getSSLContext();
-    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
+    TlsUtils.setSslContext(sslContext);
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       retryPolicy.attempt(() -> {
         URI uri = uriProvider.next();
         String hostName = new URI(uploadURL).getHost();
@@ -97,7 +100,7 @@ public class SegmentConversionUtils {
         try {
           SimpleHttpResponse response = fileUploadDownloadClient
               .uploadSegment(uri, segmentName, fileToUpload, httpHeaders, parameters,
-                  FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+                  HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
           LOGGER.info("Got response {}: {} while uploading table: {}, segment: {} with uploadURL: {}",
               response.getStatusCode(), response.getResponse(), tableNameWithType, segmentName, uploadURL);
           return true;
@@ -134,7 +137,8 @@ public class SegmentConversionUtils {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     SSLContext sslContext = MinionContext.getInstance().getSSLContext();
-    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
+    TlsUtils.setSslContext(sslContext);
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       URI uri = FileUploadDownloadClient
           .getStartReplaceSegmentsURI(new URI(uploadURL), rawTableName, tableType.name(), forceCleanup);
       SimpleHttpResponse response =
@@ -153,7 +157,8 @@ public class SegmentConversionUtils {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     SSLContext sslContext = MinionContext.getInstance().getSSLContext();
-    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
+    TlsUtils.setSslContext(sslContext);
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       URI uri = FileUploadDownloadClient
           .getEndReplaceSegmentsURI(new URI(uploadURL), rawTableName, tableType.name(), segmentLineageEntryId);
       SimpleHttpResponse response = fileUploadDownloadClient.endReplaceSegments(uri, socketTimeoutMs, authToken);

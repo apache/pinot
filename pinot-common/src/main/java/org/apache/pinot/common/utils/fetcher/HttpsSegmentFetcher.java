@@ -22,6 +22,7 @@ import java.util.Set;
 import javax.net.ssl.SSLContext;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -69,6 +70,7 @@ public class HttpsSegmentFetcher extends HttpSegmentFetcher {
     }
 
     SSLContext sslContext = new ClientSSLContextGenerator(sslConfig).generate();
-    _httpClient = new FileUploadDownloadClient(sslContext);
+    TlsUtils.setSslContext(sslContext);
+    _httpClient = new FileUploadDownloadClient();
   }
 }

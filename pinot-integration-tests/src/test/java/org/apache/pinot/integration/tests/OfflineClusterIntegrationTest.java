@@ -47,6 +47,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -382,7 +383,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       File segmentTarFile = segmentTarFiles[0];
       try {
         fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, headers,
-            parameters, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+            parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
         fail();
       } catch (HttpErrorStatusException e) {
         assertEquals(e.getStatusCode(), HttpStatus.SC_GONE);
@@ -392,14 +393,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       // Upload segment
       SimpleHttpResponse response =
           fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, null,
-              parameters, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+              parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
       assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
       List<SegmentZKMetadata> segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(offlineTableName);
       assertEquals(segmentsZKMetadata.size(), 1);
 
       // Refresh existing segment
       response = fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile,
-          headers, parameters, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+          headers, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
       assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
       segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(offlineTableName);
       assertEquals(segmentsZKMetadata.size(), 1);
