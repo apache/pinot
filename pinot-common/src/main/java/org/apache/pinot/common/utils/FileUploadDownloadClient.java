@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import javax.net.ssl.SSLContext;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
@@ -120,8 +121,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
     _httpClient = new HttpClient();
   }
 
-  public FileUploadDownloadClient(HttpClient httpClient) {
-    _httpClient = httpClient;
+  public FileUploadDownloadClient(SSLContext sslContext) {
+    _httpClient = new HttpClient(sslContext);
   }
 
   public HttpClient getHttpClient() {

@@ -27,7 +27,6 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.data.manager.realtime.Server2ControllerSegmentUploader;
 import org.apache.pinot.core.util.SegmentCompletionProtocolUtils;
@@ -78,8 +77,7 @@ public class ServerSegmentCompletionProtocolHandler {
   }
 
   public ServerSegmentCompletionProtocolHandler(ServerMetrics serverMetrics, String tableNameWithType) {
-    TlsUtils.setSslContext(_sslContext);
-    _fileUploadDownloadClient = new FileUploadDownloadClient();
+    _fileUploadDownloadClient = new FileUploadDownloadClient(_sslContext);
     _serverMetrics = serverMetrics;
     _rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
   }
