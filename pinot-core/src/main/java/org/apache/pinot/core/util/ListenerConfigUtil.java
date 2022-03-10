@@ -50,6 +50,8 @@ import org.glassfish.jersey.internal.guava.ThreadFactoryBuilder;
 import org.glassfish.jersey.process.JerseyProcessingUncaughtExceptionHandler;
 import org.glassfish.jersey.server.ResourceConfig;
 
+import static org.apache.pinot.spi.utils.CommonConstants.HTTPS_PROTOCOL;
+
 
 /**
  * Utility class that generates Http {@link ListenerConfig} instances
@@ -237,6 +239,20 @@ public final class ListenerConfigUtil {
     }
 
     httpServer.addListener(listener);
+  }
+
+  /**
+   * Finds the last listener that has HTTPS protocol, and returns its port. If not found any TLS, return defaultValue
+   * @param configs the config to search
+   * @param defaultValue the default value if the TLS listener is not found
+   * @return the port number of last entry that has secure protocol. If not found then defaultValue
+   */
+  public static int findLastTlsPort(List<ListenerConfig> configs, int defaultValue) {
+    return configs.stream()
+        .filter(config -> config.getProtocol().equalsIgnoreCase(HTTPS_PROTOCOL))
+        .map(ListenerConfig::getPort)
+        .reduce((first, second) -> second)
+        .orElse(defaultValue);
   }
 
   private static SSLEngineConfigurator buildSSLEngineConfigurator(TlsConfig tlsConfig) {

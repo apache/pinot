@@ -28,9 +28,11 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.http.Header;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -45,7 +47,9 @@ import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.integration.tests.access.CertBasedTlsChannelAccessControlFactory;
@@ -274,6 +278,17 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     sendDeleteRequest(
         _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)),
         AUTH_HEADER);
+  }
+
+  @Test
+  public void testUpdatedBrokerTlsPort() {
+
+    List<InstanceConfig> instanceConfigs = HelixHelper.getInstanceConfigs(_helixManager);
+    List<ExtraInstanceConfig> securedInstances =
+        instanceConfigs.stream().map(ExtraInstanceConfig::new)
+            .filter(pinotInstanceConfig -> pinotInstanceConfig.getTlsPort() != null)
+            .collect(Collectors.toList());
+    Assert.assertFalse(securedInstances.isEmpty());
   }
 
   @Test

@@ -127,6 +127,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected String _helixClusterName;
   protected String _hostname;
   protected int _port;
+  protected int _tlsPort;
   protected String _helixControllerInstanceId;
   protected String _helixParticipantInstanceId;
   protected boolean _isUpdateStateModel;
@@ -168,6 +169,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     inferHostnameIfNeeded(_config);
     _hostname = _config.getControllerHost();
     _port = _listenerConfigs.get(0).getPort();
+    _tlsPort = ListenerConfigUtil.findLastTlsPort(_listenerConfigs, 0);
     // NOTE: Use <hostname>_<port> as Helix controller instance id because ControllerLeaderLocator relies on this format
     //       to parse the leader controller's hostname and port
     // TODO: Use the same instance id for controller and participant when leadControllerResource is always enabled after
@@ -607,6 +609,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     InstanceConfig instanceConfig =
         HelixHelper.getInstanceConfig(_helixParticipantManager, _helixParticipantInstanceId);
     boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
+    if (_tlsPort > 0) {
+      updated |= HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
+    }
     updated |= HelixHelper
         .addDefaultTags(instanceConfig, () -> Collections.singletonList(CommonConstants.Helix.CONTROLLER_INSTANCE));
     if (updated) {
