@@ -30,6 +30,7 @@ import java.util.concurrent.Executors;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
@@ -101,15 +102,22 @@ public class PullRequestMergedEventsStream {
     return StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
   }
 
-  public static StreamDataProducer getKinesisStreamDataProducer()
+  public static StreamDataProducer getKinesisStreamDataProducer(String endpoint, String region)
       throws Exception {
     Properties properties = new Properties();
 
     properties.put("access", "access");
     properties.put("secret", "secret");
-    properties.put("port", "4566");
-    properties.put("region", "us-east-1");
+    if(StringUtils.isNotEmpty(endpoint)) {
+      properties.put("endpoint", endpoint);
+    }
+    properties.put("region", region);
     return StreamDataProvider.getStreamDataProducer(KinesisStarterUtils.KINESIS_PRODUCER_CLASS_NAME, properties);
+  }
+
+  public static StreamDataProducer getKinesisStreamDataProducer()
+      throws Exception {
+   return getKinesisStreamDataProducer("http://localhost:4566", "us-east-1");
   }
 
   public static StreamDataProducer getStreamDataProducer(StreamSourceType streamSourceType) throws Exception {

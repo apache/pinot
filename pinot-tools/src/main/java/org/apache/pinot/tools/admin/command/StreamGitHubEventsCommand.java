@@ -19,9 +19,12 @@
 package org.apache.pinot.tools.admin.command;
 
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.streams.githubevents.PullRequestMergedEventsStream;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
+import org.apache.pinot.tools.utils.KinesisStarterUtils;
+import org.apache.pinot.tools.utils.StreamSourceType;
 import picocli.CommandLine;
 
 
@@ -36,15 +39,22 @@ public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implemen
   @CommandLine.Option(names = {"-personalAccessToken"}, required = true, description = "GitHub personal access token.")
   private String _personalAccessToken;
 
-  @CommandLine.Option(names = {"-kafkaBrokerList"},
-      description = "Kafka broker list of the kafka cluster to produce events.")
+  @CommandLine.Option(names = {"-sourceType"}, defaultValue = "Kafka", description = "Stream DataSource to use for ingesting data. Supported values - Kafka,Kinesis")
+  private String _sourceType;
+
+  @CommandLine.Option(names = {"-kafkaBrokerList"}, description = "Kafka broker list of the kafka cluster to produce events.")
   private String _kafkaBrokerList = KafkaStarterUtils.DEFAULT_KAFKA_BROKER;
+
+  @CommandLine.Option(names = {"-kinesisEndpoint"}, description = "Endpoint of locastack or any other Kinesis cluster when not using AWS.")
+  private String _kinesisEndpoint = null;
+
+  @CommandLine.Option(names = {"-awsRegion"}, description = "AWS Region in which Kinesis is located")
+  private String _awsRegion = "us-east-1";
 
   @CommandLine.Option(names = {"-topic"}, required = true, description = "Name of kafka topic to publish events.")
   private String _topic;
 
-  @CommandLine.Option(names = {"-eventType"},
-      description = "Type of GitHub event. Supported types - pullRequestMergedEvent")
+  @CommandLine.Option(names = {"-eventType"}, description = "Type of GitHub event. Supported types - pullRequestMergedEvent")
   private String _eventType = PULL_REQUEST_MERGED_EVENT_TYPE;
 
   @CommandLine.Option(names = {"-schemaFile"}, description = "Path to schema file. "
@@ -96,7 +106,7 @@ public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implemen
 
   @Override
   public String description() {
-    return "Streams GitHubEvents into a Kafka topic";
+    return "Streams GitHubEvents into a Kafka topic or Kinesis Stream";
   }
 
   @Override
@@ -104,9 +114,18 @@ public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implemen
       throws Exception {
     PluginManager.get().init();
     if (PULL_REQUEST_MERGED_EVENT_TYPE.equals(_eventType)) {
+      StreamDataProducer streamDataProducer;
+      switch (StreamSourceType.valueOf(_sourceType.toUpperCase())) {
+        case KINESIS:
+          streamDataProducer = PullRequestMergedEventsStream.getKinesisStreamDataProducer(_kinesisEndpoint, _awsRegion);
+          break;
+        case KAFKA:
+        default:
+          streamDataProducer = PullRequestMergedEventsStream.getKafkaStreamDataProducer(_kafkaBrokerList);
+      }
       PullRequestMergedEventsStream pullRequestMergedEventsStream =
           new PullRequestMergedEventsStream(_schemaFile, _topic, _personalAccessToken,
-              PullRequestMergedEventsStream.getKafkaStreamDataProducer(_kafkaBrokerList));
+              streamDataProducer);
       pullRequestMergedEventsStream.execute();
     } else {
       throw new UnsupportedOperationException("Event type " + _eventType + " is unsupported");

@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.http.SdkHttpConfigurationOption;
@@ -23,19 +24,26 @@ public class KinesisDataProducer implements StreamDataProducer {
   public static final String ACCESS = "access";
   public static final String SECRET = "secret";
   public static final String DEFAULT_PORT = "4566";
+  public static final String DEFAULT_ENDPOINT = "http://localhost:4566";
 
   private KinesisClient _kinesisClient;
-  private String _localStackKinesisEndpoint = "http://localhost:%s";
 
   @Override
   public void init(Properties props) {
     try {
-      _localStackKinesisEndpoint = String.format(_localStackKinesisEndpoint, props.getProperty("port", DEFAULT_PORT));
-      _kinesisClient = KinesisClient.builder().httpClient(new ApacheSdkHttpService().createHttpClientBuilder().buildWithDefaults(
-              AttributeMap.builder().put(SdkHttpConfigurationOption.TRUST_ALL_CERTIFICATES, Boolean.TRUE).build())).credentialsProvider(getLocalAWSCredentials(props)).region(Region.of(props.getProperty(
-              REGION)))
-          .endpointOverride(new URI(_localStackKinesisEndpoint)).build();
-    } catch (Exception e){
+      if (props.containsKey("endpoint")) {
+        String localStackKinesisEndpoint;
+        localStackKinesisEndpoint = props.getProperty("endpoint", DEFAULT_ENDPOINT);
+        _kinesisClient = KinesisClient.builder().httpClient(new ApacheSdkHttpService().createHttpClientBuilder()
+                .buildWithDefaults(
+                    AttributeMap.builder().put(SdkHttpConfigurationOption.TRUST_ALL_CERTIFICATES, Boolean.TRUE).build()))
+            .credentialsProvider(getLocalAWSCredentials(props)).region(Region.of(props.getProperty(REGION)))
+            .endpointOverride(new URI(localStackKinesisEndpoint)).build();
+      } else {
+        _kinesisClient = KinesisClient.builder().credentialsProvider(DefaultCredentialsProvider.create())
+            .region(Region.of(props.getProperty(REGION))).build();
+      }
+    } catch (Exception e) {
       _kinesisClient = null;
     }
   }
@@ -51,8 +59,8 @@ public class KinesisDataProducer implements StreamDataProducer {
   @Override
   public void produce(String topic, byte[] key, byte[] payload) {
     PutRecordRequest putRecordRequest =
-        PutRecordRequest.builder().streamName(topic).data(SdkBytes.fromByteArray(payload))
-            .partitionKey(new String(key)).build();
+        PutRecordRequest.builder().streamName(topic).data(SdkBytes.fromByteArray(payload)).partitionKey(new String(key))
+            .build();
     PutRecordResponse putRecordResponse = _kinesisClient.putRecord(putRecordRequest);
   }
 
@@ -62,7 +70,7 @@ public class KinesisDataProducer implements StreamDataProducer {
   }
 
   private AwsCredentialsProvider getLocalAWSCredentials(Properties props) {
-    return StaticCredentialsProvider.create(AwsBasicCredentials.create(props.getProperty(ACCESS), props.getProperty(
-        SECRET)));
+    return StaticCredentialsProvider.create(
+        AwsBasicCredentials.create(props.getProperty(ACCESS), props.getProperty(SECRET)));
   }
 }
