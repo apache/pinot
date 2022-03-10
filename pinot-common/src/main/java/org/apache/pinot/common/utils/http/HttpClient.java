@@ -63,12 +63,13 @@ public class HttpClient implements AutoCloseable {
   private final CloseableHttpClient _httpClient;
 
   public HttpClient() {
-    this(TlsUtils.getSslContext());
+    this(null);
   }
 
-  public HttpClient(SSLContext sslContext) {
+  public HttpClient(@Nullable SSLContext sslContext) {
+    SSLContext context = sslContext != null ? sslContext : TlsUtils.getSslContext();
     // Set NoopHostnameVerifier to skip validating hostname when uploading/downloading segments.
-    SSLConnectionSocketFactory csf = new SSLConnectionSocketFactory(sslContext, NoopHostnameVerifier.INSTANCE);
+    SSLConnectionSocketFactory csf = new SSLConnectionSocketFactory(context, NoopHostnameVerifier.INSTANCE);
     _httpClient = HttpClients.custom().setSSLSocketFactory(csf).build();
   }
 
