@@ -62,6 +62,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
   private static final int PERIODIC_TASK_INITIAL_DELAY_SECONDS = 30;
   private static final int PERIODIC_TASK_FREQUENCY_SECONDS = 5;
   private static final String PERIODIC_TASK_FREQUENCY = "5s";
+  private static final String PERIODIC_TASK_WAIT_FOR_PUSH_TIME_PERIOD = "5s";
 
   private static final int NUM_REPLICAS = 2;
   private static final String TENANT_NAME = "TestTenant";
@@ -124,6 +125,8 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
         PERIODIC_TASK_INITIAL_DELAY_SECONDS);
     properties.put(ControllerPeriodicTasksConf.DEPRECATED_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS,
         PERIODIC_TASK_FREQUENCY_SECONDS);
+    properties.put(ControllerPeriodicTasksConf.STATUS_CHECKER_WAIT_FOR_PUSH_TIME_PERIOD,
+        PERIODIC_TASK_WAIT_FOR_PUSH_TIME_PERIOD);
 
     startController(properties);
     startBrokers(NUM_BROKERS);
