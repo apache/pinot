@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
@@ -45,17 +46,17 @@ public class ComplexTypeConfig extends BaseJsonConfig {
   private final CollectionNotUnnestedToJson _collectionNotUnnestedToJson;
 
   @JsonPropertyDescription("The prefixes of fields to rename so the resulting field names don't have them")
-  private final List<String> _prefixesToDropFromFields;
+  private final Map<String, String> _prefixesToRename;
 
   @JsonCreator
   public ComplexTypeConfig(@JsonProperty("fieldsToUnnest") @Nullable List<String> fieldsToUnnest,
       @JsonProperty("delimiter") @Nullable String delimiter,
       @JsonProperty("collectionNotUnnestedToJson") @Nullable CollectionNotUnnestedToJson collectionNotUnnestedToJson,
-                           @JsonProperty("prefixesToDropFromFields") @Nullable List<String> prefixesToDropFromFields) {
+                           @JsonProperty("prefixesToRename") @Nullable Map<String, String> prefixesToRename) {
     _fieldsToUnnest = fieldsToUnnest;
     _delimiter = delimiter;
     _collectionNotUnnestedToJson = collectionNotUnnestedToJson;
-    _prefixesToDropFromFields = prefixesToDropFromFields;
+    _prefixesToRename = prefixesToRename;
   }
 
   @Nullable
@@ -74,7 +75,7 @@ public class ComplexTypeConfig extends BaseJsonConfig {
   }
 
   @Nullable
-  public List<String> getPrefixesToDropFromFields() {
-    return _prefixesToDropFromFields;
+  public Map<String, String> getPrefixesToRename() {
+    return _prefixesToRename;
   }
 }

@@ -22,7 +22,9 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
@@ -213,9 +215,10 @@ public class IngestionUtilsTest {
     TransformConfig transformConfig = new TransformConfig("dateColumn", "toDateTime(timestampColumn, 'yyyy-MM-dd')");
     transformConfigs = Lists.newArrayList(transformConfig);
     List<String> fieldsToUnnest = Arrays.asList("before.test", "after.test");
-    List<String> prefixesToDropFromFields = Arrays.asList("before", "after");
+    Map<String, String> prefixesToRename = new HashMap<>();
+    prefixesToRename.put("before", "after");
     ComplexTypeConfig complexTypeConfigs = new ComplexTypeConfig(fieldsToUnnest, ".",
-            ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE, prefixesToDropFromFields);
+            ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE, prefixesToRename);
     FilterConfig filterConfig = new FilterConfig("Groovy({d1 == \"10\"}, d1)");
     ingestionConfig = new IngestionConfig(null, null, filterConfig, transformConfigs, complexTypeConfigs);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));

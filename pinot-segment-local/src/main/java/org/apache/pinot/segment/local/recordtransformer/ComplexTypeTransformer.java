@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -89,30 +90,30 @@ public class ComplexTypeTransformer implements RecordTransformer {
   private final List<String> _fieldsToUnnest;
   private final String _delimiter;
   private final ComplexTypeConfig.CollectionNotUnnestedToJson _collectionNotUnnestedToJson;
-  private final List<String> _prefixesToDropFromFields;
+  private final Map<String, String> _prefixesToRename;
 
   public ComplexTypeTransformer(TableConfig tableConfig) {
     this(parseFieldsToUnnest(tableConfig), parseDelimiter(tableConfig),
-            parseCollectionNotUnnestedToJson(tableConfig), parsePrefixesToDropFromFields(tableConfig));
+            parseCollectionNotUnnestedToJson(tableConfig), parsePrefixesToRename(tableConfig));
   }
 
   @VisibleForTesting
   ComplexTypeTransformer(List<String> fieldsToUnnest, String delimiter) {
-    this(fieldsToUnnest, delimiter, DEFAULT_COLLECTION_TO_JSON_MODE, new ArrayList<>());
+    this(fieldsToUnnest, delimiter, DEFAULT_COLLECTION_TO_JSON_MODE, new HashMap<>());
   }
 
   @VisibleForTesting
   ComplexTypeTransformer(List<String> fieldsToUnnest,
                          String delimiter,
                          ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson,
-                         List<String> prefixesToDropFromFields) {
+                         Map<String, String> prefixesToRename) {
     _fieldsToUnnest = new ArrayList<>(fieldsToUnnest);
     _delimiter = delimiter;
     _collectionNotUnnestedToJson = collectionNotUnnestedToJson;
     // the unnest fields are sorted to achieve the topological sort of the collections, so that the parent collection
     // (e.g. foo) is unnested before the child collection (e.g. foo.bar)
     Collections.sort(_fieldsToUnnest);
-    _prefixesToDropFromFields = new ArrayList<>(prefixesToDropFromFields);
+    _prefixesToRename = new HashMap<>(prefixesToRename);
   }
 
   private static List<String> parseFieldsToUnnest(TableConfig tableConfig) {
@@ -154,12 +155,12 @@ public class ComplexTypeTransformer implements RecordTransformer {
     }
   }
 
-  private static List<String> parsePrefixesToDropFromFields(TableConfig tableConfig) {
+  private static Map<String, String> parsePrefixesToRename(TableConfig tableConfig) {
     if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getComplexTypeConfig() != null
-            && tableConfig.getIngestionConfig().getComplexTypeConfig().getPrefixesToDropFromFields() != null) {
-      return tableConfig.getIngestionConfig().getComplexTypeConfig().getPrefixesToDropFromFields();
+            && tableConfig.getIngestionConfig().getComplexTypeConfig().getPrefixesToRename() != null) {
+      return tableConfig.getIngestionConfig().getComplexTypeConfig().getPrefixesToRename();
     } else {
-      return new ArrayList<>();
+      return new HashMap<>();
     }
   }
 
@@ -169,7 +170,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
     for (String collection : _fieldsToUnnest) {
       unnestCollection(record, collection);
     }
-    dropPrefixes(record);
+    renamePrefixes(record);
     return record;
   }
 
@@ -295,16 +296,17 @@ public class ComplexTypeTransformer implements RecordTransformer {
   }
 
   /**
-   *
+   * Loops through all columns and renames the column's prefix with the corresponding replacement if the prefix matches.
    */
   @VisibleForTesting
-  protected void dropPrefixes(GenericRow record) {
+  protected void renamePrefixes(GenericRow record) {
     List<String> columns = new ArrayList<>(record.getFieldToValueMap().keySet());
     for (String column : columns) {
-      for (String prefix : _prefixesToDropFromFields) {
+      for (String prefix : _prefixesToRename.keySet()) {
         if (column.startsWith(prefix)) {
           Object value = record.removeValue(column);
-          String newName = column.substring(prefix.length());
+          String remainingColumnName = column.substring(prefix.length());
+          String newName = _prefixesToRename.get(prefix) + remainingColumnName;
           record.putValue(newName, value);
         }
       }

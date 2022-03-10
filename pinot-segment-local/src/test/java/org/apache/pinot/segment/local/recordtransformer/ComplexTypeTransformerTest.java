@@ -299,7 +299,7 @@ public class ComplexTypeTransformerTest {
     //   "array":"[1,2]"
     // }
     transformer = new ComplexTypeTransformer(Arrays.asList(), ".",
-            ComplexTypeConfig.CollectionNotUnnestedToJson.ALL, Arrays.asList());
+            ComplexTypeConfig.CollectionNotUnnestedToJson.ALL, new HashMap<>());
     genericRow = new GenericRow();
     array = new Object[]{1, 2};
     genericRow.putValue("array", array);
@@ -345,16 +345,18 @@ public class ComplexTypeTransformerTest {
     map.put("array1", array1);
     genericRow.putValue("t", map);
     transformer = new ComplexTypeTransformer(Arrays.asList(), ".",
-            ComplexTypeConfig.CollectionNotUnnestedToJson.NONE, Arrays.asList());
+            ComplexTypeConfig.CollectionNotUnnestedToJson.NONE, new HashMap<>());
     transformer.transform(genericRow);
     Assert.assertTrue(ComplexTypeTransformer.isArray(genericRow.getValue("t.array1")));
   }
 
   @Test
-  public void testPrefixesToDropFromFields() {
-    List<String> prefixesToDropFromFields = Arrays.asList("map1.");
+  public void testPrefixesToRename() {
+    HashMap<String, String> prefixesToRename = new HashMap<>();
+    prefixesToRename.put("map1.", "");
+    prefixesToRename.put("map2", "test");
     ComplexTypeTransformer transformer = new ComplexTypeTransformer(new ArrayList<>(), ".",
-            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToDropFromFields);
+            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
 
     // test flatten root-level tuples
     GenericRow genericRow = new GenericRow();
@@ -375,6 +377,6 @@ public class ComplexTypeTransformerTest {
     Assert.assertEquals(genericRow.getValue("b"), "v");
     Assert.assertEquals(genericRow.getValue("im1.aa"), 2);
     Assert.assertEquals(genericRow.getValue("im1.bb"), "u");
-    Assert.assertEquals(genericRow.getValue("map2.c"), 3);
+    Assert.assertEquals(genericRow.getValue("test.c"), 3);
   }
 }
