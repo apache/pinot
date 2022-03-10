@@ -241,15 +241,6 @@ public abstract class BaseQueriesTest {
     return brokerResponse;
   }
 
-  /**
-   * Run optimized SQL query on multiple index segments.
-   * <p>Use this to test the whole flow from server to broker.
-   * <p>The result should be equivalent to querying 4 identical index segments.
-   */
-  protected BrokerResponseNative getBrokerResponseForOptimizedSqlQuery(String sqlQuery, @Nullable Schema schema) {
-    return getBrokerResponseForOptimizedSqlQuery(sqlQuery, null, schema, PLAN_MAKER);
-  }
-
   protected BrokerResponseNative getBrokerResponseForOptimizedSqlQuery(String sqlQuery, @Nullable TableConfig config,
       @Nullable Schema schema) {
     return getBrokerResponseForOptimizedSqlQuery(sqlQuery, config, schema, PLAN_MAKER);
