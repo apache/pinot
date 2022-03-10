@@ -149,15 +149,16 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
       StartServiceManagerCommand startServiceManagerCommand =
           new StartServiceManagerCommand().setZkAddress(_zkAddress).setClusterName(_clusterName).setPort(-1)
               .setBootstrapServices(new String[0]).addBootstrapService(ServiceRole.BROKER, brokerConf);
-      startServiceManagerCommand.execute();
-      String pidFile = ".pinotAdminBroker-" + System.currentTimeMillis() + ".pid";
-      savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
-      return true;
+      if (startServiceManagerCommand.execute()) {
+        String pidFile = ".pinotAdminBroker-" + System.currentTimeMillis() + ".pid";
+        savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
+        return true;
+      }
     } catch (Exception e) {
       LOGGER.error("Caught exception while starting broker, exiting", e);
-      System.exit(-1);
-      return false;
     }
+    System.exit(-1);
+    return false;
   }
 
   protected Map<String, Object> getBrokerConf()

@@ -16,33 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.index.reader;
+package org.apache.pinot.connector.flink.http;
 
-/**
- * Interface for mutable dictionary (for CONSUMING segment).
- */
-public interface MutableDictionary extends Dictionary {
+public class HttpException extends RuntimeException {
+  private final int _statusCode;
+  private final String _errorMessage;
 
-  /**
-   * Indexes a single-value entry (a value of the dictionary type) into the dictionary, and returns the dictId of the
-   * value.
-   */
-  int index(Object value);
-
-  /**
-   * Indexes a multi-value entry (an array of values of the dictionary type) into the dictionary, and returns an array
-   * of dictIds for each value.
-   */
-  int[] index(Object[] values);
-
-  @Override
-  default boolean isSorted() {
-    return false;
+  public HttpException(int statusCode, String errorMessage) {
+    super();
+    _statusCode = statusCode;
+    _errorMessage = errorMessage;
   }
 
-  @Override
-  default int insertionIndexOf(String stringValue) {
-    // This method should not be called for unsorted dictionary.
-    throw new UnsupportedOperationException();
+  public int getStatusCode() {
+    return _statusCode;
+  }
+
+  public String getErrorMessage() {
+    return _errorMessage;
   }
 }

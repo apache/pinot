@@ -147,7 +147,7 @@
     <zstd-jni.version>1.4.9-5</zstd-jni.version>
     <lz4-java.version>1.7.1</lz4-java.version>
     <log4j.version>2.17.1</log4j.version>
-    <netty.version>4.1.54.Final</netty.version>
+    <netty.version>4.1.74.Final</netty.version>
     <netty-tcnative.version>2.0.36.Final</netty-tcnative.version>
     <reactivestreams.version>1.0.3</reactivestreams.version>
     <jts.version>1.16.1</jts.version>
@@ -163,7 +163,7 @@
     To change kafka connector dependency, we only need to update this version number config.
     TODO: figure out a way to inject kafka dependency instead of explicitly setting the kafka module dependency -->
     <kafka.version>2.0</kafka.version>
-    <protobuf.version>3.12.0</protobuf.version>
+    <protobuf.version>3.19.2</protobuf.version>
     <grpc.version>1.41.0</grpc.version>
 
     <!-- Checkstyle violation prop.-->
@@ -1818,7 +1818,7 @@
 
             <!-- Test output -->
             <exclude>**/test-output/**</exclude>
-            
+
             <!-- MISC -->
             <exclude>**/.factorypath</exclude>
           </excludes>

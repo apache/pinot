@@ -25,9 +25,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
-import org.apache.pinot.segment.spi.index.reader.MutableDictionary;
+import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

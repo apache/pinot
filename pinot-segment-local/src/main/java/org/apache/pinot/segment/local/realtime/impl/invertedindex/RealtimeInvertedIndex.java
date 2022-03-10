@@ -21,8 +21,8 @@ package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
-import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
+import org.apache.pinot.segment.spi.index.mutable.MutableInvertedIndex;
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -30,12 +30,12 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * Real-time bitmap based inverted index reader which allows adding values on the fly.
  * <p>This class is thread-safe for single writer multiple readers.
  */
-public class RealtimeInvertedIndexReader implements InvertedIndexReader<MutableRoaringBitmap> {
+public class RealtimeInvertedIndex implements MutableInvertedIndex {
   private final List<ThreadSafeMutableRoaringBitmap> _bitmaps = new ArrayList<>();
   private final ReentrantReadWriteLock.ReadLock _readLock;
   private final ReentrantReadWriteLock.WriteLock _writeLock;
 
-  public RealtimeInvertedIndexReader() {
+  public RealtimeInvertedIndex() {
     ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
     _readLock = readWriteLock.readLock();
     _writeLock = readWriteLock.writeLock();
@@ -44,6 +44,7 @@ public class RealtimeInvertedIndexReader implements InvertedIndexReader<MutableR
   /**
    * Adds the document id to the bitmap of the given dictionary id.
    */
+  @Override
   public void add(int dictId, int docId) {
     if (_bitmaps.size() == dictId) {
       // Bitmap for the dictionary id does not exist, add a new bitmap into the list

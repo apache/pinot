@@ -16,31 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.io.readerwriter;
+package org.apache.pinot.segment.spi.index.mutable;
 
-import java.io.Closeable;
-import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 
 
-/**
- * Interface for memory manager that allocates/manages PinotDataBuffer.
- * At the moment, this is far from a memory manager, and is just an allocator.
- */
-public interface PinotDataBufferMemoryManager extends Closeable {
-
+public interface MutableTextIndex extends TextIndexReader {
   /**
-   * Allocates and returns a PinotDataBuffer of specified size with native byte order.
-   *
-   * @param size Size of the data buffer to be allocated.
-   * @param allocationContext Context for allocation.
-   * @return Allocated data buffer.
+   * Index the document
+   * @param document the document as a string
    */
-  PinotDataBuffer allocate(long size, String allocationContext);
-
-  /**
-   * Returns total size of memory allocated in bytes.
-   *
-   * @return Total memory size in bytes.
-   */
-  long getTotalAllocatedBytes();
+  void add(String document);
 }

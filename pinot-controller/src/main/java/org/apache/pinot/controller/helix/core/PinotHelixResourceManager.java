@@ -1539,7 +1539,12 @@ public class PinotHelixResourceManager {
     return _helixDataAccessor.getBaseDataAccessor().get(path, null, -1);
   }
 
-  public List<String> getZKChildren(String path) {
+  public List<ZNRecord> getZKChildren(String path) {
+    return _helixDataAccessor.getBaseDataAccessor().getChildren(path, null, -1,
+        CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
+  }
+
+  public List<String> getZKChildNames(String path) {
     return _helixDataAccessor.getBaseDataAccessor().getChildNames(path, -1);
   }
 
