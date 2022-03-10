@@ -1,14 +1,8 @@
 package org.apache.pinot.tools.utils;
 
-import java.util.Optional;
 import java.util.Properties;
-import java.util.ServiceLoader;
-import java.util.stream.StreamSupport;
-import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
-import org.apache.pinot.spi.utils.NetUtils;
-
 
 public class KinesisStarterUtils {
   private KinesisStarterUtils(){}
@@ -30,9 +24,9 @@ public class KinesisStarterUtils {
     return "org.apache.pinot.plugin.stream.kinesis";
   }
 
-  public static Properties getTopicCreationProps(int numKafkaPartitions) {
+  public static Properties getTopicCreationProps(int numKinesisShards) {
     Properties topicProps = new Properties();
-    topicProps.put(NUM_SHARDS, numKafkaPartitions);
+    topicProps.put(NUM_SHARDS, numKinesisShards);
     return topicProps;
   }
 
