@@ -31,9 +31,9 @@ public class KinesisDataProducer implements StreamDataProducer {
   @Override
   public void init(Properties props) {
     try {
-      if (props.containsKey("endpoint")) {
+      if (props.containsKey(ENDPOINT)) {
         String localStackKinesisEndpoint;
-        localStackKinesisEndpoint = props.getProperty("endpoint", DEFAULT_ENDPOINT);
+        localStackKinesisEndpoint = props.getProperty(ENDPOINT, DEFAULT_ENDPOINT);
         _kinesisClient = KinesisClient.builder().httpClient(new ApacheSdkHttpService().createHttpClientBuilder()
                 .buildWithDefaults(
                     AttributeMap.builder().put(SdkHttpConfigurationOption.TRUST_ALL_CERTIFICATES, Boolean.TRUE).build()))
