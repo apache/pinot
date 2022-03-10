@@ -23,6 +23,7 @@ import java.net.URI;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
+import javax.net.ssl.SSLContext;
 import org.apache.commons.lang.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpHeaders;
@@ -62,9 +63,12 @@ public class HttpClient implements AutoCloseable {
   private final CloseableHttpClient _httpClient;
 
   public HttpClient() {
+    this(TlsUtils.getSslContext());
+  }
+
+  public HttpClient(SSLContext sslContext) {
     // Set NoopHostnameVerifier to skip validating hostname when uploading/downloading segments.
-    SSLConnectionSocketFactory csf = new SSLConnectionSocketFactory(TlsUtils.getSslContext(),
-        NoopHostnameVerifier.INSTANCE);
+    SSLConnectionSocketFactory csf = new SSLConnectionSocketFactory(sslContext, NoopHostnameVerifier.INSTANCE);
     _httpClient = HttpClients.custom().setSSLSocketFactory(csf).build();
   }
 
