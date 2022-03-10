@@ -36,6 +36,8 @@ import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Quickstart;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
+import org.apache.pinot.tools.utils.KinesisStarterUtils;
+import org.apache.pinot.tools.utils.StreamSourceType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,6 +99,25 @@ public class PullRequestMergedEventsStream {
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
     properties.put("request.required.acks", "1");
     return StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
+  }
+
+  public static StreamDataProducer getKinesisStreamDataProducer()
+      throws Exception {
+    Properties properties = new Properties();
+
+    properties.put("access", "access");
+    properties.put("secret", "secret");
+    properties.put("port", "4566");
+    properties.put("region", "us-east-1");
+    return StreamDataProvider.getStreamDataProducer(KinesisStarterUtils.KINESIS_PRODUCER_CLASS_NAME, properties);
+  }
+
+  public static StreamDataProducer getStreamDataProducer(StreamSourceType streamSourceType) throws Exception {
+    switch (streamSourceType){
+      case KAFKA: return getKafkaStreamDataProducer();
+      case KINESIS: return getKinesisStreamDataProducer();
+      default: throw new RuntimeException("Invalid streamSourceType specified: " + streamSourceType);
+    }
   }
 
   public static void main(String[] args)
