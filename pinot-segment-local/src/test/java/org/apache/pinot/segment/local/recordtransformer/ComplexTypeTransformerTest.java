@@ -351,6 +351,39 @@ public class ComplexTypeTransformerTest {
   }
 
   @Test
+  public void testRenamePrefixes() {
+    HashMap<String, String> prefixesToRename = new HashMap<>();
+    prefixesToRename.put("map1.", "");
+    prefixesToRename.put("map2", "test");
+    ComplexTypeTransformer transformer = new ComplexTypeTransformer(new ArrayList<>(), ".",
+            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
+
+    GenericRow genericRow = new GenericRow();
+    genericRow.putValue("a", 1L);
+    genericRow.putValue("map1.b", 2L);
+    genericRow.putValue("map2.c", "u");
+    transformer.renamePrefixes(genericRow);
+    Assert.assertEquals(genericRow.getValue("a"), 1L);
+    Assert.assertEquals(genericRow.getValue("b"), 2L);
+    Assert.assertEquals(genericRow.getValue("test.c"), "u");
+
+    // name conflict
+    prefixesToRename = new HashMap<>();
+    prefixesToRename.put("test.", "");
+    transformer = new ComplexTypeTransformer(new ArrayList<>(), ".",
+            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
+    genericRow = new GenericRow();
+    genericRow.putValue("a", 1L);
+    genericRow.putValue("test.a", 2L);
+    try {
+      transformer.renamePrefixes(genericRow);
+      Assert.fail("Should fail due to name conflict after renaming");
+    } catch (RuntimeException e) {
+      // expected
+    }
+  }
+
+  @Test
   public void testPrefixesToRename() {
     HashMap<String, String> prefixesToRename = new HashMap<>();
     prefixesToRename.put("map1.", "");

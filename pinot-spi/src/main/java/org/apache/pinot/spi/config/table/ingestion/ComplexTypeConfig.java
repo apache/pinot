@@ -45,7 +45,7 @@ public class ComplexTypeConfig extends BaseJsonConfig {
   @JsonPropertyDescription("The mode of converting collection to JSON string")
   private final CollectionNotUnnestedToJson _collectionNotUnnestedToJson;
 
-  @JsonPropertyDescription("The prefixes of fields to rename so the resulting field names don't have them")
+  @JsonPropertyDescription("Map of <prefix, replacement> so matching fields are renamed to start with the replacement")
   private final Map<String, String> _prefixesToRename;
 
   @JsonCreator

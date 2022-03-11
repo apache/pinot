@@ -300,13 +300,17 @@ public class ComplexTypeTransformer implements RecordTransformer {
    */
   @VisibleForTesting
   protected void renamePrefixes(GenericRow record) {
-    List<String> columns = new ArrayList<>(record.getFieldToValueMap().keySet());
-    for (String column : columns) {
+    List<String> fields = new ArrayList<>(record.getFieldToValueMap().keySet());
+    for (String field : fields) {
       for (String prefix : _prefixesToRename.keySet()) {
-        if (column.startsWith(prefix)) {
-          Object value = record.removeValue(column);
-          String remainingColumnName = column.substring(prefix.length());
+        if (field.startsWith(prefix)) {
+          Object value = record.removeValue(field);
+          String remainingColumnName = field.substring(prefix.length());
           String newName = _prefixesToRename.get(prefix) + remainingColumnName;
+          if (record.getValue(newName) != null) {
+            throw new RuntimeException(
+                    String.format("Name conflict after attempting to rename field %s to %s", field, newName));
+          }
           record.putValue(newName, value);
         }
       }
