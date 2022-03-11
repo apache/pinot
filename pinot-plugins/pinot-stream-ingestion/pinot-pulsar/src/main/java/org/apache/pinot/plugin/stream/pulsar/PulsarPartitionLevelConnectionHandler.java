@@ -53,14 +53,13 @@ public class PulsarPartitionLevelConnectionHandler {
     _topic = _config.getPulsarTopicName();
 
     try {
-      Authentication authentication = AuthenticationFactory.token(_config.getAuthenticationToken());
-
       ClientBuilder pulsarClientBuilder = PulsarClient.builder().serviceUrl(_config.getBootstrapServers());
       if (_config.getTlsTrustCertsFilePath() != null) {
         pulsarClientBuilder.tlsTrustCertsFilePath(_config.getTlsTrustCertsFilePath());
       }
 
       if (_config.getAuthenticationToken() != null) {
+        Authentication authentication = AuthenticationFactory.token(_config.getAuthenticationToken());
         pulsarClientBuilder.authentication(authentication);
       }
 

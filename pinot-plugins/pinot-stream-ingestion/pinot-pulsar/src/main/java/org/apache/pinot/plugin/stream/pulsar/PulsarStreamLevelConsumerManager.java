@@ -78,15 +78,14 @@ public class PulsarStreamLevelConsumerManager {
 
       // Create the consumer
       try {
-        Authentication authentication = AuthenticationFactory.token(
-                pulsarStreamLevelStreamConfig.getAuthenticationToken());
-
         ClientBuilder pulsarClientBuilder = PulsarClient.builder().serviceUrl(pulsarStreamLevelStreamConfig.getBootstrapServers());
         if (pulsarStreamLevelStreamConfig.getTlsTrustCertsFilePath() != null) {
           pulsarClientBuilder.tlsTrustCertsFilePath(pulsarStreamLevelStreamConfig.getTlsTrustCertsFilePath());
         }
 
         if (pulsarStreamLevelStreamConfig.getAuthenticationToken() != null) {
+          Authentication authentication = AuthenticationFactory.token(
+                  pulsarStreamLevelStreamConfig.getAuthenticationToken());
           pulsarClientBuilder.authentication(authentication);
         }
 
