@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.ImmutableTriple;
 import org.apache.pulsar.client.api.Authentication;
 import org.apache.pulsar.client.api.AuthenticationFactory;
+import org.apache.pulsar.client.api.ClientBuilder;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Reader;
@@ -79,10 +80,17 @@ public class PulsarStreamLevelConsumerManager {
       try {
         Authentication authentication = AuthenticationFactory.token(
                 pulsarStreamLevelStreamConfig.getAuthenticationToken());
-        _pulsarClient = PulsarClient.builder().serviceUrl(pulsarStreamLevelStreamConfig.getBootstrapServers())
-                .tlsTrustCertsFilePath(pulsarStreamLevelStreamConfig.getTlsTrustCertsFilePath())
-                .authentication(authentication)
-                .build();
+
+        ClientBuilder pulsarClientBuilder = PulsarClient.builder().serviceUrl(pulsarStreamLevelStreamConfig.getBootstrapServers());
+        if (pulsarStreamLevelStreamConfig.getTlsTrustCertsFilePath() != null) {
+          pulsarClientBuilder.tlsTrustCertsFilePath(pulsarStreamLevelStreamConfig.getTlsTrustCertsFilePath());
+        }
+
+        if (pulsarStreamLevelStreamConfig.getAuthenticationToken() != null) {
+          pulsarClientBuilder.authentication(authentication);
+        }
+
+        _pulsarClient = pulsarClientBuilder.build();
 
         _reader = _pulsarClient.newReader().topic(pulsarStreamLevelStreamConfig.getPulsarTopicName())
             .startMessageId(pulsarStreamLevelStreamConfig.getInitialMessageId()).create();

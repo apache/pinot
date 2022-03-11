@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pulsar.client.api.Authentication;
 import org.apache.pulsar.client.api.AuthenticationFactory;
+import org.apache.pulsar.client.api.ClientBuilder;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.Reader;
 import org.slf4j.Logger;
@@ -53,10 +54,17 @@ public class PulsarPartitionLevelConnectionHandler {
 
     try {
       Authentication authentication = AuthenticationFactory.token(_config.getAuthenticationToken());
-      _pulsarClient = PulsarClient.builder().serviceUrl(_config.getBootstrapServers())
-              .tlsTrustCertsFilePath(_config.getTlsTrustCertsFilePath())
-              .authentication(authentication)
-              .build();
+
+      ClientBuilder pulsarClientBuilder = PulsarClient.builder().serviceUrl(_config.getBootstrapServers());
+      if (_config.getTlsTrustCertsFilePath() != null) {
+        pulsarClientBuilder.tlsTrustCertsFilePath(_config.getTlsTrustCertsFilePath());
+      }
+
+      if (_config.getAuthenticationToken() != null) {
+        pulsarClientBuilder.authentication(authentication);
+      }
+
+      _pulsarClient = pulsarClientBuilder.build();
 
       _reader = _pulsarClient.newReader().topic(getPartitionedTopicName(partition))
           .startMessageId(_config.getInitialMessageId()).create();
