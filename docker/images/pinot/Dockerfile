@@ -71,7 +71,7 @@ ENV JAVA_OPTS="-Xms4G -Xmx4G -Dpinot.admin.system.exit=false"
 VOLUME ["${PINOT_HOME}/configs", "${PINOT_HOME}/data"]
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends vim wget curl git python && \
+    apt-get install -y --no-install-recommends vim less wget curl git python && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=pinot_build_env ${PINOT_HOME} ${PINOT_HOME}
