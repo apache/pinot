@@ -22,8 +22,10 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpHeaders;
@@ -32,12 +34,16 @@ import org.apache.http.NameValuePair;
 import org.apache.http.StatusLine;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.methods.RequestBuilder;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
+import org.apache.http.entity.mime.MultipartEntityBuilder;
+import org.apache.http.entity.mime.content.StringBody;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicHeader;
@@ -119,7 +125,19 @@ public class HttpClient implements AutoCloseable {
     return sendRequest(requestBuilder.build());
   }
 
-  public SimpleHttpResponse postJsonRequest(URI uri, @Nullable String jsonRequestBody, @Nullable String authToken)
+  public SimpleHttpResponse postJsonRequest(URI uri, @Nullable String jsonRequestBody)
+      throws HttpErrorStatusException, IOException {
+    return postJsonRequest(uri, jsonRequestBody, null, null);
+  }
+
+  public SimpleHttpResponse postJsonRequest(URI uri, @Nullable String jsonRequestBody,
+      @Nullable Map<String, String> headers)
+      throws HttpErrorStatusException, IOException {
+    return postJsonRequest(uri, jsonRequestBody, headers, null);
+  }
+
+  public SimpleHttpResponse postJsonRequest(URI uri, @Nullable String jsonRequestBody,
+      @Nullable Map<String, String> headers, @Nullable String authToken)
       throws HttpErrorStatusException, IOException {
     RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
         .setHeader(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
@@ -128,6 +146,42 @@ public class HttpClient implements AutoCloseable {
     }
     if (StringUtils.isNotBlank(authToken)) {
       requestBuilder.addHeader("Authorization", authToken);
+    }
+    if (MapUtils.isNotEmpty(headers)) {
+      for (Map.Entry<String, String> header : headers.entrySet()) {
+        requestBuilder.addHeader(header.getKey(), header.getValue());
+      }
+    }
+    setTimeout(requestBuilder, DEFAULT_SOCKET_TIMEOUT_MS);
+    return sendRequest(requestBuilder.build());
+  }
+
+  public SimpleHttpResponse putJsonRequest(URI uri, @Nullable String jsonRequestBody)
+      throws HttpErrorStatusException, IOException {
+    return putJsonRequest(uri, jsonRequestBody, null, null);
+  }
+
+  public SimpleHttpResponse putJsonRequest(URI uri, @Nullable String jsonRequestBody,
+      @Nullable Map<String, String> headers)
+      throws HttpErrorStatusException, IOException {
+    return putJsonRequest(uri, jsonRequestBody, headers, null);
+  }
+
+  public SimpleHttpResponse putJsonRequest(URI uri, @Nullable String jsonRequestBody,
+      @Nullable Map<String, String> headers, @Nullable String authToken)
+      throws HttpErrorStatusException, IOException {
+    RequestBuilder requestBuilder = RequestBuilder.put(uri).setVersion(HttpVersion.HTTP_1_1)
+        .setHeader(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
+    if (jsonRequestBody != null) {
+      requestBuilder.setEntity(new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON));
+    }
+    if (StringUtils.isNotBlank(authToken)) {
+      requestBuilder.addHeader("Authorization", authToken);
+    }
+    if (MapUtils.isNotEmpty(headers)) {
+      for (Map.Entry<String, String> header : headers.entrySet()) {
+        requestBuilder.addHeader(header.getKey(), header.getValue());
+      }
     }
     setTimeout(requestBuilder, DEFAULT_SOCKET_TIMEOUT_MS);
     return sendRequest(requestBuilder.build());
@@ -158,6 +212,26 @@ public class HttpClient implements AutoCloseable {
   public CloseableHttpResponse execute(HttpUriRequest request)
       throws IOException {
     return _httpClient.execute(request);
+  }
+
+  public CloseableHttpResponse sendMultipartPostRequest(String url, String body)
+      throws IOException {
+    HttpPost post = new HttpPost(url);
+    // our handlers ignore key...so we can put anything here
+    MultipartEntityBuilder builder = MultipartEntityBuilder.create();
+    builder.addPart("body", new StringBody(body));
+    post.setEntity(builder.build());
+    return _httpClient.execute(post);
+  }
+
+  public CloseableHttpResponse sendMultipartPutRequest(String url, String body)
+      throws IOException {
+    HttpPut put = new HttpPut(url);
+    // our handlers ignore key...so we can put anything here
+    MultipartEntityBuilder builder = MultipartEntityBuilder.create();
+    builder.addPart("body", new StringBody(body));
+    put.setEntity(builder.build());
+    return _httpClient.execute(put);
   }
 
   public static String getErrorMessage(HttpUriRequest request, CloseableHttpResponse response) {

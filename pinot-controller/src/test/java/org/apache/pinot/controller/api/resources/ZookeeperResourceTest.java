@@ -108,7 +108,7 @@ public class ZookeeperResourceTest {
     params = "path=" + path2 + "&expectedVersion=" + expectedVersion + "&accessOption=" + accessOption;
     Map<String, String> headers = new HashMap<>();
     headers.put("Content-Type", "application/json");
-    result = ControllerTestUtils.sendPutRequest(urlPut + "?" + params, headers, largeData);
+    result = ControllerTestUtils.sendPutRequest(urlPut + "?" + params, largeData, headers);
     Assert.assertTrue(result.toLowerCase().contains("successfully updated"));
 
     // validate that zk/getChildren return 2 items.
