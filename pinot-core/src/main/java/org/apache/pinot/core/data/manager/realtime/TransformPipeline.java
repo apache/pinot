@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -48,28 +49,38 @@ public class TransformPipeline {
       decodedRow = _complexTypeTransformer.transform(decodedRow);
     }
     Collection<GenericRow> rows = (Collection<GenericRow>) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
-    if (rows != null) {
-      for (GenericRow row : rows) {
-        GenericRow transformedRow = _recordTransformer.transform(row);
-        if (transformedRow != null && IngestionUtils.shouldIngestRow(row)) {
-          res.transformedRows.add(transformedRow);
-        } else {
-          res.failedRows.add(row);
-        }
-      }
-    } else {
-      GenericRow transformedRow = _recordTransformer.transform(decodedRow);
-      if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-        res.transformedRows.add(transformedRow);
+    if (rows == null) {
+      rows = ImmutableList.of(decodedRow);
+    }
+    for (GenericRow row : rows) {
+      GenericRow transformedRow = _recordTransformer.transform(row);
+      if (transformedRow != null && IngestionUtils.shouldIngestRow(row)) {
+        res.addTransformedRows(transformedRow);
       } else {
-        res.failedRows.add(transformedRow);
+        res.addFailedRows(row);
       }
     }
     return res;
   }
 
   public static class Result {
-    List<GenericRow> transformedRows = new ArrayList<>();
-    List<GenericRow> failedRows = new ArrayList<>();
+    private List<GenericRow> _transformedRows = new ArrayList<>();
+    private List<GenericRow> _failedRows = new ArrayList<>();
+
+    public List<GenericRow> getTransformedRows() {
+      return _transformedRows;
+    }
+
+    public List<GenericRow> getFailedRows() {
+      return _failedRows;
+    }
+
+    public void addTransformedRows(GenericRow row) {
+      _transformedRows.add(row);
+    }
+
+    public void addFailedRows(GenericRow row) {
+      _failedRows.add(row);
+    }
   }
 }
