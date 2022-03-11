@@ -108,7 +108,7 @@ public class PullRequestMergedEventsStream {
 
     properties.put("access", "access");
     properties.put("secret", "secret");
-    if(StringUtils.isNotEmpty(endpoint)) {
+    if (StringUtils.isNotEmpty(endpoint)) {
       properties.put("endpoint", endpoint);
     }
     properties.put("region", region);
@@ -117,14 +117,18 @@ public class PullRequestMergedEventsStream {
 
   public static StreamDataProducer getKinesisStreamDataProducer()
       throws Exception {
-   return getKinesisStreamDataProducer("http://localhost:4566", "us-east-1");
+    return getKinesisStreamDataProducer("http://localhost:4566", "us-east-1");
   }
 
-  public static StreamDataProducer getStreamDataProducer(StreamSourceType streamSourceType) throws Exception {
-    switch (streamSourceType){
-      case KAFKA: return getKafkaStreamDataProducer();
-      case KINESIS: return getKinesisStreamDataProducer();
-      default: throw new RuntimeException("Invalid streamSourceType specified: " + streamSourceType);
+  public static StreamDataProducer getStreamDataProducer(StreamSourceType streamSourceType)
+      throws Exception {
+    switch (streamSourceType) {
+      case KAFKA:
+        return getKafkaStreamDataProducer();
+      case KINESIS:
+        return getKinesisStreamDataProducer();
+      default:
+        throw new RuntimeException("Invalid streamSourceType specified: " + streamSourceType);
     }
   }
 

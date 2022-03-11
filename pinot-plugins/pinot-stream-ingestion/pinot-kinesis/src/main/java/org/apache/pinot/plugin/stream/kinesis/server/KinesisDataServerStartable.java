@@ -20,16 +20,12 @@ package org.apache.pinot.plugin.stream.kinesis.server;
 
 import cloud.localstack.Localstack;
 import cloud.localstack.ServiceName;
-import cloud.localstack.docker.annotation.IEnvironmentVariableProvider;
 import cloud.localstack.docker.annotation.LocalstackDockerConfiguration;
-import cloud.localstack.docker.annotation.LocalstackDockerProperties;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import org.apache.groovy.util.SystemUtil;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
-import cloud.localstack.docker.annotation.LocalstackDockerAnnotationProcessor;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,11 +60,13 @@ public class KinesisDataServerStartable implements StreamDataServerStartable {
     _serverProperties = props;
     final Map<String, String> environmentVariables = new HashMap<>();
     environmentVariables.put("SERVICES", ServiceName.KINESIS);
-    _dockerConfig = LocalstackDockerConfiguration.builder().portEdge(_serverProperties.getProperty("port", DEFAULT_PORT))
-        .portElasticSearch(String.valueOf(NetUtils.findOpenPort(4571))).imageTag("0.12.15")
-        .environmentVariables(environmentVariables).build();
+    _dockerConfig =
+        LocalstackDockerConfiguration.builder().portEdge(_serverProperties.getProperty("port", DEFAULT_PORT))
+            .portElasticSearch(String.valueOf(NetUtils.findOpenPort(4571))).imageTag("0.12.15")
+            .environmentVariables(environmentVariables).build();
 
-    _localStackKinesisEndpoint = String.format(_localStackKinesisEndpoint, _serverProperties.getProperty("port", DEFAULT_PORT));
+    _localStackKinesisEndpoint =
+        String.format(_localStackKinesisEndpoint, _serverProperties.getProperty("port", DEFAULT_PORT));
   }
 
   @Override

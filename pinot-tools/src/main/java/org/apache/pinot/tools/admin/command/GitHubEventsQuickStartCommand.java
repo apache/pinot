@@ -33,7 +33,8 @@ public class GitHubEventsQuickStartCommand extends AbstractBaseAdminCommand impl
   @CommandLine.Option(names = {"-personalAccessToken"}, required = true, description = "GitHub personal access token.")
   private String _personalAccessToken;
 
-  @CommandLine.Option(names = {"-sourceType"}, defaultValue = "Kafka", description = "Stream DataSource to use for ingesting data. Supported values - Kafka,Kinesis")
+  @CommandLine.Option(names = {"-sourceType"}, defaultValue = "Kafka",
+      description = "Stream DataSource to use for ingesting data. Supported values - Kafka,Kinesis")
   private String _sourceType;
 
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message.")

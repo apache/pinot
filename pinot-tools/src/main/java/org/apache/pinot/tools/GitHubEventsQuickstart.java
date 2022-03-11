@@ -24,13 +24,11 @@ import java.io.File;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 import java.util.Properties;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
-import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Quickstart.Color;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tools.streams.githubevents.PullRequestMergedEventsStream;
@@ -91,11 +89,12 @@ public class GitHubEventsQuickstart extends QuickStartBase {
 
   private void startServer() {
     switch (_sourceType) {
-      case KAFKA:
-        startKafka();
-        break;
       case KINESIS:
         startKinesis();
+        break;
+      case KAFKA:
+      default:
+        startKafka();
         break;
     }
   }
@@ -196,14 +195,15 @@ public class GitHubEventsQuickstart extends QuickStartBase {
   private String getTableConfigFilePath() {
     String tableConfigFilePath;
     switch (_sourceType) {
-      case KAFKA:
-        tableConfigFilePath = "examples/stream/githubEvents/pullRequestMergedEvents_realtime_table_config.json";
-        break;
       case KINESIS:
-        tableConfigFilePath = "examples/stream/githubEvents/pullRequestMergedEvents_kinesis_realtime_table_config.json";
+        tableConfigFilePath =
+            "examples/stream/githubEvents/pullRequestMergedEvents_kinesis_realtime_table_config.json";
         break;
+      case KAFKA:
       default:
-        tableConfigFilePath = "examples/stream/githubEvents/pullRequestMergedEvents_realtime_table_config.json";
+        tableConfigFilePath =
+            "examples/stream/githubEvents/pullRequestMergedEvents_realtime_table_config.json";
+        break;
     }
     return tableConfigFilePath;
   }
