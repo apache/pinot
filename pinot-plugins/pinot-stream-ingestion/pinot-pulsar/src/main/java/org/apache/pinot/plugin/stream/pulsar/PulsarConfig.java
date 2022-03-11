@@ -37,14 +37,14 @@ public class PulsarConfig {
   public static final String BOOTSTRAP_SERVERS = "bootstrap.servers";
   public static final String AUTHENTICATION_TOKEN = "authenticationToken";
   public static final String TLS_TRUST_CERTS_FILE_PATH = "tlsTrustCertsFilePath";
-  
+
   private String _pulsarTopicName;
   private String _subscriberId;
   private String _bootstrapServers;
   private MessageId _initialMessageId;
   private String _authenticationToken;
   private String _tlsTrustCertsFilePath;
-  
+
   public PulsarConfig(StreamConfig streamConfig, String subscriberId) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
     _pulsarTopicName = streamConfig.getTopicName();

@@ -78,7 +78,8 @@ public class PulsarStreamLevelConsumerManager {
 
       // Create the consumer
       try {
-        ClientBuilder pulsarClientBuilder = PulsarClient.builder().serviceUrl(pulsarStreamLevelStreamConfig.getBootstrapServers());
+        ClientBuilder pulsarClientBuilder = PulsarClient.builder().serviceUrl(
+                pulsarStreamLevelStreamConfig.getBootstrapServers());
         if (pulsarStreamLevelStreamConfig.getTlsTrustCertsFilePath() != null) {
           pulsarClientBuilder.tlsTrustCertsFilePath(pulsarStreamLevelStreamConfig.getTlsTrustCertsFilePath());
         }
