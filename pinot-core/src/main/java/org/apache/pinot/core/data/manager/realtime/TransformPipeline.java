@@ -42,25 +42,29 @@ public class TransformPipeline {
     _complexTypeTransformer = ComplexTypeTransformer.getComplexTypeTransformer(tableConfig);
   }
 
-  public Result processRow(GenericRow decodedRow) throws Exception {
+  public Result processRow(GenericRow decodedRow) throws TransformException {
     Result res = new Result();
-    if (_complexTypeTransformer != null) {
-      // TODO: consolidate complex type transformer into composite type transformer
-      decodedRow = _complexTypeTransformer.transform(decodedRow);
-    }
-    Collection<GenericRow> rows = (Collection<GenericRow>) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
-    if (rows == null) {
-      rows = ImmutableList.of(decodedRow);
-    }
-    for (GenericRow row : rows) {
-      GenericRow transformedRow = _recordTransformer.transform(row);
-      if (transformedRow != null && IngestionUtils.shouldIngestRow(row)) {
-        res.addTransformedRows(transformedRow);
-      } else {
-        res.addFailedRows(row);
+    try {
+      if (_complexTypeTransformer != null) {
+        // TODO: consolidate complex type transformer into composite type transformer
+        decodedRow = _complexTypeTransformer.transform(decodedRow);
       }
+      Collection<GenericRow> rows = (Collection<GenericRow>) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
+      if (rows == null) {
+        rows = ImmutableList.of(decodedRow);
+      }
+      for (GenericRow row : rows) {
+        GenericRow transformedRow = _recordTransformer.transform(row);
+        if (transformedRow != null && IngestionUtils.shouldIngestRow(row)) {
+          res.addTransformedRows(transformedRow);
+        } else {
+          res.addFailedRows(row);
+        }
+      }
+      return res;
+    } catch (Exception ex) {
+      throw new TransformException("Encountered error while processing row", res, ex);
     }
-    return res;
   }
 
   public static class Result {
@@ -81,6 +85,22 @@ public class TransformPipeline {
 
     public void addFailedRows(GenericRow row) {
       _failedRows.add(row);
+    }
+  }
+
+  public static class TransformException extends Exception {
+    private final Result _partialResult;
+    public TransformException(String message, Result partialResult, Throwable cause) {
+      super(message, cause);
+      _partialResult = partialResult;
+    }
+
+    /**
+     * Retrieve the partially processed rows in a batch.
+     * @return the Result containing partial results
+     */
+    public Result getPartialResult() {
+      return _partialResult;
     }
   }
 }
