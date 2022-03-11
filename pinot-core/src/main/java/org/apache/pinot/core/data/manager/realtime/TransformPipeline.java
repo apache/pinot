@@ -72,11 +72,11 @@ public class TransformPipeline {
     private List<GenericRow> _failedRows = new ArrayList<>();
 
     public List<GenericRow> getTransformedRows() {
-      return _transformedRows;
+      return ImmutableList.copyOf(_transformedRows);
     }
 
     public List<GenericRow> getFailedRows() {
-      return _failedRows;
+      return ImmutableList.copyOf(_failedRows);
     }
 
     public void addTransformedRows(GenericRow row) {
@@ -88,6 +88,10 @@ public class TransformPipeline {
     }
   }
 
+  /**
+   * The exception contains the reference to a "partial result".
+   * It contains records of failed rows, transformed rows
+   */
   public static class TransformException extends Exception {
     private final Result _partialResult;
     public TransformException(String message, Result partialResult, Throwable cause) {
