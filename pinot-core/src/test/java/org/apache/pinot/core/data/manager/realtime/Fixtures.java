@@ -153,5 +153,4 @@ public class Fixtures {
     retVal.putValue(GenericRow.MULTIPLE_RECORDS_KEY, ImmutableList.of(firstRow, secondRow, thirdRow));
     return retVal;
   }
-
 }
