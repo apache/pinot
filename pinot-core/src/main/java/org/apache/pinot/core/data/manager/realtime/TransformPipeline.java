@@ -42,8 +42,16 @@ public class TransformPipeline {
     _complexTypeTransformer = ComplexTypeTransformer.getComplexTypeTransformer(tableConfig);
   }
 
+  /**
+   * Process and validate the decoded row against schema.
+   * @param decodedRow the row data to pass in
+   * @return both processed rows and failed rows in a struct.
+   * @throws TransformException when data has issues like schema validation. Fetch the partialResult from Exception
+   */
   public Result processRow(GenericRow decodedRow) throws TransformException {
     Result res = new Result();
+    // to keep track and add to "failedRows" when exception happens
+    GenericRow currentRow = null;
     try {
       if (_complexTypeTransformer != null) {
         // TODO: consolidate complex type transformer into composite type transformer
@@ -54,6 +62,7 @@ public class TransformPipeline {
         rows = ImmutableList.of(decodedRow);
       }
       for (GenericRow row : rows) {
+        currentRow = row;
         GenericRow transformedRow = _recordTransformer.transform(row);
         if (transformedRow != null && IngestionUtils.shouldIngestRow(row)) {
           res.addTransformedRows(transformedRow);
@@ -63,13 +72,15 @@ public class TransformPipeline {
       }
       return res;
     } catch (Exception ex) {
+      // when exception happens, the current processing row needs to be added to failed list
+      res.addFailedRows(currentRow);
       throw new TransformException("Encountered error while processing row", res, ex);
     }
   }
 
   public static class Result {
-    private List<GenericRow> _transformedRows = new ArrayList<>();
-    private List<GenericRow> _failedRows = new ArrayList<>();
+    private final List<GenericRow> _transformedRows = new ArrayList<>();
+    private final List<GenericRow> _failedRows = new ArrayList<>();
 
     public List<GenericRow> getTransformedRows() {
       return ImmutableList.copyOf(_transformedRows);
