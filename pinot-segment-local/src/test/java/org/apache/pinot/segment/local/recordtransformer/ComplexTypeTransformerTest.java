@@ -367,7 +367,7 @@ public class ComplexTypeTransformerTest {
     Assert.assertEquals(genericRow.getValue("b"), 2L);
     Assert.assertEquals(genericRow.getValue("test.c"), "u");
 
-    // name conflict
+    // name conflict where there becomes duplicate field names after renaming
     prefixesToRename = new HashMap<>();
     prefixesToRename.put("test.", "");
     transformer = new ComplexTypeTransformer(new ArrayList<>(), ".",
@@ -381,6 +381,32 @@ public class ComplexTypeTransformerTest {
     } catch (RuntimeException e) {
       // expected
     }
+
+    // name conflict where there becomes an empty field name after renaming
+    prefixesToRename = new HashMap<>();
+    prefixesToRename.put("test", "");
+    transformer = new ComplexTypeTransformer(new ArrayList<>(), ".",
+            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
+    genericRow = new GenericRow();
+    genericRow.putValue("a", 1L);
+    genericRow.putValue("test", 2L);
+    try {
+      transformer.renamePrefixes(genericRow);
+      Assert.fail("Should fail due to empty name after renaming");
+    } catch (RuntimeException e) {
+      // expected
+    }
+
+    // case where nothing gets renamed
+    prefixesToRename = new HashMap<>();
+    transformer = new ComplexTypeTransformer(new ArrayList<>(), ".",
+            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
+    genericRow = new GenericRow();
+    genericRow.putValue("a", 1L);
+    genericRow.putValue("test", 2L);
+    transformer.renamePrefixes(genericRow);
+    Assert.assertEquals(genericRow.getValue("a"), 1L);
+    Assert.assertEquals(genericRow.getValue("test"), 2L);
   }
 
   @Test
