@@ -466,6 +466,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     boolean canTakeMore = true;
 
     GenericRow reuse = new GenericRow();
+    TransformPipeline.Result reusedResult = new TransformPipeline.Result();
     for (int index = 0; index < messageCount; index++) {
       if (_shouldStop || endCriteriaReached()) {
         if (_segmentLogger.isDebugEnabled()) {
@@ -505,9 +506,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           .decode(messagesAndOffsets.getMessageAtIndex(index), messagesAndOffsets.getMessageOffsetAtIndex(index),
               messagesAndOffsets.getMessageLengthAtIndex(index), reuse);
       if (decodedRow != null) {
-        TransformPipeline.Result result = new TransformPipeline.Result();
         try {
-          result = _transformPipeline.processRow(decodedRow);
+          reusedResult = _transformPipeline.processRow(decodedRow, reusedResult);
         } catch (TransformPipeline.TransformException e) {
           _numRowsErrored++;
           String errorMessage = String.format("Caught exception while transforming the record: %s", decodedRow);
@@ -516,14 +516,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               new SegmentErrorInfo(System.currentTimeMillis(), errorMessage, e));
           // for a row with multiple records (multi rows), if we encounter exception in the middle,
           // there could be some rows that are processed successfully. We still wish to process them.
-          result = e.getPartialResult();
+          reusedResult = e.getPartialResult();
         }
-        if (!result.getFailedRows().isEmpty()) {
+        if (reusedResult.getFailedRowCount() > 0) {
           realtimeRowsDroppedMeter =
               _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED,
-                  result.getFailedRows().size(), realtimeRowsDroppedMeter);
+                  reusedResult.getFailedRowCount(), realtimeRowsDroppedMeter);
         }
-        for (GenericRow transformedRow : result.getTransformedRows()) {
+        for (GenericRow transformedRow : reusedResult.getTransformedRows()) {
           try {
             canTakeMore = _realtimeSegment.index(transformedRow, msgMetadata);
             indexedMessageCount++;

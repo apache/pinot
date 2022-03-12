@@ -37,10 +37,10 @@ public class TransformPipelineTest {
     Schema schema = createSchema();
     TransformPipeline pipeline = new TransformPipeline(config, schema);
     GenericRow simpleRow = createSingleRow(9527);
-    TransformPipeline.Result result = pipeline.processRow(simpleRow);
+    TransformPipeline.Result result = pipeline.processRow(simpleRow, null);
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getTransformedRows().size(), 1);
-    Assert.assertTrue(result.getFailedRows().isEmpty());
+    Assert.assertEquals(result.getFailedRowCount(), 0);
     Assert.assertEquals(result.getTransformedRows().get(0), simpleRow);
   }
 
@@ -53,14 +53,13 @@ public class TransformPipelineTest {
     GenericRow simpleRow = createInvalidSingleRow(9527);
     TransformPipeline.Result result;
     try {
-      result = pipeline.processRow(simpleRow);
+      result = pipeline.processRow(simpleRow, null);
     } catch (TransformPipeline.TransformException ex) {
       result = ex.getPartialResult();
     }
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getTransformedRows().size(), 0);
-    Assert.assertFalse(result.getFailedRows().isEmpty());
-    Assert.assertEquals(result.getFailedRows().get(0), simpleRow);
+    Assert.assertEquals(result.getFailedRowCount(), 1);
   }
 
   @Test
@@ -71,11 +70,12 @@ public class TransformPipelineTest {
     TransformPipeline pipeline = new TransformPipeline(config, schema);
     GenericRow multipleRow = createMultipleRow(9527);
     Collection<GenericRow> rows = (Collection<GenericRow>) multipleRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
-    TransformPipeline.Result result = pipeline.processRow(multipleRow);
+    TransformPipeline.Result result = new TransformPipeline.Result();
+    result = pipeline.processRow(multipleRow, result);
 
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getTransformedRows().size(), rows.size());
-    Assert.assertTrue(result.getFailedRows().isEmpty());
+    Assert.assertEquals(result.getFailedRowCount(), 0);
     Assert.assertEquals(result.getTransformedRows(), rows);
   }
 
@@ -88,13 +88,13 @@ public class TransformPipelineTest {
     GenericRow multipleRow = createMultipleRowPartialFailure(9527);
     TransformPipeline.Result result;
     try {
-      result = pipeline.processRow(multipleRow);
+      result = pipeline.processRow(multipleRow, null);
     } catch (TransformPipeline.TransformException ex) {
       result = ex.getPartialResult();
     }
 
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getTransformedRows().size(), 1);
-    Assert.assertEquals(result.getTransformedRows().size(), 1);
+    Assert.assertEquals(result.getFailedRowCount(), 1);
   }
 }
