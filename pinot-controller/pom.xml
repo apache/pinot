@@ -279,12 +279,12 @@
           twice. See https://github.com/apache/pinot/pull/6326#issue-533412053 for more details.
         -->
         <version>3.0.0-M5</version>
-        <configuration combine.children="override">
-          <suiteXmlFiles>
-            <suiteXmlFile>testng-statefull.xml</suiteXmlFile>
-            <suiteXmlFile>testng-stateless.xml</suiteXmlFile>
-          </suiteXmlFiles>
-        </configuration>
+<!--        <configuration combine.children="override">-->
+<!--          <suiteXmlFiles>-->
+<!--            <suiteXmlFile>testng-statefull.xml</suiteXmlFile>-->
+<!--            <suiteXmlFile>testng-stateless.xml</suiteXmlFile>-->
+<!--          </suiteXmlFiles>-->
+<!--        </configuration>-->
       </plugin>
     </plugins>
   </build>
