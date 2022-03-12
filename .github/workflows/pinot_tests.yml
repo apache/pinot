@@ -30,7 +30,8 @@ on:
       - "**.md"
   pull_request:
     branches:
-      - '*master'
+      - master
+      - multi_stage_query_engine
     paths-ignore:
       - "docs/**"
       - "licenses/**"
