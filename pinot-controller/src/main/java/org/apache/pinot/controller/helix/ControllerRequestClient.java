@@ -44,7 +44,11 @@ public class ControllerRequestClient {
   public void addSchema(Schema schema)
       throws IOException {
     String url = _controllerRequestURLBuilder.forSchemaCreate();
-    _httpClient.sendMultipartPostRequest(url, schema.toSingleLineJsonString());
+    try {
+      _httpClient.sendMultipartPostRequest(url, schema.toSingleLineJsonString());
+    } catch (HttpErrorStatusException e) {
+      throw new IOException(e);
+    }
   }
 
   public Schema getSchema(String schemaName)

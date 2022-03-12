@@ -50,7 +50,6 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.http.HttpResponse;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.ZkStarter;
@@ -554,14 +553,22 @@ public abstract class ControllerTestUtils {
     }
   }
 
-  public static HttpResponse sendMultipartPostRequest(String url, String body)
+  public static SimpleHttpResponse sendMultipartPostRequest(String url, String body)
       throws IOException {
-    return _httpClient.sendMultipartPostRequest(url, body);
+    try {
+      return _httpClient.sendMultipartPostRequest(url, body);
+    } catch (HttpErrorStatusException e) {
+      return new SimpleHttpResponse(e.getStatusCode(), e.getMessage());
+    }
   }
 
-  public static HttpResponse sendMultipartPutRequest(String url, String body)
+  public static SimpleHttpResponse sendMultipartPutRequest(String url, String body)
       throws IOException {
-    return _httpClient.sendMultipartPutRequest(url, body);
+    try {
+      return _httpClient.sendMultipartPutRequest(url, body);
+    } catch (HttpErrorStatusException e) {
+      return new SimpleHttpResponse(e.getStatusCode(), e.getMessage());
+    }
   }
 
   private static String constructResponse(SimpleHttpResponse resp) {

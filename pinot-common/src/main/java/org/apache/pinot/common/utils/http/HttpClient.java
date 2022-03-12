@@ -43,7 +43,6 @@ import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.entity.mime.MultipartEntityBuilder;
-import org.apache.http.entity.mime.content.StringBody;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicHeader;
@@ -214,24 +213,38 @@ public class HttpClient implements AutoCloseable {
     return _httpClient.execute(request);
   }
 
-  public CloseableHttpResponse sendMultipartPostRequest(String url, String body)
-      throws IOException {
+  public SimpleHttpResponse sendMultipartPostRequest(String url, String body)
+      throws IOException, HttpErrorStatusException {
     HttpPost post = new HttpPost(url);
     // our handlers ignore key...so we can put anything here
     MultipartEntityBuilder builder = MultipartEntityBuilder.create();
-    builder.addPart("body", new StringBody(body));
+    builder.addTextBody("body", body);
     post.setEntity(builder.build());
-    return _httpClient.execute(post);
+    try (CloseableHttpResponse response = _httpClient.execute(post)) {
+      StatusLine statusLine = response.getStatusLine();
+      int statusCode = statusLine.getStatusCode();
+      if (statusCode >= 300) {
+        throw new HttpErrorStatusException(HttpClient.getErrorMessage(post, response), statusCode);
+      }
+      return new SimpleHttpResponse(statusCode, EntityUtils.toString(response.getEntity()));
+    }
   }
 
-  public CloseableHttpResponse sendMultipartPutRequest(String url, String body)
-      throws IOException {
+  public SimpleHttpResponse sendMultipartPutRequest(String url, String body)
+      throws IOException, HttpErrorStatusException {
     HttpPut put = new HttpPut(url);
     // our handlers ignore key...so we can put anything here
     MultipartEntityBuilder builder = MultipartEntityBuilder.create();
-    builder.addPart("body", new StringBody(body));
+    builder.addTextBody("body", body);
     put.setEntity(builder.build());
-    return _httpClient.execute(put);
+    try (CloseableHttpResponse response = _httpClient.execute(put)) {
+      StatusLine statusLine = response.getStatusLine();
+      int statusCode = statusLine.getStatusCode();
+      if (statusCode >= 300) {
+        throw new HttpErrorStatusException(HttpClient.getErrorMessage(put, response), statusCode);
+      }
+      return new SimpleHttpResponse(statusCode, EntityUtils.toString(response.getEntity()));
+    }
   }
 
   public static String getErrorMessage(HttpUriRequest request, CloseableHttpResponse response) {
