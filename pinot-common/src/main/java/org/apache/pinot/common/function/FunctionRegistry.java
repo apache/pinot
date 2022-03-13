@@ -61,8 +61,12 @@ public class FunctionRegistry {
     for (Method method : methodSet) {
       ScalarFunction scalarFunction = method.getAnnotation(ScalarFunction.class);
       if (scalarFunction.enabled()) {
-        if (!scalarFunction.name().isEmpty()) {
-          FunctionRegistry.registerFunction(scalarFunction.name(), method);
+        // Annotated function names
+        String[] scalarFunctionNames = scalarFunction.names();
+        if (scalarFunctionNames.length > 0) {
+          for (String name : scalarFunctionNames) {
+            FunctionRegistry.registerFunction(name, method);
+          }
         } else {
           FunctionRegistry.registerFunction(method);
         }

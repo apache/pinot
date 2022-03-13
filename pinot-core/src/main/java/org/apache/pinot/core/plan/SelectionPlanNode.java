@@ -31,7 +31,6 @@ import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 
 
 /**
@@ -56,14 +55,16 @@ public class SelectionPlanNode implements PlanNode {
       if (orderByExpressions == null) {
         // Selection only
         TransformOperator transformOperator = new TransformPlanNode(_indexSegment, _queryContext, expressions,
-            Math.min(limit + _queryContext.getOffset(), DocIdSetPlanNode.MAX_DOC_PER_CALL)).run();
+            Math.min(limit, DocIdSetPlanNode.MAX_DOC_PER_CALL)).run();
         return new SelectionOnlyOperator(_indexSegment, _queryContext, expressions, transformOperator);
       } else {
-        if (isAllOrderByColumnsSorted(orderByExpressions)) { // no sorting needed
-          TransformOperator transformOperator =
-              new TransformPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
+        // Selection order-by
+        if (isAllOrderByColumnsSorted(orderByExpressions)) {
+          // All order-by columns are sorted, no need to sort the records
+          TransformOperator transformOperator = new TransformPlanNode(_indexSegment, _queryContext, expressions,
+              Math.min(limit + _queryContext.getOffset(), DocIdSetPlanNode.MAX_DOC_PER_CALL)).run();
           return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, transformOperator, true);
-        } else if (orderByExpressions.size() == expressions.size()) { // Selection order-by
+        } else if (orderByExpressions.size() == expressions.size()) {
           // All output expressions are ordered
           TransformOperator transformOperator =
               new TransformPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
@@ -71,11 +72,10 @@ public class SelectionPlanNode implements PlanNode {
         } else {
           // Not all output expressions are ordered, only fetch the order-by expressions and docId to avoid the
           // unnecessary data fetch
-          List<ExpressionContext> expressionsToTransform = new ArrayList<>(orderByExpressions.size() + 1);
+          List<ExpressionContext> expressionsToTransform = new ArrayList<>(orderByExpressions.size());
           for (OrderByExpressionContext orderByExpression : orderByExpressions) {
             expressionsToTransform.add(orderByExpression.getExpression());
           }
-          expressionsToTransform.add(ExpressionContext.forIdentifier(BuiltInVirtualColumn.DOCID));
           TransformOperator transformOperator =
               new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform,
                   DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
@@ -101,14 +101,12 @@ public class SelectionPlanNode implements PlanNode {
    * @return true is all columns in order by clause are sorted . False otherwise
    */
   private boolean isAllOrderByColumnsSorted(List<OrderByExpressionContext> orderByExpressions) {
-    int numOrderByExpressions = orderByExpressions.size();
-    for (int i = 0; i < numOrderByExpressions; i++) {
-      OrderByExpressionContext expressionContext = orderByExpressions.get(0);
-      if (!(expressionContext.getExpression().getType() == ExpressionContext.Type.IDENTIFIER) || !expressionContext
-          .isAsc()) {
+    for (OrderByExpressionContext orderByExpression : orderByExpressions) {
+      if (!(orderByExpression.getExpression().getType() == ExpressionContext.Type.IDENTIFIER)
+          || !orderByExpression.isAsc()) {
         return false;
       }
-      String column = expressionContext.getExpression().getIdentifier();
+      String column = orderByExpression.getExpression().getIdentifier();
       if (!_indexSegment.getDataSource(column).getDataSourceMetadata().isSorted()) {
         return false;
       }

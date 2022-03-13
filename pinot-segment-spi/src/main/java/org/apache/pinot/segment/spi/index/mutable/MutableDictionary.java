@@ -16,7 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.index.reader;
+package org.apache.pinot.segment.spi.index.mutable;
+
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
+
 
 /**
  * Interface for mutable dictionary (for CONSUMING segment).

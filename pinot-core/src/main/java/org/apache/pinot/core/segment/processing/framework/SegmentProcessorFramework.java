@@ -117,13 +117,14 @@ public class SegmentProcessorFramework {
     Schema schema = _segmentProcessorConfig.getSchema();
     String segmentNamePrefix = _segmentProcessorConfig.getSegmentConfig().getSegmentNamePrefix();
     String segmentNamePostfix = _segmentProcessorConfig.getSegmentConfig().getSegmentNamePostfix();
+    String fixedSegmentName = _segmentProcessorConfig.getSegmentConfig().getFixedSegmentName();
     SegmentGeneratorConfig generatorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     generatorConfig.setOutDir(_segmentsOutputDir.getPath());
 
     if (tableConfig.getIndexingConfig().getSegmentNameGeneratorType() != null) {
-      generatorConfig.setSegmentNameGenerator(
-          SegmentNameGeneratorFactory
-              .createSegmentNameGenerator(tableConfig, schema, segmentNamePrefix, segmentNamePostfix, false));
+      generatorConfig.setSegmentNameGenerator(SegmentNameGeneratorFactory
+          .createSegmentNameGenerator(tableConfig, schema, segmentNamePrefix, segmentNamePostfix, fixedSegmentName,
+              false));
     } else {
       // SimpleSegmentNameGenerator is used by default.
       generatorConfig.setSegmentNamePrefix(segmentNamePrefix);

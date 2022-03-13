@@ -87,6 +87,7 @@ public class BenchmarkQueries extends BaseQueriesTest {
   private static final String RAW_INT_COL_NAME = "RAW_INT_COL";
   private static final String RAW_STRING_COL_NAME = "RAW_STRING_COL";
   private static final String NO_INDEX_INT_COL_NAME = "NO_INDEX_INT_COL";
+  private static final String NO_INDEX_STRING_COL = "NO_INDEX_STRING_COL";
 
   public static final String FILTERED_QUERY = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 123 AND INT_COL < 599999),"
       + "MAX(INT_COL) FILTER(WHERE INT_COL > 123 AND INT_COL < 599999) "
@@ -112,13 +113,16 @@ public class BenchmarkQueries extends BaseQueriesTest {
   public static final String MULTI_GROUP_BY_WITH_RAW_QUERY_2 = "SELECT RAW_STRING_COL,RAW_INT_COL,INT_COL,COUNT(*) "
       + "FROM MyTable GROUP BY RAW_STRING_COL,RAW_INT_COL,INT_COL";
 
+  public static final String NO_INDEX_LIKE_QUERY = "SELECT RAW_INT_COL FROM MyTable "
+      + "WHERE NO_INDEX_STRING_COL LIKE '%foo%'";
+
   @Param("1500000")
   private int _numRows;
   @Param({"EXP(0.001)", "EXP(0.5)", "EXP(0.999)"})
   String _scenario;
   @Param({
       MULTI_GROUP_BY_WITH_RAW_QUERY, MULTI_GROUP_BY_WITH_RAW_QUERY_2, FILTERED_QUERY, NON_FILTERED_QUERY,
-      SUM_QUERY
+      SUM_QUERY, NO_INDEX_LIKE_QUERY
   })
   String _query;
   private IndexSegment _indexSegment;
@@ -164,11 +168,12 @@ public class BenchmarkQueries extends BaseQueriesTest {
     List<GenericRow> rows = new ArrayList<>();
     for (int i = 0; i < numRows; i++) {
       GenericRow row = new GenericRow();
-      row.putField(INT_COL_NAME, (int) _supplier.getAsLong());
-      row.putField(NO_INDEX_INT_COL_NAME, (int) _supplier.getAsLong());
-      row.putField(RAW_INT_COL_NAME, (int) _supplier.getAsLong());
-      row.putField(RAW_STRING_COL_NAME,
+      row.putValue(INT_COL_NAME, (int) _supplier.getAsLong());
+      row.putValue(NO_INDEX_INT_COL_NAME, (int) _supplier.getAsLong());
+      row.putValue(RAW_INT_COL_NAME, (int) _supplier.getAsLong());
+      row.putValue(RAW_STRING_COL_NAME,
           strings.computeIfAbsent((int) _supplier.getAsLong(), k -> UUID.randomUUID().toString()));
+      row.putValue(NO_INDEX_STRING_COL, row.getValue(RAW_STRING_COL_NAME));
       rows.add(row);
     }
     return rows;
@@ -189,6 +194,7 @@ public class BenchmarkQueries extends BaseQueriesTest {
         .addSingleValueDimension(RAW_INT_COL_NAME, FieldSpec.DataType.INT)
         .addSingleValueDimension(INT_COL_NAME, FieldSpec.DataType.INT)
         .addSingleValueDimension(RAW_STRING_COL_NAME, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(NO_INDEX_STRING_COL, FieldSpec.DataType.STRING)
         .build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR.getPath());

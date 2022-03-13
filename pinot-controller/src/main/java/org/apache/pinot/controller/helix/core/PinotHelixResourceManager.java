@@ -46,6 +46,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import javax.ws.rs.BadRequestException;
+import javax.ws.rs.ClientErrorException;
+import javax.ws.rs.NotFoundException;
+import javax.ws.rs.core.Response;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.StringUtils;
@@ -400,50 +404,152 @@ public class PinotHelixResourceManager {
    * Add an instance into the Helix cluster.
    *
    * @param instance Instance to be added
+   * @param updateBrokerResource Whether to update broker resource for broker instance
    * @return Request response
    */
-  public synchronized PinotResourceManagerResponse addInstance(Instance instance) {
-    List<String> instances = getAllInstances();
-    String instanceIdToAdd = InstanceUtils.getHelixInstanceId(instance);
-    if (instances.contains(instanceIdToAdd)) {
-      return PinotResourceManagerResponse.failure("Instance " + instanceIdToAdd + " already exists");
+  public synchronized PinotResourceManagerResponse addInstance(Instance instance, boolean updateBrokerResource) {
+    String instanceId = InstanceUtils.getHelixInstanceId(instance);
+    InstanceConfig instanceConfig = getHelixInstanceConfig(instanceId);
+    if (instanceConfig != null) {
+      throw new ClientErrorException(String.format("Instance: %s already exists", instanceId),
+          Response.Status.CONFLICT);
+    }
+
+    instanceConfig = InstanceUtils.toHelixInstanceConfig(instance);
+    _helixAdmin.addInstance(_helixClusterName, instanceConfig);
+
+    // Update broker resource if necessary
+    boolean shouldUpdateBrokerResource = false;
+    List<String> newBrokerTags = null;
+    if (instanceId.startsWith(Helix.PREFIX_OF_BROKER_INSTANCE) && updateBrokerResource) {
+      List<String> newTags = instance.getTags();
+      if (CollectionUtils.isNotEmpty(newTags)) {
+        newBrokerTags = newTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
+        shouldUpdateBrokerResource = !newBrokerTags.isEmpty();
+      }
+    }
+    if (shouldUpdateBrokerResource) {
+      long startTimeMs = System.currentTimeMillis();
+      List<String> tablesAdded = new ArrayList<>();
+      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, null);
+      LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}", instanceId,
+          newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded);
+      return PinotResourceManagerResponse.success(
+          String.format("Added instance: %s, and updated broker resource - tables added: %s", instanceId, tablesAdded));
     } else {
-      _helixAdmin.addInstance(_helixClusterName, InstanceUtils.toHelixInstanceConfig(instance));
-      return PinotResourceManagerResponse.SUCCESS;
+      return PinotResourceManagerResponse.success("Added instance: " + instanceId);
     }
   }
 
   /**
    * Update a given instance for the specified Instance ID
    */
-  public synchronized PinotResourceManagerResponse updateInstance(String instanceIdToUpdate, Instance newInstance) {
-    InstanceConfig instanceConfig = getHelixInstanceConfig(instanceIdToUpdate);
+  public synchronized PinotResourceManagerResponse updateInstance(String instanceId, Instance newInstance,
+      boolean updateBrokerResource) {
+    InstanceConfig instanceConfig = getHelixInstanceConfig(instanceId);
     if (instanceConfig == null) {
-      return PinotResourceManagerResponse.failure("Instance " + instanceIdToUpdate + " does not exists");
+      throw new NotFoundException("Failed to find instance config for instance: " + instanceId);
+    }
+
+    List<String> newTags = newInstance.getTags();
+    List<String> oldTags = instanceConfig.getTags();
+    InstanceUtils.updateHelixInstanceConfig(instanceConfig, newInstance);
+    if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceId), instanceConfig)) {
+      throw new RuntimeException("Failed to set instance config for instance: " + instanceId);
+    }
+
+    // Update broker resource if necessary
+    boolean shouldUpdateBrokerResource = false;
+    List<String> newBrokerTags = null;
+    if (instanceId.startsWith(Helix.PREFIX_OF_BROKER_INSTANCE) && updateBrokerResource) {
+      newBrokerTags =
+          newTags != null ? newTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList())
+              : Collections.emptyList();
+      List<String> oldBrokerTags =
+          oldTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
+      shouldUpdateBrokerResource = !newBrokerTags.equals(oldBrokerTags);
+    }
+    if (shouldUpdateBrokerResource) {
+      long startTimeMs = System.currentTimeMillis();
+      List<String> tablesAdded = new ArrayList<>();
+      List<String> tablesRemoved = new ArrayList<>();
+      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, tablesRemoved);
+      LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
+          instanceId, newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
+      return PinotResourceManagerResponse.success(
+          String.format("Updated instance: %s, and updated broker resource - tables added: %s, tables removed: %s",
+              instanceId, tablesAdded, tablesRemoved));
     } else {
-      InstanceUtils.updateHelixInstanceConfig(instanceConfig, newInstance);
-      if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceIdToUpdate), instanceConfig)) {
-        return PinotResourceManagerResponse.failure("Unable to update instance: " + instanceIdToUpdate);
-      }
-      return PinotResourceManagerResponse.SUCCESS;
+      return PinotResourceManagerResponse.success("Updated instance: " + instanceId);
     }
   }
 
   /**
    * Updates the tags of the specified instance ID
    */
-  public synchronized PinotResourceManagerResponse updateInstanceTags(String instanceIdToUpdate, String tags) {
-    InstanceConfig instanceConfig = getHelixInstanceConfig(instanceIdToUpdate);
+  public synchronized PinotResourceManagerResponse updateInstanceTags(String instanceId, String tagsString,
+      boolean updateBrokerResource) {
+    InstanceConfig instanceConfig = getHelixInstanceConfig(instanceId);
     if (instanceConfig == null) {
-      return PinotResourceManagerResponse.failure("Instance " + instanceIdToUpdate + " does not exists");
+      throw new NotFoundException("Failed to find instance config for instance: " + instanceId);
     }
-    List<String> tagList = Arrays.asList(StringUtils.split(tags, ','));
-    instanceConfig.getRecord().setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), tagList);
-    if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceIdToUpdate), instanceConfig)) {
-      return PinotResourceManagerResponse
-          .failure("Unable to update instance: " + instanceIdToUpdate + " to tags: " + tags);
+
+    List<String> newTags = Arrays.asList(StringUtils.split(tagsString, ','));
+    List<String> oldTags = instanceConfig.getTags();
+    instanceConfig.getRecord().setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), newTags);
+    if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceId), instanceConfig)) {
+      throw new RuntimeException("Failed to set instance config for instance: " + instanceId);
     }
-    return PinotResourceManagerResponse.SUCCESS;
+
+    // Update broker resource if necessary
+    boolean shouldUpdateBrokerResource = false;
+    List<String> newBrokerTags = null;
+    if (instanceId.startsWith(Helix.PREFIX_OF_BROKER_INSTANCE) && updateBrokerResource) {
+      newBrokerTags = newTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
+      List<String> oldBrokerTags =
+          oldTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
+      shouldUpdateBrokerResource = !newBrokerTags.equals(oldBrokerTags);
+    }
+    if (shouldUpdateBrokerResource) {
+      long startTimeMs = System.currentTimeMillis();
+      List<String> tablesAdded = new ArrayList<>();
+      List<String> tablesRemoved = new ArrayList<>();
+      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, tablesRemoved);
+      LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
+          instanceId, newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
+      return PinotResourceManagerResponse.success(String.format(
+          "Updated tags: %s for instance: %s, and updated broker resource - tables added: %s, tables removed: %s",
+          newTags, instanceId, tablesAdded, tablesRemoved));
+    } else {
+      return PinotResourceManagerResponse.success(
+          String.format("Updated tags: %s for instance: %s", newTags, instanceId));
+    }
+  }
+
+  /**
+   * Updates the tables served by the specified broker instance in the broker resource.
+   * NOTE: This method will read all the table configs, so can be costly.
+   */
+  public PinotResourceManagerResponse updateBrokerResource(String instanceId) {
+    if (!instanceId.startsWith(Helix.PREFIX_OF_BROKER_INSTANCE)) {
+      throw new BadRequestException("Cannot update broker resource for non-broker instance: " + instanceId);
+    }
+    InstanceConfig instanceConfig = getHelixInstanceConfig(instanceId);
+    if (instanceConfig == null) {
+      throw new NotFoundException("Failed to find instance config for instance: " + instanceId);
+    }
+
+    long startTimeMs = System.currentTimeMillis();
+    List<String> brokerTags =
+        instanceConfig.getTags().stream().filter(TagNameUtils::isBrokerTag).collect(Collectors.toList());
+    List<String> tablesAdded = new ArrayList<>();
+    List<String> tablesRemoved = new ArrayList<>();
+    HelixHelper.updateBrokerResource(_helixZkManager, instanceId, brokerTags, tablesAdded, tablesRemoved);
+    LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
+        instanceId, brokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
+    return PinotResourceManagerResponse.success(
+        String.format("Updated broker resource for broker: %s - tables added: %s, tables removed: %s", instanceId,
+            tablesAdded, tablesRemoved));
   }
 
   /**
