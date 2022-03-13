@@ -321,6 +321,9 @@ public class GapfillUtils {
   }
 
   public static BrokerRequest stripGapfill(BrokerRequest brokerRequest) {
+    if (brokerRequest.getPinotQuery().getDataSource() == null) {
+      return brokerRequest;
+    }
     QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
     GapfillUtils.GapfillType gapfillType = queryContext.getGapfillType();
     if (gapfillType == null) {
