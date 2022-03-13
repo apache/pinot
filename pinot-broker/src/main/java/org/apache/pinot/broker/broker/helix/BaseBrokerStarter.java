@@ -45,6 +45,7 @@ import org.apache.pinot.broker.requesthandler.GrpcBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
 import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -84,6 +85,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected String _zkServers;
   protected String _hostname;
   protected int _port;
+  protected int _tlsPort;
   protected String _instanceId;
   private volatile boolean _isStarting = false;
   private volatile boolean _isShuttingDown = false;
@@ -124,6 +126,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
               : NetUtils.getHostAddress();
     }
     _port = _listenerConfigs.get(0).getPort();
+    _tlsPort = ListenerConfigUtil.findLastTlsPort(_listenerConfigs, -1);
 
     _instanceId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY);
     if (_instanceId != null) {
@@ -238,6 +241,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     TableCache tableCache = new TableCache(_propertyStore, caseInsensitive);
     // Configure TLS for netty connection to server
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_TLS_PREFIX);
+    NettyConfig nettyDefaults = NettyConfig.extractNettyConfig(_brokerConf, Broker.BROKER_NETTY_PREFIX);
 
     if (_brokerConf.getProperty(Broker.BROKER_REQUEST_HANDLER_TYPE, Broker.DEFAULT_BROKER_REQUEST_HANDLER_TYPE)
         .equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
@@ -250,11 +254,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       if (_brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false)) {
         _brokerRequestHandler =
             new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
-                queryQuotaManager, tableCache, _brokerMetrics, tlsDefaults);
+                queryQuotaManager, tableCache, _brokerMetrics, nettyDefaults, tlsDefaults);
       } else {
         _brokerRequestHandler =
             new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
-                queryQuotaManager, tableCache, _brokerMetrics, null);
+                queryQuotaManager, tableCache, _brokerMetrics, nettyDefaults, null);
       }
     }
 
@@ -326,6 +330,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   private void updateInstanceConfigAndBrokerResourceIfNeeded() {
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_participantHelixManager, _instanceId);
     boolean instanceConfigUpdated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
+    if (_tlsPort > 0) {
+      HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
+    }
     boolean shouldUpdateBrokerResource = false;
     String brokerTag = null;
     List<String> instanceTags = instanceConfig.getTags();

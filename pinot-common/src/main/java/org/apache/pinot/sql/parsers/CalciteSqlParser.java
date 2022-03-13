@@ -42,7 +42,9 @@ import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.calcite.sql.SqlOrderBy;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.SqlSelectKeyword;
+import org.apache.calcite.sql.fun.SqlBetweenOperator;
 import org.apache.calcite.sql.fun.SqlCase;
+import org.apache.calcite.sql.fun.SqlLikeOperator;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.babel.SqlBabelParserImpl;
@@ -55,6 +57,7 @@ import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.Pairs;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
@@ -689,19 +692,21 @@ public class CalciteSqlParser {
 
   private static Expression compileFunctionExpression(SqlBasicCall functionNode) {
     SqlKind functionKind = functionNode.getKind();
+    boolean negated = false;
     String functionName;
     switch (functionKind) {
       case AND:
         return compileAndExpression(functionNode);
       case OR:
         return compileOrExpression(functionNode);
-      case COUNT:
-        SqlLiteral functionQuantifier = functionNode.getFunctionQuantifier();
-        if (functionQuantifier != null && functionQuantifier.toValue().equalsIgnoreCase("DISTINCT")) {
-          functionName = AggregationFunctionType.DISTINCTCOUNT.name();
-        } else {
-          functionName = AggregationFunctionType.COUNT.name();
-        }
+      // BETWEEN and LIKE might be negated (NOT BETWEEN, NOT LIKE)
+      case BETWEEN:
+        negated = ((SqlBetweenOperator) functionNode.getOperator()).isNegated();
+        functionName = SqlKind.BETWEEN.name();
+        break;
+      case LIKE:
+        negated = ((SqlLikeOperator) functionNode.getOperator()).isNegated();
+        functionName = SqlKind.LIKE.name();
         break;
       case OTHER:
       case OTHER_FUNCTION:
@@ -743,7 +748,16 @@ public class CalciteSqlParser {
     validateFunction(functionName, operands);
     Expression functionExpression = RequestUtils.getFunctionExpression(functionName);
     functionExpression.getFunctionCall().setOperands(operands);
-    return functionExpression;
+    if (negated) {
+      Expression negatedFunctionExpression = RequestUtils.getFunctionExpression(FilterKind.NOT.name());
+      // Do not use `Collections.singletonList()` because we might modify the operand later
+      List<Expression> negatedFunctionOperands = new ArrayList<>(1);
+      negatedFunctionOperands.add(functionExpression);
+      negatedFunctionExpression.getFunctionCall().setOperands(negatedFunctionOperands);
+      return negatedFunctionExpression;
+    } else {
+      return functionExpression;
+    }
   }
 
   /**

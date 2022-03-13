@@ -21,7 +21,6 @@ package org.apache.pinot.controller.helix;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.spi.config.provider.SchemaChangeListener;
@@ -35,13 +34,11 @@ import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNull;
+import static org.testng.Assert.*;
 
 
 public class TableCacheTest {
@@ -96,11 +93,6 @@ public class TableCacheTest {
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
     // Case-insensitive table name are handled based on the table config instead of the schema
     assertNull(tableCache.getActualTableName(RAW_TABLE_NAME));
-    TestSchemaChangeListener schemaChangeListener = new TestSchemaChangeListener();
-    List<Schema> schemas = tableCache.registerSchemaChangeListener(schemaChangeListener);
-    Assert.assertNotNull(schemas);
-    Assert.assertEquals(schemas.size(), 1);
-    Assert.assertEquals(schemas.get(0).getSchemaName(), SCHEMA_NAME);
 
     // Add a table config
     TableConfig tableConfig =
@@ -118,78 +110,100 @@ public class TableCacheTest {
     assertEquals(tableCache.getColumnNameMap(SCHEMA_NAME), expectedColumnMap);
     assertEquals(tableCache.getSchema(RAW_TABLE_NAME), expectedSchema);
     assertEquals(tableCache.getColumnNameMap(RAW_TABLE_NAME), expectedColumnMap);
+
+    // Register the change listeners
     TestTableConfigChangeListener tableConfigChangeListener = new TestTableConfigChangeListener();
-    List<TableConfig> tableConfigs = tableCache.registerTableConfigChangeListener(tableConfigChangeListener);
-    Assert.assertNotNull(tableConfigs);
-    Assert.assertEquals(tableConfigs.size(), 1);
-    Assert.assertEquals(tableConfigs.get(0).getTableName(), OFFLINE_TABLE_NAME);
+    assertTrue(tableCache.registerTableConfigChangeListener(tableConfigChangeListener));
+    assertEquals(tableConfigChangeListener._tableConfigList.size(), 1);
+    assertEquals(tableConfigChangeListener._tableConfigList.get(0), tableConfig);
+    TestSchemaChangeListener schemaChangeListener = new TestSchemaChangeListener();
+    assertTrue(tableCache.registerSchemaChangeListener(schemaChangeListener));
+    assertEquals(schemaChangeListener._schemaList.size(), 1);
+    assertEquals(schemaChangeListener._schemaList.get(0), expectedSchema);
+    // Re-register the change listener should fail
+    assertFalse(tableCache.registerTableConfigChangeListener(tableConfigChangeListener));
+    assertFalse(tableCache.registerSchemaChangeListener(schemaChangeListener));
 
     // Update the schema
     schema.addField(new DimensionFieldSpec("newColumn", DataType.LONG, true));
     ControllerTestUtils.getHelixResourceManager().updateSchema(schema, false);
     // Wait for at most 10 seconds for the callback to update the schema in the cache
-    // NOTE: schema should never be null during the transitioning
+    // NOTE:
+    // - Schema should never be null during the transitioning
+    // - Schema change listener callback should always contain 1 schema
+    // - Verify if the callback is fully done by checking the schema change lister because it is the last step of the
+    //   callback handling
     expectedSchema.addField(new DimensionFieldSpec("newColumn", DataType.LONG, true));
-    TestUtils.waitForCondition(
-        aVoid -> Objects.requireNonNull(tableCache.getSchema(SCHEMA_NAME)).equals(expectedSchema), 10_000L,
-        "Failed to update the schema in the cache");
-    // Schema can be accessed by both the schema name and the raw table name
     expectedColumnMap.put("newcolumn", "newColumn");
+    TestUtils.waitForCondition(aVoid -> {
+      assertNotNull(tableCache.getSchema(SCHEMA_NAME));
+      assertEquals(schemaChangeListener._schemaList.size(), 1);
+      return schemaChangeListener._schemaList.get(0).equals(expectedSchema);
+    }, 10_000L, "Failed to update the schema in the cache");
+    // Schema can be accessed by both the schema name and the raw table name
+    assertEquals(tableCache.getSchema(SCHEMA_NAME), expectedSchema);
     assertEquals(tableCache.getColumnNameMap(SCHEMA_NAME), expectedColumnMap);
     assertEquals(tableCache.getSchema(RAW_TABLE_NAME), expectedSchema);
     assertEquals(tableCache.getColumnNameMap(RAW_TABLE_NAME), expectedColumnMap);
-    Assert.assertNotNull(schemaChangeListener._schemaList);
-    Assert.assertEquals(schemaChangeListener._schemaList.size(), 1);
-    Assert.assertEquals(schemaChangeListener._schemaList.get(0).getSchemaName(), SCHEMA_NAME);
 
     // Update the table config and drop the schema name
     tableConfig.getValidationConfig().setSchemaName(null);
     ControllerTestUtils.getHelixResourceManager().updateTableConfig(tableConfig);
     // Wait for at most 10 seconds for the callback to update the table config in the cache
+    // NOTE:
+    // - Table config should never be null during the transitioning
+    // - Table config change listener callback should always contain 1 table config
+    // - Verify if the callback is fully done by checking the table config change lister because it is the last step of
+    //   the callback handling
+    TestUtils.waitForCondition(aVoid -> {
+      assertNotNull(tableCache.getTableConfig(OFFLINE_TABLE_NAME));
+      assertEquals(tableConfigChangeListener._tableConfigList.size(), 1);
+      return tableConfigChangeListener._tableConfigList.get(0).equals(tableConfig);
+    }, 10_000L, "Failed to update the table config in the cache");
     // After dropping the schema name from the table config, schema can only be accessed by the schema name, but not by
     // the table name
-    // NOTE: Table config should never be null during the transitioning
-    TestUtils.waitForCondition(
-        aVoid -> Objects.requireNonNull(tableCache.getTableConfig(OFFLINE_TABLE_NAME)).equals(tableConfig)
-            && tableCache.getSchema(RAW_TABLE_NAME) == null && tableCache.getColumnNameMap(RAW_TABLE_NAME) == null,
-        10_000L, "Failed to update the table config in the cache");
+    assertEquals(tableCache.getTableConfig(OFFLINE_TABLE_NAME), tableConfig);
+    assertNull(tableCache.getSchema(RAW_TABLE_NAME));
+    assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
     assertEquals(tableCache.getActualTableName(MANGLED_RAW_TABLE_NAME), RAW_TABLE_NAME);
     assertEquals(tableCache.getActualTableName(MANGLED_OFFLINE_TABLE_NAME), OFFLINE_TABLE_NAME);
     assertNull(tableCache.getActualTableName(REALTIME_TABLE_NAME));
     assertEquals(tableCache.getSchema(SCHEMA_NAME), expectedSchema);
     assertEquals(tableCache.getColumnNameMap(SCHEMA_NAME), expectedColumnMap);
-    Assert.assertNotNull(tableConfigChangeListener._tableConfigList);
-    Assert.assertEquals(tableConfigChangeListener._tableConfigList.size(), 1);
-    Assert.assertEquals(tableConfigChangeListener._tableConfigList.get(0).getTableName(), OFFLINE_TABLE_NAME);
 
     // Remove the table config
     ControllerTestUtils.getHelixResourceManager().deleteOfflineTable(RAW_TABLE_NAME);
     // Wait for at most 10 seconds for the callback to remove the table config from the cache
-    TestUtils.waitForCondition(aVoid -> tableCache.getTableConfig(OFFLINE_TABLE_NAME) == null
-            && tableCache.getActualTableName(RAW_TABLE_NAME) == null, 10_000L,
+    // NOTE:
+    // - Verify if the callback is fully done by checking the table config change lister because it is the last step of
+    //   the callback handling
+    TestUtils.waitForCondition(aVoid -> tableConfigChangeListener._tableConfigList.isEmpty(), 10_000L,
         "Failed to remove the table config from the cache");
+    assertNull(tableCache.getTableConfig(OFFLINE_TABLE_NAME));
+    assertNull(tableCache.getActualTableName(RAW_TABLE_NAME));
     assertEquals(tableCache.getSchema(SCHEMA_NAME), expectedSchema);
     assertEquals(tableCache.getColumnNameMap(SCHEMA_NAME), expectedColumnMap);
     assertNull(tableCache.getSchema(RAW_TABLE_NAME));
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
-    Assert.assertNotNull(schemaChangeListener._schemaList);
-    Assert.assertEquals(schemaChangeListener._schemaList.size(), 1);
-    Assert.assertEquals(tableConfigChangeListener._tableConfigList.size(), 0);
 
     // Remove the schema
     ControllerTestUtils.getHelixResourceManager().deleteSchema(schema);
     // Wait for at most 10 seconds for the callback to remove the schema from the cache
-    TestUtils.waitForCondition(aVoid -> tableCache.getSchema(SCHEMA_NAME) == null, 10_000L,
+    // NOTE:
+    // - Verify if the callback is fully done by checking the schema change lister because it is the last step of the
+    //   callback handling
+    TestUtils.waitForCondition(aVoid -> schemaChangeListener._schemaList.isEmpty(), 10_000L,
         "Failed to remove the schema from the cache");
+    assertNull(tableCache.getSchema(SCHEMA_NAME));
     assertNull(tableCache.getColumnNameMap(SCHEMA_NAME));
     assertNull(tableCache.getSchema(RAW_TABLE_NAME));
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
-    Assert.assertEquals(schemaChangeListener._schemaList.size(), 0);
-    Assert.assertEquals(tableConfigChangeListener._tableConfigList.size(), 0);
+    assertEquals(schemaChangeListener._schemaList.size(), 0);
+    assertEquals(tableConfigChangeListener._tableConfigList.size(), 0);
   }
 
   private static class TestTableConfigChangeListener implements TableConfigChangeListener {
-    private List<TableConfig> _tableConfigList;
+    private volatile List<TableConfig> _tableConfigList;
 
     @Override
     public void onChange(List<TableConfig> tableConfigList) {
@@ -198,7 +212,7 @@ public class TableCacheTest {
   }
 
   private static class TestSchemaChangeListener implements SchemaChangeListener {
-    private List<Schema> _schemaList;
+    private volatile List<Schema> _schemaList;
 
     @Override
     public void onChange(List<Schema> schemaList) {

@@ -19,15 +19,14 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.common.base.Charsets;
+import com.google.common.annotations.VisibleForTesting;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -44,14 +43,15 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang.StringUtils;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.ZNRecordSerializer;
-import org.apache.helix.util.GZipCompressionUtil;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.zookeeper.data.Stat;
+import org.codehaus.jackson.map.DeserializationConfig;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.map.SerializationConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,13 +59,24 @@ import org.slf4j.LoggerFactory;
 @Api(tags = Constants.ZOOKEEPER)
 @Path("/")
 public class ZookeeperResource {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ZookeeperResource.class);
 
-  public static final Logger LOGGER = LoggerFactory.getLogger(ZookeeperResource.class);
+  // Helix uses codehaus.jackson.map.ObjectMapper, hence we can't use pinot JsonUtils here.
+  @VisibleForTesting
+  static final ObjectMapper MAPPER = new ObjectMapper();
+
+  static {
+    // Configuration should be identical to org.apache.helix.manager.zk.ZNRecordSerializer.
+    MAPPER.configure(SerializationConfig.Feature.INDENT_OUTPUT, true);
+    MAPPER.configure(SerializationConfig.Feature.AUTO_DETECT_FIELDS, true);
+    MAPPER.configure(SerializationConfig.Feature.CAN_OVERRIDE_ACCESS_MODIFIERS, true);
+    MAPPER.configure(DeserializationConfig.Feature.AUTO_DETECT_FIELDS, true);
+    MAPPER.configure(DeserializationConfig.Feature.AUTO_DETECT_SETTERS, true);
+    MAPPER.configure(DeserializationConfig.Feature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+  }
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
-
-  ZNRecordSerializer _znRecordSerializer = new ZNRecordSerializer();
 
   @GET
   @Path("/zk/get")
@@ -84,17 +95,15 @@ public class ZookeeperResource {
 
     ZNRecord znRecord = _pinotHelixResourceManager.readZKData(path);
     if (znRecord != null) {
-      byte[] serializeBytes = _znRecordSerializer.serialize(znRecord);
-      if (GZipCompressionUtil.isCompressed(serializeBytes)) {
-        try {
-          serializeBytes = GZipCompressionUtil.uncompress(new ByteArrayInputStream(serializeBytes));
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
+      try {
+        return MAPPER.writeValueAsString(znRecord);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
       }
-      return new String(serializeBytes, StandardCharsets.UTF_8);
+    } else {
+      // TODO: should throw Not found exception, but need to fix how UI interpret the error
+      return null;
     }
-    return null;
   }
 
   @DELETE
@@ -154,11 +163,12 @@ public class ZookeeperResource {
     }
     ZNRecord znRecord;
     try {
-      znRecord = (ZNRecord) _znRecordSerializer.deserialize(data.getBytes(Charsets.UTF_8));
+      znRecord = MAPPER.readValue(data, ZNRecord.class);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Failed to deserialize the data", Response.Status.BAD_REQUEST,
           e);
     }
+
     try {
       boolean result = _pinotHelixResourceManager.setZKData(path, znRecord, expectedVersion, accessOption);
       if (result) {
@@ -187,11 +197,45 @@ public class ZookeeperResource {
 
     path = validateAndNormalizeZKPath(path, true);
 
-    List<String> children = _pinotHelixResourceManager.getZKChildren(path);
+    List<String> childNames = _pinotHelixResourceManager.getZKChildNames(path);
     try {
-      return JsonUtils.objectToString(children);
+      return JsonUtils.objectToString(childNames);
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  @GET
+  @Path("/zk/getChildren")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get all child znodes")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "ZK Path not found"),
+      @ApiResponse(code = 204, message = "No Content"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public String getChildren(
+      @ApiParam(value = "Zookeeper Path, must start with /", required = true) @QueryParam("path") String path) {
+
+    path = validateAndNormalizeZKPath(path, true);
+
+    List<ZNRecord> znRecords = _pinotHelixResourceManager.getZKChildren(path);
+    if (znRecords != null) {
+      List<ZNRecord> nonNullRecords = new ArrayList<>(znRecords.size());
+      for (ZNRecord znRecord : znRecords) {
+        if (znRecord != null) {
+          nonNullRecords.add(znRecord);
+        }
+      }
+      try {
+        return MAPPER.writeValueAsString(nonNullRecords);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    } else {
+      throw new ControllerApplicationException(LOGGER, String.format("ZNRecord children %s not found", path),
+          Response.Status.NOT_FOUND);
     }
   }
 

@@ -80,7 +80,8 @@ public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I
         break;
       case DAYS:
         _dateTimeTruncate = (dateTime) -> _outputDateTimeFormatter
-            .print(dateTime.withDayOfMonth((dateTime.getDayOfMonth() / sz) * sz).dayOfMonth().roundFloorCopy());
+            .print(dateTime.withDayOfMonth(((dateTime.getDayOfMonth() - 1) / sz) * sz + 1).dayOfMonth()
+                .roundFloorCopy());
         break;
       default:
         _dateTimeTruncate = _outputDateTimeFormatter::print;

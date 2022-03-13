@@ -59,9 +59,10 @@ public abstract class GeoFunctionTest {
   protected static final String STRING_SV_COLUMN = "stringSV";
   protected static final String LONG_SV_COLUMN = "longSV";
   protected static final String STRING_SV_COLUMN2 = "stringSV2";
+
+  private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
   private static final String INDEX_DIR_PATH = FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME;
-  protected static final String TIME_COLUMN = "time";
 
   private static final double DELTA = 0.00001;
 
@@ -81,9 +82,9 @@ public abstract class GeoFunctionTest {
       throws Exception {
     assertIntFunction(
         String.format("%s(ST_GeomFromText(%s),ST_GeomFromText(%s))", functionName, STRING_SV_COLUMN, STRING_SV_COLUMN2),
-        new int[]{result ? 1 : 0}, Arrays
-            .asList(new Column(STRING_SV_COLUMN, FieldSpec.DataType.STRING, new String[]{leftWkt}),
-                new Column(STRING_SV_COLUMN2, FieldSpec.DataType.STRING, new String[]{rightWkt})));
+        new int[]{result ? 1 : 0},
+        Arrays.asList(new Column(STRING_SV_COLUMN, FieldSpec.DataType.STRING, new String[]{leftWkt}),
+            new Column(STRING_SV_COLUMN2, FieldSpec.DataType.STRING, new String[]{rightWkt})));
   }
 
   protected void assertLongFunction(String function, long[] expectedValues, List<Column> columns)
@@ -151,8 +152,7 @@ public abstract class GeoFunctionTest {
       rows.add(row);
     }
 
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COLUMN).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR_PATH);
     config.setSegmentName(SEGMENT_NAME);

@@ -24,31 +24,37 @@ import org.apache.pinot.spi.data.Schema;
 
 
 /**
- * An interface for the provider of pinot table configs and schema
+ * An interface for the provider of pinot table configs and schemas.
  */
 public interface PinotConfigProvider {
 
   /**
-   * Gets the tableConfig
+   * Returns the table config for the given table name with type suffix.
    */
   TableConfig getTableConfig(String tableNameWithType);
 
   /**
    * Registers the {@link TableConfigChangeListener} and notifies it whenever any changes (addition, update, removal)
-   * to any of the table configs are detected
-   * @return current list of tables
+   * to any of the table configs are detected. If the listener is successfully registered,
+   * {@link TableConfigChangeListener#onChange(List)} will be invoked with the current table configs.
+   *
+   * @return {@code true} if the listener is successfully registered, {@code false} if the listener is already
+   *         registered.
    */
-  List<TableConfig> registerTableConfigChangeListener(TableConfigChangeListener tableConfigChangeListener);
+  boolean registerTableConfigChangeListener(TableConfigChangeListener tableConfigChangeListener);
 
   /**
-   * Gets the schema
+   * Returns the schema for the given raw table name.
    */
   Schema getSchema(String rawTableName);
 
   /**
-   * Registers the {@link SchemaChangeListener} and notifies it whenever any changes  (addition, update, removal) to
-   * schemas are detected
-   * @return current list of schemas
+   * Registers the {@link SchemaChangeListener} and notifies it whenever any changes (addition, update, removal) to any
+   * of the schemas are detected. If the listener is successfully registered,
+   * {@link SchemaChangeListener#onChange(List)} will be invoked with the current schemas.
+   *
+   * @return {@code true} if the listener is successfully registered, {@code false} if the listener is already
+   *         registered.
    */
-  List<Schema> registerSchemaChangeListener(SchemaChangeListener schemaChangeListener);
+  boolean registerSchemaChangeListener(SchemaChangeListener schemaChangeListener);
 }

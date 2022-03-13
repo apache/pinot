@@ -19,42 +19,38 @@
 package org.apache.pinot.queries;
 
 import java.io.File;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
-import org.apache.pinot.spi.config.table.FSTType;
-import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+
 
 public class NotOperatorQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "NotOperatorQueriesTest");
-  private static final String TABLE_NAME = "MyTable";
+  private static final String TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
   private static final String FIRST_INT_COL_NAME = "FIRST_INT_COL";
   private static final String SECOND_INT_COL_NAME = "SECOND_INT_COL";
@@ -85,21 +81,10 @@ public class NotOperatorQueriesTest extends BaseQueriesTest {
       throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
-    List<IndexSegment> segments = new ArrayList<>();
     buildSegment();
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    Set<String> invertedIndexCols = new HashSet<>();
-    invertedIndexCols.add(FIRST_INT_COL_NAME);
-    indexLoadingConfig.setInvertedIndexColumns(invertedIndexCols);
-    Set<String> fstIndexCols = new HashSet<>();
-    fstIndexCols.add(DOMAIN_NAMES_COL);
-    indexLoadingConfig.setFSTIndexColumns(fstIndexCols);
-    indexLoadingConfig.setFSTIndexType(FSTType.LUCENE);
-    ImmutableSegment segment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
-    segments.add(segment);
-
-    _indexSegment = segment;
-    _indexSegments = segments;
+    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.mmap);
+    _indexSegment = immutableSegment;
+    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }
 
   private List<String> getDomainNames() {
@@ -109,15 +94,15 @@ public class NotOperatorQueriesTest extends BaseQueriesTest {
         "www.sd.domain2.co.bc", "www.sd.domain2.co.cd");
   }
 
-  private List<GenericRow> createTestData(int numRows) {
+  private List<GenericRow> createTestData() {
     List<GenericRow> rows = new ArrayList<>();
     List<String> domainNames = getDomainNames();
-    for (int i = 0; i < numRows; i++) {
+    for (int i = 0; i < NUM_ROWS; i++) {
       String domain = domainNames.get(i % domainNames.size());
       GenericRow row = new GenericRow();
-      row.putField(FIRST_INT_COL_NAME, i);
-      row.putField(SECOND_INT_COL_NAME, INT_BASE_VALUE + i);
-      row.putField(DOMAIN_NAMES_COL, domain);
+      row.putValue(FIRST_INT_COL_NAME, i);
+      row.putValue(SECOND_INT_COL_NAME, INT_BASE_VALUE + i);
+      row.putValue(DOMAIN_NAMES_COL, domain);
       rows.add(row);
     }
     return rows;
@@ -125,15 +110,8 @@ public class NotOperatorQueriesTest extends BaseQueriesTest {
 
   private void buildSegment()
       throws Exception {
-    List<GenericRow> rows = createTestData(NUM_ROWS);
-    List<FieldConfig> fieldConfigs = new ArrayList<>();
-    fieldConfigs.add(
-        new FieldConfig(DOMAIN_NAMES_COL, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null));
-    fieldConfigs.add(
-        new FieldConfig(FIRST_INT_COL_NAME, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED, null,
-            null));
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInvertedIndexColumns(Arrays.asList(FIRST_INT_COL_NAME)).setFieldConfigList(fieldConfigs).build();
+    List<GenericRow> rows = createTestData();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(FIRST_INT_COL_NAME, FieldSpec.DataType.INT)
         .addSingleValueDimension(DOMAIN_NAMES_COL, FieldSpec.DataType.STRING)
@@ -156,92 +134,53 @@ public class NotOperatorQueriesTest extends BaseQueriesTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  private void testSelectionResults(String query, int expectedResultSize, List<Serializable[]> expectedResults) {
-    Operator<IntermediateResultsBlock> operator = getOperatorForSqlQuery(query);
-    IntermediateResultsBlock operatorResult = operator.nextBlock();
-    List<Object[]> resultset = (List<Object[]>) operatorResult.getSelectionResult();
-    Assert.assertNotNull(resultset);
-    Assert.assertEquals(resultset.size(), expectedResultSize);
-    if (expectedResults != null) {
-      for (int i = 0; i < expectedResultSize; i++) {
-        Object[] actualRow = resultset.get(i);
-        Object[] expectedRow = expectedResults.get(i);
-        Assert.assertEquals(actualRow.length, expectedRow.length);
-        for (int j = 0; j < actualRow.length; j++) {
-          Object actualColValue = actualRow[j];
-          Object expectedColValue = expectedRow[j];
-          Assert.assertEquals(actualColValue, expectedColValue);
-        }
-      }
-    }
-  }
+  private void testNotOperator(String filter, long expectedSegmentResult) {
+    String query = "SELECT COUNT(*) FROM testTable WHERE " + filter;
+    AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
+    List<Object> segmentResults = aggregationOperator.nextBlock().getAggregationResult();
+    assertNotNull(segmentResults);
+    assertEquals((long) segmentResults.get(0), expectedSegmentResult);
 
-  private void testOptimizedQueryHelper(String query, int expectedResultSize, List<Serializable[]> expectedResults) {
-    BrokerResponseNative brokerResponseNative = getBrokerResponseForOptimizedSqlQuery(query, null);
-    ResultTable resultTable = brokerResponseNative.getResultTable();
-    List<Object[]> results = resultTable.getRows();
-    Assert.assertEquals(results.size(), expectedResultSize);
-
-    if (expectedResults != null) {
-      for (int i = 0; i < expectedResults.size(); i++) {
-        Object[] actualRow = results.get(i);
-        Serializable[] expectedRow = expectedResults.get(i);
-        Assert.assertEquals(actualRow, expectedRow);
-      }
-    }
+    BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+    ResultTable resultTable = brokerResponse.getResultTable();
+    Object[] brokerResults = resultTable.getRows().get(0);
+    assertEquals((long) brokerResults[0], 4 * expectedSegmentResult);
   }
 
   @Test
-  public void testLikeBasedNotOperator() {
-    String query =
-        "SELECT FIRST_INT_COL, SECOND_INT_COL FROM MyTable WHERE NOT REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') LIMIT "
-            + "50000";
-    testSelectionResults(query, 768, null);
-    testOptimizedQueryHelper(query, 1536, null);
+  public void testLikePredicates() {
+    testNotOperator("DOMAIN_NAMES NOT LIKE 'www.domain1%'", 768);
+    testNotOperator("NOT REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*')", 768);
 
-    query = "SELECT FIRST_INT_COL, SECOND_INT_COL FROM MyTable WHERE NOT REGEXP_LIKE(DOMAIN_NAMES, 'www.sd.domain1.*') "
-        + "LIMIT 50000";
-    testSelectionResults(query, 768, null);
-    testOptimizedQueryHelper(query, 1536, null);
+    testNotOperator("DOMAIN_NAMES NOT LIKE 'www.sd.domain1%'", 768);
+    testNotOperator("NOT REGEXP_LIKE(DOMAIN_NAMES, 'www.sd.domain1.*')", 768);
 
-    query =
-        "SELECT FIRST_INT_COL, SECOND_INT_COL FROM MyTable WHERE NOT REGEXP_LIKE(DOMAIN_NAMES, '.*domain1.*') LIMIT "
-            + "50000";
-    testSelectionResults(query, 512, null);
-    testOptimizedQueryHelper(query, 1024, null);
+    testNotOperator("DOMAIN_NAMES NOT LIKE '%domain1%'", 512);
+    testNotOperator("NOT REGEXP_LIKE(DOMAIN_NAMES, '.*domain1.*')", 512);
 
-    query = "SELECT FIRST_INT_COL, SECOND_INT_COL FROM MyTable WHERE NOT REGEXP_LIKE(DOMAIN_NAMES, '.*domain.*') LIMIT "
-        + "50000";
-    testSelectionResults(query, 0, null);
-    testOptimizedQueryHelper(query, 0, null);
+    testNotOperator("DOMAIN_NAMES NOT LIKE '%domain%'", 0);
+    testNotOperator("NOT REGEXP_LIKE(DOMAIN_NAMES, '.*domain.*')", 0);
 
-    query =
-        "SELECT FIRST_INT_COL, SECOND_INT_COL FROM MyTable WHERE NOT REGEXP_LIKE(DOMAIN_NAMES, '.*com') LIMIT 50000";
-    testSelectionResults(query, 768, null);
-    testOptimizedQueryHelper(query, 1536, null);
+    testNotOperator("DOMAIN_NAMES NOT LIKE '%com'", 768);
+    testNotOperator("NOT REGEXP_LIKE(DOMAIN_NAMES, '.*com')", 768);
   }
 
   @Test
-  public void testWeirdPredicates() {
-    String query = "SELECT FIRST_INT_COL, SECOND_INT_COL FROM MyTable WHERE NOT FIRST_INT_COL = 5 LIMIT 50000";
-    testSelectionResults(query, 1023, null);
+  public void testRangePredicates() {
+    testNotOperator("NOT FIRST_INT_COL = 5", 1023);
+    testNotOperator("NOT FIRST_INT_COL < 5", 1019);
+    testNotOperator("NOT FIRST_INT_COL > 5", 6);
 
-    query = "SELECT FIRST_INT_COL, SECOND_INT_COL FROM MyTable WHERE NOT FIRST_INT_COL < 5 LIMIT " + "50000";
-    testSelectionResults(query, 1019, null);
-
-    query = "SELECT FIRST_INT_COL, SECOND_INT_COL FROM MyTable WHERE NOT FIRST_INT_COL > 5 LIMIT " + "50000";
-    testSelectionResults(query, 6, null);
+    testNotOperator("FIRST_INT_COL NOT BETWEEN 10 AND 20", 1013);
+    testNotOperator("NOT FIRST_INT_COL BETWEEN 10 AND 20", 1013);
   }
 
   @Test
   public void testCompositePredicates() {
-    String query =
-        "SELECT FIRST_INT_COL, SECOND_INT_COL FROM MyTable WHERE NOT (FIRST_INT_COL > 5 AND SECOND_INT_COL < 1009) "
-            + "LIMIT " + "50000";
-    testSelectionResults(query, 1021, null);
+    testNotOperator("NOT (FIRST_INT_COL > 5 AND SECOND_INT_COL < 1009)", 1021);
+    testNotOperator("NOT FIRST_INT_COL > 5 OR NOT SECOND_INT_COL < 1009", 1021);
 
-    query = "SELECT FIRST_INT_COL, SECOND_INT_COL FROM MyTable WHERE NOT (FIRST_INT_COL < 5 OR SECOND_INT_COL > 2000) "
-        + "LIMIT " + "50000";
-    testSelectionResults(query, 996, null);
+    testNotOperator("NOT (FIRST_INT_COL < 5 OR SECOND_INT_COL > 2000)", 996);
+    testNotOperator("NOT FIRST_INT_COL < 5 AND NOT SECOND_INT_COL > 2000", 996);
   }
 }

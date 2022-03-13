@@ -36,7 +36,7 @@ import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.BaseJsonIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
-import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
+import org.apache.pinot.segment.spi.index.mutable.MutableJsonIndex;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -50,7 +50,7 @@ import static org.apache.pinot.common.request.context.FilterContext.Type.PREDICA
 /**
  * Json index for mutable segment.
  */
-public class MutableJsonIndex implements JsonIndexReader {
+public class MutableJsonIndexImpl implements MutableJsonIndex {
   private final Map<String, RoaringBitmap> _postingListMap;
   private final IntList _docIdMapping;
   private final ReentrantReadWriteLock.ReadLock _readLock;
@@ -59,7 +59,7 @@ public class MutableJsonIndex implements JsonIndexReader {
   private int _nextDocId;
   private int _nextFlattenedDocId;
 
-  public MutableJsonIndex() {
+  public MutableJsonIndexImpl() {
     _postingListMap = new HashMap<>();
     _docIdMapping = new IntArrayList();
 
@@ -71,6 +71,7 @@ public class MutableJsonIndex implements JsonIndexReader {
   /**
    * Adds the next json value.
    */
+  @Override
   public void add(String jsonString)
       throws IOException {
     try {

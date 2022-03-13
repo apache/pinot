@@ -227,11 +227,6 @@ public final class TableConfigUtils {
       }
     }
 
-    if (validationConfig.isAllowNullTimeValue()) {
-      Preconditions.checkState(timeColumnName != null && !timeColumnName.isEmpty(),
-          "'timeColumnName' should exist if null time value is allowed");
-    }
-
     validateRetentionConfig(tableConfig);
   }
 

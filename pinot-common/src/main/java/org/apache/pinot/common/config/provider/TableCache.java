@@ -19,33 +19,38 @@
 package org.apache.pinot.common.config.provider;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.I0Itec.zkclient.IZkChildListener;
 import org.I0Itec.zkclient.IZkDataListener;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.spi.config.provider.PinotConfigProvider;
 import org.apache.pinot.spi.config.provider.SchemaChangeListener;
 import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
+import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,15 +69,16 @@ public class TableCache implements PinotConfigProvider {
   private static final String LOWER_CASE_OFFLINE_TABLE_SUFFIX = "_offline";
   private static final String LOWER_CASE_REALTIME_TABLE_SUFFIX = "_realtime";
 
-  private final Set<TableConfigChangeListener> _tableConfigChangeListeners = ConcurrentHashMap.newKeySet();
-  private final Set<SchemaChangeListener> _schemaChangeListeners = ConcurrentHashMap.newKeySet();
+  // NOTE: No need to use concurrent set because it is always accessed within the ZK change listener lock
+  private final Set<TableConfigChangeListener> _tableConfigChangeListeners = new HashSet<>();
+  private final Set<SchemaChangeListener> _schemaChangeListeners = new HashSet<>();
 
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final boolean _caseInsensitive;
 
   private final ZkTableConfigChangeListener _zkTableConfigChangeListener = new ZkTableConfigChangeListener();
-  // Key is table name with type suffix, value is table config
-  private final Map<String, TableConfig> _tableConfigMap = new ConcurrentHashMap<>();
+  // Key is table name with type suffix, value is table config info
+  private final Map<String, TableConfigInfo> _tableConfigInfoMap = new ConcurrentHashMap<>();
   // Key is table name (with or without type suffix), value is schema name
   // It only stores table with schema name not matching the raw table name
   private final Map<String, String> _schemaNameMap = new ConcurrentHashMap<>();
@@ -149,19 +155,32 @@ public class TableCache implements PinotConfigProvider {
   }
 
   /**
+   * Returns the expression override map for the given table, or {@code null} if no override is configured.
+   */
+  @Nullable
+  public Map<Expression, Expression> getExpressionOverrideMap(String tableNameWithType) {
+    TableConfigInfo tableConfigInfo = _tableConfigInfoMap.get(tableNameWithType);
+    return tableConfigInfo != null ? tableConfigInfo._expressionOverrideMap : null;
+  }
+
+  /**
    * Returns the table config for the given table, or {@code null} if it does not exist.
    */
   @Nullable
   @Override
   public TableConfig getTableConfig(String tableNameWithType) {
-    return _tableConfigMap.get(tableNameWithType);
+    TableConfigInfo tableConfigInfo = _tableConfigInfoMap.get(tableNameWithType);
+    return tableConfigInfo != null ? tableConfigInfo._tableConfig : null;
   }
 
   @Override
-  public List<TableConfig> registerTableConfigChangeListener(TableConfigChangeListener tableConfigChangeListener) {
+  public boolean registerTableConfigChangeListener(TableConfigChangeListener tableConfigChangeListener) {
     synchronized (_zkTableConfigChangeListener) {
-      _tableConfigChangeListeners.add(tableConfigChangeListener);
-      return Lists.newArrayList(_tableConfigMap.values());
+      boolean added = _tableConfigChangeListeners.add(tableConfigChangeListener);
+      if (added) {
+        tableConfigChangeListener.onChange(getTableConfigs());
+      }
+      return added;
     }
   }
 
@@ -177,10 +196,13 @@ public class TableCache implements PinotConfigProvider {
   }
 
   @Override
-  public List<Schema> registerSchemaChangeListener(SchemaChangeListener schemaChangeListener) {
+  public boolean registerSchemaChangeListener(SchemaChangeListener schemaChangeListener) {
     synchronized (_zkSchemaChangeListener) {
-      _schemaChangeListeners.add(schemaChangeListener);
-      return _schemaInfoMap.values().stream().map(s -> s._schema).collect(Collectors.toList());
+      boolean added = _schemaChangeListeners.add(schemaChangeListener);
+      if (added) {
+        schemaChangeListener.onChange(getSchemas());
+      }
+      return added;
     }
   }
 
@@ -205,7 +227,7 @@ public class TableCache implements PinotConfigProvider {
       throws IOException {
     TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);
     String tableNameWithType = tableConfig.getTableName();
-    _tableConfigMap.put(tableNameWithType, tableConfig);
+    _tableConfigInfoMap.put(tableNameWithType, new TableConfigInfo(tableConfig));
 
     String schemaName = tableConfig.getValidationConfig().getSchemaName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
@@ -225,7 +247,7 @@ public class TableCache implements PinotConfigProvider {
   private void removeTableConfig(String path) {
     _propertyStore.unsubscribeDataChanges(path, _zkTableConfigChangeListener);
     String tableNameWithType = path.substring(TABLE_CONFIG_PATH_PREFIX.length());
-    _tableConfigMap.remove(tableNameWithType);
+    _tableConfigInfoMap.remove(tableNameWithType);
     removeSchemaName(tableNameWithType);
     if (_caseInsensitive) {
       _tableNameMap.remove(tableNameWithType.toLowerCase());
@@ -315,15 +337,37 @@ public class TableCache implements PinotConfigProvider {
   }
 
   private void notifyTableConfigChangeListeners() {
-    for (TableConfigChangeListener tableConfigChangeListener : _tableConfigChangeListeners) {
-      tableConfigChangeListener.onChange(Lists.newArrayList(_tableConfigMap.values()));
+    if (!_tableConfigChangeListeners.isEmpty()) {
+      List<TableConfig> tableConfigs = getTableConfigs();
+      for (TableConfigChangeListener tableConfigChangeListener : _tableConfigChangeListeners) {
+        tableConfigChangeListener.onChange(tableConfigs);
+      }
     }
   }
 
-  private void notifySchemaChangeListeners() {
-    for (SchemaChangeListener schemaChangeListener : _schemaChangeListeners) {
-      schemaChangeListener.onChange(_schemaInfoMap.values().stream().map(s -> s._schema).collect(Collectors.toList()));
+  private List<TableConfig> getTableConfigs() {
+    List<TableConfig> tableConfigs = new ArrayList<>(_tableConfigInfoMap.size());
+    for (TableConfigInfo tableConfigInfo : _tableConfigInfoMap.values()) {
+      tableConfigs.add(tableConfigInfo._tableConfig);
     }
+    return tableConfigs;
+  }
+
+  private void notifySchemaChangeListeners() {
+    if (!_schemaChangeListeners.isEmpty()) {
+      List<Schema> schemas = getSchemas();
+      for (SchemaChangeListener schemaChangeListener : _schemaChangeListeners) {
+        schemaChangeListener.onChange(schemas);
+      }
+    }
+  }
+
+  private List<Schema> getSchemas() {
+    List<Schema> schemas = new ArrayList<>(_schemaInfoMap.size());
+    for (SchemaInfo schemaInfo : _schemaInfoMap.values()) {
+      schemas.add(schemaInfo._schema);
+    }
+    return schemas;
   }
 
   private class ZkTableConfigChangeListener implements IZkChildListener, IZkDataListener {
@@ -337,7 +381,7 @@ public class TableCache implements PinotConfigProvider {
       // Only process new added table configs. Changed/removed table configs are handled by other callbacks.
       List<String> pathsToAdd = new ArrayList<>();
       for (String tableNameWithType : tableNamesWithType) {
-        if (!_tableConfigMap.containsKey(tableNameWithType)) {
+        if (!_tableConfigInfoMap.containsKey(tableNameWithType)) {
           pathsToAdd.add(TABLE_CONFIG_PATH_PREFIX + tableNameWithType);
         }
       }
@@ -409,6 +453,40 @@ public class TableCache implements PinotConfigProvider {
       String schemaName = path.substring(path.lastIndexOf('/') + 1);
       removeSchema(SCHEMA_PATH_PREFIX + schemaName);
       notifySchemaChangeListeners();
+    }
+  }
+
+  private static class TableConfigInfo {
+    final TableConfig _tableConfig;
+    final Map<Expression, Expression> _expressionOverrideMap;
+
+    private TableConfigInfo(TableConfig tableConfig) {
+      _tableConfig = tableConfig;
+      QueryConfig queryConfig = tableConfig.getQueryConfig();
+      if (queryConfig != null && MapUtils.isNotEmpty(queryConfig.getExpressionOverrideMap())) {
+        Map<Expression, Expression> expressionOverrideMap = new TreeMap<>();
+        for (Map.Entry<String, String> entry : queryConfig.getExpressionOverrideMap().entrySet()) {
+          try {
+            Expression srcExp = CalciteSqlParser.compileToExpression(entry.getKey());
+            Expression destExp = CalciteSqlParser.compileToExpression(entry.getValue());
+            expressionOverrideMap.put(srcExp, destExp);
+          } catch (Exception e) {
+            LOGGER.warn("Caught exception while compiling expression override: {} -> {} for table: {}, skipping it",
+                entry.getKey(), entry.getValue(), tableConfig.getTableName());
+          }
+        }
+        int mapSize = expressionOverrideMap.size();
+        if (mapSize == 0) {
+          _expressionOverrideMap = null;
+        } else if (mapSize == 1) {
+          Map.Entry<Expression, Expression> entry = expressionOverrideMap.entrySet().iterator().next();
+          _expressionOverrideMap = Collections.singletonMap(entry.getKey(), entry.getValue());
+        } else {
+          _expressionOverrideMap = expressionOverrideMap;
+        }
+      } else {
+        _expressionOverrideMap = null;
+      }
     }
   }
 

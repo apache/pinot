@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.client;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -44,6 +46,37 @@ public class ExternalViewReaderTest {
 
   private ExternalViewReader _externalViewReaderUnderTest;
 
+  private final String _instanceConfigPlain = "{\n"
+      + "  \"id\": \"Broker_12.34.56.78_1234\",\n"
+      + "  \"simpleFields\": {\n"
+      + "    \"HELIX_ENABLED\": \"true\",\n"
+      + "    \"HELIX_ENABLED_TIMESTAMP\": \"1646486555646\",\n"
+      + "    \"HELIX_HOST\": \"first.pug-pinot-broker-headless\",\n"
+      + "    \"HELIX_PORT\": \"8099\"\n"
+      + "  },\n"
+      + "  \"mapFields\": {},\n"
+      + "  \"listFields\": {\n"
+      + "    \"TAG_LIST\": [\n"
+      + "      \"DefaultTenant_BROKER\"\n"
+      + "    ]\n"
+      + "  }\n"
+      + "}";
+  private final String _instanceConfigTls = "{\n"
+      + "  \"id\": \"Broker_12.34.56.78_1234\",\n"
+      + "  \"simpleFields\": {\n"
+      + "    \"HELIX_ENABLED\": \"true\",\n"
+      + "    \"HELIX_ENABLED_TIMESTAMP\": \"1646486555646\",\n"
+      + "    \"HELIX_HOST\": \"first.pug-pinot-broker-headless\",\n"
+      + "    \"HELIX_PORT\": \"8099\",\n"
+      + "    \"PINOT_TLS_PORT\": \"8090\""
+      + "  },\n"
+      + "  \"mapFields\": {},\n"
+      + "  \"listFields\": {\n"
+      + "    \"TAG_LIST\": [\n"
+      + "      \"DefaultTenant_BROKER\"\n"
+      + "    ]\n"
+      + "  }\n"
+      + "}";
   @BeforeMethod
   public void setUp()
       throws Exception {
@@ -111,5 +144,81 @@ public class ExternalViewReaderTest {
 
     // Verify the results
     assertEquals(expectedResult, result);
+  }
+
+  @Test
+  public void testGetBrokersMapByInstanceConfig() {
+    configureData(_instanceConfigPlain, true);
+    // Run the test
+    final Map<String, List<String>> result = _externalViewReaderUnderTest.getTableToBrokersMap();
+    final Map<String, List<String>> expectedResult = ImmutableMap.of("field1",
+        Arrays.asList("first.pug-pinot-broker-headless:8099"));
+    // Verify the results
+    assertEquals(expectedResult, result);
+  }
+
+  private void configureData(String instanceConfigPlain, boolean preferTls) {
+    when(_mockZkClient.readData(ExternalViewReader.BROKER_EXTERNAL_VIEW_PATH, true))
+        .thenReturn("json".getBytes());
+    when(_mockZkClient.readData(ExternalViewReader.BROKER_INSTANCE_PATH + "/Broker_12.34.56.78_1234", true))
+        .thenReturn(instanceConfigPlain.getBytes(StandardCharsets.UTF_8));
+    _externalViewReaderUnderTest._preferTlsPort = preferTls;
+  }
+
+  @Test
+  public void testGetBrokerListByInstanceConfigDefault() {
+    configureData(_instanceConfigPlain, false);
+    final List<String> brokers = _externalViewReaderUnderTest.getLiveBrokers();
+    assertEquals(brokers, Arrays.asList("first.pug-pinot-broker-headless:8099"));
+  }
+
+  @Test
+  public void testGetBrokersMapByInstanceConfigTlsDefault() {
+    configureData(_instanceConfigTls, false);
+    final Map<String, List<String>> result = _externalViewReaderUnderTest.getTableToBrokersMap();
+    final Map<String, List<String>> expectedResult = ImmutableMap.of("field1",
+        Arrays.asList("first.pug-pinot-broker-headless:8099"));
+    // Verify the results
+    assertEquals(expectedResult, result);
+  }
+  @Test
+  public void testGetBrokerListByInstanceConfigTlsDefault() {
+    configureData(_instanceConfigTls, false);
+    final List<String> brokers = _externalViewReaderUnderTest.getLiveBrokers();
+    assertEquals(brokers, Arrays.asList("first.pug-pinot-broker-headless:8099"));
+  }
+
+  @Test
+  public void testGetBrokersMapByInstanceConfigDefault() {
+    configureData(_instanceConfigPlain, false);
+    // Run the test
+    final Map<String, List<String>> result = _externalViewReaderUnderTest.getTableToBrokersMap();
+    final Map<String, List<String>> expectedResult = ImmutableMap.of("field1",
+        Arrays.asList("first.pug-pinot-broker-headless:8099"));
+    // Verify the results
+    assertEquals(expectedResult, result);
+  }
+
+  @Test
+  public void testGetBrokerListByInstanceConfig() {
+    configureData(_instanceConfigPlain, true);
+    final List<String> brokers = _externalViewReaderUnderTest.getLiveBrokers();
+    assertEquals(brokers, Arrays.asList("first.pug-pinot-broker-headless:8099"));
+  }
+
+  @Test
+  public void testGetBrokersMapByInstanceConfigTls() {
+    configureData(_instanceConfigTls, true);
+    final Map<String, List<String>> result = _externalViewReaderUnderTest.getTableToBrokersMap();
+    final Map<String, List<String>> expectedResult = ImmutableMap.of("field1",
+        Arrays.asList("first.pug-pinot-broker-headless:8090"));
+    // Verify the results
+    assertEquals(expectedResult, result);
+  }
+  @Test
+  public void testGetBrokerListByInstanceConfigTls() {
+    configureData(_instanceConfigTls, true);
+    final List<String> brokers = _externalViewReaderUnderTest.getLiveBrokers();
+    assertEquals(brokers, Arrays.asList("first.pug-pinot-broker-headless:8090"));
   }
 }
