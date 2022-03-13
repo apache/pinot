@@ -40,7 +40,6 @@ import org.apache.pinot.core.operator.combine.SelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyCombineOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
-import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.core.util.trace.TraceCallable;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -133,8 +132,8 @@ public class CombinePlanNode implements PlanNode {
       // Get all results
       try {
         for (Future future : futures) {
-          List<Operator> ops = (List<Operator>) future
-              .get(_queryContext.getEndTimeMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+          List<Operator> ops = (List<Operator>) future.get(_queryContext.getEndTimeMs() - System.currentTimeMillis(),
+              TimeUnit.MILLISECONDS);
           operators.addAll(ops);
         }
       } catch (Exception e) {
@@ -162,16 +161,8 @@ public class CombinePlanNode implements PlanNode {
       // Streaming query (only support selection only)
       return new StreamingSelectionOnlyCombineOperator(operators, _queryContext, _executorService, _streamObserver);
     }
-    GapfillUtils.GapfillType gapfillType = _queryContext.getGapfillType();
     if (QueryContextUtils.isAggregationQuery(_queryContext)) {
-      if (gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL_AGGREGATE) {
-        _queryContext.getSubQueryContext().getSubQueryContext().setEndTimeMs(_queryContext.getEndTimeMs());
-        return new GroupByOrderByCombineOperator(operators, _queryContext.getSubQueryContext().getSubQueryContext(),
-            _executorService);
-      } else if (gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL) {
-        _queryContext.getSubQueryContext().setEndTimeMs(_queryContext.getEndTimeMs());
-        return new GroupByOrderByCombineOperator(operators, _queryContext.getSubQueryContext(), _executorService);
-      } else if (_queryContext.getGroupByExpressions() == null) {
+      if (_queryContext.getGroupByExpressions() == null) {
         // Aggregation only
         return new AggregationOnlyCombineOperator(operators, _queryContext, _executorService);
       } else {
@@ -184,25 +175,11 @@ public class CombinePlanNode implements PlanNode {
     } else if (QueryContextUtils.isSelectionQuery(_queryContext)) {
       if (_queryContext.getLimit() == 0 || _queryContext.getOrderByExpressions() == null) {
         // Selection only
-        if (gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE
-            || gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
-          _queryContext.getSubQueryContext().setEndTimeMs(_queryContext.getEndTimeMs());
-          return new SelectionOnlyCombineOperator(operators, _queryContext.getSubQueryContext(), _executorService);
-        } else {
-          return new SelectionOnlyCombineOperator(operators, _queryContext, _executorService);
-        }
+        return new SelectionOnlyCombineOperator(operators, _queryContext, _executorService);
       } else {
         // Selection order-by
-        if (gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE
-            || gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
-          _queryContext.getSubQueryContext().setEndTimeMs(_queryContext.getEndTimeMs());
-          return new SelectionOrderByCombineOperator(operators, _queryContext.getSubQueryContext(), _executorService);
-        } else {
-          return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService);
-        }
+        return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService);
       }
-    } else if (gapfillType != null) {
-      return new SelectionOnlyCombineOperator(operators, _queryContext, _executorService);
     } else {
       assert QueryContextUtils.isDistinctQuery(_queryContext);
       return new DistinctCombineOperator(operators, _queryContext, _executorService);

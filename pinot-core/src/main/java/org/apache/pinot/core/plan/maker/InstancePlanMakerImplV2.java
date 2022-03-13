@@ -136,13 +136,11 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     _minSegmentGroupTrimSize = config.getProperty(MIN_SEGMENT_GROUP_TRIM_SIZE_KEY, DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE);
     _minServerGroupTrimSize = config.getProperty(MIN_SERVER_GROUP_TRIM_SIZE_KEY, DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE);
     _groupByTrimThreshold = config.getProperty(GROUPBY_TRIM_THRESHOLD_KEY, DEFAULT_GROUPBY_TRIM_THRESHOLD);
-    Preconditions
-        .checkState(_groupByTrimThreshold > 0, "Invalid configurable: groupByTrimThreshold: %d must be positive",
-            _groupByTrimThreshold);
+    Preconditions.checkState(_groupByTrimThreshold > 0,
+        "Invalid configurable: groupByTrimThreshold: %d must be positive", _groupByTrimThreshold);
     LOGGER.info("Initializing plan maker with maxInitialResultHolderCapacity: {}, numGroupsLimit: {}, "
             + "minSegmentGroupTrimSize: {}, minServerGroupTrimSize: {}", _maxInitialResultHolderCapacity,
-        _numGroupsLimit,
-        _minSegmentGroupTrimSize, _minServerGroupTrimSize);
+        _numGroupsLimit, _minSegmentGroupTrimSize, _minServerGroupTrimSize);
   }
 
   @Override
@@ -227,7 +225,6 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   @Override
   public PlanNode makeSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
-
     if (QueryContextUtils.isAggregationQuery(queryContext)) {
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
       if (groupByExpressions != null) {
@@ -241,7 +238,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         return new AggregationPlanNode(indexSegment, queryContext);
       }
     } else if (QueryContextUtils.isSelectionQuery(queryContext)) {
-        return new SelectionPlanNode(indexSegment, queryContext);
+      return new SelectionPlanNode(indexSegment, queryContext);
     } else {
       assert QueryContextUtils.isDistinctQuery(queryContext);
       return new DistinctPlanNode(indexSegment, queryContext);
@@ -260,14 +257,13 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, executorService, streamObserver);
     if (QueryContextUtils.isSelectionOnlyQuery(queryContext)) {
       // selection-only is streamed in StreamingSelectionPlanNode --> here only metadata block is returned.
-      return new GlobalPlanImplV0(
-          new InstanceResponsePlanNode(combinePlanNode, indexSegments, Collections.emptyList()));
+      return new GlobalPlanImplV0(new InstanceResponsePlanNode(
+          combinePlanNode, indexSegments, Collections.emptyList()));
     } else {
       // non-selection-only requires a StreamingInstanceResponsePlanNode to stream data block back and metadata block
       // as final return.
-      return new GlobalPlanImplV0(
-          new StreamingInstanceResponsePlanNode(combinePlanNode, indexSegments, Collections.emptyList(),
-              streamObserver));
+      return new GlobalPlanImplV0(new StreamingInstanceResponsePlanNode(
+          combinePlanNode, indexSegments, Collections.emptyList(), streamObserver));
     }
   }
 
