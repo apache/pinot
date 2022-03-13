@@ -340,12 +340,17 @@ public class SegmentStatusCheckerTest {
     idealState.setPartitionState("myTable_0", "pinot1", "ONLINE");
     idealState.setPartitionState("myTable_1", "pinot1", "ONLINE");
     idealState.setPartitionState("myTable_1", "pinot2", "ONLINE");
+    idealState.setPartitionState("myTable_2", "pinot1", "ONLINE");
+    idealState.setPartitionState("myTable_2", "pinot2", "ONLINE");
     idealState.setReplicas("2");
     idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
 
     ExternalView externalView = new ExternalView(offlineTableName);
     externalView.setState("myTable_1", "pinot1", "ONLINE");
     externalView.setState("myTable_1", "pinot2", "ONLINE");
+    // myTable_2 is push in-progress and only one replica has been downloaded by servers. It will be skipped for
+    // the segment status check.
+    externalView.setState("myTable_2", "pinot1", "ONLINE");
 
     ZNRecord znrecord = new ZNRecord("myTable_0");
     znrecord.setSimpleField(CommonConstants.Segment.INDEX_VERSION, "v1");
@@ -359,6 +364,18 @@ public class SegmentStatusCheckerTest {
     znrecord.setLongField(CommonConstants.Segment.PUSH_TIME, System.currentTimeMillis());
     znrecord.setLongField(CommonConstants.Segment.REFRESH_TIME, System.currentTimeMillis());
 
+    ZNRecord znrecord2 = new ZNRecord("myTable_2");
+    znrecord2.setSimpleField(CommonConstants.Segment.INDEX_VERSION, "v1");
+    znrecord2.setLongField(CommonConstants.Segment.START_TIME, 1000);
+    znrecord2.setLongField(CommonConstants.Segment.END_TIME, 2000);
+    znrecord2.setSimpleField(CommonConstants.Segment.TIME_UNIT, TimeUnit.HOURS.toString());
+    znrecord2.setLongField(CommonConstants.Segment.TOTAL_DOCS, 10000);
+    znrecord2.setLongField(CommonConstants.Segment.CRC, 1235);
+    znrecord2.setLongField(CommonConstants.Segment.CREATION_TIME, 3000);
+    znrecord2.setSimpleField(CommonConstants.Segment.DOWNLOAD_URL, "http://localhost:8000/myTable_2");
+    znrecord2.setLongField(CommonConstants.Segment.PUSH_TIME, System.currentTimeMillis());
+    znrecord2.setLongField(CommonConstants.Segment.REFRESH_TIME, System.currentTimeMillis());
+
     {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
       when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
@@ -366,6 +383,8 @@ public class SegmentStatusCheckerTest {
       when(_helixResourceManager.getTableExternalView(offlineTableName)).thenReturn(externalView);
       when(_helixResourceManager.getSegmentZKMetadata(offlineTableName, "myTable_0"))
           .thenReturn(new SegmentZKMetadata(znrecord));
+      when(_helixResourceManager.getSegmentZKMetadata(offlineTableName, "myTable_2"))
+          .thenReturn(new SegmentZKMetadata(znrecord2));
     }
     {
       _config = mock(ControllerConf.class);

@@ -377,25 +377,29 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (offlineTableName != null && realtimeTableName != null) {
       // Hybrid
       offlineBrokerRequest = getOfflineBrokerRequest(brokerRequest);
-      _queryOptimizer.optimize(offlineBrokerRequest.getPinotQuery(), _tableCache.getTableConfig(offlineTableName),
-          schema);
+      PinotQuery offlinePinotQuery = offlineBrokerRequest.getPinotQuery();
+      handleExpressionOverride(offlinePinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
+      _queryOptimizer.optimize(offlinePinotQuery, offlineTableConfig, schema);
       realtimeBrokerRequest = getRealtimeBrokerRequest(brokerRequest);
-      _queryOptimizer.optimize(realtimeBrokerRequest.getPinotQuery(), _tableCache.getTableConfig(realtimeTableName),
-          schema);
+      PinotQuery realtimePinotQuery = realtimeBrokerRequest.getPinotQuery();
+      handleExpressionOverride(realtimePinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
+      _queryOptimizer.optimize(realtimePinotQuery, realtimeTableConfig, schema);
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.HYBRID);
       requestStatistics.setOfflineServerTenant(getServerTenant(offlineTableName));
       requestStatistics.setRealtimeServerTenant(getServerTenant(realtimeTableName));
     } else if (offlineTableName != null) {
       // OFFLINE only
       setTableName(brokerRequest, offlineTableName);
-      _queryOptimizer.optimize(pinotQuery, _tableCache.getTableConfig(offlineTableName), schema);
+      handleExpressionOverride(pinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
+      _queryOptimizer.optimize(pinotQuery, offlineTableConfig, schema);
       offlineBrokerRequest = brokerRequest;
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.OFFLINE);
       requestStatistics.setOfflineServerTenant(getServerTenant(offlineTableName));
     } else {
       // REALTIME only
       setTableName(brokerRequest, realtimeTableName);
-      _queryOptimizer.optimize(pinotQuery, _tableCache.getTableConfig(realtimeTableName), schema);
+      handleExpressionOverride(pinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
+      _queryOptimizer.optimize(pinotQuery, offlineTableConfig, schema);
       realtimeBrokerRequest = brokerRequest;
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.REALTIME);
       requestStatistics.setRealtimeServerTenant(getServerTenant(realtimeTableName));
@@ -1433,6 +1437,46 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         handleDistinctCountBitmapOverride(operand);
       }
     }
+  }
+
+  private static void handleExpressionOverride(PinotQuery pinotQuery,
+      @Nullable Map<Expression, Expression> expressionOverrideMap) {
+    if (expressionOverrideMap == null) {
+      return;
+    }
+    pinotQuery.getSelectList().replaceAll(o -> handleExpressionOverride(o, expressionOverrideMap));
+    Expression filterExpression = pinotQuery.getFilterExpression();
+    if (filterExpression != null) {
+      pinotQuery.setFilterExpression(handleExpressionOverride(filterExpression, expressionOverrideMap));
+    }
+    List<Expression> groupByList = pinotQuery.getGroupByList();
+    if (groupByList != null) {
+      groupByList.replaceAll(o -> handleExpressionOverride(o, expressionOverrideMap));
+    }
+    List<Expression> orderByList = pinotQuery.getOrderByList();
+    if (orderByList != null) {
+      for (Expression expression : orderByList) {
+        // NOTE: Order-by is always a Function with the ordering of the Expression
+        expression.getFunctionCall().getOperands().replaceAll(o -> handleExpressionOverride(o, expressionOverrideMap));
+      }
+    }
+    Expression havingExpression = pinotQuery.getHavingExpression();
+    if (havingExpression != null) {
+      pinotQuery.setHavingExpression(handleExpressionOverride(havingExpression, expressionOverrideMap));
+    }
+  }
+
+  private static Expression handleExpressionOverride(Expression expression,
+      Map<Expression, Expression> expressionOverrideMap) {
+    Expression override = expressionOverrideMap.get(expression);
+    if (override != null) {
+      return new Expression(override);
+    }
+    Function function = expression.getFunctionCall();
+    if (function != null) {
+      function.getOperands().replaceAll(o -> handleExpressionOverride(o, expressionOverrideMap));
+    }
+    return expression;
   }
 
   /**

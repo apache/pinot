@@ -46,6 +46,7 @@ import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -632,6 +633,18 @@ public class HelixHelper {
       updated = true;
     }
     return updated;
+  }
+
+  /**
+   * Updates a tlsPort value into Pinot instance config so it can be retrieved later
+   * @param instanceConfig the instance config to update
+   * @param tlsPort the tlsPort number
+   * @return true if updated
+   */
+  public static boolean updateTlsPort(InstanceConfig instanceConfig, int tlsPort) {
+    ExtraInstanceConfig pinotInstanceConfig = new ExtraInstanceConfig(instanceConfig);
+    pinotInstanceConfig.setTlsPort(String.valueOf(tlsPort));
+    return true;
   }
 
   /**

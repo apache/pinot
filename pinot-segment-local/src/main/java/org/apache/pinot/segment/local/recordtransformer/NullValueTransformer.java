@@ -21,18 +21,22 @@ package org.apache.pinot.segment.local.recordtransformer;
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.TimeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class NullValueTransformer implements RecordTransformer {
+  private static final Logger LOGGER = LoggerFactory.getLogger(NullValueTransformer.class);
+
   private final Map<String, Object> _defaultNullValues = new HashMap<>();
-  private final DateTimeFieldSpec _dateTimeFieldSpec;
-  private final DateTimeFormatSpec _defaultTimeValueFormat;
 
   public NullValueTransformer(TableConfig tableConfig, Schema schema) {
     String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
@@ -49,15 +53,32 @@ public class NullValueTransformer implements RecordTransformer {
       }
     }
 
-    if (tableConfig.getValidationConfig().isAllowNullTimeValue() && timeColumnName != null) {
-      _dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
-      Preconditions
-          .checkState(_dateTimeFieldSpec != null, "Failed to find time field: %s from schema: %s", timeColumnName,
-              schema.getSchemaName());
-      _defaultTimeValueFormat = new DateTimeFormatSpec(_dateTimeFieldSpec.getFormat());
-    } else {
-      _dateTimeFieldSpec = null;
-      _defaultTimeValueFormat = null;
+    // NOTE: Time column is used to manage the segments, so its values have to be within the valid range. If the default
+    //       time value in the field spec is within the valid range, we use it as the default time value; if not, we use
+    //       current time as the default time value.
+    if (StringUtils.isNotEmpty(timeColumnName)) {
+      DateTimeFieldSpec timeColumnSpec = schema.getSpecForTimeColumn(timeColumnName);
+      Preconditions.checkState(timeColumnSpec != null, "Failed to find time field: %s from schema: %s", timeColumnName,
+          schema.getSchemaName());
+
+      String defaultTimeString = timeColumnSpec.getDefaultNullValueString();
+      String timeFormat = timeColumnSpec.getFormat();
+      DateTimeFormatSpec dateTimeFormatSpec = new DateTimeFormatSpec(timeFormat);
+      try {
+        long defaultTimeMs = dateTimeFormatSpec.fromFormatToMillis(defaultTimeString);
+        if (TimeUtils.timeValueInValidRange(defaultTimeMs)) {
+          _defaultNullValues.put(timeColumnName, timeColumnSpec.getDefaultNullValue());
+          return;
+        }
+      } catch (Exception e) {
+        // Ignore
+      }
+      String currentTimeString = dateTimeFormatSpec.fromMillisToFormat(System.currentTimeMillis());
+      Object currentTime = timeColumnSpec.getDataType().convert(currentTimeString);
+      _defaultNullValues.put(timeColumnName, currentTime);
+      LOGGER.info(
+          "Default time: {} does not comply with format: {}, using current time: {} as the default time for table: {}",
+          defaultTimeString, timeFormat, currentTime, tableConfig.getTableName());
     }
   }
 
@@ -70,14 +91,6 @@ public class NullValueTransformer implements RecordTransformer {
         record.putDefaultNullValue(fieldName, entry.getValue());
       }
     }
-
-    // handle null value in time column
-    if (_defaultTimeValueFormat != null && record.getValue(_dateTimeFieldSpec.getName()) == null) {
-      String timeValueStr = _defaultTimeValueFormat.fromMillisToFormat(System.currentTimeMillis());
-      Object timeValue = _dateTimeFieldSpec.getDataType().convert(timeValueStr);
-      record.putDefaultNullValue(_dateTimeFieldSpec.getName(), timeValue);
-    }
-
     return record;
   }
 }

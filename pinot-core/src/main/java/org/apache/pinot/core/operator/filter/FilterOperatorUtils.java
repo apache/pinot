@@ -180,7 +180,7 @@ public class FilterOperatorUtils {
           return 4;
         }
         if (filterOperator instanceof NotFilterOperator) {
-          return getPriority((NotFilterOperator) ((NotFilterOperator) filterOperator).getChildFilterOperator());
+          return getPriority(((NotFilterOperator) filterOperator).getChildFilterOperator());
         }
         if (filterOperator instanceof ScanBasedFilterOperator) {
           return getScanBasedFilterPriority((ScanBasedFilterOperator) filterOperator, 5, debugOptions);
