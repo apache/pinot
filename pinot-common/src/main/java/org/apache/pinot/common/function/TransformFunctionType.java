@@ -108,10 +108,10 @@ public enum TransformFunctionType {
   // Geo indexing
   GEOTOH3("geoToH3");
 
-  private static final Set<String> NAMES = Arrays.stream(values())
-      .flatMap(func -> Stream.of(func.getName(), StringUtils.remove(func.getName(), '_').toUpperCase(),
-          func.getName().toUpperCase(), func.getName().toLowerCase(), func.name(), func.name().toLowerCase()))
-      .collect(Collectors.toSet());
+  private static final Set<String> NAMES = Arrays.stream(values()).flatMap(
+      func -> Stream.of(func.getName(), StringUtils.remove(func.getName(), '_').toUpperCase(),
+          StringUtils.remove(func.getName(), '_').toLowerCase(), func.getName().toUpperCase(),
+          func.getName().toLowerCase(), func.name(), func.name().toLowerCase())).collect(Collectors.toSet());
 
   private final String _name;
 

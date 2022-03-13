@@ -65,8 +65,9 @@ public class SelectStarWithOtherColsRewriteTest {
       countMap.put(col, countMap.getOrDefault(col, 0) + 1);
     }
     Assert.assertEquals(countMap.size(), 5, "More new selections than expected");
-    Assert.assertTrue(countMap.keySet().containsAll(COL_MAP.keySet().stream().filter(a -> !a.startsWith("$")).collect(
-        Collectors.toList())), "New selections contain virtual columns");
+    Assert.assertTrue(countMap.keySet()
+            .containsAll(COL_MAP.keySet().stream().filter(a -> !a.startsWith("$")).collect(Collectors.toList())),
+        "New selections contain virtual columns");
     countMap.forEach(
         (key, value) -> Assert.assertEquals((int) value, 1, key + " has more than one occurrences in new selection"));
   }
@@ -156,7 +157,7 @@ public class SelectStarWithOtherColsRewriteTest {
     BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
     List<Expression> newSelections = pinotQuery.getSelectList();
     Assert.assertTrue(newSelections.get(0).isSetFunctionCall());
-    Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperator(), "AS");
+    Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperator(), "as");
     Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
         "playerID");
     Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "pid");
@@ -180,7 +181,7 @@ public class SelectStarWithOtherColsRewriteTest {
     BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
     List<Expression> newSelections = pinotQuery.getSelectList();
     Assert.assertTrue(newSelections.get(0).isSetFunctionCall());
-    Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperator(), "SQRT");
+    Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperator(), "sqrt");
     Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
         "homeRuns");
     //homeRuns is returned as well
@@ -203,7 +204,7 @@ public class SelectStarWithOtherColsRewriteTest {
     BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
     List<Expression> newSelections = pinotQuery.getSelectList();
     Assert.assertTrue(newSelections.get(0).isSetFunctionCall());
-    Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperator(), "ADD");
+    Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperator(), "add");
     Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
         "homeRuns");
     Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(),
@@ -252,11 +253,11 @@ public class SelectStarWithOtherColsRewriteTest {
     BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
     List<Expression> newSelections = pinotQuery.getSelectList();
     Assert.assertTrue(newSelections.get(0).isSetFunctionCall());
-    Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperator(), "ABS");
+    Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperator(), "abs");
     Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
         "homeRuns");
     Assert.assertTrue(newSelections.get(1).isSetFunctionCall());
-    Assert.assertEquals(newSelections.get(1).getFunctionCall().getOperator(), "SQRT");
+    Assert.assertEquals(newSelections.get(1).getFunctionCall().getOperator(), "sqrt");
     Assert.assertEquals(newSelections.get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
         "groundedIntoDoublePlays");
     Assert.assertEquals(newSelections.get(2).getIdentifier().getName(), "G_old");
@@ -266,7 +267,7 @@ public class SelectStarWithOtherColsRewriteTest {
     Assert.assertEquals(newSelections.get(6).getIdentifier().getName(), "playerStint");
     Assert.assertEquals(newSelections.get(7).getIdentifier().getName(), "$segmentName");
     Assert.assertEquals(newSelections.get(8).getIdentifier().getName(), "$hostName");
-    Assert.assertEquals(newSelections.get(9).getFunctionCall().getOperator(), "AS");
+    Assert.assertEquals(newSelections.get(9).getFunctionCall().getOperator(), "as");
     Assert.assertEquals(newSelections.get(9).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
         "playerStint");
     Assert.assertEquals(newSelections.get(9).getFunctionCall().getOperands().get(1).getIdentifier().getName(),

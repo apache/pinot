@@ -71,8 +71,7 @@ public class FilterPlanNode implements PlanNode {
     _numDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
   }
 
-  public FilterPlanNode(IndexSegment indexSegment, QueryContext queryContext,
-      FilterContext filterContext) {
+  public FilterPlanNode(IndexSegment indexSegment, QueryContext queryContext, FilterContext filterContext) {
     this(indexSegment, queryContext);
 
     _filterContext = filterContext;
@@ -120,7 +119,8 @@ public class FilterPlanNode implements PlanNode {
     if (predicate.getType() != Predicate.Type.RANGE) {
       return false;
     }
-    if (!function.getFunctionName().equalsIgnoreCase(StDistanceFunction.FUNCTION_NAME)) {
+    String functionName = function.getFunctionName();
+    if (!functionName.equals("st_distance") && !functionName.equals("stdistance")) {
       return false;
     }
     List<ExpressionContext> arguments = function.getArguments();
@@ -221,8 +221,8 @@ public class FilterPlanNode implements PlanNode {
               return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, _numDocs);
             case JSON_MATCH:
               JsonIndexReader jsonIndex = dataSource.getJsonIndex();
-              Preconditions
-                  .checkState(jsonIndex != null, "Cannot apply JSON_MATCH on column: %s without json index", column);
+              Preconditions.checkState(jsonIndex != null, "Cannot apply JSON_MATCH on column: %s without json index",
+                  column);
               return new JsonMatchFilterOperator(jsonIndex, (JsonMatchPredicate) predicate, _numDocs);
             case IS_NULL:
               NullValueVectorReader nullValueVector = dataSource.getNullValueVector();

@@ -20,7 +20,6 @@ package org.apache.pinot.sql.parsers.rewriter;
 
 import java.util.Arrays;
 import java.util.List;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
@@ -50,12 +49,11 @@ public class PredicateComparisonRewriter implements QueryRewriter {
   private static Expression updateComparisonPredicate(Expression expression) {
     Function function = expression.getFunctionCall();
     if (function != null) {
-      String operator = function.getOperator().toUpperCase();
       FilterKind filterKind;
       try {
-        filterKind = FilterKind.valueOf(operator);
+        filterKind = FilterKind.valueOf(function.getOperator());
       } catch (Exception e) {
-        throw new SqlCompilationException("Unsupported filter kind: " + operator);
+        throw new SqlCompilationException("Unsupported filter kind: " + function.getOperator());
       }
       List<Expression> operands = function.getOperands();
       switch (filterKind) {
@@ -84,7 +82,7 @@ public class PredicateComparisonRewriter implements QueryRewriter {
 
           // Handle predicate like 'a > b' -> 'a - b > 0'
           if (!secondOperand.isSetLiteral()) {
-            Expression minusExpression = RequestUtils.getFunctionExpression(SqlKind.MINUS.name());
+            Expression minusExpression = RequestUtils.getFunctionExpression("minus");
             minusExpression.getFunctionCall().setOperands(Arrays.asList(firstOperand, secondOperand));
             operands.set(0, minusExpression);
             operands.set(1, RequestUtils.getLiteralExpression(0));
