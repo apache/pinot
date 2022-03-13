@@ -811,7 +811,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         String firstTimeCol = ((Long) (gapFillRows1.get(index)[0])).toString();
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
-        if (gapFillRows1.get(index)[3].equals(1)) {
+        if (gapFillRows1.get(index)[1].equals(1)) {
           ones--;
         } else {
           zeros--;
@@ -1397,7 +1397,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         String firstTimeCol = ((Long) (gapFillRows1.get(index)[0])).toString();
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
-        if (gapFillRows1.get(index)[3].equals(1)) {
+        if (gapFillRows1.get(index)[1].equals(1)) {
           ones--;
         } else {
           zeros--;
@@ -1982,7 +1982,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         String firstTimeCol = ((Long) (gapFillRows1.get(index)[0])).toString();
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
-        if (gapFillRows1.get(index)[3].equals(1)) {
+        if (gapFillRows1.get(index)[1].equals(1)) {
           ones--;
         } else {
           zeros--;
@@ -2569,7 +2569,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         String firstTimeCol = ((Long) (gapFillRows1.get(index)[0])).toString();
         long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
         Assert.assertEquals(timeStamp, start);
-        if (gapFillRows1.get(index)[3].equals(1)) {
+        if (gapFillRows1.get(index)[1].equals(1)) {
           ones--;
         } else {
           zeros--;

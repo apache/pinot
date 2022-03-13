@@ -40,6 +40,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -161,7 +162,9 @@ public abstract class BaseQueriesTest {
       }
     }
     QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
-    return getBrokerResponse(queryContext, planMaker);
+    BrokerRequest strippedBrokerRequest = GapfillUtils.stripGapfill(brokerRequest);
+    QueryContext strippedQueryContext = BrokerRequestToQueryContextConverter.convert(strippedBrokerRequest);
+    return getBrokerResponse(queryContext, strippedQueryContext, planMaker);
   }
 
   /**
@@ -197,8 +200,17 @@ public abstract class BaseQueriesTest {
     }
     queryOptions.put(Request.QueryOptionKey.GROUP_BY_MODE, Request.SQL);
     queryOptions.put(Request.QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
+    BrokerRequest strippedBrokerRequest = GapfillUtils.stripGapfill(brokerRequest);
+    queryOptions = strippedBrokerRequest.getPinotQuery().getQueryOptions();
+    if (queryOptions == null) {
+      queryOptions = new HashMap<>();
+      strippedBrokerRequest.getPinotQuery().setQueryOptions(queryOptions);
+    }
+    queryOptions.put(Request.QueryOptionKey.GROUP_BY_MODE, Request.SQL);
+    queryOptions.put(Request.QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
     QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
-    return getBrokerResponse(queryContext, planMaker);
+    QueryContext strippedQueryContext = BrokerRequestToQueryContextConverter.convert(strippedBrokerRequest);
+    return getBrokerResponse(queryContext, strippedQueryContext, planMaker);
   }
 
   /**
@@ -206,12 +218,13 @@ public abstract class BaseQueriesTest {
    * <p>Use this to test the whole flow from server to broker.
    * <p>The result should be equivalent to querying 4 identical index segments.
    */
-  private BrokerResponseNative getBrokerResponse(QueryContext queryContext, PlanMaker planMaker) {
+  private BrokerResponseNative getBrokerResponse(
+      QueryContext queryContext, QueryContext strippedQueryContext, PlanMaker planMaker) {
     // Server side.
-    queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
-    Plan plan = planMaker.makeInstancePlan(getIndexSegments(), queryContext, EXECUTOR_SERVICE);
+    strippedQueryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    Plan plan = planMaker.makeInstancePlan(getIndexSegments(), strippedQueryContext, EXECUTOR_SERVICE);
 
-    BrokerRequest brokerRequest = queryContext.getBrokerRequest();
+    BrokerRequest brokerRequest = strippedQueryContext.getBrokerRequest();
     DataTable instanceResponse =
         brokerRequest != null && brokerRequest.getPinotQuery() != null && brokerRequest.getPinotQuery().isExplain()
             ? ServerQueryExecutorV1Impl.processExplainPlanQueries(plan) : plan.execute();
@@ -271,7 +284,9 @@ public abstract class BaseQueriesTest {
     }
     queryOptions.put(Request.QueryOptionKey.GROUP_BY_MODE, Request.SQL);
     queryOptions.put(Request.QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
+    BrokerRequest strippedBrokerRequest = GapfillUtils.stripGapfill(brokerRequest);
     QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
-    return getBrokerResponse(queryContext, planMaker);
+    QueryContext strippedQueryContext = BrokerRequestToQueryContextConverter.convert(strippedBrokerRequest);
+    return getBrokerResponse(queryContext, strippedQueryContext, planMaker);
   }
 }

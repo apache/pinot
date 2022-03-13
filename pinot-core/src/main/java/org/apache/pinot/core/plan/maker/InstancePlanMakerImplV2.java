@@ -36,7 +36,6 @@ import org.apache.pinot.core.plan.AggregationGroupByPlanNode;
 import org.apache.pinot.core.plan.AggregationPlanNode;
 import org.apache.pinot.core.plan.CombinePlanNode;
 import org.apache.pinot.core.plan.DistinctPlanNode;
-import org.apache.pinot.core.plan.GapfillSelectionPlanNode;
 import org.apache.pinot.core.plan.GlobalPlanImplV0;
 import org.apache.pinot.core.plan.InstanceResponsePlanNode;
 import org.apache.pinot.core.plan.Plan;
@@ -47,7 +46,6 @@ import org.apache.pinot.core.plan.StreamingSelectionPlanNode;
 import org.apache.pinot.core.query.config.QueryExecutorConfig;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
-import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.segment.spi.FetchContext;
@@ -230,17 +228,11 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   @Override
   public PlanNode makeSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
 
-    GapfillUtils.GapfillType gapfillType = queryContext.getGapfillType();
     if (QueryContextUtils.isAggregationQuery(queryContext)) {
-      if (gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL) {
-        queryContext = queryContext.getSubQueryContext();
-      } else if (gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL_AGGREGATE) {
-        queryContext = queryContext.getSubQueryContext().getSubQueryContext();
-      }
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
       if (groupByExpressions != null) {
         // Aggregation group-by query
-        if (QueryOptionsUtils.isGroupByModeSQL(queryContext.getQueryOptions()) || gapfillType != null) {
+        if (QueryOptionsUtils.isGroupByModeSQL(queryContext.getQueryOptions())) {
           return new AggregationGroupByOrderByPlanNode(indexSegment, queryContext);
         }
         return new AggregationGroupByPlanNode(indexSegment, queryContext);
@@ -249,14 +241,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         return new AggregationPlanNode(indexSegment, queryContext);
       }
     } else if (QueryContextUtils.isSelectionQuery(queryContext)) {
-      if (gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT
-          || gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE) {
-        return new GapfillSelectionPlanNode(indexSegment, queryContext.getSubQueryContext());
-      } else if (gapfillType == GapfillUtils.GapfillType.GAP_FILL) {
-        return new GapfillSelectionPlanNode(indexSegment, queryContext);
-      } else {
         return new SelectionPlanNode(indexSegment, queryContext);
-      }
     } else {
       assert QueryContextUtils.isDistinctQuery(queryContext);
       return new DistinctPlanNode(indexSegment, queryContext);

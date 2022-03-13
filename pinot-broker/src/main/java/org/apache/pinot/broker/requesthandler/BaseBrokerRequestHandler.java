@@ -81,6 +81,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -219,6 +220,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       requestStatistics.setErrorCode(QueryException.PQL_PARSING_ERROR_CODE);
       return new BrokerResponseNative(QueryException.getException(QueryException.PQL_PARSING_ERROR, e));
     }
+
+    BrokerRequest originalBrokerRequest = brokerRequest;
+    brokerRequest = GapfillUtils.stripGapfill(originalBrokerRequest);
+
     PinotQuery pinotQuery = brokerRequest.getPinotQuery();
     setOptions(pinotQuery, requestId, query, request);
 
@@ -533,9 +538,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         setRoutingToOneSegment(realtimeRoutingTable);
       }
     }
-    BrokerResponseNative brokerResponse =
-        processBrokerRequest(requestId, brokerRequest, offlineBrokerRequest, offlineRoutingTable, realtimeBrokerRequest,
-            realtimeRoutingTable, remainingTimeMs, serverStats, requestStatistics);
+    BrokerResponseNative brokerResponse = processBrokerRequest(
+        requestId, originalBrokerRequest, offlineBrokerRequest, offlineRoutingTable, realtimeBrokerRequest,
+        realtimeRoutingTable, remainingTimeMs, serverStats, requestStatistics);
     brokerResponse.setExceptions(exceptions);
     long executionEndTimeNs = System.nanoTime();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION,

@@ -25,10 +25,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.DataSource;
+import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.ExpressionType;
+import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
 
 
 /**
@@ -37,6 +44,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 public class GapfillUtils {
   private static final String POST_AGGREGATE_GAP_FILL = "postaggregategapfill";
   private static final String GAP_FILL = "gapfill";
+  private static final String AS = "as";
   private static final String FILL = "fill";
   private static final String TIME_SERIES_ON = "timeSeriesOn";
   private static final int STARTING_INDEX_OF_OPTIONAL_ARGS_FOR_PRE_AGGREGATE_GAP_FILL = 5;
@@ -305,6 +313,84 @@ public class GapfillUtils {
     return groupByExpressions;
   }
 
+  public static String getTableName(PinotQuery pinotQuery) {
+    while (pinotQuery.getDataSource().getSubquery() != null) {
+      pinotQuery = pinotQuery.getDataSource().getSubquery();
+    }
+    return pinotQuery.getDataSource().getTableName();
+  }
+
+  public static BrokerRequest stripGapfill(BrokerRequest brokerRequest) {
+    QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
+    GapfillUtils.GapfillType gapfillType = queryContext.getGapfillType();
+    if (gapfillType == null) {
+      return brokerRequest;
+    }
+    switch (gapfillType) {
+      // one sql query with gapfill only
+      case GAP_FILL:
+        return stripGapfill(brokerRequest.getPinotQuery());
+      // gapfill as subquery, the outer query may have the filter
+      case GAP_FILL_SELECT:
+        // gapfill as subquery, the outer query has the aggregation
+      case GAP_FILL_AGGREGATE:
+        // aggregation as subqery, the outer query is gapfill
+      case AGGREGATE_GAP_FILL:
+        return stripGapfill(brokerRequest.getPinotQuery().getDataSource().getSubquery());
+      // aggegration as second nesting subquery, gapfill as first nesting subquery, different aggregation as outer query
+      case AGGREGATE_GAP_FILL_AGGREGATE:
+        return stripGapfill(brokerRequest.getPinotQuery().getDataSource().getSubquery().getDataSource().getSubquery());
+      default:
+        return brokerRequest;
+    }
+  }
+
+  private static BrokerRequest stripGapfill(PinotQuery pinotQuery) {
+    PinotQuery copy = new PinotQuery(pinotQuery);
+    BrokerRequest brokerRequest = new BrokerRequest();
+    brokerRequest.setPinotQuery(copy);
+    // Set table name in broker request because it is used for access control, query routing etc.
+    DataSource dataSource = copy.getDataSource();
+    if (dataSource != null) {
+      QuerySource querySource = new QuerySource();
+      querySource.setTableName(dataSource.getTableName());
+      brokerRequest.setQuerySource(querySource);
+    }
+    List<Expression> selectList = copy.getSelectList();
+    for (int i = 0; i < selectList.size(); i++) {
+      Expression select = selectList.get(i);
+      if (select.getType() != ExpressionType.FUNCTION) {
+        continue;
+      }
+      if (GAP_FILL.equalsIgnoreCase(select.getFunctionCall().getOperator())) {
+        selectList.set(i, select.getFunctionCall().getOperands().get(0));
+        break;
+      }
+      if (AS.equalsIgnoreCase(select.getFunctionCall().getOperator())
+          && select.getFunctionCall().getOperands().get(0).getType() == ExpressionType.FUNCTION
+          && GAP_FILL.equalsIgnoreCase(select.getFunctionCall().getOperands().get(0).getFunctionCall().getOperator())) {
+        select.getFunctionCall().getOperands().set(0,
+            select.getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0));
+        break;
+      }
+    }
+    List<Expression> orderByList = copy.getOrderByList();
+    for (int i = 0; i < orderByList.size(); i++) {
+      Expression orderBy = orderByList.get(i);
+      if (orderBy.getType() != ExpressionType.FUNCTION) {
+        continue;
+      }
+      if (orderBy.getFunctionCall().getOperands().get(0).getType() == ExpressionType.FUNCTION
+          && GAP_FILL.equalsIgnoreCase(
+              orderBy.getFunctionCall().getOperands().get(0).getFunctionCall().getOperator())) {
+        orderBy.getFunctionCall().getOperands().set(0,
+            orderBy.getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0));
+        break;
+      }
+    }
+    return brokerRequest;
+  }
+
   public enum GapfillType {
     // one sql query with gapfill only
     GAP_FILL,
@@ -314,7 +400,7 @@ public class GapfillUtils {
     GAP_FILL_AGGREGATE,
     // aggregation as subqery, the outer query is gapfill
     AGGREGATE_GAP_FILL,
-    // aggegration as second nesting subquery, gapfill as fist nesting subquery, different aggregation as outer query
+    // aggegration as second nesting subquery, gapfill as first nesting subquery, different aggregation as outer query
     AGGREGATE_GAP_FILL_AGGREGATE
   }
 

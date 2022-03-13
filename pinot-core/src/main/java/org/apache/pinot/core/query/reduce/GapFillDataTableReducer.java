@@ -320,7 +320,12 @@ public class GapFillDataTableReducer implements DataTableReducer {
     for (ExpressionContext entityColum : _timeSeries) {
       int index = indexes.get(entityColum.getIdentifier());
       _isGroupBySelections[index] = true;
-      _groupByKeyIndexes.add(index);
+    }
+
+    for (int i = 0; i < _isGroupBySelections.length; i++) {
+      if (_isGroupBySelections[i]) {
+        _groupByKeyIndexes.add(i);
+      }
     }
 
     List<Object[]>[] timeBucketedRawRows;
