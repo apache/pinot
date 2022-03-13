@@ -44,15 +44,14 @@ public class PinotSchemaRestletResourceTest {
   public void testBadContentType() {
     Schema schema = ControllerTestUtils.createDummySchema("testSchema");
     try {
+      Map<String, String> header = new HashMap<>();
+      header.put("Content-Type", "application/text");
       ControllerTestUtils.sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaCreate(),
-          schema.toSingleLineJsonString());
+          schema.toSingleLineJsonString(), header);
+      Assert.fail("Should have caught an exception");
     } catch (IOException e) {
-      // TODO The Jersey API returns 400, so we need to check return code here not a string.
-//      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 415"), e.getMessage());
-      return;
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"), e.getMessage());
     }
-    // should not reach here
-    Assert.fail("Should have caught an exception");
   }
 
   @Test
@@ -65,25 +64,14 @@ public class PinotSchemaRestletResourceTest {
         + "    \"name\" : \"subject\",\n" + "    \"dataType\" : \"STRING\"\n" + "  } ],\n"
         + "  \"metricFieldSpecs\" : [ {\n" + "    \"name\" : \"score\",\n" + "    \"dataType\" : \"FLOAT\"\n"
         + "  } ]}";
-    try {
-      Map<String, String> header = new HashMap<>();
-      ControllerTestUtils
-          .sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaCreate(), schemaString,
-              header);
-    } catch (IOException e) {
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 415"), e.getMessage());
-    }
 
     try {
-      Map<String, String> header = new HashMap<>();
-      header.put("Content-Type", "application/json");
       final String response = ControllerTestUtils
-          .sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaCreate(), schemaString,
-              header);
+          .sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaCreate(), schemaString);
       Assert.assertEquals(response, "{\"status\":\"transcript successfully added\"}");
     } catch (IOException e) {
       // should not reach here
-      Assert.fail("Shouldn't have caught an exception");
+      Assert.fail("Shouldn't have caught an exception: " + e.getMessage());
     }
   }
 
