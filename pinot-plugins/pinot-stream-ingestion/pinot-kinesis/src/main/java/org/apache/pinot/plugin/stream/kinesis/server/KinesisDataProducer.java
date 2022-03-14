@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.stream.kinesis.server;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Properties;
 import java.util.UUID;
 import org.apache.pinot.spi.stream.StreamDataProducer;
@@ -27,14 +28,12 @@ import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.SdkBytes;
-import software.amazon.awssdk.http.SdkHttpConfigurationOption;
 import software.amazon.awssdk.http.apache.ApacheSdkHttpService;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.kinesis.KinesisClient;
+import software.amazon.awssdk.services.kinesis.KinesisClientBuilder;
 import software.amazon.awssdk.services.kinesis.model.PutRecordRequest;
 import software.amazon.awssdk.services.kinesis.model.PutRecordResponse;
-import software.amazon.awssdk.utils.AttributeMap;
-
 
 public class KinesisDataProducer implements StreamDataProducer {
   public static final String ENDPOINT = "endpoint";
@@ -49,19 +48,29 @@ public class KinesisDataProducer implements StreamDataProducer {
   @Override
   public void init(Properties props) {
     try {
-      if (props.containsKey(ENDPOINT)) {
-        String kinesisEndpoint;
-        kinesisEndpoint = props.getProperty(ENDPOINT, DEFAULT_ENDPOINT);
-        _kinesisClient = KinesisClient.builder().httpClient(new ApacheSdkHttpService().createHttpClientBuilder()
-                .buildWithDefaults(
-                    AttributeMap.builder().put(
-                        SdkHttpConfigurationOption.TRUST_ALL_CERTIFICATES, Boolean.TRUE).build()))
-            .credentialsProvider(getLocalAWSCredentials(props)).region(Region.of(props.getProperty(REGION)))
-            .endpointOverride(new URI(kinesisEndpoint)).build();
+      KinesisClientBuilder kinesisClientBuilder;
+      if (props.containsKey(ACCESS) && props.containsKey(SECRET)) {
+        kinesisClientBuilder = KinesisClient.builder().region(Region.of(props.getProperty(REGION)))
+            .credentialsProvider(getLocalAWSCredentials(props))
+            .httpClientBuilder(new ApacheSdkHttpService().createHttpClientBuilder());
       } else {
-        _kinesisClient = KinesisClient.builder().credentialsProvider(DefaultCredentialsProvider.create())
-            .region(Region.of(props.getProperty(REGION))).build();
+        kinesisClientBuilder =
+            KinesisClient.builder().region(Region.of(props.getProperty(REGION)))
+                .credentialsProvider(DefaultCredentialsProvider.create())
+                .httpClientBuilder(new ApacheSdkHttpService().createHttpClientBuilder());
       }
+
+      if (props.containsKey(ENDPOINT)) {
+        String kinesisEndpoint = props.getProperty(ENDPOINT, DEFAULT_ENDPOINT);
+        try {
+          kinesisClientBuilder = kinesisClientBuilder.endpointOverride(new URI(kinesisEndpoint));
+        } catch (URISyntaxException e) {
+          throw new IllegalArgumentException("URI syntax is not correctly specified for endpoint: "
+              + kinesisEndpoint, e);
+        }
+      }
+
+      _kinesisClient = kinesisClientBuilder.build();
     } catch (Exception e) {
       _kinesisClient = null;
     }
