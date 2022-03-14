@@ -110,8 +110,8 @@ public class BrokerReduceService extends BaseReduceService {
             _groupByTrimThreshold), brokerMetrics);
     QueryContext originalQueryContext = BrokerRequestToQueryContextConverter.convert(originalBrokerRequest);
     if (originalQueryContext.getGapfillType() != null) {
-      GapFillDataTableReducer gapFillDataTableReducer = new GapFillDataTableReducer(originalQueryContext);
-      gapFillDataTableReducer.reduceAndSetResults(brokerResponseNative, brokerMetrics);
+      GapFillProcessor gapFillProcessor = new GapFillProcessor(originalQueryContext);
+      gapFillProcessor.process(brokerResponseNative);
     }
     updateAlias(queryContext, brokerResponseNative);
     return brokerResponseNative;

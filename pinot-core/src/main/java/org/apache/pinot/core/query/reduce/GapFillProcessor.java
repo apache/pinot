@@ -48,7 +48,7 @@ import org.apache.pinot.spi.data.DateTimeGranularitySpec;
  * Helper class to reduce and set gap fill results into the BrokerResponseNative
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class GapFillDataTableReducer {
+public class GapFillProcessor {
   private final QueryContext _queryContext;
 
   private final int _limitForAggregatedResult;
@@ -69,7 +69,7 @@ public class GapFillDataTableReducer {
   private final int _timeBucketColumnIndex;
   private int[] _sourceColumnIndexForResultSchema = null;
 
-  GapFillDataTableReducer(QueryContext queryContext) {
+  GapFillProcessor(QueryContext queryContext) {
     _queryContext = queryContext;
     _gapfillType = queryContext.getGapfillType();
     _limitForAggregatedResult = queryContext.getLimit();
@@ -141,7 +141,7 @@ public class GapFillDataTableReducer {
    * 2. Gapfill the data for missing entities per time bucket
    * 3. Aggregate the dataset per time bucket.
    */
-  public void reduceAndSetResults(BrokerResponseNative brokerResponseNative, BrokerMetrics brokerMetrics) {
+  public void process(BrokerResponseNative brokerResponseNative) {
     DataSchema dataSchema = brokerResponseNative.getResultTable().getDataSchema();
     DataSchema resultTableSchema = getResultTableDataSchema(dataSchema);
     if (brokerResponseNative.getResultTable().getRows().isEmpty()) {
