@@ -162,9 +162,7 @@ public abstract class BaseQueriesTest {
       }
     }
     QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
-    BrokerRequest strippedBrokerRequest = GapfillUtils.stripGapfill(brokerRequest);
-    QueryContext strippedQueryContext = BrokerRequestToQueryContextConverter.convert(strippedBrokerRequest);
-    return getBrokerResponse(queryContext, strippedQueryContext, planMaker);
+    return getBrokerResponse(queryContext, queryContext, planMaker);
   }
 
   /**
