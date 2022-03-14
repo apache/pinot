@@ -21,10 +21,12 @@ package org.apache.pinot.plugin.stream.kinesis.server;
 import cloud.localstack.Localstack;
 import cloud.localstack.ServiceName;
 import cloud.localstack.docker.annotation.LocalstackDockerConfiguration;
+import com.google.common.base.Function;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.slf4j.Logger;
@@ -92,16 +94,22 @@ public class KinesisDataServerStartable implements StreamDataServerStartable {
           CreateStreamRequest.builder().streamName(topic).shardCount((Integer) topicProps.get(NUM_SHARDS_PROPERTY))
               .build());
 
-      String kinesisStreamStatus =
-          kinesisClient.describeStream(DescribeStreamRequest.builder().streamName(topic).build()).streamDescription()
-              .streamStatusAsString();
+      waitForCondition(new Function<Void, Boolean>() {
+        @Nullable
+        @Override
+        public Boolean apply(@Nullable Void aVoid) {
+          try {
+            String kinesisStreamStatus =
+                kinesisClient.describeStream(DescribeStreamRequest.builder().streamName(topic).build())
+                    .streamDescription().streamStatusAsString();
 
-      while (!kinesisStreamStatus.contentEquals("ACTIVE")) {
-        Thread.sleep(5000L);
-        kinesisStreamStatus =
-            kinesisClient.describeStream(DescribeStreamRequest.builder().streamName(topic).build()).streamDescription()
-                .streamStatusAsString();
-      }
+            return kinesisStreamStatus.contentEquals("ACTIVE");
+          } catch (Exception e) {
+            LOGGER.warn("Could not fetch kinesis stream status", e);
+            return null;
+          }
+        }
+      }, 1000L, 30000, "Kinesis stream " + topic + " is not created or is not in active state");
 
       LOGGER.info("Kinesis stream created successfully: " + topic);
     } catch (Exception e) {
@@ -116,5 +124,22 @@ public class KinesisDataServerStartable implements StreamDataServerStartable {
 
   private AwsCredentialsProvider getLocalAWSCredentials() {
     return StaticCredentialsProvider.create(AwsBasicCredentials.create(DEFAULT_ACCESS_KEY, DEFAULT_SECRET_KEY));
+  }
+
+  private static void waitForCondition(Function<Void, Boolean> condition, long checkIntervalMs, long timeoutMs,
+      @Nullable String errorMessage) {
+    long endTime = System.currentTimeMillis() + timeoutMs;
+    String errorMessageSuffix = errorMessage != null ? ", error message: " + errorMessage : "";
+    while (System.currentTimeMillis() < endTime) {
+      try {
+        if (Boolean.TRUE.equals(condition.apply(null))) {
+          return;
+        }
+        Thread.sleep(checkIntervalMs);
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while checking the condition" + errorMessageSuffix, e);
+      }
+    }
+    LOGGER.error("Failed to meet condition in " + timeoutMs + "ms" + errorMessageSuffix);
   }
 }
