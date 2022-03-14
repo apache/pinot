@@ -28,7 +28,7 @@ import picocli.CommandLine;
 
 
 /**
- * Command to stream GitHub events into a kafka topic
+ * Command to stream GitHub events into a kafka topic or kinesis stream
  */
 @CommandLine.Command(name = "StreamGitHubEvents")
 public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implements Command {
@@ -47,13 +47,14 @@ public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implemen
   private String _kafkaBrokerList = KafkaStarterUtils.DEFAULT_KAFKA_BROKER;
 
   @CommandLine.Option(names = {"-kinesisEndpoint"},
-      description = "Endpoint of locastack or any other Kinesis cluster when not using AWS.")
+      description = "Endpoint of localstack or any other Kinesis cluster when not using AWS.")
   private String _kinesisEndpoint = null;
 
   @CommandLine.Option(names = {"-awsRegion"}, description = "AWS Region in which Kinesis is located")
   private String _awsRegion = "us-east-1";
 
-  @CommandLine.Option(names = {"-topic"}, required = true, description = "Name of kafka topic to publish events.")
+  @CommandLine.Option(names = {"-topic"}, required = true,
+      description = "Name of kafka-topic/kinesis-stream to publish events.")
   private String _topic;
 
   @CommandLine.Option(names = {"-eventType"},

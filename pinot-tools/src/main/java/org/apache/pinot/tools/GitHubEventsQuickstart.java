@@ -87,7 +87,7 @@ public class GitHubEventsQuickstart extends QuickStartBase {
     _serverStarter.createTopic("pullRequestMergedEvents", topicProperties);
   }
 
-  private void startServer() {
+  private void startStreamServer() {
     switch (_sourceType) {
       case KINESIS:
         startKinesis();
@@ -115,8 +115,7 @@ public class GitHubEventsQuickstart extends QuickStartBase {
     URL resource = classLoader.getResource("examples/stream/githubEvents/pullRequestMergedEvents_schema.json");
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, schemaFile);
-    String tableConfigFilePath;
-    tableConfigFilePath = getTableConfigFilePath();
+    String tableConfigFilePath = getTableConfigFilePath();
     resource = classLoader.getResource(tableConfigFilePath);
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
@@ -128,7 +127,7 @@ public class GitHubEventsQuickstart extends QuickStartBase {
         new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 0, tempDir, getConfigOverrides());
 
     printStatus(Color.CYAN, String.format("***** Starting %s *****", streamSourceType));
-    startServer();
+    startStreamServer();
 
     printStatus(Color.CYAN, "***** Starting zookeeper, controller, server and broker *****");
     runner.startAll();
