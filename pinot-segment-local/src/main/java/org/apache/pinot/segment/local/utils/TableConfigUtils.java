@@ -358,7 +358,7 @@ public final class TableConfigUtils {
         if (MapUtils.isNotEmpty(prefixesToRename)) {
           for (String prefix : prefixesToRename.keySet()) {
             for (String field : fieldNames) {
-              Preconditions.checkState(field.startsWith(prefix),
+              Preconditions.checkState(!field.startsWith(prefix),
                       "Fields in the schema may not begin with any prefix specified in the prefixesToRename"
                               + " config. Name conflict with field: " + field + " and prefix: " + prefix);
             }

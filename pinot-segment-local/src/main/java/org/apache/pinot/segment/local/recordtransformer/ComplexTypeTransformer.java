@@ -25,7 +25,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.scalar.JsonFunctions;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -301,7 +300,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
     if (_prefixesToRename.isEmpty()) {
       return;
     }
-    Set<String> fields = record.getFieldToValueMap().keySet();
+    List<String> fields = new ArrayList<>(record.getFieldToValueMap().keySet());
     for (Map.Entry<String, String> entry : _prefixesToRename.entrySet()) {
       for (String field : fields) {
         String prefix = entry.getKey();
