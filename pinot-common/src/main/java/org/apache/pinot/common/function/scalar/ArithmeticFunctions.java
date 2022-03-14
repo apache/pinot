@@ -137,7 +137,9 @@ public class ArithmeticFunctions {
     return Math.log10(a);
   }
 
-  @ScalarFunction(names = {"round_decimal"})
+  //TODO: The function should ideally be named 'round'
+  // but it is not possible because of existing DateTimeFunction with same name.
+  @ScalarFunction
   public static double roundDecimal(double a, int b) {
     return BigDecimal.valueOf(a).setScale(b, RoundingMode.HALF_UP).doubleValue();
   }
