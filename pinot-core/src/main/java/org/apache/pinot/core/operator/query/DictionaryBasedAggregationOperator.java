@@ -30,14 +30,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.DistinctCountHLLAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.DistinctCountRawHLLAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountSmartHLLAggregationFunction;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -76,18 +80,52 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
       int dictionarySize = dictionary.length();
       switch (aggregationFunction.getType()) {
         case MIN:
+        case MINMV:
           aggregationResults.add(toDouble(dictionary.getMinVal()));
           break;
         case MAX:
+        case MAXMV:
           aggregationResults.add(toDouble(dictionary.getMaxVal()));
           break;
         case MINMAXRANGE:
+        case MINMAXRANGEMV:
           aggregationResults.add(
               new MinMaxRangePair(toDouble(dictionary.getMinVal()), toDouble(dictionary.getMaxVal())));
           break;
         case DISTINCTCOUNT:
+        case DISTINCTCOUNTMV:
           aggregationResults.add(getDistinctValueSet(dictionary));
           break;
+        case DISTINCTCOUNTHLL:
+        case DISTINCTCOUNTHLLMV:
+        case DISTINCTCOUNTRAWHLL:
+        case DISTINCTCOUNTRAWHLLMV: {
+          HyperLogLog hll;
+          if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
+            // Treat BYTES value as serialized HyperLogLog
+            try {
+              hll = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(dictionary.getBytesValue(0));
+              for (int dictId = 1; dictId < dictionarySize; dictId++) {
+                hll.addAll(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(dictionary.getBytesValue(dictId)));
+              }
+            } catch (Exception e) {
+              throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
+            }
+          } else {
+            int log2m;
+            if (aggregationFunction instanceof DistinctCountHLLAggregationFunction) {
+              log2m = ((DistinctCountHLLAggregationFunction) aggregationFunction).getLog2m();
+            } else {
+              log2m = ((DistinctCountRawHLLAggregationFunction) aggregationFunction).getLog2m();
+            }
+            hll = new HyperLogLog(log2m);
+            for (int dictId = 0; dictId < dictionarySize; dictId++) {
+              hll.offer(dictionary.get(dictId));
+            }
+          }
+          aggregationResults.add(hll);
+          break;
+        }
         case SEGMENTPARTITIONEDDISTINCTCOUNT:
           aggregationResults.add((long) dictionarySize);
           break;

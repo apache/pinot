@@ -58,9 +58,12 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 @SuppressWarnings("rawtypes")
 public class AggregationPlanNode implements PlanNode {
   private static final EnumSet<AggregationFunctionType> DICTIONARY_BASED_FUNCTIONS =
-      EnumSet.of(AggregationFunctionType.MIN, AggregationFunctionType.MAX, AggregationFunctionType.MINMAXRANGE,
-          AggregationFunctionType.DISTINCTCOUNT, AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT,
-          AggregationFunctionType.DISTINCTCOUNTSMARTHLL);
+      EnumSet.of(AggregationFunctionType.MIN, AggregationFunctionType.MINMV, AggregationFunctionType.MAX,
+          AggregationFunctionType.MAXMV, AggregationFunctionType.MINMAXRANGE, AggregationFunctionType.MINMAXRANGEMV,
+          AggregationFunctionType.DISTINCTCOUNT, AggregationFunctionType.DISTINCTCOUNTMV,
+          AggregationFunctionType.DISTINCTCOUNTHLL, AggregationFunctionType.DISTINCTCOUNTHLLMV,
+          AggregationFunctionType.DISTINCTCOUNTRAWHLL, AggregationFunctionType.DISTINCTCOUNTRAWHLLMV,
+          AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT, AggregationFunctionType.DISTINCTCOUNTSMARTHLL);
 
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;

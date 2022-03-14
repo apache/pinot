@@ -44,6 +44,10 @@ public class DistinctCountRawHLLAggregationFunction
     _distinctCountHLLAggregationFunction = distinctCountHLLAggregationFunction;
   }
 
+  public int getLog2m() {
+    return _distinctCountHLLAggregationFunction.getLog2m();
+  }
+
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.DISTINCTCOUNTRAWHLL;
@@ -74,8 +78,8 @@ public class DistinctCountRawHLLAggregationFunction
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    _distinctCountHLLAggregationFunction
-        .aggregateGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSetMap);
+    _distinctCountHLLAggregationFunction.aggregateGroupByMV(length, groupKeysArray, groupByResultHolder,
+        blockValSetMap);
   }
 
   @Override
