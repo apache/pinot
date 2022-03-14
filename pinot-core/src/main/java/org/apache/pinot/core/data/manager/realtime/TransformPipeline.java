@@ -62,6 +62,8 @@ public class TransformPipeline {
     // to keep track and add to "failedRows" when exception happens
     if (reusedResult == null) {
       reusedResult = new Result();
+    } else {
+      reusedResult.reset();
     }
     try {
       if (_complexTypeTransformer != null) {
@@ -75,7 +77,7 @@ public class TransformPipeline {
           if (transformedRow != null && IngestionUtils.shouldIngestRow(row)) {
             reusedResult.addTransformedRows(transformedRow);
           } else {
-            reusedResult.incFailedRowCount(1);
+            reusedResult.incSkippedRowCount(1);
           }
         }
       } else {
@@ -83,15 +85,15 @@ public class TransformPipeline {
         if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
           reusedResult.addTransformedRows(transformedRow);
         } else {
-          reusedResult.incFailedRowCount(1);
+          reusedResult.incSkippedRowCount(1);
         }
       }
       return reusedResult;
     } catch (Exception ex) {
       // when exception happens, we abandon the transformed row record, but keep the failed count properly
-      int failedRowCount = reusedResult.getFailedRowCount();
+      int skippedCount = reusedResult.getSkippedRowCount();
       reusedResult.reset();
-      reusedResult.incFailedRowCount(failedRowCount + 1);
+      reusedResult.incSkippedRowCount(skippedCount);
       throw new TransformException("Encountered error while processing row", reusedResult, ex);
     }
   }
@@ -101,26 +103,26 @@ public class TransformPipeline {
    */
   public static class Result {
     private final List<GenericRow> _transformedRows = new ArrayList<>();
-    private int _failedRowCount = 0;
+    private int _skippedRowCount = 0;
 
     public List<GenericRow> getTransformedRows() {
       return _transformedRows;
     }
 
-    public int getFailedRowCount() {
-      return _failedRowCount;
+    public int getSkippedRowCount() {
+      return _skippedRowCount;
     }
 
     public void addTransformedRows(GenericRow row) {
       _transformedRows.add(row);
     }
 
-    public void incFailedRowCount(int increment) {
-      _failedRowCount += increment;
+    public void incSkippedRowCount(int increment) {
+      _skippedRowCount += increment;
     }
 
     public void reset() {
-      _failedRowCount = 0;
+      _skippedRowCount = 0;
       _transformedRows.clear();
     }
   }

@@ -40,7 +40,7 @@ public class TransformPipelineTest {
     TransformPipeline.Result result = pipeline.processRow(simpleRow, null);
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getTransformedRows().size(), 1);
-    Assert.assertEquals(result.getFailedRowCount(), 0);
+    Assert.assertEquals(result.getSkippedRowCount(), 0);
     Assert.assertEquals(result.getTransformedRows().get(0), simpleRow);
   }
 
@@ -59,7 +59,7 @@ public class TransformPipelineTest {
     }
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getTransformedRows().size(), 0);
-    Assert.assertEquals(result.getFailedRowCount(), 1);
+    Assert.assertEquals(result.getSkippedRowCount(), 1);
   }
 
   @Test
@@ -75,7 +75,7 @@ public class TransformPipelineTest {
 
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getTransformedRows().size(), rows.size());
-    Assert.assertEquals(result.getFailedRowCount(), 0);
+    Assert.assertEquals(result.getSkippedRowCount(), 0);
     Assert.assertEquals(result.getTransformedRows(), rows);
   }
 
@@ -95,6 +95,6 @@ public class TransformPipelineTest {
 
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getTransformedRows().size(), 1);
-    Assert.assertEquals(result.getFailedRowCount(), 1);
+    Assert.assertEquals(result.getSkippedRowCount(), 1);
   }
 }

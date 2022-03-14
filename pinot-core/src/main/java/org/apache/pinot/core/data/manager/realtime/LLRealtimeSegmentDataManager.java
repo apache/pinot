@@ -518,10 +518,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           // there could be some rows that are processed successfully. We still wish to process them.
           reusedResult = e.getPartialResult();
         }
-        if (reusedResult.getFailedRowCount() > 0) {
+        if (reusedResult.getSkippedRowCount() > 0) {
           realtimeRowsDroppedMeter =
               _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED,
-                  reusedResult.getFailedRowCount(), realtimeRowsDroppedMeter);
+                  reusedResult.getSkippedRowCount(), realtimeRowsDroppedMeter);
         }
         for (GenericRow transformedRow : reusedResult.getTransformedRows()) {
           try {
