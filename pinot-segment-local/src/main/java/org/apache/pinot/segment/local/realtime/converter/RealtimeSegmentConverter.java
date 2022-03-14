@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.realtime.converter;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -94,14 +93,14 @@ public class RealtimeSegmentConverter {
     }
     if (_noDictionaryColumns != null) {
       genConfig.setRawIndexCreationColumns(_noDictionaryColumns);
-      Map<String, ChunkCompressionType> columnToCompressionType = new HashMap<>();
       for (String column : _noDictionaryColumns) {
         FieldSpec fieldSpec = _dataSchema.getFieldSpecFor(column);
+        // Compression type is already configured in the constructor of genConfig.
+        // Only update metrics compression type.
         if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.METRIC)) {
-          columnToCompressionType.put(column, ChunkCompressionType.PASS_THROUGH);
+          genConfig.setRawIndexCompressionType(column, ChunkCompressionType.PASS_THROUGH);
         }
       }
-      genConfig.setRawIndexCompressionType(columnToCompressionType);
     }
 
     if (_varLengthDictionaryColumns != null) {
