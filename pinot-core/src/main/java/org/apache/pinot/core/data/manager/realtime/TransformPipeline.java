@@ -63,7 +63,6 @@ public class TransformPipeline {
     if (reusedResult == null) {
       reusedResult = new Result();
     }
-    GenericRow transformedRow = null;
     try {
       if (_complexTypeTransformer != null) {
         // TODO: consolidate complex type transformer into composite type transformer
@@ -72,25 +71,27 @@ public class TransformPipeline {
       Collection<GenericRow> rows = (Collection<GenericRow>) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
       if (rows != null) {
         for (GenericRow row : rows) {
-          transformedRow = _recordTransformer.transform(row);
+          GenericRow transformedRow = _recordTransformer.transform(row);
           if (transformedRow != null && IngestionUtils.shouldIngestRow(row)) {
             reusedResult.addTransformedRows(transformedRow);
           } else {
-            reusedResult.addFailedRows(row);
+            reusedResult.incFailedRowCount(1);
           }
         }
       } else {
-        transformedRow = _recordTransformer.transform(decodedRow);
+        GenericRow transformedRow = _recordTransformer.transform(decodedRow);
         if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
           reusedResult.addTransformedRows(transformedRow);
         } else {
-          reusedResult.addFailedRows(transformedRow);
+          reusedResult.incFailedRowCount(1);
         }
       }
       return reusedResult;
     } catch (Exception ex) {
-      // when exception happens, the current processing row needs to be added to failed list
-      reusedResult.addFailedRows(transformedRow);
+      // when exception happens, we abandon the transformed row record, but keep the failed count properly
+      int failedRowCount = reusedResult.getFailedRowCount();
+      reusedResult.reset();
+      reusedResult.incFailedRowCount(failedRowCount + 1);
       throw new TransformException("Encountered error while processing row", reusedResult, ex);
     }
   }
@@ -114,8 +115,8 @@ public class TransformPipeline {
       _transformedRows.add(row);
     }
 
-    public void addFailedRows(GenericRow unused) {
-      _failedRowCount++;
+    public void incFailedRowCount(int increment) {
+      _failedRowCount += increment;
     }
 
     public void reset() {
