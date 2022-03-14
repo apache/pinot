@@ -52,7 +52,7 @@ public class ComplexTypeConfig extends BaseJsonConfig {
   public ComplexTypeConfig(@JsonProperty("fieldsToUnnest") @Nullable List<String> fieldsToUnnest,
       @JsonProperty("delimiter") @Nullable String delimiter,
       @JsonProperty("collectionNotUnnestedToJson") @Nullable CollectionNotUnnestedToJson collectionNotUnnestedToJson,
-                           @JsonProperty("prefixesToRename") @Nullable Map<String, String> prefixesToRename) {
+      @JsonProperty("prefixesToRename") @Nullable Map<String, String> prefixesToRename) {
     _fieldsToUnnest = fieldsToUnnest;
     _delimiter = delimiter;
     _collectionNotUnnestedToJson = collectionNotUnnestedToJson;

@@ -23,9 +23,9 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.scalar.JsonFunctions;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -99,21 +99,19 @@ public class ComplexTypeTransformer implements RecordTransformer {
 
   @VisibleForTesting
   ComplexTypeTransformer(List<String> fieldsToUnnest, String delimiter) {
-    this(fieldsToUnnest, delimiter, DEFAULT_COLLECTION_TO_JSON_MODE, new HashMap<>());
+    this(fieldsToUnnest, delimiter, DEFAULT_COLLECTION_TO_JSON_MODE, Collections.emptyMap());
   }
 
   @VisibleForTesting
-  ComplexTypeTransformer(List<String> fieldsToUnnest,
-                         String delimiter,
-                         ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson,
-                         Map<String, String> prefixesToRename) {
+  ComplexTypeTransformer(List<String> fieldsToUnnest, String delimiter,
+      ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson, Map<String, String> prefixesToRename) {
     _fieldsToUnnest = new ArrayList<>(fieldsToUnnest);
     _delimiter = delimiter;
     _collectionNotUnnestedToJson = collectionNotUnnestedToJson;
     // the unnest fields are sorted to achieve the topological sort of the collections, so that the parent collection
     // (e.g. foo) is unnested before the child collection (e.g. foo.bar)
     Collections.sort(_fieldsToUnnest);
-    _prefixesToRename = new HashMap<>(prefixesToRename);
+    _prefixesToRename = prefixesToRename;
   }
 
   private static List<String> parseFieldsToUnnest(TableConfig tableConfig) {
@@ -160,7 +158,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
             && tableConfig.getIngestionConfig().getComplexTypeConfig().getPrefixesToRename() != null) {
       return tableConfig.getIngestionConfig().getComplexTypeConfig().getPrefixesToRename();
     } else {
-      return new HashMap<>();
+      return Collections.emptyMap();
     }
   }
 
@@ -303,13 +301,15 @@ public class ComplexTypeTransformer implements RecordTransformer {
     if (_prefixesToRename.isEmpty()) {
       return;
     }
-    List<String> fields = new ArrayList<>(record.getFieldToValueMap().keySet());
-    for (String prefix : _prefixesToRename.keySet()) {
+    Set<String> fields = record.getFieldToValueMap().keySet();
+    for (Map.Entry<String, String> entry : _prefixesToRename.entrySet()) {
       for (String field : fields) {
+        String prefix = entry.getKey();
+        String replacementPrefix = entry.getValue();
         if (field.startsWith(prefix)) {
           Object value = record.removeValue(field);
           String remainingColumnName = field.substring(prefix.length());
-          String newName = _prefixesToRename.get(prefix) + remainingColumnName;
+          String newName = replacementPrefix + remainingColumnName;
           if (newName.isEmpty() || record.getValue(newName) != null) {
             throw new RuntimeException(
                     String.format("Name conflict after attempting to rename field %s to %s", field, newName));

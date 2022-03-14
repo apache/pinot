@@ -355,13 +355,12 @@ public final class TableConfigUtils {
       if (complexTypeConfig != null && schema != null) {
         Map<String, String> prefixesToRename = complexTypeConfig.getPrefixesToRename();
         Set<String> fieldNames = schema.getFieldSpecMap().keySet();
-        if (prefixesToRename != null) {
+        if (MapUtils.isNotEmpty(prefixesToRename)) {
           for (String prefix : prefixesToRename.keySet()) {
             for (String field : fieldNames) {
-              if (field.startsWith(prefix)) {
-                throw new IllegalStateException("Fields in the schema may not begin with any prefix specified in the "
-                        + "prefixesToRename config. Name conflict with field: " + field + " and prefix: " + prefix);
-              }
+              Preconditions.checkState(field.startsWith(prefix),
+                      "Fields in the schema may not begin with any prefix specified in the prefixesToRename"
+                              + " config. Name conflict with field: " + field + " and prefix: " + prefix);
             }
           }
         }
