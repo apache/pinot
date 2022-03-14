@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils.http;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -28,6 +29,7 @@ import javax.net.ssl.SSLContext;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.http.Header;
+import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
 import org.apache.http.HttpVersion;
 import org.apache.http.NameValuePair;
@@ -57,6 +59,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * The {@code HTTPClient} wraps around a {@link CloseableHttpClient} to provide a reusable client for making
+ * HTTP requests.
+ */
 public class HttpClient implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(HttpClient.class);
 
@@ -77,6 +83,10 @@ public class HttpClient implements AutoCloseable {
     SSLConnectionSocketFactory csf = new SSLConnectionSocketFactory(context, NoopHostnameVerifier.INSTANCE);
     _httpClient = HttpClients.custom().setSSLSocketFactory(csf).build();
   }
+
+  // --------------------------------------------------------------------------
+  // Generic HTTP Request APIs
+  // --------------------------------------------------------------------------
 
   /**
    * Deprecated due to lack of auth header support. May break for deployments with auth enabled
@@ -124,24 +134,23 @@ public class HttpClient implements AutoCloseable {
     return sendRequest(requestBuilder.build());
   }
 
-  public SimpleHttpResponse postJsonRequest(URI uri, @Nullable String jsonRequestBody)
-      throws HttpErrorStatusException, IOException {
-    return postJsonRequest(uri, jsonRequestBody, null, null);
+  /**
+   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
+   *
+   * @see #sendPostRequest(URI, HttpEntity, Map, String)
+   */
+  @Deprecated
+  public SimpleHttpResponse sendPostRequest(URI uri, HttpEntity payload, Map<String, String> headers)
+      throws IOException, HttpErrorStatusException {
+    return sendPostRequest(uri, payload, headers, null);
   }
 
-  public SimpleHttpResponse postJsonRequest(URI uri, @Nullable String jsonRequestBody,
-      @Nullable Map<String, String> headers)
-      throws HttpErrorStatusException, IOException {
-    return postJsonRequest(uri, jsonRequestBody, headers, null);
-  }
-
-  public SimpleHttpResponse postJsonRequest(URI uri, @Nullable String jsonRequestBody,
-      @Nullable Map<String, String> headers, @Nullable String authToken)
-      throws HttpErrorStatusException, IOException {
-    RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
-        .setHeader(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
-    if (jsonRequestBody != null) {
-      requestBuilder.setEntity(new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON));
+  public SimpleHttpResponse sendPostRequest(URI uri, HttpEntity payload, Map<String, String> headers,
+      @Nullable String authToken)
+      throws IOException, HttpErrorStatusException {
+    RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1);
+    if (payload != null) {
+      requestBuilder.setEntity(payload);
     }
     if (StringUtils.isNotBlank(authToken)) {
       requestBuilder.addHeader("Authorization", authToken);
@@ -153,38 +162,72 @@ public class HttpClient implements AutoCloseable {
     }
     setTimeout(requestBuilder, DEFAULT_SOCKET_TIMEOUT_MS);
     return sendRequest(requestBuilder.build());
+  }
+
+  /**
+   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
+   *
+   * @see #sendPutRequest(URI, HttpEntity, Map, String)
+   */
+  @Deprecated
+  public SimpleHttpResponse sendPutRequest(URI uri, HttpEntity payload, Map<String, String> headers)
+      throws IOException, HttpErrorStatusException {
+    return sendPutRequest(uri, payload, headers, null);
+  }
+
+  public SimpleHttpResponse sendPutRequest(URI uri, HttpEntity payload, Map<String, String> headers,
+      @Nullable String authToken)
+      throws IOException, HttpErrorStatusException {
+    RequestBuilder requestBuilder = RequestBuilder.put(uri).setVersion(HttpVersion.HTTP_1_1);
+    if (payload != null) {
+      requestBuilder.setEntity(payload);
+    }
+    if (StringUtils.isNotBlank(authToken)) {
+      requestBuilder.addHeader("Authorization", authToken);
+    }
+    setTimeout(requestBuilder, DELETE_REQUEST_SOCKET_TIMEOUT_MS);
+    return sendRequest(requestBuilder.build());
+  }
+
+  // --------------------------------------------------------------------------
+  // JSON post/put utility APIs
+  // --------------------------------------------------------------------------
+
+  public SimpleHttpResponse postJsonRequest(URI uri, @Nullable String jsonRequestBody)
+      throws HttpErrorStatusException, IOException {
+    return postJsonRequest(uri, jsonRequestBody, null);
+  }
+
+  public SimpleHttpResponse postJsonRequest(URI uri, @Nullable String requestBody,
+      @Nullable Map<String, String> headers)
+      throws HttpErrorStatusException, IOException {
+    if (MapUtils.isEmpty(headers)) {
+      headers = new HashMap<>();
+    }
+    headers.put(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
+    HttpEntity entity = requestBody == null ? null : new StringEntity(requestBody, ContentType.APPLICATION_JSON);
+    return sendPostRequest(uri, entity, headers, null);
   }
 
   public SimpleHttpResponse putJsonRequest(URI uri, @Nullable String jsonRequestBody)
       throws HttpErrorStatusException, IOException {
-    return putJsonRequest(uri, jsonRequestBody, null, null);
+    return putJsonRequest(uri, jsonRequestBody, null);
   }
 
-  public SimpleHttpResponse putJsonRequest(URI uri, @Nullable String jsonRequestBody,
+  public SimpleHttpResponse putJsonRequest(URI uri, @Nullable String requestBody,
       @Nullable Map<String, String> headers)
       throws HttpErrorStatusException, IOException {
-    return putJsonRequest(uri, jsonRequestBody, headers, null);
+    if (MapUtils.isEmpty(headers)) {
+      headers = new HashMap<>();
+    }
+    headers.put(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
+    HttpEntity entity = requestBody == null ? null : new StringEntity(requestBody, ContentType.APPLICATION_JSON);
+    return sendPutRequest(uri, entity, headers, null);
   }
 
-  public SimpleHttpResponse putJsonRequest(URI uri, @Nullable String jsonRequestBody,
-      @Nullable Map<String, String> headers, @Nullable String authToken)
-      throws HttpErrorStatusException, IOException {
-    RequestBuilder requestBuilder = RequestBuilder.put(uri).setVersion(HttpVersion.HTTP_1_1)
-        .setHeader(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
-    if (jsonRequestBody != null) {
-      requestBuilder.setEntity(new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON));
-    }
-    if (StringUtils.isNotBlank(authToken)) {
-      requestBuilder.addHeader("Authorization", authToken);
-    }
-    if (MapUtils.isNotEmpty(headers)) {
-      for (Map.Entry<String, String> header : headers.entrySet()) {
-        requestBuilder.addHeader(header.getKey(), header.getValue());
-      }
-    }
-    setTimeout(requestBuilder, DEFAULT_SOCKET_TIMEOUT_MS);
-    return sendRequest(requestBuilder.build());
-  }
+  // --------------------------------------------------------------------------
+  // Lower-level request/execute APIs.
+  // --------------------------------------------------------------------------
 
   public SimpleHttpResponse sendRequest(HttpUriRequest request)
       throws IOException, HttpErrorStatusException {
@@ -212,6 +255,10 @@ public class HttpClient implements AutoCloseable {
       throws IOException {
     return _httpClient.execute(request);
   }
+
+  // --------------------------------------------------------------------------
+  // Multi-part post/put APIs.
+  // --------------------------------------------------------------------------
 
   public SimpleHttpResponse sendMultipartPostRequest(String url, String body)
       throws IOException, HttpErrorStatusException {
@@ -246,6 +293,10 @@ public class HttpClient implements AutoCloseable {
       return new SimpleHttpResponse(statusCode, EntityUtils.toString(response.getEntity()));
     }
   }
+
+  // --------------------------------------------------------------------------
+  // Static utility for dealing with lower-level API responses.
+  // --------------------------------------------------------------------------
 
   public static String getErrorMessage(HttpUriRequest request, CloseableHttpResponse response) {
     String controllerHost = null;
