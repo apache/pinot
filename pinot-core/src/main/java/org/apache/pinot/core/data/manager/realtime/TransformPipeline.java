@@ -74,7 +74,7 @@ public class TransformPipeline {
       if (rows != null) {
         for (GenericRow row : rows) {
           GenericRow transformedRow = _recordTransformer.transform(row);
-          if (transformedRow != null && IngestionUtils.shouldIngestRow(row)) {
+          if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
             reusedResult.addTransformedRows(transformedRow);
           } else {
             reusedResult.incSkippedRowCount(1);
