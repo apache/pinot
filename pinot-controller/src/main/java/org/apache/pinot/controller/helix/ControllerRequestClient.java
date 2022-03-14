@@ -45,7 +45,7 @@ public class ControllerRequestClient {
       throws IOException {
     String url = _controllerRequestURLBuilder.forSchemaCreate();
     try {
-      _httpClient.sendMultipartPostRequest(url, schema.toSingleLineJsonString());
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendMultipartPostRequest(url, schema.toSingleLineJsonString()));
     } catch (HttpErrorStatusException e) {
       throw new IOException(e);
     }
@@ -55,7 +55,7 @@ public class ControllerRequestClient {
       throws IOException {
     String url = _controllerRequestURLBuilder.forSchemaGet(schemaName);
     try {
-      SimpleHttpResponse resp = _httpClient.sendGetRequest(new URL(url).toURI());
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(new URL(url).toURI()));
       return Schema.fromString(resp.getResponse());
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
@@ -65,8 +65,8 @@ public class ControllerRequestClient {
   public void addTableConfig(TableConfig tableConfig)
       throws IOException {
     try {
-      _httpClient.postJsonRequest(new URL(_controllerRequestURLBuilder.forTableCreate()).toURI(),
-          tableConfig.toJsonString());
+      HttpClient.wrapAndThrowHttpException(_httpClient.postJsonRequest(new URL(
+          _controllerRequestURLBuilder.forTableCreate()).toURI(), tableConfig.toJsonString()));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
@@ -75,8 +75,9 @@ public class ControllerRequestClient {
   public void createBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
     try {
-      _httpClient.postJsonRequest(new URL(_controllerRequestURLBuilder.forTenantCreate()).toURI(),
-          getBrokerTenantRequestPayload(tenantName, numBrokers));
+      HttpClient.wrapAndThrowHttpException(_httpClient.postJsonRequest(new URL(
+          _controllerRequestURLBuilder.forTenantCreate()).toURI(),
+          getBrokerTenantRequestPayload(tenantName, numBrokers)));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
@@ -85,8 +86,9 @@ public class ControllerRequestClient {
   public void updateBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
     try {
-      _httpClient.putJsonRequest(new URL(_controllerRequestURLBuilder.forTenantCreate()).toURI(),
-          getBrokerTenantRequestPayload(tenantName, numBrokers));
+      HttpClient.wrapAndThrowHttpException(_httpClient.putJsonRequest(new URL(
+          _controllerRequestURLBuilder.forTenantCreate()).toURI(),
+          getBrokerTenantRequestPayload(tenantName, numBrokers)));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
@@ -95,8 +97,9 @@ public class ControllerRequestClient {
   public void createServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
       throws IOException {
     try {
-      _httpClient.postJsonRequest(new URL(_controllerRequestURLBuilder.forTenantCreate()).toURI(),
-          getServerTenantRequestPayload(tenantName, numOfflineServers, numRealtimeServers));
+      HttpClient.wrapAndThrowHttpException(_httpClient.postJsonRequest(new URL(
+          _controllerRequestURLBuilder.forTenantCreate()).toURI(),
+          getServerTenantRequestPayload(tenantName, numOfflineServers, numRealtimeServers)));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }

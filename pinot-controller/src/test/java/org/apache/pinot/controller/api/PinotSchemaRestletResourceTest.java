@@ -19,8 +19,6 @@
 package org.apache.pinot.controller.api;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -38,20 +36,6 @@ public class PinotSchemaRestletResourceTest {
   public void setUp()
       throws Exception {
     ControllerTestUtils.setupClusterAndValidate();
-  }
-
-  @Test
-  public void testBadContentType() {
-    Schema schema = ControllerTestUtils.createDummySchema("testSchema");
-    try {
-      Map<String, String> header = new HashMap<>();
-      header.put("Content-Type", "application/text");
-      ControllerTestUtils.sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaCreate(),
-          schema.toSingleLineJsonString(), header);
-      Assert.fail("Should have caught an exception");
-    } catch (IOException e) {
-      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"), e.getMessage());
-    }
   }
 
   @Test

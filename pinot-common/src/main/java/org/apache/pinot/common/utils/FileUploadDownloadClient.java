@@ -510,7 +510,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public SimpleHttpResponse addSchema(URI uri, String schemaName, File schemaFile, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters)
       throws IOException, HttpErrorStatusException {
-    return _httpClient.sendRequest(getAddSchemaRequest(uri, schemaName, schemaFile, headers, parameters));
+    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
+        getAddSchemaRequest(uri, schemaName, schemaFile, headers, parameters)));
   }
 
   /**
@@ -530,9 +531,9 @@ public class FileUploadDownloadClient implements AutoCloseable {
   @Deprecated
   public SimpleHttpResponse updateSchema(URI uri, String schemaName, File schemaFile)
       throws IOException, HttpErrorStatusException {
-    return _httpClient.sendRequest(
+    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
         getUploadFileRequest(HttpPut.METHOD_NAME, uri, getContentBody(schemaName, schemaFile), null, null,
-            HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
+            HttpClient.DEFAULT_SOCKET_TIMEOUT_MS)));
   }
 
   /**
@@ -550,9 +551,9 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public SimpleHttpResponse updateSchema(URI uri, String schemaName, File schemaFile, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters)
       throws IOException, HttpErrorStatusException {
-    return _httpClient.sendRequest(
+    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
         getUploadFileRequest(HttpPut.METHOD_NAME, uri, getContentBody(schemaName, schemaFile), headers, parameters,
-            HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
+            HttpClient.DEFAULT_SOCKET_TIMEOUT_MS)));
   }
 
   /**
@@ -571,8 +572,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public SimpleHttpResponse uploadSegmentMetadata(URI uri, String segmentName, File segmentMetadataFile,
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
-    return _httpClient.sendRequest(
-        getUploadSegmentMetadataRequest(uri, segmentName, segmentMetadataFile, headers, parameters, socketTimeoutMs));
+    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
+        getUploadSegmentMetadataRequest(uri, segmentName, segmentMetadataFile, headers, parameters, socketTimeoutMs)));
   }
 
   /**
@@ -593,8 +594,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public SimpleHttpResponse uploadSegmentMetadataFiles(URI uri, Map<String, File> metadataFiles,
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int segmentUploadRequestTimeoutMs)
       throws IOException, HttpErrorStatusException {
-    return _httpClient.sendRequest(
-        getUploadSegmentMetadataFilesRequest(uri, metadataFiles, headers, parameters, segmentUploadRequestTimeoutMs));
+    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
+        getUploadSegmentMetadataFilesRequest(uri, metadataFiles, headers, parameters, segmentUploadRequestTimeoutMs)));
   }
 
   /**
@@ -618,8 +619,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public SimpleHttpResponse uploadSegment(URI uri, String segmentName, File segmentFile, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
-    return _httpClient.sendRequest(getUploadSegmentRequest(
-        uri, segmentName, segmentFile, headers, parameters, socketTimeoutMs));
+    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(getUploadSegmentRequest(
+        uri, segmentName, segmentFile, headers, parameters, socketTimeoutMs)));
   }
 
   /**
@@ -724,8 +725,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
     parameters = parameters == null ? new ArrayList<>() : new ArrayList<>(parameters);
     parameters.add(tableNameValuePair);
     parameters.add(tableTypeValuePair);
-    return _httpClient.sendRequest(getUploadSegmentRequest(
-        uri, segmentName, inputStream, headers, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
+    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(getUploadSegmentRequest(
+        uri, segmentName, inputStream, headers, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS)));
   }
 
   /**
@@ -746,8 +747,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public SimpleHttpResponse uploadSegment(URI uri, String segmentName, InputStream inputStream,
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
-    return _httpClient.sendRequest(getUploadSegmentRequest(
-        uri, segmentName, inputStream, headers, parameters, socketTimeoutMs));
+    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(getUploadSegmentRequest(
+        uri, segmentName, inputStream, headers, parameters, socketTimeoutMs)));
   }
 
   /**
@@ -786,7 +787,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
     RequestBuilder requestBuilder = RequestBuilder.post(new URI(uri)).setVersion(HttpVersion.HTTP_1_1);
     HttpClient.setTimeout(requestBuilder, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
     // sendRequest checks the response status code
-    SimpleHttpResponse response = _httpClient.sendRequest(requestBuilder.build());
+    SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(requestBuilder.build()));
     String downloadUrl = response.getResponse();
     if (downloadUrl.isEmpty()) {
       throw new HttpErrorStatusException(String
@@ -813,7 +814,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public SimpleHttpResponse sendSegmentUri(URI uri, String downloadUri, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
-    return _httpClient.sendRequest(getSendSegmentUriRequest(uri, downloadUri, headers, parameters, socketTimeoutMs));
+    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
+        getSendSegmentUriRequest(uri, downloadUri, headers, parameters, socketTimeoutMs)));
   }
 
   /**
@@ -854,7 +856,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public SimpleHttpResponse sendSegmentJson(URI uri, String jsonString, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
-    return _httpClient.sendRequest(getSendSegmentJsonRequest(uri, jsonString, headers, parameters, socketTimeoutMs));
+    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
+        getSendSegmentJsonRequest(uri, jsonString, headers, parameters, socketTimeoutMs)));
   }
 
   /**
@@ -889,8 +892,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public SimpleHttpResponse startReplaceSegments(URI uri, StartReplaceSegmentsRequest startReplaceSegmentsRequest,
       @Nullable String authToken)
       throws IOException, HttpErrorStatusException {
-    return _httpClient.sendRequest(getStartReplaceSegmentsRequest(
-        uri, JsonUtils.objectToString(startReplaceSegmentsRequest), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, authToken));
+    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(getStartReplaceSegmentsRequest(
+        uri, JsonUtils.objectToString(startReplaceSegmentsRequest), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, authToken)));
   }
 
   /**
@@ -905,7 +908,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
    */
   public SimpleHttpResponse endReplaceSegments(URI uri, int socketTimeoutMs, @Nullable String authToken)
       throws IOException, HttpErrorStatusException {
-    return _httpClient.sendRequest(getEndReplaceSegmentsRequest(uri, socketTimeoutMs, authToken));
+    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
+        getEndReplaceSegmentsRequest(uri, socketTimeoutMs, authToken)));
   }
 
   /**
@@ -918,7 +922,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
    */
   public SimpleHttpResponse revertReplaceSegments(URI uri)
       throws IOException, HttpErrorStatusException {
-    return _httpClient.sendRequest(getRevertReplaceSegmentRequest(uri));
+    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(getRevertReplaceSegmentRequest(uri)));
   }
 
   /**
@@ -954,7 +958,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public SimpleHttpResponse sendSegmentCompletionProtocolRequest(URI uri, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
-    return _httpClient.sendRequest(getSegmentCompletionProtocolRequest(uri, headers, parameters, socketTimeoutMs));
+    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
+        getSegmentCompletionProtocolRequest(uri, headers, parameters, socketTimeoutMs)));
   }
 
   /**

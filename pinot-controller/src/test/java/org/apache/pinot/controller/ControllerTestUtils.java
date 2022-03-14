@@ -496,9 +496,10 @@ public abstract class ControllerTestUtils {
   public static String sendGetRequest(String urlString)
       throws IOException {
     try {
-      SimpleHttpResponse resp = _httpClient.sendGetRequest(new URL(urlString).toURI());
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(
+          new URL(urlString).toURI()));
       return constructResponse(resp);
-    } catch (HttpErrorStatusException | URISyntaxException e) {
+    } catch (URISyntaxException | HttpErrorStatusException e) {
       throw new IOException(e);
     }
   }
@@ -516,9 +517,10 @@ public abstract class ControllerTestUtils {
   public static String sendPostRequest(String urlString, String payload, Map<String, String> headers)
       throws IOException {
     try {
-      SimpleHttpResponse resp = _httpClient.postJsonRequest(new URL(urlString).toURI(), payload, headers);
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(_httpClient.postJsonRequest(
+          new URL(urlString).toURI(), payload, headers));
       return constructResponse(resp);
-    } catch (HttpErrorStatusException | URISyntaxException e) {
+    } catch (URISyntaxException | HttpErrorStatusException e) {
       throw new IOException(e);
     }
   }
@@ -536,9 +538,10 @@ public abstract class ControllerTestUtils {
   public static String sendPutRequest(String urlString, String payload, Map<String, String> headers)
       throws IOException {
     try {
-      SimpleHttpResponse resp = _httpClient.putJsonRequest(new URL(urlString).toURI(), payload, headers);
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(_httpClient.putJsonRequest(
+          new URL(urlString).toURI(), payload, headers));
       return constructResponse(resp);
-    } catch (HttpErrorStatusException | URISyntaxException e) {
+    } catch (URISyntaxException | HttpErrorStatusException e) {
       throw new IOException(e);
     }
   }
@@ -546,29 +549,22 @@ public abstract class ControllerTestUtils {
   public static String sendDeleteRequest(String urlString)
       throws IOException {
     try {
-      SimpleHttpResponse resp = _httpClient.sendDeleteRequest(new URL(urlString).toURI());
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(
+          new URL(urlString).toURI()));
       return constructResponse(resp);
-    } catch (HttpErrorStatusException | URISyntaxException e) {
+    } catch (URISyntaxException | HttpErrorStatusException e) {
       throw new IOException(e);
     }
   }
 
   public static SimpleHttpResponse sendMultipartPostRequest(String url, String body)
       throws IOException {
-    try {
-      return _httpClient.sendMultipartPostRequest(url, body);
-    } catch (HttpErrorStatusException e) {
-      return new SimpleHttpResponse(e.getStatusCode(), e.getMessage());
-    }
+    return _httpClient.sendMultipartPostRequest(url, body);
   }
 
   public static SimpleHttpResponse sendMultipartPutRequest(String url, String body)
       throws IOException {
-    try {
-      return _httpClient.sendMultipartPutRequest(url, body);
-    } catch (HttpErrorStatusException e) {
-      return new SimpleHttpResponse(e.getStatusCode(), e.getMessage());
-    }
+    return _httpClient.sendMultipartPutRequest(url, body);
   }
 
   private static String constructResponse(SimpleHttpResponse resp) {

@@ -95,14 +95,14 @@ public class HttpClient implements AutoCloseable {
    */
   @Deprecated
   public SimpleHttpResponse sendGetRequest(URI uri)
-      throws IOException, HttpErrorStatusException {
+      throws IOException {
     RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
     setTimeout(requestBuilder, GET_REQUEST_SOCKET_TIMEOUT_MS);
     return sendRequest(requestBuilder.build());
   }
 
   public SimpleHttpResponse sendGetRequest(URI uri, @Nullable String authToken)
-      throws IOException, HttpErrorStatusException {
+      throws IOException {
     RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
     if (StringUtils.isNotBlank(authToken)) {
       requestBuilder.addHeader("Authorization", authToken);
@@ -118,14 +118,14 @@ public class HttpClient implements AutoCloseable {
    */
   @Deprecated
   public SimpleHttpResponse sendDeleteRequest(URI uri)
-      throws IOException, HttpErrorStatusException {
+      throws IOException {
     RequestBuilder requestBuilder = RequestBuilder.delete(uri).setVersion(HttpVersion.HTTP_1_1);
     setTimeout(requestBuilder, DELETE_REQUEST_SOCKET_TIMEOUT_MS);
     return sendRequest(requestBuilder.build());
   }
 
   public SimpleHttpResponse sendDeleteRequest(URI uri, @Nullable String authToken)
-      throws IOException, HttpErrorStatusException {
+      throws IOException {
     RequestBuilder requestBuilder = RequestBuilder.delete(uri).setVersion(HttpVersion.HTTP_1_1);
     if (StringUtils.isNotBlank(authToken)) {
       requestBuilder.addHeader("Authorization", authToken);
@@ -141,13 +141,13 @@ public class HttpClient implements AutoCloseable {
    */
   @Deprecated
   public SimpleHttpResponse sendPostRequest(URI uri, HttpEntity payload, Map<String, String> headers)
-      throws IOException, HttpErrorStatusException {
+      throws IOException {
     return sendPostRequest(uri, payload, headers, null);
   }
 
   public SimpleHttpResponse sendPostRequest(URI uri, HttpEntity payload, Map<String, String> headers,
       @Nullable String authToken)
-      throws IOException, HttpErrorStatusException {
+      throws IOException {
     RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1);
     if (payload != null) {
       requestBuilder.setEntity(payload);
@@ -171,13 +171,13 @@ public class HttpClient implements AutoCloseable {
    */
   @Deprecated
   public SimpleHttpResponse sendPutRequest(URI uri, HttpEntity payload, Map<String, String> headers)
-      throws IOException, HttpErrorStatusException {
+      throws IOException {
     return sendPutRequest(uri, payload, headers, null);
   }
 
   public SimpleHttpResponse sendPutRequest(URI uri, HttpEntity payload, Map<String, String> headers,
       @Nullable String authToken)
-      throws IOException, HttpErrorStatusException {
+      throws IOException {
     RequestBuilder requestBuilder = RequestBuilder.put(uri).setVersion(HttpVersion.HTTP_1_1);
     if (payload != null) {
       requestBuilder.setEntity(payload);
@@ -194,13 +194,13 @@ public class HttpClient implements AutoCloseable {
   // --------------------------------------------------------------------------
 
   public SimpleHttpResponse postJsonRequest(URI uri, @Nullable String jsonRequestBody)
-      throws HttpErrorStatusException, IOException {
+      throws IOException {
     return postJsonRequest(uri, jsonRequestBody, null);
   }
 
   public SimpleHttpResponse postJsonRequest(URI uri, @Nullable String requestBody,
       @Nullable Map<String, String> headers)
-      throws HttpErrorStatusException, IOException {
+      throws IOException {
     if (MapUtils.isEmpty(headers)) {
       headers = new HashMap<>();
     }
@@ -210,13 +210,13 @@ public class HttpClient implements AutoCloseable {
   }
 
   public SimpleHttpResponse putJsonRequest(URI uri, @Nullable String jsonRequestBody)
-      throws HttpErrorStatusException, IOException {
+      throws IOException {
     return putJsonRequest(uri, jsonRequestBody, null);
   }
 
   public SimpleHttpResponse putJsonRequest(URI uri, @Nullable String requestBody,
       @Nullable Map<String, String> headers)
-      throws HttpErrorStatusException, IOException {
+      throws IOException {
     if (MapUtils.isEmpty(headers)) {
       headers = new HashMap<>();
     }
@@ -230,7 +230,7 @@ public class HttpClient implements AutoCloseable {
   // --------------------------------------------------------------------------
 
   public SimpleHttpResponse sendRequest(HttpUriRequest request)
-      throws IOException, HttpErrorStatusException {
+      throws IOException {
     try (CloseableHttpResponse response = _httpClient.execute(request)) {
       String controllerHost = null;
       String controllerVersion = null;
@@ -245,7 +245,7 @@ public class HttpClient implements AutoCloseable {
       }
       int statusCode = response.getStatusLine().getStatusCode();
       if (statusCode >= 300) {
-        throw new HttpErrorStatusException(getErrorMessage(request, response), statusCode);
+        return new SimpleHttpResponse(statusCode, getErrorMessage(request, response));
       }
       return new SimpleHttpResponse(statusCode, EntityUtils.toString(response.getEntity()));
     }
@@ -261,7 +261,7 @@ public class HttpClient implements AutoCloseable {
   // --------------------------------------------------------------------------
 
   public SimpleHttpResponse sendMultipartPostRequest(String url, String body)
-      throws IOException, HttpErrorStatusException {
+      throws IOException {
     HttpPost post = new HttpPost(url);
     // our handlers ignore key...so we can put anything here
     MultipartEntityBuilder builder = MultipartEntityBuilder.create();
@@ -271,14 +271,14 @@ public class HttpClient implements AutoCloseable {
       StatusLine statusLine = response.getStatusLine();
       int statusCode = statusLine.getStatusCode();
       if (statusCode >= 300) {
-        throw new HttpErrorStatusException(HttpClient.getErrorMessage(post, response), statusCode);
+        return new SimpleHttpResponse(statusCode, getErrorMessage(post, response));
       }
       return new SimpleHttpResponse(statusCode, EntityUtils.toString(response.getEntity()));
     }
   }
 
   public SimpleHttpResponse sendMultipartPutRequest(String url, String body)
-      throws IOException, HttpErrorStatusException {
+      throws IOException {
     HttpPut put = new HttpPut(url);
     // our handlers ignore key...so we can put anything here
     MultipartEntityBuilder builder = MultipartEntityBuilder.create();
@@ -288,7 +288,7 @@ public class HttpClient implements AutoCloseable {
       StatusLine statusLine = response.getStatusLine();
       int statusCode = statusLine.getStatusCode();
       if (statusCode >= 300) {
-        throw new HttpErrorStatusException(HttpClient.getErrorMessage(put, response), statusCode);
+        return new SimpleHttpResponse(statusCode, getErrorMessage(put, response));
       }
       return new SimpleHttpResponse(statusCode, EntityUtils.toString(response.getEntity()));
     }
@@ -297,6 +297,15 @@ public class HttpClient implements AutoCloseable {
   // --------------------------------------------------------------------------
   // Static utility for dealing with lower-level API responses.
   // --------------------------------------------------------------------------
+
+  public static SimpleHttpResponse wrapAndThrowHttpException(SimpleHttpResponse resp)
+      throws HttpErrorStatusException {
+    if (resp.getStatusCode() >= 300) {
+      throw new HttpErrorStatusException(resp.getResponse(), resp.getStatusCode());
+    } else {
+      return resp;
+    }
+  }
 
   public static String getErrorMessage(HttpUriRequest request, CloseableHttpResponse response) {
     String controllerHost = null;
