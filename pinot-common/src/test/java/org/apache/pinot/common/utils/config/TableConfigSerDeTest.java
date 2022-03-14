@@ -279,7 +279,7 @@ public class TableConfigSerDeTest {
       List<Map<String, String>> batchConfigMaps = new ArrayList<>();
       batchConfigMaps.add(batchConfigMap);
       List<String> fieldsToUnnest = Arrays.asList("c1, c2");
-      Map<String, String> prefixesToRename = new HashMap();
+      Map<String, String> prefixesToRename = new HashMap<>();
       IngestionConfig ingestionConfig =
           new IngestionConfig(new BatchIngestionConfig(batchConfigMaps, "APPEND", "HOURLY"),
               new StreamIngestionConfig(streamConfigMaps), new FilterConfig("filterFunc(foo)"), transformConfigs,
