@@ -4,7 +4,7 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
 public class TrigonometricFunctions {
-  private TrigonometricFunctions(){
+  private TrigonometricFunctions() {
   }
 
   @ScalarFunction

@@ -118,10 +118,14 @@ public class ArithmeticFunctions {
   }
 
   @ScalarFunction
-  public static double pi() { return Math.PI; }
+  public static double pi() {
+    return Math.PI;
+  }
 
   @ScalarFunction
-  public static double e() { return Math.E; }
+  public static double e() {
+    return Math.E;
+  }
 
   @ScalarFunction
   public static double power(double a, double b) {
