@@ -94,7 +94,7 @@ public class TransformPipelineTest {
     }
 
     Assert.assertNotNull(result);
-    Assert.assertEquals(result.getTransformedRows().size(), 1);
+    Assert.assertEquals(result.getTransformedRows().size(), 0);
     Assert.assertEquals(result.getSkippedRowCount(), 1);
   }
 

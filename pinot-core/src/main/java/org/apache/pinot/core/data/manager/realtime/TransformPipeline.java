@@ -93,7 +93,7 @@ public class TransformPipeline {
       // when exception happens, we abandon the transformed row record, but keep the failed count properly
       int skippedCount = reusedResult.getSkippedRowCount();
       reusedResult.reset();
-      reusedResult.incSkippedRowCount(skippedCount);
+      reusedResult.incSkippedRowCount(skippedCount + 1);
       throw new TransformException("Encountered error while processing row", reusedResult, ex);
     }
   }
