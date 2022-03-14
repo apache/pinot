@@ -239,6 +239,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
 
     //copy input path to local
     File localInputDataFile = createLocalInputDateFile(inputFileURI, localInputTempDir);
+    System.out.println("localInputDataFile = " + localInputDataFile);
 
     _inputDirFS.copyToLocalFile(inputFileURI, localInputDataFile);
 
@@ -294,8 +295,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
 
   private File createLocalInputDateFile(URI inputFileURI, File localInputTempDir) {
     String inputFileURIPath = inputFileURI.getPath();
-    String fileNameFriendlyPath = inputFileURIPath.substring(0,
-        inputFileURIPath.lastIndexOf(File.separator)).replaceAll("\\W+", "-");
+    String fileNameFriendlyPath = UUID.randomUUID().toString();
     File localInputFileDir = new File(localInputTempDir, fileNameFriendlyPath);
     return new File(localInputFileDir, new File(inputFileURIPath).getName());
   }
