@@ -45,7 +45,7 @@ public class StringFunctions {
   private final static Pattern RTRIM = Pattern.compile("\\s+$");
 
   /**
-   * @see StringBuilder#reverse()
+   * @see StringUtils#reverse(String)
    * @param input
    * @return reversed input in from end to start
    */
@@ -184,8 +184,9 @@ public class StringFunctions {
   }
 
   /**
+   * @see StringUtils#left(String, int)
    * @param input
-   * @return trim spaces from right side of the string
+   * @return get substring starting from the first index and extending upto specified length.
    */
   @ScalarFunction
   public static String leftSubStr(String input, int length) {
@@ -193,8 +194,9 @@ public class StringFunctions {
   }
 
   /**
+   * @see StringUtils#right(String, int)
    * @param input
-   * @return trim spaces from right side of the string
+   * @return get substring ending at the last index with specified length
    */
   @ScalarFunction
   public static String rightSubStr(String input, int length) {
@@ -304,7 +306,7 @@ public class StringFunctions {
   }
 
   /**
-   * @see String#startsWith(String)
+   * @see StringUtils#startsWith(CharSequence, CharSequence)
    * @param input
    * @param prefix substring to check if it is the prefix
    * @return true if string starts with prefix, false o.w.
@@ -315,10 +317,10 @@ public class StringFunctions {
   }
 
   /**
-   * @see String#startsWith(String)
+   * @see StringUtils#endsWith(CharSequence, CharSequence)
    * @param input
    * @param suffix substring to check if it is the prefix
-   * @return true if string starts with prefix, false o.w.
+   * @return true if string ends with prefix, false o.w.
    */
   @ScalarFunction
   public static boolean endsWith(String input, String suffix) {
@@ -392,7 +394,7 @@ public class StringFunctions {
   }
 
   /**
-   * @see StandardCharsets#UTF_8#encode(String)
+   * @see StandardCharsets#US_ASCII#encode(String)
    * @param input
    * @return bytes
    */
@@ -402,7 +404,7 @@ public class StringFunctions {
   }
 
   /**
-   * see Normalizer#normalize(String, Form)
+   * @see Normalizer#normalize(CharSequence, Normalizer.Form)
    * @param input
    * @return transforms string with NFC normalization form.
    */
@@ -412,7 +414,7 @@ public class StringFunctions {
   }
 
   /**
-   * see Normalizer#normalize(String, Form)
+   * @see Normalizer#normalize(CharSequence, Normalizer.Form)
    * @param input
    * @param form
    * @return transforms string with the specified normalization form
@@ -424,7 +426,7 @@ public class StringFunctions {
   }
 
   /**
-   * see String#split(String)
+   * @see StringUtils#split(String, String)
    * @param input
    * @param delimiter
    * @return splits string on specified delimiter and returns an array.
@@ -435,15 +437,15 @@ public class StringFunctions {
   }
 
   /**
-   * see String#split(String)
    * @param input
    * @param delimiter
-   * @return splits string on specified delimiter and returns an array.
+   * @param index
+   * @return splits string on specified delimiter and returns String at specified index from the split.
    */
   @ScalarFunction
   public static String split(String input, String delimiter, int index) {
     String[] splitString = StringUtils.split(input, delimiter);
-    if(index < splitString.length){
+    if (index < splitString.length) {
       return splitString[index];
     } else {
       return "null";
@@ -451,10 +453,10 @@ public class StringFunctions {
   }
 
   /**
-   * see String#split(String)
+   * @see StringUtils#repeat(char, int)
    * @param input
    * @param times
-   * @return splits string on specified delimiter and returns an array.
+   * @return concatenate the string to itself specified number of times
    */
   @ScalarFunction
   public static String repeat(String input, int times) {
@@ -462,19 +464,18 @@ public class StringFunctions {
   }
 
   /**
-   * see String#split(String)
+   * @see StringUtils#repeat(String, String, int)
    * @param input
    * @param times
-   * @return splits string on specified delimiter and returns an array.
+   * @return concatenate the string to itself specified number of times with specified seperator
    */
   @ScalarFunction
   public static String repeat(String input, String sep, int times) {
     return StringUtils.repeat(input, sep, times);
   }
 
-
   /**
-   * see String#replaceAll(String, String)
+   * @see StringUtils#remove(String, String)
    * @param input
    * @param search
    * @return removes all instances of search from string
@@ -504,7 +505,7 @@ public class StringFunctions {
   }
 
   /**
-   * see String#contains(String)
+   * @see String#contains(CharSequence)
    * @param input
    * @param substring
    * @return returns true if substring present in main string else false.
