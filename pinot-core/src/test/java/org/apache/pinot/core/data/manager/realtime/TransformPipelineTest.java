@@ -97,4 +97,26 @@ public class TransformPipelineTest {
     Assert.assertEquals(result.getTransformedRows().size(), 1);
     Assert.assertEquals(result.getSkippedRowCount(), 1);
   }
+
+  @Test
+  public void testReuseResultSet() throws Exception {
+    TableConfig config = createTableConfig();
+    Schema schema = createSchema();
+    TransformPipeline pipeline = new TransformPipeline(config, schema);
+    GenericRow simpleRow = createSingleRow(9527);
+
+    TransformPipeline.Result result = pipeline.processRow(simpleRow, null);
+    Assert.assertNotNull(result);
+    Assert.assertEquals(result.getTransformedRows().size(), 1);
+    Assert.assertEquals(result.getSkippedRowCount(), 0);
+    Assert.assertEquals(result.getTransformedRows().get(0), simpleRow);
+
+    // same row runs twice, should reset the flag.
+    result = pipeline.processRow(simpleRow, result);
+    Assert.assertNotNull(result);
+    Assert.assertEquals(result.getTransformedRows().size(), 1);
+    Assert.assertEquals(result.getSkippedRowCount(), 0);
+    Assert.assertEquals(result.getTransformedRows().get(0), simpleRow);
+
+  }
 }
