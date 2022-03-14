@@ -20,45 +20,26 @@ package org.apache.pinot.core.query.reduce;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
-import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Key;
-import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.core.data.table.SimpleIndexedTable;
-import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
-import org.apache.pinot.core.operator.combine.GroupByOrderByCombineOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
-import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GapfillUtils;
-import org.apache.pinot.core.util.GroupByUtils;
-import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 
@@ -67,9 +48,7 @@ import org.apache.pinot.spi.data.DateTimeGranularitySpec;
  * Helper class to reduce and set gap fill results into the BrokerResponseNative
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class GapFillDataTableReducer implements DataTableReducer {
-  private static final int MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE = 2; // TBD, find a better value.
-
+public class GapFillDataTableReducer {
   private final QueryContext _queryContext;
 
   private final int _limitForAggregatedResult;
@@ -87,6 +66,8 @@ public class GapFillDataTableReducer implements DataTableReducer {
   private final GapfillUtils.GapfillType _gapfillType;
   private int _limitForGapfilledResult;
   private boolean[] _isGroupBySelections;
+  private final int _timeBucketColumnIndex;
+  private int[] _sourceColumnIndexForResultSchema = null;
 
   GapFillDataTableReducer(QueryContext queryContext) {
     _queryContext = queryContext;
@@ -100,6 +81,7 @@ public class GapFillDataTableReducer implements DataTableReducer {
     }
 
     ExpressionContext gapFillSelection = GapfillUtils.getGapfillExpressionContext(queryContext);
+    _timeBucketColumnIndex = GapfillUtils.findTimeBucketColumnIndex(queryContext);
 
     List<ExpressionContext> args = gapFillSelection.getFunction().getArguments();
 
@@ -154,155 +136,15 @@ public class GapFillDataTableReducer implements DataTableReducer {
   }
 
   /**
-   * Computes the number of reduce threads to use per query.
-   * <ul>
-   *   <li> Use single thread if number of data tables to reduce is less than
-   *   {@value #MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE}.</li>
-   *   <li> Else, use min of max allowed reduce threads per query, and number of data tables.</li>
-   * </ul>
-   *
-   * @param numDataTables Number of data tables to reduce
-   * @param maxReduceThreadsPerQuery Max allowed reduce threads per query
-   * @return Number of reduce threads to use for the query
-   */
-  private int getNumReduceThreadsToUse(int numDataTables, int maxReduceThreadsPerQuery) {
-    // Use single thread if number of data tables < MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE.
-    if (numDataTables < MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE) {
-      return Math.min(1, numDataTables); // Number of data tables can be zero.
-    }
-
-    return Math.min(maxReduceThreadsPerQuery, numDataTables);
-  }
-
-  private IndexedTable getIndexedTable(DataSchema dataSchema, Collection<DataTable> dataTablesToReduce,
-      DataTableReducerContext reducerContext)
-      throws TimeoutException {
-    QueryContext queryContext = _queryContext.getSubQueryContext();
-    if (_queryContext.getGapfillType() == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL_AGGREGATE) {
-      queryContext = queryContext.getSubQueryContext();
-    }
-    long start = System.currentTimeMillis();
-    int numDataTables = dataTablesToReduce.size();
-
-    // Get the number of threads to use for reducing.
-    // In case of single reduce thread, fall back to SimpleIndexedTable to avoid redundant locking/unlocking calls.
-    int numReduceThreadsToUse = getNumReduceThreadsToUse(numDataTables, reducerContext.getMaxReduceThreadsPerQuery());
-    int limit = queryContext.getLimit();
-    // TODO: Make minTrimSize configurable
-    int trimSize = GroupByUtils.getTableCapacity(limit);
-    // NOTE: For query with HAVING clause, use trimSize as resultSize to ensure the result accuracy.
-    // TODO: Resolve the HAVING clause within the IndexedTable before returning the result
-    int resultSize = queryContext.getHavingFilter() != null ? trimSize : limit;
-    int trimThreshold = reducerContext.getGroupByTrimThreshold();
-    IndexedTable indexedTable;
-    if (numReduceThreadsToUse <= 1) {
-      indexedTable = new SimpleIndexedTable(dataSchema, queryContext, resultSize, trimSize, trimThreshold);
-    } else {
-      if (trimThreshold >= GroupByOrderByCombineOperator.MAX_TRIM_THRESHOLD) {
-        // special case of trim threshold where it is set to max value.
-        // there won't be any trimming during upsert in this case.
-        // thus we can avoid the overhead of read-lock and write-lock
-        // in the upsert method.
-        indexedTable = new UnboundedConcurrentIndexedTable(dataSchema, queryContext, resultSize);
-      } else {
-        indexedTable = new ConcurrentIndexedTable(dataSchema, queryContext, resultSize, trimSize, trimThreshold);
-      }
-    }
-
-    Future[] futures = new Future[numDataTables];
-    CountDownLatch countDownLatch = new CountDownLatch(numDataTables);
-
-    // Create groups of data tables that each thread can process concurrently.
-    // Given that numReduceThreads is <= numDataTables, each group will have at least one data table.
-    ArrayList<DataTable> dataTables = new ArrayList<>(dataTablesToReduce);
-    List<List<DataTable>> reduceGroups = new ArrayList<>(numReduceThreadsToUse);
-
-    for (int i = 0; i < numReduceThreadsToUse; i++) {
-      reduceGroups.add(new ArrayList<>());
-    }
-    for (int i = 0; i < numDataTables; i++) {
-      reduceGroups.get(i % numReduceThreadsToUse).add(dataTables.get(i));
-    }
-
-    int cnt = 0;
-    ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
-    int numColumns = storedColumnDataTypes.length;
-    for (List<DataTable> reduceGroup : reduceGroups) {
-      futures[cnt++] = reducerContext.getExecutorService().submit(new TraceRunnable() {
-        @Override
-        public void runJob() {
-          for (DataTable dataTable : reduceGroup) {
-            int numRows = dataTable.getNumberOfRows();
-
-            try {
-              for (int rowId = 0; rowId < numRows; rowId++) {
-                Object[] values = new Object[numColumns];
-                for (int colId = 0; colId < numColumns; colId++) {
-                  switch (storedColumnDataTypes[colId]) {
-                    case INT:
-                      values[colId] = dataTable.getInt(rowId, colId);
-                      break;
-                    case LONG:
-                      values[colId] = dataTable.getLong(rowId, colId);
-                      break;
-                    case FLOAT:
-                      values[colId] = dataTable.getFloat(rowId, colId);
-                      break;
-                    case DOUBLE:
-                      values[colId] = dataTable.getDouble(rowId, colId);
-                      break;
-                    case STRING:
-                      values[colId] = dataTable.getString(rowId, colId);
-                      break;
-                    case BYTES:
-                      values[colId] = dataTable.getBytes(rowId, colId);
-                      break;
-                    case OBJECT:
-                      values[colId] = dataTable.getObject(rowId, colId);
-                      break;
-                    // Add other aggregation intermediate result / group-by column type supports here
-                    default:
-                      throw new IllegalStateException();
-                  }
-                }
-                indexedTable.upsert(new Record(values));
-              }
-            } finally {
-              countDownLatch.countDown();
-            }
-          }
-        }
-      });
-    }
-
-    try {
-      long timeOutMs = reducerContext.getReduceTimeOutMs() - (System.currentTimeMillis() - start);
-      countDownLatch.await(timeOutMs, TimeUnit.MILLISECONDS);
-    } catch (InterruptedException e) {
-      for (Future future : futures) {
-        if (!future.isDone()) {
-          future.cancel(true);
-        }
-      }
-      throw new TimeoutException("Timed out in broker reduce phase.");
-    }
-
-    indexedTable.finish(true);
-    return indexedTable;
-  }
-
-  /**
    * Here are three things that happen
    * 1. Sort the result sets from all pinot servers based on timestamp
    * 2. Gapfill the data for missing entities per time bucket
    * 3. Aggregate the dataset per time bucket.
    */
-  @Override
-  public void reduceAndSetResults(String tableName, DataSchema dataSchema,
-      Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
-      DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics) {
+  public void reduceAndSetResults(BrokerResponseNative brokerResponseNative, BrokerMetrics brokerMetrics) {
+    DataSchema dataSchema = brokerResponseNative.getResultTable().getDataSchema();
     DataSchema resultTableSchema = getResultTableDataSchema(dataSchema);
-    if (dataTableMap.isEmpty()) {
+    if (brokerResponseNative.getResultTable().getRows().isEmpty()) {
       brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, Collections.emptyList()));
       return;
     }
@@ -328,99 +170,36 @@ public class GapFillDataTableReducer implements DataTableReducer {
       }
     }
 
-    List<Object[]>[] timeBucketedRawRows;
-    if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE || _gapfillType == GapfillUtils.GapfillType.GAP_FILL
-        || _gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
-      timeBucketedRawRows = putRawRowsIntoTimeBucket(dataTableMap.values());
-    } else {
-      try {
-        IndexedTable indexedTable = getIndexedTable(dataSchema, dataTableMap.values(), reducerContext);
-        timeBucketedRawRows = putRawRowsIntoTimeBucket(indexedTable);
-      } catch (TimeoutException e) {
-        brokerResponseNative.getProcessingExceptions()
-            .add(new QueryProcessingException(QueryException.BROKER_TIMEOUT_ERROR_CODE, e.getMessage()));
-        return;
-      }
-    }
+    List<Object[]>[] timeBucketedRawRows = putRawRowsIntoTimeBucket(brokerResponseNative.getResultTable().getRows());
+
     List<Object[]> resultRows;
     replaceColumnNameWithAlias(dataSchema);
+
+    if (_queryContext.getAggregationFunctions() == null) {
+
+      Map<String, Integer> sourceColumnsIndexes = new HashMap<>();
+      for (int i = 0; i < dataSchema.getColumnNames().length; i++) {
+        sourceColumnsIndexes.put(dataSchema.getColumnName(i), i);
+      }
+      _sourceColumnIndexForResultSchema = new int[resultTableSchema.getColumnNames().length];
+      for (int i = 0; i < _sourceColumnIndexForResultSchema.length; i++) {
+        _sourceColumnIndexForResultSchema[i] = sourceColumnsIndexes.get(resultTableSchema.getColumnName(i));
+      }
+    }
 
     if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE || _gapfillType == GapfillUtils.GapfillType.GAP_FILL
         || _gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
       List<Object[]> gapfilledRows = gapFillAndAggregate(timeBucketedRawRows, resultTableSchema, dataSchema);
       if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
-        List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(_queryContext, dataSchema);
         resultRows = new ArrayList<>(gapfilledRows.size());
-
-        Map<String, Integer> columnNameToIndexMap = new HashMap<>(dataSchema.getColumnNames().length);
-        String[] columnNames = dataSchema.getColumnNames();
-        for (int i = 0; i < columnNames.length; i++) {
-          columnNameToIndexMap.put(columnNames[i], i);
-        }
-
-        ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
-        ColumnDataType[] resultColumnDataTypes = new ColumnDataType[selectionColumns.size()];
-        for (int i = 0; i < resultColumnDataTypes.length; i++) {
-          String name = selectionColumns.get(i);
-          int index = columnNameToIndexMap.get(name);
-          resultColumnDataTypes[i] = columnDataTypes[index];
-        }
-
-        for (Object[] row : gapfilledRows) {
-          Object[] resultRow = new Object[selectionColumns.size()];
-          for (int i = 0; i < selectionColumns.size(); i++) {
-            int index = columnNameToIndexMap.get(selectionColumns.get(i));
-            resultRow[i] = resultColumnDataTypes[i].convertAndFormat(row[index]);
-          }
-          resultRows.add(resultRow);
-        }
+        resultRows.addAll(gapfilledRows);
       } else {
         resultRows = gapfilledRows;
       }
     } else {
-      this.setupColumnTypeForAggregatedColum(dataSchema.getColumnDataTypes());
-      ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
-      for (List<Object[]> rawRowsForTimeBucket : timeBucketedRawRows) {
-        if (rawRowsForTimeBucket == null) {
-          continue;
-        }
-        for (Object[] row : rawRowsForTimeBucket) {
-          extractFinalAggregationResults(row);
-          for (int i = 0; i < columnDataTypes.length; i++) {
-            row[i] = columnDataTypes[i].convert(row[i]);
-          }
-        }
-      }
       resultRows = gapFillAndAggregate(timeBucketedRawRows, resultTableSchema, dataSchema);
     }
     brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, resultRows));
-  }
-
-  private void extractFinalAggregationResults(Object[] row) {
-    AggregationFunction[] aggregationFunctions;
-    if (_gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL) {
-      aggregationFunctions = _queryContext.getSubQueryContext().getAggregationFunctions();
-    } else {
-      aggregationFunctions = _queryContext.getSubQueryContext().getSubQueryContext().getAggregationFunctions();
-    }
-    int numAggregationFunctionsForInnerQuery = aggregationFunctions == null ? 0 : aggregationFunctions.length;
-    for (int i = 0; i < numAggregationFunctionsForInnerQuery; i++) {
-      int valueIndex = _timeSeries.size() + 1 + i;
-      row[valueIndex] = aggregationFunctions[i].extractFinalResult(row[valueIndex]);
-    }
-  }
-
-  private void setupColumnTypeForAggregatedColum(ColumnDataType[] columnDataTypes) {
-    AggregationFunction[] aggregationFunctions;
-    if (_gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL) {
-      aggregationFunctions = _queryContext.getSubQueryContext().getAggregationFunctions();
-    } else {
-      aggregationFunctions = _queryContext.getSubQueryContext().getSubQueryContext().getAggregationFunctions();
-    }
-    int numAggregationFunctionsForInnerQuery = aggregationFunctions == null ? 0 : aggregationFunctions.length;
-    for (int i = 0; i < numAggregationFunctionsForInnerQuery; i++) {
-      columnDataTypes[_timeSeries.size() + 1 + i] = aggregationFunctions[i].getFinalResultColumnType();
-    }
   }
 
   /**
@@ -483,7 +262,13 @@ public class GapFillDataTableReducer implements DataTableReducer {
       int index = findBucketIndex(time);
       List<Object[]> bucketedResult = gapfill(time, timeBucketedRawRows[index], dataSchema, postGapfillFilterHandler);
       if (_queryContext.getAggregationFunctions() == null) {
-        result.addAll(bucketedResult);
+        for (Object [] row : bucketedResult) {
+          Object[] resultRow = new Object[_sourceColumnIndexForResultSchema.length];
+          for (int i = 0; i < _sourceColumnIndexForResultSchema.length; i++) {
+            resultRow[i] = row[_sourceColumnIndexForResultSchema[i]];
+          }
+          result.add(resultRow);
+        }
       } else if (bucketedResult.size() > 0) {
         List<Object[]> aggregatedRows = aggregateGapfilledData(bucketedResult, dataSchema);
         for (Object[] aggregatedRow : aggregatedRows) {
@@ -654,32 +439,11 @@ public class GapFillDataTableReducer implements DataTableReducer {
   /**
    * Merge all result tables from different pinot servers and sort the rows based on timebucket.
    */
-  private List<Object[]>[] putRawRowsIntoTimeBucket(Collection<DataTable> dataTables) {
+  private List<Object[]>[] putRawRowsIntoTimeBucket(List<Object[]> rows) {
     List<Object[]>[] bucketedItems = new List[_numOfTimeBuckets];
 
-    for (DataTable dataTable : dataTables) {
-      int numRows = dataTable.getNumberOfRows();
-      for (int rowId = 0; rowId < numRows; rowId++) {
-        Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
-        long timeBucket = _dateTimeFormatter.fromFormatToMillis(String.valueOf(row[0]));
-        int index = findBucketIndex(timeBucket);
-        if (bucketedItems[index] == null) {
-          bucketedItems[index] = new ArrayList<>();
-        }
-        bucketedItems[index].add(row);
-        _groupByKeys.add(constructGroupKeys(row));
-      }
-    }
-    return bucketedItems;
-  }
-
-  private List<Object[]>[] putRawRowsIntoTimeBucket(IndexedTable indexedTable) {
-    List<Object[]>[] bucketedItems = new List[_numOfTimeBuckets];
-
-    Iterator<Record> iterator = indexedTable.iterator();
-    while (iterator.hasNext()) {
-      Object[] row = iterator.next().getValues();
-      long timeBucket = _dateTimeFormatter.fromFormatToMillis(String.valueOf(row[0]));
+    for (Object[] row: rows) {
+      long timeBucket = _dateTimeFormatter.fromFormatToMillis(String.valueOf(row[_timeBucketColumnIndex]));
       int index = findBucketIndex(timeBucket);
       if (bucketedItems[index] == null) {
         bucketedItems[index] = new ArrayList<>();
@@ -687,7 +451,6 @@ public class GapFillDataTableReducer implements DataTableReducer {
       bucketedItems[index].add(row);
       _groupByKeys.add(constructGroupKeys(row));
     }
-
     return bucketedItems;
   }
 }

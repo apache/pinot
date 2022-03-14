@@ -246,8 +246,8 @@ public abstract class BaseQueriesTest {
     }
 
     BrokerResponseNative brokerResponse =
-        brokerReduceService.reduceOnDataTable(queryContext.getBrokerRequest(), dataTableMap,
-            CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS, null);
+        brokerReduceService.reduceOnDataTable(queryContext.getBrokerRequest(), strippedQueryContext.getBrokerRequest(),
+            dataTableMap, CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS, null);
     brokerReduceService.shutDown();
     return brokerResponse;
   }

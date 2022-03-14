@@ -46,7 +46,7 @@ public class BrokerReduceService extends BaseReduceService {
     super(config);
   }
 
-  public BrokerResponseNative reduceOnDataTable(BrokerRequest brokerRequest,
+  public BrokerResponseNative reduceOnDataTable(BrokerRequest originalBrokerRequest, BrokerRequest brokerRequest,
       Map<ServerRoutingInstance, DataTable> dataTableMap, long reduceTimeOutMs, @Nullable BrokerMetrics brokerMetrics) {
     if (dataTableMap.isEmpty()) {
       // Empty response.
@@ -108,6 +108,11 @@ public class BrokerReduceService extends BaseReduceService {
     dataTableReducer.reduceAndSetResults(rawTableName, cachedDataSchema, dataTableMap, brokerResponseNative,
         new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
             _groupByTrimThreshold), brokerMetrics);
+    QueryContext originalQueryContext = BrokerRequestToQueryContextConverter.convert(originalBrokerRequest);
+    if (originalQueryContext.getGapfillType() != null) {
+      GapFillDataTableReducer gapFillDataTableReducer = new GapFillDataTableReducer(originalQueryContext);
+      gapFillDataTableReducer.reduceAndSetResults(brokerResponseNative, brokerMetrics);
+    }
     updateAlias(queryContext, brokerResponseNative);
     return brokerResponseNative;
   }

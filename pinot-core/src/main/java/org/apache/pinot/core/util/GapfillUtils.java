@@ -265,6 +265,40 @@ public class GapfillUtils {
     }
   }
 
+  public static int findGapfillExpressionContextIndex(QueryContext queryContext) {
+    List<ExpressionContext> expressionContexts = queryContext.getSelectExpressions();
+    for (int i = 0; i < expressionContexts.size(); i++) {
+      if (isGapfill(expressionContexts.get(i))) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  public static int findGapfillExpressionContextIndexWithSubquery(QueryContext queryContext) {
+    List<ExpressionContext> expressionContexts = queryContext.getSelectExpressions();
+    for (int i = 0; i < expressionContexts.size(); i++) {
+      if (isGapfill(expressionContexts.get(i))) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  public static int findTimeBucketColumnIndex(QueryContext queryContext) {
+    GapfillType gapfillType = queryContext.getGapfillType();
+    if (gapfillType == GapfillType.GAP_FILL) {
+      return findGapfillExpressionContextIndex(queryContext);
+    } else if (gapfillType == GapfillType.GAP_FILL_AGGREGATE || gapfillType == GapfillType.GAP_FILL_SELECT) {
+      return findGapfillExpressionContextIndex(queryContext.getSubQueryContext());
+    } else if (gapfillType == GapfillType.AGGREGATE_GAP_FILL) {
+      return findGapfillExpressionContextIndexWithSubquery(queryContext);
+    } else if (gapfillType == GapfillType.AGGREGATE_GAP_FILL_AGGREGATE) {
+      return findGapfillExpressionContextIndexWithSubquery(queryContext.getSubQueryContext());
+    }
+    return -1;
+  }
+
   public static ExpressionContext getTimeSeriesOnExpressionContext(ExpressionContext gapFillSelection) {
     List<ExpressionContext> args = gapFillSelection.getFunction().getArguments();
     for (int i = STARTING_INDEX_OF_OPTIONAL_ARGS_FOR_PRE_AGGREGATE_GAP_FILL; i < args.size(); i++) {
