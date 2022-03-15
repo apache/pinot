@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.data.Segment;
@@ -79,7 +80,6 @@ public class TaskGeneratorUtils {
    */
   public static Map<String, TaskState> getIncompleteTasks(String taskType, String tableNameWithType,
       ClusterInfoAccessor clusterInfoAccessor) {
-
     Map<String, TaskState> nonCompletedTasks = new HashMap<>();
     Map<String, TaskState> taskStates = clusterInfoAccessor.getTaskStates(taskType);
     for (Map.Entry<String, TaskState> entry : taskStates.entrySet()) {
@@ -90,13 +90,46 @@ public class TaskGeneratorUtils {
       if (isTaskOlderThanOneDay(taskName)) {
         continue;
       }
-      for (PinotTaskConfig pinotTaskConfig : clusterInfoAccessor.getTaskConfigs(entry.getKey())) {
+      for (PinotTaskConfig pinotTaskConfig : clusterInfoAccessor.getTaskConfigs(taskName)) {
         if (tableNameWithType.equals(pinotTaskConfig.getConfigs().get(MinionConstants.TABLE_NAME_KEY))) {
-          nonCompletedTasks.put(entry.getKey(), entry.getValue());
+          nonCompletedTasks.put(taskName, entry.getValue());
         }
       }
     }
     return nonCompletedTasks;
+  }
+
+  /**
+   * Get all the tasks for the provided task type and tableName, which have not reached final task state yet.
+   * In general, if the task is not in final state, we can treat it as running, although it may wait to start
+   * or is paused. The caller provides a consumer to process the task configs of those tasks.
+   */
+  public static void forRunningTasks(String tableNameWithType, String taskType, ClusterInfoAccessor clusterInfoAccessor,
+      Consumer<Map<String, String>> taskConfigConsumer) {
+    Map<String, TaskState> taskStates = clusterInfoAccessor.getTaskStates(taskType);
+    for (Map.Entry<String, TaskState> entry : taskStates.entrySet()) {
+      if (isTaskInFinalState(entry.getValue())) {
+        continue;
+      }
+      String taskName = entry.getKey();
+      for (PinotTaskConfig pinotTaskConfig : clusterInfoAccessor.getTaskConfigs(taskName)) {
+        Map<String, String> config = pinotTaskConfig.getConfigs();
+        String tableNameFromTaskConfig = config.get(MinionConstants.TABLE_NAME_KEY);
+        if (tableNameWithType.equals(tableNameFromTaskConfig)) {
+          taskConfigConsumer.accept(config);
+        }
+      }
+    }
+  }
+
+  /**
+   * @return true if task is in final state, i.e. will not be running any more.
+   * Note that STOPPED is not a final task state in helix task framework, as a
+   * stopped task is just paused and can be resumed to rerun.
+   */
+  private static boolean isTaskInFinalState(TaskState taskState) {
+    return taskState == TaskState.COMPLETED || taskState == TaskState.FAILED || taskState == TaskState.ABORTED
+        || taskState == TaskState.TIMED_OUT;
   }
 
   /**
