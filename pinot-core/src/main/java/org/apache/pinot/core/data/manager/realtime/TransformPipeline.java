@@ -21,6 +21,7 @@ package org.apache.pinot.core.data.manager.realtime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import javax.annotation.Nonnull;
 import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
@@ -55,16 +56,11 @@ public class TransformPipeline {
    * Process and validate the decoded row against schema.
    * @param decodedRow the row data to pass in
    * @param reusedResult the reused result so we can reduce objects created for each row
-   * @return both processed rows and failed rows in a struct.
    * @throws TransformException when data has issues like schema validation. Fetch the partialResult from Exception
    */
-  public Result processRow(GenericRow decodedRow, Result reusedResult) throws TransformException {
-    // to keep track and add to "failedRows" when exception happens
-    if (reusedResult == null) {
-      reusedResult = new Result();
-    } else {
-      reusedResult.reset();
-    }
+  public void processRow(GenericRow decodedRow, @Nonnull Result reusedResult)
+      throws TransformException {
+    reusedResult.reset();
     try {
       if (_complexTypeTransformer != null) {
         // TODO: consolidate complex type transformer into composite type transformer
@@ -77,7 +73,7 @@ public class TransformPipeline {
           if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
             reusedResult.addTransformedRows(transformedRow);
           } else {
-            reusedResult.incSkippedRowCount(1);
+            reusedResult.incSkippedRowCount();
           }
         }
       } else {
@@ -85,15 +81,11 @@ public class TransformPipeline {
         if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
           reusedResult.addTransformedRows(transformedRow);
         } else {
-          reusedResult.incSkippedRowCount(1);
+          reusedResult.incSkippedRowCount();
         }
       }
-      return reusedResult;
     } catch (Exception ex) {
-      // when exception happens, we abandon the transformed row record, but keep the failed count properly
-      int skippedCount = reusedResult.getSkippedRowCount();
-      reusedResult.reset();
-      reusedResult.incSkippedRowCount(skippedCount + 1);
+      reusedResult.incSkippedRowCount();
       throw new TransformException("Encountered error while processing row", reusedResult, ex);
     }
   }
@@ -117,8 +109,8 @@ public class TransformPipeline {
       _transformedRows.add(row);
     }
 
-    public void incSkippedRowCount(int increment) {
-      _skippedRowCount += increment;
+    public void incSkippedRowCount() {
+      _skippedRowCount++;
     }
 
     public void reset() {
@@ -133,6 +125,7 @@ public class TransformPipeline {
    */
   public static class TransformException extends Exception {
     private final Result _partialResult;
+
     public TransformException(String message, Result partialResult, Throwable cause) {
       super(message, cause);
       _partialResult = partialResult;

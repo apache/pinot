@@ -507,16 +507,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               messagesAndOffsets.getMessageLengthAtIndex(index), reuse);
       if (decodedRow != null) {
         try {
-          reusedResult = _transformPipeline.processRow(decodedRow, reusedResult);
+          _transformPipeline.processRow(decodedRow, reusedResult);
         } catch (TransformPipeline.TransformException e) {
           _numRowsErrored++;
+          reusedResult.getTransformedRows().clear();
           String errorMessage = String.format("Caught exception while transforming the record: %s", decodedRow);
           _segmentLogger.error(errorMessage, e);
           _realtimeTableDataManager.addSegmentError(_segmentNameStr,
               new SegmentErrorInfo(System.currentTimeMillis(), errorMessage, e));
-          // for a row with multiple records (multi rows), if we encounter exception in the middle,
-          // there could be some rows that are processed successfully. We still wish to process them.
-          reusedResult = e.getPartialResult();
         }
         if (reusedResult.getSkippedRowCount() > 0) {
           realtimeRowsDroppedMeter =
