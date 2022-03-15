@@ -29,7 +29,7 @@ There is a docker build script which will build a given Git repo/branch and tag 
 Usage:
 
 ```SHELL
-./docker-build.sh [Docker Tag] [Git Branch] [Pinot Git URL] [Kafka Version] [Java Version] [JDK Version] [OpenJDK Image ]
+./docker-build.sh [Docker Tag] [Git Branch] [Pinot Git URL] [Kafka Version] [Java Version] [JDK Version]
 ```
 
 This script will check out Pinot Repo `[Pinot Git URL]` on branch `[Git Branch]` and build the docker image for that.
@@ -47,8 +47,6 @@ The docker image is tagged as `[Docker Tag]`.
 `Java Version`: The Java Build and Runtime image version. Default is `11`
 
 `JDK Version`: The JDK parameter to build pinot, set as part of maven build option: `-Djdk.version=${JDK_VERSION}`. Default is `11`
-
-`OpenJDK Image`: Base image to use for Pinot build and runtime. Default is `openjdk`.
 
 * Example of building and tagging a snapshot on your own fork:
 ```SHELL
