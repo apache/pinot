@@ -67,20 +67,19 @@ public class TransformPipeline {
     Collection<GenericRow> rows = (Collection<GenericRow>) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
     if (rows != null) {
       for (GenericRow row : rows) {
-        GenericRow transformedRow = _recordTransformer.transform(row);
-        if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-          reusedResult.addTransformedRows(transformedRow);
-        } else {
-          reusedResult.incSkippedRowCount();
-        }
+        processPlainRow(row, reusedResult);
       }
     } else {
-      GenericRow transformedRow = _recordTransformer.transform(decodedRow);
-      if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-        reusedResult.addTransformedRows(transformedRow);
-      } else {
-        reusedResult.incSkippedRowCount();
-      }
+      processPlainRow(decodedRow, reusedResult);
+    }
+  }
+
+  private void processPlainRow(GenericRow plainRow, Result reusedResult) {
+    GenericRow transformedRow = _recordTransformer.transform(plainRow);
+    if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
+      reusedResult.addTransformedRows(transformedRow);
+    } else {
+      reusedResult.incSkippedRowCount();
     }
   }
 
