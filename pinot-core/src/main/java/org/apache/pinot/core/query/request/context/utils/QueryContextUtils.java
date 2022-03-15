@@ -27,7 +27,6 @@ import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.util.GapfillUtils;
 
 
 @SuppressWarnings("rawtypes")
@@ -39,12 +38,7 @@ public class QueryContextUtils {
    * Returns {@code true} if the given query is a selection query, {@code false} otherwise.
    */
   public static boolean isSelectionQuery(QueryContext query) {
-    if (query.getGapfillType() == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE
-        || query.getGapfillType() == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
-      return query.getSubQueryContext().getAggregationFunctions() == null;
-    } else {
-      return query.getAggregationFunctions() == null;
-    }
+    return query.getAggregationFunctions() == null;
   }
 
   /**
@@ -60,17 +54,9 @@ public class QueryContextUtils {
    * Returns {@code true} if the given query is an aggregation query, {@code false} otherwise.
    */
   public static boolean isAggregationQuery(QueryContext query) {
-    GapfillUtils.GapfillType gapfillType = query.getGapfillType();
-    if (gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL
-        || gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL_AGGREGATE) {
-      return true;
-    } else if (gapfillType != null) {
-      return false;
-    } else {
-      AggregationFunction[] aggregationFunctions = query.getAggregationFunctions();
-      return aggregationFunctions != null && (aggregationFunctions.length != 1
-          || !(aggregationFunctions[0] instanceof DistinctAggregationFunction));
-    }
+    AggregationFunction[] aggregationFunctions = query.getAggregationFunctions();
+    return aggregationFunctions != null && (aggregationFunctions.length != 1
+        || !(aggregationFunctions[0] instanceof DistinctAggregationFunction));
   }
 
   /**
@@ -109,6 +95,7 @@ public class QueryContextUtils {
       }
     }
   }
+
 
   /** Collect aggregation functions from an ExpressionContext. */
   public static void collectPostAggregations(ExpressionContext expression, Set<String> postAggregations) {
