@@ -182,6 +182,11 @@ public class PinotSchemaRestletResourceTest {
     putMethod = ControllerTestUtils.sendMultipartPutRequest(updateSchemaUrl, invalidSchemaString);
     Assert.assertEquals(putMethod.getStatusCode(), 400);
 
+    // Update schema with null schema name
+    schema.setSchemaName(null);
+    putMethod = ControllerTestUtils.sendMultipartPutRequest(updateSchemaUrl, schema.toSingleLineJsonString());
+    Assert.assertEquals(putMethod.getStatusCode(), 400);
+
     // Update schema with non-matching schema name
     String newSchemaName = "newSchemaName";
     schema.setSchemaName(newSchemaName);
