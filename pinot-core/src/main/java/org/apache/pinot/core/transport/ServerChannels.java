@@ -52,6 +52,8 @@ import org.apache.pinot.core.util.OsCheck;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.apache.thrift.transport.TTransportException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -61,6 +63,7 @@ import org.apache.thrift.transport.TTransportException;
  */
 @ThreadSafe
 public class ServerChannels {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ServerChannels.class);
   public static final String CHANNEL_LOCK_TIMEOUT_MSG = "Timeout while acquiring channel lock";
   private final QueryRouter _queryRouter;
   private final BrokerMetrics _brokerMetrics;
@@ -139,6 +142,8 @@ public class ServerChannels {
 
     ServerChannel(ServerRoutingInstance serverRoutingInstance) {
       _serverRoutingInstance = serverRoutingInstance;
+      LOGGER.info("Bootstrapping with remote address {}:{}, {}", serverRoutingInstance.getHostname(),
+          serverRoutingInstance.getPort(), debugPrintTls());
       _bootstrap = new Bootstrap().remoteAddress(serverRoutingInstance.getHostname(), serverRoutingInstance.getPort())
           .group(_eventLoopGroup).channel(_channelClass).option(ChannelOption.SO_KEEPALIVE, true)
           .handler(new ChannelInitializer<SocketChannel>() {
@@ -156,6 +161,14 @@ public class ServerChannels {
                       new DataTableHandler(_queryRouter, _serverRoutingInstance, _brokerMetrics));
             }
           });
+    }
+
+    private String debugPrintTls() {
+      if (_tlsConfig == null) {
+        return " plain text ";
+      } else {
+        return _tlsConfig.toString();
+      }
     }
 
     private void attachSSLHandler(SocketChannel ch) {
@@ -200,6 +213,8 @@ public class ServerChannels {
         _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.NETTY_CONNECTION_CONNECT_TIME_MS,
             System.currentTimeMillis() - startTime);
       }
+      LOGGER.info("Sending request to {}:{} with payload length of {}", serverRoutingInstance.getHostname(),
+          serverRoutingInstance.getPort(), requestBytes.length);
       long sendRequestStartTimeMs = System.currentTimeMillis();
       _channel.writeAndFlush(Unpooled.wrappedBuffer(requestBytes)).addListener(f -> {
         long requestSentLatencyMs = System.currentTimeMillis() - sendRequestStartTimeMs;

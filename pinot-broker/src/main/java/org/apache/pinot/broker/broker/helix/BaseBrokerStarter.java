@@ -242,24 +242,18 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // Configure TLS for netty connection to server
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_TLS_PREFIX);
     NettyConfig nettyDefaults = NettyConfig.extractNettyConfig(_brokerConf, Broker.BROKER_NETTY_PREFIX);
-
+    boolean tlsNettyEnabled = _brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false);
     if (_brokerConf.getProperty(Broker.BROKER_REQUEST_HANDLER_TYPE, Broker.DEFAULT_BROKER_REQUEST_HANDLER_TYPE)
         .equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
       LOGGER.info("Starting Grpc BrokerRequestHandler.");
       _brokerRequestHandler =
-          new GrpcBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory, queryQuotaManager,
-              tableCache, _brokerMetrics, null);
+          new GrpcBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
+              queryQuotaManager, tableCache, _brokerMetrics, tlsNettyEnabled ? tlsDefaults : null);
     } else { // default request handler type, e.g. netty
       LOGGER.info("Starting Netty BrokerRequestHandler.");
-      if (_brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false)) {
-        _brokerRequestHandler =
-            new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
-                queryQuotaManager, tableCache, _brokerMetrics, nettyDefaults, tlsDefaults);
-      } else {
-        _brokerRequestHandler =
-            new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
-                queryQuotaManager, tableCache, _brokerMetrics, nettyDefaults, null);
-      }
+      _brokerRequestHandler =
+          new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
+              queryQuotaManager, tableCache, _brokerMetrics, nettyDefaults, tlsNettyEnabled ? tlsDefaults : null);
     }
 
     LOGGER.info("Starting broker admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));

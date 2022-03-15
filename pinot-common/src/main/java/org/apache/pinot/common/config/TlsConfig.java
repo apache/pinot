@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.config;
 
+import com.google.common.base.Strings;
 import io.netty.handler.ssl.SslProvider;
 import java.security.KeyStore;
 import org.apache.commons.lang3.StringUtils;
@@ -117,5 +118,36 @@ public class TlsConfig {
 
   public boolean isCustomized() {
     return StringUtils.isNoneBlank(_keyStorePath) || StringUtils.isNoneBlank(_trustStorePath);
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append("keyStorePath:");
+    sb.append(this.getKeyStorePath());
+    sb.append(",");
+    sb.append("keyStoreType:");
+    sb.append(this.getKeyStoreType());
+    sb.append(",");
+    sb.append("trustStorePath:");
+    sb.append(this.getTrustStorePath());
+    sb.append(",");
+    sb.append("trustStoreType:");
+    sb.append(this.getTrustStoreType());
+    sb.append(",");
+    if (Strings.isNullOrEmpty(this.getKeyStorePassword())) {
+      sb.append("keyStorePassword is empty,");
+    } else {
+      sb.append("keyStorePassword: <redacted>,");
+    }
+    if (Strings.isNullOrEmpty(this.getTrustStorePassword())) {
+      sb.append("trustStorePassword is empty,");
+    } else {
+      sb.append("trustStorePassword: <redacted>,");
+    }
+    sb.append("sslProvider:");
+    sb.append(this.getSslProvider());
+
+    return sb.toString();
   }
 }

@@ -43,6 +43,8 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -50,6 +52,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
  */
 @ThreadSafe
 public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
+  private static final Logger LOGGER = LoggerFactory.getLogger(GrpcBrokerRequestHandler.class);
 
   private final GrpcQueryClient.Config _grpcConfig;
   private final StreamingReduceService _streamingReduceService;
@@ -59,7 +62,7 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       BrokerMetrics brokerMetrics, TlsConfig tlsConfig) {
     super(config, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
-    _grpcConfig = buildGrpcQueryClientConfig(config);
+    _grpcConfig = buildGrpcQueryClientConfig(config, tlsConfig);
 
     // create streaming query client
     _streamingQueryClient = new PinotStreamingQueryClient(_grpcConfig);
@@ -131,8 +134,8 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   // return empty config for now
-  private GrpcQueryClient.Config buildGrpcQueryClientConfig(PinotConfiguration config) {
-    return new GrpcQueryClient.Config();
+  private GrpcQueryClient.Config buildGrpcQueryClientConfig(PinotConfiguration config, TlsConfig tlsConfig) {
+    return new GrpcQueryClient.Config(config.toMap(), tlsConfig);
   }
 
   public static class PinotStreamingQueryClient {
