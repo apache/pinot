@@ -656,10 +656,6 @@ public class SegmentGeneratorConfig implements Serializable {
     _rawIndexCompressionType.putAll(rawIndexCompressionType);
   }
 
-  public void setRawIndexCompressionType(String column, ChunkCompressionType compressionType) {
-    _rawIndexCompressionType.put(column, compressionType);
-  }
-
   public List<String> getMetrics() {
     return getQualifyingFields(FieldType.METRIC, true);
   }

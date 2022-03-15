@@ -30,13 +30,11 @@ import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSe
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -89,17 +87,6 @@ public class RealtimeSegmentConverter {
     if (_invertedIndexColumns != null && !_invertedIndexColumns.isEmpty()) {
       for (String column : _invertedIndexColumns) {
         genConfig.createInvertedIndexForColumn(column);
-      }
-    }
-    if (_noDictionaryColumns != null) {
-      genConfig.setRawIndexCreationColumns(_noDictionaryColumns);
-      for (String column : _noDictionaryColumns) {
-        FieldSpec fieldSpec = _dataSchema.getFieldSpecFor(column);
-        // Compression type is already configured in the constructor of genConfig.
-        // Only update metrics compression type.
-        if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.METRIC)) {
-          genConfig.setRawIndexCompressionType(column, ChunkCompressionType.PASS_THROUGH);
-        }
       }
     }
 
