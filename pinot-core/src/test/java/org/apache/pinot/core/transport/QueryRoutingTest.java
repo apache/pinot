@@ -48,9 +48,9 @@ public class QueryRoutingTest {
   private static final int TEST_PORT = 12345;
   private static final ServerInstance SERVER_INSTANCE = new ServerInstance("localhost", TEST_PORT);
   private static final ServerRoutingInstance OFFLINE_SERVER_ROUTING_INSTANCE =
-      SERVER_INSTANCE.toServerRoutingInstance(TableType.OFFLINE);
+      SERVER_INSTANCE.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
   private static final ServerRoutingInstance REALTIME_SERVER_ROUTING_INSTANCE =
-      SERVER_INSTANCE.toServerRoutingInstance(TableType.REALTIME);
+      SERVER_INSTANCE.toServerRoutingInstance(TableType.REALTIME, ServerInstance.RoutingType.NETTY);
   private static final BrokerRequest BROKER_REQUEST =
       new Pql2Compiler().compileToBrokerRequest("SELECT * FROM testTable");
   private static final Map<ServerInstance, List<String>> ROUTING_TABLE =
@@ -110,8 +110,9 @@ public class QueryRoutingTest {
     assertEquals(serverResponse.getResponseSize(), responseBytes.length);
 
     // Hybrid
-    asyncQueryResponse = _queryRouter
-        .submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, BROKER_REQUEST, ROUTING_TABLE, 1_000L);
+    asyncQueryResponse =
+        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, BROKER_REQUEST, ROUTING_TABLE,
+            1_000L);
     response = asyncQueryResponse.getResponse();
     assertEquals(response.size(), 2);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));

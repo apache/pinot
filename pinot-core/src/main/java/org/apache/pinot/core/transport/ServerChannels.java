@@ -39,6 +39,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.ReentrantLock;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
@@ -68,18 +69,8 @@ public class ServerChannels {
   private final ThreadLocal<TSerializer> _threadLocalTSerializer;
   private final ConcurrentHashMap<ServerRoutingInstance, ServerChannel> _serverToChannelMap = new ConcurrentHashMap<>();
   private final TlsConfig _tlsConfig;
-  private EventLoopGroup _eventLoopGroup;
-  private Class<? extends SocketChannel> _channelClass;
-
-  /**
-   * Create an unsecured server channel
-   *
-   * @param queryRouter query router
-   * @param brokerMetrics broker metrics
-   */
-  public ServerChannels(QueryRouter queryRouter, BrokerMetrics brokerMetrics, NettyConfig nettyConfig) {
-    this(queryRouter, brokerMetrics, nettyConfig, null);
-  }
+  private final EventLoopGroup _eventLoopGroup;
+  private final Class<? extends SocketChannel> _channelClass;
 
   /**
    * Create a server channel with TLS config
@@ -88,9 +79,8 @@ public class ServerChannels {
    * @param brokerMetrics broker metrics
    * @param tlsConfig TLS/SSL config
    */
-  public ServerChannels(QueryRouter queryRouter, BrokerMetrics brokerMetrics, NettyConfig nettyConfig,
-      TlsConfig tlsConfig) {
-
+  public ServerChannels(QueryRouter queryRouter, BrokerMetrics brokerMetrics, @Nullable NettyConfig nettyConfig,
+      @Nullable TlsConfig tlsConfig) {
     if (nettyConfig != null && nettyConfig.isNativeTransportsEnabled()
         && OsCheck.getOperatingSystemType() == OsCheck.OSType.Linux) {
       _eventLoopGroup = new EpollEventLoopGroup();
