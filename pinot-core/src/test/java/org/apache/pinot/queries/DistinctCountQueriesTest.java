@@ -299,6 +299,95 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
   }
 
   @Test
+  public void testHLL() {
+    // Dictionary based
+    String query = "SELECT DISTINCTCOUNTHLL(intColumn), DISTINCTCOUNTHLL(longColumn), DISTINCTCOUNTHLL(floatColumn), "
+        + "DISTINCTCOUNTHLL(doubleColumn), DISTINCTCOUNTHLL(stringColumn) FROM testTable";
+
+    // Inner segment
+    String[] interSegmentsExpectedResults = new String[5];
+    for (Object operator : Arrays.asList(getOperatorForSqlQuery(query), getOperatorForSqlQueryWithFilter(query))) {
+      assertTrue(operator instanceof DictionaryBasedAggregationOperator);
+      IntermediateResultsBlock resultsBlock = ((DictionaryBasedAggregationOperator) operator).nextBlock();
+      QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS,
+          0, 0, NUM_RECORDS);
+      List<Object> aggregationResult = resultsBlock.getAggregationResult();
+      assertNotNull(aggregationResult);
+      assertEquals(aggregationResult.size(), 5);
+      for (int i = 0; i < 5; i++) {
+        assertTrue(aggregationResult.get(i) instanceof HyperLogLog);
+        HyperLogLog hll = (HyperLogLog) aggregationResult.get(i);
+
+        // Check log2m is 8
+        assertEquals(hll.sizeof(), 172);
+
+        int actualResult = (int) hll.cardinality();
+        int expectedResult = _values.size();
+        // Allow 15% error for HLL
+        assertEquals(actualResult, expectedResult, expectedResult * 0.15);
+
+        interSegmentsExpectedResults[i] = Integer.toString(actualResult);
+      }
+    }
+
+    // Inter segments
+    for (BrokerResponseNative brokerResponse : Arrays.asList(getBrokerResponseForPqlQuery(query),
+        getBrokerResponseForPqlQueryWithFilter(query))) {
+      QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 0, 4 * NUM_RECORDS,
+          interSegmentsExpectedResults);
+    }
+
+    // Regular aggregation
+    query = query + " WHERE intColumn >= 500";
+
+    // Inner segment
+    int expectedResult = 0;
+    for (Integer value : _values) {
+      if (value >= 500) {
+        expectedResult++;
+      }
+    }
+    Operator operator = getOperatorForSqlQuery(query);
+    assertTrue(operator instanceof AggregationOperator);
+    List<Object> aggregationResult = ((AggregationOperator) operator).nextBlock().getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 5);
+    for (int i = 0; i < 5; i++) {
+      assertTrue(aggregationResult.get(i) instanceof HyperLogLog);
+      HyperLogLog hll = (HyperLogLog) aggregationResult.get(i);
+
+      // Check log2m is 8
+      assertEquals(hll.sizeof(), 172);
+
+      int actualResult = (int) hll.cardinality();
+      // Allow 15% error for HLL
+      assertEquals(actualResult, expectedResult, expectedResult * 0.15);
+    }
+
+    // Inter segment
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
+    List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
+    assertNotNull(aggregationResults);
+    assertEquals(aggregationResults.size(), 5);
+    for (int i = 0; i < 5; i++) {
+      assertEquals(Integer.parseInt((String) aggregationResults.get(i).getValue()), expectedResult,
+          expectedResult * 0.15);
+    }
+
+    // Change log2m
+    query = "SELECT DISTINCTCOUNTHLL(intColumn, 12) FROM testTable";
+    operator = getOperatorForSqlQuery(query);
+    assertTrue(operator instanceof DictionaryBasedAggregationOperator);
+    aggregationResult = ((DictionaryBasedAggregationOperator) operator).nextBlock().getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 1);
+    assertTrue(aggregationResult.get(0) instanceof HyperLogLog);
+    HyperLogLog hll = (HyperLogLog) aggregationResult.get(0);
+    // Check log2m is 12
+    assertEquals(hll.sizeof(), 2732);
+  }
+
+  @Test
   public void testSmartHLL() {
     // Dictionary based
     String query = "SELECT DISTINCTCOUNTSMARTHLL(intColumn, 'hllConversionThreshold=10'), "
