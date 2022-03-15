@@ -56,13 +56,13 @@ public class TransformPipelineTest {
     TransformPipeline.Result result = new TransformPipeline.Result();
     try {
       pipeline.processRow(simpleRow, result);
-    } catch (TransformPipeline.TransformException ex) {
+    } catch (Exception ex) {
       exceptionThrown = true;
     }
     Assert.assertTrue(exceptionThrown);
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getTransformedRows().size(), 0);
-    Assert.assertEquals(result.getSkippedRowCount(), 1);
+    Assert.assertEquals(result.getSkippedRowCount(), 0);
   }
 
   @Test
@@ -90,15 +90,17 @@ public class TransformPipelineTest {
     TransformPipeline pipeline = new TransformPipeline(config, schema);
     GenericRow multipleRow = createMultipleRowPartialFailure(9527);
     TransformPipeline.Result result = new TransformPipeline.Result();
+    boolean exceptionThrown = false;
     try {
       pipeline.processRow(multipleRow, result);
-    } catch (TransformPipeline.TransformException ex) {
-      result = ex.getPartialResult();
+    } catch (Exception ex) {
+      exceptionThrown = true;
     }
 
+    Assert.assertTrue(exceptionThrown);
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getTransformedRows().size(), 1);
-    Assert.assertEquals(result.getSkippedRowCount(), 1);
+    Assert.assertEquals(result.getSkippedRowCount(), 0);
   }
 
   @Test

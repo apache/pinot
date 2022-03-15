@@ -56,37 +56,32 @@ public class TransformPipeline {
    * Process and validate the decoded row against schema.
    * @param decodedRow the row data to pass in
    * @param reusedResult the reused result so we can reduce objects created for each row
-   * @throws TransformException when data has issues like schema validation. Fetch the partialResult from Exception
+   * @throws Exception when data has issues like schema validation. Fetch the partialResult from Exception
    */
   public void processRow(GenericRow decodedRow, @Nonnull Result reusedResult)
-      throws TransformException {
+      throws Exception {
     reusedResult.reset();
-    try {
-      if (_complexTypeTransformer != null) {
-        // TODO: consolidate complex type transformer into composite type transformer
-        decodedRow = _complexTypeTransformer.transform(decodedRow);
-      }
-      Collection<GenericRow> rows = (Collection<GenericRow>) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
-      if (rows != null) {
-        for (GenericRow row : rows) {
-          GenericRow transformedRow = _recordTransformer.transform(row);
-          if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-            reusedResult.addTransformedRows(transformedRow);
-          } else {
-            reusedResult.incSkippedRowCount();
-          }
-        }
-      } else {
-        GenericRow transformedRow = _recordTransformer.transform(decodedRow);
+    if (_complexTypeTransformer != null) {
+      // TODO: consolidate complex type transformer into composite type transformer
+      decodedRow = _complexTypeTransformer.transform(decodedRow);
+    }
+    Collection<GenericRow> rows = (Collection<GenericRow>) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
+    if (rows != null) {
+      for (GenericRow row : rows) {
+        GenericRow transformedRow = _recordTransformer.transform(row);
         if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
           reusedResult.addTransformedRows(transformedRow);
         } else {
           reusedResult.incSkippedRowCount();
         }
       }
-    } catch (Exception ex) {
-      reusedResult.incSkippedRowCount();
-      throw new TransformException("Encountered error while processing row", reusedResult, ex);
+    } else {
+      GenericRow transformedRow = _recordTransformer.transform(decodedRow);
+      if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
+        reusedResult.addTransformedRows(transformedRow);
+      } else {
+        reusedResult.incSkippedRowCount();
+      }
     }
   }
 
@@ -116,27 +111,6 @@ public class TransformPipeline {
     public void reset() {
       _skippedRowCount = 0;
       _transformedRows.clear();
-    }
-  }
-
-  /**
-   * The exception contains the reference to a "partial result".
-   * It contains records of failed rows, transformed rows
-   */
-  public static class TransformException extends Exception {
-    private final Result _partialResult;
-
-    public TransformException(String message, Result partialResult, Throwable cause) {
-      super(message, cause);
-      _partialResult = partialResult;
-    }
-
-    /**
-     * Retrieve the partially processed rows in a batch.
-     * @return the Result containing partial results
-     */
-    public Result getPartialResult() {
-      return _partialResult;
     }
   }
 }
