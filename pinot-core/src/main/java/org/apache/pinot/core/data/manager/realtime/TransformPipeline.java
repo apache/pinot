@@ -21,7 +21,6 @@ package org.apache.pinot.core.data.manager.realtime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import javax.annotation.Nonnull;
 import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
@@ -58,7 +57,7 @@ public class TransformPipeline {
    * @param reusedResult the reused result so we can reduce objects created for each row
    * @throws Exception when data has issues like schema validation. Fetch the partialResult from Exception
    */
-  public void processRow(GenericRow decodedRow, @Nonnull Result reusedResult)
+  public void processRow(GenericRow decodedRow, Result reusedResult)
       throws Exception {
     reusedResult.reset();
     if (_complexTypeTransformer != null) {

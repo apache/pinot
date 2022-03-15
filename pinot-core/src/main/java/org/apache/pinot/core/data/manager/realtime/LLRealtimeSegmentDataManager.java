@@ -510,6 +510,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           _transformPipeline.processRow(decodedRow, reusedResult);
         } catch (Exception e) {
           _numRowsErrored++;
+          // when exception happens we prefer abandoning the whole batch and not partially indexing some rows
           reusedResult.getTransformedRows().clear();
           String errorMessage = String.format("Caught exception while transforming the record: %s", decodedRow);
           _segmentLogger.error(errorMessage, e);
