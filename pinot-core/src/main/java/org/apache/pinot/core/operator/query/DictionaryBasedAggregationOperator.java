@@ -77,76 +77,45 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
     for (AggregationFunction aggregationFunction : _aggregationFunctions) {
       String column = ((ExpressionContext) aggregationFunction.getInputExpressions().get(0)).getIdentifier();
       Dictionary dictionary = _dictionaryMap.get(column);
-      int dictionarySize = dictionary.length();
+      Object result;
       switch (aggregationFunction.getType()) {
         case MIN:
         case MINMV:
-          aggregationResults.add(toDouble(dictionary.getMinVal()));
+          result = toDouble(dictionary.getMinVal());
           break;
         case MAX:
         case MAXMV:
-          aggregationResults.add(toDouble(dictionary.getMaxVal()));
+          result = toDouble(dictionary.getMaxVal());
           break;
         case MINMAXRANGE:
         case MINMAXRANGEMV:
-          aggregationResults.add(
-              new MinMaxRangePair(toDouble(dictionary.getMinVal()), toDouble(dictionary.getMaxVal())));
+          result = new MinMaxRangePair(toDouble(dictionary.getMinVal()), toDouble(dictionary.getMaxVal()));
           break;
         case DISTINCTCOUNT:
         case DISTINCTCOUNTMV:
-          aggregationResults.add(getDistinctValueSet(dictionary));
+          result = getDistinctValueSet(dictionary);
           break;
         case DISTINCTCOUNTHLL:
         case DISTINCTCOUNTHLLMV:
-        case DISTINCTCOUNTRAWHLL:
-        case DISTINCTCOUNTRAWHLLMV: {
-          HyperLogLog hll;
-          if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
-            // Treat BYTES value as serialized HyperLogLog
-            try {
-              hll = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(dictionary.getBytesValue(0));
-              for (int dictId = 1; dictId < dictionarySize; dictId++) {
-                hll.addAll(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(dictionary.getBytesValue(dictId)));
-              }
-            } catch (Exception e) {
-              throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
-            }
-          } else {
-            int log2m;
-            if (aggregationFunction instanceof DistinctCountHLLAggregationFunction) {
-              log2m = ((DistinctCountHLLAggregationFunction) aggregationFunction).getLog2m();
-            } else {
-              log2m = ((DistinctCountRawHLLAggregationFunction) aggregationFunction).getLog2m();
-            }
-            hll = new HyperLogLog(log2m);
-            for (int dictId = 0; dictId < dictionarySize; dictId++) {
-              hll.offer(dictionary.get(dictId));
-            }
-          }
-          aggregationResults.add(hll);
+          result = getDistinctCountHLLResult(dictionary, (DistinctCountHLLAggregationFunction) aggregationFunction);
           break;
-        }
+        case DISTINCTCOUNTRAWHLL:
+        case DISTINCTCOUNTRAWHLLMV:
+          result = getDistinctCountHLLResult(dictionary,
+              ((DistinctCountRawHLLAggregationFunction) aggregationFunction).getDistinctCountHLLAggregationFunction());
+          break;
         case SEGMENTPARTITIONEDDISTINCTCOUNT:
-          aggregationResults.add((long) dictionarySize);
+          result = (long) dictionary.length();
           break;
         case DISTINCTCOUNTSMARTHLL:
-          DistinctCountSmartHLLAggregationFunction distinctCountSmartHLLAggregationFunction =
-              (DistinctCountSmartHLLAggregationFunction) aggregationFunction;
-          if (dictionarySize > distinctCountSmartHLLAggregationFunction.getHllConversionThreshold()) {
-            // Store values into a HLL when the dictionary size exceeds the conversion threshold
-            HyperLogLog hll = new HyperLogLog(distinctCountSmartHLLAggregationFunction.getHllLog2m());
-            for (int dictId = 0; dictId < dictionarySize; dictId++) {
-              hll.offer(dictionary.get(dictId));
-            }
-            aggregationResults.add(hll);
-          } else {
-            aggregationResults.add(getDistinctValueSet(dictionary));
-          }
+          result = getDistinctCountSmartHLLResult(dictionary,
+              (DistinctCountSmartHLLAggregationFunction) aggregationFunction);
           break;
         default:
           throw new IllegalStateException(
               "Dictionary based aggregation operator does not support function type: " + aggregationFunction.getType());
       }
+      aggregationResults.add(result);
     }
 
     // Build intermediate result block based on aggregation result from the executor.
@@ -161,7 +130,7 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
     }
   }
 
-  private Set getDistinctValueSet(Dictionary dictionary) {
+  private static Set getDistinctValueSet(Dictionary dictionary) {
     int dictionarySize = dictionary.length();
     switch (dictionary.getValueType()) {
       case INT:
@@ -202,6 +171,44 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
         return bytesSet;
       default:
         throw new IllegalStateException();
+    }
+  }
+
+  private static HyperLogLog getDistinctValueHLL(Dictionary dictionary, int log2m) {
+    HyperLogLog hll = new HyperLogLog(log2m);
+    int length = dictionary.length();
+    for (int i = 0; i < length; i++) {
+      hll.offer(dictionary.get(i));
+    }
+    return hll;
+  }
+
+  private static HyperLogLog getDistinctCountHLLResult(Dictionary dictionary,
+      DistinctCountHLLAggregationFunction function) {
+    if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
+      // Treat BYTES value as serialized HyperLogLog
+      try {
+        HyperLogLog hll = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(dictionary.getBytesValue(0));
+        int length = dictionary.length();
+        for (int i = 1; i < length; i++) {
+          hll.addAll(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(dictionary.getBytesValue(i)));
+        }
+        return hll;
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
+      }
+    } else {
+      return getDistinctValueHLL(dictionary, function.getLog2m());
+    }
+  }
+
+  private static Object getDistinctCountSmartHLLResult(Dictionary dictionary,
+      DistinctCountSmartHLLAggregationFunction function) {
+    if (dictionary.length() > function.getHllConversionThreshold()) {
+      // Store values into a HLL when the dictionary size exceeds the conversion threshold
+      return getDistinctValueHLL(dictionary, function.getHllLog2m());
+    } else {
+      return getDistinctValueSet(dictionary);
     }
   }
 

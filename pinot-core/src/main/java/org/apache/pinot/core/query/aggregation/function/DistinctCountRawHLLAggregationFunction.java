@@ -44,8 +44,8 @@ public class DistinctCountRawHLLAggregationFunction
     _distinctCountHLLAggregationFunction = distinctCountHLLAggregationFunction;
   }
 
-  public int getLog2m() {
-    return _distinctCountHLLAggregationFunction.getLog2m();
+  public DistinctCountHLLAggregationFunction getDistinctCountHLLAggregationFunction() {
+    return _distinctCountHLLAggregationFunction;
   }
 
   @Override
