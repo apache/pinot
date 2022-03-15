@@ -20,7 +20,6 @@ package org.apache.pinot.core.util;
 
 import com.google.common.base.Preconditions;
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -303,32 +302,6 @@ public class GapfillUtils {
     return fillExpressions;
   }
 
-  public static List<ExpressionContext> findGroupByExpressions(QueryContext queryContext) {
-    ExpressionContext gapFillSelection = GapfillUtils.findGapfillExpressionContext(queryContext);
-    if (gapFillSelection == null) {
-      return null;
-    }
-    List<ExpressionContext> groupByExpressions = new ArrayList<>();
-
-    ExpressionContext timeseriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);
-    groupByExpressions.add(gapFillSelection.getFunction().getArguments().get(0));
-    groupByExpressions.addAll(timeseriesOn.getFunction().getArguments());
-    return groupByExpressions;
-  }
-
-  public static List<ExpressionContext> getGroupByExpressions(QueryContext queryContext) {
-    ExpressionContext gapFillSelection = GapfillUtils.getGapfillExpressionContext(queryContext);
-    if (gapFillSelection == null) {
-      return null;
-    }
-    List<ExpressionContext> groupByExpressions = new ArrayList<>();
-
-    ExpressionContext timeseriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);
-    groupByExpressions.add(gapFillSelection.getFunction().getArguments().get(0));
-    groupByExpressions.addAll(timeseriesOn.getFunction().getArguments());
-    return groupByExpressions;
-  }
-
   public static String getTableName(PinotQuery pinotQuery) {
     while (pinotQuery.getDataSource().getSubquery() != null) {
       pinotQuery = pinotQuery.getDataSource().getSubquery();
@@ -393,9 +366,8 @@ public class GapfillUtils {
         break;
       }
     }
-    List<Expression> orderByList = copy.getOrderByList();
-    for (int i = 0; i < orderByList.size(); i++) {
-      Expression orderBy = orderByList.get(i);
+
+    for (Expression orderBy : copy.getOrderByList()) {
       if (orderBy.getType() != ExpressionType.FUNCTION) {
         continue;
       }
