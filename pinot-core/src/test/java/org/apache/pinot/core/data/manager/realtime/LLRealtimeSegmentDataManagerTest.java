@@ -38,8 +38,6 @@ import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
-import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
-import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
@@ -54,13 +52,16 @@ import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.core.data.manager.realtime.Fixtures.MAX_ROWS_IN_SEGMENT;
+import static org.apache.pinot.core.data.manager.realtime.Fixtures.MAX_TIME_FOR_SEGMENT_CLOSE_MS;
+import static org.apache.pinot.core.data.manager.realtime.Fixtures.createSchema;
+import static org.apache.pinot.core.data.manager.realtime.Fixtures.createTableConfig;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.anyString;
@@ -81,85 +82,9 @@ public class LLRealtimeSegmentDataManagerTest {
   private static final String SEGMENT_NAME_STR = SEGMENT_NAME.getSegmentName();
   private static final long START_OFFSET_VALUE = 19885L;
   private static final LongMsgOffset START_OFFSET = new LongMsgOffset(START_OFFSET_VALUE);
-  private static final String TOPIC_NAME = "someTopic";
-  private static final String CONSUMER_FACTORY_CLASS = FakeStreamConsumerFactory.class.getName();
-  private static final String MESSAGE_DECODER_CLASS = FakeStreamMessageDecoder.class.getName();
-  private static final int MAX_ROWS_IN_SEGMENT = 250000;
-  private static final long MAX_TIME_FOR_SEGMENT_CLOSE_MS = 64368000L;
-
-  //@formatter:off
-  private static final String TABLE_CONFIG_JSON =
-        "{"
-      + "  \"metadata\":{},"
-      + "  \"segmentsConfig\":{"
-      + "    \"replicasPerPartition\":\"3\","
-      + "    \"replication\":\"3\","
-      + "    \"replicationNumber\":3,"
-      + "    \"retentionTimeUnit\":\"DAYS\","
-      + "    \"retentionTimeValue\":\"3\","
-      + "    \"schemaName\":\"testSchema\","
-      + "    \"segmentAssignmentStrategy\":\"BalanceNumSegmentAssignmentStrategy\","
-      + "    \"segmentPushFrequency\":\"daily\","
-      + "    \"segmentPushType\":\"APPEND\","
-      + "    \"timeColumnName\":\"minutesSinceEpoch\","
-      + "    \"timeType\":\"MINUTES\""
-      + "  },"
-      + "  \"tableIndexConfig\":{"
-      + "    \"invertedIndexColumns\":[],"
-      + "    \"lazyLoad\":\"false\","
-      + "    \"loadMode\":\"HEAP\","
-      + "    \"segmentFormatVersion\":null,"
-      + "    \"sortedColumn\":[],"
-      + "    \"streamConfigs\":{"
-      + "      \"realtime.segment.flush.threshold.rows\":\"" + MAX_ROWS_IN_SEGMENT + "\","
-      + "      \"realtime.segment.flush.threshold.time\":\"" + MAX_TIME_FOR_SEGMENT_CLOSE_MS + "\","
-      + "      \"stream.fakeStream.broker.list\":\"broker:7777\","
-      + "      \"stream.fakeStream.consumer.prop.auto.offset.reset\":\"smallest\","
-      + "      \"stream.fakeStream.consumer.type\":\"simple\","
-      + "      \"stream.fakeStream.consumer.factory.class.name\":\"" + CONSUMER_FACTORY_CLASS + "\","
-      + "      \"stream.fakeStream.decoder.class.name\":\"" + MESSAGE_DECODER_CLASS + "\","
-      + "      \"stream.fakeStream.decoder.prop.schema.registry.rest.url\":\"http://1.2.3.4:1766/schemas\","
-      + "      \"stream.fakeStream.decoder.prop.schema.registry.schema.name\":\"UnknownSchema\","
-      + "      \"stream.fakeStream.hlc.zk.connect.string\":\"zoo:2181/kafka-queuing\","
-      + "      \"stream.fakeStream.topic.name\":\"" + TOPIC_NAME + "\","
-      + "      \"stream.fakeStream.zk.broker.url\":\"kafka-broker:2181/kafka-queuing\","
-      + "      \"streamType\":\"fakeStream\""
-      + "    }"
-      + "  },"
-      + "  \"tableName\":\"Coffee_REALTIME\","
-      + "  \"tableType\":\"realtime\","
-      + "  \"tenants\":{"
-      + "    \"broker\":\"shared\","
-      + "    \"server\":\"server-1\""
-      + "  },"
-      + "  \"upsertConfig\":{"
-      + "    \"mode\":\"FULL\""
-      + "  }"
-      + "}";
-  private static final String SCHEMA_JSON =
-        "{"
-      + "  \"schemaName\":\"testSchema\","
-      + "  \"metricFieldSpecs\":[{\"name\":\"m\",\"dataType\":\"LONG\"}],"
-      + "  \"dimensionFieldSpecs\":[{\"name\":\"d\",\"dataType\":\"STRING\",\"singleValueField\":true}],"
-      + "  \"timeFieldSpec\":{"
-      + "    \"incomingGranularitySpec\":{"
-      + "      \"dataType\":\"LONG\","
-      + "      \"timeType\":\"MINUTES\","
-      + "      \"name\":\"minutesSinceEpoch\""
-      + "    },"
-      + "    \"defaultNullValue\":12345"
-      + "  },"
-      + "  \"primaryKeyColumns\": [\"event_id\"]"
-      + "}";
-  //@formatter:on
 
   private static long _timeNow = System.currentTimeMillis();
   private final Map<Integer, Semaphore> _partitionGroupIdToSemaphoreMap = new ConcurrentHashMap<>();
-
-  private TableConfig createTableConfig()
-      throws Exception {
-    return JsonUtils.stringToObject(TABLE_CONFIG_JSON, TableConfig.class);
-  }
 
   private RealtimeTableDataManager createTableDataManager(TableConfig tableConfig) {
     final String instanceId = "server-1";
@@ -189,7 +114,7 @@ public class LLRealtimeSegmentDataManagerTest {
     RealtimeTableDataManager tableDataManager = createTableDataManager(tableConfig);
     LLCSegmentName llcSegmentName = new LLCSegmentName(SEGMENT_NAME_STR);
     _partitionGroupIdToSemaphoreMap.putIfAbsent(PARTITION_GROUP_ID, new Semaphore(1));
-    Schema schema = Schema.fromString(SCHEMA_JSON);
+    Schema schema = createSchema();
     ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     return new FakeLLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, tableDataManager, SEGMENT_DIR, schema,
         llcSegmentName, _partitionGroupIdToSemaphoreMap, serverMetrics);
