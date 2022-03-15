@@ -24,8 +24,8 @@ import java.util.List;
 import java.util.Map;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
-import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.mutable.MutableInt;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -35,6 +35,7 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.pql.parsers.pql2.ast.FloatingPointLiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
@@ -173,11 +174,40 @@ public class RequestUtils {
     return RequestUtils.getLiteralExpression(object.toString());
   }
 
-  public static Expression getFunctionExpression(String operator) {
+  public static Expression getFunctionExpression(String canonicalName) {
+    assert canonicalName.equals(canonicalizeFunctionNamePreservingSpecialKey(canonicalName));
     Expression expression = new Expression(ExpressionType.FUNCTION);
-    Function function = new Function(operator);
+    Function function = new Function(canonicalName);
     expression.setFunctionCall(function);
     return expression;
+  }
+
+  /**
+   * Converts the function name into its canonical form.
+   */
+  public static String canonicalizeFunctionName(String functionName) {
+    return StringUtils.remove(functionName, '_').toLowerCase();
+  }
+
+  private static final Map<String, String> CANONICAL_NAME_TO_SPECIAL_KEY_MAP;
+
+  static {
+    CANONICAL_NAME_TO_SPECIAL_KEY_MAP = new HashMap<>();
+    for (FilterKind filterKind : FilterKind.values()) {
+      CANONICAL_NAME_TO_SPECIAL_KEY_MAP.put(canonicalizeFunctionName(filterKind.name()), filterKind.name());
+    }
+    CANONICAL_NAME_TO_SPECIAL_KEY_MAP.put("stdistance", "st_distance");
+  }
+
+  /**
+   * Converts the function name into its canonical form, but preserving the special keys.
+   * - Keep FilterKind.name() as is because we need to read the FilterKind via FilterKind.valueOf().
+   * - Keep ST_Distance as is because we use exact match when applying geo-spatial index up to release 0.10.0.
+   * TODO: Remove the ST_Distance special handling after releasing 0.11.0.
+   */
+  public static String canonicalizeFunctionNamePreservingSpecialKey(String functionName) {
+    String canonicalName = canonicalizeFunctionName(functionName);
+    return CANONICAL_NAME_TO_SPECIAL_KEY_MAP.getOrDefault(canonicalName, canonicalName);
   }
 
   private static FilterQuery traverseFilterQueryAndPopulateMap(FilterQueryTree tree,
@@ -254,7 +284,8 @@ public class RequestUtils {
       return createIdentifierExpression(((IdentifierAstNode) astNode).getName());
     } else if (astNode instanceof FunctionCallAstNode) {
       // Function expression
-      Expression expression = getFunctionExpression(((FunctionCallAstNode) astNode).getName());
+      Expression expression = getFunctionExpression(
+          RequestUtils.canonicalizeFunctionNamePreservingSpecialKey(((FunctionCallAstNode) astNode).getName()));
       Function func = expression.getFunctionCall();
       final List<? extends AstNode> operandsAstNodes = astNode.getChildren();
       if (operandsAstNodes != null) {

@@ -57,7 +57,7 @@ public class NonAggregationGroupByToDistinctQueryRewriter implements QueryRewrit
       Set<String> selectIdentifiers = CalciteSqlParser.extractIdentifiers(pinotQuery.getSelectList(), true);
       Set<String> groupByIdentifiers = CalciteSqlParser.extractIdentifiers(pinotQuery.getGroupByList(), true);
       if (groupByIdentifiers.containsAll(selectIdentifiers)) {
-        Expression distinctExpression = RequestUtils.getFunctionExpression("DISTINCT");
+        Expression distinctExpression = RequestUtils.getFunctionExpression("distinct");
         for (Expression select : pinotQuery.getSelectList()) {
           distinctExpression.getFunctionCall().addToOperands(select);
         }

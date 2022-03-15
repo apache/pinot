@@ -206,14 +206,14 @@ public class StUnionQueriesTest extends BaseQueriesTest {
     BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
     ResultTable resultTable = brokerResponse.getResultTable();
     DataSchema expectedDataSchema = new DataSchema(new String[]{
-        "st_as_text(st_union(pointColumn))",
-        "st_as_binary(st_union(pointColumn))",
-        "to_geometry(st_union(pointColumn))",
-        "to_spherical_geography(st_union(pointColumn))",
-        "st_geom_from_text(st_as_text(st_union(pointColumn)))",
-        "st_geog_from_text(st_as_text(st_union(pointColumn)))",
-        "st_geom_from_wkb(st_as_binary(st_union(pointColumn)))",
-        "st_geog_from_wkb(st_as_binary(st_union(pointColumn)))"
+        "stastext(stunion(pointColumn))",
+        "stasbinary(stunion(pointColumn))",
+        "togeometry(stunion(pointColumn))",
+        "tosphericalgeography(stunion(pointColumn))",
+        "stgeomfromtext(stastext(stunion(pointColumn)))",
+        "stgeogfromtext(stastext(stunion(pointColumn)))",
+        "stgeomfromwkb(stasbinary(stunion(pointColumn)))",
+        "stgeogfromwkb(stasbinary(stunion(pointColumn)))"
     }, new ColumnDataType[]{
         ColumnDataType.STRING,
         ColumnDataType.BYTES,
