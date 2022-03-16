@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.minion.generator;
 
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -37,6 +38,14 @@ public class TaskGeneratorUtils {
   }
 
   private static final long ONE_DAY_IN_MILLIS = 24 * 60 * 60 * 1000L;
+
+  /**
+   * If task is in final state, it will not be running any more. But note that
+   * STOPPED is not a final task state in helix task framework, as a stopped task
+   * is just paused and can be resumed to rerun.
+   */
+  private static final EnumSet<TaskState> TASK_FINAL_STATES =
+      EnumSet.of(TaskState.COMPLETED, TaskState.FAILED, TaskState.ABORTED, TaskState.TIMED_OUT);
 
   /**
    * Returns all the segments that have been scheduled in one day but not finished.
@@ -108,7 +117,7 @@ public class TaskGeneratorUtils {
       Consumer<Map<String, String>> taskConfigConsumer) {
     Map<String, TaskState> taskStates = clusterInfoAccessor.getTaskStates(taskType);
     for (Map.Entry<String, TaskState> entry : taskStates.entrySet()) {
-      if (isTaskInFinalState(entry.getValue())) {
+      if (TASK_FINAL_STATES.contains(entry.getValue())) {
         continue;
       }
       String taskName = entry.getKey();
@@ -120,16 +129,6 @@ public class TaskGeneratorUtils {
         }
       }
     }
-  }
-
-  /**
-   * @return true if task is in final state, i.e. will not be running any more.
-   * Note that STOPPED is not a final task state in helix task framework, as a
-   * stopped task is just paused and can be resumed to rerun.
-   */
-  private static boolean isTaskInFinalState(TaskState taskState) {
-    return taskState == TaskState.COMPLETED || taskState == TaskState.FAILED || taskState == TaskState.ABORTED
-        || taskState == TaskState.TIMED_OUT;
   }
 
   /**
