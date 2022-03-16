@@ -30,6 +30,12 @@ import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.data.Schema;
 
 
+/**
+ * The {@code ControllerRequestClient} provides handy utilities to make request to controller.
+ *
+ * <p>It should be provided with a specified {@link ControllerRequestURLBuilder} for constructing the URL requests
+ * as well as a reusable {@link HttpClient} during construction.
+ */
 public class ControllerRequestClient {
   private final HttpClient _httpClient;
   private final ControllerRequestURLBuilder _controllerRequestURLBuilder;

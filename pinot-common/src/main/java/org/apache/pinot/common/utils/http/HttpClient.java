@@ -27,7 +27,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.collections.MapUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
@@ -69,6 +69,7 @@ public class HttpClient implements AutoCloseable {
   public static final int DEFAULT_SOCKET_TIMEOUT_MS = 600 * 1000; // 10 minutes
   public static final int GET_REQUEST_SOCKET_TIMEOUT_MS = 5 * 1000; // 5 seconds
   public static final int DELETE_REQUEST_SOCKET_TIMEOUT_MS = 10 * 1000; // 10 seconds
+  public static final String AUTH_HTTP_HEADER = "Authorization";
   public static final String JSON_CONTENT_TYPE = "application/json";
 
   private final CloseableHttpClient _httpClient;
@@ -93,7 +94,6 @@ public class HttpClient implements AutoCloseable {
    *
    * @see #sendGetRequest(URI, String)
    */
-  @Deprecated
   public SimpleHttpResponse sendGetRequest(URI uri)
       throws IOException {
     RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
@@ -105,7 +105,7 @@ public class HttpClient implements AutoCloseable {
       throws IOException {
     RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
     if (StringUtils.isNotBlank(authToken)) {
-      requestBuilder.addHeader("Authorization", authToken);
+      requestBuilder.addHeader(AUTH_HTTP_HEADER, authToken);
     }
     setTimeout(requestBuilder, GET_REQUEST_SOCKET_TIMEOUT_MS);
     return sendRequest(requestBuilder.build());
@@ -116,7 +116,6 @@ public class HttpClient implements AutoCloseable {
    *
    * @see #sendDeleteRequest(URI, String)
    */
-  @Deprecated
   public SimpleHttpResponse sendDeleteRequest(URI uri)
       throws IOException {
     RequestBuilder requestBuilder = RequestBuilder.delete(uri).setVersion(HttpVersion.HTTP_1_1);
@@ -128,7 +127,7 @@ public class HttpClient implements AutoCloseable {
       throws IOException {
     RequestBuilder requestBuilder = RequestBuilder.delete(uri).setVersion(HttpVersion.HTTP_1_1);
     if (StringUtils.isNotBlank(authToken)) {
-      requestBuilder.addHeader("Authorization", authToken);
+      requestBuilder.addHeader(AUTH_HTTP_HEADER, authToken);
     }
     setTimeout(requestBuilder, DELETE_REQUEST_SOCKET_TIMEOUT_MS);
     return sendRequest(requestBuilder.build());
@@ -139,7 +138,6 @@ public class HttpClient implements AutoCloseable {
    *
    * @see #sendPostRequest(URI, HttpEntity, Map, String)
    */
-  @Deprecated
   public SimpleHttpResponse sendPostRequest(URI uri, HttpEntity payload, Map<String, String> headers)
       throws IOException {
     return sendPostRequest(uri, payload, headers, null);
@@ -153,7 +151,7 @@ public class HttpClient implements AutoCloseable {
       requestBuilder.setEntity(payload);
     }
     if (StringUtils.isNotBlank(authToken)) {
-      requestBuilder.addHeader("Authorization", authToken);
+      requestBuilder.addHeader(AUTH_HTTP_HEADER, authToken);
     }
     if (MapUtils.isNotEmpty(headers)) {
       for (Map.Entry<String, String> header : headers.entrySet()) {
@@ -169,7 +167,6 @@ public class HttpClient implements AutoCloseable {
    *
    * @see #sendPutRequest(URI, HttpEntity, Map, String)
    */
-  @Deprecated
   public SimpleHttpResponse sendPutRequest(URI uri, HttpEntity payload, Map<String, String> headers)
       throws IOException {
     return sendPutRequest(uri, payload, headers, null);
@@ -183,7 +180,7 @@ public class HttpClient implements AutoCloseable {
       requestBuilder.setEntity(payload);
     }
     if (StringUtils.isNotBlank(authToken)) {
-      requestBuilder.addHeader("Authorization", authToken);
+      requestBuilder.addHeader(AUTH_HTTP_HEADER, authToken);
     }
     setTimeout(requestBuilder, DELETE_REQUEST_SOCKET_TIMEOUT_MS);
     return sendRequest(requestBuilder.build());
@@ -232,13 +229,9 @@ public class HttpClient implements AutoCloseable {
   public SimpleHttpResponse sendRequest(HttpUriRequest request)
       throws IOException {
     try (CloseableHttpResponse response = _httpClient.execute(request)) {
-      String controllerHost = null;
-      String controllerVersion = null;
       if (response.containsHeader(CommonConstants.Controller.HOST_HTTP_HEADER)) {
-        controllerHost = response.getFirstHeader(CommonConstants.Controller.HOST_HTTP_HEADER).getValue();
-        controllerVersion = response.getFirstHeader(CommonConstants.Controller.VERSION_HTTP_HEADER).getValue();
-      }
-      if (controllerHost != null) {
+        String controllerHost = response.getFirstHeader(CommonConstants.Controller.HOST_HTTP_HEADER).getValue();
+        String controllerVersion = response.getFirstHeader(CommonConstants.Controller.VERSION_HTTP_HEADER).getValue();
         LOGGER.info(String
             .format("Sending request: %s to controller: %s, version: %s", request.getURI(), controllerHost,
                 controllerVersion));
@@ -357,10 +350,10 @@ public class HttpClient implements AutoCloseable {
    * @return list of 0 or 1 "Authorization" headers
    */
   public static List<Header> makeAuthHeader(String authToken) {
-    if (org.apache.commons.lang3.StringUtils.isBlank(authToken)) {
+    if (StringUtils.isBlank(authToken)) {
       return Collections.emptyList();
     }
-    return Collections.singletonList(new BasicHeader("Authorization", authToken));
+    return Collections.singletonList(new BasicHeader(AUTH_HTTP_HEADER, authToken));
   }
 
   @Override
