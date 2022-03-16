@@ -52,10 +52,23 @@ import org.apache.pinot.core.operator.transform.function.SingleParamMathTransfor
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.FloorTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.LnTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.SqrtTransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.LogTransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.SignTransformFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
-
+import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.SinTransformFunction;
+import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.CosTransformFunction;
+import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.TanTransformFunction;
+import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.AsinTransformFunction;
+import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.AcosTransformFunction;
+import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.AtanTransformFunction;
+import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.Atan2TransformFunction;
+import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.SinhTransformFunction;
+import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.CoshTransformFunction;
+import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.TanhTransformFunction;
+import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.DegreesTransformFunction;
+import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.RadiansTransformFunction;
 
 /**
  * Factory class for transformation functions.
@@ -86,7 +99,9 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.EXP, ExpTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.FLOOR, FloorTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.LN, LnTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.LOG, LogTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.SQRT, SqrtTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ROUND_DECIMAL, RoundDecimalTransformFunction.class);
 
     typeToImplementation.put(TransformFunctionType.CAST, CastTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.JSONEXTRACTSCALAR,
@@ -185,6 +200,20 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.IS_NULL, IsNullTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.IS_NOT_NULL,
         IsNotNullTransformFunction.class);
+
+    // Trignometric functions
+    typeToImplementation.put(TransformFunctionType.SIN, SinTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.COS, CosTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.TAN, TanTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ASIN, AsinTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ACOS, AcosTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ATAN, AtanTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ATAN2, Atan2TransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.SINH, SinhTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.COSH, CoshTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.TANH, TanhTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.DEGREES, DegreesTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.RADIANS, RadiansTransformFunction.class);
 
     Map<String, Class<? extends TransformFunction>> registry = new HashMap<>(typeToImplementation.size());
     for (Map.Entry<TransformFunctionType, Class<? extends TransformFunction>> entry : typeToImplementation.entrySet()) {
