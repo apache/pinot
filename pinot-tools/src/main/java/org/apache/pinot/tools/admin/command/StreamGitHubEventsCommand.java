@@ -53,6 +53,14 @@ public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implemen
   @CommandLine.Option(names = {"-awsRegion"}, description = "AWS Region in which Kinesis is located")
   private String _awsRegion = "us-east-1";
 
+  @CommandLine.Option(names = {"-awsAccessKey"},
+      description = "AccessKey for AWS Account.")
+  private String _accessKey;
+
+  @CommandLine.Option(names = {"-awsSecretKey"},
+      description = "SecretKey for AWS Account")
+  private String _secretKey;
+
   @CommandLine.Option(names = {"-topic"}, required = true,
       description = "Name of kafka-topic/kinesis-stream to publish events.")
   private String _topic;
@@ -122,7 +130,7 @@ public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implemen
       switch (StreamSourceType.valueOf(_sourceType.toUpperCase())) {
         case KINESIS:
           streamDataProducer =
-              PullRequestMergedEventsStream.getKinesisStreamDataProducer(_kinesisEndpoint, _awsRegion);
+              PullRequestMergedEventsStream.getKinesisStreamDataProducer(_kinesisEndpoint, _awsRegion, _accessKey, _secretKey);
           break;
         case KAFKA:
         default:
