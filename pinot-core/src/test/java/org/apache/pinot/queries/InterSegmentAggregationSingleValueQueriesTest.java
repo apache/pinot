@@ -45,28 +45,27 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     String query = "SELECT COUNT(*) FROM testTable";
 
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L, new String[]{"120000"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L,
+        new String[]{"120000"});
 
     brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 0L, 120000L, new String[]{"24516"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 0L, 120000L,
+        new String[]{"24516"});
 
     brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 120000L, 120000L, new String[]{"64420"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 120000L, 120000L,
+        new String[]{"64420"});
 
     brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 24516L, 120000L, new String[]{"17080"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 24516L, 120000L,
+        new String[]{"17080"});
   }
 
   @Test
   public void testMax() {
     String query = "SELECT MAX(column1), MAX(column3) FROM testTable";
 
-    // Query should be answered by MetadataBasedAggregationOperator, so check if numEntriesScannedInFilter and
-    // numEntriesScannedPostFilter are 0
+    // Without filter, query should be answered by DictionaryBasedAggregationOperator (numEntriesScannedPostFilter = 0)
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L,
         new String[]{"2146952047.00000", "2147419555.00000"});
@@ -88,8 +87,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   public void testMin() {
     String query = "SELECT MIN(column1), MIN(column3) FROM testTable";
 
-    // Query should be answered by MetadataBasedAggregationOperator, so check if numEntriesScannedInFilter and
-    // numEntriesScannedPostFilter are 0
+    // Without filter, query should be answered by DictionaryBasedAggregationOperator (numEntriesScannedPostFilter = 0)
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L,
         new String[]{"240528.00000", "17891.00000"});
@@ -153,8 +151,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   public void testMinMaxRange() {
     String query = "SELECT MINMAXRANGE(column1), MINMAXRANGE(column3) FROM testTable";
 
-    // Query should be answered by MetadataBasedAggregationOperator, so check if numEntriesScannedInFilter and
-    // numEntriesScannedPostFilter are 0
+    // Without filter, query should be answered by DictionaryBasedAggregationOperator (numEntriesScannedPostFilter = 0)
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L,
         new String[]{"2146711519.00000", "2147401664.00000"});
@@ -176,10 +173,10 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   public void testDistinctCount() {
     String query = "SELECT DISTINCTCOUNT(column1), DISTINCTCOUNT(column3) FROM testTable";
 
+    // Without filter, query should be answered by DictionaryBasedAggregationOperator (numEntriesScannedPostFilter = 0)
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    //without filter, we should be using dictionary for distinctcount
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L, new String[]{"6582", "21910"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L,
+        new String[]{"6582", "21910"});
 
     brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
@@ -198,8 +195,9 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   public void testDistinctCountHLL() {
     String query = "SELECT DISTINCTCOUNTHLL(column1), DISTINCTCOUNTHLL(column3) FROM testTable";
 
+    // Without filter, query should be answered by DictionaryBasedAggregationOperator (numEntriesScannedPostFilter = 0)
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L,
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L,
         new String[]{"5977", "23825"});
 
     brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
@@ -218,28 +216,25 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   @Test
   public void testDistinctCountRawHLL() {
     String query = "SELECT DISTINCTCOUNTRAWHLL(column1), DISTINCTCOUNTRAWHLL(column3) FROM testTable";
-    Function<Serializable, String> cardinalityExtractor = value -> String
-        .valueOf(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String) value)).cardinality());
+    Function<Serializable, String> cardinalityExtractor = value -> String.valueOf(
+        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String) value)).cardinality());
 
+    // Without filter, query should be answered by DictionaryBasedAggregationOperator (numEntriesScannedPostFilter = 0)
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L, cardinalityExtractor,
-            new String[]{"5977", "23825"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L, cardinalityExtractor,
+        new String[]{"5977", "23825"});
 
     brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, cardinalityExtractor,
-            new String[]{"1886", "4492"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
+        cardinalityExtractor, new String[]{"1886", "4492"});
 
     brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L, cardinalityExtractor,
-            new String[]{"3592", "11889"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
+        cardinalityExtractor, new String[]{"3592", "11889"});
 
     brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, cardinalityExtractor,
-            new String[]{"1324", "3197"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
+        cardinalityExtractor, new String[]{"1324", "3197"});
   }
 
   @Test
@@ -438,10 +433,9 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   private void queryAndTestAggregationResult(String query, ExpectedQueryResult<String> expectedQueryResults,
       Function<Serializable, String> responseMapper) {
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, expectedQueryResults.getNumDocsScanned(),
-            expectedQueryResults.getNumEntriesScannedInFilter(), expectedQueryResults.getNumEntriesScannedPostFilter(),
-            expectedQueryResults.getNumTotalDocs(), responseMapper, expectedQueryResults.getResults());
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, expectedQueryResults.getNumDocsScanned(),
+        expectedQueryResults.getNumEntriesScannedInFilter(), expectedQueryResults.getNumEntriesScannedPostFilter(),
+        expectedQueryResults.getNumTotalDocs(), responseMapper, expectedQueryResults.getResults());
   }
 
   private void testPercentileRawEstAggregationFunction(int percentile) {
@@ -453,9 +447,8 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
         String.format("SELECT PERCENTILERAWEST%d(column1), PERCENTILERAWEST%d(column3) FROM testTable", percentile,
             percentile);
 
-    String query =
-        String
-            .format("SELECT PERCENTILEEST%d(column1), PERCENTILEEST%d(column3) FROM testTable", percentile, percentile);
+    String query = String.format("SELECT PERCENTILEEST%d(column1), PERCENTILEEST%d(column3) FROM testTable", percentile,
+        percentile);
 
     queryAndTestAggregationResult(rawQuery, getExpectedQueryResults(query), quantileExtractor);
 
@@ -465,8 +458,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     queryAndTestAggregationResult(rawQuery + GROUP_BY, getExpectedQueryResults(query + GROUP_BY), quantileExtractor);
 
     queryAndTestAggregationResult(rawQuery + getFilter() + GROUP_BY,
-        getExpectedQueryResults(query + getFilter() + GROUP_BY),
-        quantileExtractor);
+        getExpectedQueryResults(query + getFilter() + GROUP_BY), quantileExtractor);
   }
 
   @Test
@@ -491,8 +483,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
   private void testPercentileRawTDigestAggregationFunction(int percentile) {
     Function<Serializable, String> quantileExtractor = value -> String.valueOf(
-        ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
-            .quantile(percentile / 100.0));
+        ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value)).quantile(percentile / 100.0));
 
     String rawQuery =
         String.format("SELECT PERCENTILERAWTDIGEST%d(column1), PERCENTILERAWTDIGEST%d(column3) FROM testTable",
@@ -511,8 +502,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
         quantileExtractor);
 
     queryAndTestAggregationResultWithDelta(rawQuery + getFilter() + GROUP_BY,
-        getExpectedQueryResults(query + getFilter() + GROUP_BY),
-        quantileExtractor);
+        getExpectedQueryResults(query + getFilter() + GROUP_BY), quantileExtractor);
   }
 
   private ExpectedQueryResult<String> getExpectedQueryResults(String query) {
@@ -523,11 +513,10 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
       Function<Serializable, String> responseMapper) {
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
 
-    QueriesTestUtils
-        .testInterSegmentApproximateAggregationResult(brokerResponse, expectedQueryResults.getNumDocsScanned(),
-            expectedQueryResults.getNumEntriesScannedInFilter(), expectedQueryResults.getNumEntriesScannedPostFilter(),
-            expectedQueryResults.getNumTotalDocs(), responseMapper, expectedQueryResults.getResults(),
-            PERCENTILE_TDIGEST_DELTA);
+    QueriesTestUtils.testInterSegmentApproximateAggregationResult(brokerResponse,
+        expectedQueryResults.getNumDocsScanned(), expectedQueryResults.getNumEntriesScannedInFilter(),
+        expectedQueryResults.getNumEntriesScannedPostFilter(), expectedQueryResults.getNumTotalDocs(), responseMapper,
+        expectedQueryResults.getResults(), PERCENTILE_TDIGEST_DELTA);
   }
 
   @Test

@@ -20,7 +20,7 @@ package org.apache.pinot.sql.parsers;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -50,11 +50,11 @@ import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.babel.SqlBabelParserImpl;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
@@ -194,7 +194,7 @@ public class CalciteSqlParser {
     List<Expression> selectList = pinotQuery.getSelectList();
     if (selectList.size() == 1) {
       Function function = selectList.get(0).getFunctionCall();
-      if (function != null && function.getOperator().equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
+      if (function != null && function.getOperator().equals("distinct")) {
         if (CollectionUtils.isNotEmpty(pinotQuery.getGroupByList())) {
           // TODO: Explore if DISTINCT should be supported with GROUP BY
           throw new IllegalStateException("DISTINCT with GROUP BY is currently not supported");
@@ -238,16 +238,15 @@ public class CalciteSqlParser {
     if (expr.getType() == ExpressionType.LITERAL || isAggregateExpression(expr) || groupByExprs.contains(expr)) {
       return false;
     }
-
-    final Function funcExpr = expr.getFunctionCall();
+    Function function = expr.getFunctionCall();
     // function expression
-    if (funcExpr != null) {
+    if (function != null) {
       // for Alias function, check the actual value
-      if (funcExpr.getOperator().equalsIgnoreCase(SqlKind.AS.toString())) {
-        return expressionOutsideGroupByList(funcExpr.getOperands().get(0), groupByExprs);
+      if (function.getOperator().equals("as")) {
+        return expressionOutsideGroupByList(function.getOperands().get(0), groupByExprs);
       }
       // Expression is invalid if any of its children is invalid
-      return funcExpr.getOperands().stream().anyMatch(e -> expressionOutsideGroupByList(e, groupByExprs));
+      return function.getOperands().stream().anyMatch(e -> expressionOutsideGroupByList(e, groupByExprs));
     }
     return true;
   }
@@ -271,7 +270,8 @@ public class CalciteSqlParser {
   }
 
   public static boolean isAsFunction(Expression expression) {
-    return expression.getFunctionCall() != null && expression.getFunctionCall().getOperator().equalsIgnoreCase("AS");
+    Function function = expression.getFunctionCall();
+    return function != null && function.getOperator().equals("as");
   }
 
   /**
@@ -284,15 +284,17 @@ public class CalciteSqlParser {
   public static Set<String> extractIdentifiers(List<Expression> expressions, boolean excludeAs) {
     Set<String> identifiers = new HashSet<>();
     for (Expression expression : expressions) {
-      if (expression.getIdentifier() != null) {
-        identifiers.add(expression.getIdentifier().getName());
-      } else if (expression.getFunctionCall() != null) {
-        if (excludeAs && expression.getFunctionCall().getOperator().equalsIgnoreCase("AS")) {
-          identifiers
-              .addAll(extractIdentifiers(Arrays.asList(expression.getFunctionCall().getOperands().get(0)), true));
-          continue;
+      Identifier identifier = expression.getIdentifier();
+      if (identifier != null) {
+        identifiers.add(identifier.getName());
+        continue;
+      }
+      Function function = expression.getFunctionCall();
+      if (function != null) {
+        if (excludeAs && function.getOperator().equals("as")) {
+          identifiers.addAll(extractIdentifiers(Collections.singletonList(function.getOperands().get(0)), true));
         } else {
-          identifiers.addAll(extractIdentifiers(expression.getFunctionCall().getOperands(), excludeAs));
+          identifiers.addAll(extractIdentifiers(function.getOperands(), excludeAs));
         }
       }
     }
@@ -559,19 +561,14 @@ public class CalciteSqlParser {
   }
 
   private static Expression convertOrderBy(SqlNode node) {
-    final SqlKind kind = node.getKind();
     Expression expression;
-    switch (kind) {
-      case DESCENDING:
-        SqlBasicCall basicCall = (SqlBasicCall) node;
-        expression = RequestUtils.getFunctionExpression("DESC");
-        expression.getFunctionCall().addToOperands(toExpression(basicCall.getOperandList().get(0)));
-        break;
-      case IDENTIFIER:
-      default:
-        expression = RequestUtils.getFunctionExpression("ASC");
-        expression.getFunctionCall().addToOperands(toExpression(node));
-        break;
+    if (node.getKind() == SqlKind.DESCENDING) {
+      SqlBasicCall basicCall = (SqlBasicCall) node;
+      expression = RequestUtils.getFunctionExpression("desc");
+      expression.getFunctionCall().addToOperands(toExpression(basicCall.getOperandList().get(0)));
+    } else {
+      expression = RequestUtils.getFunctionExpression("asc");
+      expression.getFunctionCall().addToOperands(toExpression(node));
     }
     return expression;
   }
@@ -584,8 +581,7 @@ public class CalciteSqlParser {
    * @return DISTINCT function expression
    */
   private static Expression convertDistinctAndSelectListToFunctionExpression(SqlNodeList selectList) {
-    String functionName = AggregationFunctionType.DISTINCT.getName();
-    Expression functionExpression = RequestUtils.getFunctionExpression(functionName);
+    Expression functionExpression = RequestUtils.getFunctionExpression("distinct");
     for (SqlNode node : selectList) {
       Expression columnExpression = toExpression(node);
       if (columnExpression.getType() == ExpressionType.IDENTIFIER && columnExpression.getIdentifier().getName()
@@ -594,9 +590,7 @@ public class CalciteSqlParser {
             "Syntax error: Pinot currently does not support DISTINCT with *. Please specify each column name after "
                 + "DISTINCT keyword");
       } else if (columnExpression.getType() == ExpressionType.FUNCTION) {
-        Function functionCall = columnExpression.getFunctionCall();
-        String function = functionCall.getOperator();
-        if (AggregationFunctionType.isAggregationFunction(function)) {
+        if (AggregationFunctionType.isAggregationFunction(columnExpression.getFunctionCall().getOperator())) {
           throw new SqlCompilationException(
               "Syntax error: Use of DISTINCT with aggregation functions is not supported");
         }
@@ -642,7 +636,7 @@ public class CalciteSqlParser {
             return leftExpr;
           }
         }
-        final Expression asFuncExpr = RequestUtils.getFunctionExpression(SqlKind.AS.toString());
+        Expression asFuncExpr = RequestUtils.getFunctionExpression("as");
         asFuncExpr.getFunctionCall().addToOperands(leftExpr);
         asFuncExpr.getFunctionCall().addToOperands(rightExpr);
         return asFuncExpr;
@@ -656,7 +650,7 @@ public class CalciteSqlParser {
         SqlNodeList whenOperands = caseSqlNode.getWhenOperands();
         SqlNodeList thenOperands = caseSqlNode.getThenOperands();
         SqlNode elseOperand = caseSqlNode.getElseOperand();
-        Expression caseFuncExpr = RequestUtils.getFunctionExpression(SqlKind.CASE.name());
+        Expression caseFuncExpr = RequestUtils.getFunctionExpression("case");
         for (SqlNode whenSqlNode : whenOperands.getList()) {
           Expression whenExpression = toExpression(whenSqlNode);
           if (isAggregateExpression(whenExpression)) {
@@ -693,7 +687,7 @@ public class CalciteSqlParser {
   private static Expression compileFunctionExpression(SqlBasicCall functionNode) {
     SqlKind functionKind = functionNode.getKind();
     boolean negated = false;
-    String functionName;
+    String canonicalName;
     switch (functionKind) {
       case AND:
         return compileAndExpression(functionNode);
@@ -702,35 +696,36 @@ public class CalciteSqlParser {
       // BETWEEN and LIKE might be negated (NOT BETWEEN, NOT LIKE)
       case BETWEEN:
         negated = ((SqlBetweenOperator) functionNode.getOperator()).isNegated();
-        functionName = SqlKind.BETWEEN.name();
+        canonicalName = SqlKind.BETWEEN.name();
         break;
       case LIKE:
         negated = ((SqlLikeOperator) functionNode.getOperator()).isNegated();
-        functionName = SqlKind.LIKE.name();
+        canonicalName = SqlKind.LIKE.name();
         break;
       case OTHER:
       case OTHER_FUNCTION:
       case DOT:
-        functionName = functionNode.getOperator().getName().toUpperCase();
+        String functionName = functionNode.getOperator().getName();
         if (functionName.equals("ITEM") || functionName.equals("DOT")) {
           // Calcite parses path expression such as "data[0][1].a.b[0]" into a chain of ITEM and/or DOT
           // functions. Collapse this chain into an identifier.
-          StringBuffer path = new StringBuffer();
-          compilePathExpression(functionName, functionNode, path);
-          return RequestUtils.getIdentifierExpression(path.toString());
+          StringBuilder pathBuilder = new StringBuilder();
+          compilePathExpression(functionNode, pathBuilder);
+          return RequestUtils.getIdentifierExpression(pathBuilder.toString());
         }
-        if ((functionNode.getFunctionQuantifier() != null) && ("DISTINCT"
-            .equals(functionNode.getFunctionQuantifier().toString()))) {
-          if (AggregationFunctionType.COUNT.name().equals(functionName)) {
-            functionName = AggregationFunctionType.DISTINCTCOUNT.name();
-          } else if (AggregationFunctionType.isAggregationFunction(functionName)) {
+        canonicalName = RequestUtils.canonicalizeFunctionNamePreservingSpecialKey(functionName);
+        if ((functionNode.getFunctionQuantifier() != null) && ("DISTINCT".equals(
+            functionNode.getFunctionQuantifier().toString()))) {
+          if (canonicalName.equals("count")) {
+            canonicalName = "distinctcount";
+          } else if (AggregationFunctionType.isAggregationFunction(canonicalName)) {
             // Aggregation function(other than COUNT) on DISTINCT is not supported, e.g. SUM(DISTINCT colA).
             throw new SqlCompilationException("Function '" + functionName + "' on DISTINCT is not supported.");
           }
         }
         break;
       default:
-        functionName = functionKind.name();
+        canonicalName = RequestUtils.canonicalizeFunctionNamePreservingSpecialKey(functionKind.name());
         break;
     }
     // When there is no argument, set an empty list as the operands
@@ -745,8 +740,8 @@ public class CalciteSqlParser {
         operands.add(toExpression(childNode));
       }
     }
-    validateFunction(functionName, operands);
-    Expression functionExpression = RequestUtils.getFunctionExpression(functionName);
+    validateFunction(canonicalName, operands);
+    Expression functionExpression = RequestUtils.getFunctionExpression(canonicalName);
     functionExpression.getFunctionCall().setOperands(operands);
     if (negated) {
       Expression negatedFunctionExpression = RequestUtils.getFunctionExpression(FilterKind.NOT.name());
@@ -776,22 +771,22 @@ public class CalciteSqlParser {
    *                              ├── LITERAL (1)
    *                              └── IDENTIFIER (jsoncolumn.data)
    *
-   * @param functionName Name of the function ("DOT" or "ITEM")
    * @param functionNode Root node of the DOT and/or ITEM operator function chain.
-   * @param path String representation of path represented by DOT and/or ITEM function chain.
+   * @param pathBuilder StringBuilder representation of path represented by DOT and/or ITEM function chain.
    */
-  private static void compilePathExpression(String functionName, SqlBasicCall functionNode, StringBuffer path) {
+  private static void compilePathExpression(SqlBasicCall functionNode, StringBuilder pathBuilder) {
     List<SqlNode> operands = functionNode.getOperandList();
 
     // Compile first operand of the function (either an identifier or another DOT and/or ITEM function).
-    SqlKind kind0 = operands.get(0).getKind();
+    SqlNode operand0 = operands.get(0);
+    SqlKind kind0 = operand0.getKind();
     if (kind0 == SqlKind.IDENTIFIER) {
-      path.append(operands.get(0).toString());
+      pathBuilder.append(operand0);
     } else if (kind0 == SqlKind.DOT || kind0 == SqlKind.OTHER_FUNCTION) {
-      SqlBasicCall function0 = (SqlBasicCall) operands.get(0);
+      SqlBasicCall function0 = (SqlBasicCall) operand0;
       String name0 = function0.getOperator().getName();
       if (name0.equals("ITEM") || name0.equals("DOT")) {
-        compilePathExpression(name0, function0, path);
+        compilePathExpression(function0, pathBuilder);
       } else {
         throw new SqlCompilationException("SELECT list item has bad path expression.");
       }
@@ -800,26 +795,19 @@ public class CalciteSqlParser {
     }
 
     // Compile second operand of the function (either an identifier or literal).
-    SqlKind kind1 = operands.get(1).getKind();
+    SqlNode operand1 = operands.get(1);
+    SqlKind kind1 = operand1.getKind();
     if (kind1 == SqlKind.IDENTIFIER) {
-      path.append(".").append(((SqlIdentifier) operands.get(1)).getSimple());
+      pathBuilder.append('.').append(((SqlIdentifier) operand1).getSimple());
     } else if (kind1 == SqlKind.LITERAL) {
-      path.append("[").append(((SqlLiteral) operands.get(1)).toValue()).append("]");
+      pathBuilder.append('[').append(((SqlLiteral) operand1).toValue()).append(']');
     } else {
       throw new SqlCompilationException("SELECT list item has bad path expression.");
     }
   }
 
-  public static String canonicalize(String functionName) {
-    return StringUtils.remove(functionName, '_').toLowerCase();
-  }
-
-  public static boolean isSameFunction(String function1, String function2) {
-    return canonicalize(function1).equals(canonicalize(function2));
-  }
-
-  private static void validateFunction(String functionName, List<Expression> operands) {
-    switch (canonicalize(functionName)) {
+  private static void validateFunction(String canonicalName, List<Expression> operands) {
+    switch (canonicalName) {
       case "jsonextractscalar":
         validateJsonExtractScalarFunction(operands);
         break;
@@ -874,7 +862,7 @@ public class CalciteSqlParser {
         operands.add(toExpression(childNode));
       }
     }
-    Expression andExpression = RequestUtils.getFunctionExpression(SqlKind.AND.name());
+    Expression andExpression = RequestUtils.getFunctionExpression(FilterKind.AND.name());
     andExpression.getFunctionCall().setOperands(operands);
     return andExpression;
   }
@@ -892,7 +880,7 @@ public class CalciteSqlParser {
         operands.add(toExpression(childNode));
       }
     }
-    Expression andExpression = RequestUtils.getFunctionExpression(SqlKind.OR.name());
+    Expression andExpression = RequestUtils.getFunctionExpression(FilterKind.OR.name());
     andExpression.getFunctionCall().setOperands(operands);
     return andExpression;
   }
@@ -902,9 +890,9 @@ public class CalciteSqlParser {
       return true;
     }
     if (e.getType() == ExpressionType.FUNCTION) {
-      Function functionCall = e.getFunctionCall();
-      if (functionCall.getOperator().equalsIgnoreCase(SqlKind.AS.toString())) {
-        return isLiteralOnlyExpression(functionCall.getOperands().get(0));
+      Function function = e.getFunctionCall();
+      if (function.getOperator().equals("as")) {
+        return isLiteralOnlyExpression(function.getOperands().get(0));
       }
       return false;
     }

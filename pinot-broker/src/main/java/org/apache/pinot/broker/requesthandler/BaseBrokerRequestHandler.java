@@ -39,7 +39,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.api.RequesterIdentity;
@@ -50,7 +49,6 @@ import org.apache.pinot.broker.routing.RoutingTable;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -76,7 +74,6 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
@@ -105,7 +102,8 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRequestHandler.class);
-  private static final String IN_SUBQUERY = "inSubquery";
+  private static final String IN_SUBQUERY = "insubquery";
+  private static final String IN_ID_SET = "inidset";
   private static final Expression FALSE = RequestUtils.getLiteralExpression(false);
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
   private static final Expression STAR = RequestUtils.getIdentifierExpression("*");
@@ -980,7 +978,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
 
       String serializedIdSet = (String) response.getAggregationResults().get(0).getValue();
-      expression.setValue(TransformFunctionType.INIDSET.name());
+      expression.setValue(IN_ID_SET);
       children.set(1,
           new TransformExpressionTree(TransformExpressionTree.ExpressionType.LITERAL, serializedIdSet, null));
     } else {
@@ -1018,7 +1016,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return;
     }
     List<Expression> operands = function.getOperands();
-    if (StringUtils.remove(function.getOperator(), '_').equalsIgnoreCase(IN_SUBQUERY)) {
+    if (function.getOperator().equals(IN_SUBQUERY)) {
       Preconditions.checkState(operands.size() == 2, "IN_SUBQUERY requires 2 arguments: expression, subquery");
       Literal subqueryLiteral = operands.get(1).getLiteral();
       Preconditions.checkState(subqueryLiteral != null, "Second argument of IN_SUBQUERY must be a literal (subquery)");
@@ -1029,7 +1027,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         throw new RuntimeException("Caught exception while executing subquery: " + subquery);
       }
       String serializedIdSet = (String) response.getResultTable().getRows().get(0)[0];
-      function.setOperator(TransformFunctionType.INIDSET.name());
+      function.setOperator(IN_ID_SET);
       operands.set(1, RequestUtils.getLiteralExpression(serializedIdSet));
     } else {
       for (Expression operand : operands) {
@@ -1241,21 +1239,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   private static void rejectGroovyQuery(Expression expression) {
-    Function functionCall = expression.getFunctionCall();
-    if (functionCall == null) {
+    Function function = expression.getFunctionCall();
+    if (function == null) {
       return;
     }
-
-    if (TransformFunctionFactory.canonicalize(functionCall.getOperator())
-        .equals(TransformFunctionType.GROOVY.getName())) {
+    if (function.getOperator().equals("groovy")) {
       throw new BadQueryRequestException("Groovy transform functions are disabled for queries");
     }
-
-    List<Expression> operands = functionCall.getOperands();
-    if (operands != null) {
-      for (Expression operandExpression : operands) {
-        rejectGroovyQuery(operandExpression);
-      }
+    for (Expression operandExpression : function.getOperands()) {
+      rejectGroovyQuery(operandExpression);
     }
   }
 
@@ -1263,26 +1255,24 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Sets HyperLogLog log2m for DistinctCountHLL functions if not explicitly set for the given SQL expression.
    */
   private static void handleHLLLog2mOverride(Expression expression, int hllLog2mOverride) {
-    Function functionCall = expression.getFunctionCall();
-    if (functionCall == null) {
+    Function function = expression.getFunctionCall();
+    if (function == null) {
       return;
     }
-    switch (functionCall.getOperator().toUpperCase()) {
-      case "DISTINCTCOUNTHLL":
-      case "DISTINCTCOUNTHLLMV":
-      case "DISTINCTCOUNTRAWHLL":
-      case "DISTINCTCOUNTRAWHLLMV":
-        if (functionCall.getOperandsSize() == 1) {
-          functionCall.addToOperands(RequestUtils.getLiteralExpression(hllLog2mOverride));
+    switch (function.getOperator()) {
+      case "distinctcounthll":
+      case "distinctcounthllmv":
+      case "distinctcountrawhll":
+      case "distinctcountrawhllmv":
+        if (function.getOperandsSize() == 1) {
+          function.addToOperands(RequestUtils.getLiteralExpression(hllLog2mOverride));
         }
         return;
       default:
         break;
     }
-    if (functionCall.getOperandsSize() > 0) {
-      for (Expression operand : functionCall.getOperands()) {
-        handleHLLLog2mOverride(operand, hllLog2mOverride);
-      }
+    for (Expression operand : function.getOperands()) {
+      handleHLLLog2mOverride(operand, hllLog2mOverride);
     }
   }
 
@@ -1392,12 +1382,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (function == null) {
       return;
     }
-    if (StringUtils.remove(function.getOperator(), '_')
-        .equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())) {
+    if (function.getOperator().equals("distinctcount")) {
       List<Expression> operands = function.getOperands();
       if (operands.size() == 1 && operands.get(0).isSetIdentifier() && segmentPartitionedColumns.contains(
           operands.get(0).getIdentifier().getName())) {
-        function.setOperator(AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT.name());
+        function.setOperator("segmentpartitioneddistinctcount");
       }
     } else {
       for (Expression operand : function.getOperands()) {
@@ -1434,9 +1423,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (function == null) {
       return;
     }
-    if (StringUtils.remove(function.getOperator(), '_')
-        .equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())) {
-      function.setOperator(AggregationFunctionType.DISTINCTCOUNTBITMAP.name());
+    if (function.getOperator().equals("distinctcount")) {
+      function.setOperator("distinctcountbitmap");
     } else {
       for (Expression operand : function.getOperands()) {
         handleDistinctCountBitmapOverride(operand);
@@ -1530,7 +1518,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       computeResultsForLiteral(e.getLiteral(), columnNames, columnTypes, row);
     }
     if (e.getType() == ExpressionType.FUNCTION) {
-      if (e.getFunctionCall().getOperator().equalsIgnoreCase(SqlKind.AS.toString())) {
+      if (e.getFunctionCall().getOperator().equals("as")) {
         String columnName = e.getFunctionCall().getOperands().get(1).getIdentifier().getName();
         computeResultsForExpression(e.getFunctionCall().getOperands().get(0), columnNames, columnTypes, row);
         columnNames.set(columnNames.size() - 1, columnName);
@@ -1746,7 +1734,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     } else if (expressionType == ExpressionType.FUNCTION) {
       final Function functionCall = expression.getFunctionCall();
       switch (functionCall.getOperator()) {
-        case "AS":
+        case "as":
           fixColumnName(rawTableName, functionCall.getOperands().get(0), columnNameMap, aliasMap, isCaseInsensitive);
           final Expression rightAsExpr = functionCall.getOperands().get(1);
           if (rightAsExpr.isSetIdentifier()) {
@@ -1758,7 +1746,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
             }
           }
           break;
-        case "LOOKUP":
+        case "lookup":
           // LOOKUP function looks up another table's schema, skip the check for now.
           break;
         default:

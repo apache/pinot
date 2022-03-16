@@ -18,18 +18,15 @@
  */
 package org.apache.pinot.core.query.optimizer.statement;
 
-import java.lang.reflect.Method;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.function.scalar.StringFunctions;
+import org.apache.pinot.common.function.FunctionInfo;
+import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
-import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -47,9 +44,8 @@ import org.apache.pinot.spi.data.Schema;
  * rewrite phase with optimizer phase to avoid such issues altogether.
  */
 public class StringPredicateFilterOptimizer implements StatementOptimizer {
-  private static final String MINUS_OPERATOR_NAME = "MINUS";
-  private static final String STRCMP_OPERATOR_NAME = "STRCMP";
-  private static final Set<String> STRING_OUTPUT_FUNCTIONS = getStringOutputFunctionList();
+  private static final String MINUS_OPERATOR_NAME = "minus";
+  private static final String STRCMP_OPERATOR_NAME = "strcmp";
 
   @Override
   public void optimize(PinotQuery query, @Nullable TableConfig tableConfig, @Nullable Schema schema) {
@@ -105,8 +101,8 @@ public class StringPredicateFilterOptimizer implements StatementOptimizer {
     Function function = expression.getFunctionCall();
     String operator = function.getOperator();
     List<Expression> operands = function.getOperands();
-    if (operator.equals(MINUS_OPERATOR_NAME) && operands.size() == 2 && isString(operands.get(0), schema)
-        && isString(operands.get(1), schema)) {
+    if (operator.equals(MINUS_OPERATOR_NAME) && operands.size() == 2 && isString(operands.get(0), schema) && isString(
+        operands.get(1), schema)) {
       function.setOperator(STRCMP_OPERATOR_NAME);
     }
   }
@@ -122,26 +118,14 @@ public class StringPredicateFilterOptimizer implements StatementOptimizer {
       return fieldSpec != null && fieldSpec.getDataType() == FieldSpec.DataType.STRING;
     }
 
-    // Check if the function returns STRING as output.
-    return (expressionType == ExpressionType.FUNCTION && STRING_OUTPUT_FUNCTIONS
-        .contains(expression.getFunctionCall().getOperator().toUpperCase()));
-  }
-
-  /** List of string functions that return STRING output. */
-  private static Set<String> getStringOutputFunctionList() {
-    Set<String> set = new HashSet<>();
-    Method[] methods = StringFunctions.class.getDeclaredMethods();
-    for (Method method : methods) {
-      if (method.getReturnType() == String.class) {
-        if (method.isAnnotationPresent(ScalarFunction.class)) {
-          ScalarFunction annotation = method.getAnnotation(ScalarFunction.class);
-          for (String name : annotation.names()) {
-            set.add(name.toUpperCase());
-          }
-        }
-        set.add(method.getName().toUpperCase());
-      }
+    if (expressionType == ExpressionType.FUNCTION) {
+      // Check if the function returns STRING as output.
+      Function function = expression.getFunctionCall();
+      FunctionInfo functionInfo =
+          FunctionRegistry.getFunctionInfo(function.getOperator(), function.getOperands().size());
+      return functionInfo != null && functionInfo.getMethod().getReturnType() == String.class;
     }
-    return set;
+
+    return false;
   }
 }

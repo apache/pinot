@@ -50,6 +50,8 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
+import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
+
 
 /**
  * The <code>AggregationPlanNode</code> class provides the execution plan for aggregation only query on a single
@@ -58,9 +60,9 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 @SuppressWarnings("rawtypes")
 public class AggregationPlanNode implements PlanNode {
   private static final EnumSet<AggregationFunctionType> DICTIONARY_BASED_FUNCTIONS =
-      EnumSet.of(AggregationFunctionType.MIN, AggregationFunctionType.MAX, AggregationFunctionType.MINMAXRANGE,
-          AggregationFunctionType.DISTINCTCOUNT, AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT,
-          AggregationFunctionType.DISTINCTCOUNTSMARTHLL);
+      EnumSet.of(MIN, MINMV, MAX, MAXMV, MINMAXRANGE, MINMAXRANGEMV, DISTINCTCOUNT, DISTINCTCOUNTMV, DISTINCTCOUNTHLL,
+          DISTINCTCOUNTHLLMV, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTRAWHLLMV, SEGMENTPARTITIONEDDISTINCTCOUNT,
+          DISTINCTCOUNTSMARTHLL);
 
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;
@@ -226,7 +228,7 @@ public class AggregationPlanNode implements PlanNode {
    */
   private static boolean isFitForMetadataBasedPlan(AggregationFunction[] aggregationFunctions) {
     for (AggregationFunction aggregationFunction : aggregationFunctions) {
-      if (aggregationFunction.getType() != AggregationFunctionType.COUNT) {
+      if (aggregationFunction.getType() != COUNT) {
         return false;
       }
     }
