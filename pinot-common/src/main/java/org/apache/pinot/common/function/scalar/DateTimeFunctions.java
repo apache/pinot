@@ -725,40 +725,33 @@ public class DateTimeFunctions {
     }
   }
 
+  /**
+   * Add a time period to the provided timestamp.
+   * e.g. timestampAdd('days', 10, NOW()) will add 10 days to the current timestamp and return the value
+   * @param unit the timeunit of the period to add. e.g. milliseconds, seconds, days, year
+   * @param interval value of the period to add.
+   * @param timestamp
+   * @return
+   */
   @ScalarFunction(names = {"timestampAdd", "dateAdd"})
-  public static long timestampAdd(String unit, int interval, long timestamp) {
+  public static long timestampAdd(String unit, long interval, long timestamp) {
     ISOChronology chronology = ISOChronology.getInstanceUTC();
-    long millis = getTimestampField(chronology, unit).add(timestamp, interval);
+    long millis = DateTimeUtils.getTimestampField(chronology, unit).add(timestamp, interval);
     return millis;
   }
 
+  /**
+   * Get difference between two timestamps and return the result in the specified timeunit.
+   * e.g. timestampDiff('days', ago('10D'), ago('2D')) will return 8 i.e. 8 days
+   * @param unit
+   * @param timestamp1
+   * @param timestamp2
+   * @return
+   */
   @ScalarFunction(names = {"timestampDiff", "dateDiff"})
   public static long timestampDiff(String unit, long timestamp1, long timestamp2) {
     ISOChronology chronology = ISOChronology.getInstanceUTC();
-    long millis = getTimestampField(chronology, unit).getDifferenceAsLong(timestamp1, timestamp2);
+    long millis = DateTimeUtils.getTimestampField(chronology, unit).getDifferenceAsLong(timestamp2, timestamp1);
     return millis;
-  }
-
-  private static DateTimeField getTimestampField(ISOChronology chronology, String unit) {
-    switch (unit.toLowerCase()) {
-      case "millisecond":
-        return chronology.millisOfSecond();
-      case "second":
-        return chronology.secondOfMinute();
-      case "minute":
-        return chronology.minuteOfHour();
-      case "hour":
-        return chronology.hourOfDay();
-      case "day":
-        return chronology.dayOfMonth();
-      case "week":
-        return chronology.weekOfWeekyear();
-      case "month":
-        return chronology.monthOfYear();
-      case "year":
-        return chronology.year();
-      default:
-        throw new UnsupportedOperationException("Timeunit " + unit + " is not supported by Pinot");
-    }
   }
 }
