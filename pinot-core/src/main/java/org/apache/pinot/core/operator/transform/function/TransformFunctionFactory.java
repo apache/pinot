@@ -52,7 +52,8 @@ import org.apache.pinot.core.operator.transform.function.SingleParamMathTransfor
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.FloorTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.LnTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.SqrtTransformFunction;
-import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.LogTransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.Log2TransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.Log10TransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.SignTransformFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -99,7 +100,8 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.EXP, ExpTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.FLOOR, FloorTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.LN, LnTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.LOG, LogTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.LOG2, Log2TransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.LOG10, Log10TransformFunction.class);
     typeToImplementation.put(TransformFunctionType.SQRT, SqrtTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.ROUND_DECIMAL, RoundDecimalTransformFunction.class);
 

@@ -123,7 +123,12 @@ public class ArithmeticFunctions {
   }
 
   @ScalarFunction
-  public static double log(double a) {
+  public static double log2(double a) {
+    return Math.log(a) / Math.log(2);
+  }
+
+  @ScalarFunction
+  public static double log10(double a) {
     return Math.log10(a);
   }
 
