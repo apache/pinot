@@ -42,7 +42,7 @@ public class TrigonometricFunctions {
 
   @ScalarFunction
   public static double cot(double a) {
-    return Math.sin(a);
+    return 1.0/tan(a);
   }
 
   @ScalarFunction
