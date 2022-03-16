@@ -38,6 +38,8 @@ public class IndexingConfigTest {
     IndexingConfig indexingConfig = new IndexingConfig();
     indexingConfig.setLoadMode("MMAP");
     indexingConfig.setAggregateMetrics(true);
+    List<String> preAggregationConfigs = Arrays.asList("p", "r", "e");
+    indexingConfig.setPreAggregationConfigs(preAggregationConfigs);
     List<String> invertedIndexColumns = Arrays.asList("a", "b", "c");
     indexingConfig.setInvertedIndexColumns(invertedIndexColumns);
     List<String> sortedColumn = Arrays.asList("d", "e", "f");
@@ -58,6 +60,7 @@ public class IndexingConfigTest {
 
     assertEquals(indexingConfig.getLoadMode(), "MMAP");
     assertTrue(indexingConfig.isAggregateMetrics());
+    assertEquals(indexingConfig.getPreAggregationConfigs(), preAggregationConfigs);
     assertEquals(indexingConfig.getInvertedIndexColumns(), invertedIndexColumns);
     assertEquals(indexingConfig.getSortedColumn(), sortedColumn);
     assertEquals(indexingConfig.getOnHeapDictionaryColumns(), onHeapDictionaryColumns);
