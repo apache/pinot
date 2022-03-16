@@ -193,7 +193,7 @@ public class PinotSchemaRestletResource {
       @Context Request request) {
     Schema schema = getSchemaFromMultiPart(multiPart);
     String endpointUrl = request.getRequestURL().toString();
-    validateSchemaName(schema);
+    validateSchemaName(schema.getSchemaName());
     _accessControlUtils.validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl,
         _accessControlFactory.create());
     return addSchema(schema, override);
@@ -215,7 +215,7 @@ public class PinotSchemaRestletResource {
       @QueryParam("override") boolean override, Schema schema, @Context HttpHeaders httpHeaders,
       @Context Request request) {
     String endpointUrl = request.getRequestURL().toString();
-    validateSchemaName(schema);
+    validateSchemaName(schema.getSchemaName());
     _accessControlUtils.validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl,
         _accessControlFactory.create());
     return addSchema(schema, override);
@@ -253,17 +253,16 @@ public class PinotSchemaRestletResource {
     return schema.toPrettyJsonString();
   }
 
-  private void validateSchemaName(Schema schema) {
-    if (StringUtils.isBlank(schema.getSchemaName())) {
-      throw new ControllerApplicationException(LOGGER,
-          "Invalid schema: " + schema.getSchemaName() + ". Reason: 'schemaName' should not be null",
+  private void validateSchemaName(String schemaName) {
+    if (StringUtils.isBlank(schemaName)) {
+      throw new ControllerApplicationException(LOGGER, "Invalid schema. Reason: 'schemaName' should not be null",
           Response.Status.BAD_REQUEST);
     }
   }
 
   private void validateSchemaInternal(Schema schema) {
+    validateSchemaName(schema.getSchemaName());
     try {
-      Preconditions.checkNotNull(schema.getSchemaName(), "'schemaName' should not be null");
       List<TableConfig> tableConfigs = _pinotHelixResourceManager.getTableConfigsForSchema(schema.getSchemaName());
       SchemaUtils.validate(schema, tableConfigs);
     } catch (Exception e) {
