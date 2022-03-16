@@ -34,6 +34,7 @@ import org.apache.pinot.common.request.QueryType;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.pql.parsers.pql2.ast.OrderByAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
 import org.apache.thrift.TException;
@@ -147,15 +148,15 @@ public class BrokerRequestSerializationTest {
     pinotQuery.addToOrderByList(ascExpr);
 
     //Populate FilterQuery
-    Expression filter = RequestUtils.getFunctionExpression(FilterOperator.AND.name());
+    Expression filter = RequestUtils.getFunctionExpression(FilterKind.AND.name());
 
-    Expression filterExpr1 = RequestUtils.getFunctionExpression(FilterOperator.EQUALITY.name());
+    Expression filterExpr1 = RequestUtils.getFunctionExpression(FilterKind.EQUALS.name());
     filterExpr1.getFunctionCall().addToOperands(RequestUtils.createIdentifierExpression("dummy1"));
     filterExpr1.getFunctionCall()
         .addToOperands(RequestUtils.createLiteralExpression(new StringLiteralAstNode("dummy1")));
     filter.getFunctionCall().addToOperands(filterExpr1);
 
-    Expression filterExpr2 = RequestUtils.getFunctionExpression(FilterOperator.EQUALITY.name());
+    Expression filterExpr2 = RequestUtils.getFunctionExpression(FilterKind.EQUALS.name());
     filterExpr2.getFunctionCall().addToOperands(RequestUtils.createIdentifierExpression("dummy2"));
     filterExpr2.getFunctionCall()
         .addToOperands(RequestUtils.createLiteralExpression(new StringLiteralAstNode("dummy2")));

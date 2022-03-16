@@ -20,7 +20,6 @@ package org.apache.pinot.sql.parsers.rewriter;
 
 import java.util.Arrays;
 import java.util.List;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
@@ -54,7 +53,7 @@ public class OrdinalsUpdater implements QueryRewriter {
     if (ordinal > 0 && ordinal <= selectList.size()) {
       final Expression expression = selectList.get(ordinal - 1);
       // If the expression has AS, return the left operand.
-      if (expression.isSetFunctionCall() && expression.getFunctionCall().getOperator().equals(SqlKind.AS.name())) {
+      if (expression.isSetFunctionCall() && expression.getFunctionCall().getOperator().equals("as")) {
         return expression.getFunctionCall().getOperands().get(0);
       }
       return expression;

@@ -265,7 +265,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
    * @return a Function with "AS" operator that wraps another function.
    */
   private static Function getAliasFunction(String alias, Function function) {
-    Function aliasFunction = new Function("AS");
+    Function aliasFunction = new Function("as");
 
     List<Expression> operands = new ArrayList<>();
     Expression expression = new Expression(ExpressionType.FUNCTION);
@@ -287,7 +287,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
    * @return a Function with JSON_EXTRACT_SCALAR operator created using parts of fully qualified identifier name.
    */
   private static Function getJsonExtractFunction(String[] parts, DataSchema.ColumnDataType dataType) {
-    Function jsonExtractScalarFunction = new Function("JSON_EXTRACT_SCALAR");
+    Function jsonExtractScalarFunction = new Function("jsonextractscalar");
     List<Expression> operands = new ArrayList<>();
     operands.add(RequestUtils.createIdentifierExpression(parts[0]));
     operands.add(RequestUtils.createLiteralExpression(new StringLiteralAstNode(getJsonPath(parts, false))));
@@ -333,7 +333,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
               String[] parts = getIdentifierParts(left.getIdentifier());
               if (parts.length > 1 && isValidJSONColumn(parts[0], schema)) {
                 if (isIndexedJSONColumn(parts[0], tableConfig)) {
-                  Function jsonMatchFunction = new Function("JSON_MATCH");
+                  Function jsonMatchFunction = new Function(FilterKind.JSON_MATCH.name());
 
                   List<Expression> jsonMatchFunctionOperands = new ArrayList<>();
                   jsonMatchFunctionOperands.add(RequestUtils.createIdentifierExpression(parts[0]));
@@ -360,7 +360,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
               String[] parts = getIdentifierParts(operand.getIdentifier());
               if (parts.length > 1 && isValidJSONColumn(parts[0], schema)) {
                 if (isIndexedJSONColumn(parts[0], tableConfig)) {
-                  Function jsonMatchFunction = new Function("JSON_MATCH");
+                  Function jsonMatchFunction = new Function(FilterKind.JSON_MATCH.name());
 
                   List<Expression> jsonMatchFunctionOperands = new ArrayList<>();
                   jsonMatchFunctionOperands.add(RequestUtils.createIdentifierExpression(parts[0]));
@@ -409,11 +409,11 @@ public class JsonStatementOptimizer implements StatementOptimizer {
 
     // column name followed by all other JSON path expression
     if (dotIndex != -1) {
-      return new String[] {name.substring(0, dotIndex), name.substring(dotIndex)};
+      return new String[]{name.substring(0, dotIndex), name.substring(dotIndex)};
     }
 
     // column name without any JSON path expression
-    return new String[] {name};
+    return new String[]{name};
   }
 
   /**
