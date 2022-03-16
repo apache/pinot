@@ -274,9 +274,6 @@ public class DateTimeFunctions {
    */
   @ScalarFunction
   public static long fromDateTime(String dateTimeString, String pattern) {
-    if (StringUtils.isEmpty(dateTimeString)) {
-      return 0;
-    }
     return DateTimePatternHandler.parseDateTimeStringToEpochMillis(dateTimeString, pattern);
   }
 
@@ -285,9 +282,6 @@ public class DateTimeFunctions {
    */
   @ScalarFunction
   public static long fromDateTime(String dateTimeString, String pattern, String timeZoneId) {
-    if (StringUtils.isEmpty(dateTimeString)) {
-      return 0;
-    }
     return DateTimePatternHandler.parseDateTimeStringToEpochMillis(dateTimeString, pattern, timeZoneId);
   }
 
