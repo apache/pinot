@@ -43,6 +43,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
 import org.apache.pinot.common.exception.SchemaBackwardIncompatibleException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
@@ -191,6 +192,7 @@ public class PinotSchemaRestletResource {
       @Context Request request) {
     Schema schema = getSchemaFromMultiPart(multiPart);
     String endpointUrl = request.getRequestURL().toString();
+    validateSchemaName(schema.getSchemaName());
     _accessControlUtils.validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl,
         _accessControlFactory.create());
     return addSchema(schema, override);
@@ -212,6 +214,7 @@ public class PinotSchemaRestletResource {
       @QueryParam("override") boolean override, Schema schema, @Context HttpHeaders httpHeaders,
       @Context Request request) {
     String endpointUrl = request.getRequestURL().toString();
+    validateSchemaName(schema.getSchemaName());
     _accessControlUtils.validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl,
         _accessControlFactory.create());
     return addSchema(schema, override);
@@ -229,13 +232,7 @@ public class PinotSchemaRestletResource {
   })
   public String validateSchema(FormDataMultiPart multiPart) {
     Schema schema = getSchemaFromMultiPart(multiPart);
-    try {
-      List<TableConfig> tableConfigs = _pinotHelixResourceManager.getTableConfigsForSchema(schema.getSchemaName());
-      SchemaUtils.validate(schema, tableConfigs);
-    } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER,
-          "Invalid schema: " + schema.getSchemaName() + ". Reason: " + e.getMessage(), Response.Status.BAD_REQUEST, e);
-    }
+    validateSchemaInternal(schema);
     return schema.toPrettyJsonString();
   }
 
@@ -251,6 +248,19 @@ public class PinotSchemaRestletResource {
       @ApiResponse(code = 500, message = "Internal error")
   })
   public String validateSchema(Schema schema) {
+    validateSchemaInternal(schema);
+    return schema.toPrettyJsonString();
+  }
+
+  private void validateSchemaName(String schemaName) {
+    if (StringUtils.isBlank(schemaName)) {
+      throw new ControllerApplicationException(LOGGER, "Invalid schema. Reason: 'schemaName' should not be null",
+          Response.Status.BAD_REQUEST);
+    }
+  }
+
+  private void validateSchemaInternal(Schema schema) {
+    validateSchemaName(schema.getSchemaName());
     try {
       List<TableConfig> tableConfigs = _pinotHelixResourceManager.getTableConfigsForSchema(schema.getSchemaName());
       SchemaUtils.validate(schema, tableConfigs);
@@ -258,7 +268,6 @@ public class PinotSchemaRestletResource {
       throw new ControllerApplicationException(LOGGER,
           "Invalid schema: " + schema.getSchemaName() + ". Reason: " + e.getMessage(), Response.Status.BAD_REQUEST, e);
     }
-    return schema.toPrettyJsonString();
   }
 
   /**
@@ -268,13 +277,7 @@ public class PinotSchemaRestletResource {
    */
   private SuccessResponse addSchema(Schema schema, boolean override) {
     String schemaName = schema.getSchemaName();
-    try {
-      List<TableConfig> tableConfigs = _pinotHelixResourceManager.getTableConfigsForSchema(schemaName);
-      SchemaUtils.validate(schema, tableConfigs);
-    } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER,
-          "Cannot add invalid schema: " + schemaName + ". Reason: " + e.getMessage(), Response.Status.BAD_REQUEST, e);
-    }
+    validateSchemaInternal(schema);
 
     try {
       _pinotHelixResourceManager.addSchema(schema, override);
@@ -304,14 +307,7 @@ public class PinotSchemaRestletResource {
    * @return
    */
   private SuccessResponse updateSchema(String schemaName, Schema schema, boolean reload) {
-    try {
-      List<TableConfig> tableConfigs = _pinotHelixResourceManager.getTableConfigsForSchema(schemaName);
-      SchemaUtils.validate(schema, tableConfigs);
-    } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER,
-          String.format("Cannot add invalid schema: %s. Reason: %s", schemaName, e.getMessage()),
-          Response.Status.BAD_REQUEST, e);
-    }
+    validateSchemaInternal(schema);
 
     if (schemaName != null && !schema.getSchemaName().equals(schemaName)) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
