@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.controller.helix.core.minion.generator;
 
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.data.Segment;
@@ -36,6 +38,14 @@ public class TaskGeneratorUtils {
   }
 
   private static final long ONE_DAY_IN_MILLIS = 24 * 60 * 60 * 1000L;
+
+  /**
+   * If task is in final state, it will not be running any more. But note that
+   * STOPPED is not a final task state in helix task framework, as a stopped task
+   * is just paused and can be resumed to rerun.
+   */
+  private static final EnumSet<TaskState> TASK_FINAL_STATES =
+      EnumSet.of(TaskState.COMPLETED, TaskState.FAILED, TaskState.ABORTED, TaskState.TIMED_OUT);
 
   /**
    * Returns all the segments that have been scheduled in one day but not finished.
@@ -79,7 +89,6 @@ public class TaskGeneratorUtils {
    */
   public static Map<String, TaskState> getIncompleteTasks(String taskType, String tableNameWithType,
       ClusterInfoAccessor clusterInfoAccessor) {
-
     Map<String, TaskState> nonCompletedTasks = new HashMap<>();
     Map<String, TaskState> taskStates = clusterInfoAccessor.getTaskStates(taskType);
     for (Map.Entry<String, TaskState> entry : taskStates.entrySet()) {
@@ -90,13 +99,36 @@ public class TaskGeneratorUtils {
       if (isTaskOlderThanOneDay(taskName)) {
         continue;
       }
-      for (PinotTaskConfig pinotTaskConfig : clusterInfoAccessor.getTaskConfigs(entry.getKey())) {
+      for (PinotTaskConfig pinotTaskConfig : clusterInfoAccessor.getTaskConfigs(taskName)) {
         if (tableNameWithType.equals(pinotTaskConfig.getConfigs().get(MinionConstants.TABLE_NAME_KEY))) {
-          nonCompletedTasks.put(entry.getKey(), entry.getValue());
+          nonCompletedTasks.put(taskName, entry.getValue());
         }
       }
     }
     return nonCompletedTasks;
+  }
+
+  /**
+   * Get all the tasks for the provided task type and tableName, which have not reached final task state yet.
+   * In general, if the task is not in final state, we can treat it as running, although it may wait to start
+   * or is paused. The caller provides a consumer to process the task configs of those tasks.
+   */
+  public static void forRunningTasks(String tableNameWithType, String taskType, ClusterInfoAccessor clusterInfoAccessor,
+      Consumer<Map<String, String>> taskConfigConsumer) {
+    Map<String, TaskState> taskStates = clusterInfoAccessor.getTaskStates(taskType);
+    for (Map.Entry<String, TaskState> entry : taskStates.entrySet()) {
+      if (TASK_FINAL_STATES.contains(entry.getValue())) {
+        continue;
+      }
+      String taskName = entry.getKey();
+      for (PinotTaskConfig pinotTaskConfig : clusterInfoAccessor.getTaskConfigs(taskName)) {
+        Map<String, String> config = pinotTaskConfig.getConfigs();
+        String tableNameFromTaskConfig = config.get(MinionConstants.TABLE_NAME_KEY);
+        if (tableNameWithType.equals(tableNameFromTaskConfig)) {
+          taskConfigConsumer.accept(config);
+        }
+      }
+    }
   }
 
   /**

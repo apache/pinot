@@ -32,10 +32,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
+import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
@@ -148,7 +148,7 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
             segmentsZKMetadata = _clusterInfoAccessor.getSegmentsZKMetadata(offlineTableName);
           }
           Set<String> existingSegmentInputFiles = getExistingSegmentInputFiles(segmentsZKMetadata);
-          Set<String> inputFilesFromRunningTasks = getInputFilesFromRunningTasks();
+          Set<String> inputFilesFromRunningTasks = getInputFilesFromRunningTasks(offlineTableName);
           existingSegmentInputFiles.addAll(inputFilesFromRunningTasks);
           LOGGER.info("Trying to extract input files from path: {}, "
                   + "and exclude input files from existing segments metadata: {}, "
@@ -177,30 +177,16 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
     return pinotTaskConfigs;
   }
 
-  private Set<String> getInputFilesFromRunningTasks() {
+  private Set<String> getInputFilesFromRunningTasks(String offlineTableName) {
     Set<String> inputFilesFromRunningTasks = new HashSet<>();
-    Map<String, TaskState> taskStates =
-        _clusterInfoAccessor.getTaskStates(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE);
-    for (String taskName : taskStates.keySet()) {
-      switch (taskStates.get(taskName)) {
-        case FAILED:
-        case ABORTED:
-        case STOPPED:
-        case COMPLETED:
-          continue;
-        default:
-          break;
-      }
-      List<PinotTaskConfig> taskConfigs = _clusterInfoAccessor.getTaskConfigs(taskName);
-      for (PinotTaskConfig taskConfig : taskConfigs) {
-        if (MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE.equalsIgnoreCase(taskConfig.getTaskType())) {
-          String inputFileURI = taskConfig.getConfigs().get(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY);
-          if (inputFileURI != null) {
-            inputFilesFromRunningTasks.add(inputFileURI);
-          }
-        }
-      }
-    }
+    TaskGeneratorUtils
+        .forRunningTasks(offlineTableName, MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE, _clusterInfoAccessor,
+            taskConfig -> {
+              String inputFileURI = taskConfig.get(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY);
+              if (inputFileURI != null) {
+                inputFilesFromRunningTasks.add(inputFileURI);
+              }
+            });
     return inputFilesFromRunningTasks;
   }
 
