@@ -102,11 +102,12 @@ public class PullRequestMergedEventsStream {
     return StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
   }
 
-  public static StreamDataProducer getKinesisStreamDataProducer(String endpoint, String region, String access, String secret)
+  public static StreamDataProducer getKinesisStreamDataProducer(String endpoint, String region, String access,
+      String secret)
       throws Exception {
     Properties properties = new Properties();
 
-    if(StringUtils.isNotEmpty(access) && StringUtils.isNotEmpty(secret)) {
+    if (StringUtils.isNotEmpty(access) && StringUtils.isNotEmpty(secret)) {
       properties.put("access", access);
       properties.put("secret", secret);
     }
