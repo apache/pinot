@@ -751,7 +751,6 @@ public class DateTimeFunctions {
   @ScalarFunction(names = {"timestampDiff", "dateDiff"})
   public static long timestampDiff(String unit, long timestamp1, long timestamp2) {
     ISOChronology chronology = ISOChronology.getInstanceUTC();
-    long millis = DateTimeUtils.getTimestampField(chronology, unit).getDifferenceAsLong(timestamp2, timestamp1);
-    return millis;
+    return DateTimeUtils.getTimestampField(chronology, unit).getDifferenceAsLong(timestamp2, timestamp1);
   }
 }
