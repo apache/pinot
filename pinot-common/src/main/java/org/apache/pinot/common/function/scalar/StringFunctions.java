@@ -439,11 +439,22 @@ public class StringFunctions {
   /**
    * @param input
    * @param delimiter
+   * @param limit
+   * @return splits string on specified delimiter limiting the number of results till the specified limit
+   */
+  @ScalarFunction
+  public static String[] split(String input, String delimiter, int limit) {
+    return StringUtils.split(input, delimiter, limit);
+  }
+
+  /**
+   * @param input
+   * @param delimiter
    * @param index
    * @return splits string on specified delimiter and returns String at specified index from the split.
    */
   @ScalarFunction
-  public static String split(String input, String delimiter, int index) {
+  public static String splitPart(String input, String delimiter, int index) {
     String[] splitString = StringUtils.split(input, delimiter);
     if (index < splitString.length) {
       return splitString[index];

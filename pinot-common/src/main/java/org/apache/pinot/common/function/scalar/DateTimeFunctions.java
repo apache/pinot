@@ -21,7 +21,6 @@ package org.apache.pinot.common.function.scalar;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.DateTimePatternHandler;
 import org.apache.pinot.common.function.DateTimeUtils;
 import org.apache.pinot.common.function.TimeZoneKey;
