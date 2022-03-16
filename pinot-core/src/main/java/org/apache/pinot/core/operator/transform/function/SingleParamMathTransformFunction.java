@@ -161,4 +161,33 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
       }
     }
   }
+
+  public static class LogTransformFunction extends SingleParamMathTransformFunction {
+    public static final String FUNCTION_NAME = "log";
+
+    @Override
+    public String getName() {
+      return FUNCTION_NAME;
+    }
+
+    @Override
+    protected void applyMathOperator(double[] values, int length) {
+      for(int i = 0; i < length; i++) { _results[i] =  Math.log10(values[i]); };
+    }
+  }
+
+  public static class SignTransformFunction extends SingleParamMathTransformFunction {
+    public static final String FUNCTION_NAME = "sign";
+
+    @Override
+    public String getName() {
+      return FUNCTION_NAME;
+    }
+
+    @Override
+    protected void applyMathOperator(double[] values, int length) {
+      for(int i = 0; i < length; i++) { _results[i] =  Math.signum(values[i]); };
+    }
+  }
+
 }
