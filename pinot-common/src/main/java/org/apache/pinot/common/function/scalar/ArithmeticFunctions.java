@@ -133,4 +133,9 @@ public class ArithmeticFunctions {
   public static double roundDecimal(double a, int b) {
     return BigDecimal.valueOf(a).setScale(b, RoundingMode.HALF_UP).doubleValue();
   }
+
+  @ScalarFunction
+  public static double roundDecimal(double a) {
+    return BigDecimal.valueOf(a).setScale(0, RoundingMode.HALF_UP).doubleValue();
+  }
 }

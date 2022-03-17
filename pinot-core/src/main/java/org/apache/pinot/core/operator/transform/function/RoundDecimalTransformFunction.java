@@ -26,13 +26,19 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    // Check that there are more than 1 arguments
-    if (arguments.size() != 2) {
-      throw new IllegalArgumentException("Exactly 2 arguments are required for roundDecimal transform function");
+    int numArguments = arguments.size();
+    // Check that there are more than 2 arguments or no arguments
+    if (numArguments < 1 || numArguments > 2) {
+      throw new IllegalArgumentException("roundDecimal transform function supports either 1 or 2 arguments. Num arguments provided: " + numArguments);
     }
 
     _leftTransformFunction = arguments.get(0);
-    _rightTransformFunction = arguments.get(1);
+    if(numArguments > 1) {
+      _rightTransformFunction = arguments.get(1);
+    } else {
+      _rightTransformFunction = new LiteralTransformFunction("0");
+    }
+
     Preconditions.checkArgument(
         _leftTransformFunction.getResultMetadata().isSingleValue() || _rightTransformFunction.getResultMetadata()
             .isSingleValue(), "Argument must be single-valued for transform function: %s", getName());
