@@ -40,7 +40,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
  */
 public class LiteralTransformFunction implements TransformFunction {
   private final String _literal;
-  private DataType _dataType;
+  private final DataType _dataType;
   private final int _intLiteral;
   private final long _longLiteral;
   private final float _floatLiteral;
@@ -57,36 +57,17 @@ public class LiteralTransformFunction implements TransformFunction {
   public LiteralTransformFunction(String literal) {
     _literal = literal;
     _dataType = inferLiteralDataType(literal);
-    double mathLiteral;
     if (_dataType.isNumeric()) {
       BigDecimal bigDecimal = new BigDecimal(_literal);
       _intLiteral = bigDecimal.intValue();
       _longLiteral = bigDecimal.longValue();
       _floatLiteral = bigDecimal.floatValue();
       _doubleLiteral = bigDecimal.doubleValue();
-    } else if ((mathLiteral = getMathConstant(literal)) != 0) {
-      BigDecimal bigDecimal = new BigDecimal(mathLiteral);
-      _intLiteral = bigDecimal.intValue();
-      _longLiteral = bigDecimal.longValue();
-      _floatLiteral = bigDecimal.floatValue();
-      _doubleLiteral = bigDecimal.doubleValue();
-      _dataType = DataType.DOUBLE;
     } else {
       _intLiteral = 0;
       _longLiteral = 0L;
       _floatLiteral = 0F;
       _doubleLiteral = 0D;
-    }
-  }
-
-  static double getMathConstant(String literal) {
-    switch (literal.toUpperCase()) {
-      case "E":
-        return Math.E;
-      case "PI":
-        return Math.PI;
-      default:
-        return 0D;
     }
   }
 
