@@ -58,10 +58,10 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.core.data.manager.realtime.Fixtures.MAX_ROWS_IN_SEGMENT;
-import static org.apache.pinot.core.data.manager.realtime.Fixtures.MAX_TIME_FOR_SEGMENT_CLOSE_MS;
-import static org.apache.pinot.core.data.manager.realtime.Fixtures.createSchema;
-import static org.apache.pinot.core.data.manager.realtime.Fixtures.createTableConfig;
+import static org.apache.pinot.segment.local.segment.creator.Fixtures.MAX_ROWS_IN_SEGMENT;
+import static org.apache.pinot.segment.local.segment.creator.Fixtures.MAX_TIME_FOR_SEGMENT_CLOSE_MS;
+import static org.apache.pinot.segment.local.segment.creator.Fixtures.createSchema;
+import static org.apache.pinot.segment.local.segment.creator.Fixtures.createTableConfig;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.anyString;

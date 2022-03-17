@@ -17,12 +17,10 @@
  * under the License.
  */
 
-package org.apache.pinot.core.data.manager.realtime;
+package org.apache.pinot.segment.local.segment.creator;
 
 import com.google.common.collect.ImmutableList;
 import java.util.Random;
-import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
-import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -35,8 +33,8 @@ public class Fixtures {
   public static final int MAX_ROWS_IN_SEGMENT = 250000;
   public static final long MAX_TIME_FOR_SEGMENT_CLOSE_MS = 64368000L;
   public static final String TOPIC_NAME = "someTopic";
-  public static final String CONSUMER_FACTORY_CLASS = FakeStreamConsumerFactory.class.getName();
-  public static final String MESSAGE_DECODER_CLASS = FakeStreamMessageDecoder.class.getName();
+  public static final String CONSUMER_FACTORY_CLASS = "some.consumer.factory.class";
+  public static final String MESSAGE_DECODER_CLASS = "some.message.decoder.class";
 
   //@formatter:off
   public static final String TABLE_CONFIG_JSON =
