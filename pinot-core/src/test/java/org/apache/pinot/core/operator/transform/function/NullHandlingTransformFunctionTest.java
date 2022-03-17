@@ -186,7 +186,7 @@ public class NullHandlingTransformFunctionTest {
     testTransformFunction(transformFunction, expectedValues);
   }
 
-  @Test(enabled = false)
+  @Test
   public void testIsNotNullTransformFunction()
       throws Exception {
     testIsNotNullTransformFunction(INT_SV_COLUMN);

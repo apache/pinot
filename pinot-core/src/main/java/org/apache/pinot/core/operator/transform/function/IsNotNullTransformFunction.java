@@ -37,6 +37,7 @@ public class IsNotNullTransformFunction extends BaseTransformFunction {
   private int[] _results;
   private Map<String, DataSource> _dataSourceMap = new HashMap<>();
   private PeekableIntIterator _nullValueVectorIterator;
+  private NullValueVectorReader _nullValueVectorReader;
 
   @Override
   public String getName() {
@@ -54,9 +55,9 @@ public class IsNotNullTransformFunction extends BaseTransformFunction {
     }
     _dataSourceMap = dataSourceMap;
     String columnName = ((IdentifierTransformFunction) _leftTransformFunction).getColumnName();
-    NullValueVectorReader nullValueVector = _dataSourceMap.get(columnName).getNullValueVector();
-    if (nullValueVector != null) {
-      _nullValueVectorIterator = nullValueVector.getNullBitmap().getIntIterator();
+    _nullValueVectorReader = _dataSourceMap.get(columnName).getNullValueVector();
+    if (_nullValueVectorReader != null) {
+      _nullValueVectorIterator = _nullValueVectorReader.getNullBitmap().getIntIterator();
     } else {
       _nullValueVectorIterator = null;
     }
@@ -76,8 +77,11 @@ public class IsNotNullTransformFunction extends BaseTransformFunction {
 
     int[] docIds = projectionBlock.getDocIds();
 
-    Arrays.fill(_results, 1);
+    if (!_nullValueVectorIterator.hasNext() || (docIds.length > 0 && _nullValueVectorIterator.next() > docIds[0])) {
+      _nullValueVectorIterator = _nullValueVectorReader.getNullBitmap().getIntIterator();
+    }
 
+    Arrays.fill(_results, 1);
     if (_nullValueVectorIterator != null) {
       int currentDocIdIndex = 0;
       while (_nullValueVectorIterator.hasNext() & currentDocIdIndex < length) {
