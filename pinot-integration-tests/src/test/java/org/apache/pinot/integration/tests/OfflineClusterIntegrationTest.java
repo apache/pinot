@@ -67,6 +67,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.common.function.scalar.StringFunctions.decodeUrl;
+import static org.apache.pinot.common.function.scalar.StringFunctions.encodeUrl;
 import static org.testng.Assert.*;
 
 
@@ -524,13 +526,31 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
+  public void testUrlFunc()
+      throws Exception {
+    String sqlQuery = "SELECT encodeUrl('key1=value 1&key2=value@!$2&key3=value%3'), "
+        + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') FROM myTable";
+    JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
+    String encodedString = response.get("resultTable").get("rows").get(0).get(0).asText();
+    String expectedUrlStr = encodeUrl("key1=value 1&key2=value@!$2&key3=value%3");
+    ;
+    assertEquals(encodedString, expectedUrlStr);
+
+    String decodedString = response.get("resultTable").get("rows").get(0).get(1).asText();
+    expectedUrlStr = decodeUrl("key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253");
+    ;
+    assertEquals(decodedString, expectedUrlStr);
+  }
+
+  @Test
   public void testLiteralOnlyFunc()
       throws Exception {
     long currentTsMin = System.currentTimeMillis();
     long oneHourAgoTsMin = currentTsMin - ONE_HOUR_IN_MS;
     String sqlQuery =
         "SELECT 1, now() as currentTs, ago('PT1H') as oneHourAgoTs, 'abc', toDateTime(now(), 'yyyy-MM-dd z') as "
-            + "today, now(), ago('PT1H')";
+            + "today, now(), ago('PT1H'), encodeUrl('key1=value 1&key2=value@!$2&key3=value%3') as encodedUrl, "
+            + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') as decodedUrl";
     JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
     long currentTsMax = System.currentTimeMillis();
     long oneHourAgoTsMax = currentTsMax - ONE_HOUR_IN_MS;
@@ -542,6 +562,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(4).asText(), "today");
     String nowColumnName = response.get("resultTable").get("dataSchema").get("columnNames").get(5).asText();
     String oneHourAgoColumnName = response.get("resultTable").get("dataSchema").get("columnNames").get(6).asText();
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(7).asText(), "encodedUrl");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(8).asText(), "decodedUrl");
     assertTrue(Long.parseLong(nowColumnName) > currentTsMin);
     assertTrue(Long.parseLong(nowColumnName) < currentTsMax);
     assertTrue(Long.parseLong(oneHourAgoColumnName) > oneHourAgoTsMin);
@@ -554,6 +576,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(4).asText(), "STRING");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(5).asText(), "LONG");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(6).asText(), "LONG");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(7).asText(), "STRING");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(8).asText(), "STRING");
 
     int first = response.get("resultTable").get("rows").get(0).get(0).asInt();
     long second = response.get("resultTable").get("rows").get(0).get(1).asLong();
@@ -573,6 +597,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(nowValue, Long.parseLong(nowColumnName));
     long oneHourAgoValue = response.get("resultTable").get("rows").get(0).get(6).asLong();
     assertEquals(oneHourAgoValue, Long.parseLong(oneHourAgoColumnName));
+    assertEquals(response.get("resultTable").get("rows").get(0).get(7).asText(),
+        "key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253");
+    assertEquals(response.get("resultTable").get("rows").get(0).get(8).asText(),
+        "key1=value 1&key2=value@!$2&key3=value%3");
   }
 
   @Test(dependsOnMethods = "testBloomFilterTriggering")
