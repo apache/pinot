@@ -96,7 +96,6 @@ public class ArithmeticFunctionsTest {
     inputs.add(new Object[]{"sign(a)", Lists.newArrayList("a"), row6, 1.0});
     inputs.add(new Object[]{"sign(a)", Lists.newArrayList("a"), row7, -1.0});
 
-
     return inputs.toArray(new Object[0][]);
   }
 }
