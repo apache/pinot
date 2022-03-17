@@ -46,6 +46,7 @@ public enum TransformFunctionType {
   EXP("exp"),
   FLOOR("floor"),
   LN("ln"),
+  LOG("log"),
   SQRT("sqrt"),
   LOG2("log2"),
   LOG10("log10"),

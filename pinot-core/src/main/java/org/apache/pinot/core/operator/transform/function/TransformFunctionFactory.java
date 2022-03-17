@@ -100,6 +100,7 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.EXP, ExpTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.FLOOR, FloorTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.LN, LnTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.LOG, LnTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.LOG2, Log2TransformFunction.class);
     typeToImplementation.put(TransformFunctionType.LOG10, Log10TransformFunction.class);
     typeToImplementation.put(TransformFunctionType.SQRT, SqrtTransformFunction.class);

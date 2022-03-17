@@ -97,7 +97,7 @@ public class ArithmeticFunctions {
     return Math.exp(a);
   }
 
-  @ScalarFunction
+  @ScalarFunction(names = {"ln", "log"})
   public static double ln(double a) {
     return Math.log(a);
   }
