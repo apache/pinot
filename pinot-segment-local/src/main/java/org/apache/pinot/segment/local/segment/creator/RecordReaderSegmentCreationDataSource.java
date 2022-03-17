@@ -18,13 +18,8 @@
  */
 package org.apache.pinot.segment.local.segment.creator;
 
-import java.util.Collection;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
-import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
-import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
-import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.creator.SegmentCreationDataSource;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsCollector;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
@@ -51,36 +46,22 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
   @Override
   public SegmentPreIndexStatsCollector gatherStats(StatsCollectorConfig statsCollectorConfig) {
     try {
-      RecordTransformer recordTransformer = CompositeTransformer
-          .getDefaultTransformer(statsCollectorConfig.getTableConfig(), statsCollectorConfig.getSchema());
-      ComplexTypeTransformer complexTypeTransformer =
-          ComplexTypeTransformer.getComplexTypeTransformer(statsCollectorConfig.getTableConfig());
+      TransformPipeline transformPipeline =
+          new TransformPipeline(statsCollectorConfig.getTableConfig(), statsCollectorConfig.getSchema());
 
       SegmentPreIndexStatsCollector collector = new SegmentPreIndexStatsCollectorImpl(statsCollectorConfig);
       collector.init();
 
       // Gather the stats
       GenericRow reuse = new GenericRow();
+      TransformPipeline.Result reusedResult = new TransformPipeline.Result();
       while (_recordReader.hasNext()) {
         reuse.clear();
 
         reuse = _recordReader.next(reuse);
-        if (complexTypeTransformer != null) {
-          // TODO: consolidate complex type transformer into composite type transformer
-          reuse = complexTypeTransformer.transform(reuse);
-        }
-        if (reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
-          for (Object singleRow : (Collection) reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
-            GenericRow transformedRow = recordTransformer.transform((GenericRow) singleRow);
-            if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-              collector.collectRow(transformedRow);
-            }
-          }
-        } else {
-          GenericRow transformedRow = recordTransformer.transform(reuse);
-          if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-            collector.collectRow(transformedRow);
-          }
+        transformPipeline.processRow(reuse, reusedResult);
+        for (GenericRow row : reusedResult.getTransformedRows()) {
+          collector.collectRow(row);
         }
       }
 
