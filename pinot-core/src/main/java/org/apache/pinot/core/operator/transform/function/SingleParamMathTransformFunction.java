@@ -37,8 +37,8 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    Preconditions
-        .checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s", getName());
+    Preconditions.checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s",
+        getName());
     TransformFunction transformFunction = arguments.get(0);
     Preconditions.checkArgument(!(transformFunction instanceof LiteralTransformFunction),
         "Argument cannot be literal for transform function: %s", getName());
@@ -172,7 +172,10 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
 
     @Override
     protected void applyMathOperator(double[] values, int length) {
-      for(int i = 0; i < length; i++) { _results[i] =  Math.log(values[i]) / Math.log(2) ; };
+      for (int i = 0; i < length; i++) {
+        _results[i] = Math.log(values[i]) / Math.log(2);
+      }
+      ;
     }
   }
 
@@ -186,7 +189,10 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
 
     @Override
     protected void applyMathOperator(double[] values, int length) {
-      for(int i = 0; i < length; i++) { _results[i] =  Math.log10(values[i]); };
+      for (int i = 0; i < length; i++) {
+        _results[i] = Math.log10(values[i]);
+      }
+      ;
     }
   }
 
@@ -200,8 +206,10 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
 
     @Override
     protected void applyMathOperator(double[] values, int length) {
-      for(int i = 0; i < length; i++) { _results[i] =  Math.signum(values[i]); };
+      for (int i = 0; i < length; i++) {
+        _results[i] = Math.signum(values[i]);
+      }
+      ;
     }
   }
-
 }
