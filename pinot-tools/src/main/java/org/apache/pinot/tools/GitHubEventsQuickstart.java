@@ -24,6 +24,7 @@ import java.io.File;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Properties;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.spi.stream.StreamDataProvider;
@@ -32,6 +33,8 @@ import org.apache.pinot.tools.Quickstart.Color;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tools.streams.githubevents.PullRequestMergedEventsStream;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
+import org.apache.pinot.tools.utils.KinesisStarterUtils;
+import org.apache.pinot.tools.utils.StreamSourceType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,15 +43,16 @@ import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
 
 /**
  * Sets up a demo Pinot cluster with 1 zookeeper, 1 controller, 1 broker and 1 server
- * Sets up a demo Kafka cluster, and creates a topic pullRequestMergedEvents
+ * Sets up a demo Kafka/Kinesis cluster, and creates a topic pullRequestMergedEvents
  * Creates a realtime table pullRequestMergedEvents
  * Starts the {@link PullRequestMergedEventsStream} to publish pullRequestMergedEvents into the topic
  */
 public class GitHubEventsQuickstart extends QuickStartBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(GitHubEventsQuickstart.class);
-  private StreamDataServerStartable _kafkaStarter;
+  private StreamDataServerStartable _serverStarter;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
   private String _personalAccessToken;
+  private StreamSourceType _sourceType;
 
   public GitHubEventsQuickstart() {
   }
@@ -56,16 +60,46 @@ public class GitHubEventsQuickstart extends QuickStartBase {
   private void startKafka() {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
     try {
-      _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME,
+      _serverStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME,
           KafkaStarterUtils.getDefaultKafkaConfiguration(_zookeeperInstance));
     } catch (Exception e) {
       throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
     }
-    _kafkaStarter.start();
-    _kafkaStarter.createTopic("pullRequestMergedEvents", KafkaStarterUtils.getTopicCreationProps(2));
+    _serverStarter.start();
+    _serverStarter.createTopic("pullRequestMergedEvents", KafkaStarterUtils.getTopicCreationProps(2));
   }
 
-  private void execute(String personalAccessToken)
+  private void startKinesis() {
+    try {
+
+      Properties serverProperties = new Properties();
+      serverProperties.put(KinesisStarterUtils.PORT, 4566);
+      _serverStarter =
+          StreamDataProvider.getServerDataStartable(KinesisStarterUtils.KINESIS_SERVER_STARTABLE_CLASS_NAME,
+              serverProperties);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to start " + KinesisStarterUtils.KINESIS_SERVER_STARTABLE_CLASS_NAME, e);
+    }
+    _serverStarter.start();
+
+    Properties topicProperties = new Properties();
+    topicProperties.put(KinesisStarterUtils.NUM_SHARDS, 3);
+    _serverStarter.createTopic("pullRequestMergedEvents", topicProperties);
+  }
+
+  private void startStreamServer() {
+    switch (_sourceType) {
+      case KINESIS:
+        startKinesis();
+        break;
+      case KAFKA:
+      default:
+        startKafka();
+        break;
+    }
+  }
+
+  private void execute(String personalAccessToken, StreamSourceType streamSourceType)
       throws Exception {
     final File quickStartDataDir =
         new File(new File("githubEvents-" + System.currentTimeMillis()), "pullRequestMergedEvents");
@@ -81,8 +115,8 @@ public class GitHubEventsQuickstart extends QuickStartBase {
     URL resource = classLoader.getResource("examples/stream/githubEvents/pullRequestMergedEvents_schema.json");
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, schemaFile);
-    resource =
-        classLoader.getResource("examples/stream/githubEvents/pullRequestMergedEvents_realtime_table_config.json");
+    String tableConfigFilePath = getTableConfigFilePath();
+    resource = classLoader.getResource(tableConfigFilePath);
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
@@ -92,8 +126,8 @@ public class GitHubEventsQuickstart extends QuickStartBase {
     final QuickstartRunner runner =
         new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 0, tempDir, getConfigOverrides());
 
-    printStatus(Color.CYAN, "***** Starting Kafka *****");
-    startKafka();
+    printStatus(Color.CYAN, String.format("***** Starting %s *****", streamSourceType));
+    startStreamServer();
 
     printStatus(Color.CYAN, "***** Starting zookeeper, controller, server and broker *****");
     runner.startAll();
@@ -101,10 +135,11 @@ public class GitHubEventsQuickstart extends QuickStartBase {
     printStatus(Color.CYAN, "***** Adding pullRequestMergedEvents table *****");
     runner.bootstrapTable();
 
-    printStatus(Color.CYAN, "***** Starting pullRequestMergedEvents data stream and publishing to Kafka *****");
+    printStatus(Color.CYAN,
+        String.format("***** Starting pullRequestMergedEvents data stream and publishing to %s *****", _sourceType));
     final PullRequestMergedEventsStream pullRequestMergedEventsStream =
-        new PullRequestMergedEventsStream(schemaFile.getAbsolutePath(), "pullRequestMergedEvents",
-            personalAccessToken, PullRequestMergedEventsStream.getKafkaStreamDataProducer());
+        new PullRequestMergedEventsStream(schemaFile.getAbsolutePath(), "pullRequestMergedEvents", personalAccessToken,
+            PullRequestMergedEventsStream.getStreamDataProducer(_sourceType));
     pullRequestMergedEventsStream.execute();
     printStatus(Color.CYAN, "***** Waiting for 10 seconds for a few events to get populated *****");
     Thread.sleep(10000);
@@ -113,7 +148,7 @@ public class GitHubEventsQuickstart extends QuickStartBase {
       try {
         printStatus(Color.GREEN, "***** Shutting down GitHubEventsQuickStart *****");
         runner.stop();
-        _kafkaStarter.stop();
+        _serverStarter.stop();
         ZkStarter.stopLocalZkServer(_zookeeperInstance);
         FileUtils.deleteDirectory(quickStartDataDir);
       } catch (Exception e) {
@@ -156,6 +191,22 @@ public class GitHubEventsQuickstart extends QuickStartBase {
     printStatus(Color.GREEN, "You can always go to http://localhost:9000 to play around in the query console");
   }
 
+  private String getTableConfigFilePath() {
+    String tableConfigFilePath;
+    switch (_sourceType) {
+      case KINESIS:
+        tableConfigFilePath =
+            "examples/stream/githubEvents/pullRequestMergedEvents_kinesis_realtime_table_config.json";
+        break;
+      case KAFKA:
+      default:
+        tableConfigFilePath =
+            "examples/stream/githubEvents/pullRequestMergedEvents_realtime_table_config.json";
+        break;
+    }
+    return tableConfigFilePath;
+  }
+
   @Override
   public List<String> types() {
     return Arrays.asList("GITHUB-EVENTS", "GITHUB_EVENTS");
@@ -164,11 +215,16 @@ public class GitHubEventsQuickstart extends QuickStartBase {
   @Override
   public void execute()
       throws Exception {
-    execute(_personalAccessToken);
+    execute(_personalAccessToken, _sourceType);
   }
 
   public GitHubEventsQuickstart setPersonalAccessToken(String personalAccessToken) {
     _personalAccessToken = personalAccessToken;
+    return this;
+  }
+
+  public GitHubEventsQuickstart setSourceType(String sourceType) {
+    _sourceType = StreamSourceType.valueOf(sourceType.toUpperCase());
     return this;
   }
 }
