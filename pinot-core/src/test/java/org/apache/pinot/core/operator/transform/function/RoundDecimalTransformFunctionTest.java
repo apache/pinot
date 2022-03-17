@@ -27,7 +27,6 @@ public class RoundDecimalTransformFunctionTest extends BaseTransformFunctionTest
     }
     testTransformFunction(transformFunction, expectedValues);
 
-
     expression = RequestContextUtils.getExpressionFromSQL(String.format("round_decimal(%s, -2)", DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof RoundDecimalTransformFunction);

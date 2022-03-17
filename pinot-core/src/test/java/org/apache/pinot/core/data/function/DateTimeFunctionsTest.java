@@ -188,8 +188,8 @@ public class DateTimeFunctionsTest {
     GenericRow row91 = new GenericRow();
     row91.putValue("fifteenSecondsSinceEpoch", 80640000L);
     inputs.add(
-        new Object[]{"toEpochMinutesBucket(fromEpochSecondsBucket(fifteenSecondsSinceEpoch, 15), 10)", Lists.newArrayList(
-            "fifteenSecondsSinceEpoch"), row91, 2016000L});
+        new Object[]{"toEpochMinutesBucket(fromEpochSecondsBucket(fifteenSecondsSinceEpoch, 15), 10)",
+            Lists.newArrayList("fifteenSecondsSinceEpoch"), row91, 2016000L});
 
     // toDateTime simple
     GenericRow row100 = new GenericRow();

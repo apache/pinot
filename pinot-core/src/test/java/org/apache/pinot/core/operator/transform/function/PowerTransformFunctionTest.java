@@ -17,15 +17,16 @@ public class PowerTransformFunctionTest extends BaseTransformFunctionTest {
     Assert.assertEquals(transformFunction.getName(), PowerTransformFunction.FUNCTION_NAME);
     double[] expectedValues = new double[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = Math.pow((double) _intSVValues[i] , (double) _longSVValues[i]);
+      expectedValues[i] = Math.pow((double) _intSVValues[i], (double) _longSVValues[i]);
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils.getExpressionFromSQL(String.format("power(%s,%s)", LONG_SV_COLUMN, FLOAT_SV_COLUMN));
+    expression =
+        RequestContextUtils.getExpressionFromSQL(String.format("power(%s,%s)", LONG_SV_COLUMN, FLOAT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof PowerTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = Math.pow((double) _longSVValues[i] , (double) _floatSVValues[i]);
+      expectedValues[i] = Math.pow((double) _longSVValues[i], (double) _floatSVValues[i]);
     }
     testTransformFunction(transformFunction, expectedValues);
 
@@ -34,7 +35,7 @@ public class PowerTransformFunctionTest extends BaseTransformFunctionTest {
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof PowerTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = Math.pow((double) _floatSVValues[i] , _doubleSVValues[i]);
+      expectedValues[i] = Math.pow((double) _floatSVValues[i], _doubleSVValues[i]);
     }
     testTransformFunction(transformFunction, expectedValues);
 
@@ -43,15 +44,16 @@ public class PowerTransformFunctionTest extends BaseTransformFunctionTest {
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof PowerTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = Math.pow(_doubleSVValues[i] , Double.parseDouble(_stringSVValues[i]));
+      expectedValues[i] = Math.pow(_doubleSVValues[i], Double.parseDouble(_stringSVValues[i]));
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils.getExpressionFromSQL(String.format("power(%s,%s)", STRING_SV_COLUMN, INT_SV_COLUMN));
+    expression =
+        RequestContextUtils.getExpressionFromSQL(String.format("power(%s,%s)", STRING_SV_COLUMN, INT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof PowerTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = Math.pow(Double.parseDouble(_stringSVValues[i]) , (double) _intSVValues[i]);
+      expectedValues[i] = Math.pow(Double.parseDouble(_stringSVValues[i]), (double) _intSVValues[i]);
     }
     testTransformFunction(transformFunction, expectedValues);
   }

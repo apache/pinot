@@ -29,11 +29,12 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
     int numArguments = arguments.size();
     // Check that there are more than 2 arguments or no arguments
     if (numArguments < 1 || numArguments > 2) {
-      throw new IllegalArgumentException("roundDecimal transform function supports either 1 or 2 arguments. Num arguments provided: " + numArguments);
+      throw new IllegalArgumentException(
+          "roundDecimal transform function supports either 1 or 2 arguments. Num arguments provided: " + numArguments);
     }
 
     _leftTransformFunction = arguments.get(0);
-    if(numArguments > 1) {
+    if (numArguments > 1) {
       _rightTransformFunction = arguments.get(1);
     } else {
       _rightTransformFunction = new LiteralTransformFunction("0");
