@@ -104,9 +104,10 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.LOG2, Log2TransformFunction.class);
     typeToImplementation.put(TransformFunctionType.LOG10, Log10TransformFunction.class);
     typeToImplementation.put(TransformFunctionType.SQRT, SqrtTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.ROUND_DECIMAL, RoundDecimalTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.SIGN, SignTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.POWER, PowerTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ROUND_DECIMAL, RoundDecimalTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.TRUNCATE, TruncateDecimalTransformFunction.class);
 
     typeToImplementation.put(TransformFunctionType.CAST, CastTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.JSONEXTRACTSCALAR,

@@ -53,6 +53,7 @@ public enum TransformFunctionType {
   SIGN("sign"),
   ROUND_DECIMAL("round_decimal"),
   POWER("power"),
+  TRUNCATE("truncate"),
 
   LEAST("least"),
   GREATEST("greatest"),

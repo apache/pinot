@@ -138,4 +138,14 @@ public class ArithmeticFunctions {
   public static double roundDecimal(double a) {
     return BigDecimal.valueOf(a).setScale(0, RoundingMode.HALF_UP).doubleValue();
   }
+
+  @ScalarFunction
+  public static double truncate(double a, int b) {
+    return BigDecimal.valueOf(a).setScale(b, RoundingMode.DOWN).doubleValue();
+  }
+
+  @ScalarFunction
+  public static double truncate(double a) {
+    return Math.signum(a) * Math.floor(Math.abs(a));
+  }
 }

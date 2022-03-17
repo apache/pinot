@@ -19,16 +19,19 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
-public class PowerTransformFunction extends BaseTransformFunction {
-  public static final String FUNCTION_NAME = "power";
+public class TruncateDecimalTransformFunction extends BaseTransformFunction {
+  public static final String FUNCTION_NAME = "truncate";
   private double[] _result;
   private TransformFunction _leftTransformFunction;
   private TransformFunction _rightTransformFunction;
@@ -40,16 +43,30 @@ public class PowerTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    // Check that there are more than 1 arguments
-    if (arguments.size() != 2) {
-      throw new IllegalArgumentException("Exactly 2 arguments are required for power transform function");
+    int numArguments = arguments.size();
+    // Check that there are more than 2 arguments or no arguments
+    if (numArguments < 1 || numArguments > 2) {
+      throw new IllegalArgumentException(
+          "truncate transform function supports either 1 or 2 arguments. Num arguments provided: " + numArguments);
     }
 
     _leftTransformFunction = arguments.get(0);
-    _rightTransformFunction = arguments.get(1);
-    Preconditions.checkArgument(
-        _leftTransformFunction.getResultMetadata().isSingleValue() || _rightTransformFunction.getResultMetadata()
-            .isSingleValue(), "Argument must be single-valued for transform function: %s", getName());
+    if (numArguments > 1) {
+      _rightTransformFunction = arguments.get(1);
+      Preconditions.checkArgument(_rightTransformFunction.getResultMetadata().isSingleValue()
+              && isArgumentDataTypeValid(_rightTransformFunction),
+          "Argument must be single-valued with type INT for transform function: %s", getName());
+    } else {
+      _rightTransformFunction = null;
+    }
+
+    Preconditions.checkArgument(_leftTransformFunction.getResultMetadata().isSingleValue(),
+        "Argument must be single-valued for transform function: %s", getName());
+  }
+
+  private boolean isArgumentDataTypeValid(TransformFunction transformFunction) {
+    return transformFunction.getResultMetadata().getDataType().getStoredType() == FieldSpec.DataType.INT
+        || transformFunction.getResultMetadata().getDataType().getStoredType() == FieldSpec.DataType.LONG;
   }
 
   @Override
@@ -65,10 +82,17 @@ public class PowerTransformFunction extends BaseTransformFunction {
 
     int length = projectionBlock.getNumDocs();
     double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(projectionBlock);
-    double[] rightValues = _rightTransformFunction.transformToDoubleValuesSV(projectionBlock);
-    for (int i = 0; i < length; i++) {
-      _result[i] = Math.pow(leftValues[i], rightValues[i]);
+    if (_rightTransformFunction != null) {
+      int[] rightValues = _rightTransformFunction.transformToIntValuesSV(projectionBlock);
+      for (int i = 0; i < length; i++) {
+        _result[i] = BigDecimal.valueOf(leftValues[i]).setScale(rightValues[i], RoundingMode.DOWN).doubleValue();
+      }
+    } else {
+      for (int i = 0; i < length; i++) {
+        _result[i] = Math.signum(leftValues[i]) * Math.floor(Math.abs(leftValues[i]));
+      }
     }
+
     return _result;
   }
 }
