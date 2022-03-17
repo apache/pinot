@@ -239,8 +239,6 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
 
     //copy input path to local
     File localInputDataFile = createLocalInputDateFile(inputFileURI, localInputTempDir);
-    System.out.println("localInputDataFile = " + localInputDataFile);
-
     _inputDirFS.copyToLocalFile(inputFileURI, localInputDataFile);
 
     //create task spec
