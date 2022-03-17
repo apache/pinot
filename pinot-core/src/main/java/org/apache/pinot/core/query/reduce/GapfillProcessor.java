@@ -47,7 +47,7 @@ import org.apache.pinot.spi.data.DateTimeGranularitySpec;
  * Helper class to reduce and set gap fill results into the BrokerResponseNative
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class GapFillProcessor {
+public class GapfillProcessor {
   private final QueryContext _queryContext;
 
   private final int _limitForAggregatedResult;
@@ -68,19 +68,19 @@ public class GapFillProcessor {
   private final int _timeBucketColumnIndex;
   private int[] _sourceColumnIndexForResultSchema = null;
 
-  GapFillProcessor(QueryContext queryContext) {
+  GapfillProcessor(QueryContext queryContext, GapfillUtils.GapfillType gapfillType) {
     _queryContext = queryContext;
-    _gapfillType = queryContext.getGapfillType();
+    _gapfillType = gapfillType;
     _limitForAggregatedResult = queryContext.getLimit();
     if (_gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL
         || _gapfillType == GapfillUtils.GapfillType.GAP_FILL) {
       _limitForGapfilledResult = queryContext.getLimit();
     } else {
-      _limitForGapfilledResult = queryContext.getSubQueryContext().getLimit();
+      _limitForGapfilledResult = queryContext.getSubquery().getLimit();
     }
 
-    ExpressionContext gapFillSelection = GapfillUtils.getGapfillExpressionContext(queryContext);
-    _timeBucketColumnIndex = GapfillUtils.findTimeBucketColumnIndex(queryContext);
+    ExpressionContext gapFillSelection = GapfillUtils.getGapfillExpressionContext(queryContext, _gapfillType);
+    _timeBucketColumnIndex = GapfillUtils.findTimeBucketColumnIndex(queryContext, _gapfillType);
 
     List<ExpressionContext> args = gapFillSelection.getFunction().getArguments();
 
@@ -110,11 +110,11 @@ public class GapFillProcessor {
   private void replaceColumnNameWithAlias(DataSchema dataSchema) {
     QueryContext queryContext;
     if (_gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL_AGGREGATE) {
-      queryContext = _queryContext.getSubQueryContext().getSubQueryContext();
+      queryContext = _queryContext.getSubquery().getSubquery();
     } else if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL) {
       queryContext = _queryContext;
     } else {
-      queryContext = _queryContext.getSubQueryContext();
+      queryContext = _queryContext.getSubquery();
     }
     List<String> aliasList = queryContext.getAliasList();
     Map<String, String> columnNameToAliasMap = new HashMap<>();
@@ -171,7 +171,6 @@ public class GapFillProcessor {
 
     List<Object[]>[] timeBucketedRawRows = putRawRowsIntoTimeBucket(brokerResponseNative.getResultTable().getRows());
 
-    List<Object[]> resultRows;
     replaceColumnNameWithAlias(dataSchema);
 
     if (_queryContext.getAggregationFunctions() == null) {
@@ -186,18 +185,7 @@ public class GapFillProcessor {
       }
     }
 
-    if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL_AGGREGATE || _gapfillType == GapfillUtils.GapfillType.GAP_FILL
-        || _gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
-      List<Object[]> gapfilledRows = gapFillAndAggregate(timeBucketedRawRows, resultTableSchema, dataSchema);
-      if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL_SELECT) {
-        resultRows = new ArrayList<>(gapfilledRows.size());
-        resultRows.addAll(gapfilledRows);
-      } else {
-        resultRows = gapfilledRows;
-      }
-    } else {
-      resultRows = gapFillAndAggregate(timeBucketedRawRows, resultTableSchema, dataSchema);
-    }
+    List<Object[]> resultRows = gapFillAndAggregate(timeBucketedRawRows, resultTableSchema, dataSchema);
     brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, resultRows));
   }
 
@@ -249,7 +237,7 @@ public class GapFillProcessor {
     List<Object[]> result = new ArrayList<>();
 
     GapfillFilterHandler postGapfillFilterHandler = null;
-    if (_queryContext.getSubQueryContext() != null && _queryContext.getFilter() != null) {
+    if (_queryContext.getSubquery() != null && _queryContext.getFilter() != null) {
       postGapfillFilterHandler = new GapfillFilterHandler(_queryContext.getFilter(), dataSchema);
     }
     GapfillFilterHandler postAggregateHavingFilterHandler = null;
@@ -257,6 +245,7 @@ public class GapFillProcessor {
       postAggregateHavingFilterHandler =
           new GapfillFilterHandler(_queryContext.getHavingFilter(), dataSchemaForAggregatedResult);
     }
+
     for (long time = _startMs; time < _endMs; time += _timeBucketSize) {
       int index = findBucketIndex(time);
       List<Object[]> bucketedResult = gapfill(time, timeBucketedRawRows[index], dataSchema, postGapfillFilterHandler);
@@ -386,7 +375,7 @@ public class GapFillProcessor {
     Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
     for (int i = 1; i < dataSchema.getColumnNames().length; i++) {
       blockValSetMap.put(ExpressionContext.forIdentifier(dataSchema.getColumnName(i)),
-          new ColumnDataToBlockValSetConverter(dataSchema.getColumnDataType(i), bucketedRows, i));
+          new RowBasedBlockValSet(dataSchema.getColumnDataType(i), bucketedRows, i));
     }
 
     for (int i = 0; i < _queryContext.getSelectExpressions().size(); i++) {

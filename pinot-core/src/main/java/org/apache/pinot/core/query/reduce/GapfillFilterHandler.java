@@ -44,6 +44,8 @@ public class GapfillFilterHandler implements ValueExtractorFactory {
     _dataSchema = dataSchema;
     _indexes = new HashMap<>();
     for (int i = 0; i < _dataSchema.size(); i++) {
+      // TODO: This won't work for certain aggregations because the column name in schema is not expression.toString().
+      // TODO: Please refer to {@link PostAggregationHandler} on how to handle the index for aggregation queries.
       _indexes.put(_dataSchema.getColumnName(i), i);
     }
     _rowMatcher = RowMatcherFactory.getRowMatcher(filter, this);
@@ -70,6 +72,8 @@ public class GapfillFilterHandler implements ValueExtractorFactory {
     if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
       return new ColumnValueExtractor(_indexes.get(expression.getIdentifier()), _dataSchema);
     } else {
+      // TODO: This does not handle transform properly (e.g. colA - colB where the gapfill selects colA and colB).
+      // TODO: This is handled within the PostAggregationValueExtractor, and we may also extract that out to be shared.
       return new ColumnValueExtractor(_indexes.get(expression.getFunction().toString()), _dataSchema);
     }
   }

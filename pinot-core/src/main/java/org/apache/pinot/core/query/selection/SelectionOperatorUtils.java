@@ -68,8 +68,12 @@ import org.apache.pinot.spi.utils.ByteArray;
  * </ul>
  */
 public class SelectionOperatorUtils {
+  private SelectionOperatorUtils() {
+  }
+
   public static final ExpressionContext IDENTIFIER_STAR = ExpressionContext.forIdentifier("*");
   public static final int MAX_ROW_HOLDER_INITIAL_CAPACITY = 10_000;
+
   private static final String INT_PATTERN = "##########";
   private static final String LONG_PATTERN = "####################";
   private static final String FLOAT_PATTERN = "#########0.0####";
@@ -83,8 +87,6 @@ public class SelectionOperatorUtils {
       ThreadLocal.withInitial(() -> new DecimalFormat(FLOAT_PATTERN, DECIMAL_FORMAT_SYMBOLS));
   private static final ThreadLocal<DecimalFormat> THREAD_LOCAL_DOUBLE_FORMAT =
       ThreadLocal.withInitial(() -> new DecimalFormat(DOUBLE_PATTERN, DECIMAL_FORMAT_SYMBOLS));
-  private SelectionOperatorUtils() {
-  }
 
   /**
    * Extracts the expressions from a selection query, expands {@code 'SELECT *'} to all physical columns if applies.
@@ -388,9 +390,6 @@ public class SelectionOperatorUtils {
           row[i] = dataTable.getStringArray(rowId, i);
           break;
 
-        case OBJECT:
-          row[i] = dataTable.getObject(rowId, i);
-          break;
         default:
           throw new IllegalStateException(String
               .format("Unsupported data type: %s for column: %s", storedColumnDataTypes[i],

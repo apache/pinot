@@ -67,6 +67,9 @@ import org.slf4j.LoggerFactory;
 
 
 public class CalciteSqlParser {
+  private CalciteSqlParser() {
+  }
+
   public static final List<QueryRewriter> QUERY_REWRITERS = new ArrayList<>(QueryRewriterFactory.getQueryRewriters());
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlParser.class);
 
@@ -94,9 +97,6 @@ public class CalciteSqlParser {
   //   `OPTION (<k1> = <v1>) OPTION (<k2> = <v2>) OPTION (<k3> = <v3>)`
   private static final Pattern OPTIONS_REGEX_PATTEN =
       Pattern.compile("option\\s*\\(([^\\)]+)\\)", Pattern.CASE_INSENSITIVE);
-
-  private CalciteSqlParser() {
-  }
 
   /**
    * Checks for the presence of semicolon in the sql query and modifies the query accordingly

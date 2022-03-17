@@ -22,8 +22,14 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 
 
 /**
- * Value extractor for the post-aggregation function or pre-aggregation gap fill.
+ * Factory for {@link ValueExtractor}.
  */
 public interface ValueExtractorFactory {
+  /**
+   * Create the {@link ValueExtractor} for specific column.
+   *
+   * @param expression - column expression
+   * @return {@link ValueExtractor}
+   */
   ValueExtractor getValueExtractor(ExpressionContext expression);
 }

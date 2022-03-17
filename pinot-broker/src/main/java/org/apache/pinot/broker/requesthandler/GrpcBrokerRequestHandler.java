@@ -78,14 +78,14 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   @Override
-  protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-      BrokerRequest brokerRequest, @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance,
+  protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest brokerRequest,
+      BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance,
       List<String>> offlineRoutingTable, @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance,
       List<String>> realtimeRoutingTable, long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
       throws Exception {
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
 
-    String rawTableName = TableNameBuilder.extractRawTableName(originalBrokerRequest.getQuerySource().getTableName());
+    String rawTableName = TableNameBuilder.extractRawTableName(brokerRequest.getQuerySource().getTableName());
     Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap = new HashMap<>();
     // Making request to a streaming server response.
 
@@ -102,7 +102,7 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
           realtimeBrokerRequest, realtimeRoutingTable, timeoutMs, true, 1);
     }
     BrokerResponseNative brokerResponse = _streamingReduceService.reduceOnStreamResponse(
-        originalBrokerRequest, responseMap, timeoutMs, _brokerMetrics);
+        brokerRequest, responseMap, timeoutMs, _brokerMetrics);
     return brokerResponse;
   }
 

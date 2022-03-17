@@ -24,11 +24,14 @@ import org.apache.pinot.common.request.context.FilterContext;
 /**
  * Factory for RowMatcher.
  */
-public interface RowMatcherFactory {
+public class RowMatcherFactory {
+  private RowMatcherFactory() {
+  }
+
   /**
    * Helper method to construct a RowMatcher based on the given filter.
    */
-  static RowMatcher getRowMatcher(FilterContext filter, ValueExtractorFactory valueExtractorFactory) {
+  public static RowMatcher getRowMatcher(FilterContext filter, ValueExtractorFactory valueExtractorFactory) {
     switch (filter.getType()) {
       case AND:
         return new AndRowMatcher(filter.getChildren(), valueExtractorFactory);

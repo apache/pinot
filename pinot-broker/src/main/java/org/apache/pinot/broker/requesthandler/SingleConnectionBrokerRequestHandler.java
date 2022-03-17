@@ -80,14 +80,14 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
   }
 
   @Override
-  protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-      BrokerRequest brokerRequest, @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance,
+  protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest brokerRequest,
+      BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance,
       List<String>> offlineRoutingTable, @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance,
       List<String>> realtimeRoutingTable, long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
       throws Exception {
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
 
-    String rawTableName = TableNameBuilder.extractRawTableName(originalBrokerRequest.getQuerySource().getTableName());
+    String rawTableName = TableNameBuilder.extractRawTableName(brokerRequest.getQuerySource().getTableName());
     long scatterGatherStartTimeNs = System.nanoTime();
     AsyncQueryResponse asyncQueryResponse = _queryRouter
         .submitQuery(requestId, rawTableName, offlineBrokerRequest, offlineRoutingTable, realtimeBrokerRequest,
@@ -117,7 +117,7 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
     long reduceStartTimeNs = System.nanoTime();
     long reduceTimeOutMs = timeoutMs - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - scatterGatherStartTimeNs);
     BrokerResponseNative brokerResponse = _brokerReduceService.reduceOnDataTable(
-        originalBrokerRequest, brokerRequest, dataTableMap, reduceTimeOutMs, _brokerMetrics);
+        brokerRequest, serverBrokerRequest, dataTableMap, reduceTimeOutMs, _brokerMetrics);
     final long reduceTimeNanos = System.nanoTime() - reduceStartTimeNs;
     requestStatistics.setReduceTimeNanos(reduceTimeNanos);
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REDUCE, reduceTimeNanos);

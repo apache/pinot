@@ -46,11 +46,11 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -163,7 +163,7 @@ public class PinotQueryResource {
       String inputTableName;
       switch (querySyntax) {
         case CommonConstants.Broker.Request.SQL:
-          inputTableName = GapfillUtils.getTableName(SQL_QUERY_COMPILER.compileToBrokerRequest(query).getPinotQuery());
+          inputTableName = RequestUtils.getTableName(SQL_QUERY_COMPILER.compileToBrokerRequest(query).getPinotQuery());
           break;
         case CommonConstants.Broker.Request.PQL:
           inputTableName = PQL_QUERY_COMPILER.compileToBrokerRequest(query).getQuerySource().getTableName();

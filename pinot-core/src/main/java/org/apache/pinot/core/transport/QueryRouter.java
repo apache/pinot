@@ -35,7 +35,6 @@ import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
-import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -115,7 +114,6 @@ public class QueryRouter {
     Map<ServerRoutingInstance, InstanceRequest> requestMap = new HashMap<>();
     if (offlineBrokerRequest != null) {
       assert offlineRoutingTable != null;
-      BrokerRequestToQueryContextConverter.validateGapfillQuery(offlineBrokerRequest);
       for (Map.Entry<ServerInstance, List<String>> entry : offlineRoutingTable.entrySet()) {
         ServerRoutingInstance serverRoutingInstance =
             entry.getKey().toServerRoutingInstance(TableType.OFFLINE, preferTls);
@@ -125,7 +123,6 @@ public class QueryRouter {
     }
     if (realtimeBrokerRequest != null) {
       assert realtimeRoutingTable != null;
-      BrokerRequestToQueryContextConverter.validateGapfillQuery(realtimeBrokerRequest);
       for (Map.Entry<ServerInstance, List<String>> entry : realtimeRoutingTable.entrySet()) {
         ServerRoutingInstance serverRoutingInstance =
             entry.getKey().toServerRoutingInstance(TableType.REALTIME, preferTls);
