@@ -28,10 +28,15 @@ import org.testng.annotations.Test;
 
 public class TransformPipelineTest {
 
+  private static TableConfig createTableConfig()
+      throws Exception {
+    return Fixtures.createTableConfig("some.consumer.class", "some.decoder.class");
+  }
+
   @Test
   public void testSingleRow()
       throws Exception {
-    TableConfig config = Fixtures.createTableConfig();
+    TableConfig config = createTableConfig();
     Schema schema = Fixtures.createSchema();
     TransformPipeline pipeline = new TransformPipeline(config, schema);
     GenericRow simpleRow = Fixtures.createSingleRow(9527);
@@ -46,7 +51,7 @@ public class TransformPipelineTest {
   @Test
   public void testSingleRowFailure()
       throws Exception {
-    TableConfig config = Fixtures.createTableConfig();
+    TableConfig config = createTableConfig();
     Schema schema = Fixtures.createSchema();
     TransformPipeline pipeline = new TransformPipeline(config, schema);
     GenericRow simpleRow = Fixtures.createInvalidSingleRow(9527);
@@ -66,7 +71,7 @@ public class TransformPipelineTest {
   @Test
   public void testMultipleRow()
       throws Exception {
-    TableConfig config = Fixtures.createTableConfig();
+    TableConfig config = createTableConfig();
     Schema schema = Fixtures.createSchema();
     TransformPipeline pipeline = new TransformPipeline(config, schema);
     GenericRow multipleRow = Fixtures.createMultipleRow(9527);
@@ -83,7 +88,7 @@ public class TransformPipelineTest {
   @Test
   public void testMultipleRowPartialFailure()
       throws Exception {
-    TableConfig config = Fixtures.createTableConfig();
+    TableConfig config = createTableConfig();
     Schema schema = Fixtures.createSchema();
     TransformPipeline pipeline = new TransformPipeline(config, schema);
     GenericRow multipleRow = Fixtures.createMultipleRowPartialFailure(9527);
@@ -104,7 +109,7 @@ public class TransformPipelineTest {
   @Test
   public void testReuseResultSet()
       throws Exception {
-    TableConfig config = Fixtures.createTableConfig();
+    TableConfig config = createTableConfig();
     Schema schema = Fixtures.createSchema();
     TransformPipeline pipeline = new TransformPipeline(config, schema);
     GenericRow simpleRow = Fixtures.createSingleRow(9527);
