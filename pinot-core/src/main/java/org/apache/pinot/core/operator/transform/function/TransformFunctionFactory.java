@@ -105,6 +105,7 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.SQRT, SqrtTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.ROUND_DECIMAL, RoundDecimalTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.SIGN, SignTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.POWER, PowerTransformFunction.class);
 
     typeToImplementation.put(TransformFunctionType.CAST, CastTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.JSONEXTRACTSCALAR,

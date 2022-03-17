@@ -51,6 +51,7 @@ public enum TransformFunctionType {
   LOG10("log10"),
   SIGN("sign"),
   ROUND_DECIMAL("round_decimal"),
+  POWER("power"),
 
   LEAST("least"),
   GREATEST("greatest"),
