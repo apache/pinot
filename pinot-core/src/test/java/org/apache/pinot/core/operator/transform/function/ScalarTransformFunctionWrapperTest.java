@@ -417,6 +417,34 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   }
 
   @Test
+  public void testStringStartsWithTransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpressionFromSQL(String.format("starts_with(%s, 'A')", STRING_ALPHANUM_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "startsWith");
+    int[] expectedValues = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = StringUtils.startsWith(_stringAlphaNumericSVValues[i], "A") ? 1 : 0;
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testStringEndsWithTransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpressionFromSQL(String.format("ends_with(%s, 'A')", STRING_ALPHANUM_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "endsWith");
+    int[] expectedValues = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = StringUtils.endsWith(_stringAlphaNumericSVValues[i], "A") ? 1 : 0;
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
   public void testStringNormalizeTransformFunction() {
     ExpressionContext expression =
         RequestContextUtils.getExpressionFromSQL(String.format("normalize(%s)", STRING_ALPHANUM_SV_COLUMN));
