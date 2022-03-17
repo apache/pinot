@@ -9,6 +9,7 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 //TODO: The function should ideally be named 'round'
@@ -36,13 +37,20 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
     _leftTransformFunction = arguments.get(0);
     if (numArguments > 1) {
       _rightTransformFunction = arguments.get(1);
+      Preconditions.checkArgument(_rightTransformFunction.getResultMetadata().isSingleValue()
+              && isArgumentDataTypeValid(_rightTransformFunction),
+          "Argument must be single-valued with type INT for transform function: %s", getName());
     } else {
-      _rightTransformFunction = new LiteralTransformFunction("0");
+      _rightTransformFunction = null;
     }
 
-    Preconditions.checkArgument(
-        _leftTransformFunction.getResultMetadata().isSingleValue() || _rightTransformFunction.getResultMetadata()
-            .isSingleValue(), "Argument must be single-valued for transform function: %s", getName());
+    Preconditions.checkArgument(_leftTransformFunction.getResultMetadata().isSingleValue(),
+        "Argument must be single-valued for transform function: %s", getName());
+  }
+
+  private boolean isArgumentDataTypeValid(TransformFunction transformFunction) {
+    return transformFunction.getResultMetadata().getDataType().getStoredType() == FieldSpec.DataType.INT
+        || transformFunction.getResultMetadata().getDataType().getStoredType() == FieldSpec.DataType.LONG;
   }
 
   @Override
@@ -58,9 +66,15 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
 
     int length = projectionBlock.getNumDocs();
     double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(projectionBlock);
-    int[] rightValues = _rightTransformFunction.transformToIntValuesSV(projectionBlock);
-    for (int i = 0; i < length; i++) {
-      _result[i] = BigDecimal.valueOf(leftValues[i]).setScale(rightValues[i], RoundingMode.HALF_UP).doubleValue();
+    if (_rightTransformFunction != null) {
+      int[] rightValues = _rightTransformFunction.transformToIntValuesSV(projectionBlock);
+      for (int i = 0; i < length; i++) {
+        _result[i] = BigDecimal.valueOf(leftValues[i]).setScale(rightValues[i], RoundingMode.HALF_UP).doubleValue();
+      }
+    } else {
+      for (int i = 0; i < length; i++) {
+        _result[i] = BigDecimal.valueOf(leftValues[i]).setScale(0, RoundingMode.HALF_UP).doubleValue();
+      }
     }
 
     return _result;
