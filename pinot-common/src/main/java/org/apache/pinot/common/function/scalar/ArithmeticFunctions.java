@@ -82,13 +82,8 @@ public class ArithmeticFunctions {
     return Math.abs(a);
   }
 
-  @ScalarFunction
+  @ScalarFunction(names = {"ceil", "ceiling"})
   public static double ceil(double a) {
-    return Math.ceil(a);
-  }
-
-  @ScalarFunction
-  public static double ceiling(double a) {
     return Math.ceil(a);
   }
 
