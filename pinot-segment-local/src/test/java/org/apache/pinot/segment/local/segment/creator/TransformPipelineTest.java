@@ -25,13 +25,12 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.segment.local.segment.creator.Fixtures.createSchema;
-import static org.apache.pinot.segment.local.segment.creator.Fixtures.createSingleRow;
+import static org.apache.pinot.segment.local.segment.creator.Fixtures.*;
 
 
 public class TransformPipelineTest {
 
-  private static TableConfig createTableConfig()
+  private static TableConfig createTestTableConfig()
       throws Exception {
     return Fixtures.createTableConfig("some.consumer.class", "some.decoder.class");
   }
@@ -39,7 +38,7 @@ public class TransformPipelineTest {
   @Test
   public void testSingleRow()
       throws Exception {
-    TableConfig config = createTableConfig();
+    TableConfig config = createTestTableConfig();
     Schema schema = createSchema();
     TransformPipeline pipeline = new TransformPipeline(config, schema);
     GenericRow simpleRow = createSingleRow(9527);
@@ -54,10 +53,10 @@ public class TransformPipelineTest {
   @Test
   public void testSingleRowFailure()
       throws Exception {
-    TableConfig config = createTableConfig();
+    TableConfig config = createTestTableConfig();
     Schema schema = createSchema();
     TransformPipeline pipeline = new TransformPipeline(config, schema);
-    GenericRow simpleRow = Fixtures.createInvalidSingleRow(9527);
+    GenericRow simpleRow = createInvalidSingleRow(9527);
     boolean exceptionThrown = false;
     TransformPipeline.Result result = new TransformPipeline.Result();
     try {
@@ -74,10 +73,10 @@ public class TransformPipelineTest {
   @Test
   public void testMultipleRow()
       throws Exception {
-    TableConfig config = createTableConfig();
+    TableConfig config = createTestTableConfig();
     Schema schema = createSchema();
     TransformPipeline pipeline = new TransformPipeline(config, schema);
-    GenericRow multipleRow = Fixtures.createMultipleRow(9527);
+    GenericRow multipleRow = createMultipleRow(9527);
     Collection<GenericRow> rows = (Collection<GenericRow>) multipleRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
     TransformPipeline.Result result = new TransformPipeline.Result();
     pipeline.processRow(multipleRow, result);
@@ -91,10 +90,10 @@ public class TransformPipelineTest {
   @Test
   public void testMultipleRowPartialFailure()
       throws Exception {
-    TableConfig config = createTableConfig();
+    TableConfig config = createTestTableConfig();
     Schema schema = createSchema();
     TransformPipeline pipeline = new TransformPipeline(config, schema);
-    GenericRow multipleRow = Fixtures.createMultipleRowPartialFailure(9527);
+    GenericRow multipleRow = createMultipleRowPartialFailure(9527);
     TransformPipeline.Result result = new TransformPipeline.Result();
     boolean exceptionThrown = false;
     try {
@@ -112,7 +111,7 @@ public class TransformPipelineTest {
   @Test
   public void testReuseResultSet()
       throws Exception {
-    TableConfig config = createTableConfig();
+    TableConfig config = createTestTableConfig();
     Schema schema = createSchema();
     TransformPipeline pipeline = new TransformPipeline(config, schema);
     GenericRow simpleRow = createSingleRow(9527);
