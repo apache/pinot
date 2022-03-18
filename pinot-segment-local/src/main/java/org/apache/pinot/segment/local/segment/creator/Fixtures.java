@@ -101,8 +101,8 @@ public class Fixtures {
   //@formatter:on
   public static TableConfig createTableConfig(String consumerFactoryClass, String decoderFactoryClass)
       throws Exception {
-    return JsonUtils.stringToObject(String.format(TABLE_CONFIG_JSON_TEMPLATE, consumerFactoryClass, decoderFactoryClass),
-        TableConfig.class);
+    return JsonUtils.stringToObject(String.format(TABLE_CONFIG_JSON_TEMPLATE, consumerFactoryClass,
+        decoderFactoryClass), TableConfig.class);
   }
 
   public static Schema createSchema() throws Exception {
