@@ -18,7 +18,13 @@
  */
 package org.apache.pinot.common.utils.http;
 
+import com.google.common.base.Preconditions;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URI;
 import java.util.Collections;
 import java.util.HashMap;
@@ -26,7 +32,9 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
+import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
@@ -57,6 +65,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -96,9 +106,7 @@ public class HttpClient implements AutoCloseable {
    */
   public SimpleHttpResponse sendGetRequest(URI uri)
       throws IOException {
-    RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
-    setTimeout(requestBuilder, GET_REQUEST_SOCKET_TIMEOUT_MS);
-    return sendRequest(requestBuilder.build());
+    return sendGetRequest(uri, null);
   }
 
   public SimpleHttpResponse sendGetRequest(URI uri, @Nullable String authToken)
@@ -118,9 +126,7 @@ public class HttpClient implements AutoCloseable {
    */
   public SimpleHttpResponse sendDeleteRequest(URI uri)
       throws IOException {
-    RequestBuilder requestBuilder = RequestBuilder.delete(uri).setVersion(HttpVersion.HTTP_1_1);
-    setTimeout(requestBuilder, DELETE_REQUEST_SOCKET_TIMEOUT_MS);
-    return sendRequest(requestBuilder.build());
+    return sendDeleteRequest(uri, null);
   }
 
   public SimpleHttpResponse sendDeleteRequest(URI uri, @Nullable String authToken)
@@ -138,13 +144,14 @@ public class HttpClient implements AutoCloseable {
    *
    * @see #sendPostRequest(URI, HttpEntity, Map, String)
    */
-  public SimpleHttpResponse sendPostRequest(URI uri, HttpEntity payload, Map<String, String> headers)
+  public SimpleHttpResponse sendPostRequest(URI uri, @Nullable HttpEntity payload,
+      @Nullable Map<String, String> headers)
       throws IOException {
     return sendPostRequest(uri, payload, headers, null);
   }
 
-  public SimpleHttpResponse sendPostRequest(URI uri, HttpEntity payload, Map<String, String> headers,
-      @Nullable String authToken)
+  public SimpleHttpResponse sendPostRequest(URI uri, @Nullable HttpEntity payload,
+      @Nullable Map<String, String> headers, @Nullable String authToken)
       throws IOException {
     RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1);
     if (payload != null) {
@@ -167,12 +174,12 @@ public class HttpClient implements AutoCloseable {
    *
    * @see #sendPutRequest(URI, HttpEntity, Map, String)
    */
-  public SimpleHttpResponse sendPutRequest(URI uri, HttpEntity payload, Map<String, String> headers)
+  public SimpleHttpResponse sendPutRequest(URI uri, @Nullable HttpEntity payload, @Nullable Map<String, String> headers)
       throws IOException {
     return sendPutRequest(uri, payload, headers, null);
   }
 
-  public SimpleHttpResponse sendPutRequest(URI uri, HttpEntity payload, Map<String, String> headers,
+  public SimpleHttpResponse sendPutRequest(URI uri, @Nullable HttpEntity payload, @Nullable Map<String, String> headers,
       @Nullable String authToken)
       throws IOException {
     RequestBuilder requestBuilder = RequestBuilder.put(uri).setVersion(HttpVersion.HTTP_1_1);
@@ -182,6 +189,11 @@ public class HttpClient implements AutoCloseable {
     if (StringUtils.isNotBlank(authToken)) {
       requestBuilder.addHeader(AUTH_HTTP_HEADER, authToken);
     }
+    if (MapUtils.isNotEmpty(headers)) {
+      for (Map.Entry<String, String> header : headers.entrySet()) {
+        requestBuilder.addHeader(header.getKey(), header.getValue());
+      }
+    }
     setTimeout(requestBuilder, DELETE_REQUEST_SOCKET_TIMEOUT_MS);
     return sendRequest(requestBuilder.build());
   }
@@ -190,36 +202,50 @@ public class HttpClient implements AutoCloseable {
   // JSON post/put utility APIs
   // --------------------------------------------------------------------------
 
-  public SimpleHttpResponse postJsonRequest(URI uri, @Nullable String jsonRequestBody)
+  public SimpleHttpResponse sendJsonPostRequest(URI uri, @Nullable String jsonRequestBody)
       throws IOException {
-    return postJsonRequest(uri, jsonRequestBody, null);
+    return sendJsonPostRequest(uri, jsonRequestBody, null);
   }
 
-  public SimpleHttpResponse postJsonRequest(URI uri, @Nullable String requestBody,
+  public SimpleHttpResponse sendJsonPostRequest(URI uri, @Nullable String jsonRequestBody,
       @Nullable Map<String, String> headers)
+      throws IOException {
+    return sendJsonPostRequest(uri, jsonRequestBody, headers, null);
+  }
+
+  public SimpleHttpResponse sendJsonPostRequest(URI uri, @Nullable String jsonRequestBody,
+      @Nullable Map<String, String> headers, @Nullable String authToken)
       throws IOException {
     if (MapUtils.isEmpty(headers)) {
       headers = new HashMap<>();
     }
     headers.put(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
-    HttpEntity entity = requestBody == null ? null : new StringEntity(requestBody, ContentType.APPLICATION_JSON);
-    return sendPostRequest(uri, entity, headers, null);
+    HttpEntity entity =
+        jsonRequestBody == null ? null : new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON);
+    return sendPostRequest(uri, entity, headers, authToken);
   }
 
-  public SimpleHttpResponse putJsonRequest(URI uri, @Nullable String jsonRequestBody)
+  public SimpleHttpResponse sendJsonPutRequest(URI uri, @Nullable String jsonRequestBody)
       throws IOException {
-    return putJsonRequest(uri, jsonRequestBody, null);
+    return sendJsonPutRequest(uri, jsonRequestBody, null);
   }
 
-  public SimpleHttpResponse putJsonRequest(URI uri, @Nullable String requestBody,
+  public SimpleHttpResponse sendJsonPutRequest(URI uri, @Nullable String jsonRequestBody,
       @Nullable Map<String, String> headers)
+      throws IOException {
+    return sendJsonPutRequest(uri, jsonRequestBody, headers, null);
+  }
+
+  public SimpleHttpResponse sendJsonPutRequest(URI uri, @Nullable String jsonRequestBody,
+      @Nullable Map<String, String> headers, @Nullable String authToken)
       throws IOException {
     if (MapUtils.isEmpty(headers)) {
       headers = new HashMap<>();
     }
     headers.put(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
-    HttpEntity entity = requestBody == null ? null : new StringEntity(requestBody, ContentType.APPLICATION_JSON);
-    return sendPutRequest(uri, entity, headers, null);
+    HttpEntity entity =
+        jsonRequestBody == null ? null : new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON);
+    return sendPutRequest(uri, entity, headers, authToken);
   }
 
   // --------------------------------------------------------------------------
@@ -232,9 +258,8 @@ public class HttpClient implements AutoCloseable {
       if (response.containsHeader(CommonConstants.Controller.HOST_HTTP_HEADER)) {
         String controllerHost = response.getFirstHeader(CommonConstants.Controller.HOST_HTTP_HEADER).getValue();
         String controllerVersion = response.getFirstHeader(CommonConstants.Controller.VERSION_HTTP_HEADER).getValue();
-        LOGGER.info(String
-            .format("Sending request: %s to controller: %s, version: %s", request.getURI(), controllerHost,
-                controllerVersion));
+        LOGGER.info("Sending request: " + request.getURI() + " to controller: " + controllerHost + ", version: "
+            + controllerVersion);
       }
       int statusCode = response.getStatusLine().getStatusCode();
       if (statusCode >= 300) {
@@ -244,7 +269,7 @@ public class HttpClient implements AutoCloseable {
     }
   }
 
-  public CloseableHttpResponse execute(HttpUriRequest request)
+  protected CloseableHttpResponse execute(HttpUriRequest request)
       throws IOException {
     return _httpClient.execute(request);
   }
@@ -288,6 +313,51 @@ public class HttpClient implements AutoCloseable {
   }
 
   // --------------------------------------------------------------------------
+  // File Utils (via IOUtils)
+  // --------------------------------------------------------------------------
+
+  /**
+   * Download a file using default settings, with an optional auth token
+   *
+   * @param uri URI
+   * @param socketTimeoutMs Socket timeout in milliseconds
+   * @param dest File destination
+   * @param authToken auth token
+   * @param httpHeaders http headers
+   * @return Response status code
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public int downloadFile(URI uri, int socketTimeoutMs, File dest, String authToken, List<Header> httpHeaders)
+      throws IOException, HttpErrorStatusException {
+    HttpUriRequest request = getDownloadFileRequest(uri, socketTimeoutMs, authToken, httpHeaders);
+    try (CloseableHttpResponse response = _httpClient.execute(request)) {
+      StatusLine statusLine = response.getStatusLine();
+      int statusCode = statusLine.getStatusCode();
+      if (statusCode >= 300) {
+        throw new HttpErrorStatusException(HttpClient.getErrorMessage(request, response), statusCode);
+      }
+
+      HttpEntity entity = response.getEntity();
+      try (InputStream inputStream = response.getEntity().getContent();
+          OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(dest))) {
+        IOUtils.copyLarge(inputStream, outputStream);
+      }
+
+      // Verify content length if known
+      long contentLength = entity.getContentLength();
+      if (contentLength >= 0L) {
+        long fileLength = dest.length();
+        Preconditions.checkState(fileLength == contentLength, String
+            .format("While downloading file with uri: %s, file length: %d does not match content length: %d", uri,
+                fileLength, contentLength));
+      }
+
+      return statusCode;
+    }
+  }
+
+  // --------------------------------------------------------------------------
   // Static utility for dealing with lower-level API responses.
   // --------------------------------------------------------------------------
 
@@ -298,30 +368,6 @@ public class HttpClient implements AutoCloseable {
     } else {
       return resp;
     }
-  }
-
-  public static String getErrorMessage(HttpUriRequest request, CloseableHttpResponse response) {
-    String controllerHost = null;
-    String controllerVersion = null;
-    if (response.containsHeader(CommonConstants.Controller.HOST_HTTP_HEADER)) {
-      controllerHost = response.getFirstHeader(CommonConstants.Controller.HOST_HTTP_HEADER).getValue();
-      controllerVersion = response.getFirstHeader(CommonConstants.Controller.VERSION_HTTP_HEADER).getValue();
-    }
-    StatusLine statusLine = response.getStatusLine();
-    String reason;
-    try {
-      String entityStr = EntityUtils.toString(response.getEntity());
-      reason = JsonUtils.stringToObject(entityStr, SimpleHttpErrorInfo.class).getError();
-    } catch (Exception e) {
-      reason = String.format("Failed to get a reason, exception: %s", e.toString());
-    }
-    String errorMessage = String.format("Got error status code: %d (%s) with reason: \"%s\" while sending request: %s",
-        statusLine.getStatusCode(), statusLine.getReasonPhrase(), reason, request.getURI());
-    if (controllerHost != null) {
-      errorMessage =
-          String.format("%s to controller: %s, version: %s", errorMessage, controllerHost, controllerVersion);
-    }
-    return errorMessage;
   }
 
   public static void addHeadersAndParameters(RequestBuilder requestBuilder, @Nullable List<Header> headers,
@@ -354,6 +400,51 @@ public class HttpClient implements AutoCloseable {
       return Collections.emptyList();
     }
     return Collections.singletonList(new BasicHeader(AUTH_HTTP_HEADER, authToken));
+  }
+
+  private static String getErrorMessage(HttpUriRequest request, CloseableHttpResponse response) {
+    String controllerHost = null;
+    String controllerVersion = null;
+    if (response.containsHeader(CommonConstants.Controller.HOST_HTTP_HEADER)) {
+      controllerHost = response.getFirstHeader(CommonConstants.Controller.HOST_HTTP_HEADER).getValue();
+      controllerVersion = response.getFirstHeader(CommonConstants.Controller.VERSION_HTTP_HEADER).getValue();
+    }
+    StatusLine statusLine = response.getStatusLine();
+    String reason;
+    try {
+      String entityStr = EntityUtils.toString(response.getEntity());
+      reason = JsonUtils.stringToObject(entityStr, SimpleHttpErrorInfo.class).getError();
+    } catch (Exception e) {
+      reason = String.format("Failed to get a reason, exception: %s", e.toString());
+    }
+    String errorMessage = String.format("Got error status code: %d (%s) with reason: \"%s\" while sending request: %s",
+        statusLine.getStatusCode(), statusLine.getReasonPhrase(), reason, request.getURI());
+    if (controllerHost != null) {
+      errorMessage =
+          String.format("%s to controller: %s, version: %s", errorMessage, controllerHost, controllerVersion);
+    }
+    return errorMessage;
+  }
+
+  private static HttpUriRequest getDownloadFileRequest(URI uri, int socketTimeoutMs, String authToken,
+      List<Header> httpHeaders) {
+    RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
+    if (org.apache.commons.lang.StringUtils.isNotBlank(authToken)) {
+      requestBuilder.addHeader(HttpHeaders.AUTHORIZATION, authToken);
+    }
+    HttpClient.setTimeout(requestBuilder, socketTimeoutMs);
+    String userInfo = uri.getUserInfo();
+    if (userInfo != null) {
+      String encoded = Base64.encodeBase64String(userInfo.getBytes(UTF_8));
+      String authHeader = "Basic " + encoded;
+      requestBuilder.addHeader(HttpHeaders.AUTHORIZATION, authHeader);
+    }
+    if (httpHeaders != null && !httpHeaders.isEmpty()) {
+      for (Header header : httpHeaders) {
+        requestBuilder.addHeader(header);
+      }
+    }
+    return requestBuilder.build();
   }
 
   @Override

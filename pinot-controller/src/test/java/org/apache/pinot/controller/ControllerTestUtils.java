@@ -517,7 +517,7 @@ public abstract class ControllerTestUtils {
   public static String sendPostRequest(String urlString, String payload, Map<String, String> headers)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(_httpClient.postJsonRequest(
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(
           new URL(urlString).toURI(), payload, headers));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
@@ -538,7 +538,7 @@ public abstract class ControllerTestUtils {
   public static String sendPutRequest(String urlString, String payload, Map<String, String> headers)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(_httpClient.putJsonRequest(
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPutRequest(
           new URL(urlString).toURI(), payload, headers));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {

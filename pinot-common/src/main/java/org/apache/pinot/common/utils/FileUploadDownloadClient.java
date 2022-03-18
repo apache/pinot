@@ -18,13 +18,9 @@
  */
 package org.apache.pinot.common.utils;
 
-import com.google.common.base.Preconditions;
-import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -34,16 +30,12 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
-import org.apache.commons.codec.binary.Base64;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
 import org.apache.http.HttpVersion;
 import org.apache.http.NameValuePair;
-import org.apache.http.StatusLine;
-import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpUriRequest;
@@ -64,8 +56,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -316,8 +306,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
       throws URISyntaxException {
     return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(),
         OLD_SEGMENT_PATH + "/" + rawTableName + REVERT_REPLACE_SEGMENTS_PATH,
-        TYPE_DELIMITER + tableType + SEGMENT_LINEAGE_ENTRY_ID_PARAMETER + segmentLineageEntryId
-            + FORCE_REVERT_PARAMETER + forceRevert);
+        TYPE_DELIMITER + tableType + SEGMENT_LINEAGE_ENTRY_ID_PARAMETER + segmentLineageEntryId + FORCE_REVERT_PARAMETER
+            + forceRevert);
   }
 
   private static HttpUriRequest getUploadFileRequest(String method, URI uri, ContentBody contentBody,
@@ -374,8 +364,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
 
   private static HttpUriRequest getUploadSegmentMetadataFilesRequest(URI uri, Map<String, File> metadataFiles,
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int segmentUploadRequestTimeoutMs) {
-    MultipartEntityBuilder multipartEntityBuilder = MultipartEntityBuilder.create().
-        setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
+    MultipartEntityBuilder multipartEntityBuilder =
+        MultipartEntityBuilder.create().setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
     for (Map.Entry<String, File> entry : metadataFiles.entrySet()) {
       multipartEntityBuilder.addPart(entry.getKey(), getContentBody(entry.getKey(), entry.getValue()));
     }
@@ -446,27 +436,6 @@ public class FileUploadDownloadClient implements AutoCloseable {
     return requestBuilder.build();
   }
 
-  private static HttpUriRequest getDownloadFileRequest(URI uri, int socketTimeoutMs, String authToken,
-      List<Header> httpHeaders) {
-    RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
-    if (StringUtils.isNotBlank(authToken)) {
-      requestBuilder.addHeader(HttpHeaders.AUTHORIZATION, authToken);
-    }
-    HttpClient.setTimeout(requestBuilder, socketTimeoutMs);
-    String userInfo = uri.getUserInfo();
-    if (userInfo != null) {
-      String encoded = Base64.encodeBase64String(userInfo.getBytes(UTF_8));
-      String authHeader = "Basic " + encoded;
-      requestBuilder.addHeader(HttpHeaders.AUTHORIZATION, authHeader);
-    }
-    if (httpHeaders != null && !httpHeaders.isEmpty()) {
-      for (Header header : httpHeaders) {
-        requestBuilder.addHeader(header);
-      }
-    }
-    return requestBuilder.build();
-  }
-
   private static ContentBody getContentBody(String fileName, File file) {
     return new FileBody(file, ContentType.DEFAULT_BINARY, fileName);
   }
@@ -510,8 +479,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public SimpleHttpResponse addSchema(URI uri, String schemaName, File schemaFile, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters)
       throws IOException, HttpErrorStatusException {
-    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
-        getAddSchemaRequest(uri, schemaName, schemaFile, headers, parameters)));
+    return HttpClient.wrapAndThrowHttpException(
+        _httpClient.sendRequest(getAddSchemaRequest(uri, schemaName, schemaFile, headers, parameters)));
   }
 
   /**
@@ -619,8 +588,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public SimpleHttpResponse uploadSegment(URI uri, String segmentName, File segmentFile, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
-    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(getUploadSegmentRequest(
-        uri, segmentName, segmentFile, headers, parameters, socketTimeoutMs)));
+    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
+        getUploadSegmentRequest(uri, segmentName, segmentFile, headers, parameters, socketTimeoutMs)));
   }
 
   /**
@@ -695,8 +664,9 @@ public class FileUploadDownloadClient implements AutoCloseable {
     NameValuePair allowRefreshValuePair =
         new BasicNameValuePair(QueryParameters.ALLOW_REFRESH, String.valueOf(allowRefresh));
 
-    List<NameValuePair> parameters = Arrays
-        .asList(tableNameValuePair, tableTypeValuePair, enableParallelPushProtectionValuePair, allowRefreshValuePair);
+    List<NameValuePair> parameters =
+        Arrays.asList(tableNameValuePair, tableTypeValuePair, enableParallelPushProtectionValuePair,
+            allowRefreshValuePair);
     return uploadSegment(uri, segmentName, segmentFile, null, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
@@ -725,8 +695,9 @@ public class FileUploadDownloadClient implements AutoCloseable {
     parameters = parameters == null ? new ArrayList<>() : new ArrayList<>(parameters);
     parameters.add(tableNameValuePair);
     parameters.add(tableTypeValuePair);
-    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(getUploadSegmentRequest(
-        uri, segmentName, inputStream, headers, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS)));
+    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
+        getUploadSegmentRequest(uri, segmentName, inputStream, headers, parameters,
+            HttpClient.DEFAULT_SOCKET_TIMEOUT_MS)));
   }
 
   /**
@@ -747,8 +718,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public SimpleHttpResponse uploadSegment(URI uri, String segmentName, InputStream inputStream,
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
-    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(getUploadSegmentRequest(
-        uri, segmentName, inputStream, headers, parameters, socketTimeoutMs)));
+    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
+        getUploadSegmentRequest(uri, segmentName, inputStream, headers, parameters, socketTimeoutMs)));
   }
 
   /**
@@ -790,9 +761,9 @@ public class FileUploadDownloadClient implements AutoCloseable {
     SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(requestBuilder.build()));
     String downloadUrl = response.getResponse();
     if (downloadUrl.isEmpty()) {
-      throw new HttpErrorStatusException(String
-          .format("Returned segment download url is empty after requesting servers to upload by the path: %s", uri),
-          response.getStatusCode());
+      throw new HttpErrorStatusException(
+          String.format("Returned segment download url is empty after requesting servers to upload by the path: %s",
+              uri), response.getStatusCode());
     }
     return downloadUrl;
   }
@@ -814,8 +785,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public SimpleHttpResponse sendSegmentUri(URI uri, String downloadUri, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
-    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
-        getSendSegmentUriRequest(uri, downloadUri, headers, parameters, socketTimeoutMs)));
+    return HttpClient.wrapAndThrowHttpException(
+        _httpClient.sendRequest(getSendSegmentUriRequest(uri, downloadUri, headers, parameters, socketTimeoutMs)));
   }
 
   /**
@@ -856,8 +827,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public SimpleHttpResponse sendSegmentJson(URI uri, String jsonString, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
-    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
-        getSendSegmentJsonRequest(uri, jsonString, headers, parameters, socketTimeoutMs)));
+    return HttpClient.wrapAndThrowHttpException(
+        _httpClient.sendRequest(getSendSegmentJsonRequest(uri, jsonString, headers, parameters, socketTimeoutMs)));
   }
 
   /**
@@ -892,8 +863,9 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public SimpleHttpResponse startReplaceSegments(URI uri, StartReplaceSegmentsRequest startReplaceSegmentsRequest,
       @Nullable String authToken)
       throws IOException, HttpErrorStatusException {
-    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(getStartReplaceSegmentsRequest(
-        uri, JsonUtils.objectToString(startReplaceSegmentsRequest), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, authToken)));
+    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
+        getStartReplaceSegmentsRequest(uri, JsonUtils.objectToString(startReplaceSegmentsRequest),
+            HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, authToken)));
   }
 
   /**
@@ -908,8 +880,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
    */
   public SimpleHttpResponse endReplaceSegments(URI uri, int socketTimeoutMs, @Nullable String authToken)
       throws IOException, HttpErrorStatusException {
-    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
-        getEndReplaceSegmentsRequest(uri, socketTimeoutMs, authToken)));
+    return HttpClient.wrapAndThrowHttpException(
+        _httpClient.sendRequest(getEndReplaceSegmentsRequest(uri, socketTimeoutMs, authToken)));
   }
 
   /**
@@ -958,8 +930,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public SimpleHttpResponse sendSegmentCompletionProtocolRequest(URI uri, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
-    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
-        getSegmentCompletionProtocolRequest(uri, headers, parameters, socketTimeoutMs)));
+    return HttpClient.wrapAndThrowHttpException(
+        _httpClient.sendRequest(getSegmentCompletionProtocolRequest(uri, headers, parameters, socketTimeoutMs)));
   }
 
   /**
@@ -967,7 +939,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
    *
    * Download a file using default settings, with an optional auth token
    *
-   * @see FileUploadDownloadClient#downloadFile(URI, int, File, String, List)
+   * @see HttpClient#downloadFile(URI, int, File, String, List)
    *
    * @param uri URI
    * @param socketTimeoutMs Socket timeout in milliseconds
@@ -979,48 +951,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
   @Deprecated
   public int downloadFile(URI uri, int socketTimeoutMs, File dest)
       throws IOException, HttpErrorStatusException {
-    return downloadFile(uri, socketTimeoutMs, dest, null, null);
-  }
-
-  /**
-   * Download a file using default settings, with an optional auth token
-   *
-   * @param uri URI
-   * @param socketTimeoutMs Socket timeout in milliseconds
-   * @param dest File destination
-   * @param authToken auth token
-   * @param httpHeaders http headers
-   * @return Response status code
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
-  public int downloadFile(URI uri, int socketTimeoutMs, File dest, String authToken, List<Header> httpHeaders)
-      throws IOException, HttpErrorStatusException {
-    HttpUriRequest request = getDownloadFileRequest(uri, socketTimeoutMs, authToken, httpHeaders);
-    try (CloseableHttpResponse response = _httpClient.execute(request)) {
-      StatusLine statusLine = response.getStatusLine();
-      int statusCode = statusLine.getStatusCode();
-      if (statusCode >= 300) {
-        throw new HttpErrorStatusException(HttpClient.getErrorMessage(request, response), statusCode);
-      }
-
-      HttpEntity entity = response.getEntity();
-      try (InputStream inputStream = response.getEntity().getContent();
-          OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(dest))) {
-        IOUtils.copyLarge(inputStream, outputStream);
-      }
-
-      // Verify content length if known
-      long contentLength = entity.getContentLength();
-      if (contentLength >= 0L) {
-        long fileLength = dest.length();
-        Preconditions.checkState(fileLength == contentLength, String
-            .format("While downloading file with uri: %s, file length: %d does not match content length: %d", uri,
-                fileLength, contentLength));
-      }
-
-      return statusCode;
-    }
+    return _httpClient.downloadFile(uri, socketTimeoutMs, dest, null, null);
   }
 
   /**
@@ -1054,7 +985,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
    */
   public int downloadFile(URI uri, File dest, String authToken)
       throws IOException, HttpErrorStatusException {
-    return downloadFile(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, dest, null, null);
+    return _httpClient.downloadFile(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, dest, null, null);
   }
 
   /**
@@ -1070,7 +1001,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
    */
   public int downloadFile(URI uri, File dest, String authToken, List<Header> httpHeaders)
       throws IOException, HttpErrorStatusException {
-    return downloadFile(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, dest, authToken, httpHeaders);
+    return _httpClient.downloadFile(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, dest, authToken, httpHeaders);
   }
 
   /**
@@ -1080,8 +1011,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
    * @return param list
    */
   public static List<NameValuePair> makeTableParam(String tableName) {
-    return Collections
-        .singletonList(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, tableName));
+    return Collections.singletonList(
+        new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, tableName));
   }
 
   @Override

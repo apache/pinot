@@ -71,7 +71,7 @@ public class ControllerRequestClient {
   public void addTableConfig(TableConfig tableConfig)
       throws IOException {
     try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.postJsonRequest(new URL(
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
           _controllerRequestURLBuilder.forTableCreate()).toURI(), tableConfig.toJsonString()));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
@@ -81,7 +81,7 @@ public class ControllerRequestClient {
   public void createBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
     try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.postJsonRequest(new URL(
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
           _controllerRequestURLBuilder.forTenantCreate()).toURI(),
           getBrokerTenantRequestPayload(tenantName, numBrokers)));
     } catch (HttpErrorStatusException | URISyntaxException e) {
@@ -92,7 +92,7 @@ public class ControllerRequestClient {
   public void updateBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
     try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.putJsonRequest(new URL(
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPutRequest(new URL(
           _controllerRequestURLBuilder.forTenantCreate()).toURI(),
           getBrokerTenantRequestPayload(tenantName, numBrokers)));
     } catch (HttpErrorStatusException | URISyntaxException e) {
@@ -103,7 +103,7 @@ public class ControllerRequestClient {
   public void createServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
       throws IOException {
     try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.postJsonRequest(new URL(
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
           _controllerRequestURLBuilder.forTenantCreate()).toURI(),
           getServerTenantRequestPayload(tenantName, numOfflineServers, numRealtimeServers)));
     } catch (HttpErrorStatusException | URISyntaxException e) {
