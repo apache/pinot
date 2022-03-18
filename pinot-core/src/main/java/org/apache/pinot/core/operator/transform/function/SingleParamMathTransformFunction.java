@@ -164,6 +164,7 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
 
   public static class Log2TransformFunction extends SingleParamMathTransformFunction {
     public static final String FUNCTION_NAME = "log2";
+    public static final double LOG_BASE = Math.log(2);
 
     @Override
     public String getName() {
@@ -173,9 +174,8 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _results[i] = Math.log(values[i]) / Math.log(2);
+        _results[i] = Math.log(values[i]) / LOG_BASE;
       }
-      ;
     }
   }
 
@@ -192,7 +192,6 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
       for (int i = 0; i < length; i++) {
         _results[i] = Math.log10(values[i]);
       }
-      ;
     }
   }
 
@@ -209,7 +208,6 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
       for (int i = 0; i < length; i++) {
         _results[i] = Math.signum(values[i]);
       }
-      ;
     }
   }
 }
