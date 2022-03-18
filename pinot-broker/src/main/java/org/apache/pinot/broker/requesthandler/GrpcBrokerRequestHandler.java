@@ -42,7 +42,6 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
@@ -55,6 +54,7 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final StreamingReduceService _streamingReduceService;
   private final PinotStreamingQueryClient _streamingQueryClient;
 
+  // TODO: Support TLS
   public GrpcBrokerRequestHandler(PinotConfiguration config, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       BrokerMetrics brokerMetrics, TlsConfig tlsConfig) {
@@ -84,37 +84,25 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
       List<String>> realtimeRoutingTable, long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
       throws Exception {
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
-
-    String rawTableName = TableNameBuilder.extractRawTableName(originalBrokerRequest.getQuerySource().getTableName());
     Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap = new HashMap<>();
-    // Making request to a streaming server response.
-
     if (offlineBrokerRequest != null) {
-      // to offline servers.
       assert offlineRoutingTable != null;
-      streamingQueryToPinotServer(requestId, _brokerId, rawTableName, TableType.OFFLINE, responseMap,
-          offlineBrokerRequest, offlineRoutingTable, timeoutMs, true, 1);
+      sendRequest(TableType.OFFLINE, offlineBrokerRequest, offlineRoutingTable, responseMap);
     }
     if (realtimeBrokerRequest != null) {
-      // to realtime servers.
       assert realtimeRoutingTable != null;
-      streamingQueryToPinotServer(requestId, _brokerId, rawTableName, TableType.REALTIME, responseMap,
-          realtimeBrokerRequest, realtimeRoutingTable, timeoutMs, true, 1);
+      sendRequest(TableType.REALTIME, realtimeBrokerRequest, realtimeRoutingTable, responseMap);
     }
-    BrokerResponseNative brokerResponse = _streamingReduceService.reduceOnStreamResponse(
-        originalBrokerRequest, responseMap, timeoutMs, _brokerMetrics);
-    return brokerResponse;
+    return _streamingReduceService.reduceOnStreamResponse(originalBrokerRequest, responseMap, timeoutMs,
+        _brokerMetrics);
   }
 
   /**
    * Query pinot server for data table.
    */
-  public void streamingQueryToPinotServer(final long requestId, final String brokerHost, final String rawTableName,
-      final TableType tableType, Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap,
-      BrokerRequest brokerRequest, Map<ServerInstance, List<String>> routingTable, long connectionTimeoutInMillis,
-      boolean ignoreEmptyResponses, int pinotRetryCount) {
-    // Retries will all hit the same server because the routing decision has already been made by the pinot broker
-    Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> serverResponseMap = new HashMap<>();
+  private void sendRequest(TableType tableType, BrokerRequest brokerRequest,
+      Map<ServerInstance, List<String>> routingTable,
+      Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap) {
     for (Map.Entry<ServerInstance, List<String>> routingEntry : routingTable.entrySet()) {
       ServerInstance serverInstance = routingEntry.getKey();
       List<String> segments = routingEntry.getValue();
@@ -122,11 +110,9 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
       int port = serverInstance.getGrpcPort();
       // TODO: enable throttling on per host bases.
       Iterator<Server.ServerResponse> streamingResponse = _streamingQueryClient.submit(serverHost, port,
-          new GrpcRequestBuilder()
-              .setSegments(segments)
-              .setBrokerRequest(brokerRequest)
-              .setEnableStreaming(true));
-      responseMap.put(serverInstance.toServerRoutingInstance(tableType), streamingResponse);
+          new GrpcRequestBuilder().setSegments(segments).setBrokerRequest(brokerRequest).setEnableStreaming(true));
+      responseMap.put(serverInstance.toServerRoutingInstance(tableType, ServerInstance.RoutingType.GRPC),
+          streamingResponse);
     }
   }
 

@@ -1612,6 +1612,11 @@
             </goals>
           </execution>
         </executions>
+        <configuration>
+          <includes>
+            <include>org/apache/pinot/**/*</include>
+          </includes>
+        </configuration>
       </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
