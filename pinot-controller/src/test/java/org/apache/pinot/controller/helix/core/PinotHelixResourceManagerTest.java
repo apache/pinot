@@ -977,7 +977,7 @@ public class PinotHelixResourceManagerTest {
             .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, true)),
         new HashSet<>(Arrays.asList("s12", "s13", "s14")));
 
-    // Check empty segmentsFrom reverts previous lineage with empty segmentsFrom
+    // Check empty segmentsFrom won't revert previous lineage with empty segmentsFrom
     // Start a new segment replacement with empty segmentsFrom.
     segmentsFrom = new ArrayList<>();
     segmentsTo = Arrays.asList("s15", "s16");
@@ -995,13 +995,13 @@ public class PinotHelixResourceManagerTest {
         "downloadUrl");
 
     // Start another new segment replacement with empty segmentsFrom,
-    // and check that previous lineages with empty segmentsFrom are reverted.
+    // and check that previous lineages with empty segmentsFrom are not reverted.
     segmentsTo = Arrays.asList("s17", "s18");
     String lineageEntryId6 = ControllerTestUtils.getHelixResourceManager()
         .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, segmentsFrom, segmentsTo, true);
     segmentLineage = SegmentLineageAccessHelper
         .getSegmentLineage(ControllerTestUtils.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME);
-    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId5).getState(), LineageEntryState.REVERTED);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId5).getState(), LineageEntryState.IN_PROGRESS);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId6).getState(), LineageEntryState.IN_PROGRESS);
 
     // Finish the replacement
