@@ -36,6 +36,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GapfillUtils;
@@ -51,11 +52,13 @@ public class GapfillProcessor {
   private final QueryContext _queryContext;
 
   private final int _limitForAggregatedResult;
-  private final DateTimeGranularitySpec _dateTimeGranularity;
+  private final DateTimeGranularitySpec _gapfillDateTimeGranularity;
+  private final DateTimeGranularitySpec _postGapfillDateTimeGranularity;
   private final DateTimeFormatSpec _dateTimeFormatter;
   private final long _startMs;
   private final long _endMs;
-  private final long _timeBucketSize;
+  private final long _gapfillTimeBucketSize;
+  private final long _postGapfillTimeBucketSize;
   private final int _numOfTimeBuckets;
   private final List<Integer> _groupByKeyIndexes;
   private final Set<Key> _groupByKeys;
@@ -67,6 +70,7 @@ public class GapfillProcessor {
   private boolean[] _isGroupBySelections;
   private final int _timeBucketColumnIndex;
   private int[] _sourceColumnIndexForResultSchema = null;
+  private final int _aggregationSize;
 
   GapfillProcessor(QueryContext queryContext, GapfillUtils.GapfillType gapfillType) {
     _queryContext = queryContext;
@@ -85,15 +89,19 @@ public class GapfillProcessor {
     List<ExpressionContext> args = gapFillSelection.getFunction().getArguments();
 
     _dateTimeFormatter = new DateTimeFormatSpec(args.get(1).getLiteral());
-    _dateTimeGranularity = new DateTimeGranularitySpec(args.get(4).getLiteral());
+    _gapfillDateTimeGranularity = new DateTimeGranularitySpec(args.get(4).getLiteral());
+    _postGapfillDateTimeGranularity = new DateTimeGranularitySpec(args.get(5).getLiteral());
     String start = args.get(2).getLiteral();
     _startMs = truncate(_dateTimeFormatter.fromFormatToMillis(start));
     String end = args.get(3).getLiteral();
     _endMs = truncate(_dateTimeFormatter.fromFormatToMillis(end));
-    _timeBucketSize = _dateTimeGranularity.granularityToMillis();
-    _numOfTimeBuckets = (int) ((_endMs - _startMs) / _timeBucketSize);
+    _gapfillTimeBucketSize = _gapfillDateTimeGranularity.granularityToMillis();
+    _postGapfillTimeBucketSize = _postGapfillDateTimeGranularity.granularityToMillis();
+    _numOfTimeBuckets = (int) ((_endMs - _startMs) / _gapfillTimeBucketSize);
 
     _fillExpressions = GapfillUtils.getFillExpressions(gapFillSelection);
+
+    _aggregationSize = (int) (_postGapfillTimeBucketSize / _gapfillTimeBucketSize);
 
     _previousByGroupKey = new HashMap<>();
     _groupByKeyIndexes = new ArrayList<>();
@@ -103,8 +111,8 @@ public class GapfillProcessor {
     _timeSeries = timeseriesOn.getFunction().getArguments();
   }
 
-  private int findBucketIndex(long time) {
-    return (int) ((time - _startMs) / _timeBucketSize);
+  private int findGapfillBucketIndex(long time) {
+    return (int) ((time - _startMs) / _gapfillTimeBucketSize);
   }
 
   private void replaceColumnNameWithAlias(DataSchema dataSchema) {
@@ -228,7 +236,7 @@ public class GapfillProcessor {
   }
 
   private long truncate(long epoch) {
-    int sz = _dateTimeGranularity.getSize();
+    int sz = _gapfillDateTimeGranularity.getSize();
     return epoch / sz * sz;
   }
 
@@ -245,10 +253,12 @@ public class GapfillProcessor {
       postAggregateHavingFilterHandler =
           new GapfillFilterHandler(_queryContext.getHavingFilter(), dataSchemaForAggregatedResult);
     }
-
-    for (long time = _startMs; time < _endMs; time += _timeBucketSize) {
-      int index = findBucketIndex(time);
-      List<Object[]> bucketedResult = gapfill(time, timeBucketedRawRows[index], dataSchema, postGapfillFilterHandler);
+    long start = _startMs;
+    ColumnDataType[] resultColumnDataTypes = dataSchema.getColumnDataTypes();
+    List<Object[]> bucketedResult = new ArrayList<>();
+    for (long time = _startMs; time < _endMs; time += _gapfillTimeBucketSize) {
+      int index = findGapfillBucketIndex(time);
+      gapfill(time, bucketedResult, timeBucketedRawRows[index], dataSchema, postGapfillFilterHandler);
       if (_queryContext.getAggregationFunctions() == null) {
         for (Object [] row : bucketedResult) {
           Object[] resultRow = new Object[_sourceColumnIndexForResultSchema.length];
@@ -257,8 +267,15 @@ public class GapfillProcessor {
           }
           result.add(resultRow);
         }
-      } else if (bucketedResult.size() > 0) {
-        List<Object[]> aggregatedRows = aggregateGapfilledData(bucketedResult, dataSchema);
+        bucketedResult = new ArrayList<>();
+      } else if (index % _aggregationSize == _aggregationSize - 1 && bucketedResult.size() > 0) {
+        Object timeCol;
+        if (resultColumnDataTypes[_timeBucketColumnIndex] == ColumnDataType.LONG) {
+          timeCol = Long.valueOf(_dateTimeFormatter.fromMillisToFormat(start));
+        } else {
+          timeCol = _dateTimeFormatter.fromMillisToFormat(start);
+        }
+        List<Object[]> aggregatedRows = aggregateGapfilledData(timeCol, bucketedResult, dataSchema);
         for (Object[] aggregatedRow : aggregatedRows) {
           if (postAggregateHavingFilterHandler == null || postAggregateHavingFilterHandler.isMatch(aggregatedRow)) {
             result.add(aggregatedRow);
@@ -267,14 +284,15 @@ public class GapfillProcessor {
             return result;
           }
         }
+        bucketedResult = new ArrayList<>();
+        start = time + _gapfillTimeBucketSize;
       }
     }
     return result;
   }
 
-  private List<Object[]> gapfill(long bucketTime, List<Object[]> rawRowsForBucket, DataSchema dataSchema,
-      GapfillFilterHandler postGapfillFilterHandler) {
-    List<Object[]> bucketedResult = new ArrayList<>();
+  private void gapfill(long bucketTime, List<Object[]> bucketedResult, List<Object[]> rawRowsForBucket,
+      DataSchema dataSchema, GapfillFilterHandler postGapfillFilterHandler) {
     ColumnDataType[] resultColumnDataTypes = dataSchema.getColumnDataTypes();
     int numResultColumns = resultColumnDataTypes.length;
     Set<Key> keys = new HashSet<>(_groupByKeys);
@@ -308,7 +326,7 @@ public class GapfillProcessor {
     for (Key key : keys) {
       Object[] gapfillRow = new Object[numResultColumns];
       int keyIndex = 0;
-      if (resultColumnDataTypes[0] == ColumnDataType.LONG) {
+      if (resultColumnDataTypes[_timeBucketColumnIndex] == ColumnDataType.LONG) {
         gapfillRow[0] = Long.valueOf(_dateTimeFormatter.fromMillisToFormat(bucketTime));
       } else {
         gapfillRow[0] = _dateTimeFormatter.fromMillisToFormat(bucketTime);
@@ -334,15 +352,18 @@ public class GapfillProcessor {
     } else {
       _limitForGapfilledResult = 0;
     }
-    return bucketedResult;
   }
 
-  private List<Object[]> aggregateGapfilledData(List<Object[]> bucketedRows, DataSchema dataSchema) {
+  private List<Object[]> aggregateGapfilledData(Object timeCol, List<Object[]> bucketedRows, DataSchema dataSchema) {
     List<ExpressionContext> groupbyExpressions = _queryContext.getGroupByExpressions();
     Preconditions.checkArgument(groupbyExpressions != null, "No GroupBy Clause.");
     Map<String, Integer> indexes = new HashMap<>();
     for (int i = 0; i < dataSchema.getColumnNames().length; i++) {
       indexes.put(dataSchema.getColumnName(i), i);
+    }
+
+    for (Object [] bucketedRow : bucketedRows) {
+      bucketedRow[_timeBucketColumnIndex] = timeCol;
     }
 
     Map<List<Object>, Integer> groupKeyIndexes = new HashMap<>();
@@ -386,7 +407,13 @@ public class GapfillProcessor {
             AggregationFunctionFactory.getAggregationFunction(functionContext, _queryContext);
         GroupByResultHolder groupByResultHolder =
             aggregationFunction.createGroupByResultHolder(_groupByKeys.size(), _groupByKeys.size());
-        aggregationFunction.aggregateGroupBySV(bucketedRows.size(), groupKeyArray, groupByResultHolder, blockValSetMap);
+        if (aggregationFunction instanceof CountAggregationFunction) {
+          aggregationFunction.aggregateGroupBySV(
+              bucketedRows.size(), groupKeyArray, groupByResultHolder, new HashMap<ExpressionContext, BlockValSet>());
+        } else {
+          aggregationFunction.aggregateGroupBySV(
+              bucketedRows.size(), groupKeyArray, groupByResultHolder, blockValSetMap);
+        }
         for (int j = 0; j < groupKeyIndexes.size(); j++) {
           Object[] row = aggregatedResult.get(j);
           row[i] = aggregationFunction.extractGroupByResult(groupByResultHolder, j);
@@ -432,7 +459,7 @@ public class GapfillProcessor {
 
     for (Object[] row: rows) {
       long timeBucket = _dateTimeFormatter.fromFormatToMillis(String.valueOf(row[_timeBucketColumnIndex]));
-      int index = findBucketIndex(timeBucket);
+      int index = findGapfillBucketIndex(timeBucket);
       if (bucketedItems[index] == null) {
         bucketedItems[index] = new ArrayList<>();
       }
