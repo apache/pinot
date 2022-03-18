@@ -51,6 +51,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
@@ -340,6 +341,22 @@ public final class TableConfigUtils {
             throw new IllegalStateException(
                 "Arguments of a transform function '" + arguments + "' cannot contain the destination column '"
                     + columnName + "'");
+          }
+        }
+      }
+
+      // Complex configs
+      ComplexTypeConfig complexTypeConfig = ingestionConfig.getComplexTypeConfig();
+      if (complexTypeConfig != null && schema != null) {
+        Map<String, String> prefixesToRename = complexTypeConfig.getPrefixesToRename();
+        Set<String> fieldNames = schema.getFieldSpecMap().keySet();
+        if (MapUtils.isNotEmpty(prefixesToRename)) {
+          for (String prefix : prefixesToRename.keySet()) {
+            for (String field : fieldNames) {
+              Preconditions.checkState(!field.startsWith(prefix),
+                      "Fields in the schema may not begin with any prefix specified in the prefixesToRename"
+                              + " config. Name conflict with field: " + field + " and prefix: " + prefix);
+            }
           }
         }
       }

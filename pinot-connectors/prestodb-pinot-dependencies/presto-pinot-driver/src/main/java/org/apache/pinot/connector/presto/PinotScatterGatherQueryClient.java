@@ -200,7 +200,7 @@ public class PinotScatterGatherQueryClient {
 
     // Setup QueryRouters
     for (int i = 0; i < pinotConfig.getThreadPoolSize(); i++) {
-      _queryRouters.add(new QueryRouter(String.format("%s-%d", _prestoHostId, i), _brokerMetrics, tlsConfig));
+      _queryRouters.add(new QueryRouter(String.format("%s-%d", _prestoHostId, i), _brokerMetrics, null, tlsConfig));
     }
 
     _config = pinotConfig;

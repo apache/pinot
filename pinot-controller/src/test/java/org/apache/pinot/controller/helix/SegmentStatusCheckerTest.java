@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix;
 
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.AccessOption;
@@ -27,6 +28,10 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.lineage.LineageEntry;
+import org.apache.pinot.common.lineage.LineageEntryState;
+import org.apache.pinot.common.lineage.SegmentLineage;
+import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -41,7 +46,9 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -49,6 +56,7 @@ import static org.mockito.Mockito.when;
 public class SegmentStatusCheckerTest {
   private SegmentStatusChecker _segmentStatusChecker;
   private PinotHelixResourceManager _helixResourceManager;
+  private ZkHelixPropertyStore<ZNRecord> _helixPropertyStore;
   private LeadControllerManager _leadControllerManager;
   private PinotMetricsRegistry _metricsRegistry;
   private ControllerMetrics _controllerMetrics;
@@ -68,6 +76,12 @@ public class SegmentStatusCheckerTest {
     idealState.setPartitionState("myTable_1", "pinot2", "ONLINE");
     idealState.setPartitionState("myTable_1", "pinot3", "ONLINE");
     idealState.setPartitionState("myTable_2", "pinot3", "OFFLINE");
+    idealState.setPartitionState("myTable_3", "pinot1", "ONLINE");
+    idealState.setPartitionState("myTable_3", "pinot2", "ONLINE");
+    idealState.setPartitionState("myTable_3", "pinot3", "ONLINE");
+    idealState.setPartitionState("myTable_4", "pinot1", "ONLINE");
+    idealState.setPartitionState("myTable_4", "pinot2", "ONLINE");
+    idealState.setPartitionState("myTable_4", "pinot3", "ONLINE");
     idealState.setReplicas("2");
     idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
 
@@ -76,12 +90,32 @@ public class SegmentStatusCheckerTest {
     externalView.setState("myTable_0", "pinot2", "ONLINE");
     externalView.setState("myTable_1", "pinot1", "ERROR");
     externalView.setState("myTable_1", "pinot2", "ONLINE");
+    externalView.setState("myTable_1", "pinot3", "ERROR");
+    externalView.setState("myTable_3", "pinot1", "ERROR");
+    externalView.setState("myTable_3", "pinot2", "ONLINE");
+    externalView.setState("myTable_3", "pinot3", "ONLINE");
+    externalView.setState("myTable_4", "pinot1", "ONLINE");
 
     {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
       when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(_helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(tableName)).thenReturn(externalView);
+    }
+    {
+      _helixPropertyStore = mock(ZkHelixPropertyStore.class);
+      when(_helixResourceManager.getPropertyStore()).thenReturn(_helixPropertyStore);
+      // Based on the lineage entries: {myTable_1 -> myTable_3, COMPLETED}, {myTable_3 -> myTable_4, IN_PROGRESS},
+      // myTable_1 and myTable_4 will be skipped for the metrics.
+      SegmentLineage segmentLineage = new SegmentLineage(tableName);
+      segmentLineage.addLineageEntry(SegmentLineageUtils.generateLineageEntryId(),
+          new LineageEntry(Collections.singletonList("myTable_1"), Collections.singletonList("myTable_3"),
+              LineageEntryState.COMPLETED, 11111L));
+      segmentLineage.addLineageEntry(SegmentLineageUtils.generateLineageEntryId(),
+          new LineageEntry(Collections.singletonList("myTable_3"), Collections.singletonList("myTable_4"),
+              LineageEntryState.IN_PROGRESS, 11111L));
+      when(_helixPropertyStore.get(eq("/SEGMENT_LINEAGE/" + tableName), any(), eq(AccessOption.PERSISTENT)))
+          .thenReturn(segmentLineage.toZNRecord());
     }
     {
       _config = mock(ControllerConf.class);
@@ -98,15 +132,20 @@ public class SegmentStatusCheckerTest {
         new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();
+    Assert
+        .assertEquals(_controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.SEGMENT_COUNT), 3);
+    Assert.assertEquals(
+        _controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.SEGMENT_COUNT_INCLUDING_REPLACED),
+        5);
     Assert.assertEquals(
         _controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.SEGMENTS_IN_ERROR_STATE), 1);
     Assert
         .assertEquals(_controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.NUMBER_OF_REPLICAS),
-            1);
+            2);
     Assert
         .assertEquals(
             _controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_OF_REPLICAS),
-            33);
+            66);
     Assert.assertEquals(
         _controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
   }
@@ -147,6 +186,8 @@ public class SegmentStatusCheckerTest {
 
     {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
+      _helixPropertyStore = mock(ZkHelixPropertyStore.class);
+      when(_helixResourceManager.getPropertyStore()).thenReturn(_helixPropertyStore);
       when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(_helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(tableName)).thenReturn(externalView);
@@ -223,6 +264,8 @@ public class SegmentStatusCheckerTest {
 
     {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
+      _helixPropertyStore = mock(ZkHelixPropertyStore.class);
+      when(_helixResourceManager.getPropertyStore()).thenReturn(_helixPropertyStore);
       when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(_helixResourceManager.getTableIdealState(offlineTableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(offlineTableName)).thenReturn(externalView);
@@ -272,6 +315,8 @@ public class SegmentStatusCheckerTest {
 
     {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
+      _helixPropertyStore = mock(ZkHelixPropertyStore.class);
+      when(_helixResourceManager.getPropertyStore()).thenReturn(_helixPropertyStore);
       when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(_helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(tableName)).thenReturn(null);
@@ -378,6 +423,8 @@ public class SegmentStatusCheckerTest {
 
     {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
+      _helixPropertyStore = mock(ZkHelixPropertyStore.class);
+      when(_helixResourceManager.getPropertyStore()).thenReturn(_helixPropertyStore);
       when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(_helixResourceManager.getTableIdealState(offlineTableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(offlineTableName)).thenReturn(externalView);
@@ -429,6 +476,8 @@ public class SegmentStatusCheckerTest {
 
     {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
+      _helixPropertyStore = mock(ZkHelixPropertyStore.class);
+      when(_helixResourceManager.getPropertyStore()).thenReturn(_helixPropertyStore);
       when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(_helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(tableName)).thenReturn(null);

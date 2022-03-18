@@ -39,6 +39,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
@@ -401,6 +402,22 @@ public class TableConfigUtilsTest {
         new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("transformedCol", "reverse(x)"),
             new TransformConfig("myCol", "lower(transformedCol)")), null)).build();
     TableConfigUtils.validate(tableConfig, schema);
+
+    // invalid field name in schema with matching prefix from complexConfigType's prefixesToRename
+    HashMap<String, String> prefixesToRename = new HashMap<>();
+    prefixesToRename.put("after.", "");
+    ComplexTypeConfig complexConfig = new ComplexTypeConfig(null, ".", null, prefixesToRename);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
+            new IngestionConfig(null, null, null,
+                    null, complexConfig)).build();
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+            .addMultiValueDimension("after.test", FieldSpec.DataType.STRING).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail due to name conflict from field name in schema with a prefix in prefixesToRename");
+    } catch (IllegalStateException e) {
+      // expected
+    }
   }
 
   @Test

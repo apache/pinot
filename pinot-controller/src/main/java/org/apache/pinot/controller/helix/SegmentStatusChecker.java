@@ -18,12 +18,17 @@
  */
 package org.apache.pinot.controller.helix;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.lineage.SegmentLineage;
+import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
+import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -147,11 +152,19 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       return;
     }
 
+    // Get the segments excluding the replaced segments which are specified in the segment lineage entries and cannot
+    // be queried from the table.
+    Set<String> segmentsExcludeReplaced = new HashSet<>(idealState.getPartitionSet());
+    SegmentLineage segmentLineage =
+        SegmentLineageAccessHelper.getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), tableNameWithType);
+    SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(segmentsExcludeReplaced, segmentLineage);
     _controllerMetrics
         .setValueOfTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_SIZE, idealState.toString().length());
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_BYTE_SIZE,
         idealState.serialize(RECORD_SERIALIZER).length);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENT_COUNT,
+        (long) segmentsExcludeReplaced.size());
+    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENT_COUNT_INCLUDING_REPLACED,
         (long) (idealState.getPartitionSet().size()));
     ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
 
@@ -160,7 +173,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     int nErrors = 0; // Keeps track of number of segments in error state
     int nOffline = 0; // Keeps track of number segments with no online replicas
     int nSegments = 0; // Counts number of segments
-    for (String partitionName : idealState.getPartitionSet()) {
+    for (String partitionName : segmentsExcludeReplaced) {
       int nReplicas = 0;
       int nIdeal = 0;
       nSegments++;
@@ -246,6 +259,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_SIZE);
       _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_BYTE_SIZE);
       _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.SEGMENT_COUNT);
+      _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.SEGMENT_COUNT_INCLUDING_REPLACED);
 
       _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_IN_ERROR_STATE);
       _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE);

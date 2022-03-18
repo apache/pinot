@@ -39,6 +39,11 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   PERCENT_SEGMENTS_AVAILABLE("segments", false),
 
   SEGMENT_COUNT("SegmentCount", false),
+
+  // Number of segments including the replaced segments which are specified in the segment lineage entries and cannot
+  // be queried from the table.
+  SEGMENT_COUNT_INCLUDING_REPLACED("SegmentCount", false),
+
   IDEALSTATE_ZNODE_SIZE("idealstate", false),
   IDEALSTATE_ZNODE_BYTE_SIZE("idealstate", false),
   REALTIME_TABLE_COUNT("TableCount", true),

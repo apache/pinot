@@ -299,8 +299,8 @@ public final class IngestionUtils {
    * TableConfig and Schema
    * Fields for ingestion come from 2 places:
    * 1. The schema
-   * 2. The ingestion config in the table config. The ingestion config (e.g. filter) can have fields which are not in
-   * the schema.
+   * 2. The ingestion config in the table config. The ingestion config (e.g. filter, complexType) can have fields which
+   * are not in the schema.
    */
   public static Set<String> getFieldsForRecordExtractor(@Nullable IngestionConfig ingestionConfig, Schema schema) {
     Set<String> fieldsForRecordExtractor = new HashSet<>();
@@ -370,6 +370,10 @@ public final class IngestionUtils {
               .getColumnName()); // add the column itself too, so that if it is already transformed, we won't
           // transform again
         }
+      }
+      ComplexTypeConfig complexTypeConfig = ingestionConfig.getComplexTypeConfig();
+      if (complexTypeConfig != null && complexTypeConfig.getFieldsToUnnest() != null) {
+        fields.addAll(complexTypeConfig.getFieldsToUnnest());
       }
     }
   }

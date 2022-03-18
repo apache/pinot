@@ -33,11 +33,19 @@ public class GitHubEventsQuickStartCommand extends AbstractBaseAdminCommand impl
   @CommandLine.Option(names = {"-personalAccessToken"}, required = true, description = "GitHub personal access token.")
   private String _personalAccessToken;
 
+  @CommandLine.Option(names = {"-sourceType"}, defaultValue = "Kafka",
+      description = "Stream DataSource to use for ingesting data. Supported values - Kafka,Kinesis")
+  private String _sourceType;
+
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message.")
   private boolean _help = false;
 
   public void setPersonalAccessToken(String personalAccessToken) {
     _personalAccessToken = personalAccessToken;
+  }
+
+  public void setSourceType(String sourceType) {
+    _sourceType = sourceType;
   }
 
   @Override
@@ -52,7 +60,7 @@ public class GitHubEventsQuickStartCommand extends AbstractBaseAdminCommand impl
 
   @Override
   public String toString() {
-    return ("GitHubEventsQuickStart -personalAccessToken " + _personalAccessToken);
+    return ("GitHubEventsQuickStart -personalAccessToken " + _personalAccessToken + " -sourceType" + _sourceType);
   }
 
   @Override
@@ -68,7 +76,7 @@ public class GitHubEventsQuickStartCommand extends AbstractBaseAdminCommand impl
   public boolean execute()
       throws Exception {
     PluginManager.get().init();
-    new GitHubEventsQuickstart().setPersonalAccessToken(_personalAccessToken).execute();
+    new GitHubEventsQuickstart().setPersonalAccessToken(_personalAccessToken).setSourceType(_sourceType).execute();
     return true;
   }
 }
