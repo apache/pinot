@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
 
@@ -35,6 +34,7 @@ public class TruncateDecimalTransformFunction extends BaseTransformFunction {
   private double[] _result;
   private TransformFunction _leftTransformFunction;
   private TransformFunction _rightTransformFunction;
+  private Integer _scale;
 
   @Override
   public String getName() {
@@ -53,18 +53,25 @@ public class TruncateDecimalTransformFunction extends BaseTransformFunction {
     _leftTransformFunction = arguments.get(0);
     if (numArguments > 1) {
       _rightTransformFunction = arguments.get(1);
-      Preconditions.checkArgument(_rightTransformFunction.getResultMetadata().isSingleValue()
-              && isArgumentDataTypeValid(_rightTransformFunction),
-          "Argument must be single-valued with type INT for transform function: %s", getName());
+      if (_rightTransformFunction instanceof LiteralTransformFunction) {
+        _scale = Integer.parseInt(((LiteralTransformFunction) _rightTransformFunction).getLiteral());
+      } else {
+        _scale = null;
+      }
+      Preconditions.checkArgument(
+          _rightTransformFunction.getResultMetadata().isSingleValue() && isIntegralResultDatatype(
+              _rightTransformFunction), "Argument must be single-valued with type INT for transform function: %s",
+          getName());
     } else {
       _rightTransformFunction = null;
+      _scale = null;
     }
 
     Preconditions.checkArgument(_leftTransformFunction.getResultMetadata().isSingleValue(),
         "Argument must be single-valued for transform function: %s", getName());
   }
 
-  private boolean isArgumentDataTypeValid(TransformFunction transformFunction) {
+  private boolean isIntegralResultDatatype(TransformFunction transformFunction) {
     return transformFunction.getResultMetadata().getDataType().getStoredType() == FieldSpec.DataType.INT
         || transformFunction.getResultMetadata().getDataType().getStoredType() == FieldSpec.DataType.LONG;
   }
@@ -76,13 +83,18 @@ public class TruncateDecimalTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_result == null) {
-      _result = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int length = projectionBlock.getNumDocs();
+
+    if (_result == null || _result.length < length) {
+      _result = new double[length];
     }
 
-    int length = projectionBlock.getNumDocs();
     double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(projectionBlock);
-    if (_rightTransformFunction != null) {
+    if (_scale != null) {
+      for (int i = 0; i < length; i++) {
+        _result[i] = BigDecimal.valueOf(leftValues[i]).setScale(_scale, RoundingMode.DOWN).doubleValue();
+      }
+    } else if (_rightTransformFunction != null) {
       int[] rightValues = _rightTransformFunction.transformToIntValuesSV(projectionBlock);
       for (int i = 0; i < length; i++) {
         _result[i] = BigDecimal.valueOf(leftValues[i]).setScale(rightValues[i], RoundingMode.DOWN).doubleValue();

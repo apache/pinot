@@ -29,7 +29,7 @@ import org.testng.annotations.Test;
 public class TruncateDecimalTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test
-  public void testRoundDecimalTransformFunction() {
+  public void testTruncateDecimalTransformFunction() {
     ExpressionContext expression =
         RequestContextUtils.getExpressionFromSQL(String.format("truncate(%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
