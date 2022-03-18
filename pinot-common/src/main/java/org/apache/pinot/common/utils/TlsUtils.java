@@ -262,23 +262,26 @@ public final class TlsUtils {
     return inputUri.toURL();
   }
 
+  /**
+   * Get the SSL context, see: {@link SSLContextHolder} for more details.
+   * @return the SSL context.
+   */
   public static SSLContext getSslContext() {
     return SSLContextHolder.SSL_CONTEXT;
   }
 
+  /**
+   * Set the SSL context, see: {@link SSLContextHolder} for more details.
+   * @param sslContext the SSL context to be set.
+   */
   public static void setSslContext(SSLContext sslContext) {
-    registerOverride(sslContext);
-  }
-
-  private static void registerOverride(SSLContext override) {
-    if (!SSL_CONTEXT_REF.compareAndSet(null, override)) {
+    if (!SSL_CONTEXT_REF.compareAndSet(null, sslContext)) {
       LOGGER.warn("SSL Context has already been set.");
-      // warn that something else beat the caller here
     }
   }
 
   /**
-   * SSL Context Holder that holds static reference SSL_CONTEXT, reference via the SSLContextHolder.SSL_CONTEXT
+   * SSL Context Holder that holds static reference SSL_CONTEXT, reference via {@link SSLContextHolder#SSL_CONTEXT}.
    *
    * this context is set via the {@link TlsUtils#SSL_CONTEXT_REF} which can at most once override the default
    * SSLContext object. The advantage of this design is:
