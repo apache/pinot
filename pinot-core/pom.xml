@@ -124,8 +124,10 @@
     </dependency>-->
     <dependency>
       <groupId>io.netty</groupId>
-      <artifactId>netty-tcnative-boringssl-static</artifactId>
-      <version>${netty-tcnative.version}</version>
+      <artifactId>netty-bom</artifactId>
+      <version>${netty.version}</version>
+      <type>pom</type>
+      <scope>import</scope>
     </dependency>
     <dependency>
       <groupId>io.netty</groupId>
@@ -134,18 +136,6 @@
     <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-all</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-transport-native-epoll</artifactId>
-      <version>${netty.version}</version>
-      <classifier>linux-x86_64</classifier>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-transport-native-kqueue</artifactId>
-      <version>${netty.version}</version>
-      <classifier>osx-x86_64</classifier>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>

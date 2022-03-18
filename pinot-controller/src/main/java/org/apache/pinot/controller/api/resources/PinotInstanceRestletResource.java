@@ -241,17 +241,21 @@ public class PinotInstanceRestletResource {
   public SuccessResponse dropInstance(
       @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000")
       @PathParam("instanceName") String instanceName) {
-    if (!_pinotHelixResourceManager.instanceExists(instanceName)) {
-      throw new ControllerApplicationException(LOGGER, "Instance " + instanceName + " not found",
-          Response.Status.NOT_FOUND);
-    }
-
+    boolean instanceExists = _pinotHelixResourceManager.instanceExists(instanceName);
+    // NOTE: Even if instance config does not exist, still try to delete remaining instance ZK nodes in case some nodes
+    //       are created again due to race condition (state transition messages added after instance is dropped).
     PinotResourceManagerResponse response = _pinotHelixResourceManager.dropInstance(instanceName);
-    if (!response.isSuccessful()) {
+    if (response.isSuccessful()) {
+      if (instanceExists) {
+        return new SuccessResponse("Successfully dropped instance");
+      } else {
+        throw new ControllerApplicationException(LOGGER, "Instance " + instanceName + " not found",
+            Response.Status.NOT_FOUND);
+      }
+    } else {
       throw new ControllerApplicationException(LOGGER,
           "Failed to drop instance " + instanceName + " - " + response.getMessage(), Response.Status.CONFLICT);
     }
-    return new SuccessResponse("Successfully dropped instance");
   }
 
   @PUT
