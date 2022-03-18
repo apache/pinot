@@ -55,6 +55,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
 import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
 import org.apache.pinot.parsers.QueryCompiler;
+import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -344,6 +345,7 @@ public class InputManager {
       throws IOException {
     ObjectReader reader = new ObjectMapper().readerFor(Schema.class);
     _schema = reader.readValue(jsonNode);
+    SchemaUtils.validate(_schema);
     reader = new ObjectMapper().readerFor(SchemaWithMetaData.class);
     _schemaWithMetaData = reader.readValue(jsonNode);
     _schemaWithMetaData.getDimensionFieldSpecs().forEach(fieldMetadata -> {
