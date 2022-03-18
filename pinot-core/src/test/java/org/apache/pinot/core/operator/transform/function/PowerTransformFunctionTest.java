@@ -75,4 +75,19 @@ public class PowerTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
   }
+
+  @Test
+  public void testPowerTransformFunctionWithLiteralExponents() {
+    Double exponent = 2.5;
+    ExpressionContext expression =
+        RequestContextUtils.getExpressionFromSQL(String.format("power(%s, %f)", INT_SV_COLUMN, exponent));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof PowerTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), PowerTransformFunction.FUNCTION_NAME);
+    double[] expectedValues = new double[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.pow((double) _intSVValues[i], exponent);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
 }

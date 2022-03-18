@@ -32,6 +32,7 @@ public class PowerTransformFunction extends BaseTransformFunction {
   private double[] _result;
   private TransformFunction _leftTransformFunction;
   private TransformFunction _rightTransformFunction;
+  private Double _exponent;
 
   @Override
   public String getName() {
@@ -47,6 +48,11 @@ public class PowerTransformFunction extends BaseTransformFunction {
 
     _leftTransformFunction = arguments.get(0);
     _rightTransformFunction = arguments.get(1);
+    if (_rightTransformFunction instanceof LiteralTransformFunction) {
+      _exponent = Double.parseDouble(((LiteralTransformFunction) _rightTransformFunction).getLiteral());
+    } else {
+      _exponent = null;
+    }
     Preconditions.checkArgument(
         _leftTransformFunction.getResultMetadata().isSingleValue() || _rightTransformFunction.getResultMetadata()
             .isSingleValue(), "Argument must be single-valued for transform function: %s", getName());
@@ -65,9 +71,15 @@ public class PowerTransformFunction extends BaseTransformFunction {
 
     int length = projectionBlock.getNumDocs();
     double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(projectionBlock);
-    double[] rightValues = _rightTransformFunction.transformToDoubleValuesSV(projectionBlock);
-    for (int i = 0; i < length; i++) {
-      _result[i] = Math.pow(leftValues[i], rightValues[i]);
+    if (_exponent != null) {
+      for (int i = 0; i < length; i++) {
+        _result[i] = Math.pow(leftValues[i], _exponent);
+      }
+    } else {
+      double[] rightValues = _rightTransformFunction.transformToDoubleValuesSV(projectionBlock);
+      for (int i = 0; i < length; i++) {
+        _result[i] = Math.pow(leftValues[i], rightValues[i]);
+      }
     }
     return _result;
   }
