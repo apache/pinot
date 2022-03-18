@@ -70,13 +70,11 @@ public class IsNullTransformFunction extends BaseTransformFunction {
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-    if (_results == null || _results.length < length) {
-      _results = new int[length];
-    }
+    _results = new int[length];
 
     int[] docIds = projectionBlock.getDocIds();
 
-    if (!_nullValueVectorIterator.hasNext() || (docIds.length > 0 && _nullValueVectorIterator.next() > docIds[0])) {
+    if (!_nullValueVectorIterator.hasNext() || (length > 0 && _nullValueVectorIterator.peekNext() > docIds[0])) {
       _nullValueVectorIterator = _nullValueVectorReader.getNullBitmap().getIntIterator();
     }
 

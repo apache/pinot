@@ -77,7 +77,7 @@ public class IsNotNullTransformFunction extends BaseTransformFunction {
 
     int[] docIds = projectionBlock.getDocIds();
 
-    if (!_nullValueVectorIterator.hasNext() || (docIds.length > 0 && _nullValueVectorIterator.next() > docIds[0])) {
+    if (!_nullValueVectorIterator.hasNext() || (length > 0 && _nullValueVectorIterator.peekNext() > docIds[0])) {
       _nullValueVectorIterator = _nullValueVectorReader.getNullBitmap().getIntIterator();
     }
 
