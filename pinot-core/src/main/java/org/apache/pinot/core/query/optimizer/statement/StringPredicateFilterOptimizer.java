@@ -75,19 +75,13 @@ public class StringPredicateFilterOptimizer implements StatementOptimizer {
     Function function = expression.getFunctionCall();
     String operator = function.getOperator();
     List<Expression> operands = function.getOperands();
-    FilterKind kind = FilterKind.valueOf(operator);
-    switch (kind) {
-      case AND:
-      case OR: {
-        for (Expression operand : operands) {
-          optimizeExpression(operand, schema);
-        }
-        break;
+    if (operator.equals(FilterKind.AND.name()) || operator.equals(FilterKind.OR.name()) || operator.equals(
+        FilterKind.NOT.name())) {
+      for (Expression operand : operands) {
+        optimizeExpression(operand, schema);
       }
-      default: {
-        replaceMinusWithCompareForStrings(operands.get(0), schema);
-        break;
-      }
+    } else {
+      replaceMinusWithCompareForStrings(operands.get(0), schema);
     }
   }
 

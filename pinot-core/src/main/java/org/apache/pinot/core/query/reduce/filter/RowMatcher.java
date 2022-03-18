@@ -22,6 +22,7 @@ package org.apache.pinot.core.query.reduce.filter;
  * Filter matcher for the rows.
  */
 public interface RowMatcher {
+
   /**
    * Returns {@code true} if the given row matches the filter, {@code false} otherwise.
    */

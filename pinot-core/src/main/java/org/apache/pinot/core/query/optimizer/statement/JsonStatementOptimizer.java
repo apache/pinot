@@ -316,10 +316,10 @@ public class JsonStatementOptimizer implements StatementOptimizer {
       List<Expression> operands = function.getOperands();
       switch (kind) {
         case AND:
-        case OR: {
+        case OR:
+        case NOT:
           operands.forEach(operand -> optimizeJsonPredicate(operand, tableConfig, schema));
           break;
-        }
         case EQUALS:
         case NOT_EQUALS:
         case GREATER_THAN:

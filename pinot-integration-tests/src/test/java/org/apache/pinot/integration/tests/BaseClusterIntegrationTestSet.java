@@ -240,6 +240,24 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     query = "SELECT COUNT(*) AS \"date\", MAX(ArrTime) AS \"group\", MIN(ArrTime) AS min FROM myTable";
     testSqlQuery(query, Collections.singletonList(query));
 
+    // LIKE
+    query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT count(*) FROM mytable WHERE DestCityName LIKE 'C%'";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT count(*) FROM mytable WHERE DestCityName LIKE '_h%'";
+    testSqlQuery(query, Collections.singletonList(query));
+
+    // NOT
+    query = "SELECT count(*) FROM mytable WHERE OriginState NOT BETWEEN 'DE' AND 'PA'";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT count(*) FROM mytable WHERE OriginState NOT LIKE 'A_'";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT count(*) FROM mytable WHERE NOT (DaysSinceEpoch = 16312 AND Carrier = 'DL')";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT count(*) FROM mytable WHERE (NOT DaysSinceEpoch = 16312) AND Carrier = 'DL'";
+    testSqlQuery(query, Collections.singletonList(query));
+
     // Post-aggregation in ORDER-BY
     query = "SELECT MAX(ArrTime) FROM mytable GROUP BY DaysSinceEpoch ORDER BY MAX(ArrTime) - MIN(ArrTime)";
     testSqlQuery(query, Collections.singletonList(query));

@@ -284,6 +284,9 @@ public class RequestContextUtils {
           children.add(getFilter(operand));
         }
         return new FilterContext(FilterContext.Type.OR, children, null);
+      case NOT:
+        assert numOperands == 1;
+        return new FilterContext(FilterContext.Type.NOT, Collections.singletonList(getFilter(operands.get(0))), null);
       case EQUALS:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new EqPredicate(operands.get(0), getStringValue(operands.get(1))));

@@ -25,7 +25,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
  * Value extractor for a literal.
  */
 public class LiteralValueExtractor implements ValueExtractor {
-  final String _literal;
+  private final String _literal;
 
   public LiteralValueExtractor(String literal) {
     _literal = literal;

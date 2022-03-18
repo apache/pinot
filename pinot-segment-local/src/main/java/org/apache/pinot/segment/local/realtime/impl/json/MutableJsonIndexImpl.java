@@ -44,8 +44,6 @@ import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
-import static org.apache.pinot.common.request.context.FilterContext.Type.PREDICATE;
-
 
 /**
  * Json index for mutable segment.
@@ -122,7 +120,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
 
     _readLock.lock();
     try {
-      if (filter.getType() == PREDICATE && isExclusive(filter.getPredicate().getType())) {
+      if (filter.getType() == FilterContext.Type.PREDICATE && isExclusive(filter.getPredicate().getType())) {
         // Handle exclusive predicate separately because the flip can only be applied to the unflattened doc ids in
         // order to get the correct result, and it cannot be nested
         RoaringBitmap matchingFlattenedDocIds = getMatchingFlattenedDocIds(filter.getPredicate());

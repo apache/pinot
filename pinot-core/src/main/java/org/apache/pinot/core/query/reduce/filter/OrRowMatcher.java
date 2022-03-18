@@ -26,7 +26,7 @@ import org.apache.pinot.common.request.context.FilterContext;
  * OR filter matcher.
  */
 public class OrRowMatcher implements RowMatcher {
-  RowMatcher[] _childMatchers;
+  private final RowMatcher[] _childMatchers;
 
   public OrRowMatcher(List<FilterContext> childFilters, ValueExtractorFactory valueExtractorFactory) {
     int numChildren = childFilters.size();
