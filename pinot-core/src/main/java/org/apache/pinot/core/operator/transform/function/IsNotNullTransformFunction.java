@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -31,31 +32,27 @@ import org.roaringbitmap.PeekableIntIterator;
 
 
 public class IsNotNullTransformFunction extends BaseTransformFunction {
-  public static final String FUNCTION_NAME = "IS_NOT_NULL";
 
-  private TransformFunction _transformFunction;
   private int[] _results;
-  private Map<String, DataSource> _dataSourceMap = new HashMap<>();
   private PeekableIntIterator _nullValueVectorIterator;
   private NullValueVectorReader _nullValueVectorReader;
 
   @Override
   public String getName() {
-    return FUNCTION_NAME;
+    return TransformFunctionType.IS_NOT_NULL.getName();
   }
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     Preconditions.checkArgument(arguments.size() == 1,
         "Exact 1 argument is required for IS_NOT_NULL operator function");
-    _transformFunction = arguments.get(0);
-    if (!(_transformFunction instanceof IdentifierTransformFunction)) {
+    TransformFunction transformFunction = arguments.get(0);
+    if (!(transformFunction instanceof IdentifierTransformFunction)) {
       throw new IllegalArgumentException(
           "Only column names are supported in IS_NOT_NULL. Support for functions is planned for future release");
     }
-    _dataSourceMap = dataSourceMap;
-    String columnName = ((IdentifierTransformFunction) _transformFunction).getColumnName();
-    _nullValueVectorReader = _dataSourceMap.get(columnName).getNullValueVector();
+    String columnName = ((IdentifierTransformFunction) transformFunction).getColumnName();
+    _nullValueVectorReader = dataSourceMap.get(columnName).getNullValueVector();
     if (_nullValueVectorReader != null) {
       _nullValueVectorIterator = _nullValueVectorReader.getNullBitmap().getIntIterator();
     } else {
