@@ -70,8 +70,8 @@ public class NullHandlingTransformFunctionTest {
   protected static final String FLOAT_SV_COLUMN = "floatSV";
   protected static final String DOUBLE_SV_COLUMN = "doubleSV";
   protected static final String STRING_SV_COLUMN = "stringSV";
-  protected static final String INT_MV_COLUMN = "intMV";
   protected static final String BYTES_SV_COLUMN = "bytesSV";
+
   protected static final String TIMESTAMP_COLUMN = "timestampColumn";
   protected static final String TIME_COLUMN = "timeColumn";
   protected final long[] _timeValues = new long[NUM_ROWS];
@@ -136,7 +136,6 @@ public class NullHandlingTransformFunctionTest {
         .addSingleValueDimension(DOUBLE_SV_COLUMN, FieldSpec.DataType.DOUBLE)
         .addSingleValueDimension(STRING_SV_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(BYTES_SV_COLUMN, FieldSpec.DataType.BYTES)
-        .addMultiValueDimension(INT_MV_COLUMN, FieldSpec.DataType.INT)
         .addDateTime(TIMESTAMP_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN), null).build();
     TableConfig tableConfig =
