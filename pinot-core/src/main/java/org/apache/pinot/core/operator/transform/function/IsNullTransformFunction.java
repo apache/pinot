@@ -33,7 +33,7 @@ import org.roaringbitmap.PeekableIntIterator;
 public class IsNullTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "IS_NULL";
 
-  private TransformFunction _leftTransformFunction;
+  private TransformFunction _transformFunction;
   private int[] _results;
   private Map<String, DataSource> _dataSourceMap = new HashMap<>();
   private PeekableIntIterator _nullValueVectorIterator;
@@ -47,13 +47,13 @@ public class IsNullTransformFunction extends BaseTransformFunction {
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     Preconditions.checkArgument(arguments.size() == 1, "Exact 1 argument is required for IS_NULL operator function");
-    _leftTransformFunction = arguments.get(0);
-    if (!(_leftTransformFunction instanceof IdentifierTransformFunction)) {
+    _transformFunction = arguments.get(0);
+    if (!(_transformFunction instanceof IdentifierTransformFunction)) {
       throw new IllegalArgumentException(
           "Only column names are supported in IS_NULL. Support for functions is planned for future release");
     }
     _dataSourceMap = dataSourceMap;
-    String columnName = ((IdentifierTransformFunction) _leftTransformFunction).getColumnName();
+    String columnName = ((IdentifierTransformFunction) _transformFunction).getColumnName();
     _nullValueVectorReader = _dataSourceMap.get(columnName).getNullValueVector();
     if (_nullValueVectorReader != null) {
       _nullValueVectorIterator = _nullValueVectorReader.getNullBitmap().getIntIterator();
@@ -70,7 +70,9 @@ public class IsNullTransformFunction extends BaseTransformFunction {
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-    _results = new int[length];
+    if (_results == null || _results.length < length) {
+      _results = new int[length];
+    }
 
     int[] docIds = projectionBlock.getDocIds();
 
@@ -78,6 +80,7 @@ public class IsNullTransformFunction extends BaseTransformFunction {
       _nullValueVectorIterator = _nullValueVectorReader.getNullBitmap().getIntIterator();
     }
 
+    Arrays.fill(_results, 0);
     if (_nullValueVectorIterator != null) {
       int currentDocIdIndex = 0;
       while (_nullValueVectorIterator.hasNext() & currentDocIdIndex < length) {

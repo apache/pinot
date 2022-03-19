@@ -33,7 +33,7 @@ import org.roaringbitmap.PeekableIntIterator;
 public class IsNotNullTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "IS_NOT_NULL";
 
-  private TransformFunction _leftTransformFunction;
+  private TransformFunction _transformFunction;
   private int[] _results;
   private Map<String, DataSource> _dataSourceMap = new HashMap<>();
   private PeekableIntIterator _nullValueVectorIterator;
@@ -48,13 +48,13 @@ public class IsNotNullTransformFunction extends BaseTransformFunction {
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     Preconditions.checkArgument(arguments.size() == 1,
         "Exact 1 argument is required for IS_NOT_NULL operator function");
-    _leftTransformFunction = arguments.get(0);
-    if (!(_leftTransformFunction instanceof IdentifierTransformFunction)) {
+    _transformFunction = arguments.get(0);
+    if (!(_transformFunction instanceof IdentifierTransformFunction)) {
       throw new IllegalArgumentException(
           "Only column names are supported in IS_NOT_NULL. Support for functions is planned for future release");
     }
     _dataSourceMap = dataSourceMap;
-    String columnName = ((IdentifierTransformFunction) _leftTransformFunction).getColumnName();
+    String columnName = ((IdentifierTransformFunction) _transformFunction).getColumnName();
     _nullValueVectorReader = _dataSourceMap.get(columnName).getNullValueVector();
     if (_nullValueVectorReader != null) {
       _nullValueVectorIterator = _nullValueVectorReader.getNullBitmap().getIntIterator();

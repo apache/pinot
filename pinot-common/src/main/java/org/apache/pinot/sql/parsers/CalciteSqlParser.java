@@ -610,10 +610,6 @@ public class CalciteSqlParser {
         return RequestUtils.getIdentifierExpression(node.toString());
       case LITERAL:
         return RequestUtils.getLiteralExpression((SqlLiteral) node);
-      case IS_NULL:
-        return compileNullCheckExpression((SqlBasicCall) node, "IS_NULL");
-      case IS_NOT_NULL:
-        return compileNullCheckExpression((SqlBasicCall) node, "IS_NOT_NULL");
       case AS:
         SqlBasicCall asFuncSqlNode = (SqlBasicCall) node;
         List<SqlNode> operands = asFuncSqlNode.getOperandList();
@@ -683,14 +679,6 @@ public class CalciteSqlParser {
           return compileFunctionExpression((SqlBasicCall) node);
         }
     }
-  }
-
-  private static Expression compileNullCheckExpression(SqlBasicCall node, String nullCheckType) {
-    List<SqlNode> nullCheckOperands = node.getOperandList();
-    Expression nullCheckLeftExpr = toExpression(nullCheckOperands.get(0));
-    final Expression nullCheckExpr = RequestUtils.getFunctionExpression(nullCheckType);
-    nullCheckExpr.getFunctionCall().addToOperands(nullCheckLeftExpr);
-    return nullCheckExpr;
   }
 
   private static Expression compileFunctionExpression(SqlBasicCall functionNode) {
