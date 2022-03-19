@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.operator.DocIdSetOperator;
@@ -176,7 +177,7 @@ public class NullHandlingTransformFunctionTest {
     ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(String.format("%s IS NULL", columnName));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof IsNullTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), IsNullTransformFunction.FUNCTION_NAME);
+    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.IS_NULL.getName());
     int[] expectedValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       if (i % NULL_VALUE_MOD == 0) {
@@ -203,7 +204,7 @@ public class NullHandlingTransformFunctionTest {
         RequestContextUtils.getExpressionFromSQL(String.format("%s IS NOT NULL", columnName));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof IsNotNullTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), IsNotNullTransformFunction.FUNCTION_NAME);
+    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.IS_NOT_NULL.getName());
     int[] expectedValues = new int[NUM_ROWS];
     Arrays.fill(expectedValues, 1);
     for (int i = 0; i < NUM_ROWS; i++) {

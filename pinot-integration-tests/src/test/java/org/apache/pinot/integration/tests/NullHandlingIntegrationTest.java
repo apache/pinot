@@ -155,4 +155,18 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     String query = "SELECT count(*) FROM " + getTableName() + " where description IS NOT NULL AND salary IS NOT NULL";
     testQuery(query, Collections.singletonList(query));
   }
+
+  @Test
+  public void testCaseWithNullSalary()
+      throws Exception {
+    String query = "SELECT CASE WHEN salary IS NULL THEN 1 ELSE 0 END FROM " + getTableName();
+    testSqlQuery(query, Collections.singletonList(query));
+  }
+
+  @Test
+  public void testCaseWithNotNullDescription()
+      throws Exception {
+    String query = "SELECT CASE WHEN description IS NOT NULL THEN 1 ELSE 0 END FROM " + getTableName();
+    testSqlQuery(query, Collections.singletonList(query));
+  }
 }
