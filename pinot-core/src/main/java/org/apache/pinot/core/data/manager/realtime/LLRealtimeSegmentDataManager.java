@@ -417,11 +417,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       if (_currentOffset.compareTo(lastUpdatedOffset) != 0) {
         consecutiveIdleCount = 0;
         // We consumed something. Update the highest stream offset as well as partition-consuming metric.
-        // TODO Issue 5359 Need to find a way to bump metrics without getting actual offset value.
-        //_serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_KAFKA_OFFSET_CONSUMED,
-        //_currentOffset.getOffset());
-        //_serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED,
-        //_currentOffset.getOffset());
+        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED,
+            Long.parseLong(_currentOffset.toString()));
         _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 1);
         lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(_currentOffset);
       } else if (messageBatch.getUnfilteredMessageCount() > 0) {
