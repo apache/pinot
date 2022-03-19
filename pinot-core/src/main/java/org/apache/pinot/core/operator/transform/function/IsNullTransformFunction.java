@@ -38,7 +38,7 @@ public class IsNullTransformFunction extends BaseTransformFunction {
 
   @Override
   public String getName() {
-    return TransformFunctionType.IS_NOT_NULL.getName();
+    return TransformFunctionType.IS_NULL.getName();
   }
 
   @Override
