@@ -19,7 +19,7 @@
 package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
 import java.util.TreeMap;
@@ -94,8 +94,8 @@ public class PinotInstanceAssignmentRestletResourceTest {
     try {
       getInstancePartitionsMap();
       fail();
-    } catch (FileNotFoundException e) {
-      // Expected
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Failed to find the instance partitions"));
     }
 
     // Assign instances should fail
@@ -103,8 +103,8 @@ public class PinotInstanceAssignmentRestletResourceTest {
       ControllerTestUtils.sendPostRequest(
           ControllerTestUtils.getControllerRequestURLBuilder().forInstanceAssign(RAW_TABLE_NAME, null, true), null);
       fail();
-    } catch (FileNotFoundException e) {
-      // Expected
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Failed to find the instance assignment config"));
     }
 
     // Add OFFLINE instance assignment config to the offline table config
@@ -203,8 +203,8 @@ public class PinotInstanceAssignmentRestletResourceTest {
     try {
       getInstancePartitionsMap();
       fail();
-    } catch (FileNotFoundException e) {
-      // Expected
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Failed to find the instance partitions"));
     }
 
     // Assign instances without instance partitions type (dry run)
@@ -231,8 +231,8 @@ public class PinotInstanceAssignmentRestletResourceTest {
     try {
       getInstancePartitionsMap();
       fail();
-    } catch (FileNotFoundException e) {
-      // Expected
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Failed to find the instance partitions"));
     }
 
     // Assign instances for both offline and real-time table
@@ -280,8 +280,8 @@ public class PinotInstanceAssignmentRestletResourceTest {
           TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME), null, offlineInstanceId, consumingInstanceId),
           null);
       fail();
-    } catch (FileNotFoundException e) {
-      // Expected
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Failed to find the old instance"));
     }
 
     // Post the CONSUMING instance partitions
@@ -316,8 +316,8 @@ public class PinotInstanceAssignmentRestletResourceTest {
     try {
       getInstancePartitionsMap();
       fail();
-    } catch (FileNotFoundException e) {
-      // Expected
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Failed to find the instance partitions"));
     }
   }
 

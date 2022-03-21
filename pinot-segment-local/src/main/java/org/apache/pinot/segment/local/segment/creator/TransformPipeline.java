@@ -16,11 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.manager.realtime;
+package org.apache.pinot.segment.local.segment.creator;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
@@ -39,7 +40,18 @@ public class TransformPipeline {
   private final ComplexTypeTransformer _complexTypeTransformer;
 
   /**
-   * Constructing a transform pipeline based on TableConfig and table schema.
+   * Constructs a transform pipeline with customized RecordTransformer and customized ComplexTypeTransformer
+   * @param recordTransformer the customized record transformer
+   * @param complexTypeTransformer the customized complexType transformer
+   */
+  public TransformPipeline(RecordTransformer recordTransformer,
+      @Nullable ComplexTypeTransformer complexTypeTransformer) {
+    _recordTransformer = recordTransformer;
+    _complexTypeTransformer = complexTypeTransformer;
+  }
+
+  /**
+   * Constructs a transform pipeline based on TableConfig and table schema.
    * @param tableConfig the config for the table
    * @param schema the table schema
    */

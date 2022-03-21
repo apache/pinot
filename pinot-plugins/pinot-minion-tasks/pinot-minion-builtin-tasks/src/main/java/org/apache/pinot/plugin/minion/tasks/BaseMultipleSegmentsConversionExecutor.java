@@ -38,6 +38,7 @@ import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionConf;
@@ -214,7 +215,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
         List<Header> httpHeaders = new ArrayList<>();
         httpHeaders.add(segmentZKMetadataCustomMapModifierHeader);
-        httpHeaders.addAll(FileUploadDownloadClient.makeAuthHeader(authToken));
+        httpHeaders.addAll(HttpClient.makeAuthHeader(authToken));
 
         // Set parameters for upload request
         NameValuePair enableParallelPushProtectionParameter =

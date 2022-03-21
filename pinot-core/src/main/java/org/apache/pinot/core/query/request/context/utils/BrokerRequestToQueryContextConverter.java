@@ -53,12 +53,19 @@ public class BrokerRequestToQueryContextConverter {
    * Converts the given {@link BrokerRequest} into a {@link QueryContext}.
    */
   public static QueryContext convert(BrokerRequest brokerRequest) {
-    return brokerRequest.getPinotQuery() != null ? convertSQL(brokerRequest) : convertPQL(brokerRequest);
+    if (brokerRequest.getPinotQuery() != null) {
+      QueryContext queryContext = convertSQL(brokerRequest.getPinotQuery(), brokerRequest);
+      return queryContext;
+    } else {
+      return convertPQL(brokerRequest);
+    }
   }
 
-  private static QueryContext convertSQL(BrokerRequest brokerRequest) {
-    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
-
+  private static QueryContext convertSQL(PinotQuery pinotQuery, BrokerRequest brokerRequest) {
+    QueryContext subquery = null;
+    if (pinotQuery.getDataSource().getSubquery() != null) {
+      subquery = convertSQL(pinotQuery.getDataSource().getSubquery(), brokerRequest);
+    }
     // SELECT
     List<ExpressionContext> selectExpressions;
     List<Expression> selectList = pinotQuery.getSelectList();
@@ -147,7 +154,7 @@ public class BrokerRequestToQueryContextConverter {
         .setGroupByExpressions(groupByExpressions).setOrderByExpressions(orderByExpressions)
         .setHavingFilter(havingFilter).setLimit(pinotQuery.getLimit()).setOffset(pinotQuery.getOffset())
         .setQueryOptions(pinotQuery.getQueryOptions()).setDebugOptions(pinotQuery.getDebugOptions())
-        .setBrokerRequest(brokerRequest).build();
+        .setSubquery(subquery).setBrokerRequest(brokerRequest).build();
   }
 
   private static QueryContext convertPQL(BrokerRequest brokerRequest) {

@@ -16,27 +16,33 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce;
+package org.apache.pinot.core.query.reduce.filter;
 
-import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.core.query.reduce.filter.RowMatcher;
-import org.apache.pinot.core.query.reduce.filter.RowMatcherFactory;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
 /**
- * Handler for HAVING clause.
+ * Value extractor for a literal.
  */
-public class HavingFilterHandler {
-  private final RowMatcher _rowMatcher;
+public class LiteralValueExtractor implements ValueExtractor {
+  final String _literal;
 
-  public HavingFilterHandler(FilterContext havingFilter, PostAggregationHandler postAggregationHandler) {
-    _rowMatcher = RowMatcherFactory.getRowMatcher(havingFilter, postAggregationHandler);
+  public LiteralValueExtractor(String literal) {
+    _literal = literal;
   }
 
-  /**
-   * Returns {@code true} if the given row matches the HAVING clause, {@code false} otherwise.
-   */
-  public boolean isMatch(Object[] row) {
-    return _rowMatcher.isMatch(row);
+  @Override
+  public String getColumnName() {
+    return '\'' + _literal + '\'';
+  }
+
+  @Override
+  public ColumnDataType getColumnDataType() {
+    return ColumnDataType.STRING;
+  }
+
+  @Override
+  public Object extract(Object[] row) {
+    return _literal;
   }
 }

@@ -31,6 +31,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
@@ -42,15 +43,20 @@ import org.apache.commons.httpclient.params.HttpConnectionParams;
 import org.apache.commons.httpclient.protocol.Protocol;
 import org.apache.commons.httpclient.protocol.ProtocolSocketFactory;
 import org.apache.commons.lang.StringUtils;
+import org.apache.http.ssl.SSLContexts;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Utility class for shared TLS configuration logic
  */
 public final class TlsUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TlsUtils.class);
+
   private static final String CLIENT_AUTH_ENABLED = "client.auth.enabled";
   private static final String KEYSTORE_TYPE = "keystore.type";
   private static final String KEYSTORE_PATH = "keystore.path";
@@ -59,6 +65,8 @@ public final class TlsUtils {
   private static final String TRUSTSTORE_PATH = "truststore.path";
   private static final String TRUSTSTORE_PASSWORD = "truststore.password";
   private static final String SSL_PROVIDER = "ssl.provider";
+
+  private static final AtomicReference<SSLContext> SSL_CONTEXT_REF = new AtomicReference<>();
 
   private TlsUtils() {
     // left blank
@@ -232,8 +240,7 @@ public final class TlsUtils {
       Protocol.registerProtocol("https",
           new Protocol(CommonConstants.HTTPS_PROTOCOL, new PinotProtocolSocketFactory(sc.getSocketFactory()), 443));
 
-      // FileUploadDownloadClient
-      FileUploadDownloadClient.installDefaultSSLContext(sc);
+      setSslContext(sc);
     } catch (GeneralSecurityException e) {
       throw new IllegalStateException("Could not initialize SSL support", e);
     }
@@ -253,6 +260,41 @@ public final class TlsUtils {
       return new URL("file://./" + storePath);
     }
     return inputUri.toURL();
+  }
+
+  /**
+   * Get the SSL context, see: {@link SSLContextHolder} for more details.
+   * @return the SSL context.
+   */
+  public static SSLContext getSslContext() {
+    return SSLContextHolder.SSL_CONTEXT;
+  }
+
+  /**
+   * Set the SSL context, see: {@link SSLContextHolder} for more details.
+   * @param sslContext the SSL context to be set.
+   */
+  public static void setSslContext(SSLContext sslContext) {
+    if (!SSL_CONTEXT_REF.compareAndSet(null, sslContext)) {
+      LOGGER.warn("SSL Context has already been set.");
+    }
+  }
+
+  /**
+   * SSL Context Holder that holds static reference SSL_CONTEXT, reference via {@link SSLContextHolder#SSL_CONTEXT}.
+   *
+   * this context is set via the {@link TlsUtils#SSL_CONTEXT_REF} which can at most once override the default
+   * SSLContext object. The advantage of this design is:
+   * <ul>
+   *   <li>any override registration is thread safe - it only occur lazily when access SSLContextHolder.SSL_CONTEXT.
+   *   <li>mutable until first use.
+   *   <li>synchronization, at most once initialisation guaranteed by the classloader
+   *   <li>after initialisation, the SSLContext is constant which can drive optimisations like constant folding.
+   * </ul>
+   */
+  private static final class SSLContextHolder {
+    static final SSLContext SSL_CONTEXT = SSL_CONTEXT_REF.get() == null ? SSLContexts.createDefault()
+        : SSL_CONTEXT_REF.get();
   }
 
   /**

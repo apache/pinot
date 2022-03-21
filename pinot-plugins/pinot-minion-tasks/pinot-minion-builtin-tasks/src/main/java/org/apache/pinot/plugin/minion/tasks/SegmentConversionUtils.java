@@ -35,6 +35,7 @@ import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.RoundRobinURIProvider;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.spi.config.table.TableType;
@@ -97,7 +98,7 @@ public class SegmentConversionUtils {
         try {
           SimpleHttpResponse response = fileUploadDownloadClient
               .uploadSegment(uri, segmentName, fileToUpload, httpHeaders, parameters,
-                  FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+                  HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
           LOGGER.info("Got response {}: {} while uploading table: {}, segment: {} with uploadURL: {}",
               response.getStatusCode(), response.getResponse(), tableNameWithType, segmentName, uploadURL);
           return true;

@@ -16,27 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce;
-
-import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.core.query.reduce.filter.RowMatcher;
-import org.apache.pinot.core.query.reduce.filter.RowMatcherFactory;
-
+package org.apache.pinot.core.query.reduce.filter;
 
 /**
- * Handler for HAVING clause.
+ * Filter matcher for the rows.
  */
-public class HavingFilterHandler {
-  private final RowMatcher _rowMatcher;
-
-  public HavingFilterHandler(FilterContext havingFilter, PostAggregationHandler postAggregationHandler) {
-    _rowMatcher = RowMatcherFactory.getRowMatcher(havingFilter, postAggregationHandler);
-  }
-
+public interface RowMatcher {
   /**
-   * Returns {@code true} if the given row matches the HAVING clause, {@code false} otherwise.
+   * Returns {@code true} if the given row matches the filter, {@code false} otherwise.
    */
-  public boolean isMatch(Object[] row) {
-    return _rowMatcher.isMatch(row);
-  }
+  boolean isMatch(Object[] row);
 }

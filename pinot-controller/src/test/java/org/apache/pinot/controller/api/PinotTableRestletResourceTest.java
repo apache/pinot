@@ -22,11 +22,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.api.resources.TableAndSchemaConfig;
@@ -92,7 +89,7 @@ public class PinotTableRestletResourceTest {
       Assert.fail("Creation of an OFFLINE table with two underscores in the table name does not fail");
     } catch (IOException e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
 
     offlineTableConfig = _offlineBuilder.build();
@@ -103,7 +100,7 @@ public class PinotTableRestletResourceTest {
       Assert.fail("Creation of an OFFLINE table with dot in the table name does not fail");
     } catch (IOException e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
 
     // Create an OFFLINE table with a valid name which should succeed
@@ -117,7 +114,7 @@ public class PinotTableRestletResourceTest {
       Assert.fail("Creation of an existing OFFLINE table does not fail");
     } catch (IOException e) {
       // Expected 409 Conflict
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 409"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 409"));
     }
 
     // Create an OFFLINE table with invalid replication config
@@ -127,7 +124,7 @@ public class PinotTableRestletResourceTest {
       Assert.fail("Creation of an invalid OFFLINE table does not fail");
     } catch (IOException e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
 
     // Create a REALTIME table with an invalid name which should fail
@@ -140,7 +137,7 @@ public class PinotTableRestletResourceTest {
       Assert.fail("Creation of a REALTIME table with two underscores in the table name does not fail");
     } catch (IOException e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
 
     // Creating a REALTIME table without a valid schema should fail
@@ -150,7 +147,7 @@ public class PinotTableRestletResourceTest {
       Assert.fail("Creation of a REALTIME table without a valid schema does not fail");
     } catch (IOException e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
 
     // Creating a REALTIME table with a different schema name in the config should succeed (backwards compatibility
@@ -166,7 +163,7 @@ public class PinotTableRestletResourceTest {
       Assert.fail("Creation of a REALTIME table with a invalid time column name does not fail");
     } catch (IOException e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
 
     // Create a REALTIME table with a valid name and schema which should succeed
@@ -187,7 +184,7 @@ public class PinotTableRestletResourceTest {
       Assert.fail("Creation of an OFFLINE table with an invalid cron expression does not fail");
     } catch (IOException e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
 
     // Succeed to create a table
@@ -213,7 +210,7 @@ public class PinotTableRestletResourceTest {
       Assert.fail("Update of an OFFLINE table with an invalid cron expression does not fail");
     } catch (IOException e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
   }
 
@@ -278,7 +275,7 @@ public class PinotTableRestletResourceTest {
       ControllerTestUtils.sendPostRequest(_createTableUrl, tableConfig.toJsonString());
       Assert.fail("Creation of a DIMENSION table with larger than allowed storage quota should fail");
     } catch (IOException e) {
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
 
     // Successful creation with proper quota
@@ -344,7 +341,6 @@ public class PinotTableRestletResourceTest {
     Assert.assertEquals(modifiedConfig.getQuotaConfig().getStorage(), "10G");
     Assert.assertEquals(modifiedConfig.getQuotaConfig().getMaxQueriesPerSecond(), "100.0");
 
-    boolean notFoundException = false;
     try {
       // table does not exist
       ObjectNode tableConfigJson = (ObjectNode) tableConfig.toJsonNode();
@@ -353,13 +349,11 @@ public class PinotTableRestletResourceTest {
           .sendPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forUpdateTableConfig("noSuchTable"),
               tableConfigJson.toString());
     } catch (Exception e) {
-      Assert.assertTrue(e instanceof FileNotFoundException);
-      notFoundException = true;
+      Assert.assertTrue(e instanceof IOException);
     }
-    Assert.assertTrue(notFoundException);
   }
 
-  @Test(expectedExceptions = FileNotFoundException.class)
+  @Test(expectedExceptions = IOException.class)
   public void rebalanceNonExistentTable()
       throws Exception {
     ControllerTestUtils.sendPostRequest(
@@ -500,7 +494,7 @@ public class PinotTableRestletResourceTest {
       Assert.fail("Requesting with invalid type should fail");
     } catch (Exception e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
 
     // Case 4: Request state for non-existent table should return not found
@@ -548,7 +542,7 @@ public class PinotTableRestletResourceTest {
       Assert.fail("Validation of an invalid table config should fail.");
     } catch (IOException e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
   }
 
@@ -563,13 +557,11 @@ public class PinotTableRestletResourceTest {
     TableConfig offlineTableConfig =
         _offlineBuilder.setTableName(tableName).setInvertedIndexColumns(Arrays.asList("dimA", "dimB")).build();
     TableAndSchemaConfig tableAndSchemaConfig = new TableAndSchemaConfig(offlineTableConfig, schema);
-    Map<String, String> headerMap = new HashMap<>();
-    headerMap.put("Content-Type", "application/json");
 
     try {
       ControllerTestUtils.sendPostRequest(
           StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "validateTableAndSchema"),
-          tableAndSchemaConfig.toJsonString(), headerMap);
+          tableAndSchemaConfig.toJsonString());
     } catch (IOException e) {
       Assert.fail("Valid table config and schema validation should succeed.");
     }
@@ -580,7 +572,7 @@ public class PinotTableRestletResourceTest {
     try {
       ControllerTestUtils.sendPostRequest(
           StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "validateTableAndSchema"),
-          tableAndSchemaConfig.toJsonString(), headerMap);
+          tableAndSchemaConfig.toJsonString());
     } catch (IOException e) {
       Assert.fail("Valid table config and existing schema validation should succeed.");
     }
@@ -593,11 +585,11 @@ public class PinotTableRestletResourceTest {
     try {
       ControllerTestUtils.sendPostRequest(
           StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "validateTableAndSchema"),
-          tableAndSchemaConfig.toJsonString(), headerMap);
+          tableAndSchemaConfig.toJsonString());
       Assert.fail("Validation of an invalid table config and schema should fail.");
     } catch (IOException e) {
       // Expected
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
   }
 

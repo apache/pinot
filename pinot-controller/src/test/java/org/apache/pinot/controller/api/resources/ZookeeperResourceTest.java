@@ -20,9 +20,7 @@ package org.apache.pinot.controller.api.resources;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerTestUtils;
@@ -106,9 +104,7 @@ public class ZookeeperResourceTest {
 
     // CASE 3: Send large content data should return success
     params = "path=" + path2 + "&expectedVersion=" + expectedVersion + "&accessOption=" + accessOption;
-    Map<String, String> headers = new HashMap<>();
-    headers.put("Content-Type", "application/json");
-    result = ControllerTestUtils.sendPutRequest(urlPut + "?" + params, headers, largeData);
+    result = ControllerTestUtils.sendPutRequest(urlPut + "?" + params, largeData);
     Assert.assertTrue(result.toLowerCase().contains("successfully updated"));
 
     // validate that zk/getChildren return 2 items.
