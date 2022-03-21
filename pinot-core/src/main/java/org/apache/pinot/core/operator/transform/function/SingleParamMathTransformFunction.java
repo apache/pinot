@@ -165,7 +165,7 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
 
   public static class Log2TransformFunction extends SingleParamMathTransformFunction {
     public static final String FUNCTION_NAME = "log2";
-    public static final double LOG_BASE = 0.6931471805599453d;
+    public static final double LOG_BASE = Math.log(2.0);
 
     @Override
     public String getName() {
