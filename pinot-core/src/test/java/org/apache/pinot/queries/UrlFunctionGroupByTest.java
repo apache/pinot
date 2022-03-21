@@ -22,11 +22,16 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
+import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
+import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -44,6 +49,8 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertNotNull;
 
 
 /**
@@ -139,6 +146,19 @@ public class UrlFunctionGroupByTest extends BaseQueriesTest {
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
 
+  public static void testAggregationGroupByResultHelper(AggregationGroupByResult aggregationGroupByResult,
+      String[] resultsSet) {
+    Iterator<GroupKeyGenerator.StringGroupKey> groupKeyIterator = aggregationGroupByResult.getStringGroupKeyIterator();
+    int total = 0;
+    while (groupKeyIterator.hasNext()) {
+      total++;
+      GroupKeyGenerator.StringGroupKey groupKey = groupKeyIterator.next();
+      long resultForKey = (Long) aggregationGroupByResult.getResultForKey(groupKey, 0);
+      Assert.assertEquals(groupKey._stringKey, resultsSet[(int) resultForKey - 1]);
+    }
+    Assert.assertEquals(total, ENCODED_STRINGS.length);
+  }
+
   @Override
   protected String getFilter() {
     return "";
@@ -191,27 +211,37 @@ public class UrlFunctionGroupByTest extends BaseQueriesTest {
   @Test
   public void testInterSegment() {
     for (int i = 0; i < 20; i++) {
-      String query = "SELECT count(*) FROM " + RAW_TABLE_NAME
+      String query = "SELECT COUNT(*) FROM " + RAW_TABLE_NAME
           + " WHERE " + STRING_SV_ENCODED + "= encodeUrl('" + PLAINTEXT_QUERY_STRINGS[i] + "')";
       testInterSegmentAggregationQueryHelper(query, i + 1);
     }
     for (int i = 0; i < 20; i++) {
-      String query = "SELECT count(*) FROM " + RAW_TABLE_NAME
+      String query = "SELECT COUNT(*) FROM " + RAW_TABLE_NAME
           + " WHERE " + STRING_SV_PLAINTEXT + "= decodeUrl('" + ENCODED_STRINGS[i] + "')";
       testInterSegmentAggregationQueryHelper(query, i + 1);
     }
   }
 
-  public void testInterSegmentGroupBy() {
-    for (int i = 0; i < 20; i++) {
-      String query = "SELECT count(*) FROM " + RAW_TABLE_NAME
-          + " WHERE " + STRING_SV_ENCODED + "= encodeUrl('" + PLAINTEXT_QUERY_STRINGS[i] + "')";
-      testInterSegmentAggregationQueryHelper(query, i + 1);
-    }
+  @Test
+  public void testGroupBy() {
+    String query = "SELECT " + STRING_SV_ENCODED + " , COUNT(*) FROM " + RAW_TABLE_NAME
+        + " GROUP BY " + STRING_SV_ENCODED;
+    AggregationGroupByOperator aggregationGroupByOperator = getOperatorForSqlQuery(query);
+    IntermediateResultsBlock resultsBlock = aggregationGroupByOperator.nextBlock();
+    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+    assertNotNull(aggregationGroupByResult);
+    testAggregationGroupByResultHelper(aggregationGroupByResult, ENCODED_STRINGS);
+
+    query = "SELECT " + STRING_SV_PLAINTEXT + " , COUNT(*) FROM " + RAW_TABLE_NAME
+        + " GROUP BY " + STRING_SV_PLAINTEXT;
+    aggregationGroupByOperator = getOperatorForSqlQuery(query);
+    resultsBlock = aggregationGroupByOperator.nextBlock();
+    aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+    assertNotNull(aggregationGroupByResult);
+    testAggregationGroupByResultHelper(aggregationGroupByResult, PLAINTEXT_STRINGS);
   }
 
   private void testInterSegmentAggregationQueryHelper(String query, long expectedCount) {
-    // SQL
     BrokerResponseNative brokerResponseNative = getBrokerResponseForSqlQuery(query);
     ResultTable resultTable = brokerResponseNative.getResultTable();
     DataSchema dataSchema = resultTable.getDataSchema();
@@ -224,7 +254,6 @@ public class UrlFunctionGroupByTest extends BaseQueriesTest {
     Assert.assertEquals(row.length, 1);
     Assert.assertEquals(row[0], expectedCount * 4);
   }
-
 
   @AfterClass
   public void tearDown()
