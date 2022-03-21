@@ -16,27 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce;
+package org.apache.pinot.core.query.reduce.filter;
 
-import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.core.query.reduce.filter.RowMatcher;
-import org.apache.pinot.core.query.reduce.filter.RowMatcherFactory;
+import org.apache.pinot.common.request.context.ExpressionContext;
 
 
 /**
- * Handler for HAVING clause.
+ * Factory for {@link ValueExtractor}.
  */
-public class HavingFilterHandler {
-  private final RowMatcher _rowMatcher;
-
-  public HavingFilterHandler(FilterContext havingFilter, PostAggregationHandler postAggregationHandler) {
-    _rowMatcher = RowMatcherFactory.getRowMatcher(havingFilter, postAggregationHandler);
-  }
-
+public interface ValueExtractorFactory {
   /**
-   * Returns {@code true} if the given row matches the HAVING clause, {@code false} otherwise.
+   * Create the {@link ValueExtractor} for specific column.
+   *
+   * @param expression - column expression
+   * @return {@link ValueExtractor}
    */
-  public boolean isMatch(Object[] row) {
-    return _rowMatcher.isMatch(row);
-  }
+  ValueExtractor getValueExtractor(ExpressionContext expression);
 }

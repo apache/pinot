@@ -16,27 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce;
+package org.apache.pinot.core.query.reduce.filter;
 
 import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.core.query.reduce.filter.RowMatcher;
-import org.apache.pinot.core.query.reduce.filter.RowMatcherFactory;
 
 
 /**
- * Handler for HAVING clause.
+ * Factory for RowMatcher.
  */
-public class HavingFilterHandler {
-  private final RowMatcher _rowMatcher;
-
-  public HavingFilterHandler(FilterContext havingFilter, PostAggregationHandler postAggregationHandler) {
-    _rowMatcher = RowMatcherFactory.getRowMatcher(havingFilter, postAggregationHandler);
+public class RowMatcherFactory {
+  private RowMatcherFactory() {
   }
 
   /**
-   * Returns {@code true} if the given row matches the HAVING clause, {@code false} otherwise.
+   * Helper method to construct a RowMatcher based on the given filter.
    */
-  public boolean isMatch(Object[] row) {
-    return _rowMatcher.isMatch(row);
+  public static RowMatcher getRowMatcher(FilterContext filter, ValueExtractorFactory valueExtractorFactory) {
+    switch (filter.getType()) {
+      case AND:
+        return new AndRowMatcher(filter.getChildren(), valueExtractorFactory);
+      case OR:
+        return new OrRowMatcher(filter.getChildren(), valueExtractorFactory);
+      case PREDICATE:
+        return new PredicateRowMatcher(filter.getPredicate(),
+            valueExtractorFactory.getValueExtractor(filter.getPredicate().getLhs()));
+      default:
+        throw new IllegalStateException();
+    }
   }
 }

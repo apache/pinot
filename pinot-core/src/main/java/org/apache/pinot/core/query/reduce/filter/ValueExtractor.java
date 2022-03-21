@@ -16,27 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce;
+package org.apache.pinot.core.query.reduce.filter;
 
-import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.core.query.reduce.filter.RowMatcher;
-import org.apache.pinot.core.query.reduce.filter.RowMatcherFactory;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
 /**
- * Handler for HAVING clause.
+ * Value extractor for the post-aggregation function or pre-aggregation gap fill.
  */
-public class HavingFilterHandler {
-  private final RowMatcher _rowMatcher;
-
-  public HavingFilterHandler(FilterContext havingFilter, PostAggregationHandler postAggregationHandler) {
-    _rowMatcher = RowMatcherFactory.getRowMatcher(havingFilter, postAggregationHandler);
-  }
+public interface ValueExtractor {
+  /**
+   * Returns the column name for the value extracted.
+   */
+  String getColumnName();
 
   /**
-   * Returns {@code true} if the given row matches the HAVING clause, {@code false} otherwise.
+   * Returns the ColumnDataType of the value extracted.
    */
-  public boolean isMatch(Object[] row) {
-    return _rowMatcher.isMatch(row);
-  }
+  ColumnDataType getColumnDataType();
+
+  /**
+   * Extracts the value from the given row.
+   */
+  Object extract(Object[] row);
 }

@@ -16,27 +16,36 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce;
+package org.apache.pinot.core.query.reduce.filter;
 
-import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.core.query.reduce.filter.RowMatcher;
-import org.apache.pinot.core.query.reduce.filter.RowMatcherFactory;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
 /**
- * Handler for HAVING clause.
+ * Value extractor for a non-post-aggregation column (group-by expression or aggregation).
  */
-public class HavingFilterHandler {
-  private final RowMatcher _rowMatcher;
+public class ColumnValueExtractor implements ValueExtractor {
+  private final int _index;
+  private final DataSchema _dataSchema;
 
-  public HavingFilterHandler(FilterContext havingFilter, PostAggregationHandler postAggregationHandler) {
-    _rowMatcher = RowMatcherFactory.getRowMatcher(havingFilter, postAggregationHandler);
+  public ColumnValueExtractor(int index, DataSchema dataSchema) {
+    _index = index;
+    _dataSchema = dataSchema;
   }
 
-  /**
-   * Returns {@code true} if the given row matches the HAVING clause, {@code false} otherwise.
-   */
-  public boolean isMatch(Object[] row) {
-    return _rowMatcher.isMatch(row);
+  @Override
+  public String getColumnName() {
+    return _dataSchema.getColumnName(_index);
+  }
+
+  @Override
+  public ColumnDataType getColumnDataType() {
+    return _dataSchema.getColumnDataType(_index);
+  }
+
+  @Override
+  public Object extract(Object[] row) {
+    return row[_index];
   }
 }

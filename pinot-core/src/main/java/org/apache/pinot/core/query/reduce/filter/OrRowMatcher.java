@@ -16,27 +16,33 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce;
+package org.apache.pinot.core.query.reduce.filter;
 
+import java.util.List;
 import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.core.query.reduce.filter.RowMatcher;
-import org.apache.pinot.core.query.reduce.filter.RowMatcherFactory;
 
 
 /**
- * Handler for HAVING clause.
+ * OR filter matcher.
  */
-public class HavingFilterHandler {
-  private final RowMatcher _rowMatcher;
+public class OrRowMatcher implements RowMatcher {
+  RowMatcher[] _childMatchers;
 
-  public HavingFilterHandler(FilterContext havingFilter, PostAggregationHandler postAggregationHandler) {
-    _rowMatcher = RowMatcherFactory.getRowMatcher(havingFilter, postAggregationHandler);
+  public OrRowMatcher(List<FilterContext> childFilters, ValueExtractorFactory valueExtractorFactory) {
+    int numChildren = childFilters.size();
+    _childMatchers = new RowMatcher[numChildren];
+    for (int i = 0; i < numChildren; i++) {
+      _childMatchers[i] = RowMatcherFactory.getRowMatcher(childFilters.get(i), valueExtractorFactory);
+    }
   }
 
-  /**
-   * Returns {@code true} if the given row matches the HAVING clause, {@code false} otherwise.
-   */
+  @Override
   public boolean isMatch(Object[] row) {
-    return _rowMatcher.isMatch(row);
+    for (RowMatcher childMatcher : _childMatchers) {
+      if (childMatcher.isMatch(row)) {
+        return true;
+      }
+    }
+    return false;
   }
 }
