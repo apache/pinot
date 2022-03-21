@@ -90,7 +90,11 @@ public class GapfillProcessor {
 
     _dateTimeFormatter = new DateTimeFormatSpec(args.get(1).getLiteral());
     _gapfillDateTimeGranularity = new DateTimeGranularitySpec(args.get(4).getLiteral());
-    _postGapfillDateTimeGranularity = new DateTimeGranularitySpec(args.get(5).getLiteral());
+    if (args.get(5).getLiteral() == null) {
+      _postGapfillDateTimeGranularity = _gapfillDateTimeGranularity;
+    } else {
+      _postGapfillDateTimeGranularity = new DateTimeGranularitySpec(args.get(5).getLiteral());
+    }
     String start = args.get(2).getLiteral();
     _startMs = truncate(_dateTimeFormatter.fromFormatToMillis(start));
     String end = args.get(3).getLiteral();

@@ -305,6 +305,7 @@ public class GapfillUtils {
 
     // carry over the query options from original query to server query.
     Map<String, String> queryOptions = pinotQuery.getQueryOptions();
+    Map<String, String> debugOptions = pinotQuery.getDebugOptions();
 
     while (pinotQuery.getDataSource().getSubquery() != null) {
       pinotQuery = pinotQuery.getDataSource().getSubquery();
@@ -312,6 +313,7 @@ public class GapfillUtils {
 
     BrokerRequest strippedBrokerRequest = stripGapfill(pinotQuery);
     strippedBrokerRequest.getPinotQuery().setQueryOptions(queryOptions);
+    strippedBrokerRequest.getPinotQuery().setDebugOptions(debugOptions);
     return strippedBrokerRequest;
   }
 

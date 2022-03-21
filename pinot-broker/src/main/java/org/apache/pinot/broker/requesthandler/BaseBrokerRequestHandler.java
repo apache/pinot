@@ -219,8 +219,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return new BrokerResponseNative(QueryException.getException(QueryException.PQL_PARSING_ERROR, e));
     }
 
+    setOptions(brokerRequest.getPinotQuery(), requestId, query, request);
     BrokerRequest serverBrokerRequest = GapfillUtils.stripGapfill(brokerRequest);
-
     PinotQuery pinotQuery = serverBrokerRequest.getPinotQuery();
     setOptions(pinotQuery, requestId, query, request);
 
