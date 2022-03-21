@@ -224,6 +224,5 @@ public class DimensionTableDataManagerTest {
     Assert.assertNotNull(teamCitySpec, "Should return spec for existing column");
     Assert.assertEquals(teamCitySpec.getDataType(), FieldSpec.DataType.STRING,
         "Should return correct data type for teamCity column");
-
   }
 }
