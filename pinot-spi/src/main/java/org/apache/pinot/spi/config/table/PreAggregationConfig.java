@@ -40,4 +40,16 @@ public class PreAggregationConfig extends BaseJsonConfig {
     _aggregationFunctionType = aggregationFunctionType;
     _destColumn = destColumn;
   }
+
+  public String getSrcColumn() {
+    return _srcColumn;
+  }
+
+  public String getAggregationFunctionType() {
+    return _aggregationFunctionType;
+  }
+
+  public String getDestColumn() {
+    return _destColumn;
+  }
 }
