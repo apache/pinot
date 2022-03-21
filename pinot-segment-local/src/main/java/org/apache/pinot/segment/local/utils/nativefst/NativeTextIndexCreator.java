@@ -32,7 +32,7 @@ public class NativeTextIndexCreator implements TextIndexCreator {
     static final String TEMP_DIR_SUFFIX = ".nativetext.idx.tmp";
     static final String FST_FILE_NAME = "native.fst";
     static final String INVERTED_INDEX_FILE_NAME = "inverted.index.buf";
-    public static final int HEADER_LENGTH = 20;
+    public static final int HEADER_LENGTH = 24;
 
     private String _columnName;
     private FSTBuilder _fstBuilder;
@@ -139,6 +139,7 @@ public class NativeTextIndexCreator implements TextIndexCreator {
             throws IOException {
         ByteBuffer headerBuffer = ByteBuffer.allocate(HEADER_LENGTH);
         long invertedIndexFileLength = _invertedIndexFile.length();
+        headerBuffer.putInt(FSTHeader.FST_MAGIC);
         headerBuffer.putLong(invertedIndexFileLength);
         headerBuffer.putLong(_fstDataSize);
         headerBuffer.putInt(_numBitMaps);

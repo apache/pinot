@@ -25,9 +25,9 @@ public class NativeTextIndexReader implements TextIndexReader {
 
   public NativeTextIndexReader(PinotDataBuffer dataBuffer, int numDocs) {
     _numDocs = numDocs;
-    long invertedIndexLength = dataBuffer.getLong(0);
-    long fstDataLength = dataBuffer.getLong(8);
-    int numBitMaps = dataBuffer.getInt(16);
+    long invertedIndexLength = dataBuffer.getLong(4);
+    long fstDataLength = dataBuffer.getLong(12);
+    int numBitMaps = dataBuffer.getInt(20);
 
     long fstDataStartOffset = NativeTextIndexCreator.HEADER_LENGTH;
     long fstDataEndOffset = fstDataStartOffset + fstDataLength;
