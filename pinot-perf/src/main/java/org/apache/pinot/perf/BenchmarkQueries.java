@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
+import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.queries.BaseQueriesTest;
@@ -88,6 +89,7 @@ public class BenchmarkQueries extends BaseQueriesTest {
   private static final String RAW_STRING_COL_NAME = "RAW_STRING_COL";
   private static final String NO_INDEX_INT_COL_NAME = "NO_INDEX_INT_COL";
   private static final String NO_INDEX_STRING_COL = "NO_INDEX_STRING_COL";
+  private static final String LOW_CARDINALITY_STRING_COL = "LOW_CARDINALITY_STRING_COL";
 
   public static final String FILTERED_QUERY = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 123 AND INT_COL < 599999),"
       + "MAX(INT_COL) FILTER(WHERE INT_COL > 123 AND INT_COL < 599999) "
@@ -116,13 +118,21 @@ public class BenchmarkQueries extends BaseQueriesTest {
   public static final String NO_INDEX_LIKE_QUERY = "SELECT RAW_INT_COL FROM MyTable "
       + "WHERE NO_INDEX_STRING_COL LIKE '%foo%'";
 
+  public static final String MULTI_GROUP_BY_ORDER_BY = "SELECT NO_INDEX_STRING_COL,INT_COL,COUNT(*) "
+      + "FROM MyTable GROUP BY NO_INDEX_STRING_COL,INT_COL ORDER BY NO_INDEX_STRING_COL, INT_COL ASC";
+
+  public static final String MULTI_GROUP_BY_ORDER_BY_LOW_HIGH = "SELECT "
+      + "NO_INDEX_STRING_COL,LOW_CARDINALITY_STRING_COL,COUNT(*) "
+      + "FROM MyTable GROUP BY LOW_CARDINALITY_STRING_COL,NO_INDEX_STRING_COL "
+      + "ORDER BY LOW_CARDINALITY_STRING_COL, NO_INDEX_STRING_COL ASC";
+
   @Param("1500000")
   private int _numRows;
   @Param({"EXP(0.001)", "EXP(0.5)", "EXP(0.999)"})
   String _scenario;
   @Param({
       MULTI_GROUP_BY_WITH_RAW_QUERY, MULTI_GROUP_BY_WITH_RAW_QUERY_2, FILTERED_QUERY, NON_FILTERED_QUERY,
-      SUM_QUERY, NO_INDEX_LIKE_QUERY
+      SUM_QUERY, NO_INDEX_LIKE_QUERY, MULTI_GROUP_BY_ORDER_BY, MULTI_GROUP_BY_ORDER_BY_LOW_HIGH
   })
   String _query;
   private IndexSegment _indexSegment;
@@ -166,6 +176,8 @@ public class BenchmarkQueries extends BaseQueriesTest {
   private List<GenericRow> createTestData(int numRows) {
     Map<Integer, String> strings = new HashMap<>();
     List<GenericRow> rows = new ArrayList<>();
+    String[] lowCardinalityValues = IntStream.range(0, 10).mapToObj(i -> UUID.randomUUID().toString())
+        .toArray(String[]::new);
     for (int i = 0; i < numRows; i++) {
       GenericRow row = new GenericRow();
       row.putValue(INT_COL_NAME, (int) _supplier.getAsLong());
@@ -174,6 +186,7 @@ public class BenchmarkQueries extends BaseQueriesTest {
       row.putValue(RAW_STRING_COL_NAME,
           strings.computeIfAbsent((int) _supplier.getAsLong(), k -> UUID.randomUUID().toString()));
       row.putValue(NO_INDEX_STRING_COL, row.getValue(RAW_STRING_COL_NAME));
+      row.putValue(LOW_CARDINALITY_STRING_COL, lowCardinalityValues[i % lowCardinalityValues.length]);
       rows.add(row);
     }
     return rows;
@@ -195,6 +208,7 @@ public class BenchmarkQueries extends BaseQueriesTest {
         .addSingleValueDimension(INT_COL_NAME, FieldSpec.DataType.INT)
         .addSingleValueDimension(RAW_STRING_COL_NAME, FieldSpec.DataType.STRING)
         .addSingleValueDimension(NO_INDEX_STRING_COL, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(LOW_CARDINALITY_STRING_COL, FieldSpec.DataType.STRING)
         .build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR.getPath());
