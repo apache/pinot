@@ -165,6 +165,8 @@ public class TransformFunctionFactory {
           // tuple selection
           put(canonicalize(TransformFunctionType.LEAST.getName().toLowerCase()), LeastTransformFunction.class);
           put(canonicalize(TransformFunctionType.GREATEST.getName().toLowerCase()), GreatestTransformFunction.class);
+
+          // null handling
           put(canonicalize(TransformFunctionType.IS_NULL.getName().toLowerCase()), IsNullTransformFunction.class);
           put(canonicalize(TransformFunctionType.IS_NOT_NULL.getName().toLowerCase()),
               IsNotNullTransformFunction.class);
