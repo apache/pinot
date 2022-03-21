@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.config.table.PreAggregationConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 
@@ -56,7 +57,7 @@ public class RealtimeSegmentConfig {
   private final PartitionFunction _partitionFunction;
   private final int _partitionId;
   private final boolean _aggregateMetrics;
-  private final List<String> _preAggregationConfigs;
+  private final List<PreAggregationConfig> _preAggregationConfigs;
   private final boolean _nullHandlingEnabled;
   private final UpsertConfig.Mode _upsertMode;
   private final UpsertConfig.HashFunction _hashFunction;
@@ -71,8 +72,8 @@ public class RealtimeSegmentConfig {
       Set<String> fstIndexColumns, Set<String> jsonIndexColumns, Map<String, H3IndexConfig> h3IndexConfigs,
       SegmentZKMetadata segmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
       RealtimeSegmentStatsHistory statsHistory, String partitionColumn, PartitionFunction partitionFunction,
-      int partitionId, boolean aggregateMetrics, List<String> preAggregationConfigs, boolean nullHandlingEnabled,
-      String consumerDir, UpsertConfig.Mode upsertMode, String upsertComparisonColumn,
+      int partitionId, boolean aggregateMetrics, List<PreAggregationConfig> preAggregationConfigs,
+      boolean nullHandlingEnabled, String consumerDir, UpsertConfig.Mode upsertMode, String upsertComparisonColumn,
       UpsertConfig.HashFunction hashFunction, PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
     _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;
@@ -198,7 +199,7 @@ public class RealtimeSegmentConfig {
     return _aggregateMetrics;
   }
 
-  public List<String> getPreAggregationConfigs() {
+  public List<PreAggregationConfig> getPreAggregationConfigs() {
     return _preAggregationConfigs;
   }
 
@@ -249,7 +250,7 @@ public class RealtimeSegmentConfig {
     private PartitionFunction _partitionFunction;
     private int _partitionId;
     private boolean _aggregateMetrics = false;
-    private List<String> _preAggregationConfigs;
+    private List<PreAggregationConfig> _preAggregationConfigs;
     private boolean _nullHandlingEnabled = false;
     private String _consumerDir;
     private UpsertConfig.Mode _upsertMode;
@@ -378,7 +379,7 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
-    public Builder setPreAggregationConfigs(List<String> preAggregationConfigs) {
+    public Builder setPreAggregationConfigs(List<PreAggregationConfig> preAggregationConfigs) {
       _preAggregationConfigs = preAggregationConfigs;
       return this;
     }
