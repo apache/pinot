@@ -291,7 +291,7 @@ public class SegmentGenerationJobSpec implements Serializable {
     _authToken = authToken;
   }
 
-  public String asJSONString(boolean removeSensitiveKeys) {
+  public String toJSONString(boolean removeSensitiveKeys) {
     ObjectNode jsonNode = (ObjectNode) JsonUtils.objectToJsonNode(this);
     if (removeSensitiveKeys) {
       jsonNode.remove("authToken"); //Removing auth token as it is a sensitive key
