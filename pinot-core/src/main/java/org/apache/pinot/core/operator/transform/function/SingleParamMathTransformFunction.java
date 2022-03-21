@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
@@ -55,12 +54,14 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_results == null) {
-      _results = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int length = projectionBlock.getNumDocs();
+
+    if (_results == null || _results.length < length) {
+      _results = new double[length];
     }
 
     double[] values = _transformFunction.transformToDoubleValuesSV(projectionBlock);
-    applyMathOperator(values, projectionBlock.getNumDocs());
+    applyMathOperator(values, length);
     return _results;
   }
 
