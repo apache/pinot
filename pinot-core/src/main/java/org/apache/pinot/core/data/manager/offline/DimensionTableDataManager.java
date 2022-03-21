@@ -143,12 +143,10 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
           }
         }
       }
-
       ZkHelixPropertyStore<ZNRecord> propertyStore = _helixManager.getHelixPropertyStore();
       Schema tableSchema = ZKMetadataProvider.getTableSchema(propertyStore, _tableNameWithType);
       List<String> primaryKeyColumns = tableSchema.getPrimaryKeyColumns();
       return new DimensionTable(tableSchema, primaryKeyColumns, map);
-
     } finally {
       for (SegmentDataManager segmentManager : segmentManagers) {
         releaseSegment(segmentManager);
