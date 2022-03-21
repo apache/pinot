@@ -456,7 +456,7 @@ public class StringFunctions {
   @ScalarFunction
   public static String encodeUrl(String input)
       throws UnsupportedEncodingException {
-      return URLEncoder.encode(input, StandardCharsets.UTF_8);
+      return URLEncoder.encode(input, StandardCharsets.UTF_8.toString());
   }
 
   /**
@@ -468,6 +468,6 @@ public class StringFunctions {
   @ScalarFunction
   public static String decodeUrl(String input)
       throws UnsupportedEncodingException {
-    return URLDecoder.decode(input, StandardCharsets.UTF_8);
+    return URLDecoder.decode(input, StandardCharsets.UTF_8.toString());
   }
 }
