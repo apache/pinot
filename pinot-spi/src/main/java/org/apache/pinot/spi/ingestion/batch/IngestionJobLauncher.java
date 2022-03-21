@@ -94,7 +94,7 @@ public class IngestionJobLauncher {
   }
 
   public static void runIngestionJob(SegmentGenerationJobSpec spec) {
-    LOGGER.info("SegmentGenerationJobSpec: \n{}", spec.asJSONString(true));
+    LOGGER.info("SegmentGenerationJobSpec: \n{}", spec.toJSONString(true));
     ExecutionFrameworkSpec executionFramework = spec.getExecutionFrameworkSpec();
     PinotIngestionJobType jobType = PinotIngestionJobType.fromString(spec.getJobType());
     switch (jobType) {
