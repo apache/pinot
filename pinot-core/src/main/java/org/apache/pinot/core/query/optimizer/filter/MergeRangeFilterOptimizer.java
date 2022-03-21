@@ -136,7 +136,7 @@ public class MergeRangeFilterOptimizer implements FilterOptimizer {
         Function childFunction = child.getFunctionCall();
         FilterKind filterKind = FilterKind.valueOf(childFunction.getOperator());
         assert filterKind != FilterKind.AND;
-        if (filterKind == FilterKind.OR) {
+        if (filterKind == FilterKind.OR || filterKind == FilterKind.NOT) {
           childFunction.getOperands().replaceAll(o -> optimize(o, schema));
           newChildren.add(child);
         } else if (filterKind.isRange()) {
@@ -186,7 +186,7 @@ public class MergeRangeFilterOptimizer implements FilterOptimizer {
       } else {
         return filterExpression;
       }
-    } else if (operator.equals(FilterKind.OR.name())) {
+    } else if (operator.equals(FilterKind.OR.name()) || operator.equals(FilterKind.NOT.name())) {
       function.getOperands().replaceAll(c -> optimize(c, schema));
       return filterExpression;
     } else {

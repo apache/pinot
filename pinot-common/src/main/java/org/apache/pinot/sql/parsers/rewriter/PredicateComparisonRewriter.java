@@ -59,6 +59,7 @@ public class PredicateComparisonRewriter implements QueryRewriter {
       switch (filterKind) {
         case AND:
         case OR:
+        case NOT:
           operands.replaceAll(PredicateComparisonRewriter::updateComparisonPredicate);
           break;
         case EQUALS:

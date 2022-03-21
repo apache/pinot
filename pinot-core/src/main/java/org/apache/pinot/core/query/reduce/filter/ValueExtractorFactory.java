@@ -25,6 +25,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
  * Factory for {@link ValueExtractor}.
  */
 public interface ValueExtractorFactory {
+
   /**
    * Create the {@link ValueExtractor} for specific column.
    *

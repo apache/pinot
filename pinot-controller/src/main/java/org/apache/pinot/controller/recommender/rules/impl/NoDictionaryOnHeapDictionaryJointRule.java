@@ -21,11 +21,11 @@ package org.apache.pinot.controller.recommender.rules.impl;
 import com.google.common.util.concurrent.AtomicDouble;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
 import org.apache.pinot.controller.recommender.io.ConfigManager;
 import org.apache.pinot.controller.recommender.io.InputManager;
@@ -207,25 +207,17 @@ public class NoDictionaryOnHeapDictionaryJointRule extends AbstractRule {
   }
 
   public FixedLenBitset parsePredicateList(FilterContext filterContext) {
-    FilterContext.Type type = filterContext.getType();
     FixedLenBitset ret = mutableEmptySet();
-    if (type == FilterContext.Type.AND) {
-      for (int i = 0; i < filterContext.getChildren().size(); i++) {
-        FixedLenBitset childResult = parsePredicateList(filterContext.getChildren().get(i));
-        if (childResult != null) {
-          ret.union(childResult);
-        }
-      }
-    } else if (type == FilterContext.Type.OR) {
-      for (int i = 0; i < filterContext.getChildren().size(); i++) {
-        FixedLenBitset childResult = parsePredicateList(filterContext.getChildren().get(i));
-        if (childResult != null) {
-          ret.union(childResult);
-        }
+    List<FilterContext> children = filterContext.getChildren();
+    if (children != null) {
+      // AND, OR, NOT
+      for (FilterContext child : children) {
+        FixedLenBitset childResult = parsePredicateList(child);
+        ret.union(childResult);
       }
     } else {
-      Predicate predicate = filterContext.getPredicate();
-      ExpressionContext lhs = predicate.getLhs();
+      // PREDICATE
+      ExpressionContext lhs = filterContext.getPredicate().getLhs();
       String colName = lhs.toString();
       if (lhs.getType() == ExpressionContext.Type.FUNCTION || _input.isTimeOrDateTimeColumn(colName)) {
         LOGGER.trace("Skipping this column {}", colName);

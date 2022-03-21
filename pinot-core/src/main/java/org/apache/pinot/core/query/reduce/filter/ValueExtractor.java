@@ -25,6 +25,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
  * Value extractor for the post-aggregation function or pre-aggregation gap fill.
  */
 public interface ValueExtractor {
+
   /**
    * Returns the column name for the value extracted.
    */

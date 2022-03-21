@@ -18,31 +18,21 @@
  */
 package org.apache.pinot.core.query.reduce.filter;
 
-import java.util.List;
 import org.apache.pinot.common.request.context.FilterContext;
 
 
 /**
- * AND filter matcher.
+ * NOT filter matcher.
  */
-public class AndRowMatcher implements RowMatcher {
-  private final RowMatcher[] _childMatchers;
+public class NotRowMatcher implements RowMatcher {
+  private final RowMatcher _childMatcher;
 
-  public AndRowMatcher(List<FilterContext> childFilters, ValueExtractorFactory valueExtractorFactory) {
-    int numChildren = childFilters.size();
-    _childMatchers = new RowMatcher[numChildren];
-    for (int i = 0; i < numChildren; i++) {
-      _childMatchers[i] = RowMatcherFactory.getRowMatcher(childFilters.get(i), valueExtractorFactory);
-    }
+  public NotRowMatcher(FilterContext childFilter, ValueExtractorFactory valueExtractorFactory) {
+    _childMatcher = RowMatcherFactory.getRowMatcher(childFilter, valueExtractorFactory);
   }
 
   @Override
   public boolean isMatch(Object[] row) {
-    for (RowMatcher childMatcher : _childMatchers) {
-      if (!childMatcher.isMatch(row)) {
-        return false;
-      }
-    }
-    return true;
+    return !_childMatcher.isMatch(row);
   }
 }
