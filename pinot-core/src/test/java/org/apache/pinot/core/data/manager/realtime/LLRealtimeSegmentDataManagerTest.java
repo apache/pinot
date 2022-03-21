@@ -38,10 +38,13 @@ import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
+import org.apache.pinot.segment.local.segment.creator.Fixtures;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -58,10 +61,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.core.data.manager.realtime.Fixtures.MAX_ROWS_IN_SEGMENT;
-import static org.apache.pinot.core.data.manager.realtime.Fixtures.MAX_TIME_FOR_SEGMENT_CLOSE_MS;
-import static org.apache.pinot.core.data.manager.realtime.Fixtures.createSchema;
-import static org.apache.pinot.core.data.manager.realtime.Fixtures.createTableConfig;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.anyString;
@@ -85,6 +84,12 @@ public class LLRealtimeSegmentDataManagerTest {
 
   private static long _timeNow = System.currentTimeMillis();
   private final Map<Integer, Semaphore> _partitionGroupIdToSemaphoreMap = new ConcurrentHashMap<>();
+
+  private static TableConfig createTableConfig()
+      throws Exception {
+    return Fixtures.createTableConfig(FakeStreamConsumerFactory.class.getName(),
+        FakeStreamMessageDecoder.class.getName());
+  }
 
   private RealtimeTableDataManager createTableDataManager(TableConfig tableConfig) {
     final String instanceId = "server-1";
@@ -114,7 +119,7 @@ public class LLRealtimeSegmentDataManagerTest {
     RealtimeTableDataManager tableDataManager = createTableDataManager(tableConfig);
     LLCSegmentName llcSegmentName = new LLCSegmentName(SEGMENT_NAME_STR);
     _partitionGroupIdToSemaphoreMap.putIfAbsent(PARTITION_GROUP_ID, new Semaphore(1));
-    Schema schema = createSchema();
+    Schema schema = Fixtures.createSchema();
     ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     return new FakeLLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, tableDataManager, SEGMENT_DIR, schema,
         llcSegmentName, _partitionGroupIdToSemaphoreMap, serverMetrics);
@@ -495,9 +500,9 @@ public class LLRealtimeSegmentDataManagerTest {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
       segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.INITIAL_CONSUMING);
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
-      segmentDataManager.setNumRowsIndexed(MAX_ROWS_IN_SEGMENT - 1);
+      segmentDataManager.setNumRowsIndexed(Fixtures.MAX_ROWS_IN_SEGMENT - 1);
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
-      segmentDataManager.setNumRowsIndexed(MAX_ROWS_IN_SEGMENT);
+      segmentDataManager.setNumRowsIndexed(Fixtures.MAX_ROWS_IN_SEGMENT);
       Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
       Assert.assertEquals(segmentDataManager.getStopReason(), SegmentCompletionProtocol.REASON_ROW_LIMIT);
       segmentDataManager.destroy();
@@ -507,12 +512,12 @@ public class LLRealtimeSegmentDataManagerTest {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
       segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.INITIAL_CONSUMING);
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
-      _timeNow += MAX_TIME_FOR_SEGMENT_CLOSE_MS + 1;
+      _timeNow += Fixtures.MAX_TIME_FOR_SEGMENT_CLOSE_MS + 1;
       // We should still get false, since the number of records in the realtime segment is 0
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
       replaceRealtimeSegment(segmentDataManager, 10);
       // Now we can test when we are far ahead in time
-      _timeNow += MAX_TIME_FOR_SEGMENT_CLOSE_MS;
+      _timeNow += Fixtures.MAX_TIME_FOR_SEGMENT_CLOSE_MS;
       Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
       Assert.assertEquals(segmentDataManager.getStopReason(), SegmentCompletionProtocol.REASON_TIME_LIMIT);
       segmentDataManager.destroy();
@@ -532,7 +537,7 @@ public class LLRealtimeSegmentDataManagerTest {
     // In catching up state, test reaching final offset ignoring time
     {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
-      _timeNow += MAX_TIME_FOR_SEGMENT_CLOSE_MS;
+      _timeNow += Fixtures.MAX_TIME_FOR_SEGMENT_CLOSE_MS;
       segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.CATCHING_UP);
       final long finalOffset = START_OFFSET_VALUE + 100;
       segmentDataManager.setFinalOffset(finalOffset);

@@ -23,7 +23,6 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -38,6 +37,7 @@ import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.segment.creator.IntermediateSegmentSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
+import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConverterFactory;
 import org.apache.pinot.segment.local.segment.readers.IntermediateSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
@@ -88,8 +88,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private SegmentCreator _indexCreator;
   private SegmentIndexCreationInfo _segmentIndexCreationInfo;
   private Schema _dataSchema;
-  private RecordTransformer _recordTransformer;
-  private ComplexTypeTransformer _complexTypeTransformer;
+  private TransformPipeline _transformPipeline;
   private IngestionSchemaValidator _ingestionSchemaValidator;
   private int _totalDocs = 0;
   private File _tempIndexDir;
@@ -165,9 +164,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (config.isFailOnEmptySegment()) {
       Preconditions.checkState(_recordReader.hasNext(), "No record in data source");
     }
-
-    _recordTransformer = recordTransformer;
-    _complexTypeTransformer = complexTypeTransformer;
+    _transformPipeline = new TransformPipeline(recordTransformer, complexTypeTransformer);
 
     // Initialize stats collection
     _segmentStats = dataSource.gatherStats(
@@ -212,40 +209,23 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       _recordReader.rewind();
       LOGGER.info("Start building IndexCreator!");
       GenericRow reuse = new GenericRow();
+      TransformPipeline.Result reusedResult = new TransformPipeline.Result();
       while (_recordReader.hasNext()) {
         long recordReadStartTime = System.currentTimeMillis();
         long recordReadStopTime;
         long indexStopTime;
         reuse.clear();
         GenericRow decodedRow = _recordReader.next(reuse);
-        if (_complexTypeTransformer != null) {
-          // TODO: consolidate complex type transformer into composite type transformer
-          decodedRow = _complexTypeTransformer.transform(decodedRow);
+        recordReadStartTime = System.currentTimeMillis();
+        _transformPipeline.processRow(decodedRow, reusedResult);
+        recordReadStopTime = System.currentTimeMillis();
+        _totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
+
+        for (GenericRow row : reusedResult.getTransformedRows()) {
+          _indexCreator.indexRow(row);
         }
-        if (decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
-          recordReadStopTime = System.currentTimeMillis();
-          _totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
-          for (Object singleRow : (Collection) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
-            recordReadStartTime = System.currentTimeMillis();
-            GenericRow transformedRow = _recordTransformer.transform((GenericRow) singleRow);
-            recordReadStopTime = System.currentTimeMillis();
-            _totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
-            if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-              _indexCreator.indexRow(transformedRow);
-              indexStopTime = System.currentTimeMillis();
-              _totalIndexTime += (indexStopTime - recordReadStopTime);
-            }
-          }
-        } else {
-          GenericRow transformedRow = _recordTransformer.transform(decodedRow);
-          recordReadStopTime = System.currentTimeMillis();
-          _totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
-          if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-            _indexCreator.indexRow(transformedRow);
-            indexStopTime = System.currentTimeMillis();
-            _totalIndexTime += (indexStopTime - recordReadStopTime);
-          }
-        }
+        indexStopTime = System.currentTimeMillis();
+        _totalIndexTime += (indexStopTime - recordReadStopTime);
       }
     } catch (Exception e) {
       _indexCreator.close();
