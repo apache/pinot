@@ -48,7 +48,7 @@ import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
-import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.core.common.MinionConstants;
@@ -264,7 +264,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
       JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
       factory.setHeaders(AUTH_HEADER);
       factory.setScheme(CommonConstants.HTTPS_PROTOCOL);
-      factory.setSslContext(FileUploadDownloadClient._defaultSSLContext);
+      factory.setSslContext(TlsUtils.getSslContext());
 
       _pinotConnection =
           ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(), factory.buildTransport());
