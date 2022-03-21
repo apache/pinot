@@ -67,6 +67,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
@@ -417,8 +418,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       if (_currentOffset.compareTo(lastUpdatedOffset) != 0) {
         consecutiveIdleCount = 0;
         // We consumed something. Update the highest stream offset as well as partition-consuming metric.
-        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED,
-            Long.parseLong(_currentOffset.toString()));
+        if (_currentOffset instanceof LongMsgOffset) {
+          // TODO: only LongMsgOffset supplies long offset value.
+          _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED,
+              ((LongMsgOffset) _currentOffset).getOffset());
+        }
         _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 1);
         lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(_currentOffset);
       } else if (messageBatch.getUnfilteredMessageCount() > 0) {
