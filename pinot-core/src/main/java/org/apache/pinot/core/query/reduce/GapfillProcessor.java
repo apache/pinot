@@ -66,11 +66,11 @@ public class GapfillProcessor {
   private final Map<String, ExpressionContext> _fillExpressions;
   private final List<ExpressionContext> _timeSeries;
   private final GapfillUtils.GapfillType _gapfillType;
+  private final int _timeBucketColumnIndex;
+  private final int _aggregationSize;
   private int _limitForGapfilledResult;
   private boolean[] _isGroupBySelections;
-  private final int _timeBucketColumnIndex;
   private int[] _sourceColumnIndexForResultSchema = null;
-  private final int _aggregationSize;
 
   GapfillProcessor(QueryContext queryContext, GapfillUtils.GapfillType gapfillType) {
     _queryContext = queryContext;
@@ -264,7 +264,7 @@ public class GapfillProcessor {
       int index = findGapfillBucketIndex(time);
       gapfill(time, bucketedResult, timeBucketedRawRows[index], dataSchema, postGapfillFilterHandler);
       if (_queryContext.getAggregationFunctions() == null) {
-        for (Object [] row : bucketedResult) {
+        for (Object[] row : bucketedResult) {
           Object[] resultRow = new Object[_sourceColumnIndexForResultSchema.length];
           for (int i = 0; i < _sourceColumnIndexForResultSchema.length; i++) {
             resultRow[i] = row[_sourceColumnIndexForResultSchema[i]];
@@ -368,7 +368,7 @@ public class GapfillProcessor {
       indexes.put(dataSchema.getColumnName(i), i);
     }
 
-    for (Object [] bucketedRow : bucketedRows) {
+    for (Object[] bucketedRow : bucketedRows) {
       bucketedRow[_timeBucketColumnIndex] = timeCol;
     }
 
@@ -414,11 +414,11 @@ public class GapfillProcessor {
         GroupByResultHolder groupByResultHolder =
             aggregationFunction.createGroupByResultHolder(groupKeyIndexes.size(), groupKeyIndexes.size());
         if (aggregationFunction instanceof CountAggregationFunction) {
-          aggregationFunction.aggregateGroupBySV(
-              bucketedRows.size(), groupKeyArray, groupByResultHolder, new HashMap<ExpressionContext, BlockValSet>());
+          aggregationFunction.aggregateGroupBySV(bucketedRows.size(), groupKeyArray, groupByResultHolder,
+              new HashMap<ExpressionContext, BlockValSet>());
         } else {
-          aggregationFunction.aggregateGroupBySV(
-              bucketedRows.size(), groupKeyArray, groupByResultHolder, blockValSetMap);
+          aggregationFunction
+              .aggregateGroupBySV(bucketedRows.size(), groupKeyArray, groupByResultHolder, blockValSetMap);
         }
         for (int j = 0; j < groupKeyIndexes.size(); j++) {
           Object[] row = aggregatedResult.get(j);
@@ -463,7 +463,7 @@ public class GapfillProcessor {
   private List<Object[]>[] putRawRowsIntoTimeBucket(List<Object[]> rows) {
     List<Object[]>[] bucketedItems = new List[_numOfTimeBuckets];
 
-    for (Object[] row: rows) {
+    for (Object[] row : rows) {
       long timeBucket = _dateTimeFormatter.fromFormatToMillis(String.valueOf(row[_timeBucketColumnIndex]));
       int index = findGapfillBucketIndex(timeBucket);
       if (bucketedItems[index] == null) {
