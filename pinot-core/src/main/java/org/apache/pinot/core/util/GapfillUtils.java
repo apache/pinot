@@ -310,7 +310,7 @@ public class GapfillUtils {
       pinotQuery = pinotQuery.getDataSource().getSubquery();
     }
 
-    BrokerRequest strippedBrokerRequest =  stripGapfill(pinotQuery);
+    BrokerRequest strippedBrokerRequest = stripGapfill(pinotQuery);
     strippedBrokerRequest.getPinotQuery().setQueryOptions(queryOptions);
     return strippedBrokerRequest;
   }
