@@ -408,7 +408,7 @@ public class GapfillProcessor {
         AggregationFunction aggregationFunction =
             AggregationFunctionFactory.getAggregationFunction(functionContext, _queryContext);
         GroupByResultHolder groupByResultHolder =
-            aggregationFunction.createGroupByResultHolder(_groupByKeys.size(), _groupByKeys.size());
+            aggregationFunction.createGroupByResultHolder(groupKeyIndexes.size(), groupKeyIndexes.size());
         if (aggregationFunction instanceof CountAggregationFunction) {
           aggregationFunction.aggregateGroupBySV(
               bucketedRows.size(), groupKeyArray, groupByResultHolder, new HashMap<ExpressionContext, BlockValSet>());
