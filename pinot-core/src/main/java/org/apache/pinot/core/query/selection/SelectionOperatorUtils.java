@@ -79,6 +79,7 @@ public class SelectionOperatorUtils {
   private static final String FLOAT_PATTERN = "#########0.0####";
   private static final String DOUBLE_PATTERN = "###################0.0#########";
   private static final DecimalFormatSymbols DECIMAL_FORMAT_SYMBOLS = DecimalFormatSymbols.getInstance(Locale.US);
+
   private static final ThreadLocal<DecimalFormat> THREAD_LOCAL_INT_FORMAT =
       ThreadLocal.withInitial(() -> new DecimalFormat(INT_PATTERN, DECIMAL_FORMAT_SYMBOLS));
   private static final ThreadLocal<DecimalFormat> THREAD_LOCAL_LONG_FORMAT =

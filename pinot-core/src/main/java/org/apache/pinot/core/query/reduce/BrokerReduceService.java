@@ -114,13 +114,13 @@ public class BrokerReduceService extends BaseReduceService {
       queryContext = serverQueryContext;
     } else {
       queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
+      GapfillUtils.GapfillType gapfillType = GapfillUtils.getGapfillType(queryContext);
+      if (gapfillType != null) {
+        GapfillProcessor gapfillProcessor = new GapfillProcessor(queryContext, gapfillType);
+        gapfillProcessor.process(brokerResponseNative);
+      }
     }
 
-    GapfillUtils.GapfillType gapfillType = GapfillUtils.getGapfillType(queryContext);
-    if (gapfillType != null) {
-      GapfillProcessor gapfillProcessor = new GapfillProcessor(queryContext, gapfillType);
-      gapfillProcessor.process(brokerResponseNative);
-    }
     updateAlias(queryContext, brokerResponseNative);
     return brokerResponseNative;
   }

@@ -267,24 +267,26 @@ public class GapfillProcessor {
           }
           result.add(resultRow);
         }
-        bucketedResult = new ArrayList<>();
-      } else if (index % _aggregationSize == _aggregationSize - 1 && bucketedResult.size() > 0) {
-        Object timeCol;
-        if (resultColumnDataTypes[_timeBucketColumnIndex] == ColumnDataType.LONG) {
-          timeCol = Long.valueOf(_dateTimeFormatter.fromMillisToFormat(start));
-        } else {
-          timeCol = _dateTimeFormatter.fromMillisToFormat(start);
-        }
-        List<Object[]> aggregatedRows = aggregateGapfilledData(timeCol, bucketedResult, dataSchema);
-        for (Object[] aggregatedRow : aggregatedRows) {
-          if (postAggregateHavingFilterHandler == null || postAggregateHavingFilterHandler.isMatch(aggregatedRow)) {
-            result.add(aggregatedRow);
+        bucketedResult.clear();
+      } else if (index % _aggregationSize == _aggregationSize - 1) {
+        if (bucketedResult.size() > 0) {
+          Object timeCol;
+          if (resultColumnDataTypes[_timeBucketColumnIndex] == ColumnDataType.LONG) {
+            timeCol = Long.valueOf(_dateTimeFormatter.fromMillisToFormat(start));
+          } else {
+            timeCol = _dateTimeFormatter.fromMillisToFormat(start);
           }
-          if (result.size() >= _limitForAggregatedResult) {
-            return result;
+          List<Object[]> aggregatedRows = aggregateGapfilledData(timeCol, bucketedResult, dataSchema);
+          for (Object[] aggregatedRow : aggregatedRows) {
+            if (postAggregateHavingFilterHandler == null || postAggregateHavingFilterHandler.isMatch(aggregatedRow)) {
+              result.add(aggregatedRow);
+            }
+            if (result.size() >= _limitForAggregatedResult) {
+              return result;
+            }
           }
+          bucketedResult.clear();
         }
-        bucketedResult = new ArrayList<>();
         start = time + _gapfillTimeBucketSize;
       }
     }
