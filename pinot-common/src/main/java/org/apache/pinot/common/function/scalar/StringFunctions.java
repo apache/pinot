@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.regex.Matcher;
@@ -442,5 +445,29 @@ public class StringFunctions {
   @ScalarFunction
   public static int strcmp(String input1, String input2) {
     return input1.compareTo(input2);
+  }
+
+  /**
+   *
+   * @param input plaintext string
+   * @return url encoded string
+   * @throws UnsupportedEncodingException
+   */
+  @ScalarFunction
+  public static String encodeUrl(String input)
+      throws UnsupportedEncodingException {
+      return URLEncoder.encode(input, StandardCharsets.UTF_8.toString());
+  }
+
+  /**
+   *
+   * @param input url encoded string
+   * @return plaintext string
+   * @throws UnsupportedEncodingException
+   */
+  @ScalarFunction
+  public static String decodeUrl(String input)
+      throws UnsupportedEncodingException {
+    return URLDecoder.decode(input, StandardCharsets.UTF_8.toString());
   }
 }
