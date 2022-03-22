@@ -24,6 +24,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -67,6 +69,11 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+  }
+
+  @Override
+  protected void overrideServerConf(PinotConfiguration configuration) {
+    configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION, false);
   }
 
   @Override
