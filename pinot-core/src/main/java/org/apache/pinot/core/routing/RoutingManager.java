@@ -21,6 +21,9 @@ package org.apache.pinot.core.routing;
 import java.util.Map;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.spi.annotations.InterfaceAudience;
+import org.apache.pinot.spi.annotations.InterfaceStability;
+
 
 /**
  * The {@code RouteManager} provides the routing information for a query that requests access to a Pinot table.
@@ -30,15 +33,9 @@ import org.apache.pinot.core.transport.ServerInstance;
  *
  * set by the user. This needs to be added to support features like segment pruning.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public interface RoutingManager {
-
-  /**
-   * Validate routing exist for a table
-   *
-   * @param tableNameWithType the name of the table.
-   * @return true if the route table exists.
-   */
-  boolean routingExists(String tableNameWithType);
 
   /**
    * Get all enabled server instances that are available for routing.
@@ -54,4 +51,12 @@ public interface RoutingManager {
    * @return the route table.
    */
   RoutingTable getRoutingTable(BrokerRequest brokerRequest);
+
+  /**
+   * Validate routing exist for a table
+   *
+   * @param tableNameWithType the name of the table.
+   * @return true if the route table exists.
+   */
+  boolean routingExists(String tableNameWithType);
 }
