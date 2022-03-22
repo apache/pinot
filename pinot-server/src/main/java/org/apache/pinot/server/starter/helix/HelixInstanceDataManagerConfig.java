@@ -184,7 +184,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   @Override
   public boolean isRealtimeOffHeapAllocation() {
-    return _instanceDataManagerConfiguration.getProperty(REALTIME_OFFHEAP_ALLOCATION, false);
+    return _instanceDataManagerConfiguration.getProperty(REALTIME_OFFHEAP_ALLOCATION, true);
   }
 
   @Override
