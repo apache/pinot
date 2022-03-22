@@ -34,7 +34,6 @@ public class IsNullTransformFunction extends BaseTransformFunction {
 
   private int[] _results;
   private PeekableIntIterator _nullValueVectorIterator;
-  private NullValueVectorReader _nullValueVectorReader;
 
   @Override
   public String getName() {
@@ -50,9 +49,9 @@ public class IsNullTransformFunction extends BaseTransformFunction {
           "Only column names are supported in IS_NULL. Support for functions is planned for future release");
     }
     String columnName = ((IdentifierTransformFunction) transformFunction).getColumnName();
-    _nullValueVectorReader = dataSourceMap.get(columnName).getNullValueVector();
-    if (_nullValueVectorReader != null) {
-      _nullValueVectorIterator = _nullValueVectorReader.getNullBitmap().getIntIterator();
+    NullValueVectorReader nullValueVectorReader = dataSourceMap.get(columnName).getNullValueVector();
+    if (nullValueVectorReader != null) {
+      _nullValueVectorIterator = nullValueVectorReader.getNullBitmap().getIntIterator();
     } else {
       _nullValueVectorIterator = null;
     }
@@ -74,9 +73,6 @@ public class IsNullTransformFunction extends BaseTransformFunction {
 
     Arrays.fill(_results, 0);
     if (_nullValueVectorIterator != null) {
-      if (!_nullValueVectorIterator.hasNext() || (length > 0 && _nullValueVectorIterator.peekNext() > docIds[0])) {
-        _nullValueVectorIterator = _nullValueVectorReader.getNullBitmap().getIntIterator();
-      }
       int currentDocIdIndex = 0;
       while (_nullValueVectorIterator.hasNext() & currentDocIdIndex < length) {
         _nullValueVectorIterator.advanceIfNeeded(docIds[currentDocIdIndex]);

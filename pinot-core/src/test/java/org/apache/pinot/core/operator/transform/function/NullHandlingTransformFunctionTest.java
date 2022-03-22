@@ -183,7 +183,7 @@ public class NullHandlingTransformFunctionTest {
         expectedValues[i] = 1;
       }
     }
-    testTransformFunction(transformFunction, expectedValues);
+    testTransformFunction(expression, expectedValues);
   }
 
   @Test
@@ -211,15 +211,15 @@ public class NullHandlingTransformFunctionTest {
         expectedValues[i] = 0;
       }
     }
-    testTransformFunction(transformFunction, expectedValues);
+    testTransformFunction(expression, expectedValues);
   }
 
-  protected void testTransformFunction(TransformFunction transformFunction, int[] expectedValues) {
-    int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
-    long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
-    float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
-    double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
-    String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+  protected void testTransformFunction(ExpressionContext expression, int[] expectedValues) throws Exception {
+    int[] intValues = getTransformFunctionInstance(expression).transformToIntValuesSV(_projectionBlock);
+    long[] longValues = getTransformFunctionInstance(expression).transformToLongValuesSV(_projectionBlock);
+    float[] floatValues = getTransformFunctionInstance(expression).transformToFloatValuesSV(_projectionBlock);
+    double[] doubleValues = getTransformFunctionInstance(expression).transformToDoubleValuesSV(_projectionBlock);
+    String[] stringValues = getTransformFunctionInstance(expression).transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       Assert.assertEquals(intValues[i], expectedValues[i]);
       Assert.assertEquals(longValues[i], expectedValues[i]);
@@ -227,5 +227,9 @@ public class NullHandlingTransformFunctionTest {
       Assert.assertEquals(doubleValues[i], (double) expectedValues[i]);
       Assert.assertEquals(stringValues[i], Integer.toString(expectedValues[i]));
     }
+  }
+
+  private TransformFunction getTransformFunctionInstance(ExpressionContext expression) {
+    return TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 }
