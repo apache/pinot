@@ -469,24 +469,6 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       return null;
     }
     InstanceSelector.SelectionResult selectionResult = routingEntry.calculateRouting(brokerRequest);
-    return constructRoutingTableFromInstanceSelectionResult(tableNameWithType, selectionResult);
-  }
-
-  @Override
-  public Map<String, ServerInstance> getEnabledServerInstanceMap() {
-    return new HashMap<>(_enabledServerInstanceMap);
-  }
-
-  private String getIdealStatePath(String tableNameWithType) {
-    return _idealStatePathPrefix + tableNameWithType;
-  }
-
-  private String getExternalViewPath(String tableNameWithType) {
-    return _externalViewPathPrefix + tableNameWithType;
-  }
-
-  private RoutingTable constructRoutingTableFromInstanceSelectionResult(String tableNameWithType,
-      InstanceSelector.SelectionResult selectionResult) {
     Map<String, String> segmentToInstanceMap = selectionResult.getSegmentToInstanceMap();
     Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = new HashMap<>();
     for (Map.Entry<String, String> entry : segmentToInstanceMap.entrySet()) {
@@ -499,6 +481,19 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       }
     }
     return new RoutingTable(serverInstanceToSegmentsMap, selectionResult.getUnavailableSegments());
+  }
+
+  @Override
+  public Map<String, ServerInstance> getEnabledServerInstanceMap() {
+    return _enabledServerInstanceMap;
+  }
+
+  private String getIdealStatePath(String tableNameWithType) {
+    return _idealStatePathPrefix + tableNameWithType;
+  }
+
+  private String getExternalViewPath(String tableNameWithType) {
+    return _externalViewPathPrefix + tableNameWithType;
   }
 
   /**

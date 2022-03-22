@@ -139,17 +139,6 @@ public class RealtimeSegmentSelector implements SegmentSelector {
   }
 
   @Override
-  public Set<String> select(String tableNameWithType) {
-    if (_hlcSegments == null && _llcSegments == null) {
-      return Collections.emptySet();
-    }
-    if (_llcSegments == null) {
-      return selectHLCSegments();
-    }
-    return selectLLCSegments();
-  }
-
-  @Override
   public Set<String> select(BrokerRequest brokerRequest) {
     if (_hlcSegments == null && _llcSegments == null) {
       return Collections.emptySet();
