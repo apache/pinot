@@ -67,7 +67,6 @@ public class IndexingOverrides {
   private static final IndexCreatorProvider CREATOR_DEFAULTS = createDefaultCreatorProvider();
   private static final IndexReaderProvider READER_DEFAULTS = createDefaultReaderProvider();
   private static final MutableIndexProvider MUTABLE_INDEX_DEFAULTS = createDefaultMutableIndexProvider();
-
   private static final AtomicReference<IndexingOverride> REGISTRATION = new AtomicReference<>(null);
 
   private IndexingOverrides() {
@@ -129,8 +128,7 @@ public class IndexingOverrides {
   private static <T> T invokeDefaultConstructor(String className) {
     try {
       Class<?> clazz = Class.forName(className, false, IndexingOverrides.class.getClassLoader());
-      return (T) MethodHandles.publicLookup()
-          .findConstructor(clazz, MethodType.methodType(void.class)).invoke();
+      return (T) MethodHandles.publicLookup().findConstructor(clazz, MethodType.methodType(void.class)).invoke();
     } catch (Throwable missing) {
       LOGGER.error("could not construct MethodHandle for {}", className, missing);
       return null;
@@ -249,9 +247,9 @@ public class IndexingOverrides {
 
     @Override
     public TextIndexReader newTextIndexReader(File file, ColumnMetadata columnMetadata,
-        @Nullable Map<String, String> textIndexProperties) {
+        @Nullable Map<String, String> textIndexProperties, @Nullable PinotDataBuffer buffer) {
       ensureReaderPresent();
-      return READER_DEFAULTS.newTextIndexReader(file, columnMetadata, textIndexProperties);
+      return READER_DEFAULTS.newTextIndexReader(file, columnMetadata, textIndexProperties, buffer);
     }
 
     @Override

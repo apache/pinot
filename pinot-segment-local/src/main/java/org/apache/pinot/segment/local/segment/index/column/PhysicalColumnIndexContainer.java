@@ -53,6 +53,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
+import org.apache.pinot.spi.config.table.FSTType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -94,9 +95,15 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     }
 
     if (loadTextIndex && segmentIndexDir != null) {
+      PinotDataBuffer buffer = null;
       Preconditions.checkState(segmentReader.hasIndexFor(columnName, ColumnIndexType.TEXT_INDEX));
+     /* if (indexLoadingConfig.getFSTIndexType() == FSTType.NATIVE) {
+        buffer = segmentReader.getIndexFor(columnName, ColumnIndexType.TEXT_INDEX);
+        Preconditions.checkArgument(buffer != null);
+      }*/
       Map<String, Map<String, String>> columnProperties = indexLoadingConfig.getColumnProperties();
-      _textIndex = indexReaderProvider.newTextIndexReader(segmentIndexDir, metadata, columnProperties.get(columnName));
+      _textIndex =
+          indexReaderProvider.newTextIndexReader(segmentIndexDir, metadata, columnProperties.get(columnName), buffer);
     } else {
       _textIndex = null;
     }

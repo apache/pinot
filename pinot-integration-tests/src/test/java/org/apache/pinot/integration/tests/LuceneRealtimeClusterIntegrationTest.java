@@ -25,7 +25,9 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
@@ -101,8 +103,11 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
 
   @Override
   protected List<FieldConfig> getFieldConfigs() {
+    Map<String, String> propertiesMap = new HashMap<>();
+    propertiesMap.put("fstType", "native");
+
     return Collections.singletonList(
-        new FieldConfig(TEXT_COLUMN_NAME, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null, null));
+        new FieldConfig(TEXT_COLUMN_NAME, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null, propertiesMap));
   }
 
   @BeforeClass

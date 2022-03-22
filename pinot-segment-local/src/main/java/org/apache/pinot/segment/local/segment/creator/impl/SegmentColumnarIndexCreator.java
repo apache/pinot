@@ -52,6 +52,7 @@ import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -214,8 +215,18 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
 
       if (textIndexColumns.contains(columnName)) {
+        Map<String, String> columnProperties = _columnProperties.get(columnName);
+        FSTType fstType = FSTType.LUCENE;
+
+        //TODO: atri -- make these constants
+        if (columnProperties != null) {
+          String fstTypeConfig = columnProperties.get("fstType");
+          if (fstTypeConfig != null && fstTypeConfig.equalsIgnoreCase("native")) {
+            fstType = FSTType.NATIVE;
+          }
+        }
         _textIndexCreatorMap.put(columnName,
-            _indexCreatorProvider.newTextIndexCreator(context.forTextIndex(_config.getFSTIndexType(), true)));
+            _indexCreatorProvider.newTextIndexCreator(context.forTextIndex(fstType, true)));
       }
 
       if (fstIndexColumns.contains(columnName)) {

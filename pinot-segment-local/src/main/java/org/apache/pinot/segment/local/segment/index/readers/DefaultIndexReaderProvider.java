@@ -36,6 +36,7 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunk
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReaderV4;
 import org.apache.pinot.segment.local.segment.index.readers.geospatial.ImmutableH3IndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.json.ImmutableJsonIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.json.NativeTextIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.segment.local.utils.nativefst.FSTHeader;
@@ -157,8 +158,11 @@ public class DefaultIndexReaderProvider implements IndexReaderProvider {
   }
 
   @Override
-  public TextIndexReader newTextIndexReader(File file, ColumnMetadata columnMetadata, @Nullable
-      Map<String, String> textIndexProperties) {
+  public TextIndexReader newTextIndexReader(File file, ColumnMetadata columnMetadata,
+      @Nullable Map<String, String> textIndexProperties, @Nullable PinotDataBuffer buffer) {
+    if (buffer != null) {
+      return new NativeTextIndexReader(buffer, columnMetadata.getTotalDocs());
+    }
     return new LuceneTextIndexReader(columnMetadata.getColumnName(), file, columnMetadata.getTotalDocs(),
         textIndexProperties);
   }
