@@ -19,6 +19,7 @@
 package org.apache.pinot.common.function;
 
 import com.google.common.base.Preconditions;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -143,8 +144,8 @@ public class FunctionInvoker {
     assert _method.getParameterAnnotations().length == arguments.length;
     for (int i = 0; i < arguments.length; i++) {
       if (arguments[i] == null) {
-        var annotations = _method.getParameterAnnotations()[i];
-        for (var annotation : annotations) {
+        final Annotation[] annotations = _method.getParameterAnnotations()[i];
+        for (final Annotation annotation : annotations) {
           // Preserve null values during ingestion transformation if inbuilt function cannot accept a null value.
           if (annotation.annotationType().equals(javax.annotation.Nonnull.class)) {
             return true;
