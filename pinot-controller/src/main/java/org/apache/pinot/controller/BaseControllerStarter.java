@@ -646,7 +646,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new BrokerResourceValidationManager(_config, _helixResourceManager, _leadControllerManager, _controllerMetrics);
     periodicTasks.add(_brokerResourceValidationManager);
     _segmentStatusChecker =
-        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
+        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
+            _executorService);
     periodicTasks.add(_segmentStatusChecker);
     _segmentRelocator = new SegmentRelocator(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
         _executorService);

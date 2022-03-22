@@ -116,6 +116,7 @@ import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.segment.local.utils.ReplicationUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.ConfigUtils;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -1910,7 +1911,7 @@ public class PinotHelixResourceManager {
     // NOTE: must first set the segment ZK metadata before assigning segment to instances because segment assignment
     // might need them to determine the partition of the segment, and server will need them to download the segment
     SegmentZKMetadata segmentZkmetadata =
-        constructZkMetadataForNewSegment(tableNameWithType, segmentMetadata, downloadUrl, crypter);
+        constructZkMetadataForNewSegment(tableNameWithType, segmentMetadata, downloadUrl, crypter, -1);
     ZNRecord znRecord = segmentZkmetadata.toZNRecord();
 
     String segmentName = segmentMetadata.getName();
@@ -1930,16 +1931,18 @@ public class PinotHelixResourceManager {
    * @param segmentMetadata Segment metadata
    * @param downloadUrl Download URL
    * @param crypter Crypter
+   * @param segmentSizeInBytes Size of segment in bytes.
    * @return SegmentZkMetadata of the input segment
    */
   public SegmentZKMetadata constructZkMetadataForNewSegment(String tableNameWithType, SegmentMetadata segmentMetadata,
-      String downloadUrl, @Nullable String crypter) {
+      String downloadUrl, @Nullable String crypter, long segmentSizeInBytes) {
     // Construct segment zk metadata with common fields for offline and realtime.
     String segmentName = segmentMetadata.getName();
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
     ZKMetadataUtils.updateSegmentMetadata(segmentZKMetadata, segmentMetadata);
     segmentZKMetadata.setDownloadUrl(downloadUrl);
     segmentZKMetadata.setCrypterName(crypter);
+    segmentZKMetadata.setSizeInBytes(segmentSizeInBytes);
 
     if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
       Preconditions.checkState(isUpsertTable(tableNameWithType),
@@ -2051,7 +2054,8 @@ public class PinotHelixResourceManager {
   }
 
   public void refreshSegment(String tableNameWithType, SegmentMetadata segmentMetadata,
-      SegmentZKMetadata segmentZKMetadata, int expectedVersion, String downloadUrl, @Nullable String crypter) {
+      SegmentZKMetadata segmentZKMetadata, int expectedVersion, String downloadUrl, @Nullable String crypter,
+      long segmentSizeInBytes) {
     String segmentName = segmentMetadata.getName();
 
     // NOTE: Must first set the segment ZK metadata before trying to refresh because servers and brokers rely on segment
@@ -2062,6 +2066,7 @@ public class PinotHelixResourceManager {
     segmentZKMetadata.setRefreshTime(System.currentTimeMillis());
     segmentZKMetadata.setDownloadUrl(downloadUrl);
     segmentZKMetadata.setCrypterName(crypter);
+    segmentZKMetadata.setSizeInBytes(segmentSizeInBytes);
     if (!ZKMetadataProvider
         .setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata, expectedVersion)) {
       throw new RuntimeException(
@@ -3361,6 +3366,25 @@ public class PinotHelixResourceManager {
       }
     }
     return hosts;
+  }
+
+  /**
+   * Returns the number of replicas for a given table config
+   */
+  public int getNumReplicas(TableConfig tableConfig) {
+    if (tableConfig.isDimTable()) {
+      // If the table is a dimension table then fetch the tenant config and get the number of server belonging
+      // to the tenant
+      TenantConfig tenantConfig = tableConfig.getTenantConfig();
+      Set<String> serverInstances = getAllInstancesForServerTenant(tenantConfig.getServer());
+      return serverInstances.size();
+    }
+
+    if (ReplicationUtils.useReplicasPerPartition(tableConfig)) {
+      return Integer.parseInt(tableConfig.getValidationConfig().getReplicasPerPartition());
+    }
+
+    return tableConfig.getValidationConfig().getReplicationNumber();
   }
 
   /*
