@@ -384,6 +384,8 @@ public class PinotSchemaRestletResource {
 
     LOGGER.info("Trying to delete schema {}", schemaName);
     if (_pinotHelixResourceManager.deleteSchema(schema)) {
+      LOGGER.info("Notifying metadata event for deleting schema: {}", schemaName);
+      _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.DELETE);
       LOGGER.info("Success: Deleted schema {}", schemaName);
     } else {
       throw new ControllerApplicationException(LOGGER, String.format("Failed to delete schema %s", schemaName),
