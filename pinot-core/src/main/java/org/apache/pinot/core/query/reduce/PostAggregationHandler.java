@@ -35,7 +35,6 @@ import org.apache.pinot.core.query.reduce.filter.LiteralValueExtractor;
 import org.apache.pinot.core.query.reduce.filter.ValueExtractor;
 import org.apache.pinot.core.query.reduce.filter.ValueExtractorFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.util.GapfillUtils;
 
 
 /**
@@ -58,7 +57,7 @@ public class PostAggregationHandler implements ValueExtractorFactory {
       _numGroupByExpressions = groupByExpressions.size();
       _groupByExpressionIndexMap = new HashMap<>();
       for (int i = 0; i < _numGroupByExpressions; i++) {
-        _groupByExpressionIndexMap.put(GapfillUtils.stripGapfill(groupByExpressions.get(i)), i);
+        _groupByExpressionIndexMap.put(groupByExpressions.get(i), i);
       }
     } else {
       _numGroupByExpressions = 0;
@@ -107,7 +106,6 @@ public class PostAggregationHandler implements ValueExtractorFactory {
    */
   @Override
   public ValueExtractor getValueExtractor(ExpressionContext expression) {
-    expression = GapfillUtils.stripGapfill(expression);
     if (expression.getType() == ExpressionContext.Type.LITERAL) {
       // Literal
       return new LiteralValueExtractor(expression.getLiteral());
