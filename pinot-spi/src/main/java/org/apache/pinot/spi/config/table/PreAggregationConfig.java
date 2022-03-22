@@ -18,38 +18,42 @@
  */
 package org.apache.pinot.spi.config.table;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.common.base.Preconditions;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
 public class PreAggregationConfig extends BaseJsonConfig {
 
-  private final String _srcColumn;
-  private final String _aggregationFunctionType;
-  private final String _destColumn;
 
-  public PreAggregationConfig(@JsonProperty(value = "srcColumn", required = true) String srcColumn,
-      @JsonProperty(value = "aggregationFunctionType", required = true) String aggregationFunctionType,
-      @JsonProperty(value = "destColumn", required = true) String destColumn) {
-    Preconditions.checkArgument(srcColumn.length() > 0, "'srcColumn' must be a non-empty string");
-    Preconditions.checkArgument(aggregationFunctionType.length() > 0,
-        "'aggregationFunctionType' must be a non-empty string");
-    Preconditions.checkArgument(destColumn.length() > 0, "'destColumn' must be a non-empty string");
-    _srcColumn = srcColumn;
-    _aggregationFunctionType = aggregationFunctionType;
-    _destColumn = destColumn;
+  @JsonPropertyDescription("Column name")
+  private final String _columnName;
+
+  @JsonPropertyDescription("Transformation function string")
+  private final String _transformFunction;
+
+  @JsonPropertyDescription("Aggregated column name")
+  private final String _aggregatedColumnName;
+
+  @JsonCreator
+  public PreAggregationConfig(@JsonProperty("columnName") String columnName,
+      @JsonProperty("transformFunction") String transformFunction, @JsonProperty("aggregatedColumnName") String aggregatedColumnName) {
+    _columnName = columnName;
+    _transformFunction = transformFunction;
+    _aggregatedColumnName = aggregatedColumnName;
   }
 
-  public String getSrcColumn() {
-    return _srcColumn;
+  public String getColumnName() {
+    return _columnName;
   }
 
-  public String getAggregationFunctionType() {
-    return _aggregationFunctionType;
+  public String getTransformFunction() {
+    return _transformFunction;
   }
 
-  public String getDestColumn() {
-    return _destColumn;
+  public String getAggregatedColumnName() {
+    return _aggregatedColumnName;
   }
 }
