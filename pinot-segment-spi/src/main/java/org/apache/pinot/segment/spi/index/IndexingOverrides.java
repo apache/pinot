@@ -129,7 +129,8 @@ public class IndexingOverrides {
   private static <T> T invokeDefaultConstructor(String className) {
     try {
       Class<?> clazz = Class.forName(className, false, IndexingOverrides.class.getClassLoader());
-      return (T) MethodHandles.publicLookup().findConstructor(clazz, MethodType.methodType(void.class)).invoke();
+      return (T) MethodHandles.publicLookup()
+          .findConstructor(clazz, MethodType.methodType(void.class)).invoke();
     } catch (Throwable missing) {
       LOGGER.error("could not construct MethodHandle for {}", className, missing);
       return null;
