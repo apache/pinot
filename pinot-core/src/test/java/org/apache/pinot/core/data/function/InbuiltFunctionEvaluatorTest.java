@@ -112,7 +112,7 @@ public class InbuiltFunctionEvaluatorTest {
   public void testStateSharedBetweenRowsForExecution()
       throws Exception {
     MyFunc myFunc = new MyFunc();
-    FunctionRegistry.registerFunction(myFunc.getClass().getDeclaredMethod("appendToStringAndReturn", String.class));
+    FunctionRegistry.registerFunction(myFunc.getClass().getDeclaredMethod("appendToStringAndReturn", String.class), false);
     String expression = "appendToStringAndReturn('test ')";
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
     assertTrue(evaluator.getArguments().isEmpty());
@@ -123,7 +123,7 @@ public class InbuiltFunctionEvaluatorTest {
   }
 
   @Test
-  public void testNullReturnedDuringInbuiltFunctionEvaluatorWhenFunctionCannotWorkWithNull() {
+  public void testNullReturnedByInbuiltFunctionEvaluatorWhenFunctionCannotTakeNull() {
     String expression = "fromDateTime(reverse('2020-01-01T00:00:00Z'), \"invalid_identifier\")";
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
     assertEquals(evaluator.getArguments().size(), 1);

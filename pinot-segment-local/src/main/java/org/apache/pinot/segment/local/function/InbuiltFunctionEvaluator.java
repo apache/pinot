@@ -120,7 +120,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     @Override
     public Object execute(GenericRow row) {
       try {
-        final int numArguments = _argumentNodes.length;
+        int numArguments = _argumentNodes.length;
         for (int i = 0; i < numArguments; i++) {
           _arguments[i] = _argumentNodes[i].execute(row);
         }
