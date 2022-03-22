@@ -36,7 +36,6 @@ import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
@@ -63,8 +62,7 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
     _projectionOperator = projectionOperator;
     _dataSourceMap = projectionOperator.getDataSourceMap();
     for (ExpressionContext expression : expressions) {
-      TransformFunction transformFunction =
-          TransformFunctionFactory.get(queryContext, GapfillUtils.stripGapfill(expression), _dataSourceMap);
+      TransformFunction transformFunction = TransformFunctionFactory.get(queryContext, expression, _dataSourceMap);
       _transformFunctionMap.put(expression, transformFunction);
     }
   }
