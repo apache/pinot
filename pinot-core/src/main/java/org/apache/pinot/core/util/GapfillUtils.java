@@ -171,15 +171,15 @@ public class GapfillUtils {
     Preconditions.checkArgument(gapFillSelection != null && gapFillSelection.getFunction() != null,
         "Gapfill Expression should be function.");
     List<ExpressionContext> args = gapFillSelection.getFunction().getArguments();
-    Preconditions.checkArgument(args.size() > 5, "GapFill does not have correct number of arguments.");
+    Preconditions.checkArgument(args.size() > 5, "Gapfill does not have correct number of arguments.");
     Preconditions.checkArgument(args.get(1).getLiteral() != null,
-        "The second argument of GapFill should be TimeFormatter.");
+        "The second argument of Gapfill should be TimeFormatter.");
     Preconditions.checkArgument(args.get(2).getLiteral() != null,
-        "The third argument of GapFill should be start time.");
+        "The third argument of Gapfill should be start time.");
     Preconditions.checkArgument(args.get(3).getLiteral() != null,
-        "The fourth argument of GapFill should be end time.");
+        "The fourth argument of Gapfill should be end time.");
     Preconditions.checkArgument(args.get(4).getLiteral() != null,
-        "The fifth argument of GapFill should be time bucket size.");
+        "The fifth argument of Gapfill should be time bucket size.");
 
     ExpressionContext timeseriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);
     Preconditions.checkArgument(timeseriesOn != null, "The TimeSeriesOn expressions should be specified.");
