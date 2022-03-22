@@ -260,6 +260,16 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         .containsKey(column)) {
       return false;
     }
+
+    if(spec.isSingleValueField()) {
+      int dictionarySize = info.getDistinctValueCount() * spec.getDataType().size();
+      int forwardIndexSize = info.getTotalNumberOfEntries() * Integer.BYTES; // Only applicable for unsorted forward index.
+      int rawIndexSize = info.getTotalNumberOfEntries() * spec.getDataType().size();
+      if ((dictionarySize + forwardIndexSize) > rawIndexSize) {
+        return false;
+      }
+    }
+
     return info.isCreateDictionary();
   }
 
