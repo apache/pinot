@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.core.query.distinct;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.operator.transform.TransformOperator;
+import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.dictionary.DictionaryBasedMultiColumnDistinctOnlyExecutor;
 import org.apache.pinot.core.query.distinct.dictionary.DictionaryBasedMultiColumnDistinctOrderByExecutor;
@@ -72,7 +74,11 @@ public class DistinctExecutorFactory {
     if (expressions.size() == 1) {
       // Single column
       ExpressionContext expression = expressions.get(0);
-      DataType dataType = transformOperator.getResultMetadata(expression).getDataType();
+      TransformResultMetadata expressionMetadata = transformOperator.getResultMetadata(expression);
+      // TODO: Support MV expression
+      Preconditions.checkArgument(expressionMetadata.isSingleValue(), "DISTINCT cannot be applied to MV expression: %s",
+          expression);
+      DataType dataType = expressionMetadata.getDataType();
       Dictionary dictionary = transformOperator.getDictionary(expression);
       if (dictionary != null) {
         // Dictionary based
@@ -101,7 +107,11 @@ public class DistinctExecutorFactory {
       int numExpressions = expressions.size();
       List<DataType> dataTypes = new ArrayList<>(numExpressions);
       for (ExpressionContext expression : expressions) {
-        dataTypes.add(transformOperator.getResultMetadata(expression).getDataType());
+        TransformResultMetadata expressionMetadata = transformOperator.getResultMetadata(expression);
+        // TODO: Support MV expression
+        Preconditions.checkArgument(expressionMetadata.isSingleValue(),
+            "DISTINCT cannot be applied to MV expression: %s", expression);
+        dataTypes.add(expressionMetadata.getDataType());
       }
       List<Dictionary> dictionaries = new ArrayList<>(numExpressions);
       boolean dictionaryBased = true;
@@ -129,7 +139,11 @@ public class DistinctExecutorFactory {
     if (expressions.size() == 1) {
       // Single column
       ExpressionContext expression = expressions.get(0);
-      DataType dataType = transformOperator.getResultMetadata(expression).getDataType();
+      TransformResultMetadata expressionMetadata = transformOperator.getResultMetadata(expression);
+      // TODO: Support MV expression
+      Preconditions.checkArgument(expressionMetadata.isSingleValue(), "DISTINCT cannot be applied to MV expression: %s",
+          expression);
+      DataType dataType = expressionMetadata.getDataType();
       assert orderByExpressions.size() == 1;
       OrderByExpressionContext orderByExpression = orderByExpressions.get(0);
       Dictionary dictionary = transformOperator.getDictionary(expression);
@@ -162,7 +176,11 @@ public class DistinctExecutorFactory {
       int numExpressions = expressions.size();
       List<DataType> dataTypes = new ArrayList<>(numExpressions);
       for (ExpressionContext expression : expressions) {
-        dataTypes.add(transformOperator.getResultMetadata(expression).getDataType());
+        TransformResultMetadata expressionMetadata = transformOperator.getResultMetadata(expression);
+        // TODO: Support MV expression
+        Preconditions.checkArgument(expressionMetadata.isSingleValue(),
+            "DISTINCT cannot be applied to MV expression: %s", expression);
+        dataTypes.add(expressionMetadata.getDataType());
       }
       List<Dictionary> dictionaries = new ArrayList<>(numExpressions);
       boolean dictionaryBased = true;
