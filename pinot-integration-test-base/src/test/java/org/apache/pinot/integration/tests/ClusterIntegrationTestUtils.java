@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.Lists;
 import com.google.common.math.DoubleMath;
 import com.google.common.primitives.Longs;
 import java.io.ByteArrayOutputStream;
@@ -65,9 +64,11 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
-import org.apache.pinot.pql.parsers.PinotQuery2BrokerRequestConverter;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
@@ -782,14 +783,14 @@ public class ClusterIntegrationTestUtils {
    * @param pinotQuery Pinot sql query
    * @param brokerUrl Pinot broker URL
    * @param pinotConnection Pinot connection
-   * @param sqlQueries H2 SQL query
+   * @param h2Queries H2 queries
    * @param h2Connection H2 connection
    * @throws Exception
    */
   static void testSqlQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
-      @Nullable List<String> sqlQueries, @Nullable Connection h2Connection)
+      List<String> h2Queries, Connection h2Connection)
       throws Exception {
-    testSqlQuery(pinotQuery, brokerUrl, pinotConnection, sqlQueries, h2Connection, null);
+    testSqlQuery(pinotQuery, brokerUrl, pinotConnection, h2Queries, h2Connection, null);
   }
 
   /**
@@ -798,28 +799,14 @@ public class ClusterIntegrationTestUtils {
    * @param pinotQuery Pinot sql query
    * @param brokerUrl Pinot broker URL
    * @param pinotConnection Pinot connection
-   * @param sqlQueries H2 SQL query
+   * @param h2Queries H2 queries
    * @param h2Connection H2 connection
    * @param headers headers
    * @throws Exception
    */
   static void testSqlQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
-      @Nullable List<String> sqlQueries, @Nullable Connection h2Connection, @Nullable Map<String, String> headers)
+      List<String> h2Queries, Connection h2Connection, @Nullable Map<String, String> headers)
       throws Exception {
-    if (pinotQuery == null || sqlQueries == null) {
-      return;
-    }
-
-    // TODO: Use PinotQuery instead of BrokerRequest here
-    BrokerRequest brokerRequest =
-        new PinotQuery2BrokerRequestConverter().convert(CalciteSqlParser.compileToPinotQuery(pinotQuery));
-
-    List<String> orderByColumns = new ArrayList<>();
-    if (isSelectionQuery(brokerRequest) && brokerRequest.getOrderBy() != null
-        && !brokerRequest.getOrderBy().isEmpty()) {
-      orderByColumns.addAll(CalciteSqlParser.extractIdentifiers(brokerRequest.getPinotQuery().getOrderByList(), false));
-    }
-
     // broker response
     JsonNode pinotResponse = ClusterTest.postSqlQuery(pinotQuery, brokerUrl, headers);
     if (!pinotResponse.get("exceptions").isEmpty()) {
@@ -836,23 +823,34 @@ public class ClusterIntegrationTestUtils {
     int numColumns = resultTableResultSet.getColumnCount();
 
     // h2 response
-    String sqlQuery = sqlQueries.get(0);
+    String h2Query = h2Queries.get(0);
     Assert.assertNotNull(h2Connection);
     Statement h2statement = h2Connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-    h2statement.execute(sqlQuery);
+    h2statement.execute(h2Query);
     ResultSet h2ResultSet = h2statement.getResultSet();
 
     // compare results
-    if (isSelectionQuery(brokerRequest)) { // selection
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(pinotQuery);
+    if (!QueryContextUtils.isAggregationQuery(queryContext)) {
+      // selection/distinct
+
+      List<String> orderByColumns = new ArrayList<>();
+      if (queryContext.getOrderByExpressions() != null) {
+        orderByColumns.addAll(
+            CalciteSqlParser.extractIdentifiers(queryContext.getBrokerRequest().getPinotQuery().getOrderByList(),
+                false));
+      }
       Set<String> expectedValues = new HashSet<>();
       List<String> expectedOrderByValues = new ArrayList<>();
       int h2NumRows = getH2ExpectedValues(expectedValues, expectedOrderByValues, h2ResultSet, h2ResultSet.getMetaData(),
           orderByColumns);
 
       comparePinotResultsWithExpectedValues(expectedValues, expectedOrderByValues, resultTableResultSet, orderByColumns,
-          pinotQuery, sqlQueries, h2NumRows, pinotNumRecordsSelected);
-    } else { // aggregation
-      if (!brokerRequest.isSetGroupBy()) { // aggregation only
+          pinotQuery, h2Queries, h2NumRows, pinotNumRecordsSelected);
+    } else {
+      if (queryContext.getGroupByExpressions() == null) {
+        // aggregation only
+
         // compare the single row
         h2ResultSet.first();
         for (int c = 0; c < numColumns; c++) {
@@ -864,7 +862,7 @@ public class ClusterIntegrationTestUtils {
             if (pinotNumRecordsSelected != 0) {
               String failureMessage =
                   "No record selected in H2 but " + pinotNumRecordsSelected + " records selected in Pinot";
-              failure(pinotQuery, Lists.newArrayList(sqlQuery), failureMessage);
+              failure(pinotQuery, h2Queries, failureMessage);
             }
 
             // Skip further comparison
@@ -880,16 +878,17 @@ public class ClusterIntegrationTestUtils {
             String failureMessage =
                 "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
                     + ", got client value:" + connectionValue;
-            failure(pinotQuery, Lists.newArrayList(sqlQuery), failureMessage);
+            failure(pinotQuery, h2Queries, failureMessage);
           }
         }
-      } else { // aggregation group by
+      } else {
+        // aggregation group-by
         // TODO: compare results for aggregation group by queries w/o order by
 
         // Compare results for aggregation group by queries with order by
-        if (brokerRequest.getOrderBy() != null && !brokerRequest.getOrderBy().isEmpty()) {
+        if (queryContext.getOrderByExpressions() != null) {
           // don't compare query with multi-value column.
-          if (sqlQuery.contains("_MV")) {
+          if (h2Query.contains("_MV")) {
             return;
           }
           if (h2ResultSet.first()) {
@@ -903,7 +902,7 @@ public class ClusterIntegrationTestUtils {
                   String failureMessage =
                       "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
                           + ", got client value:" + connectionValue;
-                  failure(pinotQuery, Lists.newArrayList(sqlQuery), failureMessage);
+                  failure(pinotQuery, h2Queries, failureMessage);
                 }
               }
               if (!h2ResultSet.next()) {
@@ -913,23 +912,6 @@ public class ClusterIntegrationTestUtils {
           }
         }
       }
-    }
-  }
-
-  private static boolean isSelectionQuery(BrokerRequest brokerRequest) {
-    if (brokerRequest.getSelections() != null) {
-      return true;
-    }
-    if (brokerRequest.getAggregationsInfo() != null && brokerRequest.getAggregationsInfo().get(0).getAggregationType()
-        .equalsIgnoreCase("DISTINCT")) {
-      return true;
-    }
-    return false;
-  }
-
-  private static void convertToUpperCase(List<String> columns) {
-    for (int i = 0; i < columns.size(); i++) {
-      columns.set(i, columns.get(i).toUpperCase());
     }
   }
 
@@ -960,8 +942,8 @@ public class ClusterIntegrationTestUtils {
 
         // Handle multi-value columns
         int length = columnName.length();
-        if (length > H2_MULTI_VALUE_SUFFIX_LENGTH && columnName
-            .substring(length - H2_MULTI_VALUE_SUFFIX_LENGTH, length - 1).equals("__MV")) {
+        if (length > H2_MULTI_VALUE_SUFFIX_LENGTH && columnName.substring(length - H2_MULTI_VALUE_SUFFIX_LENGTH,
+            length - 1).equals("__MV")) {
           // Multi-value column
           String multiValueColumnName = columnName.substring(0, length - H2_MULTI_VALUE_SUFFIX_LENGTH);
           List<String> multiValue = reusableMultiValuesMap.get(multiValueColumnName);
@@ -1136,8 +1118,8 @@ public class ClusterIntegrationTestUtils {
       double expectedValue = Double.parseDouble(h2Value);
       double actualValueBroker = Double.parseDouble(brokerValue);
       double actualValueConnection = Double.parseDouble(connectionValue);
-      if (!DoubleMath.fuzzyEquals(actualValueBroker, expectedValue, 1.0) || !DoubleMath
-          .fuzzyEquals(actualValueConnection, expectedValue, 1.0)) {
+      if (!DoubleMath.fuzzyEquals(actualValueBroker, expectedValue, 1.0) || !DoubleMath.fuzzyEquals(
+          actualValueConnection, expectedValue, 1.0)) {
         error = true;
       }
     } else {

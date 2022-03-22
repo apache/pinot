@@ -37,6 +37,9 @@ public class RowMatcherFactory {
         return new AndRowMatcher(filter.getChildren(), valueExtractorFactory);
       case OR:
         return new OrRowMatcher(filter.getChildren(), valueExtractorFactory);
+      case NOT:
+        assert filter.getChildren().size() == 1;
+        return new NotRowMatcher(filter.getChildren().get(0), valueExtractorFactory);
       case PREDICATE:
         return new PredicateRowMatcher(filter.getPredicate(),
             valueExtractorFactory.getValueExtractor(filter.getPredicate().getLhs()));

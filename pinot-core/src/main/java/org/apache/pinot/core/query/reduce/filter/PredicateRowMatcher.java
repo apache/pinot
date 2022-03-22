@@ -29,9 +29,9 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * Predicate matcher.
  */
 public class PredicateRowMatcher implements RowMatcher {
-  ValueExtractor _valueExtractor;
-  DataType _valueType;
-  PredicateEvaluator _predicateEvaluator;
+  private final ValueExtractor _valueExtractor;
+  private final DataType _valueType;
+  private final PredicateEvaluator _predicateEvaluator;
 
   public PredicateRowMatcher(Predicate predicate, ValueExtractor valueExtractor) {
     _valueExtractor = valueExtractor;

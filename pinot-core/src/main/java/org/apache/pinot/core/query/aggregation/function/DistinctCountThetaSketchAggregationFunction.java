@@ -1014,23 +1014,30 @@ public class DistinctCountThetaSketchAggregationFunction
    */
   private static FilterEvaluator getFilterEvaluator(FilterContext filter,
       Map<ExpressionContext, Integer> expressionIndexMap) {
-    List<FilterContext> children = filter.getChildren();
-    if (children != null) {
-      // AND/OR
-      List<FilterEvaluator> childEvaluators = new ArrayList<>(children.size());
-      for (FilterContext child : children) {
-        childEvaluators.add(getFilterEvaluator(child, expressionIndexMap));
-      }
-      if (filter.getType() == FilterContext.Type.AND) {
+    switch (filter.getType()) {
+      case AND:
+        List<FilterContext> children = filter.getChildren();
+        List<FilterEvaluator> childEvaluators = new ArrayList<>(children.size());
+        for (FilterContext child : children) {
+          childEvaluators.add(getFilterEvaluator(child, expressionIndexMap));
+        }
         return new AndFilterEvaluator(childEvaluators);
-      } else {
+      case OR:
+        children = filter.getChildren();
+        childEvaluators = new ArrayList<>(children.size());
+        for (FilterContext child : children) {
+          childEvaluators.add(getFilterEvaluator(child, expressionIndexMap));
+        }
         return new OrFilterEvaluator(childEvaluators);
-      }
-    } else {
-      // Predicate
-      Predicate predicate = filter.getPredicate();
-      int expressionIndex = expressionIndexMap.get(predicate.getLhs());
-      return new PredicateFilterEvaluator(predicate, expressionIndex);
+      case NOT:
+        assert filter.getChildren().size() == 1;
+        return new NotFilterEvaluator(getFilterEvaluator(filter.getChildren().get(0), expressionIndexMap));
+      case PREDICATE:
+        Predicate predicate = filter.getPredicate();
+        int expressionIndex = expressionIndexMap.get(predicate.getLhs());
+        return new PredicateFilterEvaluator(predicate, expressionIndex);
+      default:
+        throw new IllegalStateException();
     }
   }
 
@@ -1365,6 +1372,19 @@ public class DistinctCountThetaSketchAggregationFunction
         }
       }
       return false;
+    }
+  }
+
+  private static class NotFilterEvaluator implements FilterEvaluator {
+    final FilterEvaluator _child;
+
+    private NotFilterEvaluator(FilterEvaluator child) {
+      _child = child;
+    }
+
+    @Override
+    public boolean evaluate(boolean[] singleValues, DataType[] valueTypes, Object[] valueArrays, int index) {
+      return !_child.evaluate(singleValues, valueTypes, valueArrays, index);
     }
   }
 

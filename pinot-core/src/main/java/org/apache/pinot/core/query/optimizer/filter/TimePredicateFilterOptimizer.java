@@ -76,7 +76,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     Function filterFunction = filterExpression.getFunctionCall();
     FilterKind filterKind = FilterKind.valueOf(filterFunction.getOperator());
     List<Expression> operands = filterFunction.getOperands();
-    if (filterKind == FilterKind.AND || filterKind == FilterKind.OR) {
+    if (filterKind == FilterKind.AND || filterKind == FilterKind.OR || filterKind == FilterKind.NOT) {
       // NOTE: We don't need to replace the children because all the changes are applied in-place
       for (Expression operand : operands) {
         optimize(operand);
@@ -408,8 +408,8 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
       // Step 3: Rewrite the filter function
       String rangeString = new Range(lowerValue, lowerInclusive, upperValue, upperInclusive).getRangeString();
       filterFunction.setOperator(FilterKind.RANGE.name());
-      filterFunction
-          .setOperands(Arrays.asList(dateTimeConvertOperands.get(0), RequestUtils.getLiteralExpression(rangeString)));
+      filterFunction.setOperands(
+          Arrays.asList(dateTimeConvertOperands.get(0), RequestUtils.getLiteralExpression(rangeString)));
     } catch (Exception e) {
       LOGGER.warn("Caught exception while optimizing DATE_TIME_CONVERT predicate: {}, skipping the optimization",
           filterFunction, e);
