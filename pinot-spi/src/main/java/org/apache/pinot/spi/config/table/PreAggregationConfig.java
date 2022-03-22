@@ -21,12 +21,10 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
-import com.google.common.base.Preconditions;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
 public class PreAggregationConfig extends BaseJsonConfig {
-
 
   @JsonPropertyDescription("Column name")
   private final String _columnName;
@@ -39,7 +37,8 @@ public class PreAggregationConfig extends BaseJsonConfig {
 
   @JsonCreator
   public PreAggregationConfig(@JsonProperty("columnName") String columnName,
-      @JsonProperty("transformFunction") String transformFunction, @JsonProperty("aggregatedColumnName") String aggregatedColumnName) {
+      @JsonProperty("transformFunction") String transformFunction,
+      @JsonProperty("aggregatedColumnName") String aggregatedColumnName) {
     _columnName = columnName;
     _transformFunction = transformFunction;
     _aggregatedColumnName = aggregatedColumnName;
