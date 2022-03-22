@@ -49,4 +49,7 @@ public @interface ScalarFunction {
   // If empty, FunctionsRegistry registers the method name as function name;
   // If not empty, FunctionsRegistry only registers the function names specified here, the method name is ignored.
   String[] names() default {};
+
+  // Whether the scalar function cannot handle nulls, and can get invoked with null parameter(s).
+  boolean nullableParameters() default false;
 }

@@ -247,8 +247,8 @@ public class DateTimeFunctions {
   /**
    * Converts Timestamp to epoch millis
    */
-  @ScalarFunction
-  public static long fromTimestamp(@NotNull Timestamp timestamp) {
+  @ScalarFunction(nullableParameters = true)
+  public static long fromTimestamp(Timestamp timestamp) {
     return timestamp.getTime();
   }
 
@@ -271,8 +271,8 @@ public class DateTimeFunctions {
   /**
    * Converts DateTime string represented by pattern to epoch millis
    */
-  @ScalarFunction
-  public static long fromDateTime(@NotNull String dateTimeString, String pattern) {
+  @ScalarFunction(nullableParameters = true)
+  public static long fromDateTime(String dateTimeString, String pattern) {
     return DateTimePatternHandler.parseDateTimeStringToEpochMillis(dateTimeString, pattern);
   }
 
@@ -306,8 +306,8 @@ public class DateTimeFunctions {
    *           "-P6H3M"    -- parses as "-6 hours and -3 minutes"
    *           "-P-6H+3M"  -- parses as "+6 hours and -3 minutes"
    */
-  @ScalarFunction
-  public static long ago(@NotNull String periodString) {
+  @ScalarFunction(nullableParameters = true)
+  public static long ago(String periodString) {
     Duration period = Duration.parse(periodString);
     return System.currentTimeMillis() - period.toMillis();
   }
@@ -320,16 +320,16 @@ public class DateTimeFunctions {
   /**
    * Returns the hour of the time zone offset.
    */
-  @ScalarFunction
-  public static int timezoneHour(@NotNull String timezoneId) {
+  @ScalarFunction(nullableParameters = true)
+  public static int timezoneHour(String timezoneId) {
     return new DateTime(DateTimeZone.forID(timezoneId).getOffset(null), DateTimeZone.UTC).getHourOfDay();
   }
 
   /**
    * Returns the minute of the time zone offset.
    */
-  @ScalarFunction
-  public static int timezoneMinute(@NotNull String timezoneId) {
+  @ScalarFunction(nullableParameters = true)
+  public static int timezoneMinute(String timezoneId) {
     return new DateTime(DateTimeZone.forID(timezoneId).getOffset(null), DateTimeZone.UTC).getMinuteOfHour();
   }
 
@@ -677,8 +677,8 @@ public class DateTimeFunctions {
    * Equivalent to {@code DateTimeConversionTransformFunction}. Both input and output are string type to support simple
    * date format.
    */
-  @ScalarFunction
-  public static String dateTimeConvert(@NotNull String timeValueStr, String inputFormatStr, String outputFormatStr,
+  @ScalarFunction(nullableParameters = true)
+  public static String dateTimeConvert(String timeValueStr, String inputFormatStr, String outputFormatStr,
       String outputGranularityStr) {
     long timeValueMs = new DateTimeFormatSpec(inputFormatStr).fromFormatToMillis(timeValueStr);
     DateTimeFormatSpec outputFormat = new DateTimeFormatSpec(outputFormatStr);

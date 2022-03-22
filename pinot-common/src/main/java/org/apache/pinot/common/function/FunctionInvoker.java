@@ -24,8 +24,8 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
-import org.apache.pinot.common.function.scalar.NotNull;
 import org.apache.pinot.common.utils.PinotDataType;
+import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
 /**
@@ -126,9 +126,6 @@ public class FunctionInvoker {
    * {@link #convertTypes(Object[])} to convert the argument types if needed before calling this method.
    */
   public Object invoke(Object[] arguments) {
-    if (skipInvoke(arguments)) {
-      return null;
-    }
     try {
       return _method.invoke(_instance, arguments);
     } catch (Exception e) {
@@ -138,19 +135,14 @@ public class FunctionInvoker {
   }
 
   /**
-   * If the function has a parameter annotated w/ @nonnull annotation, and the passed argument
-   * is null, skip invoking the method.
+   * Whether method is a scalar function with nullableParameters property set to true.
    */
-  private boolean skipInvoke(Object[] arguments) {
-    assert _method.getParameterAnnotations().length == arguments.length;
-    for (int i = 0; i < arguments.length; i++) {
-      if (arguments[i] == null) {
-        final Annotation[] annotations = _method.getParameterAnnotations()[i];
-        for (final Annotation annotation : annotations) {
-          // Preserve null values during ingestion transformation if inbuilt function cannot accept a null value.
-          if (annotation.annotationType().equals(NotNull.class)) {
-            return true;
-          }
+  public boolean hasNullableParameters() {
+    for (final Annotation annotation : _method.getAnnotations()) {
+      if (annotation.annotationType().equals(ScalarFunction.class)) {
+        final ScalarFunction scalarFunctionAnnotation = (ScalarFunction) annotation;
+        if (scalarFunctionAnnotation.nullableParameters()) {
+          return true;
         }
       }
     }
