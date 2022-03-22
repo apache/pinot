@@ -21,7 +21,6 @@ package org.apache.pinot.common.function.scalar;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.function.DateTimePatternHandler;
 import org.apache.pinot.common.function.DateTimeUtils;
 import org.apache.pinot.common.function.TimeZoneKey;
@@ -249,7 +248,7 @@ public class DateTimeFunctions {
    * Converts Timestamp to epoch millis
    */
   @ScalarFunction
-  public static long fromTimestamp(@Nonnull Timestamp timestamp) {
+  public static long fromTimestamp(@NotNull Timestamp timestamp) {
     return timestamp.getTime();
   }
 
@@ -273,7 +272,7 @@ public class DateTimeFunctions {
    * Converts DateTime string represented by pattern to epoch millis
    */
   @ScalarFunction
-  public static long fromDateTime(@Nonnull String dateTimeString, String pattern) {
+  public static long fromDateTime(@NotNull String dateTimeString, String pattern) {
     return DateTimePatternHandler.parseDateTimeStringToEpochMillis(dateTimeString, pattern);
   }
 
@@ -308,7 +307,7 @@ public class DateTimeFunctions {
    *           "-P-6H+3M"  -- parses as "+6 hours and -3 minutes"
    */
   @ScalarFunction
-  public static long ago(@Nonnull String periodString) {
+  public static long ago(@NotNull String periodString) {
     Duration period = Duration.parse(periodString);
     return System.currentTimeMillis() - period.toMillis();
   }
@@ -322,7 +321,7 @@ public class DateTimeFunctions {
    * Returns the hour of the time zone offset.
    */
   @ScalarFunction
-  public static int timezoneHour(@Nonnull String timezoneId) {
+  public static int timezoneHour(@NotNull String timezoneId) {
     return new DateTime(DateTimeZone.forID(timezoneId).getOffset(null), DateTimeZone.UTC).getHourOfDay();
   }
 
@@ -330,7 +329,7 @@ public class DateTimeFunctions {
    * Returns the minute of the time zone offset.
    */
   @ScalarFunction
-  public static int timezoneMinute(@Nonnull String timezoneId) {
+  public static int timezoneMinute(@NotNull String timezoneId) {
     return new DateTime(DateTimeZone.forID(timezoneId).getOffset(null), DateTimeZone.UTC).getMinuteOfHour();
   }
 
@@ -679,7 +678,7 @@ public class DateTimeFunctions {
    * date format.
    */
   @ScalarFunction
-  public static String dateTimeConvert(@Nonnull String timeValueStr, String inputFormatStr, String outputFormatStr,
+  public static String dateTimeConvert(@NotNull String timeValueStr, String inputFormatStr, String outputFormatStr,
       String outputGranularityStr) {
     long timeValueMs = new DateTimeFormatSpec(inputFormatStr).fromFormatToMillis(timeValueStr);
     DateTimeFormatSpec outputFormat = new DateTimeFormatSpec(outputFormatStr);

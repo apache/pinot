@@ -24,6 +24,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
+import org.apache.pinot.common.function.scalar.NotNull;
 import org.apache.pinot.common.utils.PinotDataType;
 
 
@@ -147,7 +148,7 @@ public class FunctionInvoker {
         final Annotation[] annotations = _method.getParameterAnnotations()[i];
         for (final Annotation annotation : annotations) {
           // Preserve null values during ingestion transformation if inbuilt function cannot accept a null value.
-          if (annotation.annotationType().equals(javax.annotation.Nonnull.class)) {
+          if (annotation.annotationType().equals(NotNull.class)) {
             return true;
           }
         }
