@@ -293,8 +293,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
 
   private File createLocalInputDateFile(URI inputFileURI, File localInputTempDir) {
     String inputFileURIPath = inputFileURI.getPath();
-    String fileNameFriendlyPath = UUID.randomUUID().toString();
-    File localInputFileDir = new File(localInputTempDir, fileNameFriendlyPath);
+    File localInputFileDir = new File(localInputTempDir, UUID.randomUUID().toString());
     return new File(localInputFileDir, new File(inputFileURIPath).getName());
   }
 }
