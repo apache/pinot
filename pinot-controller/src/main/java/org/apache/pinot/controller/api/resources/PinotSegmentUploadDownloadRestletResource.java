@@ -306,7 +306,7 @@ public class PinotSegmentUploadDownloadRestletResource {
           segmentName, zkDownloadUri, moveSegmentToFinalLocation, crypterClassName, allowRefresh);
 
       // We only set this gauge after the segment is successfully pushed.
-      _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.OFFLINE_SEGMENT_SIZE,
+      _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.LAST_PUSHED_SEGMENT_SIZE,
           FileUtils.sizeOfDirectory(tempSegmentDir));
 
       return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + tableNameWithType);
