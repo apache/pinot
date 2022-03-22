@@ -247,7 +247,7 @@ public class DateTimeFunctions {
   /**
    * Converts Timestamp to epoch millis
    */
-  @ScalarFunction(nullableParameters = true)
+  @ScalarFunction
   public static long fromTimestamp(Timestamp timestamp) {
     return timestamp.getTime();
   }

@@ -19,13 +19,11 @@
 package org.apache.pinot.common.function;
 
 import com.google.common.base.Preconditions;
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import org.apache.pinot.common.utils.PinotDataType;
-import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
 /**
@@ -34,12 +32,14 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
  */
 public class FunctionInvoker {
   private final Method _method;
+  private final boolean _nullableParameters;
   private final Class<?>[] _parameterClasses;
   private final PinotDataType[] _parameterTypes;
   private final Object _instance;
 
   public FunctionInvoker(FunctionInfo functionInfo) {
     _method = functionInfo.getMethod();
+    _nullableParameters = functionInfo.getNullableParameters();
     Class<?>[] parameterClasses = _method.getParameterTypes();
     int numParameters = parameterClasses.length;
     _parameterClasses = new Class<?>[numParameters];
@@ -126,26 +126,20 @@ public class FunctionInvoker {
    * {@link #convertTypes(Object[])} to convert the argument types if needed before calling this method.
    */
   public Object invoke(Object[] arguments) {
+    if (_nullableParameters) {
+      // Preserve null values during ingestion transformation if function is an inbuilt
+      // scalar function that cannot handle nulls, and invoked with null parameter(s).
+      for (final Object argument : arguments) {
+        if (argument == null) {
+          return null;
+        }
+      }
+    }
     try {
       return _method.invoke(_instance, arguments);
     } catch (Exception e) {
       throw new IllegalStateException(
           "Caught exception while invoking method: " + _method + " with arguments: " + Arrays.toString(arguments), e);
     }
-  }
-
-  /**
-   * Whether method is a scalar function with nullableParameters property set to true.
-   */
-  public boolean hasNullableParameters() {
-    for (final Annotation annotation : _method.getAnnotations()) {
-      if (annotation.annotationType().equals(ScalarFunction.class)) {
-        final ScalarFunction scalarFunctionAnnotation = (ScalarFunction) annotation;
-        if (scalarFunctionAnnotation.nullableParameters()) {
-          return true;
-        }
-      }
-    }
-    return false;
   }
 }

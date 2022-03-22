@@ -108,13 +108,11 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
   private static class FunctionExecutionNode implements ExecutableNode {
     final FunctionInvoker _functionInvoker;
-    final boolean _hasNullableParameters;
     final ExecutableNode[] _argumentNodes;
     final Object[] _arguments;
 
     FunctionExecutionNode(FunctionInfo functionInfo, ExecutableNode[] argumentNodes) {
       _functionInvoker = new FunctionInvoker(functionInfo);
-      _hasNullableParameters = _functionInvoker.hasNullableParameters();
       _argumentNodes = argumentNodes;
       _arguments = new Object[_argumentNodes.length];
     }
@@ -125,15 +123,6 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
         final int numArguments = _argumentNodes.length;
         for (int i = 0; i < numArguments; i++) {
           _arguments[i] = _argumentNodes[i].execute(row);
-        }
-        if (_hasNullableParameters) {
-          // Preserve null values during ingestion transformation if function is an inbuilt
-          // scalar function that cannot handle nulls, and invoked with null parameter(s).
-          for (int i = 0; i < numArguments; i++) {
-            if (_arguments[i] == null) {
-              return null;
-            }
-          }
         }
         _functionInvoker.convertTypes(_arguments);
         return _functionInvoker.invoke(_arguments);
