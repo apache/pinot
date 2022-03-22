@@ -95,15 +95,10 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     }
 
     if (loadTextIndex && segmentIndexDir != null) {
-      PinotDataBuffer buffer = null;
       Preconditions.checkState(segmentReader.hasIndexFor(columnName, ColumnIndexType.TEXT_INDEX));
-     /* if (indexLoadingConfig.getFSTIndexType() == FSTType.NATIVE) {
-        buffer = segmentReader.getIndexFor(columnName, ColumnIndexType.TEXT_INDEX);
-        Preconditions.checkArgument(buffer != null);
-      }*/
       Map<String, Map<String, String>> columnProperties = indexLoadingConfig.getColumnProperties();
       _textIndex =
-          indexReaderProvider.newTextIndexReader(segmentIndexDir, metadata, columnProperties.get(columnName), buffer);
+          indexReaderProvider.newTextIndexReader(segmentIndexDir, metadata, columnProperties.get(columnName));
     } else {
       _textIndex = null;
     }

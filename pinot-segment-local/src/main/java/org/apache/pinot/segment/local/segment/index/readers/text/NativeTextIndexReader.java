@@ -1,5 +1,6 @@
-package org.apache.pinot.segment.local.segment.index.readers.json;
+package org.apache.pinot.segment.local.segment.index.readers.text;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -13,27 +14,58 @@ import org.apache.pinot.segment.local.utils.nativefst.NativeTextIndexCreator;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RegexpMatcher;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.slf4j.LoggerFactory;
 
 
 public class NativeTextIndexReader implements TextIndexReader {
-  private final FST _fst;
-  private final BitmapInvertedIndexReader _invertedIndex;
-  private int _numDocs;
+  private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(NativeTextIndexReader.class);
 
-  public NativeTextIndexReader(PinotDataBuffer dataBuffer, int numDocs) {
+  private final String _column;
+  private int _numDocs;
+  private final File _indexFile;
+  private final PinotDataBuffer _buffer;
+
+  private FST _fst;
+  private BitmapInvertedIndexReader _invertedIndex;
+
+  public NativeTextIndexReader(String column, File indexDir, int numDocs) {
+    _column = column;
     _numDocs = numDocs;
-    long invertedIndexLength = dataBuffer.getLong(4);
-    long fstDataLength = dataBuffer.getLong(12);
-    int numBitMaps = dataBuffer.getInt(20);
+    try {
+      _indexFile = getTextIndexFile(indexDir);
+      _buffer = PinotDataBuffer.loadBigEndianFile(_indexFile);
+
+      populateIndexes();
+    } catch (Exception e) {
+      LOGGER.error("Failed to instantiate Lucene text index reader for column {}, exception {}", column,
+          e.getMessage());
+      throw new RuntimeException(e);
+    }
+  }
+
+  private File getTextIndexFile(File segmentIndexDir) {
+    // will return null if file does not exist
+    File file = SegmentDirectoryPaths.findTextIndexIndexFileNative(segmentIndexDir, _column);
+    if (file == null) {
+      throw new IllegalStateException("Failed to find text index file for column: " + _column);
+    }
+    return file;
+  }
+
+  private void populateIndexes() {
+    long invertedIndexLength = _buffer.getLong(4);
+    long fstDataLength = _buffer.getLong(12);
+    int numBitMaps = _buffer.getInt(20);
 
     long fstDataStartOffset = NativeTextIndexCreator.HEADER_LENGTH;
     long fstDataEndOffset = fstDataStartOffset + fstDataLength;
-    ByteBuffer byteBuffer = dataBuffer.toDirectByteBuffer(fstDataStartOffset, (int) fstDataLength);
+    ByteBuffer byteBuffer = _buffer.toDirectByteBuffer(fstDataStartOffset, (int) fstDataLength);
     byte[] arr = new byte[byteBuffer.remaining()];
-   // byteBuffer.get(arr);
+    // byteBuffer.get(arr);
     try {
       _fst = FST.read(new ByteBufferInputStream(Collections.singletonList(byteBuffer)), ImmutableFST.class, true);
     } catch (IOException e) {
@@ -41,8 +73,9 @@ public class NativeTextIndexReader implements TextIndexReader {
     }
 
     long invertedIndexEndOffset = fstDataEndOffset + invertedIndexLength;
-    _invertedIndex = new BitmapInvertedIndexReader(
-        dataBuffer.view(fstDataEndOffset, invertedIndexEndOffset, ByteOrder.BIG_ENDIAN), numBitMaps);
+    _invertedIndex =
+        new BitmapInvertedIndexReader(_buffer.view(fstDataEndOffset, invertedIndexEndOffset, ByteOrder.BIG_ENDIAN),
+            numBitMaps);
   }
 
   @Override

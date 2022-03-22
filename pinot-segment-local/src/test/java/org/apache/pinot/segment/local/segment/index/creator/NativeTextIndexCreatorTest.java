@@ -3,7 +3,7 @@ package org.apache.pinot.segment.local.segment.index.creator;
 import java.io.File;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.readers.json.NativeTextIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
 import org.apache.pinot.segment.local.utils.nativefst.NativeTextIndexCreator;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.testng.Assert;
@@ -44,8 +44,7 @@ public class NativeTextIndexCreatorTest {
     }
 
     File fstFile = new File(INDEX_DIR, "testFSTColumn" + NATIVE_TEXT_INDEX_FILE_EXTENSION);
-    try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(fstFile);
-        NativeTextIndexReader reader = new NativeTextIndexReader(dataBuffer, 4)) {
+    try (NativeTextIndexReader reader = new NativeTextIndexReader("testFSTColumn", fstFile.getParentFile(), 4)) {
 
       int[] matchedDictIds = reader.getDictIds("hello.*").toArray();
       Assert.assertEquals(1, matchedDictIds.length);

@@ -46,5 +46,5 @@ public interface TextIndexReaderProvider {
    * @return a text index reader
    */
   TextIndexReader newTextIndexReader(File file, ColumnMetadata metadata,
-      @Nullable Map<String, String> textIndexProperties, @Nullable PinotDataBuffer buffer);
+      @Nullable Map<String, String> textIndexProperties);
 }

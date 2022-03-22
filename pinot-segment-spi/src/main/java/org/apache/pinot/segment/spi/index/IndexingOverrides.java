@@ -247,9 +247,9 @@ public class IndexingOverrides {
 
     @Override
     public TextIndexReader newTextIndexReader(File file, ColumnMetadata columnMetadata,
-        @Nullable Map<String, String> textIndexProperties, @Nullable PinotDataBuffer buffer) {
+        @Nullable Map<String, String> textIndexProperties) {
       ensureReaderPresent();
-      return READER_DEFAULTS.newTextIndexReader(file, columnMetadata, textIndexProperties, buffer);
+      return READER_DEFAULTS.newTextIndexReader(file, columnMetadata, textIndexProperties);
     }
 
     @Override
