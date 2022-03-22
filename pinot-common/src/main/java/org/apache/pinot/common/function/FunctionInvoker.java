@@ -124,11 +124,34 @@ public class FunctionInvoker {
    * {@link #convertTypes(Object[])} to convert the argument types if needed before calling this method.
    */
   public Object invoke(Object[] arguments) {
+    if (skipInvoke(arguments)) {
+      return null;
+    }
     try {
       return _method.invoke(_instance, arguments);
     } catch (Exception e) {
       throw new IllegalStateException(
           "Caught exception while invoking method: " + _method + " with arguments: " + Arrays.toString(arguments), e);
     }
+  }
+
+  /**
+   * If the function has a parameter annotated w/ @nonnull annotation, and the passed argument
+   * is null, skip invoking the method.
+   */
+  private boolean skipInvoke(Object[] arguments) {
+    assert _method.getParameterAnnotations().length == arguments.length;
+    for (int i = 0; i < arguments.length; i++) {
+      if (arguments[i] == null) {
+        var annotations = _method.getParameterAnnotations()[i];
+        for (var annotation : annotations) {
+          // Preserve null values during ingestion transformation if inbuilt function cannot accept a null value.
+          if (annotation.annotationType().equals(javax.annotation.Nonnull.class)) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
   }
 }

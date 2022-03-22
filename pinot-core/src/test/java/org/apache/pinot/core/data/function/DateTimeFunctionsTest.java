@@ -251,6 +251,13 @@ public class DateTimeFunctionsTest {
         "fromDateTime(dateTime, 'EEE MMM dd HH:mm:ss ZZZ yyyy')", Lists.newArrayList("dateTime"), row112, 1251142606000L
     });
 
+    // fromDateTime with null
+    GenericRow row113 = new GenericRow();
+    row113.putValue("dateTime", null);
+    inputs.add(new Object[]{
+        "fromDateTime(dateTime, 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z''')", Lists.newArrayList("dateTime"), row113, null
+    });
+
     // timezone_hour and timezone_minute
     List<String> expectedArguments = Collections.singletonList("tz");
     GenericRow row120 = new GenericRow();
@@ -325,6 +332,16 @@ public class DateTimeFunctionsTest {
     inputs.add(new Object[]{"minute(millis, tz)", expectedArguments, row131, 23});
     inputs.add(new Object[]{"second(millis, tz)", expectedArguments, row131, 13});
     inputs.add(new Object[]{"millisecond(millis, tz)", expectedArguments, row131, 123});
+
+
+    GenericRow row140 = new GenericRow();
+    row140.putValue("duration", null);
+    inputs.add(new Object[]{"ago(duration)", Lists.newArrayList("duration"), row140, null});
+
+    GenericRow row141 = new GenericRow();
+    row141.putValue("timezoneId", null);
+    inputs.add(new Object[]{"timezoneHour(timezoneId)", Lists.newArrayList("timezoneId"), row141, null});
+
 
     return inputs.toArray(new Object[0][]);
   }
@@ -426,6 +443,8 @@ public class DateTimeFunctionsTest {
     testDateTimeConvert(5019675L/* 20170920T03:15:00 */, "5:MINUTES:EPOCH", "1:MILLISECONDS:EPOCH", "1:HOURS",
         1505901600000L/* 20170920T03:00:00 */);
 
+    testDateTimeConvert(null, "5:MINUTES:EPOCH", "1:MILLISECONDS:EPOCH", "1:HOURS", null);
+
     // EPOCH to SDF
     // Test conversion from millis since epoch to simple date format (UTC)
     testDateTimeConvert(1505985360000L/* 20170921T02:16:00 */, "1:MILLISECONDS:EPOCH",
@@ -524,6 +543,6 @@ public class DateTimeFunctionsTest {
     row.putValue("timeCol", timeValue);
     List<String> arguments = Collections.singletonList("timeCol");
     testFunction(String.format("dateTimeConvert(timeCol, '%s', '%s', '%s')", inputFormatStr, outputFormatStr,
-        outputGranularityStr), arguments, row, expectedResult.toString());
+        outputGranularityStr), arguments, row, expectedResult == null ? null : expectedResult.toString());
   }
 }
