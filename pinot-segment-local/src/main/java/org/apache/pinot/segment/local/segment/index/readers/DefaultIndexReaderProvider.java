@@ -52,6 +52,7 @@ import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.provider.IndexReaderProvider;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -169,8 +170,8 @@ public class DefaultIndexReaderProvider implements IndexReaderProvider {
 
   private boolean isFstTypeNative(Map<String, String> textIndexProperties) {
     for (Map.Entry<String, String> entry : textIndexProperties.entrySet()) {
-      if (entry.getKey().equalsIgnoreCase("fstType")) {
-        return entry.getValue().equalsIgnoreCase("native");
+      if (entry.getKey().equalsIgnoreCase(FieldConfig.TEXT_FST_TYPE)) {
+        return entry.getValue().equalsIgnoreCase(FieldConfig.TEXT_NATIVE_FST_LITERAL);
       }
     }
 

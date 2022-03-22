@@ -81,7 +81,7 @@ public class NativeClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Override
   protected List<FieldConfig> getFieldConfigs() {
     Map<String, String> propertiesMap = new HashMap<>();
-    propertiesMap.put("fstType", "native");
+    propertiesMap.put(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL);
 
     return Collections.singletonList(
         new FieldConfig(TEXT_COLUMN_NAME, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null,

@@ -222,7 +222,7 @@ public class IndexLoadingConfig {
           Map<String, String> propertiesMap = fieldConfig.getProperties();
 
           if (propertiesMap != null) {
-            String fstType = propertiesMap.get("fstType");
+            String fstType = propertiesMap.get(FieldConfig.TEXT_FST_TYPE);
 
             if (fstType != null) {
               if (fstType.equalsIgnoreCase("native")) {

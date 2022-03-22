@@ -44,7 +44,9 @@ public class FieldConfig extends BaseJsonConfig {
   public static final String TEXT_INDEX_NO_RAW_DATA = "noRawDataForTextIndex";
   public static final String TEXT_INDEX_RAW_VALUE = "rawValueForTextIndex";
   public static final String TEXT_INDEX_DEFAULT_RAW_VALUE = "n";
-  public static final String TEXT_INDEX_USE_NATIVE_INDEX = "useNativeIndex";
+  // "native" for native, default is Lucene
+  public static final String TEXT_FST_TYPE = "fstType";
+  public static final String TEXT_NATIVE_FST_LITERAL = "native";
 
   private final String _name;
   private final EncodingType _encodingType;

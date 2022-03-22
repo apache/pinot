@@ -218,9 +218,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         Map<String, String> columnProperties = _columnProperties.get(columnName);
         FSTType fstType = FSTType.LUCENE;
 
-        //TODO: atri -- make these constants
         if (columnProperties != null) {
-          String fstTypeConfig = columnProperties.get("fstType");
+          String fstTypeConfig = columnProperties.get(FieldConfig.TEXT_FST_TYPE);
           if (fstTypeConfig != null && fstTypeConfig.equalsIgnoreCase("native")) {
             fstType = FSTType.NATIVE;
           }
