@@ -39,6 +39,7 @@ import org.apache.pinot.segment.local.segment.index.readers.json.ImmutableJsonIn
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
+import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.nativefst.FSTHeader;
 import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -161,20 +162,10 @@ public class DefaultIndexReaderProvider implements IndexReaderProvider {
   @Override
   public TextIndexReader newTextIndexReader(File file, ColumnMetadata columnMetadata,
       @Nullable Map<String, String> textIndexProperties) {
-    if (isFstTypeNative(textIndexProperties)) {
+    if (TextIndexUtils.isFstTypeNative(textIndexProperties)) {
       return new NativeTextIndexReader(columnMetadata.getColumnName(), file, columnMetadata.getTotalDocs());
     }
     return new LuceneTextIndexReader(columnMetadata.getColumnName(), file, columnMetadata.getTotalDocs(),
         textIndexProperties);
-  }
-
-  private boolean isFstTypeNative(Map<String, String> textIndexProperties) {
-    for (Map.Entry<String, String> entry : textIndexProperties.entrySet()) {
-      if (entry.getKey().equalsIgnoreCase(FieldConfig.TEXT_FST_TYPE)) {
-        return entry.getValue().equalsIgnoreCase(FieldConfig.TEXT_NATIVE_FST_LITERAL);
-      }
-    }
-
-    return false;
   }
 }

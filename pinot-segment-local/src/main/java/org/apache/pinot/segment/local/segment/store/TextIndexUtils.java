@@ -19,11 +19,13 @@
 package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.spi.config.table.FieldConfig;
 
 
-class TextIndexUtils {
+public class TextIndexUtils {
   private TextIndexUtils() {
   }
 
@@ -38,5 +40,15 @@ class TextIndexUtils {
   static boolean hasTextIndex(File segDir, String column) {
     return (new File(segDir, column + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION).exists() || new File(segDir,
         column + V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION).exists());
+  }
+
+  public static boolean isFstTypeNative(Map<String, String> textIndexProperties) {
+    for (Map.Entry<String, String> entry : textIndexProperties.entrySet()) {
+      if (entry.getKey().equalsIgnoreCase(FieldConfig.TEXT_FST_TYPE)) {
+        return entry.getValue().equalsIgnoreCase(FieldConfig.TEXT_NATIVE_FST_LITERAL);
+      }
+    }
+
+    return false;
   }
 }

@@ -28,8 +28,9 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
-import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
+import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;gi
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
@@ -221,14 +222,8 @@ public class IndexLoadingConfig {
           _textIndexColumns.add(column);
           Map<String, String> propertiesMap = fieldConfig.getProperties();
 
-          if (propertiesMap != null) {
-            String fstType = propertiesMap.get(FieldConfig.TEXT_FST_TYPE);
-
-            if (fstType != null) {
-              if (fstType.equalsIgnoreCase("native")) {
-                _fstIndexType = FSTType.NATIVE;
-              }
-            }
+          if (TextIndexUtils.isFstTypeNative(propertiesMap)) {
+            _fstIndexType = FSTType.NATIVE;
           }
         }
       }

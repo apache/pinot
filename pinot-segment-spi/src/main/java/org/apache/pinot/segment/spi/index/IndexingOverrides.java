@@ -67,6 +67,7 @@ public class IndexingOverrides {
   private static final IndexCreatorProvider CREATOR_DEFAULTS = createDefaultCreatorProvider();
   private static final IndexReaderProvider READER_DEFAULTS = createDefaultReaderProvider();
   private static final MutableIndexProvider MUTABLE_INDEX_DEFAULTS = createDefaultMutableIndexProvider();
+
   private static final AtomicReference<IndexingOverride> REGISTRATION = new AtomicReference<>(null);
 
   private IndexingOverrides() {
