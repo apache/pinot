@@ -61,4 +61,9 @@ public interface SegmentSelector {
    * (table) without overlap.
    */
   Set<String> select(BrokerRequest brokerRequest);
+
+  /**
+   * Selects the segments based on the table name.
+   */
+  Set<String> select(String tableName);
 }

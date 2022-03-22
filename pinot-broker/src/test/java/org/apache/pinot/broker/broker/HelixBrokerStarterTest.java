@@ -24,8 +24,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
-import org.apache.pinot.broker.routing.RoutingManager;
-import org.apache.pinot.broker.routing.RoutingTable;
+import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -154,7 +154,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
     assertEquals(brokerResourceExternalView.getStateMap(OFFLINE_TABLE_NAME).size(), NUM_BROKERS);
     assertEquals(brokerResourceExternalView.getStateMap(REALTIME_TABLE_NAME).size(), NUM_BROKERS);
 
-    RoutingManager routingManager = _brokerStarter.getRoutingManager();
+    BrokerRoutingManager routingManager = _brokerStarter.getRoutingManager();
     assertTrue(routingManager.routingExists(OFFLINE_TABLE_NAME));
     assertTrue(routingManager.routingExists(REALTIME_TABLE_NAME));
 
@@ -213,7 +213,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
    */
   @Test
   public void testTimeBoundaryUpdate() {
-    RoutingManager routingManager = _brokerStarter.getRoutingManager();
+    BrokerRoutingManager routingManager = _brokerStarter.getRoutingManager();
 
     // Time boundary should be 1 day smaller than the end time
     int currentEndTime = 10;

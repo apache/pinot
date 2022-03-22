@@ -48,4 +48,9 @@ public class OfflineSegmentSelector implements SegmentSelector {
   public Set<String> select(BrokerRequest brokerRequest) {
     return _segments;
   }
+
+  @Override
+  public Set<String> select(String tableNameWithType) {
+    return _segments;
+  }
 }

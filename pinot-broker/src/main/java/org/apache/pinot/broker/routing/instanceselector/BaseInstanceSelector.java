@@ -33,7 +33,6 @@ import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.slf4j.Logger;
@@ -263,7 +262,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   }
 
   @Override
-  public SelectionResult select(BrokerRequest brokerRequest, List<String> segments) {
+  public SelectionResult select(List<String> segments) {
     int requestId = (int) (_requestId.getAndIncrement() % MAX_REQUEST_ID);
     Map<String, String> segmentToInstanceMap = select(segments, requestId, _segmentToEnabledInstancesMap);
     Set<String> unavailableSegments = _unavailableSegments;
