@@ -61,6 +61,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
@@ -303,6 +304,10 @@ public class PinotSegmentUploadDownloadRestletResource {
       // Zk operations
       completeZkOperations(enableParallelPushProtection, headers, finalSegmentFile, tableNameWithType, segmentMetadata,
           segmentName, zkDownloadUri, moveSegmentToFinalLocation, crypterClassName, allowRefresh);
+
+      // We only set this gauge after the segment is successfully pushed.
+      _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.OFFLINE_SEGMENT_SIZE,
+          FileUtils.sizeOfDirectory(tempSegmentDir));
 
       return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + tableNameWithType);
     } catch (WebApplicationException e) {
