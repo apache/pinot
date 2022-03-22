@@ -25,6 +25,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
@@ -122,18 +123,27 @@ public class InbuiltFunctionEvaluatorTest {
   }
 
   @Test
-  public void testExceptionDuringInbuiltFunctionEvaluator()
-      throws Exception {
+  public void testNullReturnedDuringInbuiltFunctionEvaluatorWhenFunctionCannotWorkWithNull() {
     String expression = "fromDateTime(reverse('2020-01-01T00:00:00Z'), \"invalid_identifier\")";
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
     assertEquals(evaluator.getArguments().size(), 1);
+    GenericRow row = new GenericRow();
+    assertNull(evaluator.evaluate(row));
+  }
+
+  @Test
+  public void testExceptionDuringInbuiltFunctionEvaluator()
+      throws Exception {
+    String expression = "toDateTime(1648010797, \"invalid_identifier\", \"invalid_identifier\")";
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
+    assertEquals(evaluator.getArguments().size(), 2);
     GenericRow row = new GenericRow();
     try {
       evaluator.evaluate(row);
       fail();
     } catch (Exception e) {
       // assert that exception contains the full function call signature
-      assertTrue(e.toString().contains("fromDateTime(reverse('2020-01-01T00:00:00Z'),invalid_identifier)"));
+      assertTrue(e.toString().contains("toDateTime('1648010797',invalid_identifier,invalid_identifier)"));
       // assert that FunctionInvoker ISE is captured correctly.
       assertTrue(e.getCause() instanceof IllegalStateException);
     }
