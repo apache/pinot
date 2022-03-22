@@ -30,6 +30,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -60,6 +61,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
   @Override
   protected void overrideServerConf(PinotConfiguration configuration) {
+    configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION, false);
   }
 
   @BeforeClass
@@ -123,16 +125,13 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testSegmentMetadataApi()
       throws Exception {
     {
-      String jsonOutputStr = sendGetRequest(
-          _controllerRequestURLBuilder.forSegmentMetadata(getTableName()));
+      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(getTableName()));
       JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
       Assert.assertEquals(tableSegmentsMetadata.size(), 8);
 
       JsonNode segmentMetadataFromAllEndpoint = tableSegmentsMetadata.elements().next();
-      String segmentName = URLEncoder.encode(segmentMetadataFromAllEndpoint.get("segmentName").asText(),
-          "UTF-8");
-      jsonOutputStr = sendGetRequest(
-          _controllerRequestURLBuilder.forSegmentMetadata(getTableName(), segmentName));
+      String segmentName = URLEncoder.encode(segmentMetadataFromAllEndpoint.get("segmentName").asText(), "UTF-8");
+      jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(getTableName(), segmentName));
       JsonNode segmentMetadataFromDirectEndpoint = JsonUtils.stringToJsonNode(jsonOutputStr);
       Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
           segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
