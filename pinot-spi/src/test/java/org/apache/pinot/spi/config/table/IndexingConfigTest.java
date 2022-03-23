@@ -39,10 +39,8 @@ public class IndexingConfigTest {
     indexingConfig.setLoadMode("MMAP");
     indexingConfig.setAggregateMetrics(true);
     List<PreAggregationConfig> preAggregationConfigs =
-        Arrays.asList(
-            new PreAggregationConfig("c1", "SUM", "SUM_c1"),
-            new PreAggregationConfig("c2", "MIN", "MIN_c2"),
-            new PreAggregationConfig("c3", "MAX", "MAX_c2"));
+        Arrays.asList(new PreAggregationConfig("SUM__c1", "SUM(c1)"), new PreAggregationConfig("MIN__c2", "MIN(c2)"),
+            new PreAggregationConfig("MAX__c3", "MAX(c3)"));
     indexingConfig.setPreAggregationConfigs(preAggregationConfigs);
     List<String> invertedIndexColumns = Arrays.asList("a", "b", "c");
     indexingConfig.setInvertedIndexColumns(invertedIndexColumns);

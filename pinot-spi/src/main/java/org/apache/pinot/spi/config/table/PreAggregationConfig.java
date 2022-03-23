@@ -26,22 +26,17 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 
 public class PreAggregationConfig extends BaseJsonConfig {
 
-  @JsonPropertyDescription("Column name")
+  @JsonPropertyDescription("Aggregated column name")
   private final String _columnName;
 
-  @JsonPropertyDescription("Transformation function string")
+  @JsonPropertyDescription("Aggregation function")
   private final String _transformFunction;
-
-  @JsonPropertyDescription("Aggregated column name")
-  private final String _aggregatedColumnName;
 
   @JsonCreator
   public PreAggregationConfig(@JsonProperty("columnName") String columnName,
-      @JsonProperty("transformFunction") String transformFunction,
-      @JsonProperty("aggregatedColumnName") String aggregatedColumnName) {
+      @JsonProperty("transformFunction") String transformFunction) {
     _columnName = columnName;
     _transformFunction = transformFunction;
-    _aggregatedColumnName = aggregatedColumnName;
   }
 
   public String getColumnName() {
@@ -50,9 +45,5 @@ public class PreAggregationConfig extends BaseJsonConfig {
 
   public String getTransformFunction() {
     return _transformFunction;
-  }
-
-  public String getAggregatedColumnName() {
-    return _aggregatedColumnName;
   }
 }
