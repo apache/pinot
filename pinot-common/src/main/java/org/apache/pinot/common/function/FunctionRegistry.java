@@ -63,7 +63,7 @@ public class FunctionRegistry {
       if (scalarFunction.enabled()) {
         // Annotated function names
         String[] scalarFunctionNames = scalarFunction.names();
-        final boolean nullableParameters = scalarFunction.nullableParameters();
+        boolean nullableParameters = scalarFunction.nullableParameters();
         if (scalarFunctionNames.length > 0) {
           for (String name : scalarFunctionNames) {
             FunctionRegistry.registerFunction(name, method, nullableParameters);
