@@ -261,8 +261,8 @@ public class ExpressionTransformerTest {
   }
 
   /** Check if there is more than one transform function definition for the same column. */
-  @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "Cannot set more than one "
-      + "ingestion transform function on a column \\(column name: 'a'\\).")
+  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Cannot set more than one"
+      + " ingestion transform function on column: a.")
   public void testMultipleTransformFunctionSortOrder() {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("a", FieldSpec.DataType.INT)
         .addSingleValueDimension("b", FieldSpec.DataType.INT).addSingleValueDimension("c", FieldSpec.DataType.INT)
@@ -310,7 +310,7 @@ public class ExpressionTransformerTest {
   }
 
   /* Check if we throw exception when Ingestion Transform Functions have a cycle. */
-  @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "Expression "
+  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Expression "
       + "cycle found for column 'a' in Ingestion Transform Function definitions.")
   public void testCyclicTransformFunctionSortOrder() {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("a", FieldSpec.DataType.INT)

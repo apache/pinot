@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.recordtransformer;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -48,13 +49,11 @@ public class ExpressionTransformer implements RecordTransformer {
     Map<String, FunctionEvaluator> expressionEvaluators = new HashMap<>();
     if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getTransformConfigs() != null) {
       for (TransformConfig transformConfig : tableConfig.getIngestionConfig().getTransformConfigs()) {
-        String columnName = transformConfig.getColumnName();
-        if (expressionEvaluators.containsKey(columnName)) {
-          throw new RuntimeException("Cannot set more than one ingestion transform function on a column (column name: "
-              + "'" + columnName + "').");
-        }
-        expressionEvaluators.put(transformConfig.getColumnName(),
+        FunctionEvaluator previous = expressionEvaluators.put(transformConfig.getColumnName(),
             FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction()));
+        Preconditions
+            .checkState(previous == null, "Cannot set more than one ingestion transform function on column: %s.",
+                transformConfig.getColumnName());
       }
     }
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
@@ -69,9 +68,9 @@ public class ExpressionTransformer implements RecordTransformer {
 
     // Carry out DFS traversal to topologically sort column names based on transform function dependencies. Throw
     // exception if a cycle is discovered. When a name is first seen it is added to discoveredNames set. When a name
-    // is completely processed (i.e the name and all of its children have been full explored and no cycles have been
-    // seen), it gets added to the _expressionEvaluators list in topologically sorted order. Fully explored names are
-    // removed from discoveredNames set.
+    // is completely processed (i.e the name and all of its dependencies have been fully explored and no cycles have
+    // been seen), it gets added to the _expressionEvaluators list in topologically sorted order. Fully explored
+    // names are removed from discoveredNames set.
     Set<String> discoveredNames = new HashSet<>();
     for (Map.Entry<String, FunctionEvaluator> entry : expressionEvaluators.entrySet()) {
       String columnName = entry.getKey();
@@ -84,7 +83,7 @@ public class ExpressionTransformer implements RecordTransformer {
   private void topologicalSort(String column, Map<String, FunctionEvaluator> expressionEvaluators,
       Set<String> discoveredNames) {
     if (discoveredNames.contains(column)) {
-      throw new RuntimeException("Expression cycle found for column '" + column + "' in Ingestion Transform Function"
+      throw new IllegalStateException("Expression cycle found for column '" + column + "' in Ingestion Transform Function"
           + " definitions.");
     }
 
