@@ -83,8 +83,8 @@ public class ExpressionTransformer implements RecordTransformer {
   private void topologicalSort(String column, Map<String, FunctionEvaluator> expressionEvaluators,
       Set<String> discoveredNames) {
     if (discoveredNames.contains(column)) {
-      throw new IllegalStateException("Expression cycle found for column '" + column + "' in Ingestion Transform Function"
-          + " definitions.");
+      throw new IllegalStateException("Expression cycle found for column '" + column + "' in Ingestion Transform "
+          + "Function definitions.");
     }
 
     FunctionEvaluator functionEvaluator = expressionEvaluators.get(column);
