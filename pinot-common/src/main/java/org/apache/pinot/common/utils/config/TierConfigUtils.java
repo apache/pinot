@@ -85,19 +85,24 @@ public final class TierConfigUtils {
       TierSegmentSelector s1 = o1.getSegmentSelector();
       TierSegmentSelector s2 = o2.getSegmentSelector();
 
+      Preconditions.checkState(TierFactory.TIME_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s1.getType())
+              || TierFactory.FIXED_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s1.getType()),
+          "Unsupported segmentSelectorType class %s", s1.getClass());
+      Preconditions.checkState(TierFactory.TIME_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s2.getType())
+          || TierFactory.FIXED_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s2.getType()),
+          "Unsupported segmentSelectorType class %s", s2.getClass());
+
       if (TierFactory.FIXED_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s1.getType())
           && TierFactory.FIXED_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s2.getType())) {
         return 0;
-      } else if (TierFactory.FIXED_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s1.getType())) {
+      }
+      if (TierFactory.FIXED_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s1.getType())) {
         return -1;
-      } else if (TierFactory.FIXED_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s2.getType())) {
+      }
+      if (TierFactory.FIXED_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s2.getType())) {
         return 1;
       }
 
-      Preconditions.checkState(TierFactory.TIME_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s1.getType()),
-          "Unsupported segmentSelectorType class %s", s1.getClass());
-      Preconditions.checkState(TierFactory.TIME_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s2.getType()),
-          "Unsupported segmentSelectorType class %s", s2.getClass());
       Long period1 = ((TimeBasedTierSegmentSelector) s1).getSegmentAgeMillis();
       Long period2 = ((TimeBasedTierSegmentSelector) s2).getSegmentAgeMillis();
       return period2.compareTo(period1);

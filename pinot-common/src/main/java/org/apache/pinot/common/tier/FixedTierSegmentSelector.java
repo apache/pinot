@@ -19,8 +19,7 @@
 package org.apache.pinot.common.tier;
 
 import com.google.common.base.Preconditions;
-import java.util.List;
-import javax.annotation.Nullable;
+import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -34,11 +33,11 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
  * A {@link TierSegmentSelector} strategy which selects segments for a tier based on a fixed list
  */
 public class FixedTierSegmentSelector implements TierSegmentSelector {
-  private final List<String> _segmentList;
+  private final Set<String> _segmentsToSelect;
   private final HelixManager _helixManager;
 
-  public FixedTierSegmentSelector(HelixManager helixManager, @Nullable List<String> segmentList) {
-    _segmentList = segmentList;
+  public FixedTierSegmentSelector(HelixManager helixManager, Set<String> segmentsToSelect) {
+    _segmentsToSelect = segmentsToSelect;
     _helixManager = helixManager;
   }
 
@@ -55,7 +54,7 @@ public class FixedTierSegmentSelector implements TierSegmentSelector {
    */
   @Override
   public boolean selectSegment(String tableNameWithType, String segmentName) {
-    if (CollectionUtils.isNotEmpty(_segmentList) && _segmentList.contains(segmentName)) {
+    if (CollectionUtils.isNotEmpty(_segmentsToSelect) && _segmentsToSelect.contains(segmentName)) {
       if (TableType.OFFLINE == TableNameBuilder.getTableTypeFromTableName(tableNameWithType)) {
         return true;
       }
@@ -65,18 +64,17 @@ public class FixedTierSegmentSelector implements TierSegmentSelector {
               segmentName);
       Preconditions.checkNotNull(segmentZKMetadata, "Could not find zk metadata for segment: {} of table: {}",
           segmentName, tableNameWithType);
-      return segmentZKMetadata.getStatus().equals(Realtime.Status.DONE);
+      return !segmentZKMetadata.getStatus().equals(Realtime.Status.IN_PROGRESS);
     }
     return false;
   }
 
-  @Nullable
-  public List<String> getSegmentList() {
-    return _segmentList;
+  public Set<String> getSegmentsToSelect() {
+    return _segmentsToSelect;
   }
 
   @Override
   public String toString() {
-    return "FixedTierSegmentSelector{" + "_segmentList=" + _segmentList + '}';
+    return "FixedTierSegmentSelector{" + "_segmentsToSelect=" + _segmentsToSelect + '}';
   }
 }

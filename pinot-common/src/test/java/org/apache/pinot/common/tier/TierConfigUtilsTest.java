@@ -21,6 +21,7 @@ package org.apache.pinot.common.tier;
 import com.google.common.collect.Lists;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Set;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -111,7 +112,7 @@ public class TierConfigUtilsTest {
     Assert.assertEquals(tier.getName(), "tier1");
     Assert.assertTrue(tier.getSegmentSelector() instanceof FixedTierSegmentSelector);
     Assert.assertEquals(tier.getSegmentSelector().getType(), TierFactory.FIXED_SEGMENT_SELECTOR_TYPE);
-    Assert.assertEquals(((FixedTierSegmentSelector) tier.getSegmentSelector()).getSegmentList(),
+    Assert.assertEquals(((FixedTierSegmentSelector) tier.getSegmentSelector()).getSegmentsToSelect(),
         Lists.newArrayList("segment1", "segment2", "segment3"));
 
     tierConfig = new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null,
@@ -121,7 +122,7 @@ public class TierConfigUtilsTest {
     Assert.assertEquals(tier.getName(), "tier1");
     Assert.assertTrue(tier.getSegmentSelector() instanceof FixedTierSegmentSelector);
     Assert.assertEquals(tier.getSegmentSelector().getType(), TierFactory.FIXED_SEGMENT_SELECTOR_TYPE);
-    Assert.assertNull(((FixedTierSegmentSelector) tier.getSegmentSelector()).getSegmentList());
+    Assert.assertNull(((FixedTierSegmentSelector) tier.getSegmentSelector()).getSegmentsToSelect());
 
     tierConfig =
         new TierConfig("tier1", "unknown", "30d", null, TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE",
@@ -167,9 +168,9 @@ public class TierConfigUtilsTest {
         new Tier("tier5", new TimeBasedTierSegmentSelector(null, "1d"),
             new PinotServerTierStorage("tag_OFFLINE", null, null));
 
-    Tier tier6 = new Tier("tier6", new FixedTierSegmentSelector(null, Lists.newArrayList("seg0")),
+    Tier tier6 = new Tier("tier6", new FixedTierSegmentSelector(null, Set.of("seg0")),
         new PinotServerTierStorage("tag_OFFLINE", null, null));
-    Tier tier7 = new Tier("tier6", new FixedTierSegmentSelector(null, Lists.newArrayList("seg1")),
+    Tier tier7 = new Tier("tier6", new FixedTierSegmentSelector(null, Set.of("seg1")),
         new PinotServerTierStorage("tag_OFFLINE", null, null));
 
     Assert.assertEquals(tierComparator.compare(tier1, tier2), 1);

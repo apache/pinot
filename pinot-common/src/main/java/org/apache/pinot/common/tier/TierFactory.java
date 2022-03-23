@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.common.tier;
 
+import com.google.common.collect.Sets;
+import java.util.Collections;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.spi.config.table.TierConfig;
 
@@ -45,7 +48,9 @@ public final class TierFactory {
     if (segmentSelectorType.equalsIgnoreCase(TierFactory.TIME_SEGMENT_SELECTOR_TYPE)) {
       segmentSelector = new TimeBasedTierSegmentSelector(helixManager, tierConfig.getSegmentAge());
     } else if (segmentSelectorType.equalsIgnoreCase(TierFactory.FIXED_SEGMENT_SELECTOR_TYPE)) {
-      segmentSelector = new FixedTierSegmentSelector(helixManager, tierConfig.getSegmentList());
+      segmentSelector = new FixedTierSegmentSelector(helixManager,
+          CollectionUtils.isEmpty(tierConfig.getSegmentList()) ? Collections.emptySet()
+              : Sets.newHashSet(tierConfig.getSegmentList()));
     } else {
       throw new IllegalStateException("Unsupported segmentSelectorType: " + segmentSelectorType);
     }
