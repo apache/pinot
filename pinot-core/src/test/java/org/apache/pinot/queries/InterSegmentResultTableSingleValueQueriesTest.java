@@ -36,12 +36,16 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -884,6 +888,20 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows.add(new Object[]{"438926263", 999309554L});
     QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows,
         expectedResultsSize, dataSchema);
+  }
+
+  @Test
+  public void testNumGroupsLimit() {
+    String query = "SELECT COUNT(*) FROM testTable GROUP BY column1";
+
+    BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+    assertFalse(brokerResponse.isNumGroupsLimitReached());
+
+    brokerResponse = getBrokerResponseForSqlQuery(query,
+        new InstancePlanMakerImplV2(1000, 1000, InstancePlanMakerImplV2.DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE,
+            InstancePlanMakerImplV2.DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE,
+            InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD));
+    assertTrue(brokerResponse.isNumGroupsLimitReached());
   }
 
   /**

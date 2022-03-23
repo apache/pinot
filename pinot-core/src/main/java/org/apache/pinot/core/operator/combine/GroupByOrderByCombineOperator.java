@@ -71,6 +71,7 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
   private final CountDownLatch _operatorLatch;
 
   private volatile IndexedTable _indexedTable;
+  private volatile boolean _numGroupsLimitReached;
 
   public GroupByOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService) {
@@ -160,6 +161,11 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
           _mergedProcessingExceptions.addAll(processingExceptionsToMerge);
         }
 
+        // Set groups limit reached flag.
+        if (resultsBlock.isNumGroupsLimitReached()) {
+          _numGroupsLimitReached = true;
+        }
+
         // Merge aggregation group-by result.
         // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
         Collection<IntermediateRecord> intermediateRecords = resultsBlock.getIntermediateRecords();
@@ -235,15 +241,15 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
     IndexedTable indexedTable = _indexedTable;
     indexedTable.finish(false);
     IntermediateResultsBlock mergedBlock = new IntermediateResultsBlock(indexedTable);
+    mergedBlock.setNumGroupsLimitReached(_numGroupsLimitReached);
+    mergedBlock.setNumResizes(indexedTable.getNumResizes());
+    mergedBlock.setResizeTimeMs(indexedTable.getResizeTimeMs());
 
     // Set the processing exceptions.
     if (!_mergedProcessingExceptions.isEmpty()) {
       mergedBlock.setProcessingExceptions(new ArrayList<>(_mergedProcessingExceptions));
     }
 
-    mergedBlock.setNumResizes(indexedTable.getNumResizes());
-    mergedBlock.setResizeTimeMs(indexedTable.getResizeTimeMs());
-    // TODO - set numGroupsLimitReached
     return mergedBlock;
   }
 
