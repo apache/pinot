@@ -30,20 +30,20 @@ public class PreAggregationConfig extends BaseJsonConfig {
   private final String _columnName;
 
   @JsonPropertyDescription("Aggregation function")
-  private final String _transformFunction;
+  private final String _aggregationFunction;
 
   @JsonCreator
   public PreAggregationConfig(@JsonProperty("columnName") String columnName,
-      @JsonProperty("transformFunction") String transformFunction) {
+      @JsonProperty("aggregationFunction") String aggregationFunction) {
     _columnName = columnName;
-    _transformFunction = transformFunction;
+    _aggregationFunction = aggregationFunction;
   }
 
   public String getColumnName() {
     return _columnName;
   }
 
-  public String getTransformFunction() {
-    return _transformFunction;
+  public String getAggregationFunction() {
+    return _aggregationFunction;
   }
 }
