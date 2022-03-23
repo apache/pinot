@@ -124,11 +124,16 @@ public class InbuiltFunctionEvaluatorTest {
 
   @Test
   public void testNullReturnedByInbuiltFunctionEvaluatorWhenFunctionCannotTakeNull() {
-    String expression = "fromDateTime(reverse('2020-01-01T00:00:00Z'), \"invalid_identifier\")";
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
-    assertEquals(evaluator.getArguments().size(), 1);
-    GenericRow row = new GenericRow();
-    assertNull(evaluator.evaluate(row));
+    String[] expressions = {
+        "fromDateTime(\"NULL\", 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z''')",
+        "fromDateTime(\"invalid_identifier\", 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z''')"
+    };
+    for (String expression : expressions) {
+      InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
+      assertEquals(evaluator.getArguments().size(), 1);
+      GenericRow row = new GenericRow();
+      assertNull(evaluator.evaluate(row));
+    }
   }
 
   @Test

@@ -306,7 +306,7 @@ public class DateTimeFunctions {
    *           "-P6H3M"    -- parses as "-6 hours and -3 minutes"
    *           "-P-6H+3M"  -- parses as "+6 hours and -3 minutes"
    */
-  @ScalarFunction(nullableParameters = true)
+  @ScalarFunction
   public static long ago(String periodString) {
     Duration period = Duration.parse(periodString);
     return System.currentTimeMillis() - period.toMillis();
@@ -320,7 +320,7 @@ public class DateTimeFunctions {
   /**
    * Returns the hour of the time zone offset.
    */
-  @ScalarFunction(nullableParameters = true)
+  @ScalarFunction
   public static int timezoneHour(String timezoneId) {
     return new DateTime(DateTimeZone.forID(timezoneId).getOffset(null), DateTimeZone.UTC).getHourOfDay();
   }
@@ -328,7 +328,7 @@ public class DateTimeFunctions {
   /**
    * Returns the minute of the time zone offset.
    */
-  @ScalarFunction(nullableParameters = true)
+  @ScalarFunction
   public static int timezoneMinute(String timezoneId) {
     return new DateTime(DateTimeZone.forID(timezoneId).getOffset(null), DateTimeZone.UTC).getMinuteOfHour();
   }

@@ -333,14 +333,6 @@ public class DateTimeFunctionsTest {
     inputs.add(new Object[]{"second(millis, tz)", expectedArguments, row131, 13});
     inputs.add(new Object[]{"millisecond(millis, tz)", expectedArguments, row131, 123});
 
-    GenericRow row140 = new GenericRow();
-    row140.putValue("duration", null);
-    inputs.add(new Object[]{"ago(duration)", Lists.newArrayList("duration"), row140, null});
-
-    GenericRow row141 = new GenericRow();
-    row141.putValue("timezoneId", null);
-    inputs.add(new Object[]{"timezoneHour(timezoneId)", Lists.newArrayList("timezoneId"), row141, null});
-
     return inputs.toArray(new Object[0][]);
   }
 
