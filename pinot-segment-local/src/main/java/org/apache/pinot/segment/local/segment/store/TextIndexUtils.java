@@ -43,6 +43,10 @@ public class TextIndexUtils {
   }
 
   public static boolean isFstTypeNative(Map<String, String> textIndexProperties) {
+    if (textIndexProperties == null) {
+      return false;
+    }
+
     for (Map.Entry<String, String> entry : textIndexProperties.entrySet()) {
       if (entry.getKey().equalsIgnoreCase(FieldConfig.TEXT_FST_TYPE)) {
         return entry.getValue().equalsIgnoreCase(FieldConfig.TEXT_NATIVE_FST_LITERAL);
