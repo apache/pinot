@@ -41,7 +41,7 @@ public class FunctionInfo {
     return _clazz;
   }
 
-  public boolean getNullableParameters() {
+  public boolean hasNullableParameters() {
     return _nullableParameters;
   }
 }
