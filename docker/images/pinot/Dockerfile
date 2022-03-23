@@ -32,8 +32,18 @@ ENV PINOT_BUILD_DIR=/opt/pinot-build
 
 # extra dependency for running launcher
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends vim wget curl git automake bison flex g++ libboost-all-dev libevent-dev libssl-dev libtool make pkg-config && \
+    apt-get install -y --no-install-recommends vim wget curl git automake bison flex g++ libboost-all-dev libevent-dev \
+    libssl-dev libtool make pkg-config sysstat linux-perf openjdk-11-dbg && \
     rm -rf /var/lib/apt/lists/*
+
+RUN case `uname -m` in \
+    x86_64) arch=x64; ;; \
+    aarch64) arch=arm64; ;; \
+    *) echo "platform=$(uname -m) un-supported, exit ..."; exit 1; ;; \
+  esac \
+  && mkdir -p /usr/local/lib/async-profiler \
+  && curl -L https://github.com/jvm-profiling-tools/async-profiler/releases/download/v2.5.1/async-profiler-2.5.1-linux-${arch}.tar.gz | tar -xz --strip-components 1 -C /usr/local/lib/async-profiler \
+  && ln -s /usr/local/lib/async-profiler/profiler.sh /usr/local/bin/async-profiler
 
 # install maven
 RUN mkdir -p /usr/share/maven /usr/share/maven/ref \
