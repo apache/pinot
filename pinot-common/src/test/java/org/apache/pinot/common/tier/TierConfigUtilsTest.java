@@ -113,7 +113,7 @@ public class TierConfigUtilsTest {
     Assert.assertTrue(tier.getSegmentSelector() instanceof FixedTierSegmentSelector);
     Assert.assertEquals(tier.getSegmentSelector().getType(), TierFactory.FIXED_SEGMENT_SELECTOR_TYPE);
     Assert.assertEquals(((FixedTierSegmentSelector) tier.getSegmentSelector()).getSegmentsToSelect(),
-        Lists.newArrayList("segment1", "segment2", "segment3"));
+        Set.of("segment1", "segment2", "segment3"));
 
     tierConfig = new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null,
         null, TierFactory.PINOT_SERVER_STORAGE_TYPE,
@@ -122,7 +122,7 @@ public class TierConfigUtilsTest {
     Assert.assertEquals(tier.getName(), "tier1");
     Assert.assertTrue(tier.getSegmentSelector() instanceof FixedTierSegmentSelector);
     Assert.assertEquals(tier.getSegmentSelector().getType(), TierFactory.FIXED_SEGMENT_SELECTOR_TYPE);
-    Assert.assertNull(((FixedTierSegmentSelector) tier.getSegmentSelector()).getSegmentsToSelect());
+    Assert.assertTrue(((FixedTierSegmentSelector) tier.getSegmentSelector()).getSegmentsToSelect().isEmpty());
 
     tierConfig =
         new TierConfig("tier1", "unknown", "30d", null, TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE",
