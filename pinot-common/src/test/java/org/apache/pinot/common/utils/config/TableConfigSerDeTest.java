@@ -298,10 +298,12 @@ public class TableConfigSerDeTest {
     {
       // With tier config
       List<TierConfig> tierConfigList = Lists.newArrayList(
-          new TierConfig("tierA", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", TierFactory.PINOT_SERVER_STORAGE_TYPE,
-              "tierA_tag_OFFLINE", null, null),
-          new TierConfig("tierB", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", TierFactory.PINOT_SERVER_STORAGE_TYPE,
-              "tierB_tag_OFFLINE", null, null));
+          new TierConfig("tierA", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
+              TierFactory.PINOT_SERVER_STORAGE_TYPE, "tierA_tag_OFFLINE", null, null),
+          new TierConfig("tierB", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null,
+              TierFactory.PINOT_SERVER_STORAGE_TYPE, "tierB_tag_OFFLINE", null, null),
+          new TierConfig("tier0", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, Lists.newArrayList("seg0"),
+              TierFactory.PINOT_SERVER_STORAGE_TYPE, "tierB_tag_OFFLINE", null, null));
       TableConfig tableConfig = tableConfigBuilder.setTierConfigList(tierConfigList).build();
 
       checkTierConfigList(tableConfig);
@@ -459,7 +461,7 @@ public class TableConfigSerDeTest {
   private void checkTierConfigList(TableConfig tableConfig) {
     List<TierConfig> tierConfigsList = tableConfig.getTierConfigsList();
     assertNotNull(tierConfigsList);
-    assertEquals(tierConfigsList.size(), 2);
+    assertEquals(tierConfigsList.size(), 3);
     assertEquals(tierConfigsList.get(0).getName(), "tierA");
     assertEquals(tierConfigsList.get(0).getSegmentSelectorType(), TierFactory.TIME_SEGMENT_SELECTOR_TYPE);
     assertEquals(tierConfigsList.get(0).getSegmentAge(), "10d");
@@ -470,6 +472,12 @@ public class TableConfigSerDeTest {
     assertEquals(tierConfigsList.get(1).getSegmentAge(), "30d");
     assertEquals(tierConfigsList.get(1).getStorageType(), TierFactory.PINOT_SERVER_STORAGE_TYPE);
     assertEquals(tierConfigsList.get(1).getServerTag(), "tierB_tag_OFFLINE");
+    assertEquals(tierConfigsList.get(2).getName(), "tier0");
+    assertEquals(tierConfigsList.get(2).getSegmentSelectorType(), TierFactory.FIXED_SEGMENT_SELECTOR_TYPE);
+    assertNull(tierConfigsList.get(2).getSegmentAge());
+    assertEquals(tierConfigsList.get(2).getSegmentList(), Lists.newArrayList("seg0"));
+    assertEquals(tierConfigsList.get(2).getStorageType(), TierFactory.PINOT_SERVER_STORAGE_TYPE);
+    assertEquals(tierConfigsList.get(2).getServerTag(), "tierB_tag_OFFLINE");
   }
 
   private void checkInstanceAssignmentConfig(TableConfig tableConfig) {

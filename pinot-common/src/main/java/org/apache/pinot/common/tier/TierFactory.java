@@ -28,6 +28,7 @@ import org.apache.pinot.spi.config.table.TierConfig;
 public final class TierFactory {
 
   public static final String TIME_SEGMENT_SELECTOR_TYPE = "time";
+  public static final String FIXED_SEGMENT_SELECTOR_TYPE = "fixed";
   public static final String PINOT_SERVER_STORAGE_TYPE = "pinot_server";
 
   private TierFactory() {
@@ -43,6 +44,8 @@ public final class TierFactory {
     String segmentSelectorType = tierConfig.getSegmentSelectorType();
     if (segmentSelectorType.equalsIgnoreCase(TierFactory.TIME_SEGMENT_SELECTOR_TYPE)) {
       segmentSelector = new TimeBasedTierSegmentSelector(helixManager, tierConfig.getSegmentAge());
+    } else if (segmentSelectorType.equalsIgnoreCase(TierFactory.FIXED_SEGMENT_SELECTOR_TYPE)) {
+      segmentSelector = new FixedTierSegmentSelector(helixManager, tierConfig.getSegmentList());
     } else {
       throw new IllegalStateException("Unsupported segmentSelectorType: " + segmentSelectorType);
     }

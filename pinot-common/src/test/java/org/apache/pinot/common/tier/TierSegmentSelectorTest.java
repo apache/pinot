@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.tier;
 
+import com.google.common.collect.Lists;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
@@ -109,6 +110,61 @@ public class TierSegmentSelectorTest {
 
     // not selected by 5d
     segmentSelector = new TimeBasedTierSegmentSelector(helixManager, "120h");
+    Assert.assertFalse(segmentSelector.selectSegment(tableNameWithType, segmentName));
+  }
+
+  @Test
+  public void testFixedSegmentSelector() {
+
+    // offline segment
+    String segmentName = "segment_0";
+    String tableNameWithType = "myTable_OFFLINE";
+
+    FixedTierSegmentSelector segmentSelector = new FixedTierSegmentSelector(null, null);
+    Assert.assertFalse(segmentSelector.selectSegment(tableNameWithType, segmentName));
+
+    segmentSelector = new FixedTierSegmentSelector(null, Lists.newArrayList());
+    Assert.assertFalse(segmentSelector.selectSegment(tableNameWithType, segmentName));
+
+    segmentSelector = new FixedTierSegmentSelector(null, Lists.newArrayList("segment_1", "segment_2"));
+    Assert.assertFalse(segmentSelector.selectSegment(tableNameWithType, segmentName));
+
+    segmentSelector = new FixedTierSegmentSelector(null, Lists.newArrayList("SEGMENT_0", "segment_1", "segment_2"));
+    Assert.assertFalse(segmentSelector.selectSegment(tableNameWithType, segmentName));
+
+    segmentSelector = new FixedTierSegmentSelector(null, Lists.newArrayList("segment_0", "segment_1", "segment_2"));
+    Assert.assertTrue(segmentSelector.selectSegment(tableNameWithType, segmentName));
+
+    segmentSelector = new FixedTierSegmentSelector(null, Lists.newArrayList("segment %", "segment_2"));
+    Assert.assertFalse(segmentSelector.selectSegment(tableNameWithType, segmentName));
+    Assert.assertTrue(segmentSelector.selectSegment(tableNameWithType, "segment %"));
+
+    // realtime segment
+    segmentName = "myTable__4__1__" + 123456789;
+    tableNameWithType = "myTable_REALTIME";
+    SegmentZKMetadata realtimeSegmentZKMetadata = new SegmentZKMetadata(segmentName);
+    realtimeSegmentZKMetadata.setStartTime(System.currentTimeMillis() - 10000);
+    realtimeSegmentZKMetadata.setEndTime(System.currentTimeMillis() - 5000);
+    realtimeSegmentZKMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
+    realtimeSegmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    realtimeSegmentZKMetadata.setNumReplicas(1);
+    ZNRecord segmentZKMetadataZNRecord = realtimeSegmentZKMetadata.toZNRecord();
+
+    HelixManager helixManager = mock(HelixManager.class);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(propertyStore
+        .get(eq(ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName)), any(),
+            anyInt())).thenReturn(segmentZKMetadataZNRecord);
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
+    segmentSelector = new FixedTierSegmentSelector(helixManager, Lists.newArrayList(segmentName, "foo", "bar"));
+    Assert.assertTrue(segmentSelector.selectSegment(tableNameWithType, segmentName));
+
+    realtimeSegmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+    segmentZKMetadataZNRecord = realtimeSegmentZKMetadata.toZNRecord();
+    when(propertyStore
+        .get(eq(ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName)), any(),
+            anyInt())).thenReturn(segmentZKMetadataZNRecord);
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
     Assert.assertFalse(segmentSelector.selectSegment(tableNameWithType, segmentName));
   }
 }
