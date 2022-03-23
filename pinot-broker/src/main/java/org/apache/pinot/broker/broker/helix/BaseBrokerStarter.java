@@ -43,7 +43,7 @@ import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManage
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.GrpcBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
-import org.apache.pinot.broker.routing.RoutingManager;
+import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
@@ -100,7 +100,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected HelixDataAccessor _helixDataAccessor;
   protected PinotMetricsRegistry _metricsRegistry;
   protected BrokerMetrics _brokerMetrics;
-  protected RoutingManager _routingManager;
+  protected BrokerRoutingManager _routingManager;
   protected AccessControlFactory _accessControlFactory;
   protected BrokerRequestHandler _brokerRequestHandler;
   protected BrokerAdminApiApplication _brokerAdminApplication;
@@ -224,7 +224,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         _brokerConf.getProperty(Broker.CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS, Collections.emptyList()));
     _brokerMetrics.initializeGlobalMeters();
     // Set up request handling classes
-    _routingManager = new RoutingManager(_brokerMetrics);
+    _routingManager = new BrokerRoutingManager(_brokerMetrics);
     _routingManager.init(_spectatorHelixManager);
     _accessControlFactory = AccessControlFactory.loadFactory(_brokerConf.subset(Broker.ACCESS_CONTROL_CONFIG_PREFIX));
     HelixExternalViewBasedQueryQuotaManager queryQuotaManager =
@@ -448,7 +448,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     return _brokerMetrics;
   }
 
-  public RoutingManager getRoutingManager() {
+  public BrokerRoutingManager getRoutingManager() {
     return _routingManager;
   }
 

@@ -44,8 +44,7 @@ import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
-import org.apache.pinot.broker.routing.RoutingManager;
-import org.apache.pinot.broker.routing.RoutingTable;
+import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.exception.QueryException;
@@ -77,6 +76,7 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
+import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.core.util.QueryOptionsUtils;
@@ -109,7 +109,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final Expression STAR = RequestUtils.getIdentifierExpression("*");
 
   protected final PinotConfiguration _config;
-  protected final RoutingManager _routingManager;
+  protected final BrokerRoutingManager _routingManager;
   protected final AccessControlFactory _accessControlFactory;
   protected final QueryQuotaManager _queryQuotaManager;
   protected final TableCache _tableCache;
@@ -133,7 +133,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private final boolean _enableQueryLimitOverride;
   private final boolean _enableDistinctCountBitmapOverride;
 
-  public BaseBrokerRequestHandler(PinotConfiguration config, RoutingManager routingManager,
+  public BaseBrokerRequestHandler(PinotConfiguration config, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       BrokerMetrics brokerMetrics) {
     _config = config;

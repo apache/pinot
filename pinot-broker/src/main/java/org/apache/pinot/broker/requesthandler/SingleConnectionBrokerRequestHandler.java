@@ -28,7 +28,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
-import org.apache.pinot.broker.routing.RoutingManager;
+import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
@@ -60,7 +60,7 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
   private final BrokerReduceService _brokerReduceService;
   private final QueryRouter _queryRouter;
 
-  public SingleConnectionBrokerRequestHandler(PinotConfiguration config, RoutingManager routingManager,
+  public SingleConnectionBrokerRequestHandler(PinotConfiguration config, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       BrokerMetrics brokerMetrics, NettyConfig nettyConfig, TlsConfig tlsConfig) {
     super(config, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);

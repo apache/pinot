@@ -24,7 +24,7 @@ import org.apache.helix.messaging.handling.MessageHandler;
 import org.apache.helix.messaging.handling.MessageHandlerFactory;
 import org.apache.helix.model.Message;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
-import org.apache.pinot.broker.routing.RoutingManager;
+import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
@@ -42,10 +42,10 @@ import org.slf4j.LoggerFactory;
 public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerUserDefinedMessageHandlerFactory.class);
 
-  private final RoutingManager _routingManager;
+  private final BrokerRoutingManager _routingManager;
   private final HelixExternalViewBasedQueryQuotaManager _queryQuotaManager;
 
-  public BrokerUserDefinedMessageHandlerFactory(RoutingManager routingManager,
+  public BrokerUserDefinedMessageHandlerFactory(BrokerRoutingManager routingManager,
       HelixExternalViewBasedQueryQuotaManager queryQuotaManager) {
     _routingManager = routingManager;
     _queryQuotaManager = queryQuotaManager;

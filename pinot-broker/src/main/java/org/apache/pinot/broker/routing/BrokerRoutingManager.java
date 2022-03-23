@@ -54,6 +54,8 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.core.routing.RoutingManager;
+import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -82,8 +84,8 @@ import org.slf4j.LoggerFactory;
  * TODO: Expose RoutingEntry class to get a consistent view in the broker request handler and save the redundant map
  *       lookups.
  */
-public class RoutingManager implements ClusterChangeHandler {
-  private static final Logger LOGGER = LoggerFactory.getLogger(RoutingManager.class);
+public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandler {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRoutingManager.class);
 
   private final BrokerMetrics _brokerMetrics;
   private final Map<String, RoutingEntry> _routingEntryMap = new ConcurrentHashMap<>();
@@ -95,7 +97,7 @@ public class RoutingManager implements ClusterChangeHandler {
   private String _instanceConfigsPath;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
-  public RoutingManager(BrokerMetrics brokerMetrics) {
+  public BrokerRoutingManager(BrokerMetrics brokerMetrics) {
     _brokerMetrics = brokerMetrics;
   }
 
@@ -448,6 +450,7 @@ public class RoutingManager implements ClusterChangeHandler {
   /**
    * Returns {@code true} if the routing exists for the given table.
    */
+  @Override
   public boolean routingExists(String tableNameWithType) {
     return _routingEntryMap.containsKey(tableNameWithType);
   }
@@ -458,6 +461,7 @@ public class RoutingManager implements ClusterChangeHandler {
    * <p>NOTE: The broker request should already have the table suffix (_OFFLINE or _REALTIME) appended.
    */
   @Nullable
+  @Override
   public RoutingTable getRoutingTable(BrokerRequest brokerRequest) {
     String tableNameWithType = brokerRequest.getQuerySource().getTableName();
     RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
@@ -477,6 +481,11 @@ public class RoutingManager implements ClusterChangeHandler {
       }
     }
     return new RoutingTable(serverInstanceToSegmentsMap, selectionResult.getUnavailableSegments());
+  }
+
+  @Override
+  public Map<String, ServerInstance> getEnabledServerInstanceMap() {
+    return _enabledServerInstanceMap;
   }
 
   private String getIdealStatePath(String tableNameWithType) {
