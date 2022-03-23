@@ -56,6 +56,8 @@
     <module>pinot-connectors</module>
     <module>pinot-segment-local</module>
     <module>pinot-compatibility-verifier</module>
+
+    <module>pinot-query-planner</module>
   </modules>
 
   <licenses>
@@ -1045,10 +1047,6 @@
           <exclusion>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-dbcp2</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.esri.geometry</groupId>
-            <artifactId>esri-geometry-api</artifactId>
           </exclusion>
           <exclusion>
             <groupId>com.fasterxml.jackson.dataformat</groupId>
