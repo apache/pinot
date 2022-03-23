@@ -1889,6 +1889,27 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(encoded, "key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253");
     Assert.assertEquals(decoded, "key1=value 1&key2=value@!$2&key3=value%3");
 
+    query = "select concat('https://www.google.com/search?q=',"
+        + "encodeUrl('key1=val1 key2=45% key3=#47 key4={''key'':[3,5]} + key5=1;2;3;4 key6=(a|b)&c key7= "
+        + "key8=5*(6/4) key9=https://pinot@pinot.com key10=CFLAGS=\"-O2 -mcpu=pentiumpro\" key12=$JAVA_HOME'),'') "
+        + "from mytable";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    encoded = pinotQuery.getSelectList().get(0).getLiteral().getStringValue();
+    Assert.assertEquals(encoded, "https://www.google.com/search?q=key1%3Dval1+key2%3D45%25+key3%3D%2347+"
+        + "key4%3D%7B%27key%27%3A%5B3%2C5%5D%7D+%2B+key5%3D1%3B2%3B3%3B4+"
+        + "key6%3D%28a%7Cb%29%26c+key7%3D+key8%3D5*%286%2F4%29+"
+        + "key9%3Dhttps%3A%2F%2Fpinot%40pinot.com+key10%3DCFLAGS%3D%22-O2+-mcpu%3Dpentiumpro%22+key12%3D%24JAVA_HOME");
+
+    query = "select decodeUrl('https://www.google.com/search?q=key1%3Dval1+key2%3D45%25+key3%3D%2347+"
+        + "key4%3D%7B%27key%27%3A%5B3%2C5%5D%7D+%2B+key5%3D1%3B2%3B3%3B4+key6%3D%28a%7Cb%29%26c+"
+        + "key7%3D+key8%3D5*%286%2F4%29+key9%3Dhttps%3A%2F%2Fpinot%40pinot.com+"
+        + "key10%3DCFLAGS%3D%22-O2+-mcpu%3Dpentiumpro%22+key12%3D%24JAVA_HOME') from mytable";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    decoded = pinotQuery.getSelectList().get(0).getLiteral().getStringValue();
+    Assert.assertEquals(decoded, "https://www.google.com/search?q=key1=val1 key2=45% key3=#47 "
+        + "key4={'key':[3,5]} + key5=1;2;3;4 key6=(a|b)&c key7= "
+        + "key8=5*(6/4) key9=https://pinot@pinot.com key10=CFLAGS=\"-O2 -mcpu=pentiumpro\" key12=$JAVA_HOME");
+
     query = "select a from mytable where foo=encodeUrl('key1=value 1&key2=value@!$2&key3=value%3') and"
         + " bar=decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253')";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
