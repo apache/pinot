@@ -54,6 +54,7 @@ public class TableResizer {
   private final int _numOrderByExpressions;
   private final OrderByValueExtractor[] _orderByValueExtractors;
   private final Comparator<IntermediateRecord> _intermediateRecordComparator;
+  private boolean _groupLimitReached = false;
 
   public TableResizer(DataSchema dataSchema, QueryContext queryContext) {
     _dataSchema = dataSchema;
@@ -138,6 +139,9 @@ public class TableResizer {
     if (numRecordsToEvict <= 0) {
       return;
     }
+
+    _groupLimitReached = true;
+
     if (numRecordsToEvict <= size) {
       // Fewer records to evict than retain, make a heap of records to evict
       IntermediateRecord[] recordsToEvict =
@@ -318,6 +322,10 @@ public class TableResizer {
           _aggregationFunctions[i].extractGroupByResult(groupByResultHolders[i], groupId);
     }
     return getIntermediateRecord(new Key(keys), new Record(values));
+  }
+
+  public boolean isNumGroupsLimitReached() {
+    return _groupLimitReached;
   }
 
   /**

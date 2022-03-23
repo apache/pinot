@@ -77,6 +77,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
       addOrUpdateRecord(key, record);
       if (_lookupMap.size() >= _resultSize) {
         _noMoreNewRecords.set(true);
+        _groupLimitReached.set(true);
       }
     }
   }

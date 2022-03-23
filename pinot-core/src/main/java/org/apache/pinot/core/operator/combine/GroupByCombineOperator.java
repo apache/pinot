@@ -28,6 +28,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
@@ -71,6 +72,7 @@ public class GroupByCombineOperator extends BaseCombineOperator {
   // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
   // _futures (try to interrupt the execution if it already started).
   private final CountDownLatch _operatorLatch;
+  private final AtomicBoolean _groupLimitReached = new AtomicBoolean();
 
   public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
     super(operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
@@ -140,6 +142,8 @@ public class GroupByCombineOperator extends BaseCombineOperator {
                   for (int i = 0; i < _numAggregationFunctions; i++) {
                     value[i] = aggregationGroupByResult.getResultForKey(groupKey, i);
                   }
+                } else {
+                  _groupLimitReached.set(true);
                 }
               } else {
                 for (int i = 0; i < _numAggregationFunctions; i++) {
@@ -215,7 +219,9 @@ public class GroupByCombineOperator extends BaseCombineOperator {
     }
     // TODO: this value should be set in the inner-segment operators. Setting it here might cause false positive as we
     //       are comparing number of groups across segments with the groups limit for each segment.
-    if (_resultsMap.size() >= _innerSegmentNumGroupsLimit) {
+    if (_resultsMap.size() >= _innerSegmentNumGroupsLimit
+            || _groupLimitReached.get()
+            || aggregationGroupByTrimmingService.isTrimApplied()) {
       mergedBlock.setNumGroupsLimitReached(true);
     }
 

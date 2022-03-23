@@ -49,6 +49,7 @@ public class SimpleIndexedTable extends IndexedTable {
       if (_lookupMap.size() < _resultSize) {
         addOrUpdateRecord(key, record);
       } else {
+        _groupLimitReached.set(true);
         updateExistingRecord(key, record);
       }
     }
