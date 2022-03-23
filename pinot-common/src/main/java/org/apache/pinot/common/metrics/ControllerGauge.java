@@ -69,6 +69,10 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // Estimated size of offline table
   OFFLINE_TABLE_ESTIMATED_SIZE("OfflineTableEstimatedSize", false),
 
+  // Size of the last uploaded offline segment
+  LAST_PUSHED_SEGMENT_SIZE("LastPushedSegmentSize", false),
+
+
   // Table quota based on setting in table config
   TABLE_QUOTA("TableQuotaBasedOnTableConfig", false),
 
