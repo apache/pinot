@@ -28,10 +28,9 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 
 public class PowerTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "power";
-  private double[] _result;
   private TransformFunction _leftTransformFunction;
   private TransformFunction _rightTransformFunction;
-  private Double _exponent;
+  private double _exponent;
 
   @Override
   public String getName() {
@@ -50,7 +49,7 @@ public class PowerTransformFunction extends BaseTransformFunction {
     if (_rightTransformFunction instanceof LiteralTransformFunction) {
       _exponent = Double.parseDouble(((LiteralTransformFunction) _rightTransformFunction).getLiteral());
     } else {
-      _exponent = null;
+      _exponent = Double.NaN;
     }
     Preconditions.checkArgument(
         _leftTransformFunction.getResultMetadata().isSingleValue() || _rightTransformFunction.getResultMetadata()
@@ -66,21 +65,21 @@ public class PowerTransformFunction extends BaseTransformFunction {
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
 
-    if (_result == null || _result.length < length) {
-      _result = new double[length];
+    if (_doubleValuesSV == null || _doubleValuesSV.length < length) {
+      _doubleValuesSV = new double[length];
     }
 
     double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(projectionBlock);
-    if (_exponent != null) {
+    if (!Double.isNaN(_exponent)) {
       for (int i = 0; i < length; i++) {
-        _result[i] = Math.pow(leftValues[i], _exponent);
+        _doubleValuesSV[i] = Math.pow(leftValues[i], _exponent);
       }
     } else {
       double[] rightValues = _rightTransformFunction.transformToDoubleValuesSV(projectionBlock);
       for (int i = 0; i < length; i++) {
-        _result[i] = Math.pow(leftValues[i], rightValues[i]);
+        _doubleValuesSV[i] = Math.pow(leftValues[i], rightValues[i]);
       }
     }
-    return _result;
+    return _doubleValuesSV;
   }
 }
