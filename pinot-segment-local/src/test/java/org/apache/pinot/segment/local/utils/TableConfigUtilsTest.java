@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.utils;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -52,8 +51,6 @@ import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import static org.testng.Assert.assertThrows;
 
 
 /**
@@ -222,7 +219,8 @@ public class TableConfigUtilsTest {
     TableConfigUtils.validate(tableConfig, schema);
   }
 
-  @Test(expectedExceptions = { IllegalStateException.class }, expectedExceptionsMessageRegExp = ".* Unable to parse expression .*")
+  @Test(expectedExceptions = { IllegalStateException.class },
+      expectedExceptionsMessageRegExp = ".* Unable to parse expression .*")
   public void invalidSQLExpressionInTransformConfig() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING).build();
@@ -235,7 +233,8 @@ public class TableConfigUtilsTest {
     TableConfigUtils.validate(tableConfig, schema);
   }
 
-  @Test(expectedExceptions = { IllegalStateException.class }, expectedExceptionsMessageRegExp = ".* Unable to compile expression .*")
+  @Test(expectedExceptions = { IllegalStateException.class },
+      expectedExceptionsMessageRegExp = ".* Unable to compile expression .*")
   public void invalidGroovyExpressionInTransformConfig() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING).build();
