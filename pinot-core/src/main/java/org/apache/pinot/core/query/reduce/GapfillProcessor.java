@@ -474,16 +474,19 @@ public class GapfillProcessor {
       _groupByKeys.add(key);
       if (index < 0) {
         // the data can potentially be used for previous value
-        if (_previousByGroupKey.containsKey(key)) {
-          Object[] previousRow = _previousByGroupKey.get(key);
-          long previousTimeBucket =
-              _dateTimeFormatter.fromFormatToMillis(String.valueOf(previousRow[_timeBucketColumnIndex]));
-          if (timeBucket > previousTimeBucket) {
-            _previousByGroupKey.put(key, row);
+        _previousByGroupKey.compute(key, (k, previousRow) -> {
+          if (previousRow == null) {
+            return row;
+          } else {
+            long previousTimeBucket =
+                _dateTimeFormatter.fromFormatToMillis(String.valueOf(previousRow[_timeBucketColumnIndex]));
+            if (timeBucket > previousTimeBucket) {
+              return row;
+            } else {
+              return previousRow;
+            }
           }
-        } else {
-          _previousByGroupKey.put(key, row);
-        }
+        });
       } else {
         if (bucketedItems[index] == null) {
           bucketedItems[index] = new ArrayList<>();
