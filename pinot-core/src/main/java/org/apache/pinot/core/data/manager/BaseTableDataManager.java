@@ -163,6 +163,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.DOCUMENT_COUNT,
         immutableSegment.getSegmentMetadata().getTotalDocs());
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
+    // Ideally this would be part of the segment metadata, but this is the only point we have easy, guaranteed
+    // access to the segment on disk.
+    _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.LAST_ADDED_SEGMENT_UNCOMPRESSED_SIZE,
+        immutableSegment.getSegmentSizeBytes());
 
     ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(immutableSegment);
     SegmentDataManager oldSegmentManager = _segmentDataManagerMap.put(segmentName, newSegmentManager);
