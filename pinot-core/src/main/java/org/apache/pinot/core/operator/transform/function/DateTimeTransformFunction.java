@@ -19,11 +19,6 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.time.temporal.ChronoField;
-import java.time.temporal.IsoFields;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
@@ -31,6 +26,8 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 
 
 public abstract class DateTimeTransformFunction extends BaseTransformFunction {
@@ -39,7 +36,7 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
       new TransformResultMetadata(FieldSpec.DataType.INT, true, false);
   private final String _name;
   private TransformFunction _timestampsFunction;
-  protected ZoneId _zoneId;
+  protected DateTimeZone _zoneId;
 
   protected DateTimeTransformFunction(String name) {
     _name = name;
@@ -53,9 +50,9 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
       Preconditions.checkArgument(arguments.get(1) instanceof LiteralTransformFunction,
           "zoneId parameter %s must be a literal",
           _name);
-      _zoneId = ZoneId.of(((LiteralTransformFunction) arguments.get(1)).getLiteral());
+      _zoneId = DateTimeZone.forID(((LiteralTransformFunction) arguments.get(1)).getLiteral());
     } else {
-      _zoneId = ZoneOffset.UTC;
+      _zoneId = DateTimeZone.UTC;
     }
   }
 
@@ -91,7 +88,7 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
       for (int i = 0; i < numDocs; i++) {
-        output[i] = Instant.ofEpochMilli(timestamps[i]).atZone(_zoneId).getYear();
+        output[i] = new DateTime(timestamps[i], _zoneId).getYear();
       }
     }
   }
@@ -105,7 +102,7 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
       for (int i = 0; i < numDocs; i++) {
-        output[i] = Instant.ofEpochMilli(timestamps[i]).atZone(_zoneId).get(IsoFields.WEEK_BASED_YEAR);
+        output[i] = new DateTime(timestamps[i], _zoneId).getWeekyear();
       }
     }
   }
@@ -119,7 +116,7 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
       for (int i = 0; i < numDocs; i++) {
-        output[i] = Instant.ofEpochMilli(timestamps[i]).atZone(_zoneId).getMonthValue();
+        output[i] = new DateTime(timestamps[i], _zoneId).getMonthOfYear();
       }
     }
   }
@@ -133,7 +130,7 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
       for (int i = 0; i < numDocs; i++) {
-        output[i] = Instant.ofEpochMilli(timestamps[i]).atZone(_zoneId).get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
+        output[i] = new DateTime(timestamps[i], _zoneId).getWeekOfWeekyear();
       }
     }
   }
@@ -147,7 +144,7 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
       for (int i = 0; i < numDocs; i++) {
-        output[i] = Instant.ofEpochMilli(timestamps[i]).atZone(_zoneId).getDayOfYear();
+        output[i] = new DateTime(timestamps[i], _zoneId).getDayOfYear();
       }
     }
   }
@@ -161,7 +158,7 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
       for (int i = 0; i < numDocs; i++) {
-        output[i] = Instant.ofEpochMilli(timestamps[i]).atZone(_zoneId).getDayOfMonth();
+        output[i] = new DateTime(timestamps[i], _zoneId).getDayOfMonth();
       }
     }
   }
@@ -175,7 +172,7 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
       for (int i = 0; i < numDocs; i++) {
-        output[i] = Instant.ofEpochMilli(timestamps[i]).atZone(_zoneId).getDayOfWeek().getValue();
+        output[i] = new DateTime(timestamps[i], _zoneId).getDayOfWeek();
       }
     }
   }
@@ -189,7 +186,7 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
       for (int i = 0; i < numDocs; i++) {
-        output[i] = Instant.ofEpochMilli(timestamps[i]).atZone(_zoneId).getHour();
+        output[i] = new DateTime(timestamps[i], _zoneId).getHourOfDay();
       }
     }
   }
@@ -203,7 +200,7 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
       for (int i = 0; i < numDocs; i++) {
-        output[i] = Instant.ofEpochMilli(timestamps[i]).atZone(_zoneId).getMinute();
+        output[i] = new DateTime(timestamps[i], _zoneId).getMinuteOfHour();
       }
     }
   }
@@ -217,7 +214,7 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
       for (int i = 0; i < numDocs; i++) {
-        output[i] = Instant.ofEpochMilli(timestamps[i]).atZone(_zoneId).getSecond();
+        output[i] = new DateTime(timestamps[i], _zoneId).getSecondOfMinute();
       }
     }
   }
@@ -231,7 +228,7 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
       for (int i = 0; i < numDocs; i++) {
-        output[i] = Instant.ofEpochMilli(timestamps[i]).atZone(_zoneId).get(ChronoField.MILLI_OF_SECOND);
+        output[i] = new DateTime(timestamps[i], _zoneId).getMillisOfSecond();
       }
     }
   }
@@ -245,7 +242,7 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
       for (int i = 0; i < numDocs; i++) {
-        output[i] = (Instant.ofEpochMilli(timestamps[i]).atZone(_zoneId).getMonthValue() - 1) / 3 + 1;
+        output[i] = (new DateTime(timestamps[i], _zoneId).getMonthOfYear() - 1) / 3 + 1;
       }
     }
   }
