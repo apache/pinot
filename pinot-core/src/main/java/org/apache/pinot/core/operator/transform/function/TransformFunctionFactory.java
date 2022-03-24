@@ -98,6 +98,18 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.DATETIMECONVERT,
         DateTimeConversionTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.DATETRUNC, DateTruncTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.YEAR, DateTimeTransformFunction.Year.class);
+    typeToImplementation.put(TransformFunctionType.YEAR_OF_WEEK, DateTimeTransformFunction.YearOfWeek.class);
+    typeToImplementation.put(TransformFunctionType.QUARTER, DateTimeTransformFunction.Quarter.class);
+    typeToImplementation.put(TransformFunctionType.MONTH_OF_YEAR, DateTimeTransformFunction.Month.class);
+    typeToImplementation.put(TransformFunctionType.WEEK_OF_YEAR, DateTimeTransformFunction.WeekOfYear.class);
+    typeToImplementation.put(TransformFunctionType.DAY_OF_YEAR, DateTimeTransformFunction.DayOfYear.class);
+    typeToImplementation.put(TransformFunctionType.DAY_OF_MONTH, DateTimeTransformFunction.DayOfMonth.class);
+    typeToImplementation.put(TransformFunctionType.DAY_OF_WEEK, DateTimeTransformFunction.DayOfWeek.class);
+    typeToImplementation.put(TransformFunctionType.HOUR, DateTimeTransformFunction.Hour.class);
+    typeToImplementation.put(TransformFunctionType.MINUTE, DateTimeTransformFunction.Minute.class);
+    typeToImplementation.put(TransformFunctionType.SECOND, DateTimeTransformFunction.Second.class);
+    typeToImplementation.put(TransformFunctionType.MILLISECOND, DateTimeTransformFunction.Millisecond.class);
     typeToImplementation.put(TransformFunctionType.ARRAYLENGTH,
         ArrayLengthTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.VALUEIN, ValueInTransformFunction.class);
