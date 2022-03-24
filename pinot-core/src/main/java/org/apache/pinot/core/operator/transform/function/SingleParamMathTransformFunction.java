@@ -147,22 +147,6 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     }
   }
 
-  public static class SqrtTransformFunction extends SingleParamMathTransformFunction {
-    public static final String FUNCTION_NAME = "sqrt";
-
-    @Override
-    public String getName() {
-      return FUNCTION_NAME;
-    }
-
-    @Override
-    protected void applyMathOperator(double[] values, int length) {
-      for (int i = 0; i < length; i++) {
-        _results[i] = Math.sqrt(values[i]);
-      }
-    }
-  }
-
   public static class Log2TransformFunction extends SingleParamMathTransformFunction {
     public static final String FUNCTION_NAME = "log2";
     public static final double LOG_BASE = Math.log(2.0);
@@ -192,6 +176,22 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
         _results[i] = Math.log10(values[i]);
+      }
+    }
+  }
+
+  public static class SqrtTransformFunction extends SingleParamMathTransformFunction {
+    public static final String FUNCTION_NAME = "sqrt";
+
+    @Override
+    public String getName() {
+      return FUNCTION_NAME;
+    }
+
+    @Override
+    protected void applyMathOperator(double[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        _results[i] = Math.sqrt(values[i]);
       }
     }
   }
