@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.function;
 
+import java.lang.reflect.Method;
 import java.util.Collections;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
@@ -27,7 +28,6 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
 
 
 public class InbuiltFunctionEvaluatorTest {
@@ -112,7 +112,8 @@ public class InbuiltFunctionEvaluatorTest {
   public void testStateSharedBetweenRowsForExecution()
       throws Exception {
     MyFunc myFunc = new MyFunc();
-    FunctionRegistry.registerFunction(myFunc.getClass().getDeclaredMethod("appendToStringAndReturn", String.class), false);
+    Method method = myFunc.getClass().getDeclaredMethod("appendToStringAndReturn", String.class);
+    FunctionRegistry.registerFunction(method, false);
     String expression = "appendToStringAndReturn('test ')";
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
     assertTrue(evaluator.getArguments().isEmpty());
