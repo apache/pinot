@@ -103,6 +103,16 @@ public class ArithmeticFunctions {
   }
 
   @ScalarFunction
+  public static double log2(double a) {
+    return Math.log(a) / Math.log(2);
+  }
+
+  @ScalarFunction
+  public static double log10(double a) {
+    return Math.log10(a);
+  }
+
+  @ScalarFunction
   public static double sqrt(double a) {
     return Math.sqrt(a);
   }
@@ -115,16 +125,6 @@ public class ArithmeticFunctions {
   @ScalarFunction
   public static double power(double a, double b) {
     return Math.pow(a, b);
-  }
-
-  @ScalarFunction
-  public static double log2(double a) {
-    return Math.log(a) / Math.log(2);
-  }
-
-  @ScalarFunction
-  public static double log10(double a) {
-    return Math.log10(a);
   }
 
   //TODO: The function should ideally be named 'round'
