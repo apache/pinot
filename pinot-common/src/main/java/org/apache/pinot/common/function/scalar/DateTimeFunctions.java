@@ -271,7 +271,7 @@ public class DateTimeFunctions {
   /**
    * Converts DateTime string represented by pattern to epoch millis
    */
-  @ScalarFunction(nullableParameters = true)
+  @ScalarFunction
   public static long fromDateTime(String dateTimeString, String pattern) {
     return DateTimePatternHandler.parseDateTimeStringToEpochMillis(dateTimeString, pattern);
   }
@@ -677,7 +677,7 @@ public class DateTimeFunctions {
    * Equivalent to {@code DateTimeConversionTransformFunction}. Both input and output are string type to support simple
    * date format.
    */
-  @ScalarFunction(nullableParameters = true)
+  @ScalarFunction
   public static String dateTimeConvert(String timeValueStr, String inputFormatStr, String outputFormatStr,
       String outputGranularityStr) {
     long timeValueMs = new DateTimeFormatSpec(inputFormatStr).fromFormatToMillis(timeValueStr);

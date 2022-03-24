@@ -126,7 +126,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
         for (int i = 0; i < numArguments; i++) {
           _arguments[i] = _argumentNodes[i].execute(row);
         }
-        if (_functionInfo.hasNullableParameters()) {
+        if (!_functionInfo.hasNullableParameters()) {
           // Preserve null values during ingestion transformation if function is an inbuilt
           // scalar function that cannot handle nulls, and invoked with null parameter(s).
           for (Object argument : _arguments) {
@@ -149,7 +149,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
         for (int i = 0; i < numArguments; i++) {
           _arguments[i] = _argumentNodes[i].execute(values);
         }
-        if (_functionInfo.hasNullableParameters()) {
+        if (!_functionInfo.hasNullableParameters()) {
           // Preserve null values during ingestion transformation if function is an inbuilt
           // scalar function that cannot handle nulls, and invoked with null parameter(s).
           for (Object argument : _arguments) {

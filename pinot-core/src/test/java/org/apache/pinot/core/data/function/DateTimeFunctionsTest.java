@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.core.data.function;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Lists;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.common.function.scalar.JsonFunctions;
 import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.joda.time.DateTime;
@@ -332,6 +334,14 @@ public class DateTimeFunctionsTest {
     inputs.add(new Object[]{"minute(millis, tz)", expectedArguments, row131, 23});
     inputs.add(new Object[]{"second(millis, tz)", expectedArguments, row131, 13});
     inputs.add(new Object[]{"millisecond(millis, tz)", expectedArguments, row131, 123});
+
+    GenericRow row140 = new GenericRow();
+    row140.putValue("duration", null);
+    inputs.add(new Object[]{"ago(duration)", Lists.newArrayList("duration"), row140, null});
+
+    GenericRow row141 = new GenericRow();
+    row141.putValue("timezoneId", null);
+    inputs.add(new Object[]{"timezoneHour(timezoneId)", Lists.newArrayList("timezoneId"), row141, null});
 
     return inputs.toArray(new Object[0][]);
   }
