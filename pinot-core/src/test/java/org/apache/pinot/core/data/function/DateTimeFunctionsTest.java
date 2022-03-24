@@ -18,14 +18,12 @@
  */
 package org.apache.pinot.core.data.function;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Lists;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import org.apache.pinot.common.function.scalar.JsonFunctions;
 import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.joda.time.DateTime;
