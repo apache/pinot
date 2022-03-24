@@ -108,7 +108,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
   private static class FunctionExecutionNode implements ExecutableNode {
     final FunctionInvoker _functionInvoker;
-    private final FunctionInfo _functionInfo;
+    final FunctionInfo _functionInfo;
     final ExecutableNode[] _argumentNodes;
     final Object[] _arguments;
 
