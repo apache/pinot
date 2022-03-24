@@ -35,14 +35,14 @@ public class DateTimeTransformerFactory {
 
     TimeFormat inputTimeFormat = inputFormat.getTimeFormat();
     TimeFormat outputTimeFormat = outputFormat.getTimeFormat();
-    if (inputTimeFormat == TimeFormat.EPOCH) {
-      if (outputTimeFormat == TimeFormat.EPOCH) {
+    if (inputTimeFormat == TimeFormat.EPOCH || inputTimeFormat == TimeFormat.TIMESTAMP) {
+      if (outputTimeFormat == TimeFormat.EPOCH || outputTimeFormat == TimeFormat.TIMESTAMP) {
         return new EpochToEpochTransformer(inputFormat, outputFormat, outputGranularity);
       } else {
         return new EpochToSDFTransformer(inputFormat, outputFormat, outputGranularity);
       }
     } else {
-      if (outputTimeFormat == TimeFormat.EPOCH) {
+      if (outputTimeFormat == TimeFormat.EPOCH || outputTimeFormat == TimeFormat.TIMESTAMP) {
         return new SDFToEpochTransformer(inputFormat, outputFormat, outputGranularity);
       } else {
         return new SDFToSDFTransformer(inputFormat, outputFormat, outputGranularity);

@@ -735,7 +735,8 @@ public final class Schema implements Serializable {
     String outgoingTimeFormat = outgoingGranularitySpec.getTimeFormat();
     String[] split = StringUtils.split(outgoingTimeFormat, DateTimeFormatSpec.COLON_SEPARATOR, 2);
     DateTimeFormatSpec formatSpec;
-    if (split[0].equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString())) {
+    if (split[0].equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()) || split[0].equals(
+        DateTimeFieldSpec.TimeFormat.TIMESTAMP.toString())) {
       formatSpec = new DateTimeFormatSpec(outgoingTimeSize, outgoingTimeUnit.toString(), split[0]);
     } else {
       formatSpec = new DateTimeFormatSpec(outgoingTimeSize, outgoingTimeUnit.toString(), split[0], split[1]);
@@ -752,8 +753,8 @@ public final class Schema implements Serializable {
       TimeUnit incomingTimeUnit = incomingGranularitySpec.getTimeType();
       String incomingTimeFormat = incomingGranularitySpec.getTimeFormat();
       Preconditions.checkState(
-          incomingTimeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()) && outgoingTimeFormat
-              .equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()),
+          (incomingTimeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()) || incomingTimeFormat.equals(
+              DateTimeFieldSpec.TimeFormat.TIMESTAMP.toString())) && outgoingTimeFormat.equals(incomingTimeFormat),
           "Conversion from incoming to outgoing is not supported for SIMPLE_DATE_FORMAT");
       String transformFunction =
           constructTransformFunctionString(incomingName, incomingTimeSize, incomingTimeUnit, outgoingTimeSize,
