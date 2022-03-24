@@ -170,12 +170,17 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Preconditions.checkState(dictEnabledColumn || !invertedIndexColumns.contains(columnName),
           "Cannot create inverted index for raw index column: %s", columnName);
 
-      IndexCreationContext.Common context = IndexCreationContext.builder().withIndexDir(_indexDir)
-          .withCardinality(columnIndexCreationInfo.getDistinctValueCount()).withDictionary(dictEnabledColumn)
-          .withFieldSpec(fieldSpec).withTotalDocs(segmentIndexCreationInfo.getTotalDocs())
+      IndexCreationContext.Common context = IndexCreationContext.builder()
+          .withIndexDir(_indexDir)
+          .withCardinality(columnIndexCreationInfo.getDistinctValueCount())
+          .withDictionary(dictEnabledColumn)
+          .withFieldSpec(fieldSpec)
+          .withTotalDocs(segmentIndexCreationInfo.getTotalDocs())
           .withTotalNumberOfEntries(columnIndexCreationInfo.getTotalNumberOfEntries())
-          .withColumnIndexCreationInfo(columnIndexCreationInfo).sorted(columnIndexCreationInfo.isSorted())
-          .onHeap(segmentCreationSpec.isOnHeap()).build();
+          .withColumnIndexCreationInfo(columnIndexCreationInfo)
+          .sorted(columnIndexCreationInfo.isSorted())
+          .onHeap(segmentCreationSpec.isOnHeap())
+          .build();
       // Initialize forward index creator
       ChunkCompressionType chunkCompressionType =
           dictEnabledColumn ? null : getColumnCompressionType(segmentCreationSpec, fieldSpec);
