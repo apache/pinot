@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.common.tier;
 
+import com.google.common.collect.Sets;
 import java.util.Collections;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
@@ -124,16 +124,16 @@ public class TierSegmentSelectorTest {
     FixedTierSegmentSelector segmentSelector = new FixedTierSegmentSelector(null, Collections.emptySet());
     Assert.assertFalse(segmentSelector.selectSegment(tableNameWithType, segmentName));
 
-    segmentSelector = new FixedTierSegmentSelector(null, Set.of("segment_1", "segment_2"));
+    segmentSelector = new FixedTierSegmentSelector(null, Sets.newHashSet("segment_1", "segment_2"));
     Assert.assertFalse(segmentSelector.selectSegment(tableNameWithType, segmentName));
 
-    segmentSelector = new FixedTierSegmentSelector(null, Set.of("SEGMENT_0", "segment_1", "segment_2"));
+    segmentSelector = new FixedTierSegmentSelector(null, Sets.newHashSet("SEGMENT_0", "segment_1", "segment_2"));
     Assert.assertFalse(segmentSelector.selectSegment(tableNameWithType, segmentName));
 
-    segmentSelector = new FixedTierSegmentSelector(null, Set.of("segment_0", "segment_1", "segment_2"));
+    segmentSelector = new FixedTierSegmentSelector(null, Sets.newHashSet("segment_0", "segment_1", "segment_2"));
     Assert.assertTrue(segmentSelector.selectSegment(tableNameWithType, segmentName));
 
-    segmentSelector = new FixedTierSegmentSelector(null, Set.of("segment %", "segment_2"));
+    segmentSelector = new FixedTierSegmentSelector(null, Sets.newHashSet("segment %", "segment_2"));
     Assert.assertFalse(segmentSelector.selectSegment(tableNameWithType, segmentName));
     Assert.assertTrue(segmentSelector.selectSegment(tableNameWithType, "segment %"));
 
@@ -154,7 +154,7 @@ public class TierSegmentSelectorTest {
         .get(eq(ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName)), any(),
             anyInt())).thenReturn(segmentZKMetadataZNRecord);
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
-    segmentSelector = new FixedTierSegmentSelector(helixManager, Set.of(segmentName, "foo", "bar"));
+    segmentSelector = new FixedTierSegmentSelector(helixManager, Sets.newHashSet(segmentName, "foo", "bar"));
     Assert.assertTrue(segmentSelector.selectSegment(tableNameWithType, segmentName));
 
     realtimeSegmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
