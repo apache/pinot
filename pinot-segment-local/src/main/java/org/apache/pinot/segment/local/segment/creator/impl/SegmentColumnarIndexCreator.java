@@ -170,17 +170,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Preconditions.checkState(dictEnabledColumn || !invertedIndexColumns.contains(columnName),
           "Cannot create inverted index for raw index column: %s", columnName);
 
-      IndexCreationContext.Common context = IndexCreationContext.builder()
-          .withIndexDir(_indexDir)
-          .withCardinality(columnIndexCreationInfo.getDistinctValueCount())
-          .withDictionary(dictEnabledColumn)
-          .withFieldSpec(fieldSpec)
-          .withTotalDocs(segmentIndexCreationInfo.getTotalDocs())
+      IndexCreationContext.Common context = IndexCreationContext.builder().withIndexDir(_indexDir)
+          .withCardinality(columnIndexCreationInfo.getDistinctValueCount()).withDictionary(dictEnabledColumn)
+          .withFieldSpec(fieldSpec).withTotalDocs(segmentIndexCreationInfo.getTotalDocs())
           .withTotalNumberOfEntries(columnIndexCreationInfo.getTotalNumberOfEntries())
-          .withColumnIndexCreationInfo(columnIndexCreationInfo)
-          .sorted(columnIndexCreationInfo.isSorted())
-          .onHeap(segmentCreationSpec.isOnHeap())
-          .build();
+          .withColumnIndexCreationInfo(columnIndexCreationInfo).sorted(columnIndexCreationInfo.isSorted())
+          .onHeap(segmentCreationSpec.isOnHeap()).build();
       // Initialize forward index creator
       ChunkCompressionType chunkCompressionType =
           dictEnabledColumn ? null : getColumnCompressionType(segmentCreationSpec, fieldSpec);
@@ -261,10 +256,15 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       return false;
     }
 
-    if(spec.isSingleValueField()) {
-      int dictionarySize = info.getDistinctValueCount() * spec.getDataType().size();
-      int forwardIndexSize = info.getTotalNumberOfEntries() * Integer.BYTES; // Only applicable for unsorted forward index.
-      int rawIndexSize = info.getTotalNumberOfEntries() * spec.getDataType().size();
+    // Do not create dictionary if size with dictionary is going to be larger than size without dictionary
+    // This is done to reduce the cost of dictionary for high cardinality columns
+    // Off by default and needs optimizeDictionaryEnabled to be set to true
+    if (config.isOptimizeDictionaryEnabled() && spec.isSingleValueField() && spec.getDataType().isFixedWidth()) {
+      long dictionarySize = info.getDistinctValueCount() * spec.getDataType().size();
+      long forwardIndexSize =
+          ((long) info.getTotalNumberOfEntries() * PinotDataBitSet.getNumBitsPerValue(info.getDistinctValueCount() - 1)
+              + Byte.SIZE - 1) / Byte.SIZE;
+      long rawIndexSize = info.getTotalNumberOfEntries() * spec.getDataType().size();
       if ((dictionarySize + forwardIndexSize) > rawIndexSize) {
         return false;
       }
