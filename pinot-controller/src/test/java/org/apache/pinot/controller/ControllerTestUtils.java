@@ -99,6 +99,8 @@ public abstract class ControllerTestUtils {
   public static final int TOTAL_NUM_BROKER_INSTANCES = 2 * NUM_BROKER_INSTANCES;
 
   protected static final List<HelixManager> FAKE_INSTANCE_HELIX_MANAGERS = new ArrayList<>();
+  protected static final HttpClient HTTP_CLIENT = HttpClient.getInstance();
+
   protected static int _controllerPort;
   protected static String _controllerBaseApiUrl;
 
@@ -115,7 +117,6 @@ public abstract class ControllerTestUtils {
   protected static ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   private static ZkStarter.ZookeeperInstance _zookeeperInstance;
-  private static HttpClient _httpClient;
 
   public static String getHelixClusterName() {
     return ControllerTestUtils.class.getSimpleName();
@@ -154,8 +155,7 @@ public abstract class ControllerTestUtils {
     _controllerPort = Integer.parseInt(_controllerConfig.getControllerPort());
     _controllerBaseApiUrl = "http://localhost:" + _controllerPort;
     _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
-    _httpClient = new HttpClient();
-    _controllerRequestClient = new ControllerRequestClient(_controllerRequestURLBuilder, _httpClient);
+    _controllerRequestClient = new ControllerRequestClient(_controllerRequestURLBuilder, HTTP_CLIENT);
     _controllerDataDir = _controllerConfig.getDataDir();
 
     _controllerStarter = new ControllerStarter();
@@ -496,7 +496,7 @@ public abstract class ControllerTestUtils {
   public static String sendGetRequest(String urlString)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(HTTP_CLIENT.sendGetRequest(
           new URL(urlString).toURI()));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
@@ -517,7 +517,7 @@ public abstract class ControllerTestUtils {
   public static String sendPostRequest(String urlString, String payload, Map<String, String> headers)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(HTTP_CLIENT.sendJsonPostRequest(
           new URL(urlString).toURI(), payload, headers));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
@@ -538,7 +538,7 @@ public abstract class ControllerTestUtils {
   public static String sendPutRequest(String urlString, String payload, Map<String, String> headers)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPutRequest(
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(HTTP_CLIENT.sendJsonPutRequest(
           new URL(urlString).toURI(), payload, headers));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
@@ -549,7 +549,7 @@ public abstract class ControllerTestUtils {
   public static String sendDeleteRequest(String urlString)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(HTTP_CLIENT.sendDeleteRequest(
           new URL(urlString).toURI()));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
@@ -559,12 +559,12 @@ public abstract class ControllerTestUtils {
 
   public static SimpleHttpResponse sendMultipartPostRequest(String url, String body)
       throws IOException {
-    return _httpClient.sendMultipartPostRequest(url, body);
+    return HTTP_CLIENT.sendMultipartPostRequest(url, body);
   }
 
   public static SimpleHttpResponse sendMultipartPutRequest(String url, String body)
       throws IOException {
-    return _httpClient.sendMultipartPutRequest(url, body);
+    return HTTP_CLIENT.sendMultipartPutRequest(url, body);
   }
 
   private static String constructResponse(SimpleHttpResponse resp) {

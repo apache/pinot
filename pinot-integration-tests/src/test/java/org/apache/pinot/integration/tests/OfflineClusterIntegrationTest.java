@@ -264,7 +264,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       fail();
     } catch (IOException e) {
       // Should get response code 400 (BAD_REQUEST)
-      assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
   }
 

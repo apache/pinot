@@ -82,14 +82,12 @@ public final class FlinkQuickStart {
     execEnv.setParallelism(2);
     DataStream<Row> srcDs = execEnv.fromCollection(data).returns(TEST_TYPE_INFO).keyBy(r -> r.getField(0));
 
-    HttpClient httpClient = new HttpClient();
+    HttpClient httpClient = HttpClient.getInstance();
     ControllerRequestClient client = new ControllerRequestClient(
         ControllerRequestURLBuilder.baseUrl(DEFAULT_CONTROLLER_URL), httpClient);
     Schema schema = PinotConnectionUtils.getSchema(client, "starbucksStores");
     TableConfig tableConfig = PinotConnectionUtils.getTableConfig(client, "starbucksStores", "OFFLINE");
     srcDs.addSink(new PinotSinkFunction<>(new FlinkRowGenericRowConverter(TEST_TYPE_INFO), tableConfig, schema));
     execEnv.execute();
-
-    httpClient.close();
   }
 }
