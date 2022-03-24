@@ -45,6 +45,10 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
         _dictionary != null);
   }
 
+  public String getColumnName() {
+    return _columnName;
+  }
+
   @Override
   public String getName() {
     throw new UnsupportedOperationException();

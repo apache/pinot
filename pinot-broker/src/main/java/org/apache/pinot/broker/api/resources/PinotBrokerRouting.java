@@ -30,7 +30,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
-import org.apache.pinot.broker.routing.RoutingManager;
+import org.apache.pinot.broker.routing.BrokerRoutingManager;
 
 
 @Api(tags = "Routing")
@@ -38,7 +38,7 @@ import org.apache.pinot.broker.routing.RoutingManager;
 public class PinotBrokerRouting {
 
   @Inject
-  RoutingManager _routingManager;
+  BrokerRoutingManager _routingManager;
 
   @PUT
   @Produces(MediaType.TEXT_PLAIN)

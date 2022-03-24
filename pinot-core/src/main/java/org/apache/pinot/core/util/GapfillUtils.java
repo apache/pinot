@@ -39,7 +39,6 @@ import org.apache.pinot.core.query.request.context.QueryContext;
  * Util class to encapsulate all utilites required for gapfill.
  */
 public class GapfillUtils {
-  private static final String POST_AGGREGATE_GAP_FILL = "postaggregategapfill";
   private static final String GAP_FILL = "gapfill";
   private static final String AS = "as";
   private static final String FILL = "fill";
@@ -56,27 +55,10 @@ public class GapfillUtils {
 
     FunctionContext function = expression.getFunction();
     String functionName = function.getFunctionName();
-    if (functionName.equals(POST_AGGREGATE_GAP_FILL) || functionName.equals(FILL) || functionName.equals(GAP_FILL)) {
+    if (functionName.equals(FILL) || functionName.equals(GAP_FILL)) {
       return function.getArguments().get(0);
     }
     return expression;
-  }
-
-  public static boolean isPostAggregateGapfill(ExpressionContext expressionContext) {
-    if (expressionContext.getType() != ExpressionContext.Type.FUNCTION) {
-      return false;
-    }
-
-    return POST_AGGREGATE_GAP_FILL.equals(expressionContext.getFunction().getFunctionName());
-  }
-
-  public static boolean isPostAggregateGapfill(QueryContext queryContext) {
-    for (ExpressionContext expressionContext : queryContext.getSelectExpressions()) {
-      if (isPostAggregateGapfill(expressionContext)) {
-        return true;
-      }
-    }
-    return false;
   }
 
   public static boolean isFill(ExpressionContext expressionContext) {
@@ -189,15 +171,15 @@ public class GapfillUtils {
     Preconditions.checkArgument(gapFillSelection != null && gapFillSelection.getFunction() != null,
         "Gapfill Expression should be function.");
     List<ExpressionContext> args = gapFillSelection.getFunction().getArguments();
-    Preconditions.checkArgument(args.size() > 5, "PreAggregateGapFill does not have correct number of arguments.");
+    Preconditions.checkArgument(args.size() > 5, "Gapfill does not have correct number of arguments.");
     Preconditions.checkArgument(args.get(1).getLiteral() != null,
-        "The second argument of PostAggregateGapFill should be TimeFormatter.");
+        "The second argument of Gapfill should be TimeFormatter.");
     Preconditions.checkArgument(args.get(2).getLiteral() != null,
-        "The third argument of PostAggregateGapFill should be start time.");
+        "The third argument of Gapfill should be start time.");
     Preconditions.checkArgument(args.get(3).getLiteral() != null,
-        "The fourth argument of PostAggregateGapFill should be end time.");
+        "The fourth argument of Gapfill should be end time.");
     Preconditions.checkArgument(args.get(4).getLiteral() != null,
-        "The fifth argument of PostAggregateGapFill should be time bucket size.");
+        "The fifth argument of Gapfill should be time bucket size.");
 
     ExpressionContext timeseriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);
     Preconditions.checkArgument(timeseriesOn != null, "The TimeSeriesOn expressions should be specified.");

@@ -80,13 +80,13 @@ public class SegmentPrunerTest extends ControllerTest {
   private static final String QUERY_2 = "SELECT * FROM testTable where memberId = 0";
   private static final String QUERY_3 = "SELECT * FROM testTable where memberId IN (1, 2)";
 
-  private static final String QUERY_5 = "SELECT * FROM testTable where timeColumn = 40";
-  private static final String QUERY_6 = "SELECT * FROM testTable where timeColumn BETWEEN 20 AND 30";
-  private static final String QUERY_7 = "SELECT * FROM testTable where 30 < timeColumn AND timeColumn <= 50";
-  private static final String QUERY_8 = "SELECT * FROM testTable where timeColumn < 15 OR timeColumn > 45";
-  private static final String QUERY_9 =
+  private static final String TIME_QUERY_1 = "SELECT * FROM testTable where timeColumn = 40";
+  private static final String TIME_QUERY_2 = "SELECT * FROM testTable where timeColumn BETWEEN 20 AND 30";
+  private static final String TIME_QUERY_3 = "SELECT * FROM testTable where 30 < timeColumn AND timeColumn <= 50";
+  private static final String TIME_QUERY_4 = "SELECT * FROM testTable where timeColumn < 15 OR timeColumn > 45";
+  private static final String TIME_QUERY_5 =
       "SELECT * FROM testTable where timeColumn < 15 OR (60 < timeColumn AND timeColumn < 70)";
-  private static final String QUERY_10 = "SELECT * FROM testTable where timeColumn < 0 AND timeColumn > 0";
+  private static final String TIME_QUERY_6 = "SELECT * FROM testTable where timeColumn < 0 AND timeColumn > 0";
 
   private static final String SDF_QUERY_1 = "SELECT * FROM testTable where timeColumn = 20200131";
   private static final String SDF_QUERY_2 = "SELECT * FROM testTable where timeColumn BETWEEN 20200101 AND 20200331";
@@ -96,6 +96,9 @@ public class SegmentPrunerTest extends ControllerTest {
       "SELECT * FROM testTable where timeColumn <= 20200101 OR timeColumn in (20200201, 20200401)";
   private static final String SDF_QUERY_5 =
       "SELECT * FROM testTable where timeColumn in (20200101, 20200102) AND timeColumn >= 20200530";
+
+  private static final String SQL_TIME_QUERY_1 = "SELECT * FROM testTable WHERE timeColumn NOT BETWEEN 20 AND 30";
+  private static final String SQL_TIME_QUERY_2 = "SELECT * FROM testTable WHERE NOT timeColumn > 30";
 
   // this is duplicate with KinesisConfig.STREAM_TYPE, while instead of use KinesisConfig.STREAM_TYPE directly, we
   // hardcode the value here to avoid pulling the entire pinot-kinesis module as dependency.
@@ -234,8 +237,8 @@ public class SegmentPrunerTest extends ControllerTest {
     assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
 
     // When streamIngestionConfig is configured with Kinesis streaming, EmptySegmentPruner should be returned.
-    when(streamIngestionConfig.getStreamConfigMaps()).thenReturn(Collections.singletonList(
-        Collections.singletonMap(StreamConfigProperties.STREAM_TYPE, KINESIS_STREAM_TYPE)));
+    when(streamIngestionConfig.getStreamConfigMaps()).thenReturn(
+        Collections.singletonList(Collections.singletonMap(StreamConfigProperties.STREAM_TYPE, KINESIS_STREAM_TYPE)));
     when(indexingConfig.getStreamConfigs()).thenReturn(
         Collections.singletonMap(StreamConfigProperties.STREAM_TYPE, KINESIS_STREAM_TYPE));
     segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
@@ -332,12 +335,12 @@ public class SegmentPrunerTest extends ControllerTest {
   @Test(dataProvider = "compilerProvider")
   public void testTimeSegmentPruner(QueryCompiler compiler) {
     BrokerRequest brokerRequest1 = compiler.compileToBrokerRequest(QUERY_1);
-    BrokerRequest brokerRequest2 = compiler.compileToBrokerRequest(QUERY_5);
-    BrokerRequest brokerRequest3 = compiler.compileToBrokerRequest(QUERY_6);
-    BrokerRequest brokerRequest4 = compiler.compileToBrokerRequest(QUERY_7);
-    BrokerRequest brokerRequest5 = compiler.compileToBrokerRequest(QUERY_8);
-    BrokerRequest brokerRequest6 = compiler.compileToBrokerRequest(QUERY_9);
-    BrokerRequest brokerRequest7 = compiler.compileToBrokerRequest(QUERY_10);
+    BrokerRequest brokerRequest2 = compiler.compileToBrokerRequest(TIME_QUERY_1);
+    BrokerRequest brokerRequest3 = compiler.compileToBrokerRequest(TIME_QUERY_2);
+    BrokerRequest brokerRequest4 = compiler.compileToBrokerRequest(TIME_QUERY_3);
+    BrokerRequest brokerRequest5 = compiler.compileToBrokerRequest(TIME_QUERY_4);
+    BrokerRequest brokerRequest6 = compiler.compileToBrokerRequest(TIME_QUERY_5);
+    BrokerRequest brokerRequest7 = compiler.compileToBrokerRequest(TIME_QUERY_6);
     // NOTE: Ideal state and external view are not used in the current implementation
     IdealState idealState = Mockito.mock(IdealState.class);
     ExternalView externalView = Mockito.mock(ExternalView.class);
@@ -514,6 +517,35 @@ public class SegmentPrunerTest extends ControllerTest {
     assertEquals(segmentPruner.prune(brokerRequest4, onlineSegments),
         new HashSet<>(Arrays.asList(segment0, segment1, segment2)));
     assertEquals(segmentPruner.prune(brokerRequest5, onlineSegments), Collections.emptySet());
+  }
+
+  @Test
+  public void testTimeSegmentPrunerSql() {
+    CalciteSqlCompiler compiler = new CalciteSqlCompiler();
+    BrokerRequest brokerRequest1 = compiler.compileToBrokerRequest(SQL_TIME_QUERY_1);
+    BrokerRequest brokerRequest2 = compiler.compileToBrokerRequest(SQL_TIME_QUERY_2);
+    // NOTE: Ideal state and external view are not used in the current implementation
+    IdealState idealState = Mockito.mock(IdealState.class);
+    ExternalView externalView = Mockito.mock(ExternalView.class);
+
+    TableConfig tableConfig = getTableConfig(RAW_TABLE_NAME, TableType.REALTIME);
+    setSchemaDateTimeFieldSpec(RAW_TABLE_NAME, TimeUnit.DAYS);
+
+    TimeSegmentPruner segmentPruner = new TimeSegmentPruner(tableConfig, _propertyStore);
+    Set<String> onlineSegments = new HashSet<>();
+    String segment0 = "segment0";
+    onlineSegments.add(segment0);
+    setSegmentZKTimeRangeMetadata(REALTIME_TABLE_NAME, segment0, 10, 60, TimeUnit.DAYS);
+    String segment1 = "segment1";
+    onlineSegments.add(segment1);
+    setSegmentZKTimeRangeMetadata(REALTIME_TABLE_NAME, segment1, 20, 30, TimeUnit.DAYS);
+    String segment2 = "segment2";
+    onlineSegments.add(segment2);
+    setSegmentZKTimeRangeMetadata(REALTIME_TABLE_NAME, segment2, 50, 65, TimeUnit.DAYS);
+    segmentPruner.init(idealState, externalView, onlineSegments);
+
+    assertEquals(segmentPruner.prune(brokerRequest1, onlineSegments), new HashSet<>(Arrays.asList(segment0, segment2)));
+    assertEquals(segmentPruner.prune(brokerRequest2, onlineSegments), new HashSet<>(Arrays.asList(segment0, segment1)));
   }
 
   @Test(dataProvider = "compilerProvider")

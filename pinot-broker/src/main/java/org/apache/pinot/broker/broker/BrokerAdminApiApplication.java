@@ -24,7 +24,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.List;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
-import org.apache.pinot.broker.routing.RoutingManager;
+import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.core.api.ServiceAutoDiscoveryFeature;
 import org.apache.pinot.core.transport.ListenerConfig;
@@ -47,7 +47,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
 
   private HttpServer _httpServer;
 
-  public BrokerAdminApiApplication(RoutingManager routingManager, BrokerRequestHandler brokerRequestHandler,
+  public BrokerAdminApiApplication(BrokerRoutingManager routingManager, BrokerRequestHandler brokerRequestHandler,
       BrokerMetrics brokerMetrics, PinotConfiguration brokerConf) {
     packages(RESOURCE_PACKAGE);
     property(PINOT_CONFIGURATION, brokerConf);
@@ -57,7 +57,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     register(new AbstractBinder() {
       @Override
       protected void configure() {
-        bind(routingManager).to(RoutingManager.class);
+        bind(routingManager).to(BrokerRoutingManager.class);
         bind(brokerRequestHandler).to(BrokerRequestHandler.class);
         bind(brokerMetrics).to(BrokerMetrics.class);
         bind(brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID)).named(BROKER_INSTANCE_ID);

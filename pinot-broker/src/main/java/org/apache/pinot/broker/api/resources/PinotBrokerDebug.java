@@ -35,9 +35,9 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.pinot.broker.routing.RoutingManager;
-import org.apache.pinot.broker.routing.RoutingTable;
+import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
+import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.TableType;
@@ -53,7 +53,7 @@ public class PinotBrokerDebug {
   private static final CalciteSqlCompiler CALCITE_COMPILER = new CalciteSqlCompiler();
 
   @Inject
-  private RoutingManager _routingManager;
+  private BrokerRoutingManager _routingManager;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)

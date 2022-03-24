@@ -444,6 +444,31 @@ public class CalciteSqlCompilerTest {
     pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT count(*) from mytable where bar > ago('PT1H')");
     literal = pinotQuery.getSelectList().get(0).getLiteral();
     Assert.assertNull(literal);
+
+    pinotQuery = CalciteSqlParser
+        .compileToPinotQuery("select encodeUrl('key1=value 1&key2=value@!$2&key3=value%3'), "
+            + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') from mytable");
+    Literal literal1 = pinotQuery.getSelectList().get(0).getLiteral();
+    Literal literal2 = pinotQuery.getSelectList().get(1).getLiteral();
+    Assert.assertNotNull(literal1);
+    Assert.assertNotNull(literal2);
+    converter = new PinotQuery2BrokerRequestConverter();
+    tempBrokerRequest = converter.convert(pinotQuery);
+    Assert.assertEquals(tempBrokerRequest.getQuerySource().getTableName(), "mytable");
+    Assert.assertEquals(tempBrokerRequest.getSelections().getSelectionColumns().get(0),
+        String.format("'%s'", literal1.getFieldValue().toString()));
+    Assert.assertEquals(tempBrokerRequest.getSelections().getSelectionColumns().get(1),
+        String.format("'%s'", literal2.getFieldValue().toString()));
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT count(*) from mytable "
+        + "where bar = encodeUrl('key1=value 1&key2=value@!$2&key3=value%3')");
+    literal = pinotQuery.getSelectList().get(0).getLiteral();
+    Assert.assertNull(literal);
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT count(*) from mytable "
+        + "where bar = decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253')");
+    literal = pinotQuery.getSelectList().get(0).getLiteral();
+    Assert.assertNull(literal);
   }
 
   @Test
@@ -1855,6 +1880,44 @@ public class CalciteSqlCompilerTest {
     upperBound = System.currentTimeMillis() - ONE_HOUR_IN_MS;
     Assert.assertTrue(nowTs >= lowerBound);
     Assert.assertTrue(nowTs <= upperBound);
+
+    query = "select encodeUrl('key1=value 1&key2=value@!$2&key3=value%3'), "
+        + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') from mytable";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    String encoded = pinotQuery.getSelectList().get(0).getLiteral().getStringValue();
+    String decoded = pinotQuery.getSelectList().get(1).getLiteral().getStringValue();
+    Assert.assertEquals(encoded, "key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253");
+    Assert.assertEquals(decoded, "key1=value 1&key2=value@!$2&key3=value%3");
+
+    query = "select concat('https://www.google.com/search?q=',"
+        + "encodeUrl('key1=val1 key2=45% key3=#47 key4={''key'':[3,5]} + key5=1;2;3;4 key6=(a|b)&c key7= "
+        + "key8=5*(6/4) key9=https://pinot@pinot.com key10=CFLAGS=\"-O2 -mcpu=pentiumpro\" key12=$JAVA_HOME'),'') "
+        + "from mytable";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    encoded = pinotQuery.getSelectList().get(0).getLiteral().getStringValue();
+    Assert.assertEquals(encoded, "https://www.google.com/search?q=key1%3Dval1+key2%3D45%25+key3%3D%2347+"
+        + "key4%3D%7B%27key%27%3A%5B3%2C5%5D%7D+%2B+key5%3D1%3B2%3B3%3B4+"
+        + "key6%3D%28a%7Cb%29%26c+key7%3D+key8%3D5*%286%2F4%29+"
+        + "key9%3Dhttps%3A%2F%2Fpinot%40pinot.com+key10%3DCFLAGS%3D%22-O2+-mcpu%3Dpentiumpro%22+key12%3D%24JAVA_HOME");
+
+    query = "select decodeUrl('https://www.google.com/search?q=key1%3Dval1+key2%3D45%25+key3%3D%2347+"
+        + "key4%3D%7B%27key%27%3A%5B3%2C5%5D%7D+%2B+key5%3D1%3B2%3B3%3B4+key6%3D%28a%7Cb%29%26c+"
+        + "key7%3D+key8%3D5*%286%2F4%29+key9%3Dhttps%3A%2F%2Fpinot%40pinot.com+"
+        + "key10%3DCFLAGS%3D%22-O2+-mcpu%3Dpentiumpro%22+key12%3D%24JAVA_HOME') from mytable";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    decoded = pinotQuery.getSelectList().get(0).getLiteral().getStringValue();
+    Assert.assertEquals(decoded, "https://www.google.com/search?q=key1=val1 key2=45% key3=#47 "
+        + "key4={'key':[3,5]} + key5=1;2;3;4 key6=(a|b)&c key7= "
+        + "key8=5*(6/4) key9=https://pinot@pinot.com key10=CFLAGS=\"-O2 -mcpu=pentiumpro\" key12=$JAVA_HOME");
+
+    query = "select a from mytable where foo=encodeUrl('key1=value 1&key2=value@!$2&key3=value%3') and"
+        + " bar=decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253')";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Function and = pinotQuery.getFilterExpression().getFunctionCall();
+    encoded = and.getOperands().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue();
+    decoded = and.getOperands().get(1).getFunctionCall().getOperands().get(1).getLiteral().getStringValue();
+    Assert.assertEquals(encoded, "key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253");
+    Assert.assertEquals(decoded, "key1=value 1&key2=value@!$2&key3=value%3");
   }
 
   @Test
@@ -1925,6 +1988,25 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(expression.getFunctionCall().getOperator(), "todatetime");
     Assert.assertEquals(expression.getFunctionCall().getOperands().get(0).getIdentifier().getName(),
         "millisSinceEpoch");
+
+    expression = CalciteSqlParser.compileToExpression("encodeUrl('key1=value 1&key2=value@!$2&key3=value%3')");
+    Assert.assertNotNull(expression.getFunctionCall());
+    pinotQuery.setFilterExpression(expression);
+    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
+    expression = pinotQuery.getFilterExpression();
+    Assert.assertNotNull(expression.getLiteral());
+    Assert.assertEquals(expression.getLiteral().getFieldValue(),
+        "key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253");
+
+    expression = CalciteSqlParser
+        .compileToExpression("decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253')");
+    Assert.assertNotNull(expression.getFunctionCall());
+    pinotQuery.setFilterExpression(expression);
+    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
+    expression = pinotQuery.getFilterExpression();
+    Assert.assertNotNull(expression.getLiteral());
+    Assert.assertEquals(expression.getLiteral().getFieldValue(),
+        "key1=value 1&key2=value@!$2&key3=value%3");
 
     expression = CalciteSqlParser.compileToExpression("reverse(playerName)");
     Assert.assertNotNull(expression.getFunctionCall());

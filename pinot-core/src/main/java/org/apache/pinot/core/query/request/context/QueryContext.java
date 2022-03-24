@@ -103,6 +103,8 @@ public class QueryContext {
   private long _endTimeMs;
   // Whether to enable prefetch for the query
   private boolean _enablePrefetch;
+  // Whether to skip upsert for the query
+  private boolean _skipUpsert;
   // Maximum number of threads used to execute the query
   private int _maxExecutionThreads = InstancePlanMakerImplV2.DEFAULT_MAX_EXECUTION_THREADS;
   // The following properties apply to group-by queries
@@ -292,6 +294,14 @@ public class QueryContext {
 
   public void setEnablePrefetch(boolean enablePrefetch) {
     _enablePrefetch = enablePrefetch;
+  }
+
+  public boolean isSkipUpsert() {
+    return _skipUpsert;
+  }
+
+  public void setSkipUpsert(boolean skipUpsert) {
+    _skipUpsert = skipUpsert;
   }
 
   public int getMaxExecutionThreads() {
