@@ -3689,6 +3689,345 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     }
   }
 
+  @Test
+  public void datetimeconvertGapfillTestSelectSelectWithExtraData() {
+    DateTimeFormatSpec dateTimeFormatter =
+        new DateTimeFormatSpec("1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS");
+    DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
+    long start;
+
+    String gapfillQuery1 = "SELECT GapFill(DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
+        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS'), "
+        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
+        + "    '2021-11-07 8:00:00.000',  '2021-11-07 10:00:00.000', '1:HOURS',"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
+        + "     levelId, lotId, isOccupied "
+        + "FROM parkingData "
+        + "WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "LIMIT 200 ";
+
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+
+    int[][] expectedOccupiedSlotsCounts1 =
+        new int[][]{{6, 4}, {4, 6}};
+    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    start = dateTimeFormatter.fromFormatToMillis("2021-11-07 08:00:00.000");
+    int index = 0;
+    for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
+      int ones = expectedOccupiedSlotsCounts1[i][0];
+      int zeros = expectedOccupiedSlotsCounts1[i][1];
+      int total = ones + zeros;
+      for (int k = 0; k < total; k++) {
+        String firstTimeCol = (String) gapFillRows1.get(index)[0];
+        long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
+        Assert.assertEquals(timeStamp, start);
+        if (gapFillRows1.get(index)[3].equals(1)) {
+          ones--;
+        } else {
+          zeros--;
+        }
+        index++;
+      }
+      Assert.assertEquals(ones, 0);
+      Assert.assertEquals(zeros, 0);
+      start += dateTimeGranularity.granularityToMillis();
+    }
+    Assert.assertEquals(gapFillRows1.size(), index);
+
+    String gapfillQuery2 = "SELECT "
+        + "time_col, levelId, lotId, isOccupied, time_col "
+        + "FROM ("
+        + "  SELECT GapFill(DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
+        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS'), "
+        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
+        + "    '2021-11-07 8:00:00.000',  '2021-11-07 10:00:00.000', '1:HOURS',"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
+        + "  FROM parkingData "
+        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  LIMIT 200 "
+        + ") "
+        + " WHERE isOccupied = 1 "
+        + " LIMIT 200 ";
+
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+
+    int[] expectedOccupiedSlotsCounts2 = new int[]{6, 4};
+    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    start = dateTimeFormatter.fromFormatToMillis("2021-11-07 08:00:00.000");
+    index = 0;
+    for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
+      for (int k = 0; k < expectedOccupiedSlotsCounts2[i]; k++) {
+        String firstTimeCol = (String) gapFillRows2.get(index)[0];
+        long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
+        Assert.assertEquals(timeStamp, start);
+        Assert.assertEquals(gapFillRows2.get(index)[3], 1);
+        index++;
+      }
+      start += dateTimeGranularity.granularityToMillis();
+    }
+    Assert.assertEquals(gapFillRows2.size(), index);
+  }
+
+  @Test
+  public void datetimeconvertGapfillTestAggregateSelectWithExtraData() {
+    DateTimeFormatSpec dateTimeFormatter =
+        new DateTimeFormatSpec("1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS");
+    DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
+    long start;
+
+    String gapfillQuery1 = "SELECT "
+        + "GapFill(time_col, "
+        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
+        + "    '2021-11-07 8:00:00.000',  '2021-11-07 10:00:00.000', '1:HOURS',"
+        + "    FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)), levelId, lotId, occupied "
+        + "FROM ("
+        + "  SELECT DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
+        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS') AS time_col,"
+        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "  FROM parkingData "
+        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
+        + "  LIMIT 200 "
+        + ") "
+        + " LIMIT 200 ";
+
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+
+    int[][] expectedOccupiedSlotsCounts1 = new int[][]{{6, 2}, {4, 4}};
+    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    start = dateTimeFormatter.fromFormatToMillis("2021-11-07 08:00:00.000");
+    int index = 0;
+    for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
+      int ones = expectedOccupiedSlotsCounts1[i][0];
+      int zeros = expectedOccupiedSlotsCounts1[i][1];
+      int total = ones + zeros;
+      for (int k = 0; k < total; k++) {
+        String firstTimeCol = (String) gapFillRows1.get(index)[0];
+        long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
+        Assert.assertEquals(timeStamp, start);
+        if (gapFillRows1.get(index)[3].equals(1)) {
+          ones--;
+        } else {
+          zeros--;
+        }
+        index++;
+      }
+      Assert.assertEquals(ones, 0);
+      Assert.assertEquals(zeros, 0);
+      start += dateTimeGranularity.granularityToMillis();
+    }
+    Assert.assertEquals(gapFillRows1.size(), index);
+
+    String gapfillQuery2 = "SELECT "
+        + "GapFill(time_col, "
+        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
+        + "    '2021-11-07 8:00:00.000',  '2021-11-07 10:00:00.000', '1:HOURS',"
+        + "    FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)), levelId, lotId, occupied "
+        + "FROM ("
+        + "  SELECT DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
+        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS') AS time_col,"
+        + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "  FROM parkingData "
+        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  GROUP BY time_col, levelId, lotId "
+        + "  LIMIT 200 "
+        + ") "
+        + " WHERE occupied = 1 "
+        + " LIMIT 200 ";
+
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+
+    int[] expectedOccupiedSlotsCounts2 = new int[]{6, 4};
+    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    start = dateTimeFormatter.fromFormatToMillis("2021-11-07 08:00:00.000");
+    index = 0;
+    for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
+      for (int k = 0; k < expectedOccupiedSlotsCounts2[i]; k++) {
+        String firstTimeCol = (String) gapFillRows2.get(index)[0];
+        long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
+        Assert.assertEquals(timeStamp, start);
+        Assert.assertEquals(gapFillRows2.get(index)[3], 1);
+        index++;
+      }
+      start += dateTimeGranularity.granularityToMillis();
+    }
+    Assert.assertEquals(gapFillRows2.size(), index);
+  }
+
+  @Test
+  public void datetimeconvertGapfillTestGapfillAggregateWithExtraData() {
+    DateTimeFormatSpec dateTimeFormatter =
+        new DateTimeFormatSpec("1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS");
+    DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
+    long start;
+
+    String dataTimeConvertQuery = "SELECT "
+        + "DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
+        + "'1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS') AS time_col, "
+        + "SUM(isOccupied) "
+        + "FROM parkingData "
+        + "WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "GROUP BY 1 "
+        + "ORDER BY 1 "
+        + "LIMIT 200";
+
+    BrokerResponseNative dateTimeConvertBrokerResponse = getBrokerResponseForSqlQuery(dataTimeConvertQuery);
+
+    ResultTable dateTimeConvertResultTable = dateTimeConvertBrokerResponse.getResultTable();
+    Assert.assertEquals(dateTimeConvertResultTable.getRows().size(), 8);
+
+    String gapfillQuery1 = "SELECT "
+        + "time_col, SUM(isOccupied) as occupied_slots_count, time_col "
+        + "FROM ("
+        + "  SELECT  GapFill(DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
+        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS'), "
+        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
+        + "    '2021-11-07 8:00:00.000',  '2021-11-07 10:00:00.000', '1:HOURS',"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
+        + "  FROM parkingData "
+        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  LIMIT 200 "
+        + ") "
+        + " GROUP BY time_col "
+        + " LIMIT 200 ";
+
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+
+    double[] expectedOccupiedSlotsCounts1 = new double[]{6, 4};
+    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
+    start = dateTimeFormatter.fromFormatToMillis("2021-11-07 08:00:00.000");
+    for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
+      String firstTimeCol = (String) gapFillRows1.get(i)[0];
+      long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
+      Assert.assertEquals(timeStamp, start);
+      Assert.assertEquals(expectedOccupiedSlotsCounts1[i], gapFillRows1.get(i)[1]);
+      start += dateTimeGranularity.granularityToMillis();
+    }
+
+    String gapfillQuery2 = "SELECT "
+        + "time_col, SUM(isOccupied) as occupied_slots_count, time_col "
+        + "FROM ("
+        + "  SELECT  GapFill(DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
+        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS'), "
+        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
+        + "    '2021-11-07 8:00:00.000',  '2021-11-07 10:00:00.000', '1:HOURS',"
+        + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
+        + "     isOccupied, lotId, levelId"
+        + "  FROM parkingData "
+        + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "  LIMIT 200 "
+        + ") "
+        + " WHERE isOccupied = 1 "
+        + " GROUP BY time_col "
+        + " LIMIT 200 ";
+
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+
+    double[] expectedOccupiedSlotsCounts2 = new double[]{6, 4};
+    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length);
+    start = dateTimeFormatter.fromFormatToMillis("2021-11-07 08:00:00.000");
+    for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
+      String firstTimeCol = (String) gapFillRows2.get(i)[0];
+      long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
+      Assert.assertEquals(timeStamp, start);
+      Assert.assertEquals(expectedOccupiedSlotsCounts2[i], gapFillRows2.get(i)[1]);
+      start += dateTimeGranularity.granularityToMillis();
+    }
+  }
+
+  @Test
+  public void datetimeconvertGapfillTestAggregateAggregateWithExtraData() {
+    DateTimeFormatSpec dateTimeFormatter =
+        new DateTimeFormatSpec("1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS");
+    DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
+    long start;
+
+    String gapfillQuery1 = "SELECT "
+        + "time_col, SUM(occupied) as occupied_slots_count, time_col "
+        + "FROM ("
+        + "  SELECT GapFill(time_col, "
+        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
+        + "    '2021-11-07 8:00:00.000',  '2021-11-07 10:00:00.000', '1:HOURS',"
+        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
+        + "      '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS') AS time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
+        + "  LIMIT 200 "
+        + ") "
+        + " GROUP BY time_col "
+        + " LIMIT 200 ";
+
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+
+    double[] expectedOccupiedSlotsCounts1 = new double[]{6, 4};
+    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
+    start = dateTimeFormatter.fromFormatToMillis("2021-11-07 08:00:00.000");
+    for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
+      String firstTimeCol = (String) gapFillRows1.get(i)[0];
+      long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
+      Assert.assertEquals(timeStamp, start);
+      Assert.assertEquals(expectedOccupiedSlotsCounts1[i], gapFillRows1.get(i)[1]);
+      start += dateTimeGranularity.granularityToMillis();
+    }
+
+    String gapfillQuery2 = "SELECT "
+        + "time_col, SUM(occupied) as occupied_slots_count, time_col "
+        + "FROM ("
+        + "  SELECT GapFill(time_col, "
+        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
+        + "    '2021-11-07 8:00:00.000',  '2021-11-07 10:00:00.000', '1:HOURS',"
+        + "     FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
+        + "     occupied, lotId, levelId"
+        + "  FROM ("
+        + "    SELECT DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
+        + "      '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS') AS time_col,"
+        + "       lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
+        + "    FROM parkingData "
+        + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+        + "    GROUP BY time_col, levelId, lotId "
+        + "    LIMIT 200 "
+        + "  ) "
+        + "  LIMIT 200 "
+        + ") "
+        + " WHERE occupied = 1 "
+        + " GROUP BY time_col "
+        + " LIMIT 200 ";
+
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+
+    double[] expectedOccupiedSlotsCounts2 = new double[]{6, 4};
+    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length);
+    start = dateTimeFormatter.fromFormatToMillis("2021-11-07 08:00:00.000");
+    for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
+      String firstTimeCol = (String) gapFillRows2.get(i)[0];
+      long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
+      Assert.assertEquals(timeStamp, start);
+      Assert.assertEquals(expectedOccupiedSlotsCounts2[i], gapFillRows2.get(i)[1]);
+      start += dateTimeGranularity.granularityToMillis();
+    }
+  }
+
   @AfterClass
   public void tearDown()
       throws IOException {
