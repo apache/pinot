@@ -25,9 +25,11 @@ import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -43,6 +45,10 @@ public class ControllerRequestClient {
   public ControllerRequestClient(ControllerRequestURLBuilder controllerRequestUrlBuilder, HttpClient httpClient) {
     _controllerRequestURLBuilder = controllerRequestUrlBuilder;
     _httpClient = httpClient;
+  }
+
+  public ControllerRequestURLBuilder getControllerRequestURLBuilder() {
+    return _controllerRequestURLBuilder;
   }
   /**
    * Add a schema to the controller.
@@ -68,11 +74,95 @@ public class ControllerRequestClient {
     }
   }
 
+  public void deleteSchema(String schemaName)
+      throws IOException {
+    String url = _controllerRequestURLBuilder.forSchemaDelete(schemaName);
+    try {
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(new URL(url).toURI()));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
   public void addTableConfig(TableConfig tableConfig)
       throws IOException {
     try {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
           _controllerRequestURLBuilder.forTableCreate()).toURI(), tableConfig.toJsonString()));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public void updateTableConfig(TableConfig tableConfig)
+      throws IOException {
+    try {
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPutRequest(new URL(
+          _controllerRequestURLBuilder.forUpdateTableConfig(tableConfig.getTableName())).toURI(),
+          tableConfig.toJsonString()));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public void deleteTable(String tableNameWithType)
+      throws IOException {
+    try {
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(new URL(
+          _controllerRequestURLBuilder.forTableDelete(tableNameWithType)).toURI()));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public TableConfig getTableConfig(String tableName, TableType tableType)
+      throws IOException {
+    try {
+      SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendGetRequest(new URL(_controllerRequestURLBuilder.forTableGet(tableName)).toURI()));
+      return JsonUtils.jsonNodeToObject(JsonUtils.stringToJsonNode(response.getResponse()).get(tableType.toString()),
+          TableConfig.class);
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public long getTableSize(String tableName)
+      throws IOException {
+    try {
+      SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendGetRequest(new URL(_controllerRequestURLBuilder.forTableSize(tableName)).toURI()));
+      return Long.parseLong(JsonUtils.stringToJsonNode(response.getResponse()).get("reportedSizeInBytes").asText());
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public void reloadTable(String tableName, TableType tableType, boolean forceDownload)
+      throws IOException {
+    try {
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
+          _controllerRequestURLBuilder.forTableReload(tableName, tableType, forceDownload)).toURI(), null));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public void reloadSegment(String tableName, TableType tableType, boolean forceReload)
+      throws IOException {
+    try {
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
+          _controllerRequestURLBuilder.forTableReload(tableName, tableType, forceReload)).toURI(), null));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public void deleteSegments(String tableName, TableType tableType)
+      throws IOException {
+    try {
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(new URL(
+          _controllerRequestURLBuilder.forSegmentDeleteAllAPI(tableName, tableType.toString())).toURI()));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
@@ -104,6 +194,17 @@ public class ControllerRequestClient {
       throws IOException {
     try {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
+          _controllerRequestURLBuilder.forTenantCreate()).toURI(),
+          getServerTenantRequestPayload(tenantName, numOfflineServers, numRealtimeServers)));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public void updateServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
+      throws IOException {
+    try {
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPutRequest(new URL(
           _controllerRequestURLBuilder.forTenantCreate()).toURI(),
           getServerTenantRequestPayload(tenantName, numOfflineServers, numRealtimeServers)));
     } catch (HttpErrorStatusException | URISyntaxException e) {
