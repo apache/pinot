@@ -505,7 +505,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"AGGREGATE_METADATA", 2, 1});
     check(query1, new ResultTable(DATA_SCHEMA, result1));
 
-    String query2 = "EXPLAIN PLAN FOR SELECT min(invertedIndexCol1) FROM testTable";
+    String query2 = "EXPLAIN PLAN FOR SELECT distinctcounthll(invertedIndexCol1) FROM testTable";
     List<Object[]> result2 = new ArrayList<>();
     result2.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
     result2.add(new Object[]{"COMBINE_AGGREGATE", 1, 0});

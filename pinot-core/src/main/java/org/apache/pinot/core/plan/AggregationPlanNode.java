@@ -19,7 +19,6 @@
 package org.apache.pinot.core.plan;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
@@ -46,6 +45,7 @@ import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
@@ -63,6 +63,10 @@ public class AggregationPlanNode implements PlanNode {
       EnumSet.of(MIN, MINMV, MAX, MAXMV, MINMAXRANGE, MINMAXRANGEMV, DISTINCTCOUNT, DISTINCTCOUNTMV, DISTINCTCOUNTHLL,
           DISTINCTCOUNTHLLMV, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTRAWHLLMV, SEGMENTPARTITIONEDDISTINCTCOUNT,
           DISTINCTCOUNTSMARTHLL);
+
+  // DISTINCTCOUNT excluded because consuming segment metadata contains unknown cardinality when there is no dictionary
+  private static final EnumSet<AggregationFunctionType> METADATA_BASED_FUNCTIONS =
+      EnumSet.of(COUNT, MIN, MINMV, MAX, MAXMV, MINMAXRANGE, MINMAXRANGEMV);
 
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;
@@ -176,11 +180,18 @@ public class AggregationPlanNode implements PlanNode {
     BaseFilterOperator filterOperator = filterPlanNode.run();
 
     // Use metadata/dictionary to solve the query if possible
-    // TODO: Use the same operator for both of them so that COUNT(*), MAX(col) can be optimized
     if (filterOperator.isResultMatchingAll()) {
       if (isFitForMetadataBasedPlan(aggregationFunctions)) {
+        DataSource[] dataSources = new DataSource[aggregationFunctions.length];
+        for (int i = 0; i < aggregationFunctions.length; i++) {
+          List<?> inputExpressions = aggregationFunctions[i].getInputExpressions();
+          if (!inputExpressions.isEmpty()) {
+            String column = ((ExpressionContext) inputExpressions.get(0)).getIdentifier();
+            dataSources[i] = _indexSegment.getDataSource(column);
+          }
+        }
         return new MetadataBasedAggregationOperator(aggregationFunctions, _indexSegment.getSegmentMetadata(),
-            Collections.emptyMap());
+            dataSources);
       } else if (isFitForDictionaryBasedPlan(aggregationFunctions, _indexSegment)) {
         Map<String, Dictionary> dictionaryMap = new HashMap<>();
         for (AggregationFunction aggregationFunction : aggregationFunctions) {
@@ -228,8 +239,14 @@ public class AggregationPlanNode implements PlanNode {
    */
   private static boolean isFitForMetadataBasedPlan(AggregationFunction[] aggregationFunctions) {
     for (AggregationFunction aggregationFunction : aggregationFunctions) {
-      if (aggregationFunction.getType() != COUNT) {
+      if (!METADATA_BASED_FUNCTIONS.contains(aggregationFunction.getType())) {
         return false;
+      }
+      if (aggregationFunction.getType() != COUNT) {
+        ExpressionContext argument = (ExpressionContext) aggregationFunction.getInputExpressions().get(0);
+        if (argument.getType() != ExpressionContext.Type.IDENTIFIER) {
+          return false;
+        }
       }
     }
     return true;

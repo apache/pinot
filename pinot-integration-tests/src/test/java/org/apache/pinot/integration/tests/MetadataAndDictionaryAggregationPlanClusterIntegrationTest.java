@@ -242,10 +242,10 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
     assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
-    // Non dictionary column: not answered by DictionaryBasedAggregationOperator
+    // Non dictionary column: answered by MetadataBasedAggregationOperator
     pqlQuery = "SELECT MAX(DepDelay) FROM " + tableName;
     response = postQuery(pqlQuery);
-    assertEquals(response.get("numEntriesScannedPostFilter").asLong(), response.get("numDocsScanned").asLong());
+    assertEquals(response.get("numEntriesScannedPostFilter").asLong(), 0);
     assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
     assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
@@ -257,11 +257,11 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
     assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
-    // multiple aggregation functions, mix of dictionary based and non dictionary based: not answered by
-    // DictionaryBasedAggregationOperator
+    // multiple aggregation functions, mix of dictionary based and non dictionary based: answered by
+    // MetadataBasedAggregationOperator
     pqlQuery = "SELECT MAX(ArrTime),COUNT(ArrTime) FROM " + tableName;
     response = postQuery(pqlQuery);
-    assertEquals(response.get("numEntriesScannedPostFilter").asLong(), response.get("numDocsScanned").asLong());
+    assertEquals(response.get("numEntriesScannedPostFilter").asLong(), 0);
     assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
     assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
@@ -321,7 +321,7 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     // mixed aggregation functions in query: not answered by MetadataBasedAggregationOperator
     pqlQuery = "SELECT COUNT(*),MAX(ArrTime) FROM " + tableName;
     response = postQuery(pqlQuery);
-    assertTrue(response.get("numEntriesScannedPostFilter").asLong() > 0);
+    assertTrue(response.get("numEntriesScannedPostFilter").asLong() == 0);
     assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
     assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
   }

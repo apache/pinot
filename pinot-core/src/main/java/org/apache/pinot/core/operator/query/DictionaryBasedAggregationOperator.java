@@ -44,6 +44,8 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ByteArray;
 
+import static org.apache.pinot.core.operator.query.AggregationOperatorUtils.toDouble;
+
 
 /**
  * Aggregation operator that utilizes dictionary for serving aggregation queries.
@@ -120,14 +122,6 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
 
     // Build intermediate result block based on aggregation result from the executor.
     return new IntermediateResultsBlock(_aggregationFunctions, aggregationResults, false);
-  }
-
-  private double toDouble(Comparable value) {
-    if (value instanceof Number) {
-      return ((Number) value).doubleValue();
-    } else {
-      return Double.parseDouble(value.toString());
-    }
   }
 
   private static Set getDistinctValueSet(Dictionary dictionary) {

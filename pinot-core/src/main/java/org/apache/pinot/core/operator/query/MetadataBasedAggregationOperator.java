@@ -18,19 +18,21 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+
+import static org.apache.pinot.core.operator.query.AggregationOperatorUtils.toDouble;
 
 
 /**
@@ -43,29 +45,45 @@ public class MetadataBasedAggregationOperator extends BaseOperator<IntermediateR
 
   private final AggregationFunction[] _aggregationFunctions;
   private final SegmentMetadata _segmentMetadata;
-  private final Map<String, DataSource> _dataSourceMap;
+  private final DataSource[] _dataSources;
 
   public MetadataBasedAggregationOperator(AggregationFunction[] aggregationFunctions, SegmentMetadata segmentMetadata,
-      Map<String, DataSource> dataSourceMap) {
+      DataSource[] dataSources) {
     _aggregationFunctions = aggregationFunctions;
     _segmentMetadata = segmentMetadata;
-
-    // Datasource is currently not used, but will start getting used as we add support for aggregation
-    // functions other than count(*).
-    _dataSourceMap = dataSourceMap;
+    _dataSources = dataSources;
   }
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
     int numAggregationFunctions = _aggregationFunctions.length;
     List<Object> aggregationResults = new ArrayList<>(numAggregationFunctions);
-    long numTotalDocs = _segmentMetadata.getTotalDocs();
-    for (AggregationFunction aggregationFunction : _aggregationFunctions) {
-      Preconditions.checkState(aggregationFunction.getType() == AggregationFunctionType.COUNT,
-          "Metadata based aggregation operator does not support function type: " + aggregationFunction.getType());
-      aggregationResults.add(numTotalDocs);
+    for (int i = 0; i < _aggregationFunctions.length; i++) {
+      AggregationFunction aggregationFunction = _aggregationFunctions[i];
+      if (aggregationFunction.getType() == AggregationFunctionType.COUNT) {
+        aggregationResults.add((long) _segmentMetadata.getTotalDocs());
+      } else {
+        DataSourceMetadata metadata = _dataSources[i].getDataSourceMetadata();
+        Object result;
+        switch (aggregationFunction.getType()) {
+          case MIN:
+          case MINMV:
+            result = toDouble(metadata.getMinValue());
+            break;
+          case MAX:
+          case MAXMV:
+            result = toDouble(metadata.getMaxValue());
+            break;
+          case MINMAXRANGE:
+          case MINMAXRANGEMV:
+            result = new MinMaxRangePair(toDouble(metadata.getMinValue()), toDouble(metadata.getMaxValue()));
+            break;
+          default:
+            throw new IllegalStateException(aggregationFunction.getType() + " cannot be satisfied by metadata");
+        }
+        aggregationResults.add(result);
+      }
     }
-
     // Build intermediate result block based on aggregation result from the executor.
     return new IntermediateResultsBlock(_aggregationFunctions, aggregationResults, false);
   }
