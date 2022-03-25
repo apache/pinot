@@ -148,11 +148,11 @@ public class ControllerRequestClient {
     }
   }
 
-  public void reloadSegment(String tableName, TableType tableType, boolean forceReload)
+  public void reloadSegment(String tableName, String segmentName, boolean forceReload)
       throws IOException {
     try {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
-          _controllerRequestURLBuilder.forTableReload(tableName, tableType, forceReload)).toURI(), null));
+          _controllerRequestURLBuilder.forSegmentReload(tableName, segmentName, forceReload)).toURI(), null));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }

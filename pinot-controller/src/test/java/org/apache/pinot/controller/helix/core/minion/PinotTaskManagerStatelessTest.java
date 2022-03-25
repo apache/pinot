@@ -163,6 +163,8 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     // Restart controller
     stopController();
     startController(properties);
+    // wait for controller to start correctly.
+    Thread.sleep(1000);
 
     // Update table to add a new task
     tableConfig.setTaskConfig(new TableTaskConfig(

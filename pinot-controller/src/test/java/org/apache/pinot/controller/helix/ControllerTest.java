@@ -561,12 +561,12 @@ public abstract class ControllerTest {
 
   protected void reloadOfflineSegment(String tableName, String segmentName, boolean forceDownload)
       throws IOException {
-    _controllerRequestClient.reloadSegment(tableName, TableType.OFFLINE, forceDownload);
+    _controllerRequestClient.reloadSegment(tableName, segmentName, forceDownload);
   }
 
   protected void reloadRealtimeTable(String tableName)
       throws IOException {
-    _controllerRequestClient.reloadSegment(tableName, TableType.REALTIME, false);
+    _controllerRequestClient.reloadTable(tableName, TableType.REALTIME, false);
   }
 
   protected void createBrokerTenant(String tenantName, int numBrokers)
