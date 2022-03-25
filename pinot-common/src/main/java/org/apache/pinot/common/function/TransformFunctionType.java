@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.common.function;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -69,6 +72,18 @@ public enum TransformFunctionType {
   TIMECONVERT("timeConvert"),
   DATETIMECONVERT("dateTimeConvert"),
   DATETRUNC("dateTrunc"),
+  YEAR("year"),
+  YEAR_OF_WEEK("yearOfWeek", "yow"),
+  QUARTER("quarter"),
+  MONTH_OF_YEAR("monthOfYear", "month"),
+  WEEK_OF_YEAR("weekOfYear", "week"),
+  DAY_OF_YEAR("dayOfYear", "doy"),
+  DAY_OF_MONTH("dayOfMonth", "day"),
+  DAY_OF_WEEK("dayOfWeek", "dow"),
+  HOUR("hour"),
+  MINUTE("minute"),
+  SECOND("second"),
+  MILLISECOND("millisecond"),
   ARRAYLENGTH("arrayLength"),
   ARRAYAVERAGE("arrayAverage"),
   ARRAYMIN("arrayMin"),
@@ -112,14 +127,24 @@ public enum TransformFunctionType {
   GEOTOH3("geoToH3");
 
   private static final Set<String> NAMES = Arrays.stream(values()).flatMap(
-      func -> Stream.of(func.getName(), StringUtils.remove(func.getName(), '_').toUpperCase(),
-          StringUtils.remove(func.getName(), '_').toLowerCase(), func.getName().toUpperCase(),
-          func.getName().toLowerCase(), func.name(), func.name().toLowerCase())).collect(Collectors.toSet());
+      func -> func.getAliases().stream().flatMap(name -> Stream.of(name, StringUtils.remove(name, '_').toUpperCase(),
+          StringUtils.remove(name, '_').toLowerCase(), name.toUpperCase(),
+          name.toLowerCase()))).collect(Collectors.toSet());
 
   private final String _name;
+  private final List<String> _aliases;
 
-  TransformFunctionType(String name) {
+  TransformFunctionType(String name, String... aliases) {
     _name = name;
+    List<String> all = new ArrayList<>(aliases.length + 2);
+    all.add(name);
+    all.add(name());
+    all.addAll(Arrays.asList(aliases));
+    _aliases = Collections.unmodifiableList(all);
+  }
+
+  public List<String> getAliases() {
+    return _aliases;
   }
 
   public static boolean isTransformFunction(String functionName) {

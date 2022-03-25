@@ -466,11 +466,33 @@ public class GapfillProcessor {
     for (Object[] row : rows) {
       long timeBucket = _dateTimeFormatter.fromFormatToMillis(String.valueOf(row[_timeBucketColumnIndex]));
       int index = findGapfillBucketIndex(timeBucket);
-      if (bucketedItems[index] == null) {
-        bucketedItems[index] = new ArrayList<>();
+      if (index >= _numOfTimeBuckets) {
+        // the data will not be used for gapfill, skip it
+        continue;
       }
-      bucketedItems[index].add(row);
-      _groupByKeys.add(constructGroupKeys(row));
+      Key key = constructGroupKeys(row);
+      _groupByKeys.add(key);
+      if (index < 0) {
+        // the data can potentially be used for previous value
+        _previousByGroupKey.compute(key, (k, previousRow) -> {
+          if (previousRow == null) {
+            return row;
+          } else {
+            long previousTimeBucket =
+                _dateTimeFormatter.fromFormatToMillis(String.valueOf(previousRow[_timeBucketColumnIndex]));
+            if (timeBucket > previousTimeBucket) {
+              return row;
+            } else {
+              return previousRow;
+            }
+          }
+        });
+      } else {
+        if (bucketedItems[index] == null) {
+          bucketedItems[index] = new ArrayList<>();
+        }
+        bucketedItems[index].add(row);
+      }
     }
     return bucketedItems;
   }
