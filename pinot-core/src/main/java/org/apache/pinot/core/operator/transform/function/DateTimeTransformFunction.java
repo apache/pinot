@@ -26,8 +26,10 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.joda.time.DateTime;
+import org.joda.time.Chronology;
+import org.joda.time.DateTimeField;
 import org.joda.time.DateTimeZone;
+import org.joda.time.chrono.ISOChronology;
 
 
 public abstract class DateTimeTransformFunction extends BaseTransformFunction {
@@ -36,7 +38,8 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
       new TransformResultMetadata(FieldSpec.DataType.INT, true, false);
   private final String _name;
   private TransformFunction _timestampsFunction;
-  protected DateTimeZone _zoneId;
+  protected static final Chronology UTC = ISOChronology.getInstanceUTC();
+  protected Chronology _chronology;
 
   protected DateTimeTransformFunction(String name) {
     _name = name;
@@ -50,9 +53,10 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
       Preconditions.checkArgument(arguments.get(1) instanceof LiteralTransformFunction,
           "zoneId parameter %s must be a literal",
           _name);
-      _zoneId = DateTimeZone.forID(((LiteralTransformFunction) arguments.get(1)).getLiteral());
+      _chronology =
+          ISOChronology.getInstance(DateTimeZone.forID(((LiteralTransformFunction) arguments.get(1)).getLiteral()));
     } else {
-      _zoneId = DateTimeZone.UTC;
+      _chronology = UTC;
     }
   }
 
@@ -87,8 +91,9 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
 
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
+      DateTimeField accessor = _chronology.year();
       for (int i = 0; i < numDocs; i++) {
-        output[i] = new DateTime(timestamps[i], _zoneId).getYear();
+        output[i] = accessor.get(timestamps[i]);
       }
     }
   }
@@ -101,8 +106,9 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
 
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
+      DateTimeField accessor = _chronology.weekyear();
       for (int i = 0; i < numDocs; i++) {
-        output[i] = new DateTime(timestamps[i], _zoneId).getWeekyear();
+        output[i] = accessor.get(timestamps[i]);
       }
     }
   }
@@ -115,8 +121,9 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
 
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
+      DateTimeField accessor = _chronology.monthOfYear();
       for (int i = 0; i < numDocs; i++) {
-        output[i] = new DateTime(timestamps[i], _zoneId).getMonthOfYear();
+        output[i] = accessor.get(timestamps[i]);
       }
     }
   }
@@ -129,8 +136,9 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
 
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
+      DateTimeField accessor = _chronology.weekOfWeekyear();
       for (int i = 0; i < numDocs; i++) {
-        output[i] = new DateTime(timestamps[i], _zoneId).getWeekOfWeekyear();
+        output[i] = accessor.get(timestamps[i]);
       }
     }
   }
@@ -143,8 +151,9 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
 
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
+      DateTimeField accessor = _chronology.dayOfYear();
       for (int i = 0; i < numDocs; i++) {
-        output[i] = new DateTime(timestamps[i], _zoneId).getDayOfYear();
+        output[i] = accessor.get(timestamps[i]);
       }
     }
   }
@@ -157,8 +166,9 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
 
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
+      DateTimeField accessor = _chronology.dayOfMonth();
       for (int i = 0; i < numDocs; i++) {
-        output[i] = new DateTime(timestamps[i], _zoneId).getDayOfMonth();
+        output[i] = accessor.get(timestamps[i]);
       }
     }
   }
@@ -171,8 +181,9 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
 
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
+      DateTimeField accessor = _chronology.dayOfWeek();
       for (int i = 0; i < numDocs; i++) {
-        output[i] = new DateTime(timestamps[i], _zoneId).getDayOfWeek();
+        output[i] = accessor.get(timestamps[i]);
       }
     }
   }
@@ -185,8 +196,9 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
 
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
+      DateTimeField accessor = _chronology.hourOfDay();
       for (int i = 0; i < numDocs; i++) {
-        output[i] = new DateTime(timestamps[i], _zoneId).getHourOfDay();
+        output[i] = accessor.get(timestamps[i]);
       }
     }
   }
@@ -199,8 +211,9 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
 
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
+      DateTimeField accessor = _chronology.minuteOfHour();
       for (int i = 0; i < numDocs; i++) {
-        output[i] = new DateTime(timestamps[i], _zoneId).getMinuteOfHour();
+        output[i] = accessor.get(timestamps[i]);
       }
     }
   }
@@ -213,8 +226,9 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
 
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
+      DateTimeField accessor = _chronology.secondOfMinute();
       for (int i = 0; i < numDocs; i++) {
-        output[i] = new DateTime(timestamps[i], _zoneId).getSecondOfMinute();
+        output[i] = accessor.get(timestamps[i]);
       }
     }
   }
@@ -227,8 +241,9 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
 
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
+      DateTimeField accessor = _chronology.millisOfSecond();
       for (int i = 0; i < numDocs; i++) {
-        output[i] = new DateTime(timestamps[i], _zoneId).getMillisOfSecond();
+        output[i] = accessor.get(timestamps[i]);
       }
     }
   }
@@ -241,8 +256,9 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
 
     @Override
     protected void convert(long[] timestamps, int numDocs, int[] output) {
+      DateTimeField accessor = _chronology.monthOfYear();
       for (int i = 0; i < numDocs; i++) {
-        output[i] = (new DateTime(timestamps[i], _zoneId).getMonthOfYear() - 1) / 3 + 1;
+        output[i] = (accessor.get(timestamps[i]) - 1) / 3 + 1;
       }
     }
   }
