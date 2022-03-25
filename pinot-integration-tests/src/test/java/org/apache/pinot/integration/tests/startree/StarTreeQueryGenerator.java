@@ -16,9 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.tools.query.comparison;
+package org.apache.pinot.integration.tests.startree;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
 
 
 /**
@@ -36,7 +38,6 @@ public class StarTreeQueryGenerator {
   private static final String SELECT = "SELECT ";
   private static final String FROM = " FROM ";
   private static final String WHERE = " WHERE ";
-  private static final String GROUP_BY = " GROUP BY ";
   private static final String BETWEEN = " BETWEEN ";
   private static final String IN = " IN ";
   private static final String NOT_IN = " NOT IN ";
@@ -72,10 +73,9 @@ public class StarTreeQueryGenerator {
    * @param metricColumn metric column.
    * @return aggregation function.
    */
-  private StringBuilder generateAggregation(String metricColumn) {
-    StringBuilder stringBuilder =
-        new StringBuilder(_aggregationFunctions.get(RANDOM.nextInt(_aggregationFunctions.size())));
-    return stringBuilder.append('(').append(metricColumn).append(')');
+  private String generateAggregation(String metricColumn) {
+    return String.format("%s(%s)", _aggregationFunctions.get(RANDOM.nextInt(_aggregationFunctions.size())),
+        metricColumn);
   }
 
   /**
@@ -83,19 +83,14 @@ public class StarTreeQueryGenerator {
    *
    * @return aggregation section.
    */
-  private StringBuilder generateAggregations() {
-    StringBuilder stringBuilder = new StringBuilder();
-
+  private String generateAggregations() {
     int numAggregations = RANDOM.nextInt(MAX_NUM_AGGREGATIONS) + 1;
     int numMetrics = _metricColumns.size();
+    String[] aggregations = new String[numAggregations];
     for (int i = 0; i < numAggregations; i++) {
-      if (i != 0) {
-        stringBuilder.append(',').append(' ');
-      }
-      stringBuilder.append(generateAggregation(_metricColumns.get(RANDOM.nextInt(numMetrics))));
+      aggregations[i] = generateAggregation(_metricColumns.get(RANDOM.nextInt(numMetrics)));
     }
-
-    return stringBuilder;
+    return StringUtils.join(aggregations, ", ");
   }
 
   /**
@@ -104,7 +99,7 @@ public class StarTreeQueryGenerator {
    * @param dimensionColumn dimension column.
    * @return comparison predicate.
    */
-  private StringBuilder generateComparisonPredicate(String dimensionColumn) {
+  private String generateComparisonPredicate(String dimensionColumn) {
     StringBuilder stringBuilder = new StringBuilder(dimensionColumn);
 
     stringBuilder.append(' ').append(COMPARATORS.get(RANDOM.nextInt(COMPARATORS.size()))).append(' ');
@@ -117,7 +112,7 @@ public class StarTreeQueryGenerator {
       stringBuilder.append(value);
     }
 
-    return stringBuilder;
+    return stringBuilder.toString();
   }
 
   /**
@@ -126,7 +121,7 @@ public class StarTreeQueryGenerator {
    * @param dimensionColumn dimension column.
    * @return between predicate.
    */
-  private StringBuilder generateBetweenPredicate(String dimensionColumn) {
+  private String generateBetweenPredicate(String dimensionColumn) {
     StringBuilder stringBuilder = new StringBuilder(dimensionColumn).append(BETWEEN);
 
     List<Object> valueArray = _singleValueDimensionValuesMap.get(dimensionColumn);
@@ -154,7 +149,7 @@ public class StarTreeQueryGenerator {
       }
     }
 
-    return stringBuilder;
+    return stringBuilder.toString();
   }
 
   /**
@@ -163,7 +158,7 @@ public class StarTreeQueryGenerator {
    * @param dimensionColumn dimension column.
    * @return in predicate.
    */
-  private StringBuilder generateInPredicate(String dimensionColumn) {
+  private String generateInPredicate(String dimensionColumn) {
     StringBuilder stringBuilder = new StringBuilder(dimensionColumn);
     if (RANDOM.nextBoolean()) {
       stringBuilder.append(IN).append('(');
@@ -210,7 +205,7 @@ public class StarTreeQueryGenerator {
       }
     }
 
-    return stringBuilder.append(')');
+    return stringBuilder.append(')').toString();
   }
 
   /**
@@ -218,7 +213,7 @@ public class StarTreeQueryGenerator {
    *
    * @return all predicates.
    */
-  private StringBuilder generatePredicates() {
+  private String generatePredicates() {
     int numPredicates = RANDOM.nextInt(MAX_NUM_PREDICATES + 1);
     if (numPredicates == 0) {
       return null;
@@ -245,31 +240,22 @@ public class StarTreeQueryGenerator {
       }
     }
 
-    return stringBuilder;
+    return stringBuilder.toString();
   }
 
   /**
-   * Randomly generate the GROUP BY section, may return empty string.
-   *
-   * @return group by section.
+   * Randomly generate the GROUP BY and ORDER BY section with the same columns, may return empty string.
    */
-  private StringBuilder generateGroupBys() {
-    int numGroupBys = RANDOM.nextInt(MAX_NUM_GROUP_BYS + 1);
-    if (numGroupBys == 0) {
+  private String generateGroupBysAndOrderBys() {
+    int numColumns = RANDOM.nextInt(MAX_NUM_GROUP_BYS + 1);
+    if (numColumns == 0) {
       return null;
     }
 
-    StringBuilder stringBuilder = new StringBuilder(GROUP_BY);
-
-    int numDimensions = _singleValueDimensionColumns.size();
-    for (int i = 0; i < numGroupBys; i++) {
-      if (i != 0) {
-        stringBuilder.append(',').append(' ');
-      }
-      stringBuilder.append(_singleValueDimensionColumns.get(RANDOM.nextInt(numDimensions)));
-    }
-
-    return stringBuilder;
+    List<String> dimensions = new ArrayList<>(_singleValueDimensionColumns);
+    Collections.shuffle(dimensions);
+    String columns = StringUtils.join(dimensions.subList(0, numColumns), ", ");
+    return String.format(" GROUP BY %s ORDER BY %s", columns, columns);
   }
 
   /**
@@ -277,17 +263,17 @@ public class StarTreeQueryGenerator {
    *
    * @param aggregations aggregation section.
    * @param predicates predicate section.
-   * @param groupBys group by section.
+   * @param groupBysAndOrderBys group by and order by section.
    * @return overall query.
    */
-  private String buildQuery(StringBuilder aggregations, StringBuilder predicates, StringBuilder groupBys) {
+  private String buildQuery(String aggregations, String predicates, String groupBysAndOrderBys) {
     StringBuilder stringBuilder = new StringBuilder(SELECT).append(aggregations);
     stringBuilder.append(FROM).append(_tableName);
     if (predicates != null) {
       stringBuilder.append(predicates);
     }
-    if (groupBys != null) {
-      stringBuilder.append(groupBys);
+    if (groupBysAndOrderBys != null) {
+      stringBuilder.append(groupBysAndOrderBys);
     }
     return stringBuilder.toString();
   }
@@ -298,6 +284,6 @@ public class StarTreeQueryGenerator {
    * @return Return the generated query.
    */
   public String nextQuery() {
-    return buildQuery(generateAggregations(), generatePredicates(), generateGroupBys());
+    return buildQuery(generateAggregations(), generatePredicates(), generateGroupBysAndOrderBys());
   }
 }
