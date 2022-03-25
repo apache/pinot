@@ -24,6 +24,8 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
+import org.roaringbitmap.buffer.BufferFastAggregation;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 public class OrFilterOperator extends BaseFilterOperator {
@@ -59,5 +61,26 @@ public class OrFilterOperator extends BaseFilterOperator {
   @Override
   public List<Operator> getChildOperators() {
     return new ArrayList<>(_filterOperators);
+  }
+
+  @Override
+  public boolean canOptimizeCount() {
+    boolean allChildrenProduceBitmaps = true;
+    for (BaseFilterOperator child : _filterOperators) {
+      allChildrenProduceBitmaps &= child.canProduceBitmaps();
+    }
+    return allChildrenProduceBitmaps;
+  }
+
+  @Override
+  public int getNumMatchingDocs() {
+    if (_filterOperators.size() == 2) {
+      return _filterOperators.get(0).getBitmaps().orCardinality(_filterOperators.get(1).getBitmaps());
+    }
+    ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[_filterOperators.size()];
+    for (int i = 0; i < _filterOperators.size(); i++) {
+      bitmaps[i] = _filterOperators.get(i).getBitmaps().reduce();
+    }
+    return BufferFastAggregation.or(bitmaps).getCardinality();
   }
 }

@@ -33,6 +33,7 @@ import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.CombinedFilterOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
+import org.apache.pinot.core.operator.query.FastFilteredCountOperator;
 import org.apache.pinot.core.operator.query.FilteredAggregationOperator;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
@@ -177,7 +178,10 @@ public class AggregationPlanNode implements PlanNode {
     FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);
     BaseFilterOperator filterOperator = filterPlanNode.run();
 
-    // Use metadata/dictionary to solve the query if possible
+    if (canOptimizeFilteredCount(filterOperator, aggregationFunctions)) {
+      return new FastFilteredCountOperator(aggregationFunctions, filterOperator, _indexSegment.getSegmentMetadata());
+    }
+
     if (filterOperator.isResultMatchingAll()) {
       if (isFitForNonScanBasedPlan(aggregationFunctions, _indexSegment)) {
         DataSource[] dataSources = new DataSource[aggregationFunctions.length];
@@ -252,5 +256,11 @@ public class AggregationPlanNode implements PlanNode {
       return false;
     }
     return true;
+  }
+
+  private static boolean canOptimizeFilteredCount(BaseFilterOperator filterOperator,
+      AggregationFunction[] aggregationFunctions) {
+    return (aggregationFunctions.length == 1 && aggregationFunctions[0].getType() == COUNT)
+        && filterOperator.canOptimizeCount();
   }
 }
