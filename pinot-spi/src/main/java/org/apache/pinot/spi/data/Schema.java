@@ -735,8 +735,7 @@ public final class Schema implements Serializable {
     String outgoingTimeFormat = outgoingGranularitySpec.getTimeFormat();
     String[] split = StringUtils.split(outgoingTimeFormat, DateTimeFormatSpec.COLON_SEPARATOR, 2);
     DateTimeFormatSpec formatSpec;
-    if (split[0].equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()) || split[0].equals(
-        DateTimeFieldSpec.TimeFormat.TIMESTAMP.toString())) {
+    if (split[0].equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString())) {
       formatSpec = new DateTimeFormatSpec(outgoingTimeSize, outgoingTimeUnit.toString(), split[0]);
     } else {
       formatSpec = new DateTimeFormatSpec(outgoingTimeSize, outgoingTimeUnit.toString(), split[0], split[1]);
