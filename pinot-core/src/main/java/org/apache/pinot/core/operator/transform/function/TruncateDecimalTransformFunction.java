@@ -31,7 +31,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 public class TruncateDecimalTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "truncate";
-  private double[] _result;
   private TransformFunction _leftTransformFunction;
   private TransformFunction _rightTransformFunction;
   private int _scale;
@@ -85,26 +84,26 @@ public class TruncateDecimalTransformFunction extends BaseTransformFunction {
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
 
-    if (_result == null || _result.length < length) {
-      _result = new double[length];
+    if (_doubleValuesSV == null || _doubleValuesSV.length < length) {
+      _doubleValuesSV = new double[length];
     }
 
     double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(projectionBlock);
     if (_scale != Integer.MIN_VALUE) {
       for (int i = 0; i < length; i++) {
-        _result[i] = BigDecimal.valueOf(leftValues[i]).setScale(_scale, RoundingMode.DOWN).doubleValue();
+        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i]).setScale(_scale, RoundingMode.DOWN).doubleValue();
       }
     } else if (_rightTransformFunction != null) {
       int[] rightValues = _rightTransformFunction.transformToIntValuesSV(projectionBlock);
       for (int i = 0; i < length; i++) {
-        _result[i] = BigDecimal.valueOf(leftValues[i]).setScale(rightValues[i], RoundingMode.DOWN).doubleValue();
+        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i]).setScale(rightValues[i], RoundingMode.DOWN).doubleValue();
       }
     } else {
       for (int i = 0; i < length; i++) {
-        _result[i] = Math.signum(leftValues[i]) * Math.floor(Math.abs(leftValues[i]));
+        _doubleValuesSV[i] = Math.signum(leftValues[i]) * Math.floor(Math.abs(leftValues[i]));
       }
     }
 
-    return _result;
+    return _doubleValuesSV;
   }
 }

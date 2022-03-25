@@ -29,7 +29,6 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 public class TrigonometricTransformFunctions {
   public static class Atan2TransformFunction extends BaseTransformFunction {
     public static final String FUNCTION_NAME = "atan2";
-    private double[] _result;
     private TransformFunction _leftTransformFunction;
     private TransformFunction _rightTransformFunction;
 
@@ -61,17 +60,17 @@ public class TrigonometricTransformFunctions {
     public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
       int length = projectionBlock.getNumDocs();
 
-      if (_result == null || _result.length < length) {
-        _result = new double[length];
+      if (_doubleValuesSV == null || _doubleValuesSV.length < length) {
+        _doubleValuesSV = new double[length];
       }
 
       double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(projectionBlock);
       double[] rightValues = _rightTransformFunction.transformToDoubleValuesSV(projectionBlock);
       for (int i = 0; i < length; i++) {
-        _result[i] = Math.atan2(leftValues[i], rightValues[i]);
+        _doubleValuesSV[i] = Math.atan2(leftValues[i], rightValues[i]);
       }
 
-      return _result;
+      return _doubleValuesSV;
     }
   }
 

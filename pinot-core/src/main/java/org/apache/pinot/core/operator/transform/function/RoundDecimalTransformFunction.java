@@ -33,7 +33,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 // but it is not possible because of existing DateTimeFunction with same name.
 public class RoundDecimalTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "roundDecimal";
-  private double[] _result;
   private TransformFunction _leftTransformFunction;
   private TransformFunction _rightTransformFunction;
   private int _scale;
@@ -87,26 +86,26 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
 
-    if (_result == null || _result.length < length) {
-      _result = new double[length];
+    if (_doubleValuesSV == null || _doubleValuesSV.length < length) {
+      _doubleValuesSV = new double[length];
     }
 
     double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(projectionBlock);
     if (_scale != Integer.MIN_VALUE) {
       for (int i = 0; i < length; i++) {
-        _result[i] = BigDecimal.valueOf(leftValues[i]).setScale(_scale, RoundingMode.HALF_UP).doubleValue();
+        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i]).setScale(_scale, RoundingMode.HALF_UP).doubleValue();
       }
     } else if (_rightTransformFunction != null) {
       int[] rightValues = _rightTransformFunction.transformToIntValuesSV(projectionBlock);
       for (int i = 0; i < length; i++) {
-        _result[i] = BigDecimal.valueOf(leftValues[i]).setScale(rightValues[i], RoundingMode.HALF_UP).doubleValue();
+        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i]).setScale(rightValues[i], RoundingMode.HALF_UP).doubleValue();
       }
     } else {
       for (int i = 0; i < length; i++) {
-        _result[i] = BigDecimal.valueOf(leftValues[i]).setScale(0, RoundingMode.HALF_UP).doubleValue();
+        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i]).setScale(0, RoundingMode.HALF_UP).doubleValue();
       }
     }
 
-    return _result;
+    return _doubleValuesSV;
   }
 }
