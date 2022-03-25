@@ -1306,7 +1306,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setOffHeap(_isOffHeap).setMemoryManager(_memoryManager)
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
             .setAggregateMetrics(indexingConfig.isAggregateMetrics())
-            .setPreAggregationConfigs(indexingConfig.getPreAggregationConfigs())
+            .setPreAggregationConfigs(IngestionConfigUtils.getAggregationConfigs(tableConfig))
             .setNullHandlingEnabled(_nullHandlingEnabled)
             .setConsumerDir(consumerDir).setUpsertMode(tableConfig.getUpsertMode())
             .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)

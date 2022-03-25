@@ -268,7 +268,7 @@ public class TableConfigUtils {
 
     if (ingestionConfig == null) {
       if (batchIngestionConfig != null || streamIngestionConfig != null) {
-        ingestionConfig = new IngestionConfig(batchIngestionConfig, streamIngestionConfig, null, null, null);
+        ingestionConfig = new IngestionConfig(batchIngestionConfig, streamIngestionConfig, null,  null, null, null);
       }
     } else {
       if (batchIngestionConfig != null) {

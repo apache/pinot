@@ -81,7 +81,7 @@ public class PinotSinkIntegrationTest extends BaseClusterIntegrationTest {
     batchConfigs.put(BatchConfigProperties.OVERWRITE_OUTPUT, "false");
     batchConfigs.put(BatchConfigProperties.PUSH_CONTROLLER_URI, _controllerBaseApiUrl);
     IngestionConfig ingestionConfig =
-        new IngestionConfig(new BatchIngestionConfig(Collections.singletonList(batchConfigs), "APPEND", "HOURLY"), null,
+        new IngestionConfig(new BatchIngestionConfig(Collections.singletonList(batchConfigs), "APPEND", "HOURLY"), null, null,
             null, null, null);
     _tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setIngestionConfig(ingestionConfig)

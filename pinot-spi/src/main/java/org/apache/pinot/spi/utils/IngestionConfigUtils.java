@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.spi.config.table.AggregationConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
@@ -71,6 +72,17 @@ public final class IngestionConfigUtils {
       throw new IllegalStateException("Could not find streamConfigs for REALTIME table: " + tableNameWithType);
     }
     return streamConfigMap;
+  }
+
+  public static List<AggregationConfig> getAggregationConfigs(TableConfig tableConfig) {
+    String tableNameWithType = tableConfig.getTableName();
+    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
+        "Cannot fetch streamConfigs for OFFLINE table: %s", tableNameWithType);
+
+    if (tableConfig.getIngestionConfig() != null) {
+      return tableConfig.getIngestionConfig().getAggregationConfigs();
+    }
+    return null;
   }
 
   /**

@@ -52,7 +52,6 @@ public class IndexingConfig extends BaseJsonConfig {
   private boolean _enableDynamicStarTreeCreation;
   private SegmentPartitionConfig _segmentPartitionConfig;
   private boolean _aggregateMetrics;
-  private List<PreAggregationConfig> _preAggregationConfigs;
   private boolean _nullHandlingEnabled;
 
   // TODO: Add a new configuration related to the segment generation
@@ -267,15 +266,6 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setAggregateMetrics(boolean value) {
     _aggregateMetrics = value;
-  }
-
-  @Nullable
-  public List<PreAggregationConfig> getPreAggregationConfigs() {
-    return _preAggregationConfigs;
-  }
-
-  public void setPreAggregationConfigs(List<PreAggregationConfig> preAggregationConfigs) {
-    _preAggregationConfigs = preAggregationConfigs;
   }
 
   public boolean isNullHandlingEnabled() {

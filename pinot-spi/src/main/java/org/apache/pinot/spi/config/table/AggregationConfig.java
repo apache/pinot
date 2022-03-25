@@ -24,7 +24,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-public class PreAggregationConfig extends BaseJsonConfig {
+public class AggregationConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Aggregated column name")
   private final String _columnName;
@@ -33,7 +33,7 @@ public class PreAggregationConfig extends BaseJsonConfig {
   private final String _aggregationFunction;
 
   @JsonCreator
-  public PreAggregationConfig(@JsonProperty("columnName") String columnName,
+  public AggregationConfig(@JsonProperty("columnName") String columnName,
       @JsonProperty("aggregationFunction") String aggregationFunction) {
     _columnName = columnName;
     _aggregationFunction = aggregationFunction;
