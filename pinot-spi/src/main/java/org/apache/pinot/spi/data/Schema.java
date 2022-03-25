@@ -752,8 +752,8 @@ public final class Schema implements Serializable {
       TimeUnit incomingTimeUnit = incomingGranularitySpec.getTimeType();
       String incomingTimeFormat = incomingGranularitySpec.getTimeFormat();
       Preconditions.checkState(
-          incomingTimeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()) && outgoingTimeFormat
-              .equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()),
+          (incomingTimeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()) || incomingTimeFormat.equals(
+              DateTimeFieldSpec.TimeFormat.TIMESTAMP.toString())) && outgoingTimeFormat.equals(incomingTimeFormat),
           "Conversion from incoming to outgoing is not supported for SIMPLE_DATE_FORMAT");
       String transformFunction =
           constructTransformFunctionString(incomingName, incomingTimeSize, incomingTimeUnit, outgoingTimeSize,
