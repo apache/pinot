@@ -126,13 +126,17 @@ public class BenchmarkQueries extends BaseQueriesTest {
       + "FROM MyTable GROUP BY LOW_CARDINALITY_STRING_COL,NO_INDEX_STRING_COL "
       + "ORDER BY LOW_CARDINALITY_STRING_COL, NO_INDEX_STRING_COL ASC";
 
+  public static final String TIME_GROUP_BY = "select count(*), "
+      + "year(INT_COL) as y, month(INT_COL) as m "
+      + "from MyTable group by y, m";
+
   @Param("1500000")
   private int _numRows;
   @Param({"EXP(0.001)", "EXP(0.5)", "EXP(0.999)"})
   String _scenario;
   @Param({
       MULTI_GROUP_BY_WITH_RAW_QUERY, MULTI_GROUP_BY_WITH_RAW_QUERY_2, FILTERED_QUERY, NON_FILTERED_QUERY,
-      SUM_QUERY, NO_INDEX_LIKE_QUERY, MULTI_GROUP_BY_ORDER_BY, MULTI_GROUP_BY_ORDER_BY_LOW_HIGH
+      SUM_QUERY, NO_INDEX_LIKE_QUERY, MULTI_GROUP_BY_ORDER_BY, MULTI_GROUP_BY_ORDER_BY_LOW_HIGH, TIME_GROUP_BY
   })
   String _query;
   private IndexSegment _indexSegment;
