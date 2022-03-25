@@ -29,6 +29,13 @@ import org.apache.pinot.spi.data.Schema;
 
 /**
  * Extends Java-base TypeFactory from Calcite.
+ *
+ * <p>{@link JavaTypeFactoryImpl} is used here because we are not overriding much of the TypeFactory methods
+ * required by Calcite. We will start extending {@link SqlTypeFactoryImpl} or even {@link RelDataTypeFactory}
+ * when necessary for Pinot to override such mechanism.
+ *
+ * <p>Noted that {@link JavaTypeFactoryImpl} is subject to change. Please pay extra attention to this class when
+ * upgrading Calcite versions.
  */
 public class TypeFactory extends JavaTypeFactoryImpl {
   private final RelDataTypeSystem _typeSystem;
@@ -63,11 +70,13 @@ public class TypeFactory extends JavaTypeFactoryImpl {
         return createSqlType(SqlTypeName.VARCHAR);
       case BYTES:
         return createSqlType(SqlTypeName.VARBINARY);
-      // TODO: support the following types once we have operator supports.
       case JSON:
+        // TODO: support JSON, JSON should be supported using a special RelDataType as it is not a simple String,
+        // nor can it be easily parsed as a STRUCT.
+      case LIST:
+        // TODO: support LIST, MV column should go fall into this category.
       case STRUCT:
       case MAP:
-      case LIST:
       default:
         throw new UnsupportedOperationException("unsupported!");
     }

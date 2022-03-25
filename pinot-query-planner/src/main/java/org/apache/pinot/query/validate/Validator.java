@@ -30,6 +30,7 @@ import org.apache.calcite.sql.validate.SqlValidatorImpl;
 public class Validator extends SqlValidatorImpl {
 
   public Validator(SqlOperatorTable opTab, SqlValidatorCatalogReader catalogReader, RelDataTypeFactory typeFactory) {
+    // TODO: support BABEL validator. Currently parser conformance is set to use BABEL.
     super(opTab, catalogReader, typeFactory, Config.DEFAULT);
   }
 }

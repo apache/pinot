@@ -100,6 +100,17 @@ public class QueryEnvironment {
   /**
    * Plan a SQL query.
    *
+   * <p>Noted that since Calcite's {@link org.apache.calcite.tools.Planner} is not threadsafe.
+   * Only one query query can be planned at a time. Afterwards planner needs to be reset in order to clear the
+   * state for the next planning.
+   *
+   * <p>In order for faster planning, we pre-constructed all the planner objects and use the plan-then-reset
+   * model. Thusn when using {@code QueryEnvironment#planQuery(String)}, caller should ensure that no concurrent
+   * plan execution occurs.
+   *
+   * TODO: follow benchmark and profile to measure whether it make sense for the latency-concurrency trade-off
+   * between reusing plannerImpl vs. create a new planner for each query.
+   *
    * @param sqlQuery SQL query string.
    * @return a dispatchable query plan
    */
@@ -114,8 +125,6 @@ public class QueryEnvironment {
     } catch (Exception e) {
       throw new RuntimeException("Error composing query plan for: " + sqlQuery, e);
     } finally {
-      // TODO: No 2 query should be planned at the same time, because PlannerImpl is stateful.
-      // make calls to planQuery sequentially
       _planner.close();
       _planner.reset();
     }
