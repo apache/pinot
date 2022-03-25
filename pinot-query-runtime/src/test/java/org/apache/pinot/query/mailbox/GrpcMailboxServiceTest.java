@@ -19,6 +19,7 @@
 package org.apache.pinot.query.mailbox;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.Map;
@@ -65,7 +66,7 @@ public class GrpcMailboxServiceTest extends GrpcMailboxServiceTestBase {
   private Mailbox.MailboxContent getTestMailboxContent(String mailboxId)
       throws IOException {
     return Mailbox.MailboxContent.newBuilder().setMailboxId(mailboxId)
-        .putAllMetadata(Map.of("key", "value", "finished", "true"))
+        .putAllMetadata(ImmutableMap.of("key", "value", "finished", "true"))
         .setPayload(ByteString.copyFrom(new DataTableBlock(DataTableBuilder.getEmptyDataTable()).toBytes())).build();
   }
 }

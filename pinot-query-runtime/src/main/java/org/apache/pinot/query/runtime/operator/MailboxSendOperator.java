@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.List;
@@ -42,7 +43,7 @@ import org.slf4j.LoggerFactory;
 public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxSendOperator.class);
   private static final Set<RelDistribution.Type> SUPPORTED_EXCHANGE_TYPE =
-      Set.of(RelDistribution.Type.SINGLETON, RelDistribution.Type.RANDOM_DISTRIBUTED,
+      ImmutableSet.of(RelDistribution.Type.SINGLETON, RelDistribution.Type.RANDOM_DISTRIBUTED,
           RelDistribution.Type.BROADCAST_DISTRIBUTED);
 
   private final List<ServerInstance> _receivingStageInstances;
