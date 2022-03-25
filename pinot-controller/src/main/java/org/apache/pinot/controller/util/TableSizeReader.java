@@ -32,12 +32,13 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.controller.api.resources.ServerTableSizeReader;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,36 +79,40 @@ public class TableSizeReader {
     Preconditions.checkNotNull(tableName, "Table name should not be null");
     Preconditions.checkArgument(timeoutMsec > 0, "Timeout value must be greater than 0");
 
-    boolean hasRealtimeTable = false;
-    boolean hasOfflineTable = false;
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    TableConfig offlineTableConfig =
+        ZKMetadataProvider.getOfflineTableConfig(_helixResourceManager.getPropertyStore(), tableName);
+    TableConfig realtimeTableConfig =
+        ZKMetadataProvider.getRealtimeTableConfig(_helixResourceManager.getPropertyStore(), tableName);
 
-    if (tableType != null) {
-      hasRealtimeTable = tableType == TableType.REALTIME;
-      hasOfflineTable = tableType == TableType.OFFLINE;
-    } else {
-      hasRealtimeTable = _helixResourceManager.hasRealtimeTable(tableName);
-      hasOfflineTable = _helixResourceManager.hasOfflineTable(tableName);
-    }
-
-    if (!hasOfflineTable && !hasRealtimeTable) {
+    if (offlineTableConfig == null && realtimeTableConfig == null) {
       return null;
     }
-
     TableSizeDetails tableSizeDetails = new TableSizeDetails(tableName);
-
-    if (hasRealtimeTable) {
+    if (realtimeTableConfig != null) {
       String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
       tableSizeDetails._realtimeSegments = getTableSubtypeSize(realtimeTableName, timeoutMsec);
       tableSizeDetails._reportedSizeInBytes += tableSizeDetails._realtimeSegments._reportedSizeInBytes;
       tableSizeDetails._estimatedSizeInBytes += tableSizeDetails._realtimeSegments._estimatedSizeInBytes;
+
+      _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.TABLE_TOTAL_SIZE_ON_SERVER,
+          tableSizeDetails._realtimeSegments._estimatedSizeInBytes);
+      _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.TABLE_SIZE_PER_REPLICA_ON_SERVER,
+          tableSizeDetails._realtimeSegments._estimatedSizeInBytes / _helixResourceManager.getNumReplicas(
+              realtimeTableConfig));
     }
-    if (hasOfflineTable) {
+    if (offlineTableConfig != null) {
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
       tableSizeDetails._offlineSegments = getTableSubtypeSize(offlineTableName, timeoutMsec);
       tableSizeDetails._reportedSizeInBytes += tableSizeDetails._offlineSegments._reportedSizeInBytes;
       tableSizeDetails._estimatedSizeInBytes += tableSizeDetails._offlineSegments._estimatedSizeInBytes;
+
+      _controllerMetrics.setValueOfTableGauge(offlineTableName, ControllerGauge.TABLE_TOTAL_SIZE_ON_SERVER,
+          tableSizeDetails._offlineSegments._estimatedSizeInBytes);
+      _controllerMetrics.setValueOfTableGauge(offlineTableName, ControllerGauge.TABLE_SIZE_PER_REPLICA_ON_SERVER,
+          tableSizeDetails._offlineSegments._estimatedSizeInBytes / _helixResourceManager.getNumReplicas(
+              offlineTableConfig));
     }
+
     return tableSizeDetails;
   }
 

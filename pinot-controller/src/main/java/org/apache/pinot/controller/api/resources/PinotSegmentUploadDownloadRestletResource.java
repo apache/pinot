@@ -214,17 +214,28 @@ public class PinotSegmentUploadDownloadRestletResource {
       boolean uploadedSegmentIsEncrypted = !Strings.isNullOrEmpty(crypterClassNameInHeader);
       FileUploadDownloadClient.FileUploadType uploadType = getUploadType(uploadTypeStr);
       File dstFile = uploadedSegmentIsEncrypted ? tempEncryptedFile : tempDecryptedFile;
+      long segmentSizeInBytes;
       switch (uploadType) {
         case URI:
           downloadSegmentFileFromURI(downloadUri, dstFile, tableName);
+          segmentSizeInBytes = dstFile.length();
           break;
         case SEGMENT:
           createSegmentFileFromMultipart(multiPart, dstFile);
+          segmentSizeInBytes = dstFile.length();
           break;
         case METADATA:
           moveSegmentToFinalLocation = false;
           Preconditions.checkState(downloadUri != null, "Download URI is required in segment metadata upload mode");
           createSegmentFileFromMultipart(multiPart, dstFile);
+          try {
+            URI segmentURI = new URI(downloadUri);
+            PinotFS pinotFS = PinotFSFactory.create(segmentURI.getScheme());
+            segmentSizeInBytes = pinotFS.length(segmentURI);
+          } catch (Exception e) {
+            segmentSizeInBytes = -1;
+            LOGGER.warn("Could not fetch segment size for metadata push", e);
+          }
           break;
         default:
           throw new UnsupportedOperationException("Unsupported upload type: " + uploadType);
@@ -302,7 +313,7 @@ public class PinotSegmentUploadDownloadRestletResource {
 
       // Zk operations
       completeZkOperations(enableParallelPushProtection, headers, finalSegmentFile, tableNameWithType, segmentMetadata,
-          segmentName, zkDownloadUri, moveSegmentToFinalLocation, crypterClassName, allowRefresh);
+          segmentName, zkDownloadUri, moveSegmentToFinalLocation, crypterClassName, allowRefresh, segmentSizeInBytes);
 
       return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + tableNameWithType);
     } catch (WebApplicationException e) {
@@ -397,15 +408,15 @@ public class PinotSegmentUploadDownloadRestletResource {
 
   private void completeZkOperations(boolean enableParallelPushProtection, HttpHeaders headers, File uploadedSegmentFile,
       String tableNameWithType, SegmentMetadata segmentMetadata, String segmentName, String zkDownloadURI,
-      boolean moveSegmentToFinalLocation, String crypter, boolean allowRefresh)
+      boolean moveSegmentToFinalLocation, String crypter, boolean allowRefresh, long segmentSizeInBytes)
       throws Exception {
     String basePath = ControllerFilePathProvider.getInstance().getDataDirURI().toString();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     URI finalSegmentLocationURI = URIUtils.getUri(basePath, rawTableName, URIUtils.encode(segmentName));
     ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
-    zkOperator
-        .completeSegmentOperations(tableNameWithType, segmentMetadata, finalSegmentLocationURI, uploadedSegmentFile,
-            enableParallelPushProtection, headers, zkDownloadURI, moveSegmentToFinalLocation, crypter, allowRefresh);
+    zkOperator.completeSegmentOperations(tableNameWithType, segmentMetadata, finalSegmentLocationURI,
+        uploadedSegmentFile, enableParallelPushProtection, headers, zkDownloadURI, moveSegmentToFinalLocation, crypter,
+        allowRefresh, segmentSizeInBytes);
   }
 
   private void decryptFile(String crypterClassName, File tempEncryptedFile, File tempDecryptedFile) {

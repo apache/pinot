@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.validation;
 
 import com.google.common.base.Preconditions;
-import java.util.Set;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -27,7 +26,6 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,17 +84,7 @@ public class StorageQuotaChecker {
     // 3. update predicted segment sizes
     // 4. is the updated size within quota
     QuotaConfig quotaConfig = _tableConfig.getQuotaConfig();
-    int numReplicas;
-
-    if (_tableConfig.isDimTable()) {
-      // If the table is a dimension table then fetch the tenant config and get the number of server belonging
-      // to the tenant
-      TenantConfig tenantConfig = _tableConfig.getTenantConfig();
-      Set<String> serverInstances = _pinotHelixResourceManager.getAllInstancesForServerTenant(tenantConfig.getServer());
-      numReplicas = serverInstances.size();
-    } else {
-      numReplicas = _tableConfig.getValidationConfig().getReplicationNumber();
-    }
+    int numReplicas = _pinotHelixResourceManager.getNumReplicas(_tableConfig);
 
     final String tableNameWithType = _tableConfig.getTableName();
 
