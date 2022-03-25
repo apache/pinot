@@ -87,8 +87,19 @@ public class ExpressionTransformer implements RecordTransformer {
       return;
     }
 
+    List<String> arguments = functionEvaluator.getArguments();
+    if (arguments.size() == 1 && arguments.get(0).equals(column)) {
+      // Transform functions with same source and sink column are supported and are not considered as an expression
+      // cycle.
+      //         "transformConfigs": [{
+      //            "columnName": "jsonColumn",
+      //            "transformFunction": "JSON_FORMAT(jsonColumn)"
+      //          }]
+      _expressionEvaluators.put(column, functionEvaluator);
+      return;
+    }
+
     if (discoveredNames.add(column)) {
-      List<String> arguments = functionEvaluator.getArguments();
       for (String arg : arguments) {
         if (!_expressionEvaluators.containsKey(arg)) {
           topologicalSort(arg, expressionEvaluators, discoveredNames);
@@ -112,6 +123,11 @@ public class ExpressionTransformer implements RecordTransformer {
       if (record.getValue(column) == null) {
         Object result = transformFunctionEvaluator.evaluate(record);
         record.putValue(column, result);
+      } else {
+        List<String> arguments = transformFunctionEvaluator.getArguments();
+        if (arguments.size() == 1 && arguments.get(0).equals(column)) {
+          record.putValue(column, transformFunctionEvaluator.evaluate(record));
+        }
       }
     }
     return record;

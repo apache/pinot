@@ -329,4 +329,39 @@ public class ExpressionTransformerTest {
             .setIngestionConfig(ingestionConfig).build();
     ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
   }
+
+  /**
+   * Test for supporting transform function that have same LHS and RHS column (column a in the example below):
+   *         "transformConfigs": [{
+   *            "columnName": "a",
+   *            "transformFunction": "plus(a,10)"
+   *          }]
+   */
+  @Test
+  public void testSameColumnSameTransforms() {
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("a", FieldSpec.DataType.INT)
+        .addSingleValueDimension("b", FieldSpec.DataType.STRING).addSingleValueDimension("c", FieldSpec.DataType.INT)
+        .build();
+
+    // Define transform function dependencies.
+    List<TransformConfig> transformConfigs = new ArrayList<>();
+    transformConfigs.add(new TransformConfig("a", "plus(a,10)"));
+    transformConfigs.add(new TransformConfig("b", "reverse(trim(b))"));
+
+    IngestionConfig ingestionConfig = new IngestionConfig(null, null, null, transformConfigs, null);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testSameColumnSameTransforms")
+            .setIngestionConfig(ingestionConfig).build();
+
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+    GenericRow genericRow = new GenericRow();
+    genericRow.putValue("a", 100);
+    genericRow.putValue("b", "abcd ");
+    genericRow.putValue("c", 200);
+    GenericRow transform = expressionTransformer.transform(genericRow);
+
+    Assert.assertEquals(110.0, transform.getValue("a"));
+    Assert.assertEquals("dcba", transform.getValue("b"));
+    Assert.assertEquals(200, transform.getValue("c"));
+  }
 }
