@@ -36,7 +36,7 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
   private double[] _result;
   private TransformFunction _leftTransformFunction;
   private TransformFunction _rightTransformFunction;
-  private Integer _scale;
+  private int _scale;
 
   @Override
   public String getName() {
@@ -58,7 +58,7 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
       if (_rightTransformFunction instanceof LiteralTransformFunction) {
         _scale = Integer.parseInt(((LiteralTransformFunction) _rightTransformFunction).getLiteral());
       } else {
-        _scale = null;
+        _scale = Integer.MIN_VALUE;
       }
       Preconditions.checkArgument(
           _rightTransformFunction.getResultMetadata().isSingleValue() && isIntegralResultDatatype(
@@ -66,7 +66,7 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
           "Argument must be single-valued with type INT or LONG for transform function: %s", getName());
     } else {
       _rightTransformFunction = null;
-      _scale = null;
+      _scale = Integer.MIN_VALUE;
     }
 
     Preconditions.checkArgument(_leftTransformFunction.getResultMetadata().isSingleValue(),
@@ -92,7 +92,7 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
     }
 
     double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(projectionBlock);
-    if (_scale != null) {
+    if (_scale != Integer.MIN_VALUE) {
       for (int i = 0; i < length; i++) {
         _result[i] = BigDecimal.valueOf(leftValues[i]).setScale(_scale, RoundingMode.HALF_UP).doubleValue();
       }
