@@ -49,6 +49,7 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.http.client.entity.EntityBuilder;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.ZkStarter;
@@ -82,7 +83,7 @@ public abstract class ControllerTest {
   protected static final String SERVER_INSTANCE_ID_PREFIX = "Server_localhost_";
   protected static final String MINION_INSTANCE_ID_PREFIX = "Minion_localhost_";
 
-  protected static final HttpClient HTTP_CLIENT = HttpClient.getInstance();
+  protected static HttpClient _httpClient = null;
   protected static ControllerRequestClient _controllerRequestClient;
 
   protected final List<HelixManager> _fakeInstanceHelixManagers = new ArrayList<>();
@@ -103,6 +104,10 @@ public abstract class ControllerTest {
 
   protected String getHelixClusterName() {
     return getClass().getSimpleName();
+  }
+
+  protected static HttpClient getHttpClient() {
+    return _httpClient == null ? HttpClient.getInstance() : _httpClient;
   }
 
   protected void startZk() {
@@ -160,7 +165,7 @@ public abstract class ControllerTest {
 
     _controllerBaseApiUrl = controllerScheme + "://localhost:" + _controllerPort;
     _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
-    _controllerRequestClient = new ControllerRequestClient(_controllerRequestURLBuilder, HTTP_CLIENT);
+    _controllerRequestClient = new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient());
     _controllerDataDir = config.getDataDir();
 
     _controllerStarter = getControllerStarter();
@@ -607,7 +612,7 @@ public abstract class ControllerTest {
   public static String sendGetRequest(String urlString, Map<String, String> headers)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(HTTP_CLIENT.sendGetRequest(
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(
           new URL(urlString).toURI(), headers));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
@@ -628,8 +633,21 @@ public abstract class ControllerTest {
   public static String sendPostRequest(String urlString, String payload, Map<String, String> headers)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(HTTP_CLIENT.sendJsonPostRequest(
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendJsonPostRequest(
           new URL(urlString).toURI(), payload, headers));
+      return constructResponse(resp);
+    } catch (URISyntaxException | HttpErrorStatusException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public static String sendPostRequestRaw(String urlString, String payload, Map<String, String> headers)
+      throws IOException {
+    try {
+      EntityBuilder builder = EntityBuilder.create();
+      builder.setText(payload);
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendPostRequest(
+          new URL(urlString).toURI(), builder.build(), headers));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
       throw new IOException(e);
@@ -649,7 +667,7 @@ public abstract class ControllerTest {
   public static String sendPutRequest(String urlString, String payload, Map<String, String> headers)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(HTTP_CLIENT.sendJsonPutRequest(
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendJsonPutRequest(
           new URL(urlString).toURI(), payload, headers));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
@@ -665,8 +683,8 @@ public abstract class ControllerTest {
   public static String sendDeleteRequest(String urlString, Map<String, String> headers)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(HTTP_CLIENT.sendDeleteRequest(
-          new URL(urlString).toURI()));
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendDeleteRequest(
+          new URL(urlString).toURI(), headers));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
       throw new IOException(e);
@@ -684,7 +702,7 @@ public abstract class ControllerTest {
 
   public static SimpleHttpResponse sendMultipartPostRequest(String url, String body, Map<String, String> headers)
       throws IOException {
-    return HTTP_CLIENT.sendMultipartPostRequest(url, body, headers);
+    return getHttpClient().sendMultipartPostRequest(url, body, headers);
   }
 
   public static SimpleHttpResponse sendMultipartPutRequest(String url, String body)
@@ -694,6 +712,6 @@ public abstract class ControllerTest {
 
   public static SimpleHttpResponse sendMultipartPutRequest(String url, String body, Map<String, String> headers)
       throws IOException {
-    return HTTP_CLIENT.sendMultipartPutRequest(url, body, headers);
+    return getHttpClient().sendMultipartPutRequest(url, body, headers);
   }
 }

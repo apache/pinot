@@ -144,14 +144,25 @@ public class HttpClient implements AutoCloseable {
    */
   public SimpleHttpResponse sendDeleteRequest(URI uri)
       throws IOException {
-    return sendDeleteRequest(uri, null);
+    return sendDeleteRequest(uri, Collections.emptyMap());
   }
 
-  public SimpleHttpResponse sendDeleteRequest(URI uri, @Nullable String authToken)
+  public SimpleHttpResponse sendDeleteRequest(URI uri, @Nullable Map<String, String> headers)
+      throws IOException {
+    return sendDeleteRequest(uri, headers, null);
+  }
+
+  public SimpleHttpResponse sendDeleteRequest(URI uri, @Nullable Map<String, String> headers,
+      @Nullable String authToken)
       throws IOException {
     RequestBuilder requestBuilder = RequestBuilder.delete(uri).setVersion(HttpVersion.HTTP_1_1);
     if (StringUtils.isNotBlank(authToken)) {
       requestBuilder.addHeader(AUTH_HTTP_HEADER, authToken);
+    }
+    if (MapUtils.isNotEmpty(headers)) {
+      for (Map.Entry<String, String> header : headers.entrySet()) {
+        requestBuilder.addHeader(header.getKey(), header.getValue());
+      }
     }
     setTimeout(requestBuilder, DELETE_REQUEST_SOCKET_TIMEOUT_MS);
     return sendRequest(requestBuilder.build());
@@ -234,10 +245,8 @@ public class HttpClient implements AutoCloseable {
   public SimpleHttpResponse sendJsonPostRequest(URI uri, @Nullable String jsonRequestBody,
       @Nullable Map<String, String> headers, @Nullable String authToken)
       throws IOException {
-    if (MapUtils.isEmpty(headers)) {
-      headers = new HashMap<>();
-    }
-    headers.put(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
+    Map<String, String> headersWrapper = MapUtils.isEmpty(headers) ? new HashMap<>() : new HashMap<>(headers);
+    headersWrapper.put(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
     HttpEntity entity =
         jsonRequestBody == null ? null : new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON);
     return sendPostRequest(uri, entity, headers, authToken);
@@ -257,13 +266,11 @@ public class HttpClient implements AutoCloseable {
   public SimpleHttpResponse sendJsonPutRequest(URI uri, @Nullable String jsonRequestBody,
       @Nullable Map<String, String> headers, @Nullable String authToken)
       throws IOException {
-    if (MapUtils.isEmpty(headers)) {
-      headers = new HashMap<>();
-    }
-    headers.put(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
+    Map<String, String> headersWrapper = MapUtils.isEmpty(headers) ? new HashMap<>() : new HashMap<>(headers);
+    headersWrapper.put(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
     HttpEntity entity =
         jsonRequestBody == null ? null : new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON);
-    return sendPutRequest(uri, entity, headers, authToken);
+    return sendPutRequest(uri, entity, headersWrapper, authToken);
   }
 
   // --------------------------------------------------------------------------
