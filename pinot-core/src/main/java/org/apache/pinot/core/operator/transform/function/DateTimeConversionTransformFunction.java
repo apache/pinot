@@ -28,7 +28,6 @@ import org.apache.pinot.core.operator.transform.transformer.datetime.EpochToEpoc
 import org.apache.pinot.core.operator.transform.transformer.datetime.EpochToSDFTransformer;
 import org.apache.pinot.core.operator.transform.transformer.datetime.SDFToEpochTransformer;
 import org.apache.pinot.core.operator.transform.transformer.datetime.SDFToSDFTransformer;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 

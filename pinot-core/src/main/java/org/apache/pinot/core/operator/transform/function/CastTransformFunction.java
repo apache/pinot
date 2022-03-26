@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
@@ -100,7 +99,6 @@ public class CastTransformFunction extends BaseTransformFunction {
       return _transformFunction.transformToIntValuesSV(projectionBlock);
     } else {
       int numDocs = projectionBlock.getNumDocs();
-      
       if (_intValuesSV == null || _intValuesSV.length < numDocs) {
         _intValuesSV = new int[numDocs];
       }

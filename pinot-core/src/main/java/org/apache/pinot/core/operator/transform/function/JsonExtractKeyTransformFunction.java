@@ -29,7 +29,6 @@ import java.util.Map;
 import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
 

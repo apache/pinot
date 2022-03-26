@@ -29,7 +29,6 @@ import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 

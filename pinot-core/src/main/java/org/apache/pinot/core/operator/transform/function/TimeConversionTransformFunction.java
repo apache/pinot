@@ -25,7 +25,6 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.transformer.timeunit.TimeUnitTransformer;
 import org.apache.pinot.core.operator.transform.transformer.timeunit.TimeUnitTransformerFactory;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
