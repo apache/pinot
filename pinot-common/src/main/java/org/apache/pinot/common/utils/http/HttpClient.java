@@ -140,7 +140,7 @@ public class HttpClient implements AutoCloseable {
   /**
    * Deprecated due to lack of auth header support. May break for deployments with auth enabled
    *
-   * @see #sendDeleteRequest(URI, String)
+   * @see #sendDeleteRequest(URI, Map, String)
    */
   public SimpleHttpResponse sendDeleteRequest(URI uri)
       throws IOException {
@@ -315,7 +315,7 @@ public class HttpClient implements AutoCloseable {
     MultipartEntityBuilder builder = MultipartEntityBuilder.create();
     builder.addTextBody("body", body);
     post.setEntity(builder.build());
-    if (headers != null) {
+    if (MapUtils.isNotEmpty(headers)) {
       for (String key : headers.keySet()) {
         post.addHeader(key, headers.get(key));
       }

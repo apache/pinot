@@ -102,10 +102,11 @@ public abstract class ControllerTestUtils {
 
   protected static int _controllerPort;
   protected static String _controllerBaseApiUrl;
-  protected static HttpClient _httpClient = null;
-
   protected static ControllerRequestURLBuilder _controllerRequestURLBuilder;
-  protected static ControllerRequestClient _controllerRequestClient;
+
+  protected static HttpClient _httpClient = null;
+  protected static ControllerRequestClient _controllerRequestClient = null;
+
   protected static String _controllerDataDir;
   protected static ControllerStarter _controllerStarter;
   protected static PinotHelixResourceManager _helixResourceManager;
@@ -122,8 +123,30 @@ public abstract class ControllerTestUtils {
     return ControllerTestUtils.class.getSimpleName();
   }
 
+  /** HttpClient is lazy evaluated, static object, only instantiate when first use.
+   *
+   * <p>This is because {@code ControllerTest} has HTTP utils that depends on the TLSUtils to install the security
+   * context first before the HttpClient can be initialized. However, because we have static usages of the HTTPClient,
+   * it is not possible to create normal member variable. thus the workaround.
+   */
   protected static HttpClient getHttpClient() {
-    return _httpClient == null ? HttpClient.getInstance() : _httpClient;
+    if (_httpClient == null) {
+      _httpClient = HttpClient.getInstance();
+    }
+    return _httpClient;
+  }
+
+  /** ControllerRequestClient is lazy evaluated, static object, only instantiate when first use.
+   *
+   * <p>This is because {@code ControllerTest} has HTTP utils that depends on the TLSUtils to install the security
+   * context first before the ControllerRequestClient can be initialized. However, because we have static usages of the
+   * ControllerRequestClient, it is not possible to create normal member variable. thus the workaround.
+   */
+  protected static ControllerRequestClient getControllerRequestClient() {
+    if (_controllerRequestClient == null) {
+      _controllerRequestClient = new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient());
+    }
+    return _controllerRequestClient;
   }
 
   protected static void startZk() {
@@ -159,7 +182,6 @@ public abstract class ControllerTestUtils {
     _controllerPort = Integer.parseInt(_controllerConfig.getControllerPort());
     _controllerBaseApiUrl = "http://localhost:" + _controllerPort;
     _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
-    _controllerRequestClient = new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient());
     _controllerDataDir = _controllerConfig.getDataDir();
 
     _controllerStarter = new ControllerStarter();
@@ -459,32 +481,32 @@ public abstract class ControllerTestUtils {
    */
   public static void addSchema(Schema schema)
       throws IOException {
-    _controllerRequestClient.addSchema(schema);
+    getControllerRequestClient().addSchema(schema);
   }
 
   protected static Schema getSchema(String schemaName)
       throws IOException {
-    return _controllerRequestClient.getSchema(schemaName);
+    return getControllerRequestClient().getSchema(schemaName);
   }
 
   protected static void addTableConfig(TableConfig tableConfig)
       throws IOException {
-    _controllerRequestClient.addTableConfig(tableConfig);
+    getControllerRequestClient().addTableConfig(tableConfig);
   }
 
   public static void createBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
-    _controllerRequestClient.createBrokerTenant(tenantName, numBrokers);
+    getControllerRequestClient().createBrokerTenant(tenantName, numBrokers);
   }
 
   public static void updateBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
-    _controllerRequestClient.updateBrokerTenant(tenantName, numBrokers);
+    getControllerRequestClient().updateBrokerTenant(tenantName, numBrokers);
   }
 
   public static void createServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
       throws IOException {
-    _controllerRequestClient.createServerTenant(tenantName, numOfflineServers, numRealtimeServers);
+    getControllerRequestClient().createServerTenant(tenantName, numOfflineServers, numRealtimeServers);
   }
 
   public static void enableResourceConfigForLeadControllerResource(boolean enable) {

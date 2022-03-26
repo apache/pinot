@@ -83,14 +83,14 @@ public abstract class ControllerTest {
   protected static final String SERVER_INSTANCE_ID_PREFIX = "Server_localhost_";
   protected static final String MINION_INSTANCE_ID_PREFIX = "Minion_localhost_";
 
+  protected static int _controllerPort;
+  protected static String _controllerBaseApiUrl;
+  protected static ControllerRequestURLBuilder _controllerRequestURLBuilder;
+
   protected static HttpClient _httpClient = null;
-  protected static ControllerRequestClient _controllerRequestClient;
+  protected static ControllerRequestClient _controllerRequestClient = null;
 
   protected final List<HelixManager> _fakeInstanceHelixManagers = new ArrayList<>();
-
-  protected int _controllerPort;
-  protected String _controllerBaseApiUrl;
-  protected ControllerRequestURLBuilder _controllerRequestURLBuilder;
   protected String _controllerDataDir;
 
   protected ControllerStarter _controllerStarter;
@@ -106,8 +106,30 @@ public abstract class ControllerTest {
     return getClass().getSimpleName();
   }
 
+  /** HttpClient is lazy evaluated, static object, only instantiate when first use.
+   *
+   * <p>This is because {@code ControllerTest} has HTTP utils that depends on the TLSUtils to install the security
+   * context first before the HttpClient can be initialized. However, because we have static usages of the HTTPClient,
+   * it is not possible to create normal member variable, thus the workaround.
+   */
   protected static HttpClient getHttpClient() {
-    return _httpClient == null ? HttpClient.getInstance() : _httpClient;
+    if (_httpClient == null) {
+      _httpClient = HttpClient.getInstance();
+    }
+    return _httpClient;
+  }
+
+  /** ControllerRequestClient is lazy evaluated, static object, only instantiate when first use.
+   *
+   * <p>This is because {@code ControllerTest} has HTTP utils that depends on the TLSUtils to install the security
+   * context first before the ControllerRequestClient can be initialized. However, because we have static usages of the
+   * ControllerRequestClient, it is not possible to create normal member variable, thus the workaround.
+   */
+  protected static ControllerRequestClient getControllerRequestClient() {
+    if (_controllerRequestClient == null) {
+      _controllerRequestClient = new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient());
+    }
+    return _controllerRequestClient;
   }
 
   protected void startZk() {
@@ -165,7 +187,6 @@ public abstract class ControllerTest {
 
     _controllerBaseApiUrl = controllerScheme + "://localhost:" + _controllerPort;
     _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
-    _controllerRequestClient = new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient());
     _controllerDataDir = config.getDataDir();
 
     _controllerStarter = getControllerStarter();
@@ -494,12 +515,12 @@ public abstract class ControllerTest {
    */
   protected void addSchema(Schema schema)
       throws IOException {
-    _controllerRequestClient.addSchema(schema);
+    getControllerRequestClient().addSchema(schema);
   }
 
   protected Schema getSchema(String schemaName) {
     try {
-      Schema schema = _controllerRequestClient.getSchema(schemaName);
+      Schema schema = getControllerRequestClient().getSchema(schemaName);
       Assert.assertNotNull(schema);
       return schema;
     } catch (Exception e) {
@@ -509,17 +530,17 @@ public abstract class ControllerTest {
 
   protected void deleteSchema(String schemaName)
       throws IOException {
-    _controllerRequestClient.deleteSchema(schemaName);
+    getControllerRequestClient().deleteSchema(schemaName);
   }
 
   protected void addTableConfig(TableConfig tableConfig)
       throws IOException {
-    _controllerRequestClient.addTableConfig(tableConfig);
+    getControllerRequestClient().addTableConfig(tableConfig);
   }
 
   protected void updateTableConfig(TableConfig tableConfig)
       throws IOException {
-    _controllerRequestClient.updateTableConfig(tableConfig);
+    getControllerRequestClient().updateTableConfig(tableConfig);
   }
 
   protected TableConfig getOfflineTableConfig(String tableName) {
@@ -536,22 +557,22 @@ public abstract class ControllerTest {
 
   protected void dropOfflineTable(String tableName)
       throws IOException {
-    _controllerRequestClient.deleteTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+    getControllerRequestClient().deleteTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
   }
 
   protected void dropRealtimeTable(String tableName)
       throws IOException {
-    _controllerRequestClient.deleteTable(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+    getControllerRequestClient().deleteTable(TableNameBuilder.REALTIME.tableNameWithType(tableName));
   }
 
   protected void dropAllSegments(String tableName, TableType tableType)
       throws IOException {
-    _controllerRequestClient.deleteSegments(tableName, tableType);
+    getControllerRequestClient().deleteSegments(tableName, tableType);
   }
 
   protected long getTableSize(String tableName)
       throws IOException {
-    return _controllerRequestClient.getTableSize(tableName);
+    return getControllerRequestClient().getTableSize(tableName);
   }
 
   protected void reloadOfflineTable(String tableName)
@@ -561,37 +582,37 @@ public abstract class ControllerTest {
 
   protected void reloadOfflineTable(String tableName, boolean forceDownload)
       throws IOException {
-    _controllerRequestClient.reloadTable(tableName, TableType.OFFLINE, forceDownload);
+    getControllerRequestClient().reloadTable(tableName, TableType.OFFLINE, forceDownload);
   }
 
   protected void reloadOfflineSegment(String tableName, String segmentName, boolean forceDownload)
       throws IOException {
-    _controllerRequestClient.reloadSegment(tableName, segmentName, forceDownload);
+    getControllerRequestClient().reloadSegment(tableName, segmentName, forceDownload);
   }
 
   protected void reloadRealtimeTable(String tableName)
       throws IOException {
-    _controllerRequestClient.reloadTable(tableName, TableType.REALTIME, false);
+    getControllerRequestClient().reloadTable(tableName, TableType.REALTIME, false);
   }
 
   protected void createBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
-    _controllerRequestClient.createBrokerTenant(tenantName, numBrokers);
+    getControllerRequestClient().createBrokerTenant(tenantName, numBrokers);
   }
 
   protected void updateBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
-    _controllerRequestClient.updateBrokerTenant(tenantName, numBrokers);
+    getControllerRequestClient().updateBrokerTenant(tenantName, numBrokers);
   }
 
   protected void createServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
       throws IOException {
-    _controllerRequestClient.createServerTenant(tenantName, numOfflineServers, numRealtimeServers);
+    getControllerRequestClient().createServerTenant(tenantName, numOfflineServers, numRealtimeServers);
   }
 
   protected void updateServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
       throws IOException {
-    _controllerRequestClient.updateServerTenant(tenantName, numOfflineServers, numRealtimeServers);
+    getControllerRequestClient().updateServerTenant(tenantName, numOfflineServers, numRealtimeServers);
   }
 
   public void enableResourceConfigForLeadControllerResource(boolean enable) {
