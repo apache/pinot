@@ -43,7 +43,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Dispatch a query to different workers.
+ * {@code QueryDispatcher} dispatch a query to different workers.
  */
 public class QueryDispatcher {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryDispatcher.class);

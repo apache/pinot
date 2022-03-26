@@ -37,6 +37,12 @@ import org.apache.pinot.query.planner.nodes.TableScanNode;
 import org.apache.pinot.query.runtime.plan.DistributedQueryPlan;
 
 
+/**
+ * {@code ServerRequestUtils} converts the {@link DistributedQueryPlan} into a {@link ServerQueryRequest}.
+ *
+ * <p>In order to reuse the current pinot {@link org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl}, a
+ * conversion step is needed so that the V2 query plan can be converted into a compatible format to run V1 executor.
+ */
 public class ServerRequestUtils {
 
   private ServerRequestUtils() {

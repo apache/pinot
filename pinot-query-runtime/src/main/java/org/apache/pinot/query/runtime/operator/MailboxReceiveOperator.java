@@ -38,6 +38,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * This {@code MailboxReceiveOperator} receives data from a {@link ReceivingMailbox} and serve it out from the
+ * {@link BaseOperator#getNextBlock()} API.
+ */
 public class MailboxReceiveOperator extends BaseOperator<DataTableBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxReceiveOperator.class);
   private static final long DEFAULT_TIMEOUT_NANO = 10_000_000_000L;

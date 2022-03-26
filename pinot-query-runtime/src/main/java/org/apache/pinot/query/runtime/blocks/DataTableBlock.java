@@ -30,6 +30,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * A {@code DataTableBlock} is a row-based data block backed by a {@link DataTable}.
+ */
 public class DataTableBlock implements Block {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceResponseBlock.class);
 

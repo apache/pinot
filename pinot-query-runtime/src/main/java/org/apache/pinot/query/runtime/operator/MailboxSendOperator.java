@@ -40,6 +40,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * This {@code MailboxSendOperator} is created to send {@link DataTableBlock}s to the receiving end.
+ */
 public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxSendOperator.class);
   private static final Set<RelDistribution.Type> SUPPORTED_EXCHANGE_TYPE =

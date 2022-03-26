@@ -33,6 +33,14 @@ import org.apache.pinot.query.runtime.blocks.DataTableBlock;
 import org.apache.pinot.query.runtime.blocks.DataTableBlockUtils;
 
 
+/**
+ * This basic {@code BroadcastJoinOperator} implement a basic broadcast join algorithm.
+ *
+ * <p>It takes the right table as the broadcast side and materialize a hash table. Then for each of the left table row,
+ * it looks up for the corresponding row(s) from the hash table and create a joint row.
+ *
+ * <p>For each of the data block received from the left table, it will generate a joint data block.
+ */
 public class BroadcastJoinOperator extends BaseOperator<DataTableBlock> {
 
   private final HashMap<Object, List<Object[]>> _broadcastHashTable;

@@ -38,7 +38,7 @@ import org.apache.pinot.query.runtime.plan.DistributedQueryPlan;
 
 
 /**
- * This utility class serialize/deserialize bewteen {@link Worker.QueryPlan} and {@link DistributedQueryPlan}.
+ * This utility class serialize/deserialize between {@link Worker.QueryPlan} and {@link DistributedQueryPlan}.
  */
 public class QueryPlanSerDeUtils {
 

@@ -39,6 +39,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * {@link QueryServer} is the GRPC server that accepts query plan requests sent from {@link QueryDispatcher}.
+ */
 public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcQueryServer.class);
 

@@ -42,7 +42,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
- * QueryRunner accepts a query plan and runs it.
+ * {@link QueryRunner} accepts a {@link DistributedQueryPlan} and runs it.
  */
 public class QueryRunner {
   // This is a temporary before merging the 2 type of executor.
