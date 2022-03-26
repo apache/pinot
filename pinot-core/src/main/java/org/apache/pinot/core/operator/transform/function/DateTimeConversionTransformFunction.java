@@ -127,11 +127,12 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
   @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
     if (_resultMetadata == LONG_SV_NO_DICTIONARY_METADATA) {
+      int length = projectionBlock.getNumDocs();
+
       if (_longOutputTimes == null) {
-        _longOutputTimes = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+        _longOutputTimes = new long[length];
       }
 
-      int length = projectionBlock.getNumDocs();
       if (_dateTimeTransformer instanceof EpochToEpochTransformer) {
         EpochToEpochTransformer dateTimeTransformer = (EpochToEpochTransformer) _dateTimeTransformer;
         dateTimeTransformer
@@ -150,11 +151,12 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
   @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
     if (_resultMetadata == STRING_SV_NO_DICTIONARY_METADATA) {
+      int length = projectionBlock.getNumDocs();
+
       if (_stringOutputTimes == null) {
-        _stringOutputTimes = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+        _stringOutputTimes = new String[length];
       }
 
-      int length = projectionBlock.getNumDocs();
       if (_dateTimeTransformer instanceof EpochToSDFTransformer) {
         EpochToSDFTransformer dateTimeTransformer = (EpochToSDFTransformer) _dateTimeTransformer;
         dateTimeTransformer

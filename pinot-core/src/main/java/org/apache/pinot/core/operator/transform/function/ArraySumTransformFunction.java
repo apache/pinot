@@ -71,10 +71,12 @@ public class ArraySumTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_results == null) {
-      _results = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
     int length = projectionBlock.getNumDocs();
+
+    if (_results == null) {
+      _results = new double[length];
+    }
+
     double[][] doubleValuesMV = _argument.transformToDoubleValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
       double sumRes = 0;

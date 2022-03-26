@@ -77,11 +77,11 @@ public class SubtractionTransformFunction extends BaseTransformFunction {
   @SuppressWarnings("Duplicates")
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_differences == null) {
-      _differences = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
-
     int length = projectionBlock.getNumDocs();
+
+    if (_differences == null) {
+      _differences = new double[length];
+    }
 
     if (_firstTransformFunction == null) {
       Arrays.fill(_differences, 0, length, _firstLiteral);

@@ -68,11 +68,12 @@ public class ArrayLengthTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
+    int numDocs = projectionBlock.getNumDocs();
+
     if (_results == null) {
-      _results = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _results = new int[numDocs];
     }
 
-    int numDocs = projectionBlock.getNumDocs();
     switch (_argument.getResultMetadata().getDataType().getStoredType()) {
       case INT:
         int[][] intValuesMV = _argument.transformToIntValuesMV(projectionBlock);

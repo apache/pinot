@@ -77,11 +77,11 @@ public class DivisionTransformFunction extends BaseTransformFunction {
   @SuppressWarnings("Duplicates")
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_quotients == null) {
-      _quotients = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
-
     int length = projectionBlock.getNumDocs();
+
+    if (_quotients == null) {
+      _quotients = new double[length];
+    }
 
     if (_firstTransformFunction == null) {
       Arrays.fill(_quotients, 0, length, _firstLiteral);

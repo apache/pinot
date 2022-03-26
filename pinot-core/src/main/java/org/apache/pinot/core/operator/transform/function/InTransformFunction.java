@@ -139,13 +139,14 @@ public class InTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+
     if (_intValuesSV == null) {
-      _intValuesSV = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _intValuesSV = new int[length];
     } else {
       Arrays.fill(_intValuesSV, 0);
     }
 
-    int length = projectionBlock.getNumDocs();
     TransformResultMetadata mainFunctionMetadata = _mainFunction.getResultMetadata();
     DataType storedType = mainFunctionMetadata.getDataType().getStoredType();
     if (_valueSet != null) {

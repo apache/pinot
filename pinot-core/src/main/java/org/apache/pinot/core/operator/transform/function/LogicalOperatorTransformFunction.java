@@ -60,10 +60,11 @@ public abstract class LogicalOperatorTransformFunction extends BaseTransformFunc
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    if (_results == null) {
-      _results = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
     int numDocs = projectionBlock.getNumDocs();
+
+    if (_results == null) {
+      _results = new int[numDocs];
+    }
     ArrayCopyUtils.copy(_arguments.get(0).transformToIntValuesSV(projectionBlock), _results, numDocs);
     int numArguments = _arguments.size();
     for (int i = 1; i < numArguments; i++) {

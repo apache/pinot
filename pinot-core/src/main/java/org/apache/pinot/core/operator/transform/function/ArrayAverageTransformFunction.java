@@ -71,11 +71,12 @@ public class ArrayAverageTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
+    int numDocs = projectionBlock.getNumDocs();
+
     if (_results == null) {
-      _results = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _results = new double[numDocs];
     }
 
-    int numDocs = projectionBlock.getNumDocs();
     switch (_argument.getResultMetadata().getDataType().getStoredType()) {
       case INT:
         int[][] intValuesMV = _argument.transformToIntValuesMV(projectionBlock);

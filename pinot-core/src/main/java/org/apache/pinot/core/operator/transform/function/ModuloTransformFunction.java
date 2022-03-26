@@ -77,11 +77,11 @@ public class ModuloTransformFunction extends BaseTransformFunction {
   @SuppressWarnings("Duplicates")
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_modulos == null) {
-      _modulos = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
-
     int length = projectionBlock.getNumDocs();
+
+    if (_modulos == null) {
+      _modulos = new double[length];
+    }
 
     if (_firstTransformFunction == null) {
       Arrays.fill(_modulos, 0, length, _firstLiteral);

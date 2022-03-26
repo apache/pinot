@@ -68,12 +68,14 @@ public class TimeConversionTransformFunction extends BaseTransformFunction {
 
   @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+
     if (_outputTimes == null) {
-      _outputTimes = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _outputTimes = new long[length];
     }
 
     _timeUnitTransformer.transform(_mainTransformFunction.transformToLongValuesSV(projectionBlock), _outputTimes,
-        projectionBlock.getNumDocs());
+        length);
     return _outputTimes;
   }
 }

@@ -86,12 +86,13 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
 
   @Override
   public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
+    int numDocs = projectionBlock.getNumDocs();
+
     if (_stringValuesMV == null) {
-      _stringValuesMV = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+      _stringValuesMV = new String[numDocs][];
     }
 
     String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    int numDocs = projectionBlock.getNumDocs();
     for (int i = 0; i < numDocs; i++) {
       List<String> values = JSON_PARSER_CONTEXT.parse(jsonStrings[i]).read(_jsonPath);
       _stringValuesMV[i] = values.toArray(new String[0]);

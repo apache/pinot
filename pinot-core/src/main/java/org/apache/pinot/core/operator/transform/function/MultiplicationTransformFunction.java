@@ -66,11 +66,12 @@ public class MultiplicationTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+
     if (_products == null) {
-      _products = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _products = new double[length];
     }
 
-    int length = projectionBlock.getNumDocs();
     Arrays.fill(_products, 0, length, _literalProduct);
     for (TransformFunction transformFunction : _transformFunctions) {
       double[] values = transformFunction.transformToDoubleValuesSV(projectionBlock);

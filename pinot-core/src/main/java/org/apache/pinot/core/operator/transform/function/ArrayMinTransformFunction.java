@@ -79,10 +79,12 @@ public class ArrayMinTransformFunction extends BaseTransformFunction {
     if (_argument.getResultMetadata().getDataType().getStoredType() != DataType.INT) {
       return super.transformToIntValuesSV(projectionBlock);
     }
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
+
     int length = projectionBlock.getNumDocs();
+
+    if (_intValuesSV == null) {
+      _intValuesSV = new int[length];
+    }
     int[][] intValuesMV = _argument.transformToIntValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
       int minRes = Integer.MAX_VALUE;
@@ -99,10 +101,13 @@ public class ArrayMinTransformFunction extends BaseTransformFunction {
     if (_argument.getResultMetadata().getDataType().getStoredType() != DataType.LONG) {
       return super.transformToLongValuesSV(projectionBlock);
     }
-    if (_longValuesSV == null) {
-      _longValuesSV = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
+
     int length = projectionBlock.getNumDocs();
+
+    if (_longValuesSV == null) {
+      _longValuesSV = new long[length];
+    }
+
     long[][] longValuesMV = _argument.transformToLongValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
       long minRes = Long.MAX_VALUE;
@@ -119,10 +124,13 @@ public class ArrayMinTransformFunction extends BaseTransformFunction {
     if (_argument.getResultMetadata().getDataType().getStoredType() != DataType.FLOAT) {
       return super.transformToFloatValuesSV(projectionBlock);
     }
-    if (_floatValuesSV == null) {
-      _floatValuesSV = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
+
     int length = projectionBlock.getNumDocs();
+
+    if (_floatValuesSV == null) {
+      _floatValuesSV = new float[length];
+    }
+
     float[][] floatValuesMV = _argument.transformToFloatValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
       float minRes = Float.POSITIVE_INFINITY;
@@ -139,10 +147,13 @@ public class ArrayMinTransformFunction extends BaseTransformFunction {
     if (_argument.getResultMetadata().getDataType().getStoredType() != DataType.DOUBLE) {
       return super.transformToDoubleValuesSV(projectionBlock);
     }
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
+
     int length = projectionBlock.getNumDocs();
+
+    if (_doubleValuesSV == null) {
+      _doubleValuesSV = new double[length];
+    }
+
     double[][] doubleValuesMV = _argument.transformToDoubleValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
       double minRes = Double.POSITIVE_INFINITY;
@@ -159,10 +170,13 @@ public class ArrayMinTransformFunction extends BaseTransformFunction {
     if (_argument.getResultMetadata().getDataType().getStoredType() != DataType.STRING) {
       return super.transformToStringValuesSV(projectionBlock);
     }
-    if (_stringValuesSV == null) {
-      _stringValuesSV = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
+
     int length = projectionBlock.getNumDocs();
+
+    if (_stringValuesSV == null) {
+      _stringValuesSV = new String[length];
+    }
+
     String[][] stringValuesMV = _argument.transformToStringValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
       String minRes = null;

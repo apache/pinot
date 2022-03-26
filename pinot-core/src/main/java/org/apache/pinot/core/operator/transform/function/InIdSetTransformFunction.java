@@ -75,11 +75,12 @@ public class InIdSetTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+
     if (_results == null) {
-      _results = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _results = new int[length];
     }
 
-    int length = projectionBlock.getNumDocs();
     DataType storedType = _transformFunction.getResultMetadata().getDataType().getStoredType();
     switch (storedType) {
       case INT:

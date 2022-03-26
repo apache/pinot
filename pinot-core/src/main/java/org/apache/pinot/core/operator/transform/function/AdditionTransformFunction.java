@@ -66,11 +66,12 @@ public class AdditionTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+
     if (_sums == null) {
-      _sums = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _sums = new double[length];
     }
 
-    int length = projectionBlock.getNumDocs();
     Arrays.fill(_sums, 0, length, _literalSum);
     for (TransformFunction transformFunction : _transformFunctions) {
       double[] values = transformFunction.transformToDoubleValuesSV(projectionBlock);

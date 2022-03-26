@@ -99,10 +99,11 @@ public class CastTransformFunction extends BaseTransformFunction {
     if (resultStoredType == DataType.INT) {
       return _transformFunction.transformToIntValuesSV(projectionBlock);
     } else {
-      if (_intValuesSV == null) {
-        _intValuesSV = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-      }
       int numDocs = projectionBlock.getNumDocs();
+      
+      if (_intValuesSV == null) {
+        _intValuesSV = new int[numDocs];
+      }
       switch (resultStoredType) {
         case LONG:
           long[] longValues = _transformFunction.transformToLongValuesSV(projectionBlock);
@@ -134,10 +135,11 @@ public class CastTransformFunction extends BaseTransformFunction {
     if (resultStoredType == DataType.LONG) {
       return _transformFunction.transformToLongValuesSV(projectionBlock);
     } else {
-      if (_longValuesSV == null) {
-        _longValuesSV = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-      }
       int numDocs = projectionBlock.getNumDocs();
+
+      if (_longValuesSV == null) {
+        _longValuesSV = new long[numDocs];
+      }
       switch (resultStoredType) {
         case INT:
           int[] intValues = _transformFunction.transformToIntValuesSV(projectionBlock);
@@ -169,10 +171,11 @@ public class CastTransformFunction extends BaseTransformFunction {
     if (resultStoredType == DataType.FLOAT) {
       return _transformFunction.transformToFloatValuesSV(projectionBlock);
     } else {
-      if (_floatValuesSV == null) {
-        _floatValuesSV = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-      }
       int numDocs = projectionBlock.getNumDocs();
+
+      if (_floatValuesSV == null) {
+        _floatValuesSV = new float[numDocs];
+      }
       switch (resultStoredType) {
         case INT:
           int[] intValues = _transformFunction.transformToIntValuesSV(projectionBlock);
@@ -204,10 +207,11 @@ public class CastTransformFunction extends BaseTransformFunction {
     if (resultStoredType == DataType.DOUBLE) {
       return _transformFunction.transformToDoubleValuesSV(projectionBlock);
     } else {
-      if (_doubleValuesSV == null) {
-        _doubleValuesSV = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-      }
       int numDocs = projectionBlock.getNumDocs();
+
+      if (_doubleValuesSV == null) {
+        _doubleValuesSV = new double[numDocs];
+      }
       switch (resultStoredType) {
         case INT:
           int[] intValues = _transformFunction.transformToIntValuesSV(projectionBlock);
@@ -243,7 +247,7 @@ public class CastTransformFunction extends BaseTransformFunction {
       DataType inputDataType = _transformFunction.getResultMetadata().getDataType();
       if (inputDataType.getStoredType() != inputDataType) {
         if (_stringValuesSV == null) {
-          _stringValuesSV = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+          _stringValuesSV = new String[numDocs];
         }
         if (inputDataType == DataType.BOOLEAN) {
           int[] intValues = _transformFunction.transformToIntValuesSV(projectionBlock);
@@ -263,7 +267,7 @@ public class CastTransformFunction extends BaseTransformFunction {
       }
     } else {
       if (_stringValuesSV == null) {
-        _stringValuesSV = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+        _stringValuesSV = new String[numDocs];
       }
       switch (resultDataType) {
         case INT:
