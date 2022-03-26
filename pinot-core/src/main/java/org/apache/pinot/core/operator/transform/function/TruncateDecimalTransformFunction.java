@@ -34,6 +34,7 @@ public class TruncateDecimalTransformFunction extends BaseTransformFunction {
   private TransformFunction _leftTransformFunction;
   private TransformFunction _rightTransformFunction;
   private int _scale;
+  private boolean _hasLiteralArg;
 
   @Override
   public String getName() {
@@ -49,13 +50,13 @@ public class TruncateDecimalTransformFunction extends BaseTransformFunction {
           "truncate transform function supports either 1 or 2 arguments. Num arguments provided: " + numArguments);
     }
 
+    _hasLiteralArg = false;
     _leftTransformFunction = arguments.get(0);
     if (numArguments > 1) {
       _rightTransformFunction = arguments.get(1);
       if (_rightTransformFunction instanceof LiteralTransformFunction) {
         _scale = Integer.parseInt(((LiteralTransformFunction) _rightTransformFunction).getLiteral());
-      } else {
-        _scale = Integer.MIN_VALUE;
+        _hasLiteralArg = true;
       }
       Preconditions.checkArgument(
           _rightTransformFunction.getResultMetadata().isSingleValue() && isIntegralResultDatatype(
@@ -63,7 +64,6 @@ public class TruncateDecimalTransformFunction extends BaseTransformFunction {
           getName());
     } else {
       _rightTransformFunction = null;
-      _scale = Integer.MIN_VALUE;
     }
 
     Preconditions.checkArgument(_leftTransformFunction.getResultMetadata().isSingleValue(),
@@ -89,14 +89,16 @@ public class TruncateDecimalTransformFunction extends BaseTransformFunction {
     }
 
     double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(projectionBlock);
-    if (_scale != Integer.MIN_VALUE) {
+    if (_hasLiteralArg) {
       for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i]).setScale(_scale, RoundingMode.DOWN).doubleValue();
+        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i])
+            .setScale(_scale, RoundingMode.DOWN).doubleValue();
       }
     } else if (_rightTransformFunction != null) {
       int[] rightValues = _rightTransformFunction.transformToIntValuesSV(projectionBlock);
       for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i]).setScale(rightValues[i], RoundingMode.DOWN).doubleValue();
+        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i])
+            .setScale(rightValues[i], RoundingMode.DOWN).doubleValue();
       }
     } else {
       for (int i = 0; i < length; i++) {

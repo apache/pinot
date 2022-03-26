@@ -36,6 +36,7 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
   private TransformFunction _leftTransformFunction;
   private TransformFunction _rightTransformFunction;
   private int _scale;
+  private boolean _hasLiteralArg;
 
   @Override
   public String getName() {
@@ -51,13 +52,13 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
           "roundDecimal transform function supports either 1 or 2 arguments. Num arguments provided: " + numArguments);
     }
 
+    _hasLiteralArg = false;
     _leftTransformFunction = arguments.get(0);
     if (numArguments > 1) {
       _rightTransformFunction = arguments.get(1);
       if (_rightTransformFunction instanceof LiteralTransformFunction) {
         _scale = Integer.parseInt(((LiteralTransformFunction) _rightTransformFunction).getLiteral());
-      } else {
-        _scale = Integer.MIN_VALUE;
+        _hasLiteralArg = true;
       }
       Preconditions.checkArgument(
           _rightTransformFunction.getResultMetadata().isSingleValue() && isIntegralResultDatatype(
@@ -65,7 +66,6 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
           "Argument must be single-valued with type INT or LONG for transform function: %s", getName());
     } else {
       _rightTransformFunction = null;
-      _scale = Integer.MIN_VALUE;
     }
 
     Preconditions.checkArgument(_leftTransformFunction.getResultMetadata().isSingleValue(),
@@ -91,18 +91,21 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
     }
 
     double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(projectionBlock);
-    if (_scale != Integer.MIN_VALUE) {
+    if (_hasLiteralArg) {
       for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i]).setScale(_scale, RoundingMode.HALF_UP).doubleValue();
+        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i])
+            .setScale(_scale, RoundingMode.HALF_UP).doubleValue();
       }
     } else if (_rightTransformFunction != null) {
       int[] rightValues = _rightTransformFunction.transformToIntValuesSV(projectionBlock);
       for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i]).setScale(rightValues[i], RoundingMode.HALF_UP).doubleValue();
+        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i])
+            .setScale(rightValues[i], RoundingMode.HALF_UP).doubleValue();
       }
     } else {
       for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i]).setScale(0, RoundingMode.HALF_UP).doubleValue();
+        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i])
+            .setScale(0, RoundingMode.HALF_UP).doubleValue();
       }
     }
 
