@@ -88,7 +88,7 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
   public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
 
-    if (_stringValuesMV == null) {
+    if (_stringValuesMV == null || _stringValuesSV.length < numDocs) {
       _stringValuesMV = new String[numDocs][];
     }
 

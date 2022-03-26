@@ -62,7 +62,7 @@ public abstract class LogicalOperatorTransformFunction extends BaseTransformFunc
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
 
-    if (_results == null) {
+    if (_results == null || _results.length < numDocs) {
       _results = new int[numDocs];
     }
     ArrayCopyUtils.copy(_arguments.get(0).transformToIntValuesSV(projectionBlock), _results, numDocs);

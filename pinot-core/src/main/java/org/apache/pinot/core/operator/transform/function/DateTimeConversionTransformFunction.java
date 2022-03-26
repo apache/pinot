@@ -129,7 +129,7 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
     if (_resultMetadata == LONG_SV_NO_DICTIONARY_METADATA) {
       int length = projectionBlock.getNumDocs();
 
-      if (_longOutputTimes == null) {
+      if (_longOutputTimes == null || _longOutputTimes.length < length) {
         _longOutputTimes = new long[length];
       }
 
@@ -153,7 +153,7 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
     if (_resultMetadata == STRING_SV_NO_DICTIONARY_METADATA) {
       int length = projectionBlock.getNumDocs();
 
-      if (_stringOutputTimes == null) {
+      if (_stringOutputTimes == null || _stringOutputTimes.length < length) {
         _stringOutputTimes = new String[length];
       }
 

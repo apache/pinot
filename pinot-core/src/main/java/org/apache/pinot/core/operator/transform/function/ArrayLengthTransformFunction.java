@@ -70,7 +70,7 @@ public class ArrayLengthTransformFunction extends BaseTransformFunction {
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
 
-    if (_results == null) {
+    if (_results == null || _results.length < numDocs) {
       _results = new int[numDocs];
     }
 

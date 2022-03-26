@@ -79,7 +79,7 @@ public class ModuloTransformFunction extends BaseTransformFunction {
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
 
-    if (_modulos == null) {
+    if (_modulos == null || _modulos.length < length) {
       _modulos = new double[length];
     }
 

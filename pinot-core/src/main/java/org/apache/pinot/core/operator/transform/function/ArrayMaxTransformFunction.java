@@ -82,7 +82,7 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
 
     int length = projectionBlock.getNumDocs();
 
-    if (_intValuesSV == null) {
+    if (_intValuesSV == null || _intValuesSV.length < length) {
       _intValuesSV = new int[length];
     }
     int[][] intValuesMV = _argument.transformToIntValuesMV(projectionBlock);
@@ -104,7 +104,7 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
 
     int length = projectionBlock.getNumDocs();
 
-    if (_longValuesSV == null) {
+    if (_longValuesSV == null || _longValuesSV.length < length) {
       _longValuesSV = new long[length];
     }
     long[][] longValuesMV = _argument.transformToLongValuesMV(projectionBlock);
@@ -126,7 +126,7 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
 
     int length = projectionBlock.getNumDocs();
 
-    if (_floatValuesSV == null) {
+    if (_floatValuesSV == null || _floatValuesSV.length < length) {
       _floatValuesSV = new float[length];
     }
     float[][] floatValuesMV = _argument.transformToFloatValuesMV(projectionBlock);
@@ -148,7 +148,7 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
 
     int length = projectionBlock.getNumDocs();
 
-    if (_doubleValuesSV == null) {
+    if (_doubleValuesSV == null || _doubleValuesSV.length < length) {
       _doubleValuesSV = new double[length];
     }
     double[][] doubleValuesMV = _argument.transformToDoubleValuesMV(projectionBlock);
@@ -170,7 +170,7 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
 
     int length = projectionBlock.getNumDocs();
 
-    if (_stringValuesSV == null) {
+    if (_stringValuesSV == null || _stringValuesSV.length < length) {
       _stringValuesSV = new String[length];
     }
     String[][] stringValuesMV = _argument.transformToStringValuesMV(projectionBlock);

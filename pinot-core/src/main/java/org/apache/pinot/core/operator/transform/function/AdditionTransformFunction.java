@@ -68,7 +68,7 @@ public class AdditionTransformFunction extends BaseTransformFunction {
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
 
-    if (_sums == null) {
+    if (_sums == null || _sums.length < length) {
       _sums = new double[length];
     }
 

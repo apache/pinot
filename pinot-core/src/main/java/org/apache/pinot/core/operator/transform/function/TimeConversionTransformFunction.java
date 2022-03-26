@@ -70,7 +70,7 @@ public class TimeConversionTransformFunction extends BaseTransformFunction {
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
 
-    if (_outputTimes == null) {
+    if (_outputTimes == null || _outputTimes.length < length) {
       _outputTimes = new long[length];
     }
 

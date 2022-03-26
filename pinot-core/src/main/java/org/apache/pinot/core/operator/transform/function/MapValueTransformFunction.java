@@ -99,7 +99,7 @@ public class MapValueTransformFunction extends BaseTransformFunction {
   public int[] transformToDictIdsSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
 
-    if (_dictIds == null) {
+    if (_dictIds == null || _dictIds.length < length) {
       _dictIds = new int[length];
     }
 

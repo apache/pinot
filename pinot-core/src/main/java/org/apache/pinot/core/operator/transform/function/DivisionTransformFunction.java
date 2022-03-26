@@ -79,7 +79,7 @@ public class DivisionTransformFunction extends BaseTransformFunction {
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
 
-    if (_quotients == null) {
+    if (_quotients == null || _quotients.length < length) {
       _quotients = new double[length];
     }
 

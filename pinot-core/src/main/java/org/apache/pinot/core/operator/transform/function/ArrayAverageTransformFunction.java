@@ -73,7 +73,7 @@ public class ArrayAverageTransformFunction extends BaseTransformFunction {
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
 
-    if (_results == null) {
+    if (_results == null || _results.length < numDocs) {
       _results = new double[numDocs];
     }
 

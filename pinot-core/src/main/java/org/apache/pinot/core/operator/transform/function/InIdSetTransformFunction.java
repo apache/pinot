@@ -77,7 +77,7 @@ public class InIdSetTransformFunction extends BaseTransformFunction {
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
 
-    if (_results == null) {
+    if (_results == null || _results.length < length) {
       _results = new int[length];
     }
 

@@ -101,7 +101,7 @@ public class CastTransformFunction extends BaseTransformFunction {
     } else {
       int numDocs = projectionBlock.getNumDocs();
       
-      if (_intValuesSV == null) {
+      if (_intValuesSV == null || _intValuesSV.length < numDocs) {
         _intValuesSV = new int[numDocs];
       }
       switch (resultStoredType) {
@@ -137,7 +137,7 @@ public class CastTransformFunction extends BaseTransformFunction {
     } else {
       int numDocs = projectionBlock.getNumDocs();
 
-      if (_longValuesSV == null) {
+      if (_longValuesSV == null || _longValuesSV.length < numDocs) {
         _longValuesSV = new long[numDocs];
       }
       switch (resultStoredType) {
@@ -173,7 +173,7 @@ public class CastTransformFunction extends BaseTransformFunction {
     } else {
       int numDocs = projectionBlock.getNumDocs();
 
-      if (_floatValuesSV == null) {
+      if (_floatValuesSV == null || _floatValuesSV.length < numDocs) {
         _floatValuesSV = new float[numDocs];
       }
       switch (resultStoredType) {
@@ -209,7 +209,7 @@ public class CastTransformFunction extends BaseTransformFunction {
     } else {
       int numDocs = projectionBlock.getNumDocs();
 
-      if (_doubleValuesSV == null) {
+      if (_doubleValuesSV == null || _doubleValuesSV.length < numDocs) {
         _doubleValuesSV = new double[numDocs];
       }
       switch (resultStoredType) {
@@ -246,7 +246,7 @@ public class CastTransformFunction extends BaseTransformFunction {
       // Specialize BOOlEAN and TIMESTAMP when casting to STRING
       DataType inputDataType = _transformFunction.getResultMetadata().getDataType();
       if (inputDataType.getStoredType() != inputDataType) {
-        if (_stringValuesSV == null) {
+        if (_stringValuesSV == null || _stringValuesSV.length < numDocs) {
           _stringValuesSV = new String[numDocs];
         }
         if (inputDataType == DataType.BOOLEAN) {
@@ -266,7 +266,7 @@ public class CastTransformFunction extends BaseTransformFunction {
         return _transformFunction.transformToStringValuesSV(projectionBlock);
       }
     } else {
-      if (_stringValuesSV == null) {
+      if (_stringValuesSV == null || _stringValuesSV.length < numDocs) {
         _stringValuesSV = new String[numDocs];
       }
       switch (resultDataType) {

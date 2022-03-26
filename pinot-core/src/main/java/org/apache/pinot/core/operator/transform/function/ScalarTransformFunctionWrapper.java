@@ -127,7 +127,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     }
     int length = projectionBlock.getNumDocs();
 
-    if (_intResults == null) {
+    if (_intResults == null || _intResults.length < length) {
       _intResults = new int[length];
     }
     getNonLiteralValues(projectionBlock);
@@ -147,7 +147,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     }
     int length = projectionBlock.getNumDocs();
 
-    if (_longResults == null) {
+    if (_longResults == null || _longResults.length < length) {
       _longResults = new long[length];
     }
     getNonLiteralValues(projectionBlock);
@@ -167,7 +167,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     }
     int length = projectionBlock.getNumDocs();
 
-    if (_floatResults == null) {
+    if (_floatResults == null || _floatResults.length < length) {
       _floatResults = new float[length];
     }
     getNonLiteralValues(projectionBlock);
@@ -187,7 +187,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     }
     int length = projectionBlock.getNumDocs();
 
-    if (_doubleResults == null) {
+    if (_doubleResults == null || _doubleResults.length < length) {
       _doubleResults = new double[length];
     }
     getNonLiteralValues(projectionBlock);
@@ -207,7 +207,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     }
     int length = projectionBlock.getNumDocs();
 
-    if (_stringResults == null) {
+    if (_stringResults == null || _stringResults.length < length) {
       _stringResults = new String[length];
     }
     getNonLiteralValues(projectionBlock);
@@ -229,7 +229,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     }
     int length = projectionBlock.getNumDocs();
 
-    if (_bytesResults == null) {
+    if (_bytesResults == null || _bytesResults.length < length) {
       _bytesResults = new byte[length][];
     }
     getNonLiteralValues(projectionBlock);
@@ -269,7 +269,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     }
     int length = projectionBlock.getNumDocs();
 
-    if (_longMVResults == null) {
+    if (_longMVResults == null || _longMVResults.length < length) {
       _longMVResults = new long[length][];
     }
     getNonLiteralValues(projectionBlock);
@@ -289,7 +289,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     }
     int length = projectionBlock.getNumDocs();
 
-    if (_floatMVResults == null) {
+    if (_floatMVResults == null || _floatMVResults.length < length) {
       _floatMVResults = new float[length][];
     }
     getNonLiteralValues(projectionBlock);
@@ -309,7 +309,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     }
     int length = projectionBlock.getNumDocs();
 
-    if (_doubleMVResults == null) {
+    if (_doubleMVResults == null || _doubleMVResults.length < length) {
       _doubleMVResults = new double[length][];
     }
     getNonLiteralValues(projectionBlock);
@@ -329,7 +329,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     }
     int length = projectionBlock.getNumDocs();
 
-    if (_stringMVResults == null) {
+    if (_stringMVResults == null || _stringMVResults.length < length) {
       _stringMVResults = new String[length][];
     }
     getNonLiteralValues(projectionBlock);

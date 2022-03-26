@@ -68,7 +68,7 @@ public class MultiplicationTransformFunction extends BaseTransformFunction {
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
 
-    if (_products == null) {
+    if (_products == null || _products.length < length) {
       _products = new double[length];
     }
 

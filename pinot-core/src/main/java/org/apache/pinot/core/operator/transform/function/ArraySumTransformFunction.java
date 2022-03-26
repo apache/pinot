@@ -73,7 +73,7 @@ public class ArraySumTransformFunction extends BaseTransformFunction {
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
 
-    if (_results == null) {
+    if (_results == null || _results.length < length) {
       _results = new double[length];
     }
 

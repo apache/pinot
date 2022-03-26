@@ -79,7 +79,7 @@ public class SubtractionTransformFunction extends BaseTransformFunction {
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
 
-    if (_differences == null) {
+    if (_differences == null || _differences.length < length) {
       _differences = new double[length];
     }
 
