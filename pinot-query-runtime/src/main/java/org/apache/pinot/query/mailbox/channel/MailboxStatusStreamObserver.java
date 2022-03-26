@@ -27,11 +27,12 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * This is the observer used by the SendingMailbox to send data over the wire.
+ * {@code MailboxStatusStreamObserver} is used by the SendingMailbox to send data over the wire.
  *
- * Once SendingMailbox.init() is called, one instances of this class is created by the GRCPMailboxService;
- * It will start the connection and listen to changes on the mailbox's data buffer; once data is put into the mailbox
- * buffer this sending thread will start sending the data.
+ * <p>Once {@link org.apache.pinot.query.mailbox.GrpcSendingMailbox#init()} is called, one instances of this class is
+ * created based on the opened GRPC connection returned {@link StreamObserver}. From this point, the sending mailbox
+ * can use the {@link MailboxStatusStreamObserver#send(Mailbox.MailboxContent)} API to send data packet to the receiving
+ * end.
  */
 public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.MailboxStatus> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxStatusStreamObserver.class);

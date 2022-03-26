@@ -25,10 +25,12 @@ import org.apache.pinot.query.mailbox.GrpcMailboxService;
 
 
 /**
- * Manages Grpc send/Receive channels.
+ * {@code ChannelManager} manages Grpc send/receive channels.
  *
- * All changes are keyed by channelId in the form of:
- * <code>senderHost:grpcPort:receiverHost:grpcPort</code>
+ * <p>Grpc channels are managed centralized per Pinot component. Channels should be reused across different
+ * query/job/stages.
+ *
+ * <p>the channelId should be in the format of: <code>"senderHost:senderPort:receiverHost:receiverPort"</code>
  */
 public class ChannelManager {
   private static final int DEFAULT_MAX_INBOUND_MESSAGE_BYTES_SIZE = 128 * 1024 * 1024;

@@ -30,10 +30,11 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * This is the content streaming observer.
+ * {@code MailboxContentStreamObserver} is the content streaming observer used to receive mailbox content.
  *
- * When the observer onNext() is called (e.g. when data packet has arrived to the GRPCMailboxServer) it puts the
- * mailbox content to the receiving mailbox buffer; response with the remaining buffer size of the receiving mailbox.
+ * <p>When the observer onNext() is called (e.g. when data packet has arrived at the receiving end), it puts the
+ * mailbox content to the receiving mailbox buffer; response with the remaining buffer size of the receiving mailbox
+ * to the sender side.
  */
 public class MailboxContentStreamObserver implements StreamObserver<Mailbox.MailboxContent> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxContentStreamObserver.class);
@@ -82,10 +83,11 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
     GrpcReceivingMailbox receivingMailbox =
         (GrpcReceivingMailbox) _mailboxService.getReceivingMailbox(mailboxContent.getMailboxId());
     receivingMailbox.init(this);
+    // when the receiving end receives a message put it in the mailbox queue.
     _receivingBuffer.offer(mailboxContent);
     if (_isEnabledFeedback) {
-      // when the receiving end receives a message. put it in the mailbox queue and returns the buffer available size.
-      // TODO: this has race conditions with onCompleted() because sender blindly closes connection channels.
+      // TODO: this has race conditions with onCompleted() because sender blindly closes connection channels once
+      // it has finished sending all the data packets.
       int remainingCapacity = _receivingBuffer.remainingCapacity() - 1;
       Mailbox.MailboxStatus.Builder builder =
           Mailbox.MailboxStatus.newBuilder().setMailboxId(mailboxContent.getMailboxId())
@@ -94,6 +96,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
         builder.putMetadata("finished", "true");
       }
       Mailbox.MailboxStatus status = builder.build();
+      // returns the buffer available size to sender for rate controller / throttling.
       _responseObserver.onNext(status);
     }
   }

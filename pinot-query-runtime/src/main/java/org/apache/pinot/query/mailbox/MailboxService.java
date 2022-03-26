@@ -25,15 +25,46 @@ package org.apache.pinot.query.mailbox;
  */
 public interface MailboxService<T> {
 
+  /**
+   * Starting the mailbox service.
+   */
   void start();
 
+  /**
+   * Shutting down the mailbox service.s
+   */
   void shutdown();
 
+  /**
+   * Get the host name on which this mailbox service is runnning on.
+   *
+   * @return the host.
+   */
   String getHostname();
 
+  /**
+   * Get the host port that receives inbound mailbox message.
+   *
+   * @return the port.
+   */
   int getMailboxPort();
 
+  /**
+   * Look up a receiving mailbox by {@link MailboxIdentifier}.
+   *
+   * <p>the acquired {@link ReceivingMailbox} will be constructed if not exist already, but it might not have been
+   * initialized.
+   *
+   * @param mailboxId mailbox identifier.
+   * @return a receiving mailbox.
+   */
   ReceivingMailbox<T> getReceivingMailbox(String mailboxId);
 
+  /**
+   * Look up a sending mailbox by {@link MailboxIdentifier}.
+   *
+   * @param mailboxId mailbox identifier.
+   * @return a sending mailbox.
+   */
   SendingMailbox<T> getSendingMailbox(String mailboxId);
 }

@@ -76,6 +76,11 @@ public class StringMailboxIdentifier implements MailboxIdentifier {
   }
 
   @Override
+  public int getFromPort() {
+    return _fromPort;
+  }
+
+  @Override
   public String getToHost() {
     return _toHost;
   }

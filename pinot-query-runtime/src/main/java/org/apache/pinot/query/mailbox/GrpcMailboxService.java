@@ -27,13 +27,19 @@ import org.apache.pinot.query.mailbox.channel.ChannelManager;
 /**
  * GRPC-based implementation of {@link MailboxService}.
  *
- * It maintains a collection of connected mailbox servers and clients to remote hosts.
- * All indexed by the connectionID (e.g. a pair of host-port combinations).
+ * <p>It maintains a collection of connected mailbox servers and clients to remote hosts. All indexed by the
+ * mailboxID in the format of: <code>"jobId:partitionKey:senderHost:senderPort:receiverHost:receiverPort"</code>
  *
- * Connections are established from the client side and only tier-down from the client side,
- * or timed out based on a mutually agreed upon timeout period after last message.
+ * <p>Connections are established/initiated from the sender side and only tier-down from the sender side as well.
+ * In the event of exception or timed out, the connection is cloased based on a mutually agreed upon timeout period
+ * after the last successful message sent/received.
  *
- * connections are reused for different jobs (and mailboxes within each job).
+ * <p>Noted that:
+ * <ul>
+ *   <li>the latter part of the mailboxID consist of the channelID.</li>
+ *   <li>the job_id should be uniquely identifying a send/receving pair, for example if one bundle job requires
+ *   to open 2 mailboxes, they should use {job_id}_1 and {job_id}_2 to distinguish the 2 different mailbox.</li>
+ * </ul>
  */
 public class GrpcMailboxService implements MailboxService<MailboxContent> {
   // channel manager

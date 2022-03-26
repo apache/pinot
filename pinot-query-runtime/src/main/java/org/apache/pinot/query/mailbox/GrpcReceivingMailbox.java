@@ -25,6 +25,9 @@ import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.query.mailbox.channel.MailboxContentStreamObserver;
 
 
+/**
+ * GRPC implementation of the {@link ReceivingMailbox}.
+ */
 public class GrpcReceivingMailbox implements ReceivingMailbox<MailboxContent> {
   private static final long DEFAULT_MAILBOX_INIT_TIMEOUT = 100L;
   private final GrpcMailboxService _mailboxService;

@@ -30,6 +30,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * {@code GrpcMailboxServer} manages GRPC-based mailboxes by creating a stream-stream GRPC server.
+ *
+ * <p>This GRPC server is responsible for constructing {@link StreamObserver} out of an initial "open" request
+ * send by the sender of the sender/receiver pair.
+ */
 public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcMailboxServer.class);
   private static final long DEFAULT_GRPC_MAILBOX_SERVER_TIMEOUT = 10000L;

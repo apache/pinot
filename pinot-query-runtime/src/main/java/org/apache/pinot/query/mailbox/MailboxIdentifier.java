@@ -19,17 +19,45 @@
 package org.apache.pinot.query.mailbox;
 
 /**
+ * {@link MailboxIdentifier} uniquely identify the mailbox that pairs a sender and a receiver.
  *
+ * <p>It consists of the job_id and the partition key. as well as the component for a channelID.
  */
 public interface MailboxIdentifier {
 
+  /**
+   * get the job identifier.
+   * @return job identifier.
+   */
   String getJobId();
 
+  /**
+   * get the partition key.
+   * @return partition key.
+   */
   String getPartitionKey();
 
+  /**
+   * get the sender host.
+   * @return sender host
+   */
   String getFromHost();
 
+  /**
+   * get the sender port.
+   * @return sender port
+   */
+  int getFromPort();
+
+  /**
+   * get the receiver host.
+   * @return receiver host
+   */
   String getToHost();
 
+  /**
+   * get the receiver port.
+   * @return receiver port
+   */
   int getToPort();
 }
