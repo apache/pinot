@@ -251,7 +251,7 @@ public class ControllerConf extends PinotConfiguration {
   private static final String DEFAULT_DIM_TABLE_MAX_SIZE = "200M";
 
   private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
-  public static final String DISABLE_GROOVY = "controller.disable.ingestion.groovy";
+  private static final String DISABLE_GROOVY = "controller.disable.ingestion.groovy";
 
   public ControllerConf() {
     super(new HashMap<>());

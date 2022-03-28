@@ -323,8 +323,8 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
 
         int actualResult = (int) hll.cardinality();
         int expectedResult = _values.size();
-        // Allow 15% error for HLL
-        assertEquals(actualResult, expectedResult, expectedResult * 0.15);
+        // The standard deviation of the error for log2m 8 is 6.5%, allow 20% error
+        assertEquals(actualResult, expectedResult, expectedResult * 0.2);
 
         interSegmentsExpectedResults[i] = Integer.toString(actualResult);
       }
@@ -360,8 +360,10 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
       assertEquals(hll.sizeof(), 172);
 
       int actualResult = (int) hll.cardinality();
-      // Allow 15% error for HLL
-      assertEquals(actualResult, expectedResult, expectedResult * 0.15);
+      // The standard deviation of the error for log2m 8 is 6.5%, allow 20% error
+      assertEquals(actualResult, expectedResult, expectedResult * 0.2);
+
+      interSegmentsExpectedResults[i] = Integer.toString(actualResult);
     }
 
     // Inter segment
@@ -370,8 +372,7 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
     assertNotNull(aggregationResults);
     assertEquals(aggregationResults.size(), 5);
     for (int i = 0; i < 5; i++) {
-      assertEquals(Integer.parseInt((String) aggregationResults.get(i).getValue()), expectedResult,
-          expectedResult * 0.15);
+      assertEquals((String) aggregationResults.get(i).getValue(), interSegmentsExpectedResults[i]);
     }
 
     // Change log2m
@@ -416,7 +417,7 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
 
         int actualResult = (int) hll.cardinality();
         int expectedResult = _values.size();
-        // Allow 5% error for HLL
+        // The standard deviation of the error for log2m 12 is 1.625%, allow 5% error
         assertEquals(actualResult, expectedResult, expectedResult * 0.05);
 
         interSegmentsExpectedResults[i] = Integer.toString(actualResult);
@@ -453,7 +454,7 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
       assertEquals(hll.sizeof(), 2732);
 
       int actualResult = (int) hll.cardinality();
-      // Allow 5% error for HLL
+      // The standard deviation of the error for log2m 12 is 1.625%, allow 5% error
       assertEquals(actualResult, expectedResult, expectedResult * 0.05);
     }
 

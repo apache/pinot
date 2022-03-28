@@ -67,7 +67,17 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   CONTROLLER_LEADER_PARTITION_COUNT("ControllerLeaderPartitionCount", true),
 
   // Estimated size of offline table
+  @Deprecated // Instead use TABLE_TOTAL_SIZE_ON_SERVER
   OFFLINE_TABLE_ESTIMATED_SIZE("OfflineTableEstimatedSize", false),
+
+  // Total size of table across replicas on servers
+  TABLE_TOTAL_SIZE_ON_SERVER("TableTotalSizeOnServer", false),
+
+  // Size of table per replica on servers
+  TABLE_SIZE_PER_REPLICA_ON_SERVER("TableSizePerReplicaOnServer", false),
+
+  // Total size of compressed segments per table
+  TABLE_COMPRESSED_SIZE("TableCompressedSize", false),
 
   // Table quota based on setting in table config
   TABLE_QUOTA("TableQuotaBasedOnTableConfig", false),

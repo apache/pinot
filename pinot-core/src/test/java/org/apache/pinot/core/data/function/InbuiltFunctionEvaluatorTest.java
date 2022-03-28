@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.function;
 
+import java.lang.reflect.Method;
 import java.util.Collections;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
@@ -25,8 +26,8 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
 
 
 public class InbuiltFunctionEvaluatorTest {
@@ -111,7 +112,8 @@ public class InbuiltFunctionEvaluatorTest {
   public void testStateSharedBetweenRowsForExecution()
       throws Exception {
     MyFunc myFunc = new MyFunc();
-    FunctionRegistry.registerFunction(myFunc.getClass().getDeclaredMethod("appendToStringAndReturn", String.class));
+    Method method = myFunc.getClass().getDeclaredMethod("appendToStringAndReturn", String.class);
+    FunctionRegistry.registerFunction(method, false);
     String expression = "appendToStringAndReturn('test ')";
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
     assertTrue(evaluator.getArguments().isEmpty());
@@ -122,20 +124,19 @@ public class InbuiltFunctionEvaluatorTest {
   }
 
   @Test
-  public void testExceptionDuringInbuiltFunctionEvaluator()
-      throws Exception {
-    String expression = "fromDateTime(reverse('2020-01-01T00:00:00Z'), \"invalid_identifier\")";
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
-    assertEquals(evaluator.getArguments().size(), 1);
-    GenericRow row = new GenericRow();
-    try {
-      evaluator.evaluate(row);
-      fail();
-    } catch (Exception e) {
-      // assert that exception contains the full function call signature
-      assertTrue(e.toString().contains("fromDateTime(reverse('2020-01-01T00:00:00Z'),invalid_identifier)"));
-      // assert that FunctionInvoker ISE is captured correctly.
-      assertTrue(e.getCause() instanceof IllegalStateException);
+  public void testNullReturnedByInbuiltFunctionEvaluatorThatCannotTakeNull() {
+    String[] expressions = {
+        "fromDateTime(\"NULL\", 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z''')",
+        "fromDateTime(\"invalid_identifier\", 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z''')",
+        "toDateTime(1648010797, \"invalid_identifier\", \"invalid_identifier\")",
+        "toDateTime(\"invalid_identifier\", \"invalid_identifier\", \"invalid_identifier\")",
+        "toDateTime(\"NULL\", \"invalid_identifier\", \"invalid_identifier\")",
+        "toDateTime(\"invalid_identifier\", \"NULL\", \"invalid_identifier\")"
+    };
+    for (String expression : expressions) {
+      InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
+      GenericRow row = new GenericRow();
+      assertNull(evaluator.evaluate(row));
     }
   }
 

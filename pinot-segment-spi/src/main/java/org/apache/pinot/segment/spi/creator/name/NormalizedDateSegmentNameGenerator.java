@@ -72,10 +72,10 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
       }
       _outputSDF.setTimeZone(TimeZone.getTimeZone("UTC"));
 
-      // Parse input time format: 'EPOCH' or 'SIMPLE_DATE_FORMAT' using pattern
+      // Parse input time format: 'EPOCH'/'TIMESTAMP' or 'SIMPLE_DATE_FORMAT' using pattern
       Preconditions.checkNotNull(dateTimeFormatSpec);
       TimeFormat timeFormat = dateTimeFormatSpec.getTimeFormat();
-      if (timeFormat == TimeFormat.EPOCH) {
+      if (timeFormat == TimeFormat.EPOCH || timeFormat == TimeFormat.TIMESTAMP) {
         _inputTimeUnit = dateTimeFormatSpec.getColumnUnit();
         _inputSDF = null;
       } else {

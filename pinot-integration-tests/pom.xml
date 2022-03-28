@@ -64,14 +64,6 @@
                 <maxMemorySize>2G</maxMemorySize>
               </jvmSettings>
             </program>
-            <program>
-              <mainClass>org.apache.pinot.integration.tests.HybridClusterIntegrationTestCommandLineRunner</mainClass>
-              <name>pinot-hybrid-cluster-test</name>
-              <jvmSettings>
-                <initialMemorySize>4G</initialMemorySize>
-                <maxMemorySize>4G</maxMemorySize>
-              </jvmSettings>
-            </program>
           </programs>
           <repositoryLayout>flat</repositoryLayout>
           <repositoryName>lib</repositoryName>

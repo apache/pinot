@@ -31,6 +31,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -94,8 +95,10 @@ public class StorageQuotaCheckerTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
     _tableSizeReader = mock(TableSizeReader.class);
     ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
-    _storageQuotaChecker = new StorageQuotaChecker(tableConfig, _tableSizeReader, controllerMetrics, true,
-        mock(PinotHelixResourceManager.class));
+    PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    when(pinotHelixResourceManager.getNumReplicas(eq(tableConfig))).thenReturn(NUM_REPLICAS);
+    _storageQuotaChecker =
+        new StorageQuotaChecker(tableConfig, _tableSizeReader, controllerMetrics, true, pinotHelixResourceManager);
     tableConfig.setQuotaConfig(new QuotaConfig("2.8K", null));
 
     // No response from server, should pass without updating metrics

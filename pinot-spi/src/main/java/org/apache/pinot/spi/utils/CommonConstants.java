@@ -550,6 +550,7 @@ public class CommonConstants {
     public static final String CRYPTER_NAME = "segment.crypter";
     public static final String PARTITION_METADATA = "segment.partition.metadata";
     public static final String CUSTOM_MAP = "custom.map";
+    public static final String SIZE_IN_BYTES = "segment.size.in.bytes";
 
     /**
      * This field is used for parallel push protection to lock the segment globally.

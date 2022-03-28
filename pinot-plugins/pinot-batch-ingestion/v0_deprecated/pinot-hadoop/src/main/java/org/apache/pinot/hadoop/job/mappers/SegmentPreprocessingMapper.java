@@ -71,7 +71,8 @@ public class SegmentPreprocessingMapper
       String timeType = _jobConf.get(InternalConfigConstants.SEGMENT_TIME_TYPE);
       String timeFormat = _jobConf.get(InternalConfigConstants.SEGMENT_TIME_FORMAT);
       DateTimeFormatSpec dateTimeFormatSpec;
-      if (timeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString())) {
+      if (timeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()) || timeFormat.equals(
+          DateTimeFieldSpec.TimeFormat.TIMESTAMP.toString())) {
         dateTimeFormatSpec = new DateTimeFormatSpec(1, timeType, timeFormat);
       } else {
         dateTimeFormatSpec = new DateTimeFormatSpec(1, timeType, timeFormat,

@@ -18,14 +18,18 @@
  */
 package org.apache.pinot.controller.helix;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.httpclient.SimpleHttpConnectionManager;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
@@ -36,6 +40,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
+import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -57,8 +62,12 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   private static final long DISABLED_TABLE_LOG_INTERVAL_MS = TimeUnit.DAYS.toMillis(1);
   private static final ZNRecordSerializer RECORD_SERIALIZER = new ZNRecordSerializer();
 
+  private static final int TABLE_CHECKER_TIMEOUT_MS = 30_000;
+
   private final int _waitForPushTimeSeconds;
   private long _lastDisabledTableLogTimestamp = 0;
+
+  private TableSizeReader _tableSizeReader;
 
   /**
    * Constructs the segment status checker.
@@ -66,12 +75,15 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
    * @param config The controller configuration object
    */
   public SegmentStatusChecker(PinotHelixResourceManager pinotHelixResourceManager,
-      LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics) {
+      LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
+      ExecutorService executorService) {
     super("SegmentStatusChecker", config.getStatusCheckerFrequencyInSeconds(),
         config.getStatusCheckerInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
         controllerMetrics);
 
     _waitForPushTimeSeconds = config.getStatusCheckerWaitForPushTimeInSeconds();
+    _tableSizeReader = new TableSizeReader(executorService, new SimpleHttpConnectionManager(true), _controllerMetrics,
+        _pinotHelixResourceManager);
   }
 
   @Override
@@ -96,6 +108,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   protected void processTable(String tableNameWithType, Context context) {
     try {
       updateSegmentMetrics(tableNameWithType, context);
+      updateTableSizeMetrics(tableNameWithType);
     } catch (Exception e) {
       LOGGER.error("Caught exception while updating segment status for table {}", tableNameWithType, e);
       // Remove the metric for this table
@@ -108,6 +121,11 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.REALTIME_TABLE_COUNT, context._realTimeTableCount);
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.OFFLINE_TABLE_COUNT, context._offlineTableCount);
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT, context._disabledTableCount);
+  }
+
+  private void updateTableSizeMetrics(String tableNameWithType)
+      throws InvalidConfigException {
+    _tableSizeReader.getTableSizeDetails(tableNameWithType, TABLE_CHECKER_TIMEOUT_MS);
   }
 
   /**
@@ -173,6 +191,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     int nErrors = 0; // Keeps track of number of segments in error state
     int nOffline = 0; // Keeps track of number segments with no online replicas
     int nSegments = 0; // Counts number of segments
+    long tableCompressedSize = 0; // Tracks the total compressed segment size in deep store per table
     for (String partitionName : segmentsExcludeReplaced) {
       int nReplicas = 0;
       int nIdeal = 0;
@@ -197,6 +216,12 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
           && segmentZKMetadata.getPushTime() > System.currentTimeMillis() - _waitForPushTimeSeconds * 1000) {
         // Push is not finished yet, skip the segment
         continue;
+      }
+      if (segmentZKMetadata != null) {
+        long sizeInBytes = segmentZKMetadata.getSizeInBytes();
+        if (sizeInBytes > 0) {
+          tableCompressedSize += sizeInBytes;
+        }
       }
       nReplicasIdealMax = (idealState.getInstanceStateMap(partitionName).size() > nReplicasIdealMax) ? idealState
           .getInstanceStateMap(partitionName).size() : nReplicasIdealMax;
@@ -240,6 +265,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_IN_ERROR_STATE, nErrors);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE,
         (nSegments > 0) ? (100 - (nOffline * 100 / nSegments)) : 100);
+    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_COMPRESSED_SIZE,
+        tableCompressedSize);
+
     if (nOffline > 0) {
       LOGGER.warn("Table {} has {} segments with no online replicas", tableNameWithType, nOffline);
     }
@@ -285,6 +313,11 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   public void cleanUpTask() {
     LOGGER.info("Resetting table metrics for all the tables.");
     setStatusToDefault();
+  }
+
+  @VisibleForTesting
+  void setTableSizeReader(TableSizeReader tableSizeReader) {
+    _tableSizeReader = tableSizeReader;
   }
 
   public static final class Context {

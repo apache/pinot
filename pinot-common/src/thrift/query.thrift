@@ -36,6 +36,7 @@ struct PinotQuery {
   10: optional map<string, string> debugOptions;
   11: optional map<string, string> queryOptions;
   12: optional bool explain;
+  13: optional map<Expression, Expression> expressionOverrideHints;
 }
 
 enum ExpressionType {

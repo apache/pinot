@@ -25,14 +25,13 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.integration.tests.startree.SegmentInfoProvider;
+import org.apache.pinot.integration.tests.startree.StarTreeQueryGenerator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.tools.query.comparison.QueryComparison;
-import org.apache.pinot.tools.query.comparison.SegmentInfoProvider;
-import org.apache.pinot.tools.query.comparison.StarTreeQueryGenerator;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -63,8 +62,8 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls_single_value_columns.schema";
   private static final int NUM_STAR_TREE_DIMENSIONS = 5;
   private static final int NUM_STAR_TREE_METRICS = 5;
-  private static final List<AggregationFunctionType> AGGREGATION_FUNCTION_TYPES = Arrays
-      .asList(AggregationFunctionType.COUNT, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
+  private static final List<AggregationFunctionType> AGGREGATION_FUNCTION_TYPES =
+      Arrays.asList(AggregationFunctionType.COUNT, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
           AggregationFunctionType.SUM, AggregationFunctionType.AVG, AggregationFunctionType.MINMAXRANGE,
           AggregationFunctionType.DISTINCTCOUNTBITMAP);
   private static final int NUM_QUERIES_TO_GENERATE = 100;
@@ -131,8 +130,8 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
     _currentTable = STAR_TREE_TABLE_NAME;
     TableConfig starTreeTableConfig = createOfflineTableConfig();
-    starTreeTableConfig.getIndexingConfig().setStarTreeIndexConfigs(Arrays
-        .asList(getStarTreeIndexConfig(starTree1Dimensions, starTree1Metrics),
+    starTreeTableConfig.getIndexingConfig().setStarTreeIndexConfigs(
+        Arrays.asList(getStarTreeIndexConfig(starTree1Dimensions, starTree1Metrics),
             getStarTreeIndexConfig(starTree2Dimensions, starTree2Metrics)));
     addTableConfig(starTreeTableConfig);
 
@@ -140,11 +139,11 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     List<File> avroFiles = unpackAvroData(_tempDir);
 
     // Create and upload segments
-    ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(avroFiles, defaultTableConfig, schema, 0, defaultTableSegmentDir, defaultTableTarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, defaultTableConfig, schema, 0, defaultTableSegmentDir,
+        defaultTableTarDir);
     uploadSegments(DEFAULT_TABLE_NAME, defaultTableTarDir);
-    ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(avroFiles, starTreeTableConfig, schema, 0, starTreeTableSegmentDir, starTreeTableTarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, starTreeTableConfig, schema, 0,
+        starTreeTableSegmentDir, starTreeTableTarDir);
     uploadSegments(STAR_TREE_TABLE_NAME, starTreeTableTarDir);
 
     // Set up the query generators
@@ -208,19 +207,10 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
 
   private void testStarQuery(String starQuery)
       throws Exception {
-    String referenceQuery = starQuery.replace(STAR_TREE_TABLE_NAME, DEFAULT_TABLE_NAME) + " TOP 10000";
-    JsonNode starResponse = postQuery(starQuery);
-    JsonNode referenceResponse = postQuery(referenceQuery);
-
-    // Skip comparison if not all results returned in reference response
-    if (referenceResponse.has("aggregationResults")) {
-      JsonNode aggregationResults = referenceResponse.get("aggregationResults").get(0);
-      if (aggregationResults.has("groupByResult") && aggregationResults.get("groupByResult").size() == 10000) {
-        return;
-      }
-    }
-
-    Assert.assertTrue(QueryComparison.compare(starResponse, referenceResponse, false),
+    String referenceQuery = starQuery.replace(STAR_TREE_TABLE_NAME, DEFAULT_TABLE_NAME);
+    JsonNode starResponse = postSqlQuery(starQuery);
+    JsonNode referenceResponse = postSqlQuery(referenceQuery);
+    Assert.assertEquals(starResponse.get("resultTable"), referenceResponse.get("resultTable"),
         "Query comparison failed for: \nStar Query: " + starQuery + "\nStar Response: " + starResponse
             + "\nReference Query: " + referenceQuery + "\nReference Response: " + referenceResponse);
   }

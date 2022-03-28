@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.tools.query.comparison;
+package org.apache.pinot.integration.tests.startree;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -36,11 +36,11 @@ import org.apache.pinot.spi.utils.ReadMode;
 
 
 /**
- * Given a segments directory, pick all segments and read the dictionaries for all single-value dimension columns.
+ * Given a segment directory, pick all segments and read the dictionaries for all single-value dimension columns.
  * Here we will treat time column (if exists) as a single-value dimension column.
  */
 public class SegmentInfoProvider {
-  private static final String TMP_DIR = System.getProperty("java.io.tmpdir");
+  private static final String TMP_DIR = FileUtils.getTempDirectoryPath();
   private static final String SEGMENT_INFO_PROVIDER = "segmentInfoProvider";
 
   private final List<String> _singleValueDimensionColumns;

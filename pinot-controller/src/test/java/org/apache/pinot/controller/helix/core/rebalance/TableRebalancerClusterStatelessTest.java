@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.rebalance;
 
 import com.google.common.collect.Lists;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
@@ -65,6 +66,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
   private static final String NO_TIER_NAME = "noTier";
   private static final String TIER_A_NAME = "tierA";
   private static final String TIER_B_NAME = "tierB";
+  private static final String TIER_FIXED_NAME = "tierFixed";
 
   @BeforeClass
   public void setUp()
@@ -318,7 +320,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
 
   /**
    * Tests rebalance with tier configs
-   * Add 10 segments, with segment metadat end time 3 days apart starting from now to 30 days ago
+   * Add 10 segments, with segment metadata end time 3 days apart starting from now to 30 days ago
    * 1. run rebalance - should see no change
    * 2. add nodes for tiers and run rebalance - should see no change
    * 3. add tier config and run rebalance - should see changed assignment
@@ -374,11 +376,15 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getSegmentAssignment(), oldSegmentAssignment);
 
     // add tier config
+    ArrayList<String> fixedTierSegments =
+        Lists.newArrayList(SEGMENT_NAME_PREFIX + 6, SEGMENT_NAME_PREFIX + 3, SEGMENT_NAME_PREFIX + 1);
     tableConfig.setTierConfigsList(Lists.newArrayList(
-        new TierConfig(TIER_A_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "7d", TierFactory.PINOT_SERVER_STORAGE_TYPE,
-            TIER_A_NAME + "_OFFLINE", null, null),
-        new TierConfig(TIER_B_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "15d",
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, TIER_B_NAME + "_OFFLINE", null, null)));
+        new TierConfig(TIER_A_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "7d", null,
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, TIER_A_NAME + "_OFFLINE", null, null),
+        new TierConfig(TIER_B_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "15d", null,
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, TIER_B_NAME + "_OFFLINE", null, null),
+        new TierConfig(TIER_FIXED_NAME, TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, fixedTierSegments,
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, NO_TIER_NAME + "_OFFLINE", null, null)));
     _helixResourceManager.updateTableConfig(tableConfig);
 
     // rebalance should change assignment
@@ -388,10 +394,14 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // check that segments have moved to tiers
     Map<String, Map<String, String>> tierSegmentAssignment = rebalanceResult.getSegmentAssignment();
     for (Map.Entry<String, Map<String, String>> entry : tierSegmentAssignment.entrySet()) {
-      int segId = Integer.parseInt(entry.getKey().split("_")[1]);
+      String segment = entry.getKey();
+      int segId = Integer.parseInt(segment.split("_")[1]);
       Map<String, String> instanceStateMap = entry.getValue();
       String expectedPrefix;
-      if (segId > 4) {
+      if (fixedTierSegments.contains(segment)) {
+        expectedPrefix = NO_TIER_NAME + "_" + SERVER_INSTANCE_ID_PREFIX;
+      } else
+        if (segId > 4) {
         expectedPrefix = TIER_B_NAME + "_" + SERVER_INSTANCE_ID_PREFIX;
       } else if (segId > 2) {
         expectedPrefix = TIER_A_NAME + "_" + SERVER_INSTANCE_ID_PREFIX;

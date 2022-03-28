@@ -125,6 +125,14 @@ public class SegmentZKMetadata implements ZKMetadata {
     setNonNegativeValue(Segment.TOTAL_DOCS, totalDocs);
   }
 
+  public void setSizeInBytes(long sizeInBytes) {
+    setNonNegativeValue(Segment.SIZE_IN_BYTES, sizeInBytes);
+  }
+
+  public long getSizeInBytes() {
+    return _znRecord.getLongField(Segment.SIZE_IN_BYTES, -1);
+  }
+
   public long getCrc() {
     return _znRecord.getLongField(Segment.CRC, -1);
   }

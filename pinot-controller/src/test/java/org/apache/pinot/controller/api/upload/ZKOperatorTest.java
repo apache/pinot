@@ -78,7 +78,7 @@ public class ZKOperatorTest {
       zkOperator
           .completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, finalSegmentLocationURI,
               currentSegmentLocation, true, httpHeaders, "downloadUrl",
-              true, "crypter", true);
+              true, "crypter", true, 10);
       fail();
     } catch (Exception e) {
       // Expected
@@ -91,10 +91,9 @@ public class ZKOperatorTest {
       return segmentZKMetadata == null;
     }, 30_000L, "Failed to delete segmentZkMetadata.");
 
-
     zkOperator
         .completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, true, httpHeaders, "downloadUrl",
-            false, "crypter", true);
+            false, "crypter", true, 10);
 
     SegmentZKMetadata segmentZKMetadata =
         ControllerTestUtils.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
@@ -107,11 +106,12 @@ public class ZKOperatorTest {
     assertEquals(segmentZKMetadata.getDownloadUrl(), "downloadUrl");
     assertEquals(segmentZKMetadata.getCrypterName(), "crypter");
     assertEquals(segmentZKMetadata.getSegmentUploadStartTime(), -1);
+    assertEquals(segmentZKMetadata.getSizeInBytes(), 10);
 
     // Upload the same segment with allowRefresh = false. Validate that an exception is thrown.
     try {
       zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, false, httpHeaders,
-          "otherDownloadUrl", false, "otherCrypter", false);
+          "otherDownloadUrl", false, "otherCrypter", false, 10);
       fail();
     } catch (Exception e) {
       // Expected
@@ -121,7 +121,7 @@ public class ZKOperatorTest {
     when(httpHeaders.getHeaderString(HttpHeaders.IF_MATCH)).thenReturn("123");
     try {
       zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, true, httpHeaders,
-          "otherDownloadUrl", false, null, true);
+          "otherDownloadUrl", false, null, true, 10);
       fail();
     } catch (Exception e) {
       // Expected
@@ -132,7 +132,7 @@ public class ZKOperatorTest {
     when(httpHeaders.getHeaderString(HttpHeaders.IF_MATCH)).thenReturn("12345");
     when(segmentMetadata.getIndexCreationTime()).thenReturn(456L);
     zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, true, httpHeaders,
-        "otherDownloadUrl", false, "otherCrypter", true);
+        "otherDownloadUrl", false, "otherCrypter", true, 10);
     segmentZKMetadata =
         ControllerTestUtils.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
     assertEquals(segmentZKMetadata.getCrc(), 12345L);
@@ -146,6 +146,7 @@ public class ZKOperatorTest {
     assertEquals(segmentZKMetadata.getDownloadUrl(), "downloadUrl");
     assertEquals(segmentZKMetadata.getCrypterName(), "crypter");
     assertEquals(segmentZKMetadata.getSegmentUploadStartTime(), -1);
+    assertEquals(segmentZKMetadata.getSizeInBytes(), 10);
 
     // Refresh the segment with a different segment (different CRC)
     when(segmentMetadata.getCrc()).thenReturn("23456");
@@ -155,7 +156,7 @@ public class ZKOperatorTest {
     // not found!" exception from being thrown sporadically.
     Thread.sleep(1000L);
     zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, true, httpHeaders,
-        "otherDownloadUrl", false, "otherCrypter", true);
+        "otherDownloadUrl", false, "otherCrypter", true, 10);
     segmentZKMetadata =
         ControllerTestUtils.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
     assertEquals(segmentZKMetadata.getCrc(), 23456L);
@@ -166,6 +167,7 @@ public class ZKOperatorTest {
     assertTrue(segmentZKMetadata.getRefreshTime() > refreshTime);
     assertEquals(segmentZKMetadata.getDownloadUrl(), "otherDownloadUrl");
     assertEquals(segmentZKMetadata.getCrypterName(), "otherCrypter");
+    assertEquals(segmentZKMetadata.getSizeInBytes(), 10);
   }
 
   @AfterClass
