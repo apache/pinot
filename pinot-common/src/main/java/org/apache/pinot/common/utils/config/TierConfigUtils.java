@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils.config;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -76,7 +75,7 @@ public final class TierConfigUtils {
   }
 
   /**
-   * Comparator for sorting the {@link Tier}. In the sort order,
+   * Comparator for sorting the {@link Tier}. In the sort order
    * 1) {@link FixedTierSegmentSelector} are always before others
    * 2) For {@link TimeBasedTierSegmentSelector}, tiers with an older age bucket appear before a younger age bucket,
    */
@@ -84,14 +83,6 @@ public final class TierConfigUtils {
     return (o1, o2) -> {
       TierSegmentSelector s1 = o1.getSegmentSelector();
       TierSegmentSelector s2 = o2.getSegmentSelector();
-
-      Preconditions.checkState(TierFactory.TIME_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s1.getType())
-              || TierFactory.FIXED_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s1.getType()),
-          "Unsupported segmentSelectorType class %s", s1.getClass());
-      Preconditions.checkState(TierFactory.TIME_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s2.getType())
-          || TierFactory.FIXED_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s2.getType()),
-          "Unsupported segmentSelectorType class %s", s2.getClass());
-
       if (TierFactory.FIXED_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s1.getType())
           && TierFactory.FIXED_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s2.getType())) {
         return 0;
@@ -102,7 +93,6 @@ public final class TierConfigUtils {
       if (TierFactory.FIXED_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s2.getType())) {
         return 1;
       }
-
       Long period1 = ((TimeBasedTierSegmentSelector) s1).getSegmentAgeMillis();
       Long period2 = ((TimeBasedTierSegmentSelector) s2).getSegmentAgeMillis();
       return period2.compareTo(period1);
