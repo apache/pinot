@@ -81,8 +81,8 @@ public final class PinotConnectionUtils {
     if (ingestionConfig.getBatchIngestionConfig() == null) {
       tableConfig.setIngestionConfig(
           new IngestionConfig(new BatchIngestionConfig(Lists.newArrayList(newBatchConfigMaps), "APPEND", "HOURLY"),
-              null, ingestionConfig.getFilterConfig(), ingestionConfig.getAggregationConfigs(), ingestionConfig.getTransformConfigs(),
-              ingestionConfig.getComplexTypeConfig()));
+              null, ingestionConfig.getFilterConfig(), ingestionConfig.getAggregationConfigs(),
+              ingestionConfig.getTransformConfigs(), ingestionConfig.getComplexTypeConfig()));
       return tableConfig;
     }
 
@@ -94,8 +94,8 @@ public final class PinotConnectionUtils {
     tableConfig.setIngestionConfig(new IngestionConfig(
         new BatchIngestionConfig(batchConfigMaps, ingestionConfig.getBatchIngestionConfig().getSegmentIngestionType(),
             ingestionConfig.getBatchIngestionConfig().getSegmentIngestionFrequency()), null,
-        ingestionConfig.getFilterConfig(), ingestionConfig.getAggregationConfigs(), ingestionConfig.getTransformConfigs(),
-        ingestionConfig.getComplexTypeConfig()));
+        ingestionConfig.getFilterConfig(), ingestionConfig.getAggregationConfigs(),
+        ingestionConfig.getTransformConfigs(), ingestionConfig.getComplexTypeConfig()));
 
     return tableConfig;
   }

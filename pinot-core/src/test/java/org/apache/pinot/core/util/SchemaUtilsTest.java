@@ -92,8 +92,8 @@ public class SchemaUtilsTest {
     // schema doesn't have destination columns from transformConfigs
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-        new IngestionConfig(null, null, null, null, Lists.newArrayList(new TransformConfig("colA", "round(colB, 1000)")),
-            null)).build();
+        new IngestionConfig(null, null, null, null,
+            Lists.newArrayList(new TransformConfig("colA", "round(colB, 1000)")), null)).build();
     try {
       SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
       Assert.fail("Should fail schema validation, as colA is not present in schema");
@@ -140,9 +140,8 @@ public class SchemaUtilsTest {
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS").build();
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
-        .setIngestionConfig(
-            new IngestionConfig(null, null, null, null, Lists.newArrayList(new TransformConfig("colA", "round(colB, 1000)")),
-                null)).build();
+        .setIngestionConfig(new IngestionConfig(null, null, null, null,
+            Lists.newArrayList(new TransformConfig("colA", "round(colB, 1000)")), null)).build();
     try {
       SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
       Assert.fail("Should fail schema validation, as colA is not present in schema");
@@ -207,21 +206,21 @@ public class SchemaUtilsTest {
   public void testValidateTimeFieldSpec() {
     Schema pinotSchema;
     // time field spec using same name for incoming and outgoing
-    pinotSchema = new Schema.SchemaBuilder()
-        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "time"),
+    pinotSchema =
+        new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "time"),
             new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "time")).build();
     checkValidationFails(pinotSchema);
 
     // time field spec using SIMPLE_DATE_FORMAT, not allowed when conversion is needed
-    pinotSchema = new Schema.SchemaBuilder()
-        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
+    pinotSchema =
+        new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
             new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS,
                 TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString(), "outgoing")).build();
     checkValidationFails(pinotSchema);
 
     // valid time field spec
-    pinotSchema = new Schema.SchemaBuilder()
-        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
+    pinotSchema =
+        new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
             new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "outgoing")).build();
     SchemaUtils.validate(pinotSchema);
   }
@@ -230,20 +229,20 @@ public class SchemaUtilsTest {
   public void testValidateDateTimeFieldSpec() {
     Schema pinotSchema;
     // valid date time.
-    pinotSchema = new Schema.SchemaBuilder()
-        .addDateTime("datetime1", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS")
+    pinotSchema = new Schema.SchemaBuilder().addDateTime("datetime1", FieldSpec.DataType.STRING,
+            "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS")
         .addDateTime("datetime2", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-ww-dd", "1:DAYS")
         .build();
     SchemaUtils.validate(pinotSchema);
 
     // date time field spec using SIMPLE_DATE_FORMAT needs to be valid.
-    pinotSchema = new Schema.SchemaBuilder()
-        .addDateTime("datetime3", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:foo_bar", "1:DAYS").build();
+    pinotSchema = new Schema.SchemaBuilder().addDateTime("datetime3", FieldSpec.DataType.STRING,
+        "1:DAYS:SIMPLE_DATE_FORMAT:foo_bar", "1:DAYS").build();
     checkValidationFails(pinotSchema);
 
     // date time field spec using SIMPLE_DATE_FORMAT needs to be lexicographical order.
-    pinotSchema = new Schema.SchemaBuilder()
-        .addDateTime("datetime4", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:M/d/yyyy", "1:DAYS").build();
+    pinotSchema = new Schema.SchemaBuilder().addDateTime("datetime4", FieldSpec.DataType.STRING,
+        "1:DAYS:SIMPLE_DATE_FORMAT:M/d/yyyy", "1:DAYS").build();
     checkValidationFails(pinotSchema);
   }
 
@@ -251,17 +250,17 @@ public class SchemaUtilsTest {
   public void testValidatePrimaryKeyColumns() {
     Schema pinotSchema;
     // non-existing column used as primary key
-    pinotSchema = new Schema.SchemaBuilder()
-        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
-            new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "outgoing"))
-        .addSingleValueDimension("col", DataType.INT).setPrimaryKeyColumns(Lists.newArrayList("test")).build();
+    pinotSchema =
+        new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
+                new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "outgoing"))
+            .addSingleValueDimension("col", DataType.INT).setPrimaryKeyColumns(Lists.newArrayList("test")).build();
     checkValidationFails(pinotSchema);
 
     // valid primary key
-    pinotSchema = new Schema.SchemaBuilder()
-        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
-            new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "outgoing"))
-        .addSingleValueDimension("col", DataType.INT).setPrimaryKeyColumns(Lists.newArrayList("col")).build();
+    pinotSchema =
+        new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
+                new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "outgoing"))
+            .addSingleValueDimension("col", DataType.INT).setPrimaryKeyColumns(Lists.newArrayList("col")).build();
     SchemaUtils.validate(pinotSchema);
   }
 

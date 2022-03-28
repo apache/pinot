@@ -53,8 +53,8 @@ public class SegmentGenerationWithFilterRecordsTest {
       {1588316400000L, 1588489200000L, 1588662000000L, 1588834800000L, 1589007600000L};
   private static final String MV_INT_COLUMN = "col3";
   private static final ArrayList[] MV_INT_VALUES = {
-      Lists.newArrayList(1, 2, 3), Lists.newArrayList(4), Lists.newArrayList(5, 1), Lists.newArrayList(2),
-      Lists.newArrayList(3, 4, 5)
+      Lists.newArrayList(1, 2, 3), Lists.newArrayList(4), Lists.newArrayList(5, 1), Lists.newArrayList(
+      2), Lists.newArrayList(3, 4, 5)
   };
   private static final String SEGMENT_DIR_NAME =
       FileUtils.getTempDirectoryPath() + File.separator + "segmentFilterRecordsTest";
@@ -67,7 +67,8 @@ public class SegmentGenerationWithFilterRecordsTest {
   public void setup() {
     String filterFunction =
         "Groovy({((col2 < 1589007600000L) &&  (col3.max() < 4)) || col1 == \"B\"}, col1, col2, col3)";
-    IngestionConfig ingestionConfig = new IngestionConfig(null, null, new FilterConfig(filterFunction),  null, null, null);
+    IngestionConfig ingestionConfig =
+        new IngestionConfig(null, null, new FilterConfig(filterFunction), null, null, null);
     _tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig).build();
     _schema = new Schema.SchemaBuilder().addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING)

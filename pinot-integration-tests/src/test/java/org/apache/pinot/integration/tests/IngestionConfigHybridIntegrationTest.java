@@ -69,7 +69,8 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
 
     List<Map<String, String>> streamConfigMaps = new ArrayList<>();
     streamConfigMaps.add(getStreamConfigMap());
-    return new IngestionConfig(null, new StreamIngestionConfig(streamConfigMaps), filterConfig, null, transformConfigs, null);
+    return new IngestionConfig(null, new StreamIngestionConfig(streamConfigMaps), filterConfig, null, transformConfigs,
+        null);
   }
 
   @Override
@@ -138,8 +139,8 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
     addTableConfig(createRealtimeTableConfig(realtimeAvroFiles.get(0)));
 
     // Create and upload segments
-    ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir,
+        _tarDir);
     uploadSegments(getTableName(), _tarDir);
 
     // Push data into Kafka
