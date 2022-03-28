@@ -72,6 +72,7 @@ import org.testng.Assert;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.*;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.Instance.ADMIN_PORT_KEY;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
+import static org.testng.Assert.assertNotNull;
 
 
 public abstract class ControllerTest {
@@ -519,13 +520,9 @@ public abstract class ControllerTest {
   }
 
   protected Schema getSchema(String schemaName) {
-    try {
-      Schema schema = getControllerRequestClient().getSchema(schemaName);
-      Assert.assertNotNull(schema);
-      return schema;
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+    Schema schema = _helixResourceManager.getSchema(schemaName);
+    assertNotNull(schema);
+    return schema;
   }
 
   protected void deleteSchema(String schemaName)

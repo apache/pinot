@@ -341,7 +341,7 @@ public class HttpClient implements AutoCloseable {
     MultipartEntityBuilder builder = MultipartEntityBuilder.create();
     builder.addTextBody("body", body);
     put.setEntity(builder.build());
-    if (headers != null) {
+    if (MapUtils.isNotEmpty(headers)) {
       for (String key : headers.keySet()) {
         put.addHeader(key, headers.get(key));
       }
