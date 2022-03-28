@@ -33,9 +33,8 @@ import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.CombinedFilterOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
-import org.apache.pinot.core.operator.query.DictionaryBasedAggregationOperator;
+import org.apache.pinot.core.operator.query.DataSourceBasedAggregationOperator;
 import org.apache.pinot.core.operator.query.FilteredAggregationOperator;
-import org.apache.pinot.core.operator.query.MetadataBasedAggregationOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
@@ -47,7 +46,6 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
-import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
@@ -61,9 +59,9 @@ import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
 @SuppressWarnings("rawtypes")
 public class AggregationPlanNode implements PlanNode {
   private static final EnumSet<AggregationFunctionType> DICTIONARY_BASED_FUNCTIONS =
-      EnumSet.of(MIN, MINMV, MAX, MAXMV, MINMAXRANGE, MINMAXRANGEMV, DISTINCTCOUNT, DISTINCTCOUNTMV, DISTINCTCOUNTHLL,
-          DISTINCTCOUNTHLLMV, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTRAWHLLMV, SEGMENTPARTITIONEDDISTINCTCOUNT,
-          DISTINCTCOUNTSMARTHLL);
+      EnumSet.of(MIN, MINMV, MAX, MAXMV, MINMAXRANGE, MINMAXRANGEMV, DISTINCTCOUNT, DISTINCTCOUNTMV,
+          DISTINCTCOUNTHLL, DISTINCTCOUNTHLLMV, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTRAWHLLMV,
+          SEGMENTPARTITIONEDDISTINCTCOUNT, DISTINCTCOUNTSMARTHLL);
 
   // DISTINCTCOUNT excluded because consuming segment metadata contains unknown cardinality when there is no dictionary
   private static final EnumSet<AggregationFunctionType> METADATA_BASED_FUNCTIONS =
@@ -182,7 +180,7 @@ public class AggregationPlanNode implements PlanNode {
 
     // Use metadata/dictionary to solve the query if possible
     if (filterOperator.isResultMatchingAll()) {
-      if (isFitForMetadataBasedPlan(aggregationFunctions, _indexSegment)) {
+      if (isFitForDataSourceBasedPlan(aggregationFunctions, _indexSegment)) {
         DataSource[] dataSources = new DataSource[aggregationFunctions.length];
         for (int i = 0; i < aggregationFunctions.length; i++) {
           List<?> inputExpressions = aggregationFunctions[i].getInputExpressions();
@@ -191,15 +189,7 @@ public class AggregationPlanNode implements PlanNode {
             dataSources[i] = _indexSegment.getDataSource(column);
           }
         }
-        return new MetadataBasedAggregationOperator(aggregationFunctions, _indexSegment.getSegmentMetadata(),
-            dataSources);
-      } else if (isFitForDictionaryBasedPlan(aggregationFunctions, _indexSegment)) {
-        Map<String, Dictionary> dictionaryMap = new HashMap<>();
-        for (AggregationFunction aggregationFunction : aggregationFunctions) {
-          String column = ((ExpressionContext) aggregationFunction.getInputExpressions().get(0)).getIdentifier();
-          dictionaryMap.computeIfAbsent(column, k -> _indexSegment.getDataSource(k).getDictionary());
-        }
-        return new DictionaryBasedAggregationOperator(aggregationFunctions, dictionaryMap, numTotalDocs);
+        return new DataSourceBasedAggregationOperator(aggregationFunctions, dataSources, numTotalDocs);
       }
     }
 
@@ -262,21 +252,29 @@ public class AggregationPlanNode implements PlanNode {
   /**
    * Returns {@code true} if the given aggregations can be solved with dictionary, {@code false} otherwise.
    */
-  private static boolean isFitForDictionaryBasedPlan(AggregationFunction[] aggregationFunctions,
+  private static boolean isFitForDataSourceBasedPlan(AggregationFunction[] aggregationFunctions,
       IndexSegment indexSegment) {
     for (AggregationFunction aggregationFunction : aggregationFunctions) {
-      if (!DICTIONARY_BASED_FUNCTIONS.contains(aggregationFunction.getType())) {
-        return false;
+      if (aggregationFunction.getType() == COUNT) {
+        continue;
       }
       ExpressionContext argument = (ExpressionContext) aggregationFunction.getInputExpressions().get(0);
       if (argument.getType() != ExpressionContext.Type.IDENTIFIER) {
         return false;
       }
-      String column = argument.getIdentifier();
-      Dictionary dictionary = indexSegment.getDataSource(column).getDictionary();
-      if (dictionary == null) {
-        return false;
+      DataSource dataSource = indexSegment.getDataSource(argument.getIdentifier());
+      if (DICTIONARY_BASED_FUNCTIONS.contains(aggregationFunction.getType())) {
+        if (dataSource.getDictionary() != null) {
+          continue;
+        }
       }
+      if (METADATA_BASED_FUNCTIONS.contains(aggregationFunction.getType())) {
+        if (dataSource.getDataSourceMetadata().getMaxValue() != null
+            && dataSource.getDataSourceMetadata().getMinValue() != null) {
+          continue;
+        }
+      }
+      return false;
     }
     return true;
   }

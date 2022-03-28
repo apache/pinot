@@ -27,9 +27,8 @@ import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
-import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -40,6 +39,7 @@ import org.apache.pinot.core.query.aggregation.function.DistinctCountHLLAggregat
 import org.apache.pinot.core.query.aggregation.function.DistinctCountRawHLLAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountSmartHLLAggregationFunction;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -58,70 +58,91 @@ import static org.apache.pinot.core.operator.query.AggregationOperatorUtils.toDo
  * For max value we use the last value from dictionary
  */
 @SuppressWarnings("rawtypes")
-public class DictionaryBasedAggregationOperator extends BaseOperator<IntermediateResultsBlock> {
+public class DataSourceBasedAggregationOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "DictionaryBasedAggregationOperator";
-  private static final String EXPLAIN_NAME = "AGGREGATE_DICTIONARY";
+  private static final String EXPLAIN_NAME = "AGGREGATE_DATASOURCE";
 
   private final AggregationFunction[] _aggregationFunctions;
-  private final Map<String, Dictionary> _dictionaryMap;
+  private final DataSource[] _dataSources;
   private final int _numTotalDocs;
 
-  public DictionaryBasedAggregationOperator(AggregationFunction[] aggregationFunctions,
-      Map<String, Dictionary> dictionaryMap, int numTotalDocs) {
+  public DataSourceBasedAggregationOperator(AggregationFunction[] aggregationFunctions,
+      DataSource[] dataSources, int numTotalDocs) {
     _aggregationFunctions = aggregationFunctions;
-    _dictionaryMap = dictionaryMap;
+    _dataSources = dataSources;
     _numTotalDocs = numTotalDocs;
   }
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
     List<Object> aggregationResults = new ArrayList<>(_aggregationFunctions.length);
-    for (AggregationFunction aggregationFunction : _aggregationFunctions) {
-      String column = ((ExpressionContext) aggregationFunction.getInputExpressions().get(0)).getIdentifier();
-      Dictionary dictionary = _dictionaryMap.get(column);
+    for (int i = 0; i < _aggregationFunctions.length; i++) {
+      AggregationFunction aggregationFunction = _aggregationFunctions[i];
+      // note that dataSource will be null for COUNT, sp do not interact with it until it's known this isn't a COUNT
+      DataSource dataSource = _dataSources[i];
       Object result;
       switch (aggregationFunction.getType()) {
+        case COUNT:
+          result = (long) _numTotalDocs;
+          break;
         case MIN:
         case MINMV:
-          result = toDouble(dictionary.getMinVal());
+          result = getMinValue(dataSource);
           break;
         case MAX:
         case MAXMV:
-          result = toDouble(dictionary.getMaxVal());
+          result = getMaxValue(dataSource);
           break;
         case MINMAXRANGE:
         case MINMAXRANGEMV:
-          result = new MinMaxRangePair(toDouble(dictionary.getMinVal()), toDouble(dictionary.getMaxVal()));
+          result = new MinMaxRangePair(getMinValue(dataSource), getMaxValue(dataSource));
           break;
         case DISTINCTCOUNT:
         case DISTINCTCOUNTMV:
-          result = getDistinctValueSet(dictionary);
+          result = getDistinctValueSet(Objects.requireNonNull(dataSource.getDictionary()));
           break;
         case DISTINCTCOUNTHLL:
         case DISTINCTCOUNTHLLMV:
-          result = getDistinctCountHLLResult(dictionary, (DistinctCountHLLAggregationFunction) aggregationFunction);
+          result = getDistinctCountHLLResult(Objects.requireNonNull(dataSource.getDictionary()),
+              (DistinctCountHLLAggregationFunction) aggregationFunction);
           break;
         case DISTINCTCOUNTRAWHLL:
         case DISTINCTCOUNTRAWHLLMV:
-          result = getDistinctCountHLLResult(dictionary,
+          result = getDistinctCountHLLResult(Objects.requireNonNull(dataSource.getDictionary()),
               ((DistinctCountRawHLLAggregationFunction) aggregationFunction).getDistinctCountHLLAggregationFunction());
           break;
         case SEGMENTPARTITIONEDDISTINCTCOUNT:
-          result = (long) dictionary.length();
+          result = (long) Objects.requireNonNull(dataSource.getDictionary()).length();
           break;
         case DISTINCTCOUNTSMARTHLL:
-          result = getDistinctCountSmartHLLResult(dictionary,
+          result = getDistinctCountSmartHLLResult(Objects.requireNonNull(dataSource.getDictionary()),
               (DistinctCountSmartHLLAggregationFunction) aggregationFunction);
           break;
         default:
           throw new IllegalStateException(
-              "Dictionary based aggregation operator does not support function type: " + aggregationFunction.getType());
+              "DataSource based aggregation operator does not support function type: " + aggregationFunction.getType());
       }
       aggregationResults.add(result);
     }
 
     // Build intermediate result block based on aggregation result from the executor.
     return new IntermediateResultsBlock(_aggregationFunctions, aggregationResults, false);
+  }
+
+  private static Double getMinValue(DataSource dataSource) {
+    Dictionary dictionary = dataSource.getDictionary();
+    if (dictionary != null) {
+      return toDouble(dictionary.getMinVal());
+    }
+    return toDouble(dataSource.getDataSourceMetadata().getMinValue());
+  }
+
+  private static Double getMaxValue(DataSource dataSource) {
+    Dictionary dictionary = dataSource.getDictionary();
+    if (dictionary != null) {
+      return toDouble(dictionary.getMaxVal());
+    }
+    return toDouble(dataSource.getDataSourceMetadata().getMaxValue());
   }
 
   private static Set getDistinctValueSet(Dictionary dictionary) {

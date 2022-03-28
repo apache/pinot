@@ -36,8 +36,7 @@ import static org.testng.Assert.assertTrue;
 
 
 /**
- * Integration test to check aggregation functions which use {@code DictionaryBasedAggregationPlanNode} and
- * {@code MetadataBasedAggregationPlanNode}.
+ * Integration test to check aggregation functions which use {@code DataSourceBasedAggregationPlanNode}
  */
 // TODO: remove this integration test and add unit test for metadata and dictionary based aggregation operator
 public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends BaseClusterIntegrationTest {
