@@ -130,13 +130,18 @@ public class BenchmarkQueries extends BaseQueriesTest {
       + "year(INT_COL) as y, month(INT_COL) as m "
       + "from MyTable group by y, m";
 
+  public static final String RAW_COLUMN_SUMMARY_STATS = "SELECT "
+      + "MIN(RAW_INT_COL), MAX(RAW_INT_COL), COUNT(*) "
+      + "FROM MyTable";
+
   @Param("1500000")
   private int _numRows;
   @Param({"EXP(0.001)", "EXP(0.5)", "EXP(0.999)"})
   String _scenario;
   @Param({
       MULTI_GROUP_BY_WITH_RAW_QUERY, MULTI_GROUP_BY_WITH_RAW_QUERY_2, FILTERED_QUERY, NON_FILTERED_QUERY,
-      SUM_QUERY, NO_INDEX_LIKE_QUERY, MULTI_GROUP_BY_ORDER_BY, MULTI_GROUP_BY_ORDER_BY_LOW_HIGH, TIME_GROUP_BY
+      SUM_QUERY, NO_INDEX_LIKE_QUERY, MULTI_GROUP_BY_ORDER_BY, MULTI_GROUP_BY_ORDER_BY_LOW_HIGH, TIME_GROUP_BY,
+      RAW_COLUMN_SUMMARY_STATS
   })
   String _query;
   private IndexSegment _indexSegment;

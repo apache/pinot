@@ -502,14 +502,14 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     List<Object[]> result1 = new ArrayList<>();
     result1.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
     result1.add(new Object[]{"COMBINE_AGGREGATE", 1, 0});
-    result1.add(new Object[]{"AGGREGATE_METADATA", 2, 1});
+    result1.add(new Object[]{"AGGREGATE_NO_SCAN", 2, 1});
     check(query1, new ResultTable(DATA_SCHEMA, result1));
 
     String query2 = "EXPLAIN PLAN FOR SELECT min(invertedIndexCol1) FROM testTable";
     List<Object[]> result2 = new ArrayList<>();
     result2.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
     result2.add(new Object[]{"COMBINE_AGGREGATE", 1, 0});
-    result2.add(new Object[]{"AGGREGATE_DICTIONARY", 2, 1});
+    result2.add(new Object[]{"AGGREGATE_NO_SCAN", 2, 1});
     check(query2, new ResultTable(DATA_SCHEMA, result2));
 
     String query3 =

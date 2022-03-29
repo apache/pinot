@@ -29,8 +29,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
-import org.apache.pinot.core.operator.query.DictionaryBasedAggregationOperator;
-import org.apache.pinot.core.operator.query.MetadataBasedAggregationOperator;
+import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
@@ -165,32 +164,32 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     });
     // COUNT from metadata
     entries.add(new Object[]{
-        "select count(*) from testTable", MetadataBasedAggregationOperator.class, AggregationOperator.class
+        "select count(*) from testTable", NonScanBasedAggregationOperator.class, AggregationOperator.class
     });
     // COUNT from metadata with match all filter
     entries.add(new Object[]{
-        "select count(*) from testTable where column1 > 10", MetadataBasedAggregationOperator.class,
+        "select count(*) from testTable where column1 > 10", NonScanBasedAggregationOperator.class,
         AggregationOperator.class
     });
     // MIN/MAX from dictionary
     entries.add(new Object[]{
-        "select max(daysSinceEpoch),min(daysSinceEpoch) from testTable", DictionaryBasedAggregationOperator.class,
+        "select max(daysSinceEpoch),min(daysSinceEpoch) from testTable", NonScanBasedAggregationOperator.class,
         AggregationOperator.class
     });
     // MIN/MAX from dictionary with match all filter
     entries.add(new Object[]{
         "select max(daysSinceEpoch),min(daysSinceEpoch) from testTable where column1 > 10",
-        DictionaryBasedAggregationOperator.class, AggregationOperator.class
+        NonScanBasedAggregationOperator.class, AggregationOperator.class
     });
     // MINMAXRANGE from dictionary
     entries.add(new Object[]{
-        "select minmaxrange(daysSinceEpoch) from testTable", DictionaryBasedAggregationOperator.class,
+        "select minmaxrange(daysSinceEpoch) from testTable", NonScanBasedAggregationOperator.class,
         AggregationOperator.class
     });
     // MINMAXRANGE from dictionary with match all filter
     entries.add(new Object[]{
         "select minmaxrange(daysSinceEpoch) from testTable where column1 > 10",
-        DictionaryBasedAggregationOperator.class, AggregationOperator.class
+        NonScanBasedAggregationOperator.class, AggregationOperator.class
     });
     // Aggregation
     entries.add(new Object[]{
@@ -203,7 +202,8 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     });
     // COUNT from metadata, MIN from dictionary
     entries.add(new Object[]{
-        "select count(*),min(column17) from testTable", AggregationOperator.class, AggregationOperator.class
+        "select count(*),min(column17) from testTable", NonScanBasedAggregationOperator.class,
+        AggregationOperator.class
     });
     // Aggregation group-by
     entries.add(new Object[]{

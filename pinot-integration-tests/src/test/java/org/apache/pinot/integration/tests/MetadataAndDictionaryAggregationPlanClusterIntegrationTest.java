@@ -36,8 +36,7 @@ import static org.testng.Assert.assertTrue;
 
 
 /**
- * Integration test to check aggregation functions which use {@code DictionaryBasedAggregationPlanNode} and
- * {@code MetadataBasedAggregationPlanNode}.
+ * Integration test to check aggregation functions which use {@code DataSourceBasedAggregationPlanNode}
  */
 // TODO: remove this integration test and add unit test for metadata and dictionary based aggregation operator
 public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends BaseClusterIntegrationTest {
@@ -235,44 +234,44 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     // Check execution stats
     JsonNode response;
 
-    // Dictionary column: answered by DictionaryBasedAggregationOperator
+    // Dictionary column: answered by NonScanBasedAggregationOperator
     pqlQuery = "SELECT MAX(ArrTime) FROM " + tableName;
     response = postQuery(pqlQuery);
     assertEquals(response.get("numEntriesScannedPostFilter").asLong(), 0);
     assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
     assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
-    // Non dictionary column: not answered by DictionaryBasedAggregationOperator
+    // Non dictionary column: answered by NonScanBasedAggregationOperator
     pqlQuery = "SELECT MAX(DepDelay) FROM " + tableName;
     response = postQuery(pqlQuery);
-    assertEquals(response.get("numEntriesScannedPostFilter").asLong(), response.get("numDocsScanned").asLong());
+    assertEquals(response.get("numEntriesScannedPostFilter").asLong(), 0);
     assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
     assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
     // multiple dictionary based aggregation functions, dictionary columns: answered by
-    // DictionaryBasedAggregationOperator
+    // NonScanBasedAggregationOperator
     pqlQuery = "SELECT MAX(ArrTime),MIN(ArrTime) FROM " + tableName;
     response = postQuery(pqlQuery);
     assertEquals(response.get("numEntriesScannedPostFilter").asLong(), 0);
     assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
     assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
-    // multiple aggregation functions, mix of dictionary based and non dictionary based: not answered by
-    // DictionaryBasedAggregationOperator
+    // multiple aggregation functions, mix of dictionary based and non dictionary based: answered by
+    // NonScanBasedAggregationOperator
     pqlQuery = "SELECT MAX(ArrTime),COUNT(ArrTime) FROM " + tableName;
     response = postQuery(pqlQuery);
-    assertEquals(response.get("numEntriesScannedPostFilter").asLong(), response.get("numDocsScanned").asLong());
+    assertEquals(response.get("numEntriesScannedPostFilter").asLong(), 0);
     assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
     assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
-    // group by in query : not answered by DictionaryBasedAggregationOperator
+    // group by in query : not answered by NonScanBasedAggregationOperator
     pqlQuery = "SELECT MAX(ArrTime) FROM " + tableName + "  group by DaysSinceEpoch";
     response = postQuery(pqlQuery);
     assertTrue(response.get("numEntriesScannedPostFilter").asLong() > 0);
     assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
     assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
-    // filter in query: not answered by DictionaryBasedAggregationOperator
+    // filter in query: not answered by NonScanBasedAggregationOperator
     pqlQuery = "SELECT MAX(ArrTime) FROM " + tableName + " where DaysSinceEpoch > 16100";
     response = postQuery(pqlQuery);
     assertTrue(response.get("numEntriesScannedPostFilter").asLong() > 0);
@@ -305,23 +304,23 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
     assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
-    // group by present in query: not answered by MetadataBasedAggregationOperator
+    // group by present in query: not answered by NonScanBasedAggregationOperator
     pqlQuery = "SELECT COUNT(*) FROM " + tableName + " GROUP BY DaysSinceEpoch";
     response = postQuery(pqlQuery);
     assertTrue(response.get("numEntriesScannedPostFilter").asLong() > 0);
     assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
     assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
-    // filter present in query: not answered by MetadataBasedAggregationOperator
+    // filter present in query: not answered by NonScanBasedAggregationOperator
     pqlQuery = "SELECT COUNT(*) FROM " + tableName + " WHERE DaysSinceEpoch > 16100";
     response = postQuery(pqlQuery);
     assertEquals(response.get("numEntriesScannedPostFilter").asLong(), 0);
     assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
 
-    // mixed aggregation functions in query: not answered by MetadataBasedAggregationOperator
+    // mixed aggregation functions in query: not answered by NonScanBasedAggregationOperator
     pqlQuery = "SELECT COUNT(*),MAX(ArrTime) FROM " + tableName;
     response = postQuery(pqlQuery);
-    assertTrue(response.get("numEntriesScannedPostFilter").asLong() > 0);
+    assertTrue(response.get("numEntriesScannedPostFilter").asLong() == 0);
     assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
     assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
   }
