@@ -81,6 +81,21 @@ public class ArithmeticFunctionsTest {
     inputs.add(new Object[]{"least(a, b)", Lists.newArrayList("a", "b"), row5, 5.0});
     inputs.add(new Object[]{"greatest(a, b)", Lists.newArrayList("a", "b"), row5, 9.0});
 
+    GenericRow row6 = new GenericRow();
+    row6.putValue("a", 9.5);
+    inputs.add(new Object[]{"floor(a)", Lists.newArrayList("a"), row6, 9.0});
+    inputs.add(new Object[]{"ceil(a)", Lists.newArrayList("a"), row6, 10.0});
+    inputs.add(new Object[]{"exp(a)", Lists.newArrayList("a"), row6, Math.exp(9.5)});
+    inputs.add(new Object[]{"sqrt(a)", Lists.newArrayList("a"), row6, Math.sqrt(9.5)});
+    inputs.add(new Object[]{"ln(a)", Lists.newArrayList("a"), row6, Math.log(9.5)});
+    inputs.add(new Object[]{"log10(a)", Lists.newArrayList("a"), row6, Math.log10(9.5)});
+    inputs.add(new Object[]{"log2(a)", Lists.newArrayList("a"), row6, Math.log(9.5) / Math.log(2.0)});
+
+    GenericRow row7 = new GenericRow();
+    row7.putValue("a", -9.5);
+    inputs.add(new Object[]{"sign(a)", Lists.newArrayList("a"), row6, 1.0});
+    inputs.add(new Object[]{"sign(a)", Lists.newArrayList("a"), row7, -1.0});
+
     return inputs.toArray(new Object[0][]);
   }
 }

@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
@@ -37,8 +36,8 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    Preconditions
-        .checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s", getName());
+    Preconditions.checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s",
+        getName());
     TransformFunction transformFunction = arguments.get(0);
     Preconditions.checkArgument(!(transformFunction instanceof LiteralTransformFunction),
         "Argument cannot be literal for transform function: %s", getName());
@@ -55,12 +54,14 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_results == null) {
-      _results = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int length = projectionBlock.getNumDocs();
+
+    if (_results == null || _results.length < length) {
+      _results = new double[length];
     }
 
     double[] values = _transformFunction.transformToDoubleValuesSV(projectionBlock);
-    applyMathOperator(values, projectionBlock.getNumDocs());
+    applyMathOperator(values, length);
     return _results;
   }
 
@@ -146,6 +147,39 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     }
   }
 
+  public static class Log2TransformFunction extends SingleParamMathTransformFunction {
+    public static final String FUNCTION_NAME = "log2";
+    public static final double LOG_BASE = Math.log(2.0);
+
+    @Override
+    public String getName() {
+      return FUNCTION_NAME;
+    }
+
+    @Override
+    protected void applyMathOperator(double[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        _results[i] = Math.log(values[i]) / LOG_BASE;
+      }
+    }
+  }
+
+  public static class Log10TransformFunction extends SingleParamMathTransformFunction {
+    public static final String FUNCTION_NAME = "log10";
+
+    @Override
+    public String getName() {
+      return FUNCTION_NAME;
+    }
+
+    @Override
+    protected void applyMathOperator(double[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        _results[i] = Math.log10(values[i]);
+      }
+    }
+  }
+
   public static class SqrtTransformFunction extends SingleParamMathTransformFunction {
     public static final String FUNCTION_NAME = "sqrt";
 
@@ -158,6 +192,22 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
         _results[i] = Math.sqrt(values[i]);
+      }
+    }
+  }
+
+  public static class SignTransformFunction extends SingleParamMathTransformFunction {
+    public static final String FUNCTION_NAME = "sign";
+
+    @Override
+    public String getName() {
+      return FUNCTION_NAME;
+    }
+
+    @Override
+    protected void applyMathOperator(double[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        _results[i] = Math.signum(values[i]);
       }
     }
   }

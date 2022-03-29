@@ -46,6 +46,13 @@ public enum TransformFunctionType {
   EXP("exp"),
   FLOOR("floor"),
   LN("ln"),
+  LOG("log"),
+  LOG2("log2"),
+  LOG10("log10"),
+  SIGN("sign"),
+  ROUND_DECIMAL("roundDecimal"),
+  TRUNCATE("truncate"),
+  POWER("power"),
   SQRT("sqrt"),
 
   LEAST("least"),
@@ -124,7 +131,22 @@ public enum TransformFunctionType {
   ST_WITHIN("ST_Within"),
 
   // Geo indexing
-  GEOTOH3("geoToH3");
+  GEOTOH3("geoToH3"),
+
+  //Trigonometry
+  SIN("sin"),
+  COS("cos"),
+  TAN("tan"),
+  COT("cot"),
+  ASIN("asin"),
+  ACOS("acos"),
+  ATAN("atan"),
+  ATAN2("atan2"),
+  SINH("sinh"),
+  COSH("cosh"),
+  TANH("tanh"),
+  DEGREES("degrees"),
+  RADIANS("radians");
 
   private static final Set<String> NAMES = Arrays.stream(values()).flatMap(
       func -> func.getAliases().stream().flatMap(name -> Stream.of(name, StringUtils.remove(name, '_').toUpperCase(),

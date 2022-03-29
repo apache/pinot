@@ -25,6 +25,9 @@ import org.apache.pinot.core.operator.transform.function.SingleParamMathTransfor
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.ExpTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.FloorTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.LnTransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.Log10TransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.Log2TransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.SignTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.SqrtTransformFunction;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -298,6 +301,141 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     Assert.assertTrue(transformFunction instanceof SqrtTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedValues[i] = Math.sqrt(Double.parseDouble(_stringSVValues[i]));
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testLog10TransformFunction() {
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(String.format("log10(%s)", INT_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof Log10TransformFunction);
+    Assert.assertEquals(transformFunction.getName(), Log10TransformFunction.FUNCTION_NAME);
+    double[] expectedValues = new double[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.log10(_intSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpressionFromSQL(String.format("log10(%s)", LONG_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof Log10TransformFunction);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.log10(_longSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpressionFromSQL(String.format("log10(%s)", FLOAT_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof Log10TransformFunction);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.log10(_floatSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpressionFromSQL(String.format("log10(%s)", DOUBLE_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof Log10TransformFunction);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.log10(_doubleSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpressionFromSQL(String.format("log10(%s)", STRING_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof Log10TransformFunction);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.log10(Double.parseDouble(_stringSVValues[i]));
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testLog2TransformFunction() {
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(String.format("log2(%s)", INT_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof Log2TransformFunction);
+    Assert.assertEquals(transformFunction.getName(), Log2TransformFunction.FUNCTION_NAME);
+    double[] expectedValues = new double[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.log(_intSVValues[i]) / Math.log(2);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpressionFromSQL(String.format("log2(%s)", LONG_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof Log2TransformFunction);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.log(_longSVValues[i]) / Math.log(2);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpressionFromSQL(String.format("log2(%s)", FLOAT_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof Log2TransformFunction);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.log(_floatSVValues[i]) / Math.log(2);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpressionFromSQL(String.format("log2(%s)", DOUBLE_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof Log2TransformFunction);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.log(_doubleSVValues[i]) / Math.log(2);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpressionFromSQL(String.format("log2(%s)", STRING_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof Log2TransformFunction);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.log(Double.parseDouble(_stringSVValues[i])) / Math.log(2);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testSignTransformFunction() {
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(String.format("sign(%s)", INT_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof SignTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), SignTransformFunction.FUNCTION_NAME);
+    double[] expectedValues = new double[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.signum(_intSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpressionFromSQL(String.format("sign(%s)", LONG_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof SignTransformFunction);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.signum(_longSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpressionFromSQL(String.format("sign(%s)", FLOAT_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof SignTransformFunction);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.signum(_floatSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpressionFromSQL(String.format("sign(%s)", DOUBLE_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof SignTransformFunction);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.signum(_doubleSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpressionFromSQL(String.format("sign(%s)", STRING_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof SignTransformFunction);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.signum(Double.parseDouble(_stringSVValues[i]));
     }
     testTransformFunction(transformFunction, expectedValues);
   }
