@@ -126,29 +126,32 @@ public class SqlResultComparator {
      */
     if (expected.has(FIELD_IS_SUPERSET) && expected.get(FIELD_IS_SUPERSET).asBoolean(false)) {
       return areElementsSubset(actualElementsSerialized, expectedElementsSerialized);
-    } else {
-      if (!areLengthsEqual(actual, expected)) {
-        return false;
-      }
-      /*
-       * Pinot server do some early termination optimization (process in parallel and early return if get enough
-       * documents to fulfill the LIMIT and OFFSET requirement) for queries:
-       * - selection without order by
-       * - selection with order by (by sorting the segments on min-max value)
-       * - DISTINCT queries.
-       * numDocsScanned is non-deterministic for those queries so numDocsScanned comparison should be skipped.
-       *
-       * NOTE: DISTINCT queries are modeled as non-selection queries during query processing, but all DISTINCT
-       * queries are selection queries during Calcite parsing (DISTINCT queries are selection queries with
-       * selectNode.getModifierNode(SqlSelectKeyword.DISTINCT) != null).
-       */
-      if (!isSelectionQuery(query) && !areNumDocsScannedEqual(actual, expected)) {
-        return false;
-      }
-      return isOrderByQuery(query) ? areOrderByQueryElementsEqual(actualRows, expectedRows, actualElementsSerialized,
-          expectedElementsSerialized, query)
-          : areNonOrderByQueryElementsEqual(actualElementsSerialized, expectedElementsSerialized);
     }
+    if (!areLengthsEqual(actual, expected)) {
+      return false;
+    }
+    boolean areResultsEqual =  isOrderByQuery(query) ? areOrderByQueryElementsEqual(actualRows, expectedRows,
+        actualElementsSerialized, expectedElementsSerialized, query)
+        : areNonOrderByQueryElementsEqual(actualElementsSerialized, expectedElementsSerialized);
+    /*
+     * Pinot servers implement early termination optimization (process in parallel and early return if we get enough
+     * documents to fulfill the LIMIT and OFFSET requirement) for queries for the following cases:
+     * - selection without order by
+     * - selection with order by (by sorting the segments on min-max value)
+     * - DISTINCT queries.
+     * numDocsScanned is non-deterministic for those queries so numDocsScanned comparison should be skipped.
+     *
+     * In other cases, we accept if numDocsScanned is better than the expected one, since that is indicative of
+     * performance improvement.
+     *
+     * NOTE: DISTINCT queries are modeled as non-selection queries during query processing, but all DISTINCT
+     * queries are selection queries during Calcite parsing (DISTINCT queries are selection queries with
+     * selectNode.getModifierNode(SqlSelectKeyword.DISTINCT) != null).
+     */
+    if (areResultsEqual && !isSelectionQuery(query) && !isNumDocsScannedBetter(actual, expected)) {
+      return false;
+    }
+    return areResultsEqual;
   }
 
   private static boolean areOrderByQueryElementsEqual(ArrayNode actualElements, ArrayNode expectedElements,
@@ -392,11 +395,11 @@ public class SqlResultComparator {
     return true;
   }
 
-  private static boolean areNumDocsScannedEqual(JsonNode actual, JsonNode expected) {
+  private static boolean isNumDocsScannedBetter(JsonNode actual, JsonNode expected) {
     int actualNumDocsScanned = actual.get(FIELD_NUM_DOCS_SCANNED).asInt();
     int expectedNumDocsScanned = expected.get(FIELD_NUM_DOCS_SCANNED).asInt();
-    if (actualNumDocsScanned != expectedNumDocsScanned) {
-      LOGGER.error("The numDocsScanned don't match! Actual: {}, Expected: {}", actualNumDocsScanned,
+    if (actualNumDocsScanned > expectedNumDocsScanned) {
+      LOGGER.error("The numDocsScanned is worse. Actual: {}, Expected: {}", actualNumDocsScanned,
           expectedNumDocsScanned);
       return false;
     }
