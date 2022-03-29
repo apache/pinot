@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.fasterxml.jackson.core.JsonParseException;
 import java.sql.Timestamp;
 import java.util.Base64;
 import org.apache.commons.lang3.ArrayUtils;
@@ -831,7 +832,7 @@ public enum PinotDataType {
       try {
         // Try to parse the string as JSON first
         return JsonUtils.stringToJsonNode((String) value).toString();
-      } catch (com.fasterxml.jackson.core.JsonParseException jpe) {
+      } catch (JsonParseException jpe) {
         // String does not represent a well-formed JSON. Ignore this exception because we are going to try to convert
         // Java String object to JSON string.
       } catch (Exception e) {
