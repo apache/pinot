@@ -100,13 +100,12 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
             .setSortedColumn(D1).build();
     TableConfig tableConfigEpochHours =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_EPOCH_HOURS).setTimeColumnName(T_TRX)
-            .setSortedColumn(D1).setIngestionConfig(
-            new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig(T_TRX, "toEpochHours(t)")),
-                null)).build();
+            .setSortedColumn(D1).setIngestionConfig(new IngestionConfig(null, null, null, null,
+                Lists.newArrayList(new TransformConfig(T_TRX, "toEpochHours(t)")), null)).build();
     TableConfig tableConfigSDF =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_SDF).setTimeColumnName(T_TRX)
-            .setSortedColumn(D1).setIngestionConfig(new IngestionConfig(null, null, null,
-            Lists.newArrayList(new TransformConfig(T_TRX, "toDateTime(t, 'yyyyMMddHH')")), null)).build();
+            .setSortedColumn(D1).setIngestionConfig(new IngestionConfig(null, null, null, null,
+                Lists.newArrayList(new TransformConfig(T_TRX, "toDateTime(t, 'yyyyMMddHH')")), null)).build();
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
             .addMetric(M1, FieldSpec.DataType.INT)

@@ -55,7 +55,8 @@ public class IngestionConfigUtilsTest {
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", "kafka");
     tableConfig.setIngestionConfig(
-        new IngestionConfig(null, new StreamIngestionConfig(Lists.newArrayList(streamConfigMap)), null, null, null));
+        new IngestionConfig(null, new StreamIngestionConfig(Lists.newArrayList(streamConfigMap)), null, null, null,
+            null));
     Map<String, String> actualStreamConfigsMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
     Assert.assertEquals(actualStreamConfigsMap.size(), 1);
     Assert.assertEquals(actualStreamConfigsMap.get("streamType"), "kafka");
@@ -73,7 +74,8 @@ public class IngestionConfigUtilsTest {
 
     // fail if multiple found
     tableConfig.setIngestionConfig(new IngestionConfig(null,
-        new StreamIngestionConfig(Lists.newArrayList(streamConfigMap, deprecatedStreamConfigMap)), null, null, null));
+        new StreamIngestionConfig(Lists.newArrayList(streamConfigMap, deprecatedStreamConfigMap)), null, null, null,
+        null));
     try {
       IngestionConfigUtils.getStreamConfigMap(tableConfig);
       Assert.fail("Should fail for multiple stream configs");
@@ -102,7 +104,7 @@ public class IngestionConfigUtilsTest {
     // get from ingestion config, when not present in segmentsConfig
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
     tableConfig.setIngestionConfig(
-        new IngestionConfig(new BatchIngestionConfig(null, "APPEND", "HOURLY"), null, null, null, null));
+        new IngestionConfig(new BatchIngestionConfig(null, "APPEND", "HOURLY"), null, null, null, null, null));
     Assert.assertEquals(IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig), "HOURLY");
 
     // get from ingestion config, even if present in segmentsConfig
@@ -127,7 +129,7 @@ public class IngestionConfigUtilsTest {
     // get from ingestion config, when not present in segmentsConfig
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
     tableConfig.setIngestionConfig(
-        new IngestionConfig(new BatchIngestionConfig(null, "APPEND", "HOURLY"), null, null, null, null));
+        new IngestionConfig(new BatchIngestionConfig(null, "APPEND", "HOURLY"), null, null, null, null, null));
     Assert.assertEquals(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig), "APPEND");
 
     // get from ingestion config, even if present in segmentsConfig

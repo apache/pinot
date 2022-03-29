@@ -943,7 +943,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     _schemaFileName = SCHEMA_FILE_NAME_WITH_EXTRA_COLUMNS;
     addSchema(createSchema());
     TableConfig tableConfig = getOfflineTableConfig();
-    tableConfig.setIngestionConfig(new IngestionConfig(null, null, null,
+    tableConfig.setIngestionConfig(new IngestionConfig(null, null, null, null,
         Arrays.asList(new TransformConfig("NewAddedDerivedHoursSinceEpoch", "times(DaysSinceEpoch, 24)"),
             new TransformConfig("NewAddedDerivedSecondsSinceEpoch", "times(times(DaysSinceEpoch, 24), 3600)"),
             new TransformConfig("NewAddedDerivedMVStringDimension", "split(DestCityName, ', ')")), null));

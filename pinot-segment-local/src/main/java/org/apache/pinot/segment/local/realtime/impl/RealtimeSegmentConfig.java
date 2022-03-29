@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.realtime.impl;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -28,6 +29,7 @@ import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.config.table.AggregationConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 
@@ -55,6 +57,7 @@ public class RealtimeSegmentConfig {
   private final PartitionFunction _partitionFunction;
   private final int _partitionId;
   private final boolean _aggregateMetrics;
+  private final List<AggregationConfig> _ingestionAggregationConfigs;
   private final boolean _nullHandlingEnabled;
   private final UpsertConfig.Mode _upsertMode;
   private final UpsertConfig.HashFunction _hashFunction;
@@ -69,9 +72,9 @@ public class RealtimeSegmentConfig {
       Set<String> fstIndexColumns, Set<String> jsonIndexColumns, Map<String, H3IndexConfig> h3IndexConfigs,
       SegmentZKMetadata segmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
       RealtimeSegmentStatsHistory statsHistory, String partitionColumn, PartitionFunction partitionFunction,
-      int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled, String consumerDir,
-      UpsertConfig.Mode upsertMode, String upsertComparisonColumn, UpsertConfig.HashFunction hashFunction,
-      PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
+      int partitionId, boolean aggregateMetrics, List<AggregationConfig> ingestionAggregationConfigs,
+      boolean nullHandlingEnabled, String consumerDir, UpsertConfig.Mode upsertMode, String upsertComparisonColumn,
+      UpsertConfig.HashFunction hashFunction, PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
     _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;
     _streamName = streamName;
@@ -94,6 +97,7 @@ public class RealtimeSegmentConfig {
     _partitionFunction = partitionFunction;
     _partitionId = partitionId;
     _aggregateMetrics = aggregateMetrics;
+    _ingestionAggregationConfigs = ingestionAggregationConfigs;
     _nullHandlingEnabled = nullHandlingEnabled;
     _consumerDir = consumerDir;
     _upsertMode = upsertMode != null ? upsertMode : UpsertConfig.Mode.NONE;
@@ -195,6 +199,10 @@ public class RealtimeSegmentConfig {
     return _aggregateMetrics;
   }
 
+  public List<AggregationConfig> getIngestionAggregationConfigs() {
+    return _ingestionAggregationConfigs;
+  }
+
   public boolean isNullHandlingEnabled() {
     return _nullHandlingEnabled;
   }
@@ -242,6 +250,7 @@ public class RealtimeSegmentConfig {
     private PartitionFunction _partitionFunction;
     private int _partitionId;
     private boolean _aggregateMetrics = false;
+    private List<AggregationConfig> _ingestionAggregationConfigs;
     private boolean _nullHandlingEnabled = false;
     private String _consumerDir;
     private UpsertConfig.Mode _upsertMode;
@@ -370,6 +379,11 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    public Builder setIngestionAggregationConfigs(List<AggregationConfig> ingestionAggregationConfigs) {
+      _ingestionAggregationConfigs = ingestionAggregationConfigs;
+      return this;
+    }
+
     public Builder setNullHandlingEnabled(boolean nullHandlingEnabled) {
       _nullHandlingEnabled = nullHandlingEnabled;
       return this;
@@ -405,8 +419,8 @@ public class RealtimeSegmentConfig {
           _capacity, _avgNumMultiValues, _noDictionaryColumns, _varLengthDictionaryColumns, _invertedIndexColumns,
           _textIndexColumns, _fstIndexColumns, _jsonIndexColumns, _h3IndexConfigs, _segmentZKMetadata, _offHeap,
           _memoryManager, _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
-          _nullHandlingEnabled, _consumerDir, _upsertMode, _upsertComparisonColumn, _hashFunction,
-          _partitionUpsertMetadataManager);
+          _ingestionAggregationConfigs, _nullHandlingEnabled, _consumerDir, _upsertMode, _upsertComparisonColumn,
+          _hashFunction, _partitionUpsertMetadataManager);
     }
   }
 }

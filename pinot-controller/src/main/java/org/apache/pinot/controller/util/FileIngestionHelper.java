@@ -148,7 +148,7 @@ public class FileIngestionHelper {
 
       // Upload segment
       IngestionConfig ingestionConfigOverride =
-          new IngestionConfig(batchIngestionConfigOverride, null, null, null, null);
+          new IngestionConfig(batchIngestionConfigOverride, null, null, null, null, null);
       TableConfig tableConfigOverride =
           new TableConfigBuilder(_tableConfig.getTableType()).setTableName(_tableConfig.getTableName())
               .setIngestionConfig(ingestionConfigOverride).build();

@@ -34,11 +34,16 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.spi.config.table.AggregationConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
@@ -306,6 +311,52 @@ public final class TableConfigUtils {
         }
       }
 
+      // Aggregation configs
+      List<AggregationConfig> aggregationConfigs = ingestionConfig.getAggregationConfigs();
+      if (aggregationConfigs != null) {
+        Preconditions.checkState(
+            tableConfig.getIndexingConfig() == null || !tableConfig.getIndexingConfig().isAggregateMetrics(),
+            "aggregateMetrics cannot be set with AggregationConfig");
+        Set<String> aggregationColumns = new HashSet<>();
+        for (AggregationConfig aggregationConfig : aggregationConfigs) {
+          String columnName = aggregationConfig.getColumnName();
+          if (schema != null) {
+            Preconditions.checkState(schema.getFieldSpecFor(columnName) != null, "The destination column '" + columnName
+                + "' of the aggregation function must be present in the schema");
+          }
+          String aggregationFunction = aggregationConfig.getAggregationFunction();
+          if (columnName == null || aggregationFunction == null) {
+            throw new IllegalStateException(
+                "columnName/aggregationFunction cannot be null in AggregationConfig " + aggregationConfig);
+          }
+
+          if (!aggregationColumns.add(columnName)) {
+            throw new IllegalStateException("Duplicate aggregation config found for column '" + columnName + "'");
+          }
+          ExpressionContext expressionContext;
+          try {
+            expressionContext = RequestContextUtils.getExpressionFromSQL(aggregationConfig.getAggregationFunction());
+          } catch (Exception e) {
+            throw new IllegalStateException(
+                "Invalid aggregation function '" + aggregationFunction + "' for column '" + columnName + "'", e);
+          }
+          Preconditions.checkState(expressionContext.getType() == ExpressionContext.Type.FUNCTION,
+              "aggregation function must be a function for: %s", aggregationConfig);
+
+          FunctionContext functionContext = expressionContext.getFunction();
+          validateIngestionAggregation(functionContext.getFunctionName());
+          Preconditions.checkState(functionContext.getArguments().size() == 1,
+              "aggregation function can only have one argument: %s", aggregationConfig);
+
+          ExpressionContext argument = functionContext.getArguments().get(0);
+          Preconditions.checkState(argument.getType() == ExpressionContext.Type.IDENTIFIER,
+              "aggregator function argument must be a identifier: %s", aggregationConfig);
+
+          Preconditions.checkState(schema.getFieldSpecFor(argument.getIdentifier()) == null,
+              "source column %s cannot be in the schema: %s", argument.getIdentifier(), aggregationConfig);
+        }
+      }
+
       // Transform configs
       List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
       if (transformConfigs != null) {
@@ -361,6 +412,25 @@ public final class TableConfigUtils {
         }
       }
     }
+  }
+
+  static public void validateIngestionAggregation(String name) {
+    /**
+     * Currently only, ValueAggregators with fixed width types are allowed, so MIN, MAX, SUM, and COUNT. The reason
+     * is that only the {@link org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex}
+     * supports random inserts and lookups. The
+     * {@link org.apache.pinot.segment.local.realtime.impl.forward.VarByteSVMutableForwardIndex only supports
+     * sequential inserts.
+     */
+    List<AggregationFunctionType> allowed =
+        Arrays.asList(AggregationFunctionType.SUM, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
+            AggregationFunctionType.COUNT);
+    for (AggregationFunctionType functionType : allowed) {
+      if (functionType.getName().equals(name)) {
+        return;
+      }
+    }
+    throw new IllegalStateException(String.format("aggregation function %s must be one of %s", name, allowed));
   }
 
   @VisibleForTesting
