@@ -90,16 +90,10 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.DIV, DivisionTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.MOD, ModuloTransformFunction.class);
 
-    typeToImplementation.put(TransformFunctionType.PLUS, AdditionTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.MINUS, SubtractionTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.TIMES, MultiplicationTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.DIVIDE, DivisionTransformFunction.class);
-
     typeToImplementation.put(TransformFunctionType.ABS, AbsTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.CEIL, CeilTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.EXP, ExpTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.FLOOR, FloorTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.LN, LnTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.LOG, LnTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.LOG2, Log2TransformFunction.class);
     typeToImplementation.put(TransformFunctionType.LOG10, Log10TransformFunction.class);
