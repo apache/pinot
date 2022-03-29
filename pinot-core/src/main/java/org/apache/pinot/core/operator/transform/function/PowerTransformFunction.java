@@ -31,7 +31,7 @@ public class PowerTransformFunction extends BaseTransformFunction {
   private TransformFunction _leftTransformFunction;
   private TransformFunction _rightTransformFunction;
   private double _exponent;
-  private boolean _hasLiteralArg;
+  private boolean _fixedExponent;
 
   @Override
   public String getName() {
@@ -45,12 +45,12 @@ public class PowerTransformFunction extends BaseTransformFunction {
       throw new IllegalArgumentException("Exactly 2 arguments are required for power transform function");
     }
 
-    _hasLiteralArg = false;
+    _fixedExponent = false;
     _leftTransformFunction = arguments.get(0);
     _rightTransformFunction = arguments.get(1);
     if (_rightTransformFunction instanceof LiteralTransformFunction) {
       _exponent = Double.parseDouble(((LiteralTransformFunction) _rightTransformFunction).getLiteral());
-      _hasLiteralArg = true;
+      _fixedExponent = true;
     }
     Preconditions.checkArgument(
         _leftTransformFunction.getResultMetadata().isSingleValue() || _rightTransformFunction.getResultMetadata()
@@ -71,7 +71,7 @@ public class PowerTransformFunction extends BaseTransformFunction {
     }
 
     double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(projectionBlock);
-    if (_hasLiteralArg) {
+    if (_fixedExponent) {
       for (int i = 0; i < length; i++) {
         _doubleValuesSV[i] = Math.pow(leftValues[i], _exponent);
       }

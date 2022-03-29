@@ -122,26 +122,31 @@ public class ArithmeticFunctions {
     return Math.signum(a);
   }
 
-  @ScalarFunction
-  public static double power(double a, double b) {
-    return Math.pow(a, b);
+  @ScalarFunction(names = {"pow", "power"})
+  public static double power(double a, double exponent) {
+    return Math.pow(a, exponent);
   }
 
-  //TODO: The function should ideally be named 'round'
+
+  // Big Decimal Implementation has been used here to avoid overflows
+  // when multiplying by Math.pow(10, scale) for rounding
+  @ScalarFunction
+  public static double roundDecimal(double a, int scale) {
+    return BigDecimal.valueOf(a).setScale(scale, RoundingMode.HALF_UP).doubleValue();
+  }
+
+  // TODO: The function should ideally be named 'round'
   // but it is not possible because of existing DateTimeFunction with same name.
   @ScalarFunction
-  public static double roundDecimal(double a, int b) {
-    return BigDecimal.valueOf(a).setScale(b, RoundingMode.HALF_UP).doubleValue();
-  }
-
-  @ScalarFunction
   public static double roundDecimal(double a) {
-    return BigDecimal.valueOf(a).setScale(0, RoundingMode.HALF_UP).doubleValue();
+    return Math.round(a);
   }
 
+  // Big Decimal Implementation has been used here to avoid overflows
+  // when multiplying by Math.pow(10, scale) for rounding
   @ScalarFunction
-  public static double truncate(double a, int b) {
-    return BigDecimal.valueOf(a).setScale(b, RoundingMode.DOWN).doubleValue();
+  public static double truncate(double a, int scale) {
+    return BigDecimal.valueOf(a).setScale(scale, RoundingMode.DOWN).doubleValue();
   }
 
   @ScalarFunction
