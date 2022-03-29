@@ -44,20 +44,6 @@
       <artifactId>guava</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.asynchttpclient</groupId>
-      <artifactId>async-http-client</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>io.netty</groupId>
-          <artifactId>netty-transport-native-unix-common</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>io.netty</groupId>
-          <artifactId>netty-transport-native-kqueue</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
       <groupId>org.glassfish.jersey.inject</groupId>
       <artifactId>jersey-hk2</artifactId>
     </dependency>
@@ -70,13 +56,16 @@
       <artifactId>flink-streaming-java_${scala.version}</artifactId>
       <version>${flink.version}</version>
     </dependency>
-
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-controller</artifactId>
+      <version>${project.parent.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-segment-writer-file-based</artifactId>
       <version>${project.parent.version}</version>
     </dependency>
-
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-segment-uploader-default</artifactId>

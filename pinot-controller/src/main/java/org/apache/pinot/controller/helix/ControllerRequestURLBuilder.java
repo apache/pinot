@@ -44,6 +44,10 @@ public class ControllerRequestURLBuilder {
     return new ControllerRequestURLBuilder(baseUrl);
   }
 
+  public String getBaseUrl() {
+    return _baseUrl;
+  }
+
   public String forDataFileUpload() {
     return StringUtil.join("/", _baseUrl, "segments");
   }

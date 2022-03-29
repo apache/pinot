@@ -26,13 +26,13 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
@@ -131,7 +131,7 @@ public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest
   @Override
   protected void addSchema(Schema schema)
       throws IOException {
-    PostMethod response =
+    SimpleHttpResponse response =
         sendMultipartPostRequest(_controllerRequestURLBuilder.forSchemaCreate(), schema.toSingleLineJsonString(),
             AUTH_HEADER);
     Assert.assertEquals(response.getStatusCode(), 200);
