@@ -30,29 +30,23 @@ import org.apache.commons.lang.StringUtils;
 
 public enum TransformFunctionType {
   // Aggregation functions for single-valued columns
-  ADD("add"),
-  SUB("sub"),
-  MULT("mult"),
-  DIV("div"),
+  ADD("add", "plus"),
+  SUB("sub", "minus"),
+  MULT("mult", "times"),
+  DIV("div", "divide"),
   MOD("mod"),
 
-  PLUS("plus"),
-  MINUS("minus"),
-  TIMES("times"),
-  DIVIDE("divide"),
-
   ABS("abs"),
-  CEIL("ceil"),
+  CEIL("ceil", "ceiling"),
   EXP("exp"),
   FLOOR("floor"),
-  LN("ln"),
-  LOG("log"),
+  LOG("log", "ln"),
   LOG2("log2"),
   LOG10("log10"),
   SIGN("sign"),
   ROUND_DECIMAL("roundDecimal"),
   TRUNCATE("truncate"),
-  POWER("power"),
+  POWER("power", "pow"),
   SQRT("sqrt"),
 
   LEAST("least"),
