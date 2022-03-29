@@ -149,7 +149,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   private static void createInputFile()
       throws IOException {
     INDEX_DIR.mkdir();
-    Schema avroSchema = Schema.createRecord("eventsRecord", null, null, false);
+    Schema avroSchema = createRecord("eventsRecord", null, null, false);
     Schema enumSchema = createEnum("direction", null, null, Arrays.asList("UP", "DOWN", "LEFT", "RIGHT"));
     Schema fixedSchema = createFixed("fixed", null, null, 4);
     List<Field> fields = Arrays

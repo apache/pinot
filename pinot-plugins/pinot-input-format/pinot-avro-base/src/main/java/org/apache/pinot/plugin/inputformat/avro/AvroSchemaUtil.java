@@ -49,6 +49,7 @@ public class AvroSchemaUtil {
       case ENUM:
         return DataType.STRING;
       case BYTES:
+      case FIXED:
         return DataType.BYTES;
       case MAP:
       case ARRAY:
@@ -95,13 +96,11 @@ public class AvroSchemaUtil {
         jsonSchema.set("type", convertStringsToJsonArray("null", "double"));
         return jsonSchema;
       case STRING:
+      case JSON:
         jsonSchema.set("type", convertStringsToJsonArray("null", "string"));
         return jsonSchema;
       case BYTES:
         jsonSchema.set("type", convertStringsToJsonArray("null", "bytes"));
-        return jsonSchema;
-      case JSON:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "json"));
         return jsonSchema;
       default:
         throw new UnsupportedOperationException();
