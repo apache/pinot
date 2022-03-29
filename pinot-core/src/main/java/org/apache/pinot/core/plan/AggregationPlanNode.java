@@ -33,8 +33,8 @@ import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.CombinedFilterOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
-import org.apache.pinot.core.operator.query.DataSourceBasedAggregationOperator;
 import org.apache.pinot.core.operator.query.FilteredAggregationOperator;
+import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
@@ -45,7 +45,6 @@ import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
@@ -180,7 +179,7 @@ public class AggregationPlanNode implements PlanNode {
 
     // Use metadata/dictionary to solve the query if possible
     if (filterOperator.isResultMatchingAll()) {
-      if (isFitForDataSourceBasedPlan(aggregationFunctions, _indexSegment)) {
+      if (isFitForNonScanBasedPlan(aggregationFunctions, _indexSegment)) {
         DataSource[] dataSources = new DataSource[aggregationFunctions.length];
         for (int i = 0; i < aggregationFunctions.length; i++) {
           List<?> inputExpressions = aggregationFunctions[i].getInputExpressions();
@@ -189,7 +188,7 @@ public class AggregationPlanNode implements PlanNode {
             dataSources[i] = _indexSegment.getDataSource(column);
           }
         }
-        return new DataSourceBasedAggregationOperator(aggregationFunctions, dataSources, numTotalDocs);
+        return new NonScanBasedAggregationOperator(aggregationFunctions, dataSources, numTotalDocs);
       }
     }
 
@@ -225,34 +224,10 @@ public class AggregationPlanNode implements PlanNode {
   }
 
   /**
-   * Returns {@code true} if the given aggregations can be solved with segment metadata, {@code false} otherwise.
-   * <p>Aggregations supported: COUNT
+   * Returns {@code true} if the given aggregations can be solved with dictionary or column metadata, {@code false}
+   * otherwise.
    */
-  private static boolean isFitForMetadataBasedPlan(AggregationFunction[] aggregationFunctions,
-      IndexSegment indexSegment) {
-    for (AggregationFunction aggregationFunction : aggregationFunctions) {
-      if (!METADATA_BASED_FUNCTIONS.contains(aggregationFunction.getType())) {
-        return false;
-      }
-      if (aggregationFunction.getType() != COUNT) {
-        ExpressionContext argument = (ExpressionContext) aggregationFunction.getInputExpressions().get(0);
-        if (argument.getType() != ExpressionContext.Type.IDENTIFIER) {
-          return false;
-        }
-        String column = argument.getIdentifier();
-        DataSourceMetadata metadata = indexSegment.getDataSource(column).getDataSourceMetadata();
-        if (metadata.getMinValue() == null || metadata.getMaxValue() == null) {
-          return false;
-        }
-      }
-    }
-    return true;
-  }
-
-  /**
-   * Returns {@code true} if the given aggregations can be solved with dictionary, {@code false} otherwise.
-   */
-  private static boolean isFitForDataSourceBasedPlan(AggregationFunction[] aggregationFunctions,
+  private static boolean isFitForNonScanBasedPlan(AggregationFunction[] aggregationFunctions,
       IndexSegment indexSegment) {
     for (AggregationFunction aggregationFunction : aggregationFunctions) {
       if (aggregationFunction.getType() == COUNT) {

@@ -44,29 +44,31 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ByteArray;
 
-import static org.apache.pinot.core.operator.query.AggregationOperatorUtils.toDouble;
-
 
 /**
- * Aggregation operator that utilizes dictionary for serving aggregation queries.
- * The dictionary operator is selected in the plan maker, if the query is of aggregation type min, max, minmaxrange
- * and the column has a dictionary.
+ * Aggregation operator that utilizes dictionary or column metadata for serving aggregation queries to avoid scanning.
+ * The scanless operator is selected in the plan maker, if the query is of aggregation type min, max, minmaxrange,
+ * distinctcount, distinctcounthll, distinctcountrawhll, segmentpartitioneddistinctcount, distinctcountsmarthll,
+ * and the column has a dictionary, or has column metadata with min and max value defined. It also supports count(*) if
+ * the query has no filter.
  * We don't use this operator if the segment has star tree,
- * as the dictionary will have aggregated values for the metrics, and dimensions will have star node value
+ * as the dictionary will have aggregated values for the metrics, and dimensions will have star node value.
  *
- * For min value, we use the first value from the dictionary
- * For max value we use the last value from dictionary
+ * For min value, we use the first value from the dictionary, falling back to the column metadata min value if there
+ * is no dictionary.
+ * For max value we use the last value from dictionary, falling back to the column metadata max value if there
+ * is no dictionary.
  */
 @SuppressWarnings("rawtypes")
-public class DataSourceBasedAggregationOperator extends BaseOperator<IntermediateResultsBlock> {
-  private static final String OPERATOR_NAME = "DictionaryBasedAggregationOperator";
-  private static final String EXPLAIN_NAME = "AGGREGATE_DATASOURCE";
+public class NonScanBasedAggregationOperator extends BaseOperator<IntermediateResultsBlock> {
+  private static final String OPERATOR_NAME = NonScanBasedAggregationOperator.class.getSimpleName();
+  private static final String EXPLAIN_NAME = "AGGREGATE_NO_SCAN";
 
   private final AggregationFunction[] _aggregationFunctions;
   private final DataSource[] _dataSources;
   private final int _numTotalDocs;
 
-  public DataSourceBasedAggregationOperator(AggregationFunction[] aggregationFunctions,
+  public NonScanBasedAggregationOperator(AggregationFunction[] aggregationFunctions,
       DataSource[] dataSources, int numTotalDocs) {
     _aggregationFunctions = aggregationFunctions;
     _dataSources = dataSources;
@@ -143,6 +145,16 @@ public class DataSourceBasedAggregationOperator extends BaseOperator<Intermediat
       return toDouble(dictionary.getMaxVal());
     }
     return toDouble(dataSource.getDataSourceMetadata().getMaxValue());
+  }
+
+  private static Double toDouble(Comparable<?> value) {
+    if (value instanceof Double) {
+      return (Double) value;
+    } else if (value instanceof Number) {
+      return ((Number) value).doubleValue();
+    } else {
+      return Double.parseDouble(value.toString());
+    }
   }
 
   private static Set getDistinctValueSet(Dictionary dictionary) {
