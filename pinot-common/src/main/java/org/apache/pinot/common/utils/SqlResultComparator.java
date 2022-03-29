@@ -130,7 +130,7 @@ public class SqlResultComparator {
     if (!areLengthsEqual(actual, expected)) {
       return false;
     }
-    boolean areResultsEqual =  isOrderByQuery(query) ? areOrderByQueryElementsEqual(actualRows, expectedRows,
+    boolean areResultsEqual = isOrderByQuery(query) ? areOrderByQueryElementsEqual(actualRows, expectedRows,
         actualElementsSerialized, expectedElementsSerialized, query)
         : areNonOrderByQueryElementsEqual(actualElementsSerialized, expectedElementsSerialized);
     /*
@@ -278,7 +278,7 @@ public class SqlResultComparator {
     return true;
   }
 
-  public static boolean hasExceptions(JsonNode actual) {
+  private static boolean hasExceptions(JsonNode actual) {
     if (!actual.get(FIELD_EXCEPTIONS).isEmpty()) {
       LOGGER.error("Got exception: {} when querying!", actual.get(FIELD_EXCEPTIONS));
       return true;
@@ -372,10 +372,10 @@ public class SqlResultComparator {
     return true;
   }
 
-  private static boolean areNumEntriesScannedInFilterEqual(JsonNode actual, JsonNode expected) {
+  private static boolean isNumEntriesScannedInFilterBetter(JsonNode actual, JsonNode expected) {
     long actualNumEntriesScannedInFilter = actual.get(FIELD_NUM_ENTRIES_SCANNED_IN_FILTER).asLong();
     long expectedNumEntriesScannedInFilter = expected.get(FIELD_NUM_ENTRIES_SCANNED_IN_FILTER).asLong();
-    if (actualNumEntriesScannedInFilter != expectedNumEntriesScannedInFilter) {
+    if (actualNumEntriesScannedInFilter > expectedNumEntriesScannedInFilter) {
       LOGGER
           .error("The numEntriesScannedInFilter don't match! Actual: {}, Expected: {}", actualNumEntriesScannedInFilter,
               expectedNumEntriesScannedInFilter);
@@ -384,10 +384,10 @@ public class SqlResultComparator {
     return true;
   }
 
-  private static boolean areNumEntriesScannedPostFilterEqual(JsonNode actual, JsonNode expected) {
+  private static boolean isNumEntriesScannedPostFilterBetter(JsonNode actual, JsonNode expected) {
     long actualNumEntriesScannedPostFilter = actual.get(FIELD_NUM_ENTRIES_SCANNED_POST_FILTER).asLong();
     long expectedNumEntriesScannedPostFilter = expected.get(FIELD_NUM_ENTRIES_SCANNED_POST_FILTER).asLong();
-    if (actualNumEntriesScannedPostFilter != expectedNumEntriesScannedPostFilter) {
+    if (actualNumEntriesScannedPostFilter > expectedNumEntriesScannedPostFilter) {
       LOGGER.error("The numEntriesScannedPostFilter don't match! Actual: {}, Expected: {}",
           actualNumEntriesScannedPostFilter, expectedNumEntriesScannedPostFilter);
       return false;
