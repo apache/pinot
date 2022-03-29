@@ -19,6 +19,7 @@
 package org.apache.pinot.core.plan;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -31,8 +32,8 @@ import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.filter.AndFilterOperator;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
-import org.apache.pinot.core.operator.filter.CombinedFilterOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.DictionaryBasedAggregationOperator;
 import org.apache.pinot.core.operator.query.FilteredAggregationOperator;
@@ -114,7 +115,7 @@ public class AggregationPlanNode implements PlanNode {
         }
         Pair<FilterPlanNode, BaseFilterOperator> pair = buildFilterOperator(currentFilterExpression);
         BaseFilterOperator wrappedFilterOperator =
-            new CombinedFilterOperator(mainPredicateFilterOperator, pair.getRight());
+            new AndFilterOperator(Arrays.asList(mainPredicateFilterOperator, pair.getRight()));
         TransformOperator newTransformOperator = buildTransformOperatorForFilteredAggregates(wrappedFilterOperator);
         // For each transform operator, associate it with the underlying expression. This allows
         // fetching the relevant TransformOperator when resolving blocks during aggregation
