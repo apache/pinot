@@ -122,7 +122,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<IntermediateRe
           break;
         default:
           throw new IllegalStateException(
-              "DataSource based aggregation operator does not support function type: " + aggregationFunction.getType());
+              "Non-scan based aggregation operator does not support function type: " + aggregationFunction.getType());
       }
       aggregationResults.add(result);
     }
