@@ -50,9 +50,7 @@ public class NativeClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final String TEXT_COLUMN_NAME = "skills";
   private static final String TIME_COLUMN_NAME = "millisSinceEpoch";
   private static final int NUM_SKILLS = 24;
-  private static final int NUM_MATCHING_SKILLS = 4;
   private static final int NUM_RECORDS = NUM_SKILLS * 1000;
-  private static final int NUM_MATCHING_RECORDS = NUM_MATCHING_SKILLS * 1000;
 
   private static final String TEST_TEXT_COLUMN_QUERY =
       "SELECT COUNT(*) FROM mytable WHERE TEXT_MATCH(skills, 'lea.*ng')";

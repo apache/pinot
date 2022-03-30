@@ -82,8 +82,6 @@ public class NativeTextIndexReader implements TextIndexReader {
     long fstDataStartOffset = NativeTextIndexCreator.HEADER_LENGTH;
     long fstDataEndOffset = fstDataStartOffset + fstDataLength;
     ByteBuffer byteBuffer = _buffer.toDirectByteBuffer(fstDataStartOffset, (int) fstDataLength);
-    byte[] arr = new byte[byteBuffer.remaining()];
-    // byteBuffer.get(arr);
     try {
       _fst = FST.read(new ByteBufferInputStream(Collections.singletonList(byteBuffer)), ImmutableFST.class, true);
     } catch (IOException e) {
@@ -101,6 +99,12 @@ public class NativeTextIndexReader implements TextIndexReader {
     try {
       RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
       RegexpMatcher.regexMatch(searchQuery, _fst, writer::add);
+
+      int i = 1;
+      if (i == 1) {
+        throw new IllegalStateException("FOOOO");
+      }
+
       return writer.get();
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while running query: " + searchQuery, e);

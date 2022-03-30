@@ -35,7 +35,6 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
-import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -216,12 +215,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
 
       if (textIndexColumns.contains(columnName)) {
-        Map<String, String> columnProperties = _columnProperties.get(columnName);
+        //TODO : atri
+        /*Map<String, String> columnProperties = _columnProperties.get(columnName);
         FSTType fstType = FSTType.LUCENE;
 
         if (TextIndexUtils.isFstTypeNative(columnProperties)) {
           fstType = FSTType.NATIVE;
-        }
+        }*/
+        FSTType fstType = _config.getFSTIndexType();
 
         _textIndexCreatorMap.put(columnName,
             _indexCreatorProvider.newTextIndexCreator(context.forTextIndex(fstType, true)));
