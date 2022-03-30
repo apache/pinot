@@ -60,7 +60,10 @@ public class DataTypeTransformer implements RecordTransformer {
           continue;
         }
         PinotDataType dest = entry.getValue();
-        value = standardize(column, value, dest.isSingleValue());
+        if (dest != PinotDataType.JSON) {
+          value = standardize(column, value, dest.isSingleValue());
+        }
+
         // NOTE: The standardized value could be null for empty Collection/Map/Object[].
         if (value == null) {
           record.putValue(column, null);

@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.avro.generic.GenericData;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.utils.Pair;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -59,6 +60,14 @@ public abstract class AbstractRecordExtractorTest {
     _recordReaderNoIncludeList = createRecordReader(null);
   }
 
+  private static Map<String, String> createMap(Pair<String, String>[] entries) {
+    Map<String, String> map = new HashMap<>();
+    for (Pair<String, String> entry : entries) {
+      map.put(entry.getFirst(), entry.getSecond());
+    }
+    return map;
+  }
+
   protected List<Map<String, Object>> getInputRecords() {
     Integer[] userID = new Integer[]{1, 2, null, 4};
     String[] firstName = new String[]{null, "John", "Ringo", "George"};
@@ -67,6 +76,14 @@ public abstract class AbstractRecordExtractorTest {
     String[] campaignInfo = new String[]{"yesterday", "blackbird", "here comes the sun", "hey jude"};
     double[] cost = new double[]{10000, 20000, 30000, 25000};
     long[] timestamp = new long[]{1570863600000L, 1571036400000L, 1571900400000L, 1574000000000L};
+    List[] arrays = new List[]{Arrays.asList("a", "b", "c"), Arrays.asList("d", "e"), Arrays.asList("w", "x", "y",
+        "z"), Collections.singletonList("a")};
+    Map<String, String>[] maps = new Map[]{
+        createMap(new Pair[]{new Pair<>("a", "1"), new Pair<>("b", "2")}),
+        createMap(new Pair[]{new Pair<>("a", "3"), new Pair<>("b", "4")}),
+        createMap(new Pair[]{new Pair<>("a", "5"), new Pair<>("b", "6")}),
+        createMap(new Pair[]{new Pair<>("a", "7"), new Pair<>("b", "8")})
+    };
 
     List<Map<String, Object>> inputRecords = new ArrayList<>(4);
     for (int i = 0; i < 4; i++) {
@@ -78,13 +95,16 @@ public abstract class AbstractRecordExtractorTest {
       record.put("campaignInfo", campaignInfo[i]);
       record.put("cost", cost[i]);
       record.put("timestamp", timestamp[i]);
+      record.put("xarray", arrays[i]);
+      record.put("xmap", maps[i]);
       inputRecords.add(record);
     }
     return inputRecords;
   }
 
   protected Set<String> getSourceFields() {
-    return Sets.newHashSet("user_id", "firstName", "lastName", "bids", "campaignInfo", "cost", "timestamp");
+    return Sets.newHashSet("user_id", "firstName", "lastName", "bids", "campaignInfo", "cost", "timestamp", "xarray",
+        "xmap");
   }
 
   @AfterClass
