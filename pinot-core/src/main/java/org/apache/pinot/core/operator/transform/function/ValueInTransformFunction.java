@@ -119,7 +119,9 @@ public class ValueInTransformFunction extends BaseTransformFunction {
           _dictIdSet.add(dictId);
         }
       }
-      _dictIds = new int[length][];
+      if(_dictIds == null || _dictIds.length < length) {
+        _dictIds = new int[length][];
+      }
     }
     int[][] unFilteredDictIds = _mainTransformFunction.transformToDictIdsMV(projectionBlock);
     for (int i = 0; i < length; i++) {
@@ -140,7 +142,9 @@ public class ValueInTransformFunction extends BaseTransformFunction {
       for (String inValue : _stringValueSet) {
         _intValueSet.add(Integer.parseInt(inValue));
       }
-      _intValues = new int[length][];
+      if(_intValues == null || _intValues.length < length) {
+        _intValues = new int[length][];
+      }
     }
     int[][] unFilteredIntValues = _mainTransformFunction.transformToIntValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
@@ -161,7 +165,9 @@ public class ValueInTransformFunction extends BaseTransformFunction {
       for (String inValue : _stringValueSet) {
         _longValueSet.add(Long.parseLong(inValue));
       }
-      _longValues = new long[length][];
+      if(_longValues == null || _longValues.length < length) {
+        _longValues = new long[length][];
+      }
     }
     long[][] unFilteredLongValues = _mainTransformFunction.transformToLongValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
@@ -182,7 +188,9 @@ public class ValueInTransformFunction extends BaseTransformFunction {
       for (String inValue : _stringValueSet) {
         _floatValueSet.add(Float.parseFloat(inValue));
       }
-      _floatValues = new float[length][];
+      if(_floatValues == null || _floatValues.length < length) {
+        _floatValues = new float[length][];
+      }
     }
     float[][] unFilteredFloatValues = _mainTransformFunction.transformToFloatValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
@@ -203,7 +211,9 @@ public class ValueInTransformFunction extends BaseTransformFunction {
       for (String inValue : _stringValueSet) {
         _doubleValueSet.add(Double.parseDouble(inValue));
       }
-      _doubleValues = new double[length][];
+      if(_doubleValues == null || _doubleValues.length < length) {
+        _doubleValues = new double[length][];
+      }
     }
     double[][] unFilteredDoubleValues = _mainTransformFunction.transformToDoubleValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
@@ -219,7 +229,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
     }
 
     int length = projectionBlock.getNumDocs();
-    if (_stringValues == null) {
+    if (_stringValues == null || _stringValues.length < length) {
       _stringValues = new String[length][];
     }
     String[][] unFilteredStringValues = _mainTransformFunction.transformToStringValuesMV(projectionBlock);
