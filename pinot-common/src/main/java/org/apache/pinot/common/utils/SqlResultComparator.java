@@ -148,8 +148,11 @@ public class SqlResultComparator {
      * queries are selection queries during Calcite parsing (DISTINCT queries are selection queries with
      * selectNode.getModifierNode(SqlSelectKeyword.DISTINCT) != null).
      */
-    if (areResultsEqual && !isSelectionQuery(query) && !isNumDocsScannedBetter(actual, expected)) {
-      return false;
+    if (areResultsEqual) {
+      // Results are good, check for any metadata differences here.
+      if (!isSelectionQuery(query) && !isNumDocsScannedBetter(actual, expected)) {
+        return false;
+      }
     }
     return areResultsEqual;
   }
@@ -377,7 +380,7 @@ public class SqlResultComparator {
     long expectedNumEntriesScannedInFilter = expected.get(FIELD_NUM_ENTRIES_SCANNED_IN_FILTER).asLong();
     if (actualNumEntriesScannedInFilter > expectedNumEntriesScannedInFilter) {
       LOGGER
-          .error("The numEntriesScannedInFilter don't match! Actual: {}, Expected: {}", actualNumEntriesScannedInFilter,
+          .error("The numEntriesScannedInFilter is worse. Actual: {}, Expected: {}", actualNumEntriesScannedInFilter,
               expectedNumEntriesScannedInFilter);
       return false;
     }
@@ -388,7 +391,7 @@ public class SqlResultComparator {
     long actualNumEntriesScannedPostFilter = actual.get(FIELD_NUM_ENTRIES_SCANNED_POST_FILTER).asLong();
     long expectedNumEntriesScannedPostFilter = expected.get(FIELD_NUM_ENTRIES_SCANNED_POST_FILTER).asLong();
     if (actualNumEntriesScannedPostFilter > expectedNumEntriesScannedPostFilter) {
-      LOGGER.error("The numEntriesScannedPostFilter don't match! Actual: {}, Expected: {}",
+      LOGGER.error("The numEntriesScannedPostFilter is worse. Actual: {}, Expected: {}",
           actualNumEntriesScannedPostFilter, expectedNumEntriesScannedPostFilter);
       return false;
     }
