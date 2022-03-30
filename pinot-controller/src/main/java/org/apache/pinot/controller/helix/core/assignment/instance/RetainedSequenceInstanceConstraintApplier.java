@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core.assignment.instance;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.helix.model.InstanceConfig;
@@ -28,37 +27,36 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Rotate the instances based on the table name hash to prevent creating hotspot instances. Use this as the default
- * instance constraint to align with the default instance partitions.
+ * An extended class from {@link HashBasedRotateInstanceConstraintApplier}
+ * Retain the instance sequence if the pool exists in the existingPoolToInstancesMap.
+ * If the pool doesn't exist in the existing map, the do the rotation.
  */
-public class HashBasedRotateInstanceConstraintApplier implements InstanceConstraintApplier {
-  private static final Logger LOGGER = LoggerFactory.getLogger(HashBasedRotateInstanceConstraintApplier.class);
+public class RetainedSequenceInstanceConstraintApplier extends HashBasedRotateInstanceConstraintApplier {
+  private static final Logger LOGGER = LoggerFactory.getLogger(RetainedSequenceInstanceConstraintApplier.class);
 
-  protected final String _tableNameWithType;
+  private final Map<Integer, List<String>> _existingPoolToInstancesMap;
 
-  public HashBasedRotateInstanceConstraintApplier(String tableNameWithType) {
-    _tableNameWithType = tableNameWithType;
+  public RetainedSequenceInstanceConstraintApplier(String tableNameWithType,
+      Map<Integer, List<String>> existingPoolToInstancesMap) {
+    super(tableNameWithType);
+    _existingPoolToInstancesMap = existingPoolToInstancesMap;
   }
 
   @Override
   public Map<Integer, List<InstanceConfig>> applyConstraint(
       Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap) {
     int tableNameHash = Math.abs(_tableNameWithType.hashCode());
-    LOGGER.info("Rotating instances for table: {} with hash: {}", _tableNameWithType, tableNameHash);
+    LOGGER.info("Keeping the same instance sequence for instances of table: {}", _tableNameWithType);
 
     for (Map.Entry<Integer, List<InstanceConfig>> entry : poolToInstanceConfigsMap.entrySet()) {
       List<InstanceConfig> instanceConfigs = entry.getValue();
       int numInstanceConfigs = instanceConfigs.size();
       Preconditions.checkState(numInstanceConfigs > 0, "No instance left in pool: %s", entry.getKey());
 
-      rotateInstances(instanceConfigs, tableNameHash, numInstanceConfigs);
+      if (!_existingPoolToInstancesMap.containsKey(entry.getKey())) {
+        rotateInstances(instanceConfigs, tableNameHash, numInstanceConfigs);
+      }
     }
-
     return poolToInstanceConfigsMap;
-  }
-
-  protected void rotateInstances(List<InstanceConfig> instanceConfigs, int tableNameHash, int numInstanceConfigs) {
-    // This should match the default InstancePartitions generated from InstancePartitionsUtils
-    Collections.rotate(instanceConfigs, -(tableNameHash % numInstanceConfigs));
   }
 }

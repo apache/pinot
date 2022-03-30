@@ -124,7 +124,9 @@ public class PinotInstanceAssignmentRestletResource {
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED") @QueryParam("type") @Nullable
           InstancePartitionsType instancePartitionsType,
-      @ApiParam(value = "Whether to do dry-run") @DefaultValue("false") @QueryParam("dryRun") boolean dryRun) {
+      @ApiParam(value = "Whether to do dry-run") @DefaultValue("false") @QueryParam("dryRun") boolean dryRun,
+      @ApiParam(value = "Whether to retain current instance sequence") @DefaultValue("false")
+      @QueryParam("retainInstanceSequence") boolean retainInstanceSequence) {
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
     List<InstanceConfig> instanceConfigs = _resourceManager.getAllHelixInstanceConfigs();
 
@@ -136,8 +138,8 @@ public class PinotInstanceAssignmentRestletResource {
         try {
           if (InstanceAssignmentConfigUtils
               .allowInstanceAssignment(offlineTableConfig, InstancePartitionsType.OFFLINE)) {
-            instancePartitionsMap.put(InstancePartitionsType.OFFLINE, new InstanceAssignmentDriver(offlineTableConfig)
-                .assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs));
+            assignInstancesForInstancePartitionsType(instancePartitionsMap, offlineTableConfig, instanceConfigs,
+                InstancePartitionsType.OFFLINE, retainInstanceSequence);
           }
         } catch (IllegalStateException e) {
           throw new ControllerApplicationException(LOGGER, "Caught IllegalStateException", Response.Status.BAD_REQUEST,
@@ -152,19 +154,18 @@ public class PinotInstanceAssignmentRestletResource {
       TableConfig realtimeTableConfig = _resourceManager.getRealtimeTableConfig(tableName);
       if (realtimeTableConfig != null) {
         try {
-          InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(realtimeTableConfig);
           if (instancePartitionsType == InstancePartitionsType.CONSUMING || instancePartitionsType == null) {
             if (InstanceAssignmentConfigUtils
                 .allowInstanceAssignment(realtimeTableConfig, InstancePartitionsType.CONSUMING)) {
-              instancePartitionsMap.put(InstancePartitionsType.CONSUMING,
-                  instanceAssignmentDriver.assignInstances(InstancePartitionsType.CONSUMING, instanceConfigs));
+              assignInstancesForInstancePartitionsType(instancePartitionsMap, realtimeTableConfig, instanceConfigs,
+                  InstancePartitionsType.CONSUMING, retainInstanceSequence);
             }
           }
           if (instancePartitionsType == InstancePartitionsType.COMPLETED || instancePartitionsType == null) {
             if (InstanceAssignmentConfigUtils
                 .allowInstanceAssignment(realtimeTableConfig, InstancePartitionsType.COMPLETED)) {
-              instancePartitionsMap.put(InstancePartitionsType.COMPLETED,
-                  instanceAssignmentDriver.assignInstances(InstancePartitionsType.COMPLETED, instanceConfigs));
+              assignInstancesForInstancePartitionsType(instancePartitionsMap, realtimeTableConfig, instanceConfigs,
+                  InstancePartitionsType.COMPLETED, retainInstanceSequence);
             }
           }
         } catch (IllegalStateException e) {
@@ -189,6 +190,28 @@ public class PinotInstanceAssignmentRestletResource {
     }
 
     return instancePartitionsMap;
+  }
+
+  /**
+   * Assign instances given the type of instancePartitions.
+   * @param instancePartitionsMap the empty map to be filled.
+   * @param tableConfig table config
+   * @param instanceConfigs list of instance configs
+   * @param instancePartitionsType type of instancePartitions
+   * @param retainInstanceSequence whether to retain instance sequence
+   */
+  private void assignInstancesForInstancePartitionsType(
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, TableConfig tableConfig,
+      List<InstanceConfig> instanceConfigs, InstancePartitionsType instancePartitionsType,
+      boolean retainInstanceSequence) {
+    Map<Integer, List<String>> existingPoolToInstancesMap = null;
+    if (retainInstanceSequence) {
+      InstancePartitions existingInstancePartitions = InstancePartitionsUtils
+          .fetchOrComputeInstancePartitions(_resourceManager.getHelixZkManager(), tableConfig, instancePartitionsType);
+      existingPoolToInstancesMap = existingInstancePartitions.getPoolToInstancesMap();
+    }
+    instancePartitionsMap.put(instancePartitionsType, new InstanceAssignmentDriver(tableConfig)
+        .assignInstances(instancePartitionsType, instanceConfigs, existingPoolToInstancesMap));
   }
 
   private void persistInstancePartitionsHelper(InstancePartitions instancePartitions) {

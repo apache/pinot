@@ -23,6 +23,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -58,24 +60,39 @@ import org.apache.pinot.spi.utils.JsonUtils;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class InstancePartitions {
   private static final char PARTITION_REPLICA_GROUP_SEPARATOR = '_';
+  private static final String POOLS_KEY = "pools";
+  private static final String INSTANCE_SEPARATOR = "/";
 
   private final String _instancePartitionsName;
+  // A map to store the partition and its associated list of instances.
+  // The partition key would be like "0_0", where the 1st number denotes the partition id,
+  // and the 2nd one denotes the replica group id.
   private final Map<String, List<String>> _partitionToInstancesMap;
+  // A map to store the selected pool numbers and their associated lists of instances.
+  private final Map<Integer, List<String>> _poolToInstancesMap;
   private int _numPartitions;
   private int _numReplicaGroups;
 
   public InstancePartitions(String instancePartitionsName) {
     _instancePartitionsName = instancePartitionsName;
     _partitionToInstancesMap = new TreeMap<>();
+    _poolToInstancesMap = new TreeMap<>();
   }
 
   @JsonCreator
   private InstancePartitions(
       @JsonProperty(value = "instancePartitionsName", required = true) String instancePartitionsName,
       @JsonProperty(value = "partitionToInstancesMap", required = true)
-          Map<String, List<String>> partitionToInstancesMap) {
+          Map<String, List<String>> partitionToInstancesMap,
+      @JsonProperty(value = "poolToInstancesMap") Map<String, String> poolToInstancesMap) {
     _instancePartitionsName = instancePartitionsName;
     _partitionToInstancesMap = partitionToInstancesMap;
+    _poolToInstancesMap = new TreeMap<>();
+    if (poolToInstancesMap != null) {
+      for (Map.Entry<String, String> entry : poolToInstancesMap.entrySet()) {
+        _poolToInstancesMap.put(Integer.parseInt(entry.getKey()), extractInstances(entry.getValue()));
+      }
+    }
     for (String key : partitionToInstancesMap.keySet()) {
       int separatorIndex = key.indexOf(PARTITION_REPLICA_GROUP_SEPARATOR);
       int partitionId = Integer.parseInt(key.substring(0, separatorIndex));
@@ -105,6 +122,11 @@ public class InstancePartitions {
     return _numReplicaGroups;
   }
 
+  @JsonIgnore
+  public Map<Integer, List<String>> getPoolToInstancesMap() {
+    return _poolToInstancesMap;
+  }
+
   public List<String> getInstances(int partitionId, int replicaGroupId) {
     return _partitionToInstancesMap
         .get(Integer.toString(partitionId) + PARTITION_REPLICA_GROUP_SEPARATOR + replicaGroupId);
@@ -117,13 +139,51 @@ public class InstancePartitions {
     _numReplicaGroups = Integer.max(_numReplicaGroups, replicaGroupId + 1);
   }
 
+  public void setPoolToInstancesMap(Map<Integer, List<String>> poolToInstancesMap) {
+    _poolToInstancesMap.putAll(poolToInstancesMap);
+  }
+
   public static InstancePartitions fromZNRecord(ZNRecord znRecord) {
-    return new InstancePartitions(znRecord.getId(), znRecord.getListFields());
+    return new InstancePartitions(znRecord.getId(), znRecord.getListFields(), znRecord.getMapField(POOLS_KEY));
+  }
+
+  private static List<String> extractInstances(String instancesRawString) {
+    if (instancesRawString == null || instancesRawString.length() == 0) {
+      return Collections.emptyList();
+    }
+    String[] instancesArray = instancesRawString.split(INSTANCE_SEPARATOR);
+    List<String> instances = new ArrayList<>(instancesArray.length);
+    Collections.addAll(instances, instancesArray);
+    return instances;
+  }
+
+  private String convertInstancesToString(List<String> instances) {
+    if (instances == null || instances.isEmpty()) {
+      return "";
+    }
+    StringBuilder stringBuilder = new StringBuilder();
+    for (String instance : instances) {
+      if (stringBuilder.length() == 0) {
+        stringBuilder.append(instance);
+      } else {
+        stringBuilder.append(INSTANCE_SEPARATOR).append(instance);
+      }
+    }
+    return stringBuilder.toString();
+  }
+
+  private Map<String, String> convertListToStringMap() {
+    Map<String, String> convertedMap = new TreeMap<>();
+    for (Map.Entry<Integer, List<String>> entry : _poolToInstancesMap.entrySet()) {
+      convertedMap.put(Integer.toString(entry.getKey()), convertInstancesToString(entry.getValue()));
+    }
+    return convertedMap;
   }
 
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = new ZNRecord(_instancePartitionsName);
     znRecord.setListFields(_partitionToInstancesMap);
+    znRecord.setMapField(POOLS_KEY, convertListToStringMap());
     return znRecord;
   }
 

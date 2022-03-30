@@ -185,8 +185,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // Result should be the same as the result in dry-run mode
     instanceAssignment = rebalanceResult.getInstanceAssignment();
     assertEquals(instanceAssignment.size(), 1);
-    assertEquals(instanceAssignment.get(InstancePartitionsType.OFFLINE).getPartitionToInstancesMap(),
-        instancePartitions.getPartitionToInstancesMap());
+    assertEquals(instanceAssignment.get(InstancePartitionsType.OFFLINE).getPoolToInstancesMap(),
+        instancePartitions.getPoolToInstancesMap());
     assertEquals(rebalanceResult.getSegmentAssignment(), newSegmentAssignment);
 
     // ExternalView should match the new segment assignment

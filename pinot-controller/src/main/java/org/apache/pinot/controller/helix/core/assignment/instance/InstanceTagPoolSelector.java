@@ -38,8 +38,8 @@ import org.slf4j.LoggerFactory;
 public class InstanceTagPoolSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceTagPoolSelector.class);
 
-  private final InstanceTagPoolConfig _tagPoolConfig;
-  private final String _tableNameWithType;
+  protected final InstanceTagPoolConfig _tagPoolConfig;
+  protected final String _tableNameWithType;
 
   public InstanceTagPoolSelector(InstanceTagPoolConfig tagPoolConfig, String tableNameWithType) {
     _tagPoolConfig = tagPoolConfig;
@@ -48,6 +48,7 @@ public class InstanceTagPoolSelector {
 
   /**
    * Returns a map from pool to instance configs based on the tag and pool config for the given instance configs.
+   * @param instanceConfigs list of latest instance configs from ZK.
    */
   public Map<Integer, List<InstanceConfig>> selectInstances(List<InstanceConfig> instanceConfigs) {
     int tableNameHash = Math.abs(_tableNameWithType.hashCode());
