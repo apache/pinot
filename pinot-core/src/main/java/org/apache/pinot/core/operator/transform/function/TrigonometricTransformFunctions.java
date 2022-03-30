@@ -85,7 +85,7 @@ public class TrigonometricTransformFunctions {
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _results[i] = Math.toDegrees(values[i]);
+        _doubleValuesSV[i] = Math.toDegrees(values[i]);
       }
     }
   }
@@ -101,7 +101,7 @@ public class TrigonometricTransformFunctions {
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _results[i] = Math.acos(values[i]);
+        _doubleValuesSV[i] = Math.acos(values[i]);
       }
     }
   }
@@ -117,7 +117,7 @@ public class TrigonometricTransformFunctions {
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _results[i] = Math.tan(values[i]);
+        _doubleValuesSV[i] = Math.tan(values[i]);
       }
     }
   }
@@ -133,7 +133,7 @@ public class TrigonometricTransformFunctions {
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _results[i] = Math.sinh(values[i]);
+        _doubleValuesSV[i] = Math.sinh(values[i]);
       }
     }
   }
@@ -149,7 +149,7 @@ public class TrigonometricTransformFunctions {
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _results[i] = 1.0 / Math.tan(values[i]);
+        _doubleValuesSV[i] = 1.0 / Math.tan(values[i]);
       }
     }
   }
@@ -165,7 +165,7 @@ public class TrigonometricTransformFunctions {
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _results[i] = Math.atan(values[i]);
+        _doubleValuesSV[i] = Math.atan(values[i]);
       }
     }
   }
@@ -181,7 +181,7 @@ public class TrigonometricTransformFunctions {
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _results[i] = Math.cos(values[i]);
+        _doubleValuesSV[i] = Math.cos(values[i]);
       }
     }
   }
@@ -197,7 +197,7 @@ public class TrigonometricTransformFunctions {
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _results[i] = Math.asin(values[i]);
+        _doubleValuesSV[i] = Math.asin(values[i]);
       }
     }
   }
@@ -213,7 +213,7 @@ public class TrigonometricTransformFunctions {
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _results[i] = Math.cosh(values[i]);
+        _doubleValuesSV[i] = Math.cosh(values[i]);
       }
     }
   }
@@ -229,7 +229,7 @@ public class TrigonometricTransformFunctions {
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _results[i] = Math.sin(values[i]);
+        _doubleValuesSV[i] = Math.sin(values[i]);
       }
     }
   }
@@ -245,7 +245,7 @@ public class TrigonometricTransformFunctions {
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _results[i] = Math.tanh(values[i]);
+        _doubleValuesSV[i] = Math.tanh(values[i]);
       }
     }
   }
@@ -261,7 +261,7 @@ public class TrigonometricTransformFunctions {
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _results[i] = Math.toRadians(values[i]);
+        _doubleValuesSV[i] = Math.toRadians(values[i]);
       }
     }
   }
