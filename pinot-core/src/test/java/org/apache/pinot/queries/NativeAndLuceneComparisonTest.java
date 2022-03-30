@@ -220,7 +220,7 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testFSTBasedRegexLike() {
+  public void testQueries() {
     // Select queries on col with FST + inverted index.
     String query = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'www.domain1%') LIMIT 50000";
     _indexSegment = _luceneSegment;
