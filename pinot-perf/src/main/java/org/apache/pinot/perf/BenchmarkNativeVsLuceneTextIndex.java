@@ -73,6 +73,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @Fork(1)
 @Warmup(iterations = 5, time = 1)
 @Measurement(iterations = 5, time = 1)
+@OutputTimeUnit(TimeUnit.MINUTES)
 @State(Scope.Benchmark)
 public class BenchmarkNativeVsLuceneTextIndex {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "TextSearchQueriesTest");
@@ -92,7 +93,7 @@ public class BenchmarkNativeVsLuceneTextIndex {
   final String _nativeQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_NATIVE, 'www.domain1.*') LIMIT 5000000";
   @Param("350000")
   int _numRows;
-  @Param({"0", "1", "10", "100", "1000", "10000"})
+  @Param({"0", "1", "10", "100"})
   int _numBlocks;
   @Param({"native", "lucene"})
   String _fstType;
