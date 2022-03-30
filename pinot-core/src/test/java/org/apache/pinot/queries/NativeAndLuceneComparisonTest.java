@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.queries;
 
 import java.io.File;
@@ -221,15 +239,26 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
 
   @Test
   public void testQueries() {
-    // Select queries on col with FST + inverted index.
     String query = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'www.domain1%') LIMIT 50000";
     _indexSegment = _luceneSegment;
     _indexSegments = Arrays.asList(_indexSegment);
     testSelectionResults(query, 256, null);
 
+    query = "SELECT * FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES_LUCENE, '.*domain1.*') LIMIT 50000";
+    testSelectionResults(query, 512, null);
+
+    query = "SELECT * FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES_LUCENE, '.*com') LIMIT 50000";
+    testSelectionResults(query, 256, null);
+
     _indexSegment = _nativeIndexSegment;
     _indexSegments = Arrays.asList(_nativeIndexSegment);
     query = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_NATIVE, 'www.domain1.*') LIMIT 50000";
+    testSelectionResults(query, 256, null);
+
+    query = "SELECT * FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES_NATIVE, '.*domain1.*') LIMIT 50000";
+    testSelectionResults(query, 512, null);
+
+    query = "SELECT * FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES_NATIVE, '.*com') LIMIT 50000";
     testSelectionResults(query, 256, null);
   }
 }
