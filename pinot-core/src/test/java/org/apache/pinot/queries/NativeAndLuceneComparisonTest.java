@@ -244,21 +244,9 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
     _indexSegments = Arrays.asList(_indexSegment);
     testSelectionResults(query, 256, null);
 
-    query = "SELECT * FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES_LUCENE, '.*domain1.*') LIMIT 50000";
-    testSelectionResults(query, 512, null);
-
-    query = "SELECT * FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES_LUCENE, '.*com') LIMIT 50000";
-    testSelectionResults(query, 256, null);
-
     _indexSegment = _nativeIndexSegment;
     _indexSegments = Arrays.asList(_nativeIndexSegment);
     query = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_NATIVE, 'www.domain1.*') LIMIT 50000";
-    testSelectionResults(query, 256, null);
-
-    query = "SELECT * FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES_NATIVE, '.*domain1.*') LIMIT 50000";
-    testSelectionResults(query, 512, null);
-
-    query = "SELECT * FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES_NATIVE, '.*com') LIMIT 50000";
     testSelectionResults(query, 256, null);
   }
 }
