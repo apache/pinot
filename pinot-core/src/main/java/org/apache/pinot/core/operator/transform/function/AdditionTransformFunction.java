@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
@@ -66,11 +65,12 @@ public class AdditionTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_sums == null) {
-      _sums = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int length = projectionBlock.getNumDocs();
+
+    if (_sums == null || _sums.length < length) {
+      _sums = new double[length];
     }
 
-    int length = projectionBlock.getNumDocs();
     Arrays.fill(_sums, 0, length, _literalSum);
     for (TransformFunction transformFunction : _transformFunctions) {
       double[] values = transformFunction.transformToDoubleValuesSV(projectionBlock);
