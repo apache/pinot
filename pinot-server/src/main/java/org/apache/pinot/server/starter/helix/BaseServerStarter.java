@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -716,6 +717,11 @@ public abstract class BaseServerStarter implements ServiceStartable {
   @Override
   public PinotConfiguration getConfig() {
     return _serverConf;
+  }
+
+  @VisibleForTesting
+  public ServerInstance getServerInstance() {
+    return _serverInstance;
   }
 
   /**

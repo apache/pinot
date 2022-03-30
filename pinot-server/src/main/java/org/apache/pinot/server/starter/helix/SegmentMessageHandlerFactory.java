@@ -26,6 +26,7 @@ import org.apache.helix.model.Message;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
+import org.apache.pinot.common.messages.TableDeletionMessage;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
@@ -58,6 +59,8 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         return new SegmentRefreshMessageHandler(new SegmentRefreshMessage(message), _metrics, context);
       case SegmentReloadMessage.RELOAD_SEGMENT_MSG_SUB_TYPE:
         return new SegmentReloadMessageHandler(new SegmentReloadMessage(message), _metrics, context);
+      case TableDeletionMessage.DELETE_TABLE_MSG_SUB_TYPE:
+        return new TableDeletionMessageHandler(new TableDeletionMessage(message), _metrics, context);
       default:
         LOGGER.warn("Unsupported user defined message sub type: {} for segment: {}", msgSubType,
             message.getPartitionName());
@@ -139,6 +142,28 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         // (without any corresponding logs to indicate failure!) in the callable path
         throw new RuntimeException(
             "Caught exception while reloading segment: " + _segmentName + " in table: " + _tableNameWithType, e);
+      }
+      return helixTaskResult;
+    }
+  }
+
+  private class TableDeletionMessageHandler extends DefaultMessageHandler {
+    TableDeletionMessageHandler(TableDeletionMessage tableDeletionMessage, ServerMetrics metrics,
+        NotificationContext context) {
+      super(tableDeletionMessage, metrics, context);
+    }
+
+    @Override
+    public HelixTaskResult handleMessage()
+        throws InterruptedException {
+      HelixTaskResult helixTaskResult = new HelixTaskResult();
+      _logger.info("Handling table deletion message");
+      try {
+        _instanceDataManager.deleteTable(_tableNameWithType);
+        helixTaskResult.setSuccess(true);
+      } catch (Exception e) {
+        _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETE_TABLE_FAILURES, 1);
+        Utils.rethrowException(e);
       }
       return helixTaskResult;
     }

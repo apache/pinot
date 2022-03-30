@@ -25,6 +25,7 @@ import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -167,6 +168,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
   public void tearDown()
       throws Exception {
     dropRealtimeTable(getTableName());
+    cleanupTestTableDataManager(TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
     stopServer();
     stopBroker();
     stopController();
