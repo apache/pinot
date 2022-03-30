@@ -23,7 +23,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.StringWriter;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -95,9 +94,7 @@ public class IngestionJobLauncher {
   }
 
   public static void runIngestionJob(SegmentGenerationJobSpec spec) {
-    StringWriter sw = new StringWriter();
-    new Yaml().dump(spec, sw);
-    LOGGER.info("SegmentGenerationJobSpec: \n{}", sw.toString());
+    LOGGER.info("SegmentGenerationJobSpec: \n{}", spec.toJSONString(true));
     ExecutionFrameworkSpec executionFramework = spec.getExecutionFrameworkSpec();
     PinotIngestionJobType jobType = PinotIngestionJobType.fromString(spec.getJobType());
     switch (jobType) {
