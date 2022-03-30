@@ -246,6 +246,6 @@ public class RangeIndexHandler implements IndexHandler {
     File indexDir = _segmentMetadata.getIndexDir();
     return indexCreatorProvider.newRangeIndexCreator(
         IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata).build()
-            .forRangeIndex(_rangeIndexVersion, columnMetadata.getMinValue(), columnMetadata.getMaxValue()));
+            .forRangeIndex(_rangeIndexVersion));
   }
 }
