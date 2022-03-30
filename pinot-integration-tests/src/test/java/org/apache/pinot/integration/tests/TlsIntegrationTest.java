@@ -44,7 +44,6 @@ import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
-import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
@@ -467,7 +466,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testRealtimeSegmentUploadDownload()
       throws Exception {
-    final Request query = new Request("sql", "SELECT count(*) FROM " + getTableName());
+    String query = "SELECT count(*) FROM " + getTableName();
 
     ResultSetGroup resultBeforeOffline = getPinotConnection().execute(query);
     Assert.assertTrue(resultBeforeOffline.getResultSet(0).getLong(0) > 0);

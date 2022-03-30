@@ -74,8 +74,8 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
     addTableConfig(createRealtimeTableConfig(realtimeAvroFiles.get(0)));
 
     // Create and upload segments
-    ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir,
+        _tarDir);
     uploadSegments(getTableName(), _tarDir);
 
     // Push data into Kafka
@@ -121,12 +121,11 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
   @Test
   public void testGrpcBrokerRequestHandlerOnSelectionOnlyQuery()
       throws Exception {
-    String sql;
-    sql = "SELECT * FROM mytable LIMIT 1000000";
-    testSqlQuery(sql, Collections.singletonList(sql));
-    sql = "SELECT * FROM mytable WHERE DaysSinceEpoch > 16312 LIMIT 10000000";
-    testSqlQuery(sql, Collections.singletonList(sql));
-    sql = "SELECT ArrTime, DaysSinceEpoch, Carrier FROM mytable LIMIT 10000000";
-    testSqlQuery(sql, Collections.singletonList(sql));
+    String query = "SELECT * FROM mytable LIMIT 1000000";
+    testQuery(query);
+    query = "SELECT * FROM mytable WHERE DaysSinceEpoch > 16312 LIMIT 10000000";
+    testQuery(query);
+    query = "SELECT ArrTime, DaysSinceEpoch, Carrier FROM mytable LIMIT 10000000";
+    testQuery(query);
   }
 }

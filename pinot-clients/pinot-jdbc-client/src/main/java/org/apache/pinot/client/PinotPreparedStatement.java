@@ -32,9 +32,8 @@ import org.apache.pinot.client.utils.DriverUtils;
 
 
 public class PinotPreparedStatement extends AbstractBasePreparedStatement {
-
-  private static final String QUERY_FORMAT = "sql";
   private static final String LIMIT_STATEMENT = "LIMIT";
+
   private Connection _connection;
   private org.apache.pinot.client.Connection _session;
   private ResultSetGroup _resultSetGroup;
@@ -50,9 +49,9 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
     _closed = false;
     _query = query;
     if (!DriverUtils.queryContainsLimitStatement(_query)) {
-      _query = _query.concat(" " + LIMIT_STATEMENT + " " + _maxRows);
+      _query += " " + LIMIT_STATEMENT + " " + _maxRows;
     }
-    _preparedStatement = new PreparedStatement(_session, new Request(QUERY_FORMAT, _query));
+    _preparedStatement = new PreparedStatement(_session, _query);
   }
 
   @Override
@@ -157,7 +156,7 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
   public void clearParameters()
       throws SQLException {
     validateState();
-    _preparedStatement = new PreparedStatement(_session, new Request(QUERY_FORMAT, _query));
+    _preparedStatement = new PreparedStatement(_session, _query);
   }
 
   @Override
@@ -178,8 +177,7 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
       throws SQLException {
     validateState();
     try {
-      Request request = new Request(QUERY_FORMAT, sql);
-      _resultSetGroup = _session.execute(request);
+      _resultSetGroup = _session.execute(sql);
       if (_resultSetGroup.getResultSetCount() == 0) {
         _resultSet = PinotResultSet.empty();
         return _resultSet;

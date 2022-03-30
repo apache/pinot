@@ -208,8 +208,8 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   private void testStarQuery(String starQuery)
       throws Exception {
     String referenceQuery = starQuery.replace(STAR_TREE_TABLE_NAME, DEFAULT_TABLE_NAME);
-    JsonNode starResponse = postSqlQuery(starQuery);
-    JsonNode referenceResponse = postSqlQuery(referenceQuery);
+    JsonNode starResponse = postQuery(starQuery);
+    JsonNode referenceResponse = postQuery(referenceQuery);
     Assert.assertEquals(starResponse.get("resultTable"), referenceResponse.get("resultTable"),
         "Query comparison failed for: \nStar Query: " + starQuery + "\nStar Response: " + starResponse
             + "\nReference Query: " + referenceQuery + "\nReference Response: " + referenceResponse);

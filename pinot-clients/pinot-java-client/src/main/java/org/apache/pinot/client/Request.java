@@ -21,6 +21,7 @@ package org.apache.pinot.client;
 /**
  * Request is used in server request to host multiple pinot query types, like PQL, SQL.
  */
+@Deprecated
 public class Request {
 
   private String _queryFormat;

@@ -301,8 +301,16 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "segments");
   }
 
-  public String forSegmentMetadata(String tableName) {
-    return StringUtil.join("/", _baseUrl, "segments", tableName, "metadata");
+  public String forSegmentsMetadataFromServer(String tableName) {
+    return forSegmentsMetadataFromServer(tableName, null);
+  }
+
+  public String forSegmentsMetadataFromServer(String tableName, @Nullable String columns) {
+    String url = StringUtil.join("/", _baseUrl, "segments", tableName, "metadata");
+    if (columns != null) {
+      url += "?columns=" + columns;
+    }
+    return url;
   }
 
   public String forSegmentMetadata(String tableName, String segmentName) {
