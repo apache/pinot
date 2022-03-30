@@ -119,7 +119,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
           _dictIdSet.add(dictId);
         }
       }
-      if(_dictIds == null || _dictIds.length < length) {
+      if (_dictIds == null || _dictIds.length < length) {
         _dictIds = new int[length][];
       }
     }
@@ -142,7 +142,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
       for (String inValue : _stringValueSet) {
         _intValueSet.add(Integer.parseInt(inValue));
       }
-      if(_intValues == null || _intValues.length < length) {
+      if (_intValues == null || _intValues.length < length) {
         _intValues = new int[length][];
       }
     }
@@ -165,7 +165,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
       for (String inValue : _stringValueSet) {
         _longValueSet.add(Long.parseLong(inValue));
       }
-      if(_longValues == null || _longValues.length < length) {
+      if (_longValues == null || _longValues.length < length) {
         _longValues = new long[length][];
       }
     }
@@ -188,7 +188,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
       for (String inValue : _stringValueSet) {
         _floatValueSet.add(Float.parseFloat(inValue));
       }
-      if(_floatValues == null || _floatValues.length < length) {
+      if (_floatValues == null || _floatValues.length < length) {
         _floatValues = new float[length][];
       }
     }
@@ -211,7 +211,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
       for (String inValue : _stringValueSet) {
         _doubleValueSet.add(Double.parseDouble(inValue));
       }
-      if(_doubleValues == null || _doubleValues.length < length) {
+      if (_doubleValues == null || _doubleValues.length < length) {
         _doubleValues = new double[length][];
       }
     }
