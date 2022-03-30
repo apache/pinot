@@ -51,6 +51,26 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
   }
 
   @Override
+  public boolean canOptimizeCount() {
+    return true;
+  }
+
+  @Override
+  public int getNumMatchingDocs() {
+    return _textIndexReader.getDocIds(_predicate.getValue()).getCardinality();
+  }
+
+  @Override
+  public boolean canProduceBitmaps() {
+    return true;
+  }
+
+  @Override
+  public BitmapCollection getBitmaps() {
+    return new BitmapCollection(_numDocs, false, _textIndexReader.getDocIds(_predicate.getValue()));
+  }
+
+  @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
   }

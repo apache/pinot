@@ -29,6 +29,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
+import org.apache.pinot.core.operator.query.FastFilteredCountOperator;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -162,14 +163,15 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     entries.add(new Object[]{
         "select * from testTable where daysSinceEpoch > 100", SelectionOnlyOperator.class, SelectionOnlyOperator.class
     });
-    // COUNT from metadata
+    // COUNT from metadata (via fast filtered count which knows the number of docs in the segment)
     entries.add(new Object[]{
-        "select count(*) from testTable", NonScanBasedAggregationOperator.class, AggregationOperator.class
+        "select count(*) from testTable", FastFilteredCountOperator.class,
+        FastFilteredCountOperator.class
     });
     // COUNT from metadata with match all filter
     entries.add(new Object[]{
-        "select count(*) from testTable where column1 > 10", NonScanBasedAggregationOperator.class,
-        AggregationOperator.class
+        "select count(*) from testTable where column1 > 10", FastFilteredCountOperator.class,
+        FastFilteredCountOperator.class
     });
     // MIN/MAX from dictionary
     entries.add(new Object[]{

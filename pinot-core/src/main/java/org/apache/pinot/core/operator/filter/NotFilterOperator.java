@@ -58,6 +58,26 @@ public class NotFilterOperator extends BaseFilterOperator {
     return new FilterBlock(new NotDocIdSet(_filterOperator.nextBlock().getBlockDocIdSet(), _numDocs));
   }
 
+  @Override
+  public boolean canOptimizeCount() {
+    return _filterOperator.canOptimizeCount();
+  }
+
+  @Override
+  public int getNumMatchingDocs() {
+    return _numDocs - _filterOperator.getNumMatchingDocs();
+  }
+
+  @Override
+  public boolean canProduceBitmaps() {
+    return _filterOperator.canProduceBitmaps();
+  }
+
+  @Override
+  public BitmapCollection getBitmaps() {
+    return _filterOperator.getBitmaps().invert();
+  }
+
   public BaseFilterOperator getChildFilterOperator() {
     return _filterOperator;
   }

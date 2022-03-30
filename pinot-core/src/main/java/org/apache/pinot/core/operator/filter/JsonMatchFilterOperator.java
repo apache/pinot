@@ -51,6 +51,26 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
   }
 
   @Override
+  public boolean canOptimizeCount() {
+    return true;
+  }
+
+  @Override
+  public int getNumMatchingDocs() {
+    return _jsonIndex.getMatchingDocIds(_predicate.getValue()).getCardinality();
+  }
+
+  @Override
+  public boolean canProduceBitmaps() {
+    return true;
+  }
+
+  @Override
+  public BitmapCollection getBitmaps() {
+    return new BitmapCollection(_numDocs, false, _jsonIndex.getMatchingDocIds(_predicate.getValue()));
+  }
+
+  @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
   }
