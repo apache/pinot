@@ -24,7 +24,7 @@ import org.apache.calcite.rel.logical.LogicalCalc;
 public class CalcNode extends AbstractStageNode {
   private final String _expression;
 
-  public CalcNode(LogicalCalc node, String currentStageId) {
+  public CalcNode(LogicalCalc node, int currentStageId) {
     super(currentStageId);
     _expression = toExpression(node);
   }

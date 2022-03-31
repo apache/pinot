@@ -50,8 +50,8 @@ public class QueryPlanSerDeUtils {
     DistributedQueryPlan distributedQueryPlan = new DistributedQueryPlan(workerQueryPlan.getStageId());
     distributedQueryPlan.setServerInstance(stringToInstance(workerQueryPlan.getInstanceId()));
     distributedQueryPlan.setStageRoot(stagePlanToStageRoot(workerQueryPlan.getStagePlan()));
-    Map<String, StageMetadata> metadataMap = distributedQueryPlan.getMetadataMap();
-    for (Map.Entry<String, Worker.StageMetadata> e : workerQueryPlan.getStageMetadataMap().entrySet()) {
+    Map<Integer, StageMetadata> metadataMap = distributedQueryPlan.getMetadataMap();
+    for (Map.Entry<Integer, Worker.StageMetadata> e : workerQueryPlan.getStageMetadataMap().entrySet()) {
       metadataMap.put(e.getKey(), fromWorkerStageMetadata(e.getValue()));
     }
     return distributedQueryPlan;
@@ -119,9 +119,9 @@ public class QueryPlanSerDeUtils {
     return builder.build();
   }
 
-  private static Map<String, Worker.StageMetadata> constructStageMetadataMap(Map<String, StageMetadata> metadataMap) {
-    Map<String, Worker.StageMetadata> protoMap = new HashMap<>();
-    for (Map.Entry<String, StageMetadata> e : metadataMap.entrySet()) {
+  private static Map<Integer, Worker.StageMetadata> constructStageMetadataMap(Map<Integer, StageMetadata> metadataMap) {
+    Map<Integer, Worker.StageMetadata> protoMap = new HashMap<>();
+    for (Map.Entry<Integer, StageMetadata> e : metadataMap.entrySet()) {
       protoMap.put(e.getKey(), toWorkerStageMetadata(e.getValue()));
     }
     return protoMap;

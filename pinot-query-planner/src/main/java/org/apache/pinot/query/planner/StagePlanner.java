@@ -41,8 +41,8 @@ public class StagePlanner {
   private final PlannerContext _plannerContext;
   private final WorkerManager _workerManager;
 
-  private Map<String, StageNode> _queryStageMap;
-  private Map<String, StageMetadata> _stageMetadataMap;
+  private Map<Integer, StageNode> _queryStageMap;
+  private Map<Integer, StageMetadata> _stageMetadataMap;
   private int _stageIdCounter;
 
   public StagePlanner(PlannerContext plannerContext, WorkerManager workerManager) {
@@ -60,7 +60,8 @@ public class StagePlanner {
     // clear the state
     _queryStageMap = new HashMap<>();
     _stageMetadataMap = new HashMap<>();
-    _stageIdCounter = 0;
+    // Stage ID starts with 1, 0 will be reserved for ROOT stage.
+    _stageIdCounter = 1;
 
     // walk the plan and create stages.
     StageNode globalStageRoot = walkRelPlan(relRoot, getNewStageId());
@@ -68,7 +69,7 @@ public class StagePlanner {
     // global root needs to send results back to the ROOT, a.k.a. the client response node.
     // the last stage is always a broadcast-gather.
     StageNode globalReceiverNode =
-        new MailboxReceiveNode("ROOT", globalStageRoot.getStageId(), RelDistribution.Type.BROADCAST_DISTRIBUTED);
+        new MailboxReceiveNode(0, globalStageRoot.getStageId(), RelDistribution.Type.BROADCAST_DISTRIBUTED);
     StageNode globalSenderNode = new MailboxSendNode(globalStageRoot, globalReceiverNode.getStageId(),
         RelDistribution.Type.BROADCAST_DISTRIBUTED);
     _queryStageMap.put(globalSenderNode.getStageId(), globalSenderNode);
@@ -81,7 +82,7 @@ public class StagePlanner {
     _stageMetadataMap.put(globalReceiverNode.getStageId(), globalReceivingStageMetadata);
 
     // assign workers to each stage.
-    for (Map.Entry<String, StageMetadata> e : _stageMetadataMap.entrySet()) {
+    for (Map.Entry<Integer, StageMetadata> e : _stageMetadataMap.entrySet()) {
       _workerManager.assignWorkerToStage(e.getKey(), e.getValue());
     }
 
@@ -89,7 +90,7 @@ public class StagePlanner {
   }
 
   // non-threadsafe
-  private StageNode walkRelPlan(RelNode node, String currentStageId) {
+  private StageNode walkRelPlan(RelNode node, int currentStageId) {
     if (isExchangeNode(node)) {
       // 1. exchangeNode always have only one input, get its input converted as a new stage root.
       StageNode nextStageRoot = walkRelPlan(node.getInput(0), getNewStageId());
@@ -120,7 +121,7 @@ public class StagePlanner {
     return (node instanceof LogicalExchange);
   }
 
-  private String getNewStageId() {
-    return String.valueOf(_stageIdCounter++);
+  private int getNewStageId() {
+    return _stageIdCounter++;
   }
 }

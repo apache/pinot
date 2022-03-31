@@ -16,34 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.nodes;
+package org.apache.pinot.query.planner;
 
-import java.util.ArrayList;
-import java.util.List;
-
-
-public abstract class AbstractStageNode implements StageNode {
-
-  protected final int _stageId;
-  protected final List<StageNode> _inputs;
-
-  public AbstractStageNode(int stageId) {
-    _stageId = stageId;
-    _inputs = new ArrayList<>();
+/**
+ * Utilities used by planner.
+ */
+public class PlannerUtils {
+  private PlannerUtils() {
+    // do not instantiate.
   }
 
-  @Override
-  public List<StageNode> getInputs() {
-    return _inputs;
-  }
-
-  @Override
-  public void addInput(StageNode stageNode) {
-    _inputs.add(stageNode);
-  }
-
-  @Override
-  public int getStageId() {
-    return _stageId;
+  public static boolean isRootStage(int stageId) {
+    return stageId == 0;
   }
 }

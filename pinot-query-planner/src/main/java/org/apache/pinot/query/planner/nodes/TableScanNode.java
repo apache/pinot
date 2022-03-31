@@ -29,7 +29,7 @@ public class TableScanNode extends AbstractStageNode {
   private final List<String> _tableName;
   private final List<String> _tableScanColumns;
 
-  public TableScanNode(LogicalTableScan tableScan, String stageId) {
+  public TableScanNode(LogicalTableScan tableScan, int stageId) {
     super(stageId);
     _tableName = tableScan.getTable().getQualifiedName();
     // TODO: optimize this, table field is not directly usable as name.

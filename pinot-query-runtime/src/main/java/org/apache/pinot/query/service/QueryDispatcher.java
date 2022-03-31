@@ -57,7 +57,7 @@ public class QueryDispatcher {
       MailboxService<Mailbox.MailboxContent> mailboxService, long timeoutNano)
       throws Exception {
     // submit all the distributed stages.
-    String reduceStageId = submit(requestId, queryPlan);
+    int reduceStageId = submit(requestId, queryPlan);
 
     // run reduce stage.
     MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(reduceStageId);
@@ -78,11 +78,11 @@ public class QueryDispatcher {
     return queryResults;
   }
 
-  public String submit(long requestId, QueryPlan queryPlan)
+  public int submit(long requestId, QueryPlan queryPlan)
       throws Exception {
-    String reduceStageId = null;
-    for (Map.Entry<String, StageMetadata> stage : queryPlan.getStageMetadataMap().entrySet()) {
-      String stageId = stage.getKey();
+    int reduceStageId = -1;
+    for (Map.Entry<Integer, StageMetadata> stage : queryPlan.getStageMetadataMap().entrySet()) {
+      int stageId = stage.getKey();
       // stage rooting at a mailbox receive node means reduce stage.
       if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
         reduceStageId = stageId;
@@ -109,14 +109,14 @@ public class QueryDispatcher {
   }
 
   protected MailboxReceiveOperator createReduceStageOperator(MailboxService<Mailbox.MailboxContent> mailboxService,
-      List<ServerInstance> sendingInstances, String jobId, String stageId, String hostname, int port) {
+      List<ServerInstance> sendingInstances, String jobId, int stageId, String hostname, int port) {
     MailboxReceiveOperator mailboxReceiveOperator =
         new MailboxReceiveOperator(mailboxService, RelDistribution.Type.ANY, sendingInstances, hostname, port, jobId,
             stageId);
     return mailboxReceiveOperator;
   }
 
-  public static DistributedQueryPlan constructDistributedQueryPlan(QueryPlan queryPlan, String stageId,
+  public static DistributedQueryPlan constructDistributedQueryPlan(QueryPlan queryPlan, int stageId,
       ServerInstance serverInstance) {
     return new DistributedQueryPlan(stageId, serverInstance, queryPlan.getQueryStageMap().get(stageId),
         queryPlan.getStageMetadataMap());

@@ -38,7 +38,7 @@ public class JoinNode extends AbstractStageNode {
   private transient final RelDataType _leftRowType;
   private transient final RelDataType _rightRowType;
 
-  public JoinNode(LogicalJoin node, String currentStageId) {
+  public JoinNode(LogicalJoin node, int currentStageId) {
     super(currentStageId);
     _joinType = node.getJoinType();
     RexCall joinCondition = (RexCall) node.getCondition();

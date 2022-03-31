@@ -30,25 +30,25 @@ import org.apache.pinot.query.planner.nodes.StageNode;
  * WorkerQueryRequest is the extended version of the {@link org.apache.pinot.core.query.request.ServerQueryRequest}.
  */
 public class DistributedQueryPlan implements Serializable {
-  private final String _stageId;
+  private final int _stageId;
   private ServerInstance _serverInstance;
   private StageNode _stageRoot;
-  private Map<String, StageMetadata> _metadataMap;
+  private Map<Integer, StageMetadata> _metadataMap;
 
-  public DistributedQueryPlan(String stageId) {
+  public DistributedQueryPlan(int stageId) {
     _stageId = stageId;
     _metadataMap = new HashMap<>();
   }
 
-  public DistributedQueryPlan(String stageId, ServerInstance serverInstance, StageNode stageRoot,
-      Map<String, StageMetadata> metadataMap) {
+  public DistributedQueryPlan(int stageId, ServerInstance serverInstance, StageNode stageRoot,
+      Map<Integer, StageMetadata> metadataMap) {
     _stageId = stageId;
     _serverInstance = serverInstance;
     _stageRoot = stageRoot;
     _metadataMap = metadataMap;
   }
 
-  public String getStageId() {
+  public int getStageId() {
     return _stageId;
   }
 
@@ -60,7 +60,7 @@ public class DistributedQueryPlan implements Serializable {
     return _stageRoot;
   }
 
-  public Map<String, StageMetadata> getMetadataMap() {
+  public Map<Integer, StageMetadata> getMetadataMap() {
     return _metadataMap;
   }
 

@@ -54,14 +54,14 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
   private final String _serverHostName;
   private final int _serverPort;
   private final String _jobId;
-  private final String _stageId;
+  private final int _stageId;
   private final MailboxService<Mailbox.MailboxContent> _mailboxService;
   private BaseOperator<DataTableBlock> _dataTableBlockBaseOperator;
   private DataTable _dataTable;
 
   public MailboxSendOperator(MailboxService<Mailbox.MailboxContent> mailboxService,
       BaseOperator<DataTableBlock> dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
-      RelDistribution.Type exchangeType, String hostName, int port, String jobId, String stageId) {
+      RelDistribution.Type exchangeType, String hostName, int port, String jobId, int stageId) {
     _mailboxService = mailboxService;
     _dataTableBlockBaseOperator = dataTableBlockBaseOperator;
     _receivingStageInstances = receivingStageInstances;
@@ -81,7 +81,7 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
    */
   public MailboxSendOperator(MailboxService<Mailbox.MailboxContent> mailboxService, DataTable dataTable,
       List<ServerInstance> receivingStageInstances, RelDistribution.Type exchangeType, String hostName, int port,
-      String jobId, String stageId) {
+      String jobId, int stageId) {
     _mailboxService = mailboxService;
     _dataTable = dataTable;
     _receivingStageInstances = receivingStageInstances;

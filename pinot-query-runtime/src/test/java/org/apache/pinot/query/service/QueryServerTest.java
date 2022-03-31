@@ -78,9 +78,9 @@ public class QueryServerTest {
       throws Exception {
     QueryPlan queryPlan = _queryEnvironment.planQuery("SELECT * FROM a JOIN b ON a.col1 = b.col2");
 
-    String singleServerStage = QueryEnvironmentTestUtils.getTestStageByServerCount(queryPlan, 1);
+    int singleServerStageId = QueryEnvironmentTestUtils.getTestStageByServerCount(queryPlan, 1);
 
-    Worker.QueryRequest queryRequest = getQueryRequest(queryPlan, singleServerStage);
+    Worker.QueryRequest queryRequest = getQueryRequest(queryPlan, singleServerStageId);
 
     // submit the request for testing.
     submitRequest(queryRequest);
@@ -96,7 +96,7 @@ public class QueryServerTest {
     Assert.assertNotNull(resp.getMetadataMap().get("OK"));
   }
 
-  private Worker.QueryRequest getQueryRequest(QueryPlan queryPlan, String stageId) {
+  private Worker.QueryRequest getQueryRequest(QueryPlan queryPlan, int stageId) {
     ServerInstance serverInstance = queryPlan.getStageMetadataMap().get(stageId).getServerInstances().get(0);
 
     return Worker.QueryRequest.newBuilder().setQueryPlan(QueryPlanSerDeUtils.serialize(

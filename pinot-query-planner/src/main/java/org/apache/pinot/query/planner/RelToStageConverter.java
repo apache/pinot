@@ -45,7 +45,7 @@ public final class RelToStageConverter {
    * @param node relational node
    * @return stage node.
    */
-  public static StageNode toStageNode(RelNode node, String currentStageId) {
+  public static StageNode toStageNode(RelNode node, int currentStageId) {
     if (node instanceof LogicalCalc) {
       return convertLogicalCal((LogicalCalc) node, currentStageId);
     } else if (node instanceof LogicalTableScan) {
@@ -57,15 +57,15 @@ public final class RelToStageConverter {
     }
   }
 
-  private static StageNode convertLogicalTableScan(LogicalTableScan node, String currentStageId) {
+  private static StageNode convertLogicalTableScan(LogicalTableScan node, int currentStageId) {
     return new TableScanNode(node, currentStageId);
   }
 
-  private static StageNode convertLogicalCal(LogicalCalc node, String currentStageId) {
+  private static StageNode convertLogicalCal(LogicalCalc node, int currentStageId) {
     return new CalcNode(node, currentStageId);
   }
 
-  private static StageNode convertLogicalJoin(LogicalJoin node, String currentStageId) {
+  private static StageNode convertLogicalJoin(LogicalJoin node, int currentStageId) {
     return new JoinNode(node, currentStageId);
   }
 }

@@ -25,10 +25,10 @@ import org.apache.calcite.rel.RelDistribution;
 
 public class MailboxSendNode extends AbstractStageNode {
   private final StageNode _stageRoot;
-  private final String _receiverStageId;
+  private final int _receiverStageId;
   private final RelDistribution.Type _exchangeType;
 
-  public MailboxSendNode(StageNode stageRoot, String receiverStageId, RelDistribution.Type exchangeType) {
+  public MailboxSendNode(StageNode stageRoot, int receiverStageId, RelDistribution.Type exchangeType) {
     super(stageRoot.getStageId());
     _stageRoot = stageRoot;
     _receiverStageId = receiverStageId;
@@ -45,7 +45,7 @@ public class MailboxSendNode extends AbstractStageNode {
     throw new UnsupportedOperationException("mailbox cannot be changed!");
   }
 
-  public String getReceiverStageId() {
+  public int getReceiverStageId() {
     return _receiverStageId;
   }
 

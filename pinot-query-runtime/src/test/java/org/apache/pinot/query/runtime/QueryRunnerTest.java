@@ -105,7 +105,7 @@ public class QueryRunnerTest {
   public void testRunningTableScanOnlyQuery()
       throws Exception {
     QueryPlan queryPlan = _queryEnvironment.planQuery("SELECT * FROM b");
-    String stageRoodId = QueryEnvironmentTestUtils.getTestStageByServerCount(queryPlan, 1);
+    int stageRoodId = QueryEnvironmentTestUtils.getTestStageByServerCount(queryPlan, 1);
     Map<String, String> requestMetadataMap =
         ImmutableMap.of("REQUEST_ID", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
 
@@ -133,7 +133,7 @@ public class QueryRunnerTest {
   public void testRunningTableScanMultipleServer()
       throws Exception {
     QueryPlan queryPlan = _queryEnvironment.planQuery("SELECT * FROM a");
-    String stageRoodId = QueryEnvironmentTestUtils.getTestStageByServerCount(queryPlan, 2);
+    int stageRoodId = QueryEnvironmentTestUtils.getTestStageByServerCount(queryPlan, 2);
     Map<String, String> requestMetadataMap =
         ImmutableMap.of("REQUEST_ID", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
 
@@ -171,7 +171,7 @@ public class QueryRunnerTest {
     Map<String, String> requestMetadataMap =
         ImmutableMap.of("REQUEST_ID", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
     MailboxReceiveOperator mailboxReceiveOperator = null;
-    for (String stageId : queryPlan.getStageMetadataMap().keySet()) {
+    for (int stageId : queryPlan.getStageMetadataMap().keySet()) {
       if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
         MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(stageId);
         mailboxReceiveOperator = createReduceStageOperator(
@@ -222,7 +222,7 @@ public class QueryRunnerTest {
     Map<String, String> requestMetadataMap =
         ImmutableMap.of("REQUEST_ID", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
     MailboxReceiveOperator mailboxReceiveOperator = null;
-    for (String stageId : queryPlan.getStageMetadataMap().keySet()) {
+    for (int stageId : queryPlan.getStageMetadataMap().keySet()) {
       if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
         MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(stageId);
         mailboxReceiveOperator = createReduceStageOperator(
@@ -269,7 +269,7 @@ public class QueryRunnerTest {
   }
 
   protected MailboxReceiveOperator createReduceStageOperator(List<ServerInstance> sendingInstances, String jobId,
-      String stageId, int port) {
+      int stageId, int port) {
     MailboxReceiveOperator mailboxReceiveOperator =
         new MailboxReceiveOperator(_mailboxService, RelDistribution.Type.ANY, sendingInstances, "localhost", port,
             jobId, stageId);

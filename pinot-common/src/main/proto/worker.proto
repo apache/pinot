@@ -54,10 +54,10 @@ message QueryResponse {
 }
 
 message QueryPlan {
-  string stageId = 1;
+  int32 stageId = 1;
   string instanceId = 2;
   StagePlan stagePlan = 3;
-  map<string, StageMetadata> stageMetadata = 4;
+  map<int32, StageMetadata> stageMetadata = 4;
 }
 
 message StagePlan {

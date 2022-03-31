@@ -96,7 +96,7 @@ public class WorkerQueryExecutor {
 
   // TODO: split this PhysicalPlanner into a separate module
   private BaseOperator<DataTableBlock> getOperator(String requestId, StageNode stageNode,
-      Map<String, StageMetadata> metadataMap) {
+      Map<Integer, StageMetadata> metadataMap) {
     // TODO: optimize this into a framework. (physical planner)
     if (stageNode instanceof MailboxSendNode) {
       MailboxSendNode sendNode = (MailboxSendNode) stageNode;

@@ -25,10 +25,10 @@ import org.apache.calcite.rel.RelDistribution;
 
 public class MailboxReceiveNode extends AbstractStageNode {
 
-  private final String _senderStageId;
+  private final int _senderStageId;
   private final RelDistribution.Type _exchangeType;
 
-  public MailboxReceiveNode(String stageId, String senderStageId, RelDistribution.Type exchangeType) {
+  public MailboxReceiveNode(int stageId, int senderStageId, RelDistribution.Type exchangeType) {
     super(stageId);
     _senderStageId = senderStageId;
     _exchangeType = exchangeType;
@@ -44,7 +44,7 @@ public class MailboxReceiveNode extends AbstractStageNode {
     throw new UnsupportedOperationException("no input should be added to mailbox receive.");
   }
 
-  public String getSenderStageId() {
+  public int getSenderStageId() {
     return _senderStageId;
   }
 
