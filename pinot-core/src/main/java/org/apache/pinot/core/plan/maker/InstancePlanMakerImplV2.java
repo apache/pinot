@@ -28,8 +28,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.plan.AcquireReleaseColumnsSegmentPlanNode;
 import org.apache.pinot.core.plan.AggregationGroupByOrderByPlanNode;
 import org.apache.pinot.core.plan.AggregationGroupByPlanNode;
@@ -228,6 +232,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   @Override
   public PlanNode makeSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
+    if (queryContext.getExpressionOverrideHints() != null && !queryContext.getExpressionOverrideHints().isEmpty()) {
+      queryContext = rewriteExpressionsWithHints(indexSegment, queryContext);
+    }
     if (QueryContextUtils.isAggregationQuery(queryContext)) {
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
       if (groupByExpressions != null) {
@@ -246,6 +253,48 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       assert QueryContextUtils.isDistinctQuery(queryContext);
       return new DistinctPlanNode(indexSegment, queryContext);
     }
+  }
+
+  private QueryContext rewriteExpressionsWithHints(IndexSegment indexSegment, QueryContext queryContext) {
+    List<ExpressionContext> newSelectExpressions = queryContext.getSelectExpressions();
+    if (newSelectExpressions != null && !newSelectExpressions.isEmpty()) {
+      newSelectExpressions = newSelectExpressions.stream().map(
+          expression -> RequestContextUtils.overrideWithExpressionHints(indexSegment,
+              queryContext.getExpressionOverrideHints(), expression)).collect(Collectors.toList());
+    }
+
+    List<ExpressionContext> newGroupByExpression = queryContext.getGroupByExpressions();
+    if (newGroupByExpression != null && !newGroupByExpression.isEmpty()) {
+      newGroupByExpression = newGroupByExpression.stream().map(
+          expression -> RequestContextUtils.overrideWithExpressionHints(indexSegment,
+              queryContext.getExpressionOverrideHints(), expression)).collect(Collectors.toList());
+    }
+
+    List<OrderByExpressionContext> newOrderByExpression = queryContext.getOrderByExpressions();
+    if (newOrderByExpression != null && !newOrderByExpression.isEmpty()) {
+      newOrderByExpression = newOrderByExpression.stream().map(expression -> new OrderByExpressionContext(
+          RequestContextUtils.overrideWithExpressionHints(indexSegment, queryContext.getExpressionOverrideHints(),
+              expression.getExpression()), expression.isAsc())).collect(Collectors.toList());
+    }
+
+    FilterContext newFilter = queryContext.getFilter();
+    if (newFilter != null) {
+      newFilter = RequestContextUtils.overrideFilterWithExpressionOverrideHints(newFilter, indexSegment,
+          queryContext.getExpressionOverrideHints());
+    }
+
+    FilterContext newHavingFilter = queryContext.getHavingFilter();
+    if (newHavingFilter != null) {
+      newHavingFilter = RequestContextUtils.overrideFilterWithExpressionOverrideHints(newHavingFilter, indexSegment,
+          queryContext.getExpressionOverrideHints());
+    }
+
+    return new QueryContext.Builder().setAliasList(queryContext.getAliasList())
+        .setDebugOptions(queryContext.getDebugOptions()).setLimit(queryContext.getLimit())
+        .setOffset(queryContext.getOffset()).setBrokerRequest(queryContext.getBrokerRequest())
+        .setQueryOptions(queryContext.getQueryOptions()).setTableName(queryContext.getTableName())
+        .setSelectExpressions(newSelectExpressions).setFilter(newFilter).setGroupByExpressions(newGroupByExpression)
+        .setOrderByExpressions(newOrderByExpression).setHavingFilter(newHavingFilter).build();
   }
 
   @Override
