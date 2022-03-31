@@ -96,9 +96,7 @@ public class NativeTextIndexCreator implements TextIndexCreator {
 
     @Override
     public void add(String[] documents, int length) {
-        for (int i = 0; i < length; i++) {
-            add(documents[i]);
-        }
+        throw new UnsupportedOperationException("Not supported yet");
     }
 
     @Override
