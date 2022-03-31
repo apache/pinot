@@ -245,6 +245,10 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
+  protected List<HelixServerStarter> getServerStarters() {
+    return _serverStarters;
+  }
+
   protected void startServerHttps() {
     FileUtils.deleteQuietly(new File(Server.DEFAULT_INSTANCE_BASE_DIR));
     _serverStarters = new ArrayList<>();

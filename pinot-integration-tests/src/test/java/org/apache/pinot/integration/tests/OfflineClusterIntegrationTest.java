@@ -32,7 +32,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
@@ -71,6 +73,8 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.decodeUrl;
 import static org.apache.pinot.common.function.scalar.StringFunctions.encodeUrl;
+import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.EXTERNAL_VIEW_CHECK_INTERVAL_MS;
+import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS;
 import static org.testng.Assert.*;
 
 
@@ -409,7 +413,23 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       assertEquals(segmentsZKMetadata.size(), 1);
       assertNotEquals(segmentsZKMetadata.get(0).getRefreshTime(), Long.MIN_VALUE);
     }
+    waitForNumOfSegmentsBecomeOnline(offlineTableName, 1);
     dropOfflineTable(SEGMENT_UPLOAD_TEST_TABLE);
+    cleanupTestTableDataManager(offlineTableName);
+  }
+
+  private void waitForNumOfSegmentsBecomeOnline(String tableNameWithType, int numSegments)
+      throws InterruptedException, TimeoutException {
+    long endTimeMs = System.currentTimeMillis() + EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS;
+    do {
+      Set<String> onlineSegments = _helixResourceManager.getOnlineSegmentsFromExternalView(tableNameWithType);
+      if (onlineSegments.size() == numSegments) {
+        return;
+      }
+      Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
+    } while (System.currentTimeMillis() < endTimeMs);
+    throw new TimeoutException(String
+        .format("Time out while waiting segments become ONLINE. (tableNameWithType = %s)", tableNameWithType));
   }
 
   @Test(dependsOnMethods = "testRangeIndexTriggering")
