@@ -1,0 +1,25 @@
+name: Docker Image CI
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: "Git hash (or tag) to build. (required)"
+        required: true
+      tag:
+        description: "docker image tag. (required)"
+        default: "latest"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Login to DockerHub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: Build the Docker image
+      run: docker build . --file docker/images/pinot/Dockerfile --build-arg PINOT_BRANCH=${{ github.event.inputs.commit }} --tag apachepinot/pinot:${{ github.event.inputs.tag }}
+    - name: Publish the Docker image
+      run: docker push apachepinot/pinot:${{ github.event.inputs.tag }}
