@@ -344,9 +344,12 @@ public class GroupByDataTableReducer implements DataTableReducer {
         @Override
         public void runJob() {
           for (DataTable dataTable : reduceGroup) {
-            int numRows = dataTable.getNumberOfRows();
-
+            // Terminate when thread is interrupted. This is expected when the query already fails in the main thread.
+            if (Thread.interrupted()) {
+              return;
+            }
             try {
+              int numRows = dataTable.getNumberOfRows();
               for (int rowId = 0; rowId < numRows; rowId++) {
                 Object[] values = new Object[_numColumns];
                 for (int colId = 0; colId < _numColumns; colId++) {
