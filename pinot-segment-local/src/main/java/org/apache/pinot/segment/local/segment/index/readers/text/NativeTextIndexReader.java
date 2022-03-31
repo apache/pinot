@@ -43,16 +43,14 @@ public class NativeTextIndexReader implements TextIndexReader {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(NativeTextIndexReader.class);
 
   private final String _column;
-  private int _numDocs;
   private final File _indexFile;
   private final PinotDataBuffer _buffer;
 
   private FST _fst;
   private BitmapInvertedIndexReader _invertedIndex;
 
-  public NativeTextIndexReader(String column, File indexDir, int numDocs) {
+  public NativeTextIndexReader(String column, File indexDir) {
     _column = column;
-    _numDocs = numDocs;
     try {
       _indexFile = getTextIndexFile(indexDir);
       _buffer = PinotDataBuffer.loadBigEndianFile(_indexFile);
@@ -99,11 +97,6 @@ public class NativeTextIndexReader implements TextIndexReader {
     try {
       RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
       RegexpMatcher.regexMatch(searchQuery, _fst, writer::add);
-
-      int i = 1;
-      if (i == 1) {
-        throw new IllegalStateException("FOOOO");
-      }
 
       return writer.get();
     } catch (Exception e) {

@@ -162,7 +162,7 @@ public class DefaultIndexReaderProvider implements IndexReaderProvider {
   public TextIndexReader newTextIndexReader(File file, ColumnMetadata columnMetadata,
       @Nullable Map<String, String> textIndexProperties) {
     if (TextIndexUtils.isFstTypeNative(textIndexProperties)) {
-      return new NativeTextIndexReader(columnMetadata.getColumnName(), file, columnMetadata.getTotalDocs());
+      return new NativeTextIndexReader(columnMetadata.getColumnName(), file);
     }
     return new LuceneTextIndexReader(columnMetadata.getColumnName(), file, columnMetadata.getTotalDocs(),
         textIndexProperties);

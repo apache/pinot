@@ -61,7 +61,7 @@ public class NativeTextIndexCreatorTest {
     }
 
     File fstFile = new File(INDEX_DIR, "testFSTColumn" + NATIVE_TEXT_INDEX_FILE_EXTENSION);
-    try (NativeTextIndexReader reader = new NativeTextIndexReader("testFSTColumn", fstFile.getParentFile(), 4)) {
+    try (NativeTextIndexReader reader = new NativeTextIndexReader("testFSTColumn", fstFile.getParentFile())) {
 
       int[] matchedDictIds = reader.getDictIds("hello.*").toArray();
       Assert.assertEquals(1, matchedDictIds.length);
