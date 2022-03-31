@@ -79,7 +79,7 @@ public class WorkerQueryExecutor {
   // TODO: split this execution from PhysicalPlanner
   public void processQuery(DistributedQueryPlan queryRequest, Map<String, String> requestMetadataMap,
       ExecutorService executorService) {
-    String requestId = requestMetadataMap.get("REQUEST_ID");
+    long requestId = Long.parseLong(requestMetadataMap.get("REQUEST_ID"));
     StageNode stageRoot = queryRequest.getStageRoot();
     BaseOperator<DataTableBlock> rootOperator = getOperator(requestId, stageRoot, queryRequest.getMetadataMap());
     executorService.submit(new TraceRunnable() {
@@ -95,7 +95,7 @@ public class WorkerQueryExecutor {
   }
 
   // TODO: split this PhysicalPlanner into a separate module
-  private BaseOperator<DataTableBlock> getOperator(String requestId, StageNode stageNode,
+  private BaseOperator<DataTableBlock> getOperator(long requestId, StageNode stageNode,
       Map<Integer, StageMetadata> metadataMap) {
     // TODO: optimize this into a framework. (physical planner)
     if (stageNode instanceof MailboxSendNode) {
@@ -103,7 +103,7 @@ public class WorkerQueryExecutor {
       BaseOperator<DataTableBlock> nextOperator = getOperator(requestId, sendNode.getInputs().get(0), metadataMap);
       StageMetadata receivingStageMetadata = metadataMap.get(sendNode.getReceiverStageId());
       return new MailboxSendOperator(_mailboxService, nextOperator, receivingStageMetadata.getServerInstances(),
-          sendNode.getExchangeType(), _hostName, _port, String.valueOf(requestId), sendNode.getStageId());
+          sendNode.getExchangeType(), _hostName, _port, requestId, sendNode.getStageId());
     } else if (stageNode instanceof MailboxReceiveNode) {
       MailboxReceiveNode receiveNode = (MailboxReceiveNode) stageNode;
       List<ServerInstance> sendingInstances = metadataMap.get(receiveNode.getSenderStageId()).getServerInstances();

@@ -115,7 +115,7 @@ public class QueryRunnerTest {
 
     MailboxReceiveOperator mailboxReceiveOperator =
         createReduceStageOperator(queryPlan.getStageMetadataMap().get(stageRoodId).getServerInstances(),
-            requestMetadataMap.get("REQUEST_ID"), stageRoodId, _reducerGrpcPort);
+            Long.parseLong(requestMetadataMap.get("REQUEST_ID")), stageRoodId, _reducerGrpcPort);
 
     // execute this single stage.
     _servers.get(serverInstance).processQuery(distributedQueryPlan, requestMetadataMap);
@@ -147,7 +147,7 @@ public class QueryRunnerTest {
 
     MailboxReceiveOperator mailboxReceiveOperator =
         createReduceStageOperator(queryPlan.getStageMetadataMap().get(stageRoodId).getServerInstances(),
-            requestMetadataMap.get("REQUEST_ID"), stageRoodId, _reducerGrpcPort);
+            Long.parseLong(requestMetadataMap.get("REQUEST_ID")), stageRoodId, _reducerGrpcPort);
 
     int count = 0;
     int rowCount = 0;
@@ -176,7 +176,7 @@ public class QueryRunnerTest {
         MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(stageId);
         mailboxReceiveOperator = createReduceStageOperator(
             queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
-            requestMetadataMap.get("REQUEST_ID"), reduceNode.getSenderStageId(), _reducerGrpcPort);
+            Long.parseLong(requestMetadataMap.get("REQUEST_ID")), reduceNode.getSenderStageId(), _reducerGrpcPort);
       } else {
         for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
           DistributedQueryPlan distributedQueryPlan =
@@ -227,7 +227,7 @@ public class QueryRunnerTest {
         MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(stageId);
         mailboxReceiveOperator = createReduceStageOperator(
             queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
-            requestMetadataMap.get("REQUEST_ID"), reduceNode.getSenderStageId(), _reducerGrpcPort);
+            Long.parseLong(requestMetadataMap.get("REQUEST_ID")), reduceNode.getSenderStageId(), _reducerGrpcPort);
       } else {
         for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
           DistributedQueryPlan distributedQueryPlan =
@@ -268,7 +268,7 @@ public class QueryRunnerTest {
     Assert.assertTrue(DataTableBlockUtils.isEndOfStream(dataTableBlock));
   }
 
-  protected MailboxReceiveOperator createReduceStageOperator(List<ServerInstance> sendingInstances, String jobId,
+  protected MailboxReceiveOperator createReduceStageOperator(List<ServerInstance> sendingInstances, long jobId,
       int stageId, int port) {
     MailboxReceiveOperator mailboxReceiveOperator =
         new MailboxReceiveOperator(_mailboxService, RelDistribution.Type.ANY, sendingInstances, "localhost", port,

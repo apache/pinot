@@ -63,7 +63,7 @@ public class QueryDispatcher {
     MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(reduceStageId);
     MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(mailboxService,
         queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
-        String.valueOf(requestId), reduceNode.getSenderStageId(), mailboxService.getHostname(),
+        requestId, reduceNode.getSenderStageId(), mailboxService.getHostname(),
         mailboxService.getMailboxPort());
 
     List<DataTable> queryResults = new ArrayList<>();
@@ -109,7 +109,7 @@ public class QueryDispatcher {
   }
 
   protected MailboxReceiveOperator createReduceStageOperator(MailboxService<Mailbox.MailboxContent> mailboxService,
-      List<ServerInstance> sendingInstances, String jobId, int stageId, String hostname, int port) {
+      List<ServerInstance> sendingInstances, long jobId, int stageId, String hostname, int port) {
     MailboxReceiveOperator mailboxReceiveOperator =
         new MailboxReceiveOperator(mailboxService, RelDistribution.Type.ANY, sendingInstances, hostname, port, jobId,
             stageId);

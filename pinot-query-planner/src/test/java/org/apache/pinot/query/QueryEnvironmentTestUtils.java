@@ -116,7 +116,7 @@ public class QueryEnvironmentTestUtils {
     List<Integer> stageIds = queryPlan.getStageMetadataMap().entrySet().stream()
         .filter(e -> !e.getKey().equals(0) && e.getValue().getServerInstances().size() == serverCount)
         .map(Map.Entry::getKey).collect(Collectors.toList());
-    return stageIds.size() > 0 ? stageIds.get(0) : null;
+    return stageIds.size() > 0 ? stageIds.get(0) : -1;
   }
 
   public static int getAvailablePort() {

@@ -100,7 +100,7 @@ public class QueryRunner {
       StageMetadata receivingStageMetadata = distributedQueryPlan.getMetadataMap().get(sendNode.getReceiverStageId());
       MailboxSendOperator mailboxSendOperator =
           new MailboxSendOperator(_mailboxService, dataTable, receivingStageMetadata.getServerInstances(),
-              sendNode.getExchangeType(), _hostname, _port, String.valueOf(serverQueryRequest.getRequestId()),
+              sendNode.getExchangeType(), _hostname, _port, serverQueryRequest.getRequestId(),
               sendNode.getStageId());
       mailboxSendOperator.nextBlock();
     } else {
@@ -109,7 +109,7 @@ public class QueryRunner {
   }
 
   private boolean isLeafStage(DistributedQueryPlan distributedQueryPlan) {
-    String stageId = distributedQueryPlan.getStageId();
+    int stageId = distributedQueryPlan.getStageId();
     ServerInstance serverInstance = distributedQueryPlan.getServerInstance();
     StageMetadata stageMetadata = distributedQueryPlan.getMetadataMap().get(stageId);
     List<String> segments = stageMetadata.getServerInstanceToSegmentsMap().get(serverInstance);

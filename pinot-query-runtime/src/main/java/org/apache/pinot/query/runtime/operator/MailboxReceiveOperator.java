@@ -51,12 +51,12 @@ public class MailboxReceiveOperator extends BaseOperator<DataTableBlock> {
   private final List<ServerInstance> _sendingStageInstances;
   private final String _hostName;
   private final int _port;
-  private final String _jobId;
+  private final long _jobId;
   private final int _stageId;
 
   public MailboxReceiveOperator(MailboxService<Mailbox.MailboxContent> mailboxService,
       RelDistribution.Type exchangeType, List<ServerInstance> sendingStageInstances, String hostName, int port,
-      String jobId, int stageId) {
+      long jobId, int stageId) {
     _mailboxService = mailboxService;
     _exchangeType = exchangeType;
     _sendingStageInstances = sendingStageInstances;
