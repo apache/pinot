@@ -39,7 +39,7 @@ import org.apache.pinot.query.runtime.blocks.DataTableBlockUtils;
 import org.apache.pinot.query.runtime.operator.BroadcastJoinOperator;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
-import org.apache.pinot.query.runtime.plan.DistributedQueryPlan;
+import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
  * WorkerQueryExecutor is the v2 of the {@link org.apache.pinot.core.query.executor.QueryExecutor} API.
  *
  * It provides not only execution interface for {@link org.apache.pinot.core.query.request.ServerQueryRequest} but
- * also a more general {@link DistributedQueryPlan}.
+ * also a more general {@link DistributedStagePlan}.
  */
 public class WorkerQueryExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkerQueryExecutor.class);
@@ -77,7 +77,7 @@ public class WorkerQueryExecutor {
   }
 
   // TODO: split this execution from PhysicalPlanner
-  public void processQuery(DistributedQueryPlan queryRequest, Map<String, String> requestMetadataMap,
+  public void processQuery(DistributedStagePlan queryRequest, Map<String, String> requestMetadataMap,
       ExecutorService executorService) {
     long requestId = Long.parseLong(requestMetadataMap.get("REQUEST_ID"));
     StageNode stageRoot = queryRequest.getStageRoot();
@@ -113,8 +113,7 @@ public class WorkerQueryExecutor {
       JoinNode joinNode = (JoinNode) stageNode;
       BaseOperator<DataTableBlock> leftOperator = getOperator(requestId, joinNode.getInputs().get(0), metadataMap);
       BaseOperator<DataTableBlock> rightOperator = getOperator(requestId, joinNode.getInputs().get(1), metadataMap);
-      return new BroadcastJoinOperator(leftOperator, rightOperator, joinNode.getLeftJoinKeySelector(),
-          joinNode.getRightJoinKeySelector());
+      return new BroadcastJoinOperator(leftOperator, rightOperator, joinNode.getCriteria());
     } else {
       throw new UnsupportedOperationException(
           String.format("Stage node type %s is not supported!", stageNode.getClass().getSimpleName()));

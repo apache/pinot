@@ -18,31 +18,17 @@
  */
 package org.apache.pinot.query.planner.nodes;
 
-import java.util.Collections;
-import java.util.List;
 import org.apache.calcite.rel.RelDistribution;
 
 
 public class MailboxSendNode extends AbstractStageNode {
-  private final StageNode _stageRoot;
   private final int _receiverStageId;
   private final RelDistribution.Type _exchangeType;
 
-  public MailboxSendNode(StageNode stageRoot, int receiverStageId, RelDistribution.Type exchangeType) {
-    super(stageRoot.getStageId());
-    _stageRoot = stageRoot;
+  public MailboxSendNode(int stageId, int receiverStageId, RelDistribution.Type exchangeType) {
+    super(stageId);
     _receiverStageId = receiverStageId;
     _exchangeType = exchangeType;
-  }
-
-  @Override
-  public List<StageNode> getInputs() {
-    return Collections.singletonList(_stageRoot);
-  }
-
-  @Override
-  public void addInput(StageNode queryStageRoot) {
-    throw new UnsupportedOperationException("mailbox cannot be changed!");
   }
 
   public int getReceiverStageId() {

@@ -28,6 +28,7 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.query.planner.nodes.JoinNode;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.DataTableBlock;
 import org.apache.pinot.query.runtime.blocks.DataTableBlockUtils;
@@ -55,11 +56,10 @@ public class BroadcastJoinOperator extends BaseOperator<DataTableBlock> {
   private KeySelector<Object[], Object> _rightKeySelector;
 
   public BroadcastJoinOperator(BaseOperator<DataTableBlock> leftTableOperator,
-      BaseOperator<DataTableBlock> rightTableOperator, KeySelector<Object[], Object> leftKeySelector,
-      KeySelector<Object[], Object> rightKeySelector) {
+      BaseOperator<DataTableBlock> rightTableOperator, List<JoinNode.JoinClause> criteria) {
     // TODO: this assumes right table is broadcast.
-    _leftKeySelector = leftKeySelector;
-    _rightKeySelector = rightKeySelector;
+    _leftKeySelector = criteria.get(0).getLeftJoinKeySelector();
+    _rightKeySelector = criteria.get(0).getRightJoinKeySelector();
     _leftTableOperator = leftTableOperator;
     _rightTableOperator = rightTableOperator;
     _isHashTableBuilt = false;

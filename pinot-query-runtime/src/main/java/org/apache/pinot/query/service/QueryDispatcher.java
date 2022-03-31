@@ -36,7 +36,7 @@ import org.apache.pinot.query.planner.nodes.MailboxReceiveNode;
 import org.apache.pinot.query.runtime.blocks.DataTableBlock;
 import org.apache.pinot.query.runtime.blocks.DataTableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
-import org.apache.pinot.query.runtime.plan.DistributedQueryPlan;
+import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -92,8 +92,9 @@ public class QueryDispatcher {
           String host = serverInstance.getHostname();
           int port = serverInstance.getPort();
           DispatchClient client = getOrCreateDispatchClient(host, port);
-          Worker.QueryResponse response = client.submit(Worker.QueryRequest.newBuilder().setQueryPlan(
-                  QueryPlanSerDeUtils.serialize(constructDistributedQueryPlan(queryPlan, stageId, serverInstance)))
+          Worker.QueryResponse response = client.submit(Worker.QueryRequest.newBuilder()
+              .setStagePlan(QueryPlanSerDeUtils.serialize(constructDistributedStagePlan(queryPlan, stageId,
+                  serverInstance)))
               .putMetadata("REQUEST_ID", String.valueOf(requestId))
               .putMetadata("SERVER_INSTANCE_HOST", serverInstance.getHostname())
               .putMetadata("SERVER_INSTANCE_PORT", String.valueOf(serverInstance.getGrpcPort())).build());
@@ -116,9 +117,9 @@ public class QueryDispatcher {
     return mailboxReceiveOperator;
   }
 
-  public static DistributedQueryPlan constructDistributedQueryPlan(QueryPlan queryPlan, int stageId,
+  public static DistributedStagePlan constructDistributedStagePlan(QueryPlan queryPlan, int stageId,
       ServerInstance serverInstance) {
-    return new DistributedQueryPlan(stageId, serverInstance, queryPlan.getQueryStageMap().get(stageId),
+    return new DistributedStagePlan(stageId, serverInstance, queryPlan.getQueryStageMap().get(stageId),
         queryPlan.getStageMetadataMap());
   }
 

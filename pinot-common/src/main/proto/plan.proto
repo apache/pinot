@@ -39,18 +39,19 @@ syntax = "proto3";
 
 package org.apache.pinot.common.proto;
 
-import "plan.proto";
-
-service PinotQueryWorker {
-  rpc Submit(QueryRequest) returns (QueryResponse);
+message StagePlan {
+  int32 stageId = 1;
+  string instanceId = 2;
+  bytes serializedStageRoot = 3;
+  map<int32, StageMetadata> stageMetadata = 4;
 }
 
-message QueryRequest {
-  map<string, string> metadata = 1;
-  StagePlan stagePlan = 2;
+message StageMetadata {
+  repeated string instances = 1;
+  repeated string dataSources = 2;
+  map<string, SegmentList> instanceToSegmentList = 3;
 }
 
-message QueryResponse {
-  map<string, string> metadata = 1;
-  bytes payload = 2;
+message SegmentList {
+  repeated string segments = 1;
 }

@@ -32,7 +32,7 @@ import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.query.runtime.QueryRunner;
-import org.apache.pinot.query.runtime.plan.DistributedQueryPlan;
+import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -186,7 +186,7 @@ public class QueryServerEnclosure {
     }
   }
 
-  public void processQuery(DistributedQueryPlan distributedQueryPlan, Map<String, String> requestMetadataMap) {
-    _queryRunner.processQuery(distributedQueryPlan, _testExecutor, requestMetadataMap);
+  public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap) {
+    _queryRunner.processQuery(distributedStagePlan, _testExecutor, requestMetadataMap);
   }
 }

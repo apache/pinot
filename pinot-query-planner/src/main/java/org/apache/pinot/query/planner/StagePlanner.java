@@ -70,8 +70,9 @@ public class StagePlanner {
     // the last stage is always a broadcast-gather.
     StageNode globalReceiverNode =
         new MailboxReceiveNode(0, globalStageRoot.getStageId(), RelDistribution.Type.BROADCAST_DISTRIBUTED);
-    StageNode globalSenderNode = new MailboxSendNode(globalStageRoot, globalReceiverNode.getStageId(),
+    StageNode globalSenderNode = new MailboxSendNode(globalStageRoot.getStageId(), globalReceiverNode.getStageId(),
         RelDistribution.Type.BROADCAST_DISTRIBUTED);
+    globalSenderNode.addInput(globalStageRoot);
     _queryStageMap.put(globalSenderNode.getStageId(), globalSenderNode);
     StageMetadata stageMetadata = _stageMetadataMap.get(globalSenderNode.getStageId());
     stageMetadata.attach(globalSenderNode);
@@ -98,7 +99,9 @@ public class StagePlanner {
 
       // 2. make an exchange sender and receiver node pair
       StageNode mailboxReceiver = new MailboxReceiveNode(currentStageId, nextStageRoot.getStageId(), exchangeType);
-      StageNode mailboxSender = new MailboxSendNode(nextStageRoot, mailboxReceiver.getStageId(), exchangeType);
+      StageNode mailboxSender = new MailboxSendNode(nextStageRoot.getStageId(), mailboxReceiver.getStageId(),
+          exchangeType);
+      mailboxSender.addInput(nextStageRoot);
 
       // 3. put the sender side as a completed stage.
       _queryStageMap.put(mailboxSender.getStageId(), mailboxSender);

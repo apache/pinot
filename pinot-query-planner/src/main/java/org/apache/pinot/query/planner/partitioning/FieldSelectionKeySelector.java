@@ -18,13 +18,11 @@
  */
 package org.apache.pinot.query.planner.partitioning;
 
-import java.io.Serializable;
-
 
 /**
  * The {@code FieldSelectionKeySelector} simply extract a column value out from a row array {@link Object[]}.
  */
-public class FieldSelectionKeySelector implements KeySelector<Object[], Object>, Serializable {
+public class FieldSelectionKeySelector implements KeySelector<Object[], Object> {
 
   private int _columnIndex;
 

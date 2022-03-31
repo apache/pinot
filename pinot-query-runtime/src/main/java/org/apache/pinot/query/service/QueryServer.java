@@ -33,7 +33,7 @@ import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.runtime.QueryRunner;
-import org.apache.pinot.query.runtime.plan.DistributedQueryPlan;
+import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,10 +81,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   @Override
   public void submit(Worker.QueryRequest request, StreamObserver<Worker.QueryResponse> responseObserver) {
     // Deserialize the request
-    DistributedQueryPlan distributedQueryPlan;
+    DistributedStagePlan distributedStagePlan;
     Map<String, String> requestMetadataMap;
     try {
-      distributedQueryPlan = QueryPlanSerDeUtils.deserialize(request.getQueryPlan());
+      distributedStagePlan = QueryPlanSerDeUtils.deserialize(request.getStagePlan());
       requestMetadataMap = request.getMetadataMap();
     } catch (Exception e) {
       LOGGER.error("Caught exception while deserializing the request: {}", request, e);
@@ -105,7 +105,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       // Process the query
       try {
         // TODO: break this into parsing and execution, so that responseObserver can return upon parsing complete.
-        _queryRunner.processQuery(distributedQueryPlan, _executorService, requestMetadataMap);
+        _queryRunner.processQuery(distributedStagePlan, _executorService, requestMetadataMap);
       } catch (Exception e) {
         LOGGER.error("Caught exception while processing request", e);
         throw new RuntimeException(e);

@@ -34,7 +34,7 @@ import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.nodes.MailboxSendNode;
 import org.apache.pinot.query.runtime.executor.WorkerQueryExecutor;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
-import org.apache.pinot.query.runtime.plan.DistributedQueryPlan;
+import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.utils.ServerRequestUtils;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -42,7 +42,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
- * {@link QueryRunner} accepts a {@link DistributedQueryPlan} and runs it.
+ * {@link QueryRunner} accepts a {@link DistributedStagePlan} and runs it.
  */
 public class QueryRunner {
   // This is a temporary before merging the 2 type of executor.
@@ -84,34 +84,34 @@ public class QueryRunner {
     _mailboxService.shutdown();
   }
 
-  public void processQuery(DistributedQueryPlan distributedQueryPlan, ExecutorService executorService,
+  public void processQuery(DistributedStagePlan distributedStagePlan, ExecutorService executorService,
       Map<String, String> requestMetadataMap) {
-    if (isLeafStage(distributedQueryPlan)) {
+    if (isLeafStage(distributedStagePlan)) {
       // TODO: make server query request return via mailbox, this is a hack to gather the non-streaming data table
       // and package it here for return. But we should really use a MailboxSendOperator directly put into the
       // server executor.
       ServerQueryRequest serverQueryRequest =
-          ServerRequestUtils.constructServerQueryRequest(distributedQueryPlan, requestMetadataMap);
+          ServerRequestUtils.constructServerQueryRequest(distributedStagePlan, requestMetadataMap);
 
       // send the data table via mailbox in one-off fashion (e.g. no block-level split, one data table/partition key)
       DataTable dataTable = _serverExecutor.processQuery(serverQueryRequest, executorService, null);
 
-      MailboxSendNode sendNode = (MailboxSendNode) distributedQueryPlan.getStageRoot();
-      StageMetadata receivingStageMetadata = distributedQueryPlan.getMetadataMap().get(sendNode.getReceiverStageId());
+      MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
+      StageMetadata receivingStageMetadata = distributedStagePlan.getMetadataMap().get(sendNode.getReceiverStageId());
       MailboxSendOperator mailboxSendOperator =
           new MailboxSendOperator(_mailboxService, dataTable, receivingStageMetadata.getServerInstances(),
               sendNode.getExchangeType(), _hostname, _port, serverQueryRequest.getRequestId(),
               sendNode.getStageId());
       mailboxSendOperator.nextBlock();
     } else {
-      _workerExecutor.processQuery(distributedQueryPlan, requestMetadataMap, executorService);
+      _workerExecutor.processQuery(distributedStagePlan, requestMetadataMap, executorService);
     }
   }
 
-  private boolean isLeafStage(DistributedQueryPlan distributedQueryPlan) {
-    int stageId = distributedQueryPlan.getStageId();
-    ServerInstance serverInstance = distributedQueryPlan.getServerInstance();
-    StageMetadata stageMetadata = distributedQueryPlan.getMetadataMap().get(stageId);
+  private boolean isLeafStage(DistributedStagePlan distributedStagePlan) {
+    int stageId = distributedStagePlan.getStageId();
+    ServerInstance serverInstance = distributedStagePlan.getServerInstance();
+    StageMetadata stageMetadata = distributedStagePlan.getMetadataMap().get(stageId);
     List<String> segments = stageMetadata.getServerInstanceToSegmentsMap().get(serverInstance);
     return segments != null && segments.size() > 0;
   }

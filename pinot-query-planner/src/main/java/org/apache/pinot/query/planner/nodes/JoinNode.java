@@ -18,69 +18,45 @@
  */
 package org.apache.pinot.query.planner.nodes;
 
-import com.google.common.base.Preconditions;
+import java.util.List;
 import org.apache.calcite.rel.core.JoinRelType;
-import org.apache.calcite.rel.logical.LogicalJoin;
-import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.rex.RexCall;
-import org.apache.calcite.rex.RexInputRef;
-import org.apache.calcite.sql.SqlKind;
-import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
+import org.apache.pinot.query.planner.partitioning.KeySelector;
 
 
 public class JoinNode extends AbstractStageNode {
-  private final JoinRelType _joinType;
-  private final int _leftOperandIndex;
-  private final int _rightOperandIndex;
-  private final FieldSelectionKeySelector _leftFieldSelectionKeySelector;
-  private final FieldSelectionKeySelector _rightFieldSelectionKeySelector;
+  private final JoinRelType _joinRelType;
+  private final List<JoinClause> _criteria;
 
-  private transient final RelDataType _leftRowType;
-  private transient final RelDataType _rightRowType;
-
-  public JoinNode(LogicalJoin node, int currentStageId) {
-    super(currentStageId);
-    _joinType = node.getJoinType();
-    RexCall joinCondition = (RexCall) node.getCondition();
-    Preconditions.checkState(
-        joinCondition.getOperator().getKind().equals(SqlKind.EQUALS) && joinCondition.getOperands().size() == 2,
-        "only equality JOIN is supported");
-    Preconditions.checkState(joinCondition.getOperands().get(0) instanceof RexInputRef, "only reference supported");
-    Preconditions.checkState(joinCondition.getOperands().get(1) instanceof RexInputRef, "only reference supported");
-    _leftRowType = node.getLeft().getRowType();
-    _rightRowType = node.getRight().getRowType();
-    _leftOperandIndex = ((RexInputRef) joinCondition.getOperands().get(0)).getIndex();
-    _rightOperandIndex = ((RexInputRef) joinCondition.getOperands().get(1)).getIndex();
-    _leftFieldSelectionKeySelector = new FieldSelectionKeySelector(_leftOperandIndex);
-    _rightFieldSelectionKeySelector =
-        new FieldSelectionKeySelector(_rightOperandIndex - _leftRowType.getFieldNames().size());
+  public JoinNode(int stageId, JoinRelType joinRelType, List<JoinClause> criteria
+  ) {
+    super(stageId);
+    _joinRelType = joinRelType;
+    _criteria = criteria;
   }
 
-  public JoinRelType getJoinType() {
-    return _joinType;
+  public JoinRelType getJoinRelType() {
+    return _joinRelType;
   }
 
-  public RelDataType getLeftRowType() {
-    return _leftRowType;
+  public List<JoinClause> getCriteria() {
+    return _criteria;
   }
 
-  public RelDataType getRightRowType() {
-    return _rightRowType;
-  }
+  public static class JoinClause {
+    private final KeySelector<Object[], Object> _leftJoinKeySelector;
+    private final KeySelector<Object[], Object> _rightJoinKeySelector;
 
-  public int getLeftOperandIndex() {
-    return _leftOperandIndex;
-  }
+    public JoinClause(KeySelector<Object[], Object> leftKeySelector, KeySelector<Object[], Object> rightKeySelector) {
+      _leftJoinKeySelector = leftKeySelector;
+      _rightJoinKeySelector = rightKeySelector;
+    }
 
-  public int getRightOperandIndex() {
-    return _rightOperandIndex;
-  }
+    public KeySelector<Object[], Object> getLeftJoinKeySelector() {
+      return _leftJoinKeySelector;
+    }
 
-  public FieldSelectionKeySelector getLeftJoinKeySelector() {
-    return _leftFieldSelectionKeySelector;
-  }
-
-  public FieldSelectionKeySelector getRightJoinKeySelector() {
-    return _rightFieldSelectionKeySelector;
+    public KeySelector<Object[], Object> getRightJoinKeySelector() {
+      return _rightJoinKeySelector;
+    }
   }
 }

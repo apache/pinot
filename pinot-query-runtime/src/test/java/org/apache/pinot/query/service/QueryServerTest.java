@@ -99,8 +99,8 @@ public class QueryServerTest {
   private Worker.QueryRequest getQueryRequest(QueryPlan queryPlan, int stageId) {
     ServerInstance serverInstance = queryPlan.getStageMetadataMap().get(stageId).getServerInstances().get(0);
 
-    return Worker.QueryRequest.newBuilder().setQueryPlan(QueryPlanSerDeUtils.serialize(
-            QueryDispatcher.constructDistributedQueryPlan(queryPlan, stageId, serverInstance)))
+    return Worker.QueryRequest.newBuilder().setStagePlan(QueryPlanSerDeUtils.serialize(
+            QueryDispatcher.constructDistributedStagePlan(queryPlan, stageId, serverInstance)))
         .putMetadata("SERVER_INSTANCE_HOST", serverInstance.getHostname())
         .putMetadata("SERVER_INSTANCE_PORT", String.valueOf(serverInstance.getPort())).build();
   }

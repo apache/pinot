@@ -34,11 +34,11 @@ import org.apache.pinot.query.planner.nodes.MailboxReceiveNode;
 import org.apache.pinot.query.planner.nodes.MailboxSendNode;
 import org.apache.pinot.query.planner.nodes.StageNode;
 import org.apache.pinot.query.planner.nodes.TableScanNode;
-import org.apache.pinot.query.runtime.plan.DistributedQueryPlan;
+import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 
 
 /**
- * {@code ServerRequestUtils} converts the {@link DistributedQueryPlan} into a {@link ServerQueryRequest}.
+ * {@code ServerRequestUtils} converts the {@link DistributedStagePlan} into a {@link ServerQueryRequest}.
  *
  * <p>In order to reuse the current pinot {@link org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl}, a
  * conversion step is needed so that the V2 query plan can be converted into a compatible format to run V1 executor.
@@ -50,24 +50,24 @@ public class ServerRequestUtils {
   }
 
   // TODO: This is a hack, make an actual ServerQueryRequest converter.
-  public static ServerQueryRequest constructServerQueryRequest(DistributedQueryPlan distributedQueryPlan,
+  public static ServerQueryRequest constructServerQueryRequest(DistributedStagePlan distributedStagePlan,
       Map<String, String> requestMetadataMap) {
     InstanceRequest instanceRequest = new InstanceRequest();
     instanceRequest.setRequestId(Long.parseLong(requestMetadataMap.get("REQUEST_ID")));
     instanceRequest.setBrokerId("unknown");
     instanceRequest.setEnableTrace(false);
     instanceRequest.setSearchSegments(
-        distributedQueryPlan.getMetadataMap().get(distributedQueryPlan.getStageId()).getServerInstanceToSegmentsMap()
-            .get(distributedQueryPlan.getServerInstance()));
-    instanceRequest.setQuery(constructBrokerRequest(distributedQueryPlan));
+        distributedStagePlan.getMetadataMap().get(distributedStagePlan.getStageId()).getServerInstanceToSegmentsMap()
+            .get(distributedStagePlan.getServerInstance()));
+    instanceRequest.setQuery(constructBrokerRequest(distributedStagePlan));
     return new ServerQueryRequest(instanceRequest, new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()),
         System.currentTimeMillis());
   }
 
   // TODO: this is a hack, create a broker request object should not be needed because we rewrite the entire
   // query into stages already.
-  public static BrokerRequest constructBrokerRequest(DistributedQueryPlan distributedQueryPlan) {
-    PinotQuery pinotQuery = constructPinotQuery(distributedQueryPlan);
+  public static BrokerRequest constructBrokerRequest(DistributedStagePlan distributedStagePlan) {
+    PinotQuery pinotQuery = constructPinotQuery(distributedStagePlan);
     BrokerRequest brokerRequest = new BrokerRequest();
     brokerRequest.setPinotQuery(pinotQuery);
     // Set table name in broker request because it is used for access control, query routing etc.
@@ -80,10 +80,10 @@ public class ServerRequestUtils {
     return brokerRequest;
   }
 
-  public static PinotQuery constructPinotQuery(DistributedQueryPlan distributedQueryPlan) {
+  public static PinotQuery constructPinotQuery(DistributedStagePlan distributedStagePlan) {
     PinotQuery pinotQuery = new PinotQuery();
     pinotQuery.setExplain(false);
-    walkStageTree(distributedQueryPlan.getStageRoot(), pinotQuery);
+    walkStageTree(distributedStagePlan.getStageRoot(), pinotQuery);
     return pinotQuery;
   }
 
@@ -93,7 +93,7 @@ public class ServerRequestUtils {
     } else if (node instanceof TableScanNode) {
       TableScanNode tableScanNode = (TableScanNode) node;
       DataSource dataSource = new DataSource();
-      dataSource.setTableName(tableScanNode.getTableName().get(0));
+      dataSource.setTableName(tableScanNode.getTableName());
       pinotQuery.setDataSource(dataSource);
       pinotQuery.setSelectList(tableScanNode.getTableScanColumns().stream().map(RequestUtils::getIdentifierExpression)
           .collect(Collectors.toList()));

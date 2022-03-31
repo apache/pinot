@@ -41,7 +41,7 @@ import org.apache.pinot.query.routing.WorkerInstance;
 import org.apache.pinot.query.runtime.blocks.DataTableBlock;
 import org.apache.pinot.query.runtime.blocks.DataTableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
-import org.apache.pinot.query.runtime.plan.DistributedQueryPlan;
+import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.service.QueryDispatcher;
 import org.testng.Assert;
@@ -110,15 +110,15 @@ public class QueryRunnerTest {
         ImmutableMap.of("REQUEST_ID", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
 
     ServerInstance serverInstance = queryPlan.getStageMetadataMap().get(stageRoodId).getServerInstances().get(0);
-    DistributedQueryPlan distributedQueryPlan =
-        QueryDispatcher.constructDistributedQueryPlan(queryPlan, stageRoodId, serverInstance);
+    DistributedStagePlan distributedStagePlan =
+        QueryDispatcher.constructDistributedStagePlan(queryPlan, stageRoodId, serverInstance);
 
     MailboxReceiveOperator mailboxReceiveOperator =
         createReduceStageOperator(queryPlan.getStageMetadataMap().get(stageRoodId).getServerInstances(),
             Long.parseLong(requestMetadataMap.get("REQUEST_ID")), stageRoodId, _reducerGrpcPort);
 
     // execute this single stage.
-    _servers.get(serverInstance).processQuery(distributedQueryPlan, requestMetadataMap);
+    _servers.get(serverInstance).processQuery(distributedStagePlan, requestMetadataMap);
 
     DataTableBlock dataTableBlock;
     // get the block back and it should have 5 rows
@@ -138,11 +138,11 @@ public class QueryRunnerTest {
         ImmutableMap.of("REQUEST_ID", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
 
     for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageRoodId).getServerInstances()) {
-      DistributedQueryPlan distributedQueryPlan =
-          QueryDispatcher.constructDistributedQueryPlan(queryPlan, stageRoodId, serverInstance);
+      DistributedStagePlan distributedStagePlan =
+          QueryDispatcher.constructDistributedStagePlan(queryPlan, stageRoodId, serverInstance);
 
       // execute this single stage.
-      _servers.get(serverInstance).processQuery(distributedQueryPlan, requestMetadataMap);
+      _servers.get(serverInstance).processQuery(distributedStagePlan, requestMetadataMap);
     }
 
     MailboxReceiveOperator mailboxReceiveOperator =
@@ -179,9 +179,9 @@ public class QueryRunnerTest {
             Long.parseLong(requestMetadataMap.get("REQUEST_ID")), reduceNode.getSenderStageId(), _reducerGrpcPort);
       } else {
         for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
-          DistributedQueryPlan distributedQueryPlan =
-              QueryDispatcher.constructDistributedQueryPlan(queryPlan, stageId, serverInstance);
-          _servers.get(serverInstance).processQuery(distributedQueryPlan, requestMetadataMap);
+          DistributedStagePlan distributedStagePlan =
+              QueryDispatcher.constructDistributedStagePlan(queryPlan, stageId, serverInstance);
+          _servers.get(serverInstance).processQuery(distributedStagePlan, requestMetadataMap);
         }
       }
     }
@@ -230,9 +230,9 @@ public class QueryRunnerTest {
             Long.parseLong(requestMetadataMap.get("REQUEST_ID")), reduceNode.getSenderStageId(), _reducerGrpcPort);
       } else {
         for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
-          DistributedQueryPlan distributedQueryPlan =
-              QueryDispatcher.constructDistributedQueryPlan(queryPlan, stageId, serverInstance);
-          _servers.get(serverInstance).processQuery(distributedQueryPlan, requestMetadataMap);
+          DistributedStagePlan distributedStagePlan =
+              QueryDispatcher.constructDistributedStagePlan(queryPlan, stageId, serverInstance);
+          _servers.get(serverInstance).processQuery(distributedStagePlan, requestMetadataMap);
         }
       }
     }
