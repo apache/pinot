@@ -37,7 +37,7 @@ import org.apache.pinot.segment.spi.Constants;
  */
 public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
   private static final String OPERATOR_NAME = "DocIdSetOperator";
-  private static final String EXPLAIN_NAME = null;
+  private static final String EXPLAIN_NAME = "DOC_ID_SET";
 
   private static final ThreadLocal<int[]> THREAD_LOCAL_DOC_IDS =
       ThreadLocal.withInitial(() -> new int[DocIdSetPlanNode.MAX_DOC_PER_CALL]);
