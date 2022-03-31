@@ -26,7 +26,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.common.Operator;
@@ -88,8 +87,10 @@ public class BenchmarkNativeVsLuceneTextIndex {
   private IndexSegment _luceneSegment;
   private IndexSegment _nativeIndexSegment;
 
-  final String _luceneQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'www.domain1%') LIMIT 5000000";
-  final String _nativeQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_NATIVE, 'www.domain1.*') LIMIT 5000000";
+  final String _luceneQuery =
+      "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'www.domain1%') LIMIT 5000000";
+  final String _nativeQuery =
+      "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_NATIVE, 'www.domain1.*') LIMIT 5000000";
   @Param("350000")
   int _numRows;
   @Param({"0", "1", "10", "100"})
@@ -125,11 +126,10 @@ public class BenchmarkNativeVsLuceneTextIndex {
   }
 
   private List<String> getDomainNames() {
-    return Arrays
-        .asList("www.domain1.com", "www.domain1.co.ab", "www.domain1.co.bc", "www.domain1.co.cd", "www.sd.domain1.com",
-            "www.sd.domain1.co.ab", "www.sd.domain1.co.bc", "www.sd.domain1.co.cd", "www.domain2.com",
-            "www.domain2.co.ab", "www.domain2.co.bc", "www.domain2.co.cd", "www.sd.domain2.com", "www.sd.domain2.co.ab",
-            "www.sd.domain2.co.bc", "www.sd.domain2.co.cd");
+    return Arrays.asList("www.domain1.com", "www.domain1.co.ab", "www.domain1.co.bc", "www.domain1.co.cd",
+        "www.sd.domain1.com", "www.sd.domain1.co.ab", "www.sd.domain1.co.bc", "www.sd.domain1.co.cd", "www.domain2.com",
+        "www.domain2.co.ab", "www.domain2.co.bc", "www.domain2.co.cd", "www.sd.domain2.com", "www.sd.domain2.co.ab",
+        "www.sd.domain2.co.bc", "www.sd.domain2.co.cd");
   }
 
   private List<GenericRow> createTestData(int numRows) {
@@ -151,13 +151,14 @@ public class BenchmarkNativeVsLuceneTextIndex {
     List<FieldConfig> fieldConfigs = new ArrayList<>();
 
     fieldConfigs.add(
-        new FieldConfig(DOMAIN_NAMES_COL_LUCENE, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null, null));
+        new FieldConfig(DOMAIN_NAMES_COL_LUCENE, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
+            null));
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInvertedIndexColumns(Arrays.asList(DOMAIN_NAMES_COL_LUCENE, DOMAIN_NAMES_COL_NATIVE)).setFieldConfigList(fieldConfigs).build();
+        .setInvertedIndexColumns(Arrays.asList(DOMAIN_NAMES_COL_LUCENE, DOMAIN_NAMES_COL_NATIVE))
+        .setFieldConfigList(fieldConfigs).build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension(DOMAIN_NAMES_COL_LUCENE, FieldSpec.DataType.STRING)
-        .build();
+        .addSingleValueDimension(DOMAIN_NAMES_COL_LUCENE, FieldSpec.DataType.STRING).build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
@@ -180,13 +181,13 @@ public class BenchmarkNativeVsLuceneTextIndex {
     propertiesMap.put(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL);
 
     fieldConfigs.add(
-        new FieldConfig(DOMAIN_NAMES_COL_NATIVE, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null, null));
+        new FieldConfig(DOMAIN_NAMES_COL_NATIVE, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
+            null));
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(Arrays.asList(DOMAIN_NAMES_COL_LUCENE)).setFieldConfigList(fieldConfigs).build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension(DOMAIN_NAMES_COL_NATIVE, FieldSpec.DataType.STRING)
-        .build();
+        .addSingleValueDimension(DOMAIN_NAMES_COL_NATIVE, FieldSpec.DataType.STRING).build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
@@ -254,7 +255,6 @@ public class BenchmarkNativeVsLuceneTextIndex {
 
   public static void main(String[] args)
       throws Exception {
-    new Runner(new OptionsBuilder().include(BenchmarkNativeVsLuceneTextIndex.class
-        .getSimpleName()).build()).run();
+    new Runner(new OptionsBuilder().include(BenchmarkNativeVsLuceneTextIndex.class.getSimpleName()).build()).run();
   }
 }
