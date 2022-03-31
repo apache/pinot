@@ -99,6 +99,13 @@ public class TableSizeReader {
       _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.TABLE_SIZE_PER_REPLICA_ON_SERVER,
           tableSizeDetails._realtimeSegments._estimatedSizeInBytes / _helixResourceManager.getNumReplicas(
               realtimeTableConfig));
+
+      tableSizeDetails._realtimeSegments._segments.values().stream()
+          .flatMap(segmentSizeDetails -> segmentSizeDetails._serverInfo.values().stream())
+          .map(segmentSizeInfo -> segmentSizeInfo.getDiskSizeInBytes()).max(Long::compare).ifPresent(
+              maxSize -> _controllerMetrics.setValueOfTableGauge(realtimeTableName,
+                  ControllerGauge.LARGEST_SEGMENT_SIZE_ON_DISK,
+                  maxSize));
     }
     if (offlineTableConfig != null) {
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
@@ -111,6 +118,13 @@ public class TableSizeReader {
       _controllerMetrics.setValueOfTableGauge(offlineTableName, ControllerGauge.TABLE_SIZE_PER_REPLICA_ON_SERVER,
           tableSizeDetails._offlineSegments._estimatedSizeInBytes / _helixResourceManager.getNumReplicas(
               offlineTableConfig));
+
+      tableSizeDetails._offlineSegments._segments.values().stream()
+          .flatMap(segmentSizeDetails -> segmentSizeDetails._serverInfo.values().stream())
+          .map(segmentSizeInfo -> segmentSizeInfo.getDiskSizeInBytes()).max(Long::compare).ifPresent(
+              maxSize -> _controllerMetrics.setValueOfTableGauge(offlineTableName,
+                  ControllerGauge.LARGEST_SEGMENT_SIZE_ON_DISK,
+                  maxSize));
     }
 
     return tableSizeDetails;
