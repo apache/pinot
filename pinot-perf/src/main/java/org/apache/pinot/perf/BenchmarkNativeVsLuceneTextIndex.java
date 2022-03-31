@@ -84,7 +84,6 @@ public class BenchmarkNativeVsLuceneTextIndex {
   private static final String DOMAIN_NAMES_COL_NATIVE = "DOMAIN_NAMES_NATIVE";
 
   private IndexSegment _indexSegment;
-  private List<IndexSegment> _indexSegments;
 
   private IndexSegment _luceneSegment;
   private IndexSegment _nativeIndexSegment;
@@ -111,23 +110,17 @@ public class BenchmarkNativeVsLuceneTextIndex {
     _nativeQueryContext = QueryContextConverterUtils.getQueryContextFromSQL(_nativeQuery);
     FileUtils.deleteQuietly(INDEX_DIR);
 
-    List<IndexSegment> segments = new ArrayList<>();
     buildLuceneSegment();
     buildNativeTextIndexSegment();
 
     _luceneSegment = loadLuceneSegment();
     _nativeIndexSegment = loadNativeIndexSegment();
-
-    segments.add(_luceneSegment);
-    segments.add(_nativeIndexSegment);
-
-    _indexSegment = segments.get(ThreadLocalRandom.current().nextInt(2));
-    _indexSegments = segments;
   }
 
   @TearDown(Level.Trial)
   public void tearDown() {
-    _indexSegment.destroy();
+    _luceneSegment.destroy();
+    _nativeIndexSegment.destroy();
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
