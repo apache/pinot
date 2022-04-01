@@ -49,6 +49,7 @@ import org.slf4j.LoggerFactory;
  */
 public class TableSizeReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableSizeReader.class);
+  public static final long DEFAULT_SIZE_WHEN_MISSING_OR_ERROR = -1L;
 
   private final Executor _executor;
   private final HttpConnectionManager _connectionManager;
@@ -99,6 +100,18 @@ public class TableSizeReader {
       _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.TABLE_SIZE_PER_REPLICA_ON_SERVER,
           tableSizeDetails._realtimeSegments._estimatedSizeInBytes / _helixResourceManager.getNumReplicas(
               realtimeTableConfig));
+
+      long largestSegmentSizeOnServer = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
+      for (SegmentSizeDetails segmentSizeDetail : tableSizeDetails._realtimeSegments._segments.values()) {
+        for (SegmentSizeInfo segmentSizeInfo : segmentSizeDetail._serverInfo.values()) {
+          largestSegmentSizeOnServer = Math.max(largestSegmentSizeOnServer, segmentSizeInfo.getDiskSizeInBytes());
+        }
+      }
+      if (largestSegmentSizeOnServer != DEFAULT_SIZE_WHEN_MISSING_OR_ERROR) {
+        _controllerMetrics.setValueOfTableGauge(realtimeTableName,
+            ControllerGauge.LARGEST_SEGMENT_SIZE_ON_SERVER,
+            largestSegmentSizeOnServer);
+      }
     }
     if (offlineTableConfig != null) {
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
@@ -111,6 +124,18 @@ public class TableSizeReader {
       _controllerMetrics.setValueOfTableGauge(offlineTableName, ControllerGauge.TABLE_SIZE_PER_REPLICA_ON_SERVER,
           tableSizeDetails._offlineSegments._estimatedSizeInBytes / _helixResourceManager.getNumReplicas(
               offlineTableConfig));
+
+      long largestSegmentSizeOnServer = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
+      for (SegmentSizeDetails segmentSizeDetail : tableSizeDetails._offlineSegments._segments.values()) {
+        for (SegmentSizeInfo segmentSizeInfo : segmentSizeDetail._serverInfo.values()) {
+          largestSegmentSizeOnServer = Math.max(largestSegmentSizeOnServer, segmentSizeInfo.getDiskSizeInBytes());
+        }
+      }
+      if (largestSegmentSizeOnServer != DEFAULT_SIZE_WHEN_MISSING_OR_ERROR) {
+        _controllerMetrics.setValueOfTableGauge(offlineTableName,
+            ControllerGauge.LARGEST_SEGMENT_SIZE_ON_SERVER,
+            largestSegmentSizeOnServer);
+      }
     }
 
     return tableSizeDetails;
@@ -205,7 +230,7 @@ public class TableSizeReader {
         for (String segment : segments) {
           SegmentSizeDetails segmentSizeDetails =
               segmentToSizeDetailsMap.computeIfAbsent(segment, k -> new SegmentSizeDetails());
-          segmentSizeDetails._serverInfo.put(server, new SegmentSizeInfo(segment, -1L));
+          segmentSizeDetails._serverInfo.put(server, new SegmentSizeInfo(segment, DEFAULT_SIZE_WHEN_MISSING_OR_ERROR));
         }
       }
     }
@@ -226,7 +251,7 @@ public class TableSizeReader {
       long segmentLevelMax = -1L;
       int errors = 0;
       for (SegmentSizeInfo sizeInfo : sizeDetails._serverInfo.values()) {
-        if (sizeInfo.getDiskSizeInBytes() != -1) {
+        if (sizeInfo.getDiskSizeInBytes() != DEFAULT_SIZE_WHEN_MISSING_OR_ERROR) {
           sizeDetails._reportedSizeInBytes += sizeInfo.getDiskSizeInBytes();
           segmentLevelMax = Math.max(segmentLevelMax, sizeInfo.getDiskSizeInBytes());
         } else {
@@ -242,8 +267,8 @@ public class TableSizeReader {
       } else {
         // Segment is missing from all servers
         missingSegments.add(segment);
-        sizeDetails._reportedSizeInBytes = -1L;
-        sizeDetails._estimatedSizeInBytes = -1L;
+        sizeDetails._reportedSizeInBytes = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
+        sizeDetails._estimatedSizeInBytes = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
         subTypeSizeDetails._missingSegments++;
       }
     }
@@ -257,8 +282,8 @@ public class TableSizeReader {
               missingPercent);
       if (subTypeSizeDetails._missingSegments == numSegments) {
         LOGGER.warn("Failed to get size report for all {} segments of table: {}", numSegments, tableNameWithType);
-        subTypeSizeDetails._reportedSizeInBytes = -1;
-        subTypeSizeDetails._estimatedSizeInBytes = -1;
+        subTypeSizeDetails._reportedSizeInBytes = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
+        subTypeSizeDetails._estimatedSizeInBytes = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
       } else {
         LOGGER.warn("Missing size report for {} out of {} segments for table {}", subTypeSizeDetails._missingSegments,
             numSegments, tableNameWithType);
