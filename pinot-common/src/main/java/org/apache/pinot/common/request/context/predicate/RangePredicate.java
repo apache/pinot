@@ -28,7 +28,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Query.Range;
  * Predicate for RANGE.
  * <p>Pinot uses RANGE to represent '>', '>=', '<', '<=', BETWEEN so that intersection of multiple ranges can be merged.
  */
-public class RangePredicate implements Predicate {
+public class RangePredicate extends BasePredicate {
   public static final char DELIMITER = Range.DELIMITER;
   public static final char LOWER_EXCLUSIVE = Range.LOWER_EXCLUSIVE;
   public static final char LOWER_INCLUSIVE = Range.LOWER_INCLUSIVE;
@@ -39,7 +39,6 @@ public class RangePredicate implements Predicate {
   // For backward-compatibility
   private static final String LEGACY_DELIMITER = "\t\t";
 
-  private final ExpressionContext _lhs;
   private final boolean _lowerInclusive;
   private final String _lowerBound;
   private final boolean _upperInclusive;
@@ -56,7 +55,7 @@ public class RangePredicate implements Predicate {
    * </ul>
    */
   public RangePredicate(ExpressionContext lhs, String range) {
-    _lhs = lhs;
+    super(lhs);
     String[] split = StringUtils.split(range, DELIMITER);
     if (split.length != 2) {
       split = StringUtils.split(range, LEGACY_DELIMITER);
@@ -72,7 +71,7 @@ public class RangePredicate implements Predicate {
 
   public RangePredicate(ExpressionContext lhs, boolean lowerInclusive, String lowerBound, boolean upperInclusive,
       String upperBound) {
-    _lhs = lhs;
+    super(lhs);
     _lowerInclusive = lowerInclusive;
     _lowerBound = lowerBound;
     _upperInclusive = upperInclusive;
@@ -82,11 +81,6 @@ public class RangePredicate implements Predicate {
   @Override
   public Type getType() {
     return Type.RANGE;
-  }
-
-  @Override
-  public ExpressionContext getLhs() {
-    return _lhs;
   }
 
   public boolean isLowerInclusive() {

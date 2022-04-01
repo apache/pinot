@@ -25,12 +25,11 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 /**
  * Predicate for EQ.
  */
-public class EqPredicate implements Predicate {
-  private final ExpressionContext _lhs;
+public class EqPredicate extends BasePredicate {
   private final String _value;
 
   public EqPredicate(ExpressionContext lhs, String value) {
-    _lhs = lhs;
+    super(lhs);
     _value = value;
   }
 
@@ -39,10 +38,6 @@ public class EqPredicate implements Predicate {
     return Type.EQ;
   }
 
-  @Override
-  public ExpressionContext getLhs() {
-    return _lhs;
-  }
 
   public String getValue() {
     return _value;

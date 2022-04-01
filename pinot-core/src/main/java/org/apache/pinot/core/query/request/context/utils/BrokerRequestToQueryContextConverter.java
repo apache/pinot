@@ -20,8 +20,10 @@ package org.apache.pinot.core.query.request.context.utils;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -149,12 +151,23 @@ public class BrokerRequestToQueryContextConverter {
       havingFilter = RequestContextUtils.getFilter(havingExpression);
     }
 
+    // EXPRESSION OVERRIDE HINTS
+    Map<ExpressionContext, ExpressionContext> expressionContextOverrideHints = new HashMap<>();
+    Map<Expression, Expression> expressionOverrideHints = pinotQuery.getExpressionOverrideHints();
+    if (expressionOverrideHints != null) {
+      for (Map.Entry<Expression, Expression> entry : expressionOverrideHints.entrySet()) {
+        expressionContextOverrideHints.put(RequestContextUtils.getExpression(entry.getKey()),
+            RequestContextUtils.getExpression(entry.getValue()));
+      }
+    }
+
     return new QueryContext.Builder().setTableName(pinotQuery.getDataSource().getTableName())
         .setSelectExpressions(selectExpressions).setAliasList(aliasList).setFilter(filter)
         .setGroupByExpressions(groupByExpressions).setOrderByExpressions(orderByExpressions)
         .setHavingFilter(havingFilter).setLimit(pinotQuery.getLimit()).setOffset(pinotQuery.getOffset())
         .setQueryOptions(pinotQuery.getQueryOptions()).setDebugOptions(pinotQuery.getDebugOptions())
-        .setSubquery(subquery).setBrokerRequest(brokerRequest).build();
+        .setSubquery(subquery).setExpressionOverrideHints(expressionContextOverrideHints)
+        .setBrokerRequest(brokerRequest).build();
   }
 
   private static QueryContext convertPQL(BrokerRequest brokerRequest) {

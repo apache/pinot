@@ -25,23 +25,17 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 /**
  * Predicate for JSON_MATCH.
  */
-public class JsonMatchPredicate implements Predicate {
-  private final ExpressionContext _lhs;
+public class JsonMatchPredicate extends BasePredicate {
   private final String _value;
 
   public JsonMatchPredicate(ExpressionContext lhs, String value) {
-    _lhs = lhs;
+    super(lhs);
     _value = value;
   }
 
   @Override
   public Type getType() {
     return Type.JSON_MATCH;
-  }
-
-  @Override
-  public ExpressionContext getLhs() {
-    return _lhs;
   }
 
   public String getValue() {
