@@ -16,30 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator;
+package org.apache.pinot.spi.trace;
 
-import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.trace.InvocationSpan;
-import org.apache.pinot.spi.trace.Tracing;
+public interface Tracer {
 
+    /**
+     * Registers the requestId on the current thread. This means the request will be traced.
+     * @param requestId the requestId
+     */
+    void register(long requestId);
 
-/**
- * Any other Pinot Operators should extend BaseOperator
- */
-public abstract class BaseOperator<T extends Block> implements Operator<T> {
+    InvocationSpan beginInvocation(Class<?> clazz);
 
-  @Override
-  public final T nextBlock() {
-    if (Thread.interrupted()) {
-      throw new EarlyTerminationException();
-    }
-    try (InvocationSpan execution = Tracing.getTracer().beginInvocation(getClass())) {
-      return getNextBlock();
-    }
-  }
-
-  // Make it protected because we should always call nextBlock()
-  protected abstract T getNextBlock();
+    /**
+     * @return the active execution
+     */
+    InvocationRecording activeRecording();
 }

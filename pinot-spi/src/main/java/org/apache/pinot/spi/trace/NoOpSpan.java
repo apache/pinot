@@ -16,30 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator;
+package org.apache.pinot.spi.trace;
 
-import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.trace.InvocationSpan;
-import org.apache.pinot.spi.trace.Tracing;
+public final class NoOpSpan extends BaseRecording implements InvocationSpan {
 
+  public static final NoOpSpan INSTANCE = new NoOpSpan();
 
-/**
- * Any other Pinot Operators should extend BaseOperator
- */
-public abstract class BaseOperator<T extends Block> implements Operator<T> {
-
-  @Override
-  public final T nextBlock() {
-    if (Thread.interrupted()) {
-      throw new EarlyTerminationException();
-    }
-    try (InvocationSpan execution = Tracing.getTracer().beginInvocation(getClass())) {
-      return getNextBlock();
-    }
+  public NoOpSpan() {
+    super(false);
   }
 
-  // Make it protected because we should always call nextBlock()
-  protected abstract T getNextBlock();
+  @Override
+  public void close() {
+  }
 }

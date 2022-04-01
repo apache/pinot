@@ -16,30 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator;
+package org.apache.pinot.core.util.trace;
 
-import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.trace.InvocationSpan;
-import org.apache.pinot.spi.trace.Tracing;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
-/**
- * Any other Pinot Operators should extend BaseOperator
- */
-public abstract class BaseOperator<T extends Block> implements Operator<T> {
+public final class TracedThreadFactory implements ThreadFactory {
 
-  @Override
-  public final T nextBlock() {
-    if (Thread.interrupted()) {
-      throw new EarlyTerminationException();
-    }
-    try (InvocationSpan execution = Tracing.getTracer().beginInvocation(getClass())) {
-      return getNextBlock();
-    }
+  private final int _priority;
+  private final boolean _daemon;
+  private final String _nameFormat;
+  private final AtomicInteger _count = new AtomicInteger();
+
+  public TracedThreadFactory(int priority, boolean daemon, String nameFormat) {
+    _priority = priority;
+    _daemon = daemon;
+    _nameFormat = nameFormat;
   }
 
-  // Make it protected because we should always call nextBlock()
-  protected abstract T getNextBlock();
+  @Override
+  public Thread newThread(Runnable task) {
+    Thread thread = new TracedThread(task);
+    thread.setPriority(_priority);
+    thread.setDaemon(_daemon);
+    thread.setName(String.format(_nameFormat, _count.getAndIncrement()));
+    return thread;
+  }
 }

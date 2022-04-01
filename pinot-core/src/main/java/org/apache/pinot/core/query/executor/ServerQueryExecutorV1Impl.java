@@ -66,6 +66,7 @@ import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -195,7 +196,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     boolean enableTrace = queryRequest.isEnableTrace();
     if (enableTrace) {
-      TraceContext.register(requestId);
+      Tracing.getTracer().register(requestId);
     }
 
     DataTable dataTable = null;

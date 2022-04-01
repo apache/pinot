@@ -16,30 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator;
+package org.apache.pinot.spi.trace;
 
-import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.trace.InvocationSpan;
-import org.apache.pinot.spi.trace.Tracing;
-
-
-/**
- * Any other Pinot Operators should extend BaseOperator
- */
-public abstract class BaseOperator<T extends Block> implements Operator<T> {
+public interface Span extends AutoCloseable {
 
   @Override
-  public final T nextBlock() {
-    if (Thread.interrupted()) {
-      throw new EarlyTerminationException();
-    }
-    try (InvocationSpan execution = Tracing.getTracer().beginInvocation(getClass())) {
-      return getNextBlock();
-    }
-  }
-
-  // Make it protected because we should always call nextBlock()
-  protected abstract T getNextBlock();
+  void close();
 }
