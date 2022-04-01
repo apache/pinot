@@ -64,6 +64,21 @@ public class PullRequestMergedEventsStream {
 
   private StreamDataProducer _producer;
 
+  public PullRequestMergedEventsStream(File schemaFile, String topicName, String personalAccessToken,
+      StreamDataProducer producer)
+      throws Exception {
+    _service = Executors.newFixedThreadPool(2);
+    try {
+      _avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(org.apache.pinot.spi.data.Schema.fromFile(schemaFile));
+    } catch (Exception e) {
+      LOGGER.error("Got exception while reading Pinot schema from file: [" + schemaFile.getName() + "]");
+      throw e;
+    }
+    _topicName = topicName;
+    _gitHubAPICaller = new GitHubAPICaller(personalAccessToken);
+    _producer = producer;
+  }
+
   public PullRequestMergedEventsStream(String schemaFilePath, String topicName, String personalAccessToken,
       StreamDataProducer producer)
       throws Exception {
