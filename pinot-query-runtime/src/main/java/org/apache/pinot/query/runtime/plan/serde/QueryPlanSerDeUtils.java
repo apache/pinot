@@ -22,7 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.proto.Plan;
+import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.routing.WorkerInstance;
@@ -30,7 +30,7 @@ import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 
 
 /**
- * This utility class serialize/deserialize between {@link Plan.StagePlan} elements to Planner elements.
+ * This utility class serialize/deserialize between {@link Worker.StagePlan} elements to Planner elements.
  */
 public class QueryPlanSerDeUtils {
 
@@ -38,16 +38,17 @@ public class QueryPlanSerDeUtils {
     // do not instantiate.
   }
 
-  public static DistributedStagePlan deserialize(Plan.StagePlan stagePlan) {
+  public static DistributedStagePlan deserialize(Worker.StagePlan stagePlan) {
     DistributedStagePlan distributedStagePlan = new DistributedStagePlan(stagePlan.getStageId());
     distributedStagePlan.setServerInstance(stringToInstance(stagePlan.getInstanceId()));
     distributedStagePlan.setStageRoot(StageNodeSerDeUtils.deserializeStageRoot(stagePlan.getSerializedStageRoot()));
     Map<Integer, StageMetadata> metadataMap = distributedStagePlan.getMetadataMap();
+    distributedStagePlan.getMetadataMap().putAll(metadataMap);
     return distributedStagePlan;
   }
 
-  public static Plan.StagePlan serialize(DistributedStagePlan distributedStagePlan) {
-    return Plan.StagePlan.newBuilder()
+  public static Worker.StagePlan serialize(DistributedStagePlan distributedStagePlan) {
+    return Worker.StagePlan.newBuilder()
         .setInstanceId(instanceToString(distributedStagePlan.getServerInstance()))
         .setSerializedStageRoot(StageNodeSerDeUtils.serializeStageRoot(distributedStagePlan.getStageRoot()))
         .putAllStageMetadata(stageMetadataMapToProtoMap(distributedStagePlan.getMetadataMap())).build();
@@ -63,43 +64,43 @@ public class QueryPlanSerDeUtils {
         serverInstance.getGrpcPort());
   }
 
-  public static Map<Integer, StageMetadata> getStageMetadataMap(Map<Integer, Plan.StageMetadata> protoMap) {
+  public static Map<Integer, StageMetadata> getStageMetadataMap(Map<Integer, Worker.StageMetadata> protoMap) {
     Map<Integer, StageMetadata> metadataMap = new HashMap<>();
-    for (Map.Entry<Integer, Plan.StageMetadata> e : protoMap.entrySet()) {
+    for (Map.Entry<Integer, Worker.StageMetadata> e : protoMap.entrySet()) {
       metadataMap.put(e.getKey(), protoMapToStageMetadataMap(e.getValue()));
     }
     return metadataMap;
   }
 
-  private static StageMetadata protoMapToStageMetadataMap(Plan.StageMetadata workerStageMetadata) {
+  private static StageMetadata protoMapToStageMetadataMap(Worker.StageMetadata workerStageMetadata) {
     StageMetadata stageMetadata = new StageMetadata();
     stageMetadata.getScannedTables().addAll(workerStageMetadata.getDataSourcesList());
     for (String serverInstanceString : workerStageMetadata.getInstancesList()) {
       stageMetadata.getServerInstances().add(stringToInstance(serverInstanceString));
     }
-    for (Map.Entry<String, Plan.SegmentList> e : workerStageMetadata.getInstanceToSegmentListMap().entrySet()) {
+    for (Map.Entry<String, Worker.SegmentList> e : workerStageMetadata.getInstanceToSegmentListMap().entrySet()) {
       stageMetadata.getServerInstanceToSegmentsMap().put(stringToInstance(e.getKey()), e.getValue().getSegmentsList());
     }
     return stageMetadata;
   }
 
-  public static Map<Integer, Plan.StageMetadata> stageMetadataMapToProtoMap(Map<Integer, StageMetadata> metadataMap) {
-    Map<Integer, Plan.StageMetadata> protoMap = new HashMap<>();
+  public static Map<Integer, Worker.StageMetadata> stageMetadataMapToProtoMap(Map<Integer, StageMetadata> metadataMap) {
+    Map<Integer, Worker.StageMetadata> protoMap = new HashMap<>();
     for (Map.Entry<Integer, StageMetadata> e : metadataMap.entrySet()) {
       protoMap.put(e.getKey(), toWorkerStageMetadata(e.getValue()));
     }
     return protoMap;
   }
 
-  private static Plan.StageMetadata toWorkerStageMetadata(StageMetadata stageMetadata) {
-    Plan.StageMetadata.Builder builder = Plan.StageMetadata.newBuilder();
+  private static Worker.StageMetadata toWorkerStageMetadata(StageMetadata stageMetadata) {
+    Worker.StageMetadata.Builder builder = Worker.StageMetadata.newBuilder();
     builder.addAllDataSources(stageMetadata.getScannedTables());
     for (ServerInstance serverInstance : stageMetadata.getServerInstances()) {
       builder.addInstances(instanceToString(serverInstance));
     }
     for (Map.Entry<ServerInstance, List<String>> e : stageMetadata.getServerInstanceToSegmentsMap().entrySet()) {
       builder.putInstanceToSegmentList(instanceToString(e.getKey()),
-          Plan.SegmentList.newBuilder().addAllSegments(e.getValue()).build());
+          Worker.SegmentList.newBuilder().addAllSegments(e.getValue()).build());
     }
     return builder.build();
   }

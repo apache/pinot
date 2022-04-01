@@ -26,7 +26,8 @@ import org.apache.pinot.query.planner.nodes.StageNode;
 
 
 /**
- * {@code DistributedStagePlan} is the deserialized version of the {@link org.apache.pinot.common.proto.Plan.StagePlan}.
+ * {@code DistributedStagePlan} is the deserialized version of the
+ * {@link org.apache.pinot.common.proto.Worker.StagePlan}.
  *
  * <p>It is also the extended version of the {@link org.apache.pinot.core.query.request.ServerQueryRequest}.
  */
