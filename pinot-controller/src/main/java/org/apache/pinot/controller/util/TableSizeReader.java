@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
  */
 public class TableSizeReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableSizeReader.class);
-  public static long DEFAULT_SIZE_WHEN_MISSING_OR_ERROR = -1L;
+  public static final long DEFAULT_SIZE_WHEN_MISSING_OR_ERROR = -1L;
 
   private final Executor _executor;
   private final HttpConnectionManager _connectionManager;
