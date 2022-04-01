@@ -25,21 +25,15 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 /**
  * Predicate for IS_NOT_NULL.
  */
-public class IsNotNullPredicate implements Predicate {
-  private final ExpressionContext _lhs;
+public class IsNotNullPredicate extends BasePredicate {
 
   public IsNotNullPredicate(ExpressionContext lhs) {
-    _lhs = lhs;
+    super(lhs);
   }
 
   @Override
   public Type getType() {
     return Type.IS_NOT_NULL;
-  }
-
-  @Override
-  public ExpressionContext getLhs() {
-    return _lhs;
   }
 
   @Override

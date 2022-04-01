@@ -28,12 +28,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
-import java.util.stream.Collectors;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
-import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.plan.AcquireReleaseColumnsSegmentPlanNode;
 import org.apache.pinot.core.plan.AggregationGroupByOrderByPlanNode;
 import org.apache.pinot.core.plan.AggregationGroupByPlanNode;
@@ -232,9 +233,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   @Override
   public PlanNode makeSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
-    if (queryContext.getExpressionOverrideHints() != null && !queryContext.getExpressionOverrideHints().isEmpty()) {
-      queryContext = rewriteExpressionsWithHints(indexSegment, queryContext);
-    }
+    rewriteQueryContextWithHints(queryContext, indexSegment);
     if (QueryContextUtils.isAggregationQuery(queryContext)) {
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
       if (groupByExpressions != null) {
@@ -253,48 +252,6 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       assert QueryContextUtils.isDistinctQuery(queryContext);
       return new DistinctPlanNode(indexSegment, queryContext);
     }
-  }
-
-  private QueryContext rewriteExpressionsWithHints(IndexSegment indexSegment, QueryContext queryContext) {
-    List<ExpressionContext> newSelectExpressions = queryContext.getSelectExpressions();
-    if (newSelectExpressions != null && !newSelectExpressions.isEmpty()) {
-      newSelectExpressions = newSelectExpressions.stream().map(
-          expression -> RequestContextUtils.overrideWithExpressionHints(indexSegment,
-              queryContext.getExpressionOverrideHints(), expression)).collect(Collectors.toList());
-    }
-
-    List<ExpressionContext> newGroupByExpression = queryContext.getGroupByExpressions();
-    if (newGroupByExpression != null && !newGroupByExpression.isEmpty()) {
-      newGroupByExpression = newGroupByExpression.stream().map(
-          expression -> RequestContextUtils.overrideWithExpressionHints(indexSegment,
-              queryContext.getExpressionOverrideHints(), expression)).collect(Collectors.toList());
-    }
-
-    List<OrderByExpressionContext> newOrderByExpression = queryContext.getOrderByExpressions();
-    if (newOrderByExpression != null && !newOrderByExpression.isEmpty()) {
-      newOrderByExpression = newOrderByExpression.stream().map(expression -> new OrderByExpressionContext(
-          RequestContextUtils.overrideWithExpressionHints(indexSegment, queryContext.getExpressionOverrideHints(),
-              expression.getExpression()), expression.isAsc())).collect(Collectors.toList());
-    }
-
-    FilterContext newFilter = queryContext.getFilter();
-    if (newFilter != null) {
-      newFilter = RequestContextUtils.overrideFilterWithExpressionOverrideHints(newFilter, indexSegment,
-          queryContext.getExpressionOverrideHints());
-    }
-
-    FilterContext newHavingFilter = queryContext.getHavingFilter();
-    if (newHavingFilter != null) {
-      newHavingFilter = RequestContextUtils.overrideFilterWithExpressionOverrideHints(newHavingFilter, indexSegment,
-          queryContext.getExpressionOverrideHints());
-    }
-
-    return new QueryContext.Builder().setAliasList(queryContext.getAliasList())
-        .setDebugOptions(queryContext.getDebugOptions()).setLimit(queryContext.getLimit())
-        .setOffset(queryContext.getOffset()).setBrokerRequest(queryContext.getBrokerRequest())
-        .setQueryOptions(queryContext.getQueryOptions()).setTableName(queryContext.getTableName())
-        .setSelectExpressions(newSelectExpressions).setFilter(newFilter).setGroupByExpressions(newGroupByExpression)
-        .setOrderByExpressions(newOrderByExpression).setHavingFilter(newHavingFilter).build();
   }
 
   @Override
@@ -329,5 +286,79 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       // Selection-only query can be directly stream back
       return new StreamingSelectionPlanNode(indexSegment, queryContext);
     }
+  }
+
+  /**
+   * In-place rewrite QueryContext based on the information from local IndexSegment.
+   *
+   * @param queryContext
+   * @param indexSegment
+   */
+  @VisibleForTesting
+  public static void rewriteQueryContextWithHints(QueryContext queryContext, IndexSegment indexSegment) {
+    Map<ExpressionContext, ExpressionContext> expressionOverrideHints = queryContext.getExpressionOverrideHints();
+    if (MapUtils.isEmpty(expressionOverrideHints)) {
+      return;
+    }
+
+    List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+    selectExpressions.replaceAll(
+        expression -> overrideWithExpressionHints(expression, indexSegment, expressionOverrideHints));
+
+    List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
+    if (CollectionUtils.isNotEmpty(groupByExpressions)) {
+      groupByExpressions.replaceAll(
+          expression -> overrideWithExpressionHints(expression, indexSegment, expressionOverrideHints));
+    }
+
+    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+    if (CollectionUtils.isNotEmpty(orderByExpressions)) {
+      orderByExpressions.replaceAll(expression -> new OrderByExpressionContext(
+          overrideWithExpressionHints(expression.getExpression(), indexSegment, expressionOverrideHints),
+          expression.isAsc()));
+    }
+
+    // In-place override
+    FilterContext filter = queryContext.getFilter();
+    if (filter != null) {
+      overrideWithExpressionHints(filter, indexSegment, expressionOverrideHints);
+    }
+
+    // In-place override
+    FilterContext havingFilter = queryContext.getHavingFilter();
+    if (havingFilter != null) {
+      overrideWithExpressionHints(havingFilter, indexSegment, expressionOverrideHints);
+    }
+  }
+
+  @VisibleForTesting
+  public static void overrideWithExpressionHints(FilterContext filter, IndexSegment indexSegment,
+      Map<ExpressionContext, ExpressionContext> expressionOverrideHints) {
+    if (filter.getChildren() != null) {
+      // AND, OR, NOT
+      for (FilterContext child : filter.getChildren()) {
+        overrideWithExpressionHints(child, indexSegment, expressionOverrideHints);
+      }
+    } else {
+      // PREDICATE
+      Predicate predicate = filter.getPredicate();
+      predicate.setLhs(overrideWithExpressionHints(predicate.getLhs(), indexSegment, expressionOverrideHints));
+    }
+  }
+
+  @VisibleForTesting
+  public static ExpressionContext overrideWithExpressionHints(ExpressionContext expression, IndexSegment indexSegment,
+      Map<ExpressionContext, ExpressionContext> expressionOverrideHints) {
+    if (expression.getType() != ExpressionContext.Type.FUNCTION) {
+      return expression;
+    }
+    ExpressionContext overrideExpression = expressionOverrideHints.get(expression);
+    if (overrideExpression != null && overrideExpression.getIdentifier() != null
+        && indexSegment.getColumnNames().contains(overrideExpression.getIdentifier())) {
+      return overrideExpression;
+    }
+    expression.getFunction().getArguments()
+        .replaceAll(argument -> overrideWithExpressionHints(argument, indexSegment, expressionOverrideHints));
+    return expression;
   }
 }

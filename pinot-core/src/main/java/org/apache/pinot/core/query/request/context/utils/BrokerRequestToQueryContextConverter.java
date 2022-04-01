@@ -155,9 +155,9 @@ public class BrokerRequestToQueryContextConverter {
     Map<ExpressionContext, ExpressionContext> expressionContextOverrideHints = new HashMap<>();
     Map<Expression, Expression> expressionOverrideHints = pinotQuery.getExpressionOverrideHints();
     if (expressionOverrideHints != null) {
-      for (Expression key : expressionOverrideHints.keySet()) {
-        expressionContextOverrideHints.put(RequestContextUtils.getExpression(key),
-            RequestContextUtils.getExpression(expressionOverrideHints.get(key)));
+      for (Map.Entry<Expression, Expression> entry : expressionOverrideHints.entrySet()) {
+        expressionContextOverrideHints.put(RequestContextUtils.getExpression(entry.getKey()),
+            RequestContextUtils.getExpression(entry.getValue()));
       }
     }
 

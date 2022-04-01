@@ -22,41 +22,23 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 
 
 /**
- * The {@code Predicate} class represents the predicate in the filter.
- * <p>Currently the query engine only accepts string literals as the right-hand side of the predicate, so we store the
- * right-hand side of the predicate as string or list of strings.
+ * Abstract predicate with left-hand side expression
  */
-public interface Predicate {
-  enum Type {
-    EQ, NOT_EQ(true), IN, NOT_IN(true), RANGE, REGEXP_LIKE, TEXT_MATCH, JSON_MATCH, IS_NULL, IS_NOT_NULL(true);
+public abstract class BasePredicate implements Predicate {
 
-    private final boolean _exclusive;
+  protected ExpressionContext _lhs;
 
-    Type(boolean exclusive) {
-      _exclusive = exclusive;
-    }
-
-    Type() {
-      this(false);
-    }
-
-    public boolean isExclusive() {
-      return _exclusive;
-    }
+  public BasePredicate(ExpressionContext lhs) {
+    _lhs = lhs;
   }
 
-  /**
-   * Returns the type of the predicate.
-   */
-  Type getType();
+  @Override
+  public ExpressionContext getLhs() {
+    return _lhs;
+  }
 
-  /**
-   * Returns the left-hand side expression of the predicate.
-   */
-  ExpressionContext getLhs();
-
-  /**
-   * Sets the left-hand side expression of the predicate.
-   */
-  void setLhs(ExpressionContext lhs);
+  @Override
+  public void setLhs(ExpressionContext lhs) {
+    _lhs = lhs;
+  }
 }
