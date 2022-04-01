@@ -101,7 +101,7 @@ public class TableSizeReader {
           tableSizeDetails._realtimeSegments._estimatedSizeInBytes / _helixResourceManager.getNumReplicas(
               realtimeTableConfig));
 
-      Long largestSegmentSizeOnServer = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
+      long largestSegmentSizeOnServer = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
       for (SegmentSizeDetails segmentSizeDetail : tableSizeDetails._realtimeSegments._segments.values()) {
         for (SegmentSizeInfo segmentSizeInfo : segmentSizeDetail._serverInfo.values()) {
           largestSegmentSizeOnServer = Math.max(largestSegmentSizeOnServer, segmentSizeInfo.getDiskSizeInBytes());
@@ -125,7 +125,7 @@ public class TableSizeReader {
           tableSizeDetails._offlineSegments._estimatedSizeInBytes / _helixResourceManager.getNumReplicas(
               offlineTableConfig));
 
-      Long largestSegmentSizeOnServer = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
+      long largestSegmentSizeOnServer = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
       for (SegmentSizeDetails segmentSizeDetail : tableSizeDetails._offlineSegments._segments.values()) {
         for (SegmentSizeInfo segmentSizeInfo : segmentSizeDetail._serverInfo.values()) {
           largestSegmentSizeOnServer = Math.max(largestSegmentSizeOnServer, segmentSizeInfo.getDiskSizeInBytes());
