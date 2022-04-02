@@ -18,9 +18,15 @@
  */
 package org.apache.pinot.query.planner.nodes;
 
+import org.apache.pinot.common.proto.Plan;
+
 
 public class CalcNode extends AbstractStageNode {
-  private final String _expression;
+  private String _expression;
+
+  public CalcNode(int stageId) {
+    super(stageId);
+  }
 
   public CalcNode(int stageId, String expression) {
     super(stageId);
@@ -29,5 +35,17 @@ public class CalcNode extends AbstractStageNode {
 
   public String getExpression() {
     return _expression;
+  }
+
+  @Override
+  public void setFields(Plan.ObjectFields objFields) {
+    _expression = objFields.getLiteralFieldOrThrow("expression").getStringField();
+  }
+
+  @Override
+  public Plan.ObjectFields getFields() {
+    return Plan.ObjectFields.newBuilder()
+        .putLiteralField("expression", SerDeUtils.stringField(_expression))
+        .build();
   }
 }

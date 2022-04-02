@@ -20,9 +20,10 @@ package org.apache.pinot.query.planner.nodes;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.proto.Plan;
 
 
-public abstract class AbstractStageNode implements StageNode {
+public abstract class AbstractStageNode implements StageNode, ProtoSerializable {
 
   protected final int _stageId;
   protected final List<StageNode> _inputs;

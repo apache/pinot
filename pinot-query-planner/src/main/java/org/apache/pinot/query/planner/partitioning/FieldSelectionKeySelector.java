@@ -30,6 +30,10 @@ public class FieldSelectionKeySelector implements KeySelector<Object[], Object> 
     _columnIndex = columnIndex;
   }
 
+  public int getColumnIndex() {
+    return _columnIndex;
+  }
+
   @Override
   public Object getKey(Object[] input) {
     return input[_columnIndex];

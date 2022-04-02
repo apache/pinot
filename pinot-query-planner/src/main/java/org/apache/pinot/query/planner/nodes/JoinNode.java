@@ -18,15 +18,21 @@
  */
 package org.apache.pinot.query.planner.nodes;
 
-import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.pinot.common.proto.Plan;
+import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 
 
 public class JoinNode extends AbstractStageNode {
-  private final JoinRelType _joinRelType;
-  private final List<JoinClause> _criteria;
+  private JoinRelType _joinRelType;
+  private List<JoinClause> _criteria;
+
+  public JoinNode(int stageId) {
+    super(stageId);
+  }
 
   public JoinNode(int stageId, JoinRelType joinRelType, List<JoinClause> criteria
   ) {
@@ -43,21 +49,65 @@ public class JoinNode extends AbstractStageNode {
     return _criteria;
   }
 
-  public static class JoinClause implements Serializable {
-    private final KeySelector<Object[], Object> _leftJoinKeySelector;
-    private final KeySelector<Object[], Object> _rightJoinKeySelector;
+  public static class JoinClause implements ProtoSerializable {
+    private FieldSelectionKeySelector _leftJoinKeySelector;
+    private FieldSelectionKeySelector _rightJoinKeySelector;
 
-    public JoinClause(KeySelector<Object[], Object> leftKeySelector, KeySelector<Object[], Object> rightKeySelector) {
+    public JoinClause() {
+    }
+
+    public JoinClause(FieldSelectionKeySelector leftKeySelector, FieldSelectionKeySelector rightKeySelector) {
       _leftJoinKeySelector = leftKeySelector;
       _rightJoinKeySelector = rightKeySelector;
     }
 
-    public KeySelector<Object[], Object> getLeftJoinKeySelector() {
+    public FieldSelectionKeySelector getLeftJoinKeySelector() {
       return _leftJoinKeySelector;
     }
 
-    public KeySelector<Object[], Object> getRightJoinKeySelector() {
+    public FieldSelectionKeySelector getRightJoinKeySelector() {
       return _rightJoinKeySelector;
     }
+
+    @Override
+    public void setFields(Plan.ObjectFields objFields) {
+      // Only column index based key selector is supported.
+      // TODO: support generic KeySelector
+      _leftJoinKeySelector = new FieldSelectionKeySelector(
+          objFields.getLiteralFieldOrThrow("leftColumnIdx").getIntField());
+      _rightJoinKeySelector = new FieldSelectionKeySelector(
+          objFields.getLiteralFieldOrThrow("rightColumnIdx").getIntField());
+    }
+
+    @Override
+    public Plan.ObjectFields getFields() {
+      return Plan.ObjectFields.newBuilder()
+          .putLiteralField("leftColumnIdx", SerDeUtils.intField(_leftJoinKeySelector.getColumnIndex()))
+          .putLiteralField("rightColumnIdx", SerDeUtils.intField(_rightJoinKeySelector.getColumnIndex()))
+          .build();
+    }
+  }
+
+  @Override
+  public void setFields(Plan.ObjectFields objFields) {
+    _joinRelType = JoinRelType.valueOf(objFields.getLiteralFieldOrThrow("jobRelType").getStringField());
+    _criteria = new ArrayList<>();
+    for (Plan.ObjectFields joinClauseField : objFields.getListFieldsOrThrow("criteria").getObjectsList()) {
+      JoinClause joinClause = new JoinClause();
+      joinClause.setFields(joinClauseField);
+      _criteria.add(joinClause);
+    }
+  }
+
+  @Override
+  public Plan.ObjectFields getFields() {
+    Plan.ListField.Builder listBuilder = Plan.ListField.newBuilder();
+    for (JoinClause joinClause : _criteria) {
+      listBuilder.addObjects(joinClause.getFields());
+    }
+    return Plan.ObjectFields.newBuilder()
+        .putLiteralField("jobRelType", SerDeUtils.stringField(_joinRelType.name()))
+        .putListFields("criteria", listBuilder.build())
+        .build();
   }
 }

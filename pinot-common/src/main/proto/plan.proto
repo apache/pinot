@@ -39,38 +39,34 @@ syntax = "proto3";
 
 package org.apache.pinot.common.proto;
 
-import "plan.proto";
-
-service PinotQueryWorker {
-  // Dispatch a QueryRequest to a PinotQueryWorker
-  rpc Submit(QueryRequest) returns (QueryResponse);
-}
-
-// QueryRequest is the dispatched content for a specific query stage on a specific worker.
-message QueryRequest {
-  map<string, string> metadata = 1;
-  StagePlan stagePlan = 2;
-}
-
-// QueryResponse is the dispatched response from worker, it doesn't contain actual data, only dispatch status.
-message QueryResponse {
-  map<string, string> metadata = 1;
-  bytes payload = 2;
-}
-
-message StagePlan {
+message StageNode {
   int32 stageId = 1;
-  string instanceId = 2;
-  StageNode stageRoot = 3;
-  map<int32, StageMetadata> stageMetadata = 4;
+  string nodeName = 2;
+  repeated StageNode inputs = 3;
+  ObjectFields fields = 4;
 }
 
-message StageMetadata {
-  repeated string instances = 1;
-  repeated string dataSources = 2;
-  map<string, SegmentList> instanceToSegmentList = 3;
+message ObjectFields {
+  map<string, LiteralField> literalField = 1;
+  map<string, ListField> listFields = 2;
+  map<string, MapField> mapFields = 3;
 }
 
-message SegmentList {
-  repeated string segments = 1;
+message LiteralField {
+  optional bool boolField = 1;
+  optional int32 intField = 2;
+  optional int64 longField = 3;
+  optional double doubleField = 4;
+  optional string stringField = 5;
+  optional bytes bytesField = 6;
+}
+
+message ListField {
+  repeated ObjectFields objects = 1;
+  repeated LiteralField literals = 2;
+}
+
+message MapField {
+  map<string, ObjectFields> objects = 1;
+  map<string, ObjectFields> literals = 2;
 }
