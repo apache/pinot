@@ -199,7 +199,7 @@ public class PinotQuery2BrokerRequestConverter {
     String functionName = function.getOperator();
 
     if (functionName.equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
-      args = Collections.singletonList("*");
+      args = new ArrayList<>(Collections.singletonList("*"));
     } else {
       // Need to de-dup columns for distinct.
       if (functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {

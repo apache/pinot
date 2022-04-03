@@ -152,7 +152,7 @@ public class SelectionOperatorUtils {
       // NOTE: The data schema might be generated from DataTableBuilder.buildEmptyDataTable(), where for 'SELECT *' it
       //       contains a single column "*". In such case, return as is to build the empty selection result.
       if (numColumns == 1 && columnNames[0].equals("*")) {
-        return Collections.singletonList("*");
+        return new ArrayList<>(Collections.singletonList("*"));
       }
 
       // Directly return all columns for selection-only queries

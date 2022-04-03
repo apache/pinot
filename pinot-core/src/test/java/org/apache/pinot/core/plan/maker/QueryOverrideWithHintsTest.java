@@ -199,7 +199,9 @@ public class QueryOverrideWithHintsTest {
 
   @Test
   public void testRewriteExpressionsWithHints() {
-    BrokerRequest brokerRequest = _sqlCompiler.compileToBrokerRequest("SELECT datetrunc('MONTH', ts) from myTable");
+    BrokerRequest brokerRequest =
+        _sqlCompiler.compileToBrokerRequest(
+            "SELECT datetrunc('MONTH', ts), count(*), sum(abc) from myTable group by datetrunc('MONTH', ts) ");
     Expression dateTruncFunctionExpr = RequestUtils.getFunctionExpression("datetrunc");
     dateTruncFunctionExpr.getFunctionCall().setOperands(new ArrayList<>(
         ImmutableList.of(RequestUtils.getLiteralExpression("MONTH"), RequestUtils.getIdentifierExpression("ts"))));
@@ -209,11 +211,14 @@ public class QueryOverrideWithHintsTest {
     QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
     InstancePlanMakerImplV2.rewriteQueryContextWithHints(queryContext, _indexSegment);
     assertEquals(queryContext.getSelectExpressions().get(0).getIdentifier(), "$ts$MONTH");
+    assertEquals(queryContext.getGroupByExpressions().get(0).getIdentifier(), "$ts$MONTH");
   }
 
   @Test
   public void testNotRewriteExpressionsWithHints() {
-    BrokerRequest brokerRequest = _sqlCompiler.compileToBrokerRequest("SELECT datetrunc('DAY', ts) from myTable");
+    BrokerRequest brokerRequest =
+        _sqlCompiler.compileToBrokerRequest(
+            "SELECT datetrunc('DAY', ts), count(*), sum(abc) from myTable group by datetrunc('DAY', ts)");
     Expression dateTruncFunctionExpr = RequestUtils.getFunctionExpression("datetrunc");
     dateTruncFunctionExpr.getFunctionCall().setOperands(new ArrayList<>(
         ImmutableList.of(RequestUtils.getLiteralExpression("DAY"), RequestUtils.getIdentifierExpression("ts"))));
