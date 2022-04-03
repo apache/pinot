@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -351,30 +350,39 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
                     mergeConfigs, taskConfigs));
           }
         } else {
-          // For partitioned table, schedule separate tasks for each partition
+          // For partitioned table, schedule separate tasks for each partitionId (partitionId is constructed from
+          // partitions of all partition columns. There should be exact match between partition columns of segment and
+          // partition columns of table configuration, and there is only partition per column in segment metadata).
+          // Other segments which do not meet these conditions are considered as outlier segments, and additional tasks
+          // are generated for them.
           Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
-          Preconditions.checkState(columnPartitionMap.size() == 1, "Cannot partition on multiple columns for table: %s",
-              tableConfig.getTableName());
-          Map.Entry<String, ColumnPartitionConfig> partitionEntry = columnPartitionMap.entrySet().iterator().next();
-          String partitionColumn = partitionEntry.getKey();
-
+          Set<String> partitionColumns = columnPartitionMap.keySet();
           for (List<SegmentZKMetadata> selectedSegmentsPerBucket : selectedSegmentsForAllBuckets) {
-            Map<Integer, List<SegmentZKMetadata>> partitionToSegments = new HashMap<>();
-            // Handle segments that have multiple partitions or no partition info
+            Map<String, List<SegmentZKMetadata>> partitionToSegments = new HashMap<>();
             List<SegmentZKMetadata> outlierSegments = new ArrayList<>();
             for (SegmentZKMetadata selectedSegment : selectedSegmentsPerBucket) {
               SegmentPartitionMetadata segmentPartitionMetadata = selectedSegment.getPartitionMetadata();
-              if (segmentPartitionMetadata == null
-                  || segmentPartitionMetadata.getPartitions(partitionColumn).size() != 1) {
+              List<Integer> partitionsBuffer = new ArrayList<>();
+              if (segmentPartitionMetadata != null && partitionColumns.equals(
+                  segmentPartitionMetadata.getColumnPartitionMap().keySet())) {
+                for (String partitionColumn : partitionColumns) {
+                  if (segmentPartitionMetadata.getPartitions(partitionColumn).size() == 1) {
+                    partitionsBuffer.add(segmentPartitionMetadata.getPartitions(partitionColumn).iterator().next());
+                  } else {
+                    partitionsBuffer.clear();
+                    break;
+                  }
+                }
+              }
+              if (partitionsBuffer.isEmpty()) {
                 outlierSegments.add(selectedSegment);
               } else {
-                int partition = segmentPartitionMetadata.getPartitions(partitionColumn).iterator().next();
-                partitionToSegments.computeIfAbsent(partition, k -> new ArrayList<>()).add(selectedSegment);
+                String partitionId = StringUtils.join(partitionsBuffer, "_");
+                partitionToSegments.computeIfAbsent(partitionId, k -> new ArrayList<>()).add(selectedSegment);
               }
             }
 
-            for (Map.Entry<Integer, List<SegmentZKMetadata>> partitionToSegmentsEntry
-                : partitionToSegments.entrySet()) {
+            for (Map.Entry<String, List<SegmentZKMetadata>> partitionToSegmentsEntry : partitionToSegments.entrySet()) {
               pinotTaskConfigsForTable.addAll(
                   createPinotTaskConfigs(partitionToSegmentsEntry.getValue(), offlineTableName, maxNumRecordsPerTask,
                       mergeLevel, mergeConfigs, taskConfigs));
