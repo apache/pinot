@@ -36,11 +36,12 @@ import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class NativeTextIndexReader implements TextIndexReader {
-  private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(NativeTextIndexReader.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(NativeTextIndexReader.class);
 
   private final String _column;
   private final File _indexFile;

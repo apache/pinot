@@ -56,7 +56,10 @@ public class NativeTextIndexCreatorTest {
     uniqueValues[3] = "zoobar";
 
     try (NativeTextIndexCreator creator = new NativeTextIndexCreator("testFSTColumn", INDEX_DIR)) {
-      creator.add(uniqueValues, 4);
+      for (int i = 0; i < 4; i++) {
+        creator.add(uniqueValues[i]);
+      }
+
       creator.seal();
     }
 

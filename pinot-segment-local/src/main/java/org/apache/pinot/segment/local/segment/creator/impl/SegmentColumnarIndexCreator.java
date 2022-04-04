@@ -215,15 +215,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
 
       if (textIndexColumns.contains(columnName)) {
-        //TODO : atri
-        /*Map<String, String> columnProperties = _columnProperties.get(columnName);
-        FSTType fstType = FSTType.LUCENE;
-
-        if (TextIndexUtils.isFstTypeNative(columnProperties)) {
-          fstType = FSTType.NATIVE;
-        }*/
         FSTType fstType = _config.getFSTIndexType();
-
         _textIndexCreatorMap.put(columnName,
             _indexCreatorProvider.newTextIndexCreator(context.forTextIndex(fstType, true)));
       }
