@@ -39,6 +39,7 @@ public class PulsarConfig {
   private String _subscriberId;
   private String _bootstrapServers;
   private MessageId _initialMessageId;
+  private SubscriptionInitialPosition _subscriptionInitialPosition;
 
   public PulsarConfig(StreamConfig streamConfig, String subscriberId) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
@@ -53,8 +54,10 @@ public class PulsarConfig {
 
     if (offsetCriteria.isSmallest()) {
       _initialMessageId = MessageId.earliest;
+      _subscriptionInitialPosition = SubscriptionInitialPosition.Earliest;
     } else if (offsetCriteria.isLargest()) {
       _initialMessageId = MessageId.latest;
+      _subscriptionInitialPosition = SubscriptionInitialPosition.Latest;
     } else {
       throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria);
     }
@@ -77,9 +80,6 @@ public class PulsarConfig {
   }
 
   public SubscriptionInitialPosition getInitialSubscriberPosition() {
-    if (_initialMessageId == MessageId.earliest) {
-      return SubscriptionInitialPosition.Earliest;
-    }
-    return SubscriptionInitialPosition.Latest;
+   return _subscriptionInitialPosition;
   }
 }
