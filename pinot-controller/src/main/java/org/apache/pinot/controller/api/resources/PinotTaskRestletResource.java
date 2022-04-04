@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.google.common.collect.ImmutableMap;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -38,6 +39,7 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.QueryParam;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.helix.task.TaskPartitionState;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -45,6 +47,7 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.spi.config.task.AdhocTaskConfig;
 import org.quartz.CronTrigger;
 import org.quartz.JobDataMap;
 import org.quartz.JobDetail;
@@ -67,6 +70,7 @@ import org.quartz.impl.matchers.GroupMatcher;
  *   <li>GET '/tasks/task/{taskName}/state': Get the task state for the given task</li>
  *   <li>GET '/tasks/task/{taskName}/config': Get the task config (a list of child task configs) for the given task</li>
  *   <li>POST '/tasks/schedule': Schedule tasks</li>
+ *   <li>POST '/tasks/execute': Execute an adhoc task</li>
  *   <li>PUT '/tasks/{taskType}/cleanup': Clean up finished tasks (COMPLETED, FAILED) for the given task type</li>
  *   <li>PUT '/tasks/{taskType}/stop': Stop all running/pending tasks (as well as the task queue) for the given task
  *   type</li>
@@ -363,6 +367,19 @@ public class PinotTaskRestletResource {
     } else {
       // Schedule tasks for all task types
       return tableName != null ? _pinotTaskManager.scheduleTasks(tableName) : _pinotTaskManager.scheduleTasks();
+    }
+  }
+
+  @POST
+  @Path("/tasks/execute")
+  @Authenticate(AccessType.CREATE)
+  @ApiOperation("Create an adhoc task to be running on minion")
+  public Map<String, String> executeAdhocTask(AdhocTaskConfig adhocTaskConfig) {
+    try {
+      return _pinotTaskManager.createTask(adhocTaskConfig.getTaskType(), adhocTaskConfig.getTableName(),
+          adhocTaskConfig.getTaskName(), adhocTaskConfig.getTaskConfigs());
+    } catch (Exception e) {
+      return ImmutableMap.of("exception", "Failed to create task: " + ExceptionUtils.getStackTrace(e));
     }
   }
 

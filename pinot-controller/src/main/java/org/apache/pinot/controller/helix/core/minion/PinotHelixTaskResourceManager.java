@@ -232,7 +232,28 @@ public class PinotHelixTaskResourceManager {
     Preconditions.checkState(numConcurrentTasksPerInstance > 0);
 
     String taskType = pinotTaskConfigs.get(0).getTaskType();
-    String parentTaskName = TASK_PREFIX + taskType + TASK_NAME_SEPARATOR + System.currentTimeMillis();
+    String parentTaskName = getParentTaskName(taskType, String.valueOf(System.currentTimeMillis()));
+    return submitTask(parentTaskName, pinotTaskConfigs, minionInstanceTag, taskTimeoutMs,
+        numConcurrentTasksPerInstance);
+  }
+
+  /**
+   * Submit a list of child tasks with same task type to the Minion instances with the given tag.
+   *
+   * @param parentTaskName Parent task name to be submitted
+   * @param pinotTaskConfigs List of child task configs to be submitted
+   * @param minionInstanceTag Tag of the Minion instances to submit the task to
+   * @param taskTimeoutMs Timeout in milliseconds for each task
+   * @param numConcurrentTasksPerInstance Maximum number of concurrent tasks allowed per instance
+   * @return Name of the submitted parent task
+   */
+  public synchronized String submitTask(String parentTaskName, List<PinotTaskConfig> pinotTaskConfigs,
+      String minionInstanceTag, long taskTimeoutMs, int numConcurrentTasksPerInstance) {
+    int numChildTasks = pinotTaskConfigs.size();
+    Preconditions.checkState(numChildTasks > 0);
+    Preconditions.checkState(numConcurrentTasksPerInstance > 0);
+
+    String taskType = pinotTaskConfigs.get(0).getTaskType();
     LOGGER
         .info("Submitting parent task: {} of type: {} with {} child task configs: {} to Minion instances with tag: {}",
             parentTaskName, taskType, numChildTasks, pinotTaskConfigs, minionInstanceTag);
@@ -347,7 +368,11 @@ public class PinotHelixTaskResourceManager {
    */
   public synchronized TaskState getTaskState(String taskName) {
     String taskType = getTaskType(taskName);
-    return _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType)).getJobState(getHelixJobName(taskName));
+    WorkflowContext workflowContext = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType));
+    if (workflowContext == null) {
+      return null;
+    }
+    return workflowContext.getJobState(getHelixJobName(taskName));
   }
 
   /**
@@ -609,6 +634,10 @@ public class PinotHelixTaskResourceManager {
    */
   private static String getTaskType(String name) {
     return name.split(TASK_NAME_SEPARATOR)[1];
+  }
+
+  public String getParentTaskName(String taskType, String taskName) {
+    return TASK_PREFIX + taskType + TASK_NAME_SEPARATOR + taskName;
   }
 
   @JsonPropertyOrder({"taskState", "subtaskCount", "startTime", "executionStartTime", "subtaskInfos"})

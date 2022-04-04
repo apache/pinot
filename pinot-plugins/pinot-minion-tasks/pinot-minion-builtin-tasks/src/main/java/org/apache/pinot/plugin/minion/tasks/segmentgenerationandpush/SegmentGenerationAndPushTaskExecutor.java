@@ -128,9 +128,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
       SegmentGenerationAndPushResult.Builder resultBuilder, Map<String, String> taskConfigs)
       throws Exception {
     // Generate Pinot Segment
-    SegmentGenerationTaskRunner taskRunner = new SegmentGenerationTaskRunner(taskSpec);
-    String segmentName = taskRunner.run();
-
+    String segmentName = new SegmentGenerationTaskRunner(taskSpec).run();
     // Tar segment directory to compress file
     File localSegmentTarFile = tarSegmentDir(taskSpec, segmentName);
 
