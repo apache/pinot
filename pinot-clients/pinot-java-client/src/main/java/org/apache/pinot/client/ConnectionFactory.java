@@ -43,6 +43,10 @@ public class ConnectionFactory {
     return fromZookeeper(zkUrl, getDefault());
   }
 
+  public static Connection fromController(String controllerHost, int controllerPort) {
+    return new Connection(new Properties(), new ControllerBrokerSelector(controllerHost, controllerPort), getDefault());
+  }
+
   /**
    * Creates a connection to a Pinot cluster, given its Zookeeper URL
    *
