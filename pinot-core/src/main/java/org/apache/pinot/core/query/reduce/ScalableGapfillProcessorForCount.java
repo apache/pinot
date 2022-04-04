@@ -73,6 +73,8 @@ class ScalableGapfillProcessorForCount extends ScalableGapfillProcessor {
           }
           if (isFilter) {
             _filteredArray[groupKeyIndex] = i;
+          } else {
+            _filteredArray[groupKeyIndex] = -1;
           }
         }
       }
