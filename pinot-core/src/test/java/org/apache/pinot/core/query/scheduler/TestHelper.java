@@ -18,15 +18,14 @@
  */
 package org.apache.pinot.core.query.scheduler;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.spi.utils.ListUtils;
 
 
 public class TestHelper {
@@ -45,7 +44,7 @@ public class TestHelper {
     qs.setTableName(table);
     br.setQuerySource(qs);
     Selection selection = new Selection();
-    selection.setSelectionColumns(new ArrayList<>(Collections.singletonList("*")));
+    selection.setSelectionColumns(ListUtils.newSingleElementArrayList("*"));
     br.setSelections(selection);
     request.setQuery(br);
     return new ServerQueryRequest(request, metrics, queryArrivalTimeMs);

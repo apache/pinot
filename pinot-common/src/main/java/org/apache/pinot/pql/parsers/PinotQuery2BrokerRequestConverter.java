@@ -19,7 +19,6 @@
 package org.apache.pinot.pql.parsers;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -43,6 +42,7 @@ import org.apache.pinot.parsers.utils.ParserUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.pql.parsers.pql2.ast.OrderByAstNode;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.utils.ListUtils;
 
 
 public class PinotQuery2BrokerRequestConverter {
@@ -199,7 +199,7 @@ public class PinotQuery2BrokerRequestConverter {
     String functionName = function.getOperator();
 
     if (functionName.equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
-      args = new ArrayList<>(Collections.singletonList("*"));
+      args = ListUtils.newSingleElementArrayList("*");
     } else {
       // Need to de-dup columns for distinct.
       if (functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {

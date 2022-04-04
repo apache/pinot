@@ -20,7 +20,6 @@ package org.apache.pinot.sql.parsers;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -59,6 +58,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.utils.ListUtils;
 import org.apache.pinot.spi.utils.Pairs;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
@@ -293,7 +293,7 @@ public class CalciteSqlParser {
       if (function != null) {
         if (excludeAs && function.getOperator().equals("as")) {
           identifiers.addAll(
-              extractIdentifiers(new ArrayList<>(Collections.singletonList(function.getOperands().get(0))), true));
+              extractIdentifiers(ListUtils.newSingleElementArrayList(function.getOperands().get(0)), true));
         } else {
           identifiers.addAll(extractIdentifiers(function.getOperands(), excludeAs));
         }

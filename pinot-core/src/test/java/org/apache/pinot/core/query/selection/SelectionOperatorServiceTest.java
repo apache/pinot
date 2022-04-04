@@ -22,7 +22,6 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.PriorityQueue;
@@ -34,6 +33,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.ListUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -163,9 +163,9 @@ public class SelectionOperatorServiceTest {
 
     // Test data schema from DataTableBuilder.buildEmptyDataTable()
     when(dataSchema.getColumnNames()).thenReturn(new String[]{"*"});
-    selectionColumns = SelectionOperatorUtils
-        .getSelectionColumns(QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable"), dataSchema);
-    assertEquals(selectionColumns, new ArrayList<>(Collections.singletonList("*")));
+    selectionColumns = SelectionOperatorUtils.getSelectionColumns(
+        QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable"), dataSchema);
+    assertEquals(selectionColumns, ListUtils.newSingleElementArrayList("*"));
   }
 
   @Test

@@ -25,7 +25,6 @@ import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -46,6 +45,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.ListUtils;
 
 
 /**
@@ -152,7 +152,7 @@ public class SelectionOperatorUtils {
       // NOTE: The data schema might be generated from DataTableBuilder.buildEmptyDataTable(), where for 'SELECT *' it
       //       contains a single column "*". In such case, return as is to build the empty selection result.
       if (numColumns == 1 && columnNames[0].equals("*")) {
-        return new ArrayList<>(Collections.singletonList("*"));
+        return ListUtils.newSingleElementArrayList("*");
       }
 
       // Directly return all columns for selection-only queries
@@ -328,8 +328,8 @@ public class SelectionOperatorUtils {
             break;
 
           default:
-            throw new IllegalStateException(String
-                .format("Unsupported data type: %s for column: %s", storedColumnDataTypes[i],
+            throw new IllegalStateException(
+                String.format("Unsupported data type: %s for column: %s", storedColumnDataTypes[i],
                     dataSchema.getColumnName(i)));
         }
       }
@@ -392,8 +392,8 @@ public class SelectionOperatorUtils {
           break;
 
         default:
-          throw new IllegalStateException(String
-              .format("Unsupported data type: %s for column: %s", storedColumnDataTypes[i],
+          throw new IllegalStateException(
+              String.format("Unsupported data type: %s for column: %s", storedColumnDataTypes[i],
                   dataSchema.getColumnName(i)));
       }
     }
