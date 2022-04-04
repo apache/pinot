@@ -122,6 +122,7 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
               partitionGroupConsumptionStatus.getStartOffset()));
     }
 
+    PulsarConfig pulsarConfig = new PulsarConfig(streamConfig, clientId);
     Consumer consumer = null;
     try {
       List<String> partitionedTopicNameList = _pulsarClient.getPartitionsForTopic(_topic).get();
@@ -132,7 +133,7 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
         for (int p = newPartitionStartIndex; p < partitionedTopicNameList.size(); p++) {
 
           consumer = _pulsarClient.newConsumer().topic(partitionedTopicNameList.get(p))
-              .subscriptionInitialPosition(_config.getInitialSubscriberPosition())
+              .subscriptionInitialPosition(pulsarConfig.getInitialSubscriberPosition())
               .subscriptionName(ConsumerName.generateRandomName()).subscribe();
 
           Message message = consumer.receive(timeoutMillis, TimeUnit.MILLISECONDS);
