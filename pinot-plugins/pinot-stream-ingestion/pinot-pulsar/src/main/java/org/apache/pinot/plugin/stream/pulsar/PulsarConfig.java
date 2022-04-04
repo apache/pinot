@@ -19,8 +19,6 @@
 package org.apache.pinot.plugin.stream.pulsar;
 
 import com.google.common.base.Preconditions;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -57,12 +55,8 @@ public class PulsarConfig {
       _initialMessageId = MessageId.earliest;
     } else if (offsetCriteria.isLargest()) {
       _initialMessageId = MessageId.latest;
-    } else if (offsetCriteria.isCustom()) {
-      try {
-        _initialMessageId = MessageId.fromByteArray(offsetCriteria.getOffsetString().getBytes(StandardCharsets.UTF_8));
-      } catch (IOException e) {
-        throw new RuntimeException("Invalid offset string found: " + offsetCriteria.getOffsetString());
-      }
+    } else {
+      throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria);
     }
   }
 
