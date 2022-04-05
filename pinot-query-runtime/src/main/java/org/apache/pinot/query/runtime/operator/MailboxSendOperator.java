@@ -45,6 +45,8 @@ import org.slf4j.LoggerFactory;
  */
 public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxSendOperator.class);
+  private static final String OPERATOR_NAME = "MailboxSendOperator";
+  private static final String EXPLAIN_NAME = "MAILBOX_SEND";
   private static final Set<RelDistribution.Type> SUPPORTED_EXCHANGE_TYPE =
       ImmutableSet.of(RelDistribution.Type.SINGLETON, RelDistribution.Type.RANDOM_DISTRIBUTED,
           RelDistribution.Type.BROADCAST_DISTRIBUTED);
@@ -94,18 +96,19 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
 
   @Override
   public String getOperatorName() {
-    return null;
+    return OPERATOR_NAME;
   }
 
   @Override
   public List<Operator> getChildOperators() {
+    // WorkerExecutor doesn't use getChildOperators, returns null here.
     return null;
   }
 
   @Nullable
   @Override
   public String toExplainString() {
-    return null;
+    return EXPLAIN_NAME;
   }
 
   @Override
@@ -173,7 +176,7 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
   }
 
   private String toMailboxId(ServerInstance serverInstance) {
-    return new StringMailboxIdentifier(String.format("%s_%s", _jobId, _stageId), "NULL", _serverHostName, _serverPort,
+    return new StringMailboxIdentifier(String.format("%s_%s", _jobId, _stageId), _serverHostName, _serverPort,
         serverInstance.getHostname(), serverInstance.getGrpcPort()).toString();
   }
 }

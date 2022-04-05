@@ -43,6 +43,8 @@ import org.apache.pinot.query.runtime.blocks.DataTableBlockUtils;
  * <p>For each of the data block received from the left table, it will generate a joint data block.
  */
 public class BroadcastJoinOperator extends BaseOperator<DataTableBlock> {
+  private static final String OPERATOR_NAME = "BroadcastJoinOperator";
+  private static final String EXPLAIN_NAME = "BROADCAST_JOIN";
 
   private final HashMap<Object, List<Object[]>> _broadcastHashTable;
   private final BaseOperator<DataTableBlock> _leftTableOperator;
@@ -68,18 +70,19 @@ public class BroadcastJoinOperator extends BaseOperator<DataTableBlock> {
 
   @Override
   public String getOperatorName() {
-    return null;
+    return OPERATOR_NAME;
   }
 
   @Override
   public List<Operator> getChildOperators() {
+    // WorkerExecutor doesn't use getChildOperators, returns null here.
     return null;
   }
 
   @Nullable
   @Override
   public String toExplainString() {
-    return null;
+    return EXPLAIN_NAME;
   }
 
   @Override

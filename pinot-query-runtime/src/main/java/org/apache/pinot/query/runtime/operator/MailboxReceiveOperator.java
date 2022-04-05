@@ -44,6 +44,8 @@ import org.slf4j.LoggerFactory;
  */
 public class MailboxReceiveOperator extends BaseOperator<DataTableBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxReceiveOperator.class);
+  private static final String OPERATOR_NAME = "MailboxReceiveOperator";
+  private static final String EXPLAIN_NAME = "MAILBOX_RECEIVE";
   private static final long DEFAULT_TIMEOUT_NANO = 10_000_000_000L;
 
   private final MailboxService<Mailbox.MailboxContent> _mailboxService;
@@ -68,18 +70,19 @@ public class MailboxReceiveOperator extends BaseOperator<DataTableBlock> {
 
   @Override
   public String getOperatorName() {
-    return null;
+    return OPERATOR_NAME;
   }
 
   @Override
   public List<Operator> getChildOperators() {
+    // WorkerExecutor doesn't use getChildOperators, returns null here.
     return null;
   }
 
   @Nullable
   @Override
   public String toExplainString() {
-    return null;
+    return EXPLAIN_NAME;
   }
 
   @Override
@@ -128,7 +131,7 @@ public class MailboxReceiveOperator extends BaseOperator<DataTableBlock> {
   }
 
   private String toMailboxId(ServerInstance serverInstance) {
-    return new StringMailboxIdentifier(String.format("%s_%s", _jobId, _stageId), "NULL", serverInstance.getHostname(),
+    return new StringMailboxIdentifier(String.format("%s_%s", _jobId, _stageId), serverInstance.getHostname(),
         serverInstance.getGrpcPort(), _hostName, _port).toString();
   }
 }

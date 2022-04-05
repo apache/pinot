@@ -32,12 +32,6 @@ public interface MailboxIdentifier {
   String getJobId();
 
   /**
-   * get the partition key.
-   * @return partition key.
-   */
-  String getPartitionKey();
-
-  /**
    * get the sender host.
    * @return sender host
    */

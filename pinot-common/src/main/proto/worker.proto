@@ -40,14 +40,17 @@ syntax = "proto3";
 package org.apache.pinot.common.proto;
 
 service PinotQueryWorker {
+  // Dispatch a QueryRequest to a PinotQueryWorker
   rpc Submit(QueryRequest) returns (QueryResponse);
 }
 
+// QueryRequest is the dispatched content for a specific query stage on a specific worker.
 message QueryRequest {
   map<string, string> metadata = 1;
   StagePlan stagePlan = 2;
 }
 
+// QueryResponse is the dispatched response from worker, it doesn't contain actual data, only dispatch status.
 message QueryResponse {
   map<string, string> metadata = 1;
   bytes payload = 2;
