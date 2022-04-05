@@ -25,6 +25,9 @@ import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.trace.InvocationRecording;
+import org.apache.pinot.spi.trace.InvocationSpan;
+import org.apache.pinot.spi.trace.Tracing;
 
 
 /**
@@ -66,71 +69,131 @@ public class ProjectionBlockValSet implements BlockValSet {
 
   @Override
   public int[] getDictionaryIdsSV() {
-    return _dataBlockCache.getDictIdsForSVColumn(_column);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(ProjectionBlockValSet.class)) {
+      recordReadDictIds(span, true);
+      return _dataBlockCache.getDictIdsForSVColumn(_column);
+    }
   }
 
   @Override
   public int[] getIntValuesSV() {
-    return _dataBlockCache.getIntValuesForSVColumn(_column);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(ProjectionBlockValSet.class)) {
+      recordReadValues(span, DataType.INT, true);
+      return _dataBlockCache.getIntValuesForSVColumn(_column);
+    }
   }
 
   @Override
   public long[] getLongValuesSV() {
-    return _dataBlockCache.getLongValuesForSVColumn(_column);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(ProjectionBlockValSet.class)) {
+      recordReadValues(span, DataType.LONG, true);
+      return _dataBlockCache.getLongValuesForSVColumn(_column);
+    }
   }
 
   @Override
   public float[] getFloatValuesSV() {
-    return _dataBlockCache.getFloatValuesForSVColumn(_column);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(ProjectionBlockValSet.class)) {
+      recordReadValues(span, DataType.FLOAT, true);
+      return _dataBlockCache.getFloatValuesForSVColumn(_column);
+    }
   }
 
   @Override
   public double[] getDoubleValuesSV() {
-    return _dataBlockCache.getDoubleValuesForSVColumn(_column);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(ProjectionBlockValSet.class)) {
+      recordReadValues(span, DataType.DOUBLE, true);
+      return _dataBlockCache.getDoubleValuesForSVColumn(_column);
+    }
   }
 
   @Override
   public String[] getStringValuesSV() {
-    return _dataBlockCache.getStringValuesForSVColumn(_column);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(ProjectionBlockValSet.class)) {
+      recordReadValues(span, DataType.STRING, true);
+      return _dataBlockCache.getStringValuesForSVColumn(_column);
+    }
   }
 
   @Override
   public byte[][] getBytesValuesSV() {
-    return _dataBlockCache.getBytesValuesForSVColumn(_column);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(ProjectionBlockValSet.class)) {
+      recordReadValues(span, DataType.BYTES, true);
+      return _dataBlockCache.getBytesValuesForSVColumn(_column);
+    }
   }
 
   @Override
   public int[][] getDictionaryIdsMV() {
-    return _dataBlockCache.getDictIdsForMVColumn(_column);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(ProjectionBlockValSet.class)) {
+      recordReadDictIds(span, false);
+      return _dataBlockCache.getDictIdsForMVColumn(_column);
+    }
   }
 
   @Override
   public int[][] getIntValuesMV() {
-    return _dataBlockCache.getIntValuesForMVColumn(_column);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(ProjectionBlockValSet.class)) {
+      recordReadValues(span, DataType.INT, false);
+      return _dataBlockCache.getIntValuesForMVColumn(_column);
+    }
   }
 
   @Override
   public long[][] getLongValuesMV() {
-    return _dataBlockCache.getLongValuesForMVColumn(_column);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(ProjectionBlockValSet.class)) {
+      recordReadValues(span, DataType.LONG, false);
+      return _dataBlockCache.getLongValuesForMVColumn(_column);
+    }
   }
 
   @Override
   public float[][] getFloatValuesMV() {
-    return _dataBlockCache.getFloatValuesForMVColumn(_column);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(ProjectionBlockValSet.class)) {
+      recordReadValues(span, DataType.FLOAT, false);
+      return _dataBlockCache.getFloatValuesForMVColumn(_column);
+    }
   }
 
   @Override
   public double[][] getDoubleValuesMV() {
-    return _dataBlockCache.getDoubleValuesForMVColumn(_column);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(ProjectionBlockValSet.class)) {
+      recordReadValues(span, DataType.DOUBLE, false);
+      return _dataBlockCache.getDoubleValuesForMVColumn(_column);
+    }
   }
 
   @Override
   public String[][] getStringValuesMV() {
-    return _dataBlockCache.getStringValuesForMVColumn(_column);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(ProjectionBlockValSet.class)) {
+      recordReadValues(span, DataType.STRING, false);
+      return _dataBlockCache.getStringValuesForMVColumn(_column);
+    }
   }
 
   @Override
   public int[] getNumMVEntries() {
     return _dataBlockCache.getNumValuesForMVColumn(_column);
+  }
+
+  private void recordReadValues(InvocationRecording recording, DataType targetDataType, boolean targetSV) {
+    if (recording.isEnabled()) {
+      int numDocs = _dataBlockCache.getNumDocs();
+      DataType sourceDataType = _dataSource.getDataSourceMetadata().getDataType();
+      boolean isSourceSV = _dataSource.getDataSourceMetadata().isSingleValue();
+      recording.setDataTypes(sourceDataType, isSourceSV, targetDataType, targetSV);
+      recording.setDocsScanned(numDocs);
+      recording.setColumnName(_column);
+    }
+  }
+
+  private void recordReadDictIds(InvocationRecording recording, boolean singleValue) {
+    if (recording.isEnabled()) {
+      int numDocs = _dataBlockCache.getNumDocs();
+      String dataType = singleValue ? "DICT" : "DICT[]";
+      recording.setDataTypes(dataType, dataType);
+      recording.setDocsScanned(numDocs);
+      recording.setColumnName(_column);
+    }
   }
 }

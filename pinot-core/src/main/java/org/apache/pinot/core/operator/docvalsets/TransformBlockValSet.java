@@ -26,6 +26,9 @@ import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.trace.InvocationRecording;
+import org.apache.pinot.spi.trace.InvocationSpan;
+import org.apache.pinot.spi.trace.Tracing;
 
 
 /**
@@ -62,67 +65,106 @@ public class TransformBlockValSet implements BlockValSet {
 
   @Override
   public int[] getDictionaryIdsSV() {
-    return _transformFunction.transformToDictIdsSV(_projectionBlock);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(TransformBlockValSet.class)) {
+      recordTransformDictIds(span, true);
+      return _transformFunction.transformToDictIdsSV(_projectionBlock);
+    }
   }
 
   @Override
   public int[] getIntValuesSV() {
-    return _transformFunction.transformToIntValuesSV(_projectionBlock);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(TransformBlockValSet.class)) {
+      recordTransformValues(span, DataType.INT, true);
+      return _transformFunction.transformToIntValuesSV(_projectionBlock);
+    }
   }
 
   @Override
   public long[] getLongValuesSV() {
-    return _transformFunction.transformToLongValuesSV(_projectionBlock);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(TransformBlockValSet.class)) {
+      recordTransformValues(span, DataType.LONG, true);
+      return _transformFunction.transformToLongValuesSV(_projectionBlock);
+    }
   }
 
   @Override
   public float[] getFloatValuesSV() {
-    return _transformFunction.transformToFloatValuesSV(_projectionBlock);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(TransformBlockValSet.class)) {
+      recordTransformValues(span, DataType.FLOAT, true);
+      return _transformFunction.transformToFloatValuesSV(_projectionBlock);
+    }
   }
 
   @Override
   public double[] getDoubleValuesSV() {
-    return _transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(TransformBlockValSet.class)) {
+      recordTransformValues(span, DataType.DOUBLE, true);
+      return _transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    }
   }
 
   @Override
   public String[] getStringValuesSV() {
-    return _transformFunction.transformToStringValuesSV(_projectionBlock);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(TransformBlockValSet.class)) {
+      recordTransformValues(span, DataType.STRING, true);
+      return _transformFunction.transformToStringValuesSV(_projectionBlock);
+    }
   }
 
   @Override
   public byte[][] getBytesValuesSV() {
-    return _transformFunction.transformToBytesValuesSV(_projectionBlock);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(TransformBlockValSet.class)) {
+      recordTransformValues(span, DataType.BYTES, true);
+      return _transformFunction.transformToBytesValuesSV(_projectionBlock);
+    }
   }
 
   @Override
   public int[][] getDictionaryIdsMV() {
-    return _transformFunction.transformToDictIdsMV(_projectionBlock);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(TransformBlockValSet.class)) {
+      recordTransformDictIds(span, false);
+      return _transformFunction.transformToDictIdsMV(_projectionBlock);
+    }
   }
 
   @Override
   public int[][] getIntValuesMV() {
-    return _transformFunction.transformToIntValuesMV(_projectionBlock);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(TransformBlockValSet.class)) {
+      recordTransformValues(span, DataType.INT, false);
+      return _transformFunction.transformToIntValuesMV(_projectionBlock);
+    }
   }
 
   @Override
   public long[][] getLongValuesMV() {
-    return _transformFunction.transformToLongValuesMV(_projectionBlock);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(TransformBlockValSet.class)) {
+      recordTransformValues(span, DataType.LONG, false);
+      return _transformFunction.transformToLongValuesMV(_projectionBlock);
+    }
   }
 
   @Override
   public float[][] getFloatValuesMV() {
-    return _transformFunction.transformToFloatValuesMV(_projectionBlock);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(TransformBlockValSet.class)) {
+      recordTransformValues(span, DataType.FLOAT, false);
+      return _transformFunction.transformToFloatValuesMV(_projectionBlock);
+    }
   }
 
   @Override
   public double[][] getDoubleValuesMV() {
-    return _transformFunction.transformToDoubleValuesMV(_projectionBlock);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(TransformBlockValSet.class)) {
+      recordTransformValues(span, DataType.DOUBLE, false);
+      return _transformFunction.transformToDoubleValuesMV(_projectionBlock);
+    }
   }
 
   @Override
   public String[][] getStringValuesMV() {
-    return _transformFunction.transformToStringValuesMV(_projectionBlock);
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(TransformBlockValSet.class)) {
+      recordTransformValues(span, DataType.STRING, false);
+      return _transformFunction.transformToStringValuesMV(_projectionBlock);
+    }
   }
 
   @Override
@@ -173,6 +215,27 @@ public class TransformBlockValSet implements BlockValSet {
         default:
           throw new IllegalStateException();
       }
+    }
+  }
+
+  private void recordTransformValues(InvocationRecording recording, DataType targetDataType,
+      boolean targetSingleValue) {
+    if (recording.isEnabled()) {
+      int numDocs = _projectionBlock.getNumDocs();
+      DataType sourceDataType = _projectionBlock.getMetadata().getDataType();
+      boolean isSourceSV = _projectionBlock.getMetadata().isSingleValue();
+      recording.setDataTypes(sourceDataType, isSourceSV, targetDataType, targetSingleValue);
+      recording.setDocsScanned(numDocs);
+      recording.setFunctionName(_transformFunction.getName());
+    }
+  }
+
+  private void recordTransformDictIds(InvocationRecording recording, boolean targetSingleValue) {
+    if (recording.isEnabled()) {
+      recording.setFunctionName(_transformFunction.getName());
+      String dataType = targetSingleValue ? "DICT" : "DICT[]";
+      recording.setDataTypes(dataType, dataType);
+      recording.setDocsScanned(_projectionBlock.getNumDocs());
     }
   }
 }
