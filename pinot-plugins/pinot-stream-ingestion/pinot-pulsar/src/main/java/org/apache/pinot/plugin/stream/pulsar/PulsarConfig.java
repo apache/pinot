@@ -26,6 +26,7 @@ import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pulsar.client.api.MessageId;
+import org.apache.pulsar.client.api.SubscriptionInitialPosition;
 
 
 /**
@@ -79,5 +80,12 @@ public class PulsarConfig {
 
   public MessageId getInitialMessageId() {
     return _initialMessageId;
+  }
+
+  public SubscriptionInitialPosition getInitialSubscriberPosition() {
+    if (_initialMessageId == MessageId.earliest) {
+      return SubscriptionInitialPosition.Earliest;
+    }
+    return SubscriptionInitialPosition.Latest;
   }
 }
