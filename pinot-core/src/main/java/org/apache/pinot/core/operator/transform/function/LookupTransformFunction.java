@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +32,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
@@ -84,6 +86,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
   private long _nullLongValue;
   private float _nullFloatValue;
   private double _nullDoubleValue;
+  private BigDecimal _nullBigDecimalValue;
 
   @Override
   public String getName() {
@@ -151,7 +154,9 @@ public class LookupTransformFunction extends BaseTransformFunction {
       _nullIntValue = ((Number) defaultNullValue).intValue();
       _nullLongValue = ((Number) defaultNullValue).longValue();
       _nullFloatValue = ((Number) defaultNullValue).floatValue();
-      _nullDoubleValue = ((Number) defaultNullValue).intValue();
+      _nullDoubleValue = ((Number) defaultNullValue).doubleValue();
+    } else if (_lookupColumnFieldSpec.getDataType() == DataType.BIG_DECIMAL && defaultNullValue instanceof byte[]) {
+      _nullBigDecimalValue = BigDecimalUtils.deserialize((byte[]) defaultNullValue);
     }
   }
 
@@ -264,6 +269,16 @@ public class LookupTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    int numDocs = projectionBlock.getNumDocs();
+    if (_bigDecimalValuesSV == null || _bigDecimalValuesSV.length < numDocs) {
+      _bigDecimalValuesSV = new BigDecimal[numDocs];
+    }
+    lookup(projectionBlock, this::setBigDecimalSV);
+    return _bigDecimalValuesSV;
+  }
+
+  @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
     if (_stringValuesSV == null || _stringValuesSV.length < numDocs) {
@@ -362,6 +377,18 @@ public class LookupTransformFunction extends BaseTransformFunction {
       _doubleValuesSV[index] = ((Number) value).doubleValue();
     } else {
       _doubleValuesSV[index] = _nullDoubleValue;
+    }
+  }
+
+  private void setBigDecimalSV(int index, Object value) {
+    if (value instanceof Number) {
+      if (value instanceof BigDecimal) {
+        _bigDecimalValuesSV[index] = (BigDecimal) value;
+      } else {
+        _bigDecimalValuesSV[index] = BigDecimal.valueOf(((Number) value).doubleValue());
+      }
+    } else {
+      _bigDecimalValuesSV[index] = _nullBigDecimalValue;
     }
   }
 

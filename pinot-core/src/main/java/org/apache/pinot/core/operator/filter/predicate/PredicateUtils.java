@@ -37,6 +37,8 @@ public class PredicateUtils {
       case TIMESTAMP:
         return getStoredTimestampValue(value);
       default:
+        // Note: although the underlying type of BigDecimal is byte[]. Caller of this method should work w/ BigDecimal
+        // values directly for correctness.
         return value;
     }
   }

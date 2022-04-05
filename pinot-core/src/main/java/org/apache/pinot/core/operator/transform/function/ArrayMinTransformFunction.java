@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
@@ -152,6 +153,13 @@ public class ArrayMinTransformFunction extends BaseTransformFunction {
       _doubleValuesSV[i] = minRes;
     }
     return _doubleValuesSV;
+  }
+
+  @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    // Note: DataFetcher does not support fetching byte[] values for a multi-valued column, and BlockValSet
+    //  does not support returning a block of values for a multi-valued bytes column.
+    throw new UnsupportedOperationException();
   }
 
   @Override

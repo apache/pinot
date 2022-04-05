@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
+
+
 public class GreaterThanTransformFunctionTest extends BinaryOperatorTransformFunctionTest {
 
   @Override
@@ -38,6 +41,11 @@ public class GreaterThanTransformFunctionTest extends BinaryOperatorTransformFun
   @Override
   int getExpectedValue(double value, double toCompare) {
     return (value > toCompare) ? 1 : 0;
+  }
+
+  @Override
+  int getExpectedValue(BigDecimal value, BigDecimal toCompare) {
+    return value.compareTo(toCompare) > 0 ? 1 : 0;
   }
 
   @Override

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -75,6 +77,17 @@ public class DivisionTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
+    expression = RequestContextUtils.getExpressionFromSQL(String.format("div(%s,%s)", DOUBLE_SV_COLUMN,
+        BIG_DECIMAL_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof DivisionTransformFunction);
+    BigDecimal[] expectedBigDecimalValues = new BigDecimal[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedBigDecimalValues[i] = BigDecimal.valueOf(_doubleSVValues[i])
+          .divide(_bigDecimalSVValues[i], RoundingMode.HALF_EVEN);
+    }
+    testTransformFunction(transformFunction, expectedBigDecimalValues);
+
     expression = RequestContextUtils.getExpressionFromSQL(String
         .format("div(div(div(div(div(12,%s),%s),div(div(%s,%s),0.34)),%s),%s)", STRING_SV_COLUMN, DOUBLE_SV_COLUMN,
             FLOAT_SV_COLUMN, LONG_SV_COLUMN, INT_SV_COLUMN, DOUBLE_SV_COLUMN));
@@ -86,6 +99,21 @@ public class DivisionTransformFunctionTest extends BaseTransformFunctionTest {
           / _doubleSVValues[i]);
     }
     testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpressionFromSQL(String
+        .format("div(div(div('3430.34473923874923809',div(%s,0.34)),%s),%s)", STRING_SV_COLUMN, BIG_DECIMAL_SV_COLUMN,
+            INT_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof DivisionTransformFunction);
+    BigDecimal constant1 = BigDecimal.valueOf(0.34d);
+    BigDecimal constant2 = new BigDecimal("3430.34473923874923809");
+    for (int i = 0; i < NUM_ROWS; i++) {
+      BigDecimal val1 = new BigDecimal(_stringSVValues[i]).divide(constant1, RoundingMode.HALF_EVEN);
+      BigDecimal val2 = constant2.divide(val1, RoundingMode.HALF_EVEN);
+      BigDecimal val3 = val2.divide(_bigDecimalSVValues[i], RoundingMode.HALF_EVEN);
+      expectedBigDecimalValues[i] = val3.divide(new BigDecimal(_intSVValues[i]), RoundingMode.HALF_EVEN);
+    }
+    testTransformFunction(transformFunction, expectedBigDecimalValues);
   }
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})

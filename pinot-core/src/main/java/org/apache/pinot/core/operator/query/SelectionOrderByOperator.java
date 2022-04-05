@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -46,6 +47,7 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -130,13 +132,13 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
     int numValuesToCompare = valueIndexList.size();
     int[] valueIndices = new int[numValuesToCompare];
-    DataType[] storedTypes = new DataType[numValuesToCompare];
+    DataType[] dataTypes = new DataType[numValuesToCompare];
     // Use multiplier -1 or 1 to control ascending/descending order
     int[] multipliers = new int[numValuesToCompare];
     for (int i = 0; i < numValuesToCompare; i++) {
       int valueIndex = valueIndexList.get(i);
       valueIndices[i] = valueIndex;
-      storedTypes[i] = _orderByExpressionMetadata[valueIndex].getDataType().getStoredType();
+      dataTypes[i] = _orderByExpressionMetadata[valueIndex].getDataType();
       multipliers[i] = _orderByExpressions.get(valueIndex).isAsc() ? -1 : 1;
     }
 
@@ -148,7 +150,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
         Object v1 = o1[index];
         Object v2 = o2[index];
         int result;
-        switch (storedTypes[i]) {
+        switch (dataTypes[i].getStoredType()) {
           case INT:
             result = ((Integer) v1).compareTo((Integer) v2);
             break;
@@ -165,8 +167,11 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
             result = ((String) v1).compareTo((String) v2);
             break;
           case BYTES:
-            result = ((ByteArray) v1).compareTo((ByteArray) v2);
-            break;
+            if (dataTypes[i] == DataType.BIG_DECIMAL) {
+              result = ((BigDecimal) v1).compareTo((BigDecimal) v2);
+              break;
+            }
+          // throw.
           // NOTE: Multi-value columns are not comparable, so we should not reach here
           default:
             throw new IllegalStateException();

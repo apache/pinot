@@ -19,6 +19,7 @@
 package org.apache.pinot.common.data;
 
 import java.io.File;
+import java.math.BigDecimal;
 import java.net.URL;
 import java.sql.Timestamp;
 import java.util.concurrent.TimeUnit;
@@ -83,13 +84,21 @@ public class SchemaTest {
     schemaToValidate.validate();
 
     schemaToValidate = new Schema();
-    schemaToValidate.addField(new MetricFieldSpec("m", FieldSpec.DataType.BOOLEAN, new Timestamp(0)));
+    schemaToValidate.addField(new MetricFieldSpec("m", FieldSpec.DataType.TIMESTAMP, new Timestamp(0)));
     try {
       schemaToValidate.validate();
       Assert.fail("Should have failed validation for invalid schema.");
     } catch (IllegalStateException e) {
       // expected
     }
+
+    schemaToValidate = new Schema();
+    schemaToValidate.addField(new DimensionFieldSpec("d", FieldSpec.DataType.BIG_DECIMAL, true));
+    schemaToValidate.validate();
+
+    schemaToValidate = new Schema();
+    schemaToValidate.addField(new MetricFieldSpec("m", FieldSpec.DataType.BIG_DECIMAL, BigDecimal.ZERO));
+    schemaToValidate.validate();
   }
 
   @Test
@@ -98,9 +107,11 @@ public class SchemaTest {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
         .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.INT, 10)
         .addSingleValueDimension("svDimensionWithMaxLength", FieldSpec.DataType.STRING, 20000, null)
+        .addSingleValueDimension("svBigDecimalDimensionWithDefault", FieldSpec.DataType.BIG_DECIMAL, BigDecimal.TEN)
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
         .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, defaultString)
         .addMultiValueDimension("mvDimensionWithMaxLength", FieldSpec.DataType.STRING, 20000, null)
+        .addMultiValueDimension("mvBigDecimalDimensionWithDefault", FieldSpec.DataType.BIG_DECIMAL, BigDecimal.ONE)
         .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
@@ -131,6 +142,14 @@ public class SchemaTest {
     Assert.assertEquals(dimensionFieldSpec.getMaxLength(), 20000);
     Assert.assertEquals(dimensionFieldSpec.getDefaultNullValue(), "null");
 
+    dimensionFieldSpec = schema.getDimensionSpec("svBigDecimalDimensionWithDefault");
+    Assert.assertNotNull(dimensionFieldSpec);
+    Assert.assertEquals(dimensionFieldSpec.getFieldType(), FieldSpec.FieldType.DIMENSION);
+    Assert.assertEquals(dimensionFieldSpec.getName(), "svBigDecimalDimensionWithDefault");
+    Assert.assertEquals(dimensionFieldSpec.getDataType(), FieldSpec.DataType.BIG_DECIMAL);
+    Assert.assertTrue(dimensionFieldSpec.isSingleValueField());
+    Assert.assertEquals(dimensionFieldSpec.getDefaultNullValue(), BigDecimal.TEN);
+
     dimensionFieldSpec = schema.getDimensionSpec("mvDimension");
     Assert.assertNotNull(dimensionFieldSpec);
     Assert.assertEquals(dimensionFieldSpec.getFieldType(), FieldSpec.FieldType.DIMENSION);
@@ -155,6 +174,14 @@ public class SchemaTest {
     Assert.assertFalse(dimensionFieldSpec.isSingleValueField());
     Assert.assertEquals(dimensionFieldSpec.getMaxLength(), 20000);
     Assert.assertEquals(dimensionFieldSpec.getDefaultNullValue(), "null");
+
+    dimensionFieldSpec = schema.getDimensionSpec("mvBigDecimalDimensionWithDefault");
+    Assert.assertNotNull(dimensionFieldSpec);
+    Assert.assertEquals(dimensionFieldSpec.getFieldType(), FieldSpec.FieldType.DIMENSION);
+    Assert.assertEquals(dimensionFieldSpec.getName(), "mvBigDecimalDimensionWithDefault");
+    Assert.assertEquals(dimensionFieldSpec.getDataType(), FieldSpec.DataType.BIG_DECIMAL);
+    Assert.assertFalse(dimensionFieldSpec.isSingleValueField());
+    Assert.assertEquals(dimensionFieldSpec.getDefaultNullValue(), BigDecimal.ONE);
 
     MetricFieldSpec metricFieldSpec = schema.getMetricSpec("metric");
     Assert.assertNotNull(metricFieldSpec);

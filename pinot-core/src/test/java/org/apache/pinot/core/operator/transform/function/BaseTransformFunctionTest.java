@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.io.File;
+import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
@@ -69,6 +70,7 @@ public abstract class BaseTransformFunctionTest {
   protected static final String LONG_SV_COLUMN = "longSV";
   protected static final String FLOAT_SV_COLUMN = "floatSV";
   protected static final String DOUBLE_SV_COLUMN = "doubleSV";
+  protected static final String BIG_DECIMAL_SV_COLUMN = "bigDecimalSV";
   protected static final String STRING_SV_COLUMN = "stringSV";
   protected static final String BYTES_SV_COLUMN = "bytesSV";
   protected static final String STRING_ALPHANUM_SV_COLUMN = "stringAlphaNumSV";
@@ -85,6 +87,7 @@ public abstract class BaseTransformFunctionTest {
   protected final long[] _longSVValues = new long[NUM_ROWS];
   protected final float[] _floatSVValues = new float[NUM_ROWS];
   protected final double[] _doubleSVValues = new double[NUM_ROWS];
+  protected final BigDecimal[] _bigDecimalSVValues = new BigDecimal[NUM_ROWS];
   protected final String[] _stringSVValues = new String[NUM_ROWS];
   protected final String[] _stringAlphaNumericSVValues = new String[NUM_ROWS];
   protected final byte[][] _bytesSVValues = new byte[NUM_ROWS][];
@@ -112,6 +115,7 @@ public abstract class BaseTransformFunctionTest {
       _longSVValues[i] = RANDOM.nextLong();
       _floatSVValues[i] = _intSVValues[i] * RANDOM.nextFloat();
       _doubleSVValues[i] = _intSVValues[i] * RANDOM.nextDouble();
+      _bigDecimalSVValues[i] = BigDecimal.valueOf(RANDOM.nextDouble()).multiply(new BigDecimal(_intSVValues[i]));
       _stringSVValues[i] = df.format(_intSVValues[i] * RANDOM.nextDouble());
       _stringAlphaNumericSVValues[i] = RandomStringUtils.randomAlphanumeric(26);
       _bytesSVValues[i] = RandomStringUtils.randomAlphanumeric(26).getBytes();
@@ -144,6 +148,7 @@ public abstract class BaseTransformFunctionTest {
       map.put(LONG_SV_COLUMN, _longSVValues[i]);
       map.put(FLOAT_SV_COLUMN, _floatSVValues[i]);
       map.put(DOUBLE_SV_COLUMN, _doubleSVValues[i]);
+      map.put(BIG_DECIMAL_SV_COLUMN, _bigDecimalSVValues[i]);
       map.put(STRING_SV_COLUMN, _stringSVValues[i]);
       map.put(STRING_ALPHANUM_SV_COLUMN, _stringAlphaNumericSVValues[i]);
       map.put(BYTES_SV_COLUMN, _bytesSVValues[i]);
@@ -166,6 +171,7 @@ public abstract class BaseTransformFunctionTest {
         .addSingleValueDimension(LONG_SV_COLUMN, FieldSpec.DataType.LONG)
         .addSingleValueDimension(FLOAT_SV_COLUMN, FieldSpec.DataType.FLOAT)
         .addSingleValueDimension(DOUBLE_SV_COLUMN, FieldSpec.DataType.DOUBLE)
+        .addSingleValueDimension(BIG_DECIMAL_SV_COLUMN, FieldSpec.DataType.BIG_DECIMAL)
         .addSingleValueDimension(STRING_SV_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_ALPHANUM_SV_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(BYTES_SV_COLUMN, FieldSpec.DataType.BYTES)
@@ -204,12 +210,14 @@ public abstract class BaseTransformFunctionTest {
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
     float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
     double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
     String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       Assert.assertEquals(intValues[i], expectedValues[i]);
       Assert.assertEquals(longValues[i], expectedValues[i]);
       Assert.assertEquals(floatValues[i], (float) expectedValues[i]);
       Assert.assertEquals(doubleValues[i], (double) expectedValues[i]);
+      Assert.assertEquals(bigDecimalValues[i].intValue(), expectedValues[i]);
       Assert.assertEquals(stringValues[i], Integer.toString(expectedValues[i]));
     }
   }
@@ -219,12 +227,14 @@ public abstract class BaseTransformFunctionTest {
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
     float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
     double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
     String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       Assert.assertEquals(intValues[i], (int) expectedValues[i]);
       Assert.assertEquals(longValues[i], expectedValues[i]);
       Assert.assertEquals(floatValues[i], (float) expectedValues[i]);
       Assert.assertEquals(doubleValues[i], (double) expectedValues[i]);
+      Assert.assertEquals(bigDecimalValues[i].longValue(), expectedValues[i]);
       Assert.assertEquals(stringValues[i], Long.toString(expectedValues[i]));
     }
   }
@@ -234,12 +244,14 @@ public abstract class BaseTransformFunctionTest {
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
     float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
     double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
     String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       Assert.assertEquals(intValues[i], (int) expectedValues[i]);
       Assert.assertEquals(longValues[i], (long) expectedValues[i]);
       Assert.assertEquals(floatValues[i], expectedValues[i]);
       Assert.assertEquals(doubleValues[i], (double) expectedValues[i]);
+      Assert.assertEquals(bigDecimalValues[i].floatValue(), expectedValues[i]);
       Assert.assertEquals(stringValues[i], Float.toString(expectedValues[i]));
     }
   }
@@ -249,13 +261,39 @@ public abstract class BaseTransformFunctionTest {
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
     float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
     double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    BigDecimal[] bigDecimalValues = null;
+    try {
+      // Some transform functions cannot work with BigDecimal (e.g. exp, ln, and sqrt).
+      bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+    } catch (UnsupportedOperationException ignored) {
+    }
     String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       Assert.assertEquals(intValues[i], (int) expectedValues[i]);
       Assert.assertEquals(longValues[i], (long) expectedValues[i]);
       Assert.assertEquals(floatValues[i], (float) expectedValues[i]);
       Assert.assertEquals(doubleValues[i], expectedValues[i]);
+      if (bigDecimalValues != null) {
+        Assert.assertEquals(bigDecimalValues[i].doubleValue(), expectedValues[i]);
+      }
       Assert.assertEquals(stringValues[i], Double.toString(expectedValues[i]));
+    }
+  }
+
+  protected void testTransformFunction(TransformFunction transformFunction, BigDecimal[] expectedValues) {
+    int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
+    long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
+    float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
+    double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+    String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(intValues[i], expectedValues[i].intValue());
+      Assert.assertEquals(longValues[i], expectedValues[i].longValue());
+      Assert.assertEquals(floatValues[i], expectedValues[i].floatValue());
+      Assert.assertEquals(doubleValues[i], expectedValues[i].doubleValue());
+      Assert.assertEquals(bigDecimalValues[i].compareTo(expectedValues[i]), 0);
+      Assert.assertEquals((new BigDecimal(stringValues[i])).compareTo(expectedValues[i]), 0);
     }
   }
 

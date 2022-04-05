@@ -27,8 +27,10 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -98,6 +100,13 @@ public class NotInPredicateEvaluatorFactory {
           nonMatchingValues.add(Double.parseDouble(value));
         }
         return new DoubleRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
+      }
+      case BIG_DECIMAL: {
+        TreeSet<BigDecimal> nonMatchingValues = new TreeSet<>();
+        for (String value : values) {
+          nonMatchingValues.add(new BigDecimal(value));
+        }
+        return new BigDecimalRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
       }
       case BOOLEAN: {
         IntSet nonMatchingValues = new IntOpenHashSet(hashSetSize);
@@ -262,6 +271,28 @@ public class NotInPredicateEvaluatorFactory {
 
     @Override
     public boolean applySV(double value) {
+      return !_nonMatchingValues.contains(value);
+    }
+  }
+
+  private static final class BigDecimalRawValueBasedNotInPredicateEvaluator
+      extends BaseRawValueBasedPredicateEvaluator {
+    // See: BigDecimalRawValueBasedInPredicateEvaluator.
+    final TreeSet<BigDecimal> _nonMatchingValues;
+
+    BigDecimalRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate,
+        TreeSet<BigDecimal> nonMatchingValues) {
+      super(notInPredicate);
+      _nonMatchingValues = nonMatchingValues;
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.BIG_DECIMAL;
+    }
+
+    @Override
+    public boolean applySV(BigDecimal value) {
       return !_nonMatchingValues.contains(value);
     }
   }

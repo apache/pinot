@@ -332,7 +332,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     }
 
     int cnt = 0;
-    ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
+    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
     for (List<DataTable> reduceGroup : reduceGroups) {
       futures[cnt++] = reducerContext.getExecutorService().submit(new TraceRunnable() {
         @Override
@@ -344,7 +344,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
               for (int rowId = 0; rowId < numRows; rowId++) {
                 Object[] values = new Object[_numColumns];
                 for (int colId = 0; colId < _numColumns; colId++) {
-                  switch (storedColumnDataTypes[colId]) {
+                  switch (columnDataTypes[colId].getStoredType()) {
                     case INT:
                       values[colId] = dataTable.getInt(rowId, colId);
                       break;
@@ -361,7 +361,11 @@ public class GroupByDataTableReducer implements DataTableReducer {
                       values[colId] = dataTable.getString(rowId, colId);
                       break;
                     case BYTES:
-                      values[colId] = dataTable.getBytes(rowId, colId);
+                      if (columnDataTypes[colId] == ColumnDataType.BIG_DECIMAL) {
+                        values[colId] = dataTable.getBigDecimal(rowId, colId);
+                      } else {
+                        values[colId] = dataTable.getBytes(rowId, colId);
+                      }
                       break;
                     case OBJECT:
                       values[colId] = dataTable.getObject(rowId, colId);

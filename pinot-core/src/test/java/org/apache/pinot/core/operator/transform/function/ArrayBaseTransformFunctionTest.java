@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -63,6 +64,12 @@ public abstract class ArrayBaseTransformFunctionTest extends BaseTransformFuncti
         double[] doubleResults = transformFunction.transformToDoubleValuesSV(_projectionBlock);
         for (int i = 0; i < NUM_ROWS; i++) {
           Assert.assertEquals(doubleResults[i], getExpectResult(_intMVValues[i]));
+        }
+        break;
+      case BIG_DECIMAL:
+        BigDecimal[] decimalResults = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+        for (int i = 0; i < NUM_ROWS; i++) {
+          Assert.assertEquals(decimalResults[i], getExpectResult(_intMVValues[i]));
         }
         break;
       case STRING:

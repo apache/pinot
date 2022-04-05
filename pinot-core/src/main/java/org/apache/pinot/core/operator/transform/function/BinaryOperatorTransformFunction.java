@@ -47,6 +47,8 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   private final TransformFunctionType _transformFunctionType;
   private TransformFunction _leftTransformFunction;
   private TransformFunction _rightTransformFunction;
+  private DataType _leftType;
+  private DataType _rightType;
   private DataType _leftStoredType;
   private DataType _rightStoredType;
   private int[] _results;
@@ -90,10 +92,13 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
         "Exact 2 arguments are required for binary operator transform function");
     _leftTransformFunction = arguments.get(0);
     _rightTransformFunction = arguments.get(1);
-    _leftStoredType = _leftTransformFunction.getResultMetadata().getDataType().getStoredType();
-    _rightStoredType = _rightTransformFunction.getResultMetadata().getDataType().getStoredType();
+    _leftType = _leftTransformFunction.getResultMetadata().getDataType();
+    _rightType = _rightTransformFunction.getResultMetadata().getDataType();
+    _leftStoredType = _leftType.getStoredType();
+    _rightStoredType = _rightType.getStoredType();
     // Data type check: left and right types should be compatible.
-    if (_leftStoredType == DataType.BYTES || _rightStoredType == DataType.BYTES) {
+    if ((_leftStoredType == DataType.BYTES && _leftType != DataType.BIG_DECIMAL) ||
+        (_rightStoredType == DataType.BYTES && _rightType != DataType.BIG_DECIMAL)) {
       Preconditions.checkState(_leftStoredType == _rightStoredType, String.format(
           "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right Transform "
               + "Function [%s] result type is [%s]]", _leftTransformFunction.getName(), _leftStoredType,
@@ -134,6 +139,10 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
         fillResultString(projectionBlock, length);
         break;
       case BYTES:
+        if (_leftType == DataType.BIG_DECIMAL) {
+          fillResultBigDecimal(projectionBlock, length);
+          break;
+        }
         fillResultBytes(projectionBlock, length);
         break;
       // NOTE: Multi-value columns are not comparable, so we should not reach here
@@ -160,6 +169,12 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
       case STRING:
         fillStringResultArray(projectionBlock, leftIntValues, length);
         break;
+      case BYTES:
+        if (_rightType == DataType.BIG_DECIMAL) {
+          fillBigDecimalResultArray(projectionBlock, leftIntValues, length);
+          break;
+        }
+        // throw.
       default:
         throw illegalState();
     }
@@ -183,6 +198,12 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
       case STRING:
         fillStringResultArray(projectionBlock, leftLongValues, length);
         break;
+      case BYTES:
+        if (_rightType == DataType.BIG_DECIMAL) {
+          fillBigDecimalResultArray(projectionBlock, leftLongValues, length);
+          break;
+        }
+        // throw.
       default:
         throw illegalState();
     }
@@ -206,6 +227,12 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
       case STRING:
         fillStringResultArray(projectionBlock, leftFloatValues, length);
         break;
+      case BYTES:
+        if (_rightType == DataType.BIG_DECIMAL) {
+          fillBigDecimalResultArray(projectionBlock, leftFloatValues, length);
+          break;
+        }
+        // throw.
       default:
         throw illegalState();
     }
@@ -229,6 +256,12 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
       case STRING:
         fillStringResultArray(projectionBlock, leftDoubleValues, length);
         break;
+      case BYTES:
+        if (_rightType == DataType.BIG_DECIMAL) {
+          fillBigDecimalResultArray(projectionBlock, leftDoubleValues, length);
+          break;
+        }
+        // throw.
       default:
         throw illegalState();
     }
@@ -257,6 +290,14 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     }
   }
 
+  private void fillResultBigDecimal(ProjectionBlock projectionBlock, int length) {
+    BigDecimal[] leftValues = _leftTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
+    BigDecimal[] rightValues = _rightTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
+    for (int i = 0; i < length; i++) {
+      _results[i] = getIntResult(leftValues[i].compareTo(rightValues[i]));
+    }
+  }
+
   private void fillIntResultArray(ProjectionBlock projectionBlock, int[] leftIntValues, int length) {
     int[] rightIntValues = _rightTransformFunction.transformToIntValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
@@ -282,6 +323,13 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     double[] rightDoubleValues = _rightTransformFunction.transformToDoubleValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
       _results[i] = getIntResult(Double.compare(leftValues[i], rightDoubleValues[i]));
+    }
+  }
+
+  private void fillBigDecimalResultArray(ProjectionBlock projectionBlock, int[] leftValues, int length) {
+    BigDecimal[] rightBigDecimalValues = _rightTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
+    for (int i = 0; i < length; i++) {
+      _results[i] = getIntResult(new BigDecimal(leftValues[i]).compareTo(rightBigDecimalValues[i]));
     }
   }
 
@@ -324,6 +372,13 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     }
   }
 
+  private void fillBigDecimalResultArray(ProjectionBlock projectionBlock, long[] leftValues, int length) {
+    BigDecimal[] rightBigDecimalValues = _rightTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
+    for (int i = 0; i < length; i++) {
+      _results[i] = getIntResult(BigDecimal.valueOf(leftValues[i]).compareTo(rightBigDecimalValues[i]));
+    }
+  }
+
   private void fillStringResultArray(ProjectionBlock projectionBlock, long[] leftValues, int length) {
     String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
@@ -363,6 +418,13 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     }
   }
 
+  private void fillBigDecimalResultArray(ProjectionBlock projectionBlock, float[] leftValues, int length) {
+    BigDecimal[] rightBigDecimalValues = _rightTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
+    for (int i = 0; i < length; i++) {
+      _results[i] = getIntResult(BigDecimal.valueOf(leftValues[i]).compareTo(rightBigDecimalValues[i]));
+    }
+  }
+
   private void fillStringResultArray(ProjectionBlock projectionBlock, float[] leftValues, int length) {
     String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
@@ -399,6 +461,13 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     double[] rightDoubleValues = _rightTransformFunction.transformToDoubleValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
       _results[i] = getIntResult(Double.compare(leftValues[i], rightDoubleValues[i]));
+    }
+  }
+
+  private void fillBigDecimalResultArray(ProjectionBlock projectionBlock, double[] leftValues, int length) {
+    BigDecimal[] rightBigDecimalValues = _rightTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
+    for (int i = 0; i < length; i++) {
+      _results[i] = getIntResult(BigDecimal.valueOf(leftValues[i]).compareTo(rightBigDecimalValues[i]));
     }
   }
 

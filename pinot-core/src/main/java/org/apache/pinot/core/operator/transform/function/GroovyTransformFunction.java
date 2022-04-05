@@ -25,6 +25,7 @@ import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
@@ -67,6 +68,7 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   private long[] _longResultSV;
   private double[] _doubleResultSV;
   private float[] _floatResultSV;
+  private BigDecimal[] _bigDecimalResultSV;
   private String[] _stringResultSV;
   private int[][] _intResultMV;
   private long[][] _longResultMV;
@@ -79,7 +81,7 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   private int _numGroovyArgs;
   private TransformFunction[] _groovyArguments;
   private boolean[] _isSourceSingleValue;
-  private DataType[] _sourceStoredTypes;
+  private DataType[] _sourceTypes;
   private BiFunction<TransformFunction, ProjectionBlock, Object>[] _transformToValuesFunctions;
   private BiFunction<Object, Integer, Object>[] _fetchElementFunctions;
   private Object[] _sourceArrays;
@@ -129,7 +131,7 @@ public class GroovyTransformFunction extends BaseTransformFunction {
     if (_numGroovyArgs > 0) {
       _groovyArguments = new TransformFunction[_numGroovyArgs];
       _isSourceSingleValue = new boolean[_numGroovyArgs];
-      _sourceStoredTypes = new DataType[_numGroovyArgs];
+      _sourceTypes = new DataType[_numGroovyArgs];
       int idx = 0;
       for (int i = 2; i < numArgs; i++) {
         TransformFunction argument = arguments.get(i);
@@ -138,7 +140,7 @@ public class GroovyTransformFunction extends BaseTransformFunction {
         _groovyArguments[idx] = argument;
         TransformResultMetadata resultMetadata = argument.getResultMetadata();
         _isSourceSingleValue[idx] = resultMetadata.isSingleValue();
-        _sourceStoredTypes[idx++] = resultMetadata.getDataType().getStoredType();
+        _sourceTypes[idx++] = resultMetadata.getDataType();
       }
       // construct arguments string for GroovyFunctionEvaluator
       String argumentsStr = IntStream.range(0, _numGroovyArgs).mapToObj(i -> ARGUMENT_PREFIX + i)
@@ -168,7 +170,7 @@ public class GroovyTransformFunction extends BaseTransformFunction {
       BiFunction<Object, Integer, Object> getElementFunction;
       BiFunction<TransformFunction, ProjectionBlock, Object> transformToValuesFunction;
       if (_isSourceSingleValue[i]) {
-        switch (_sourceStoredTypes[i]) {
+        switch (_sourceTypes[i].getStoredType()) {
           case INT:
             transformToValuesFunction = TransformFunction::transformToIntValuesSV;
             getElementFunction = (sourceArray, position) -> ((int[]) sourceArray)[position];
@@ -189,12 +191,19 @@ public class GroovyTransformFunction extends BaseTransformFunction {
             transformToValuesFunction = TransformFunction::transformToStringValuesSV;
             getElementFunction = (sourceArray, position) -> ((String[]) sourceArray)[position];
             break;
+          case BYTES:
+            if (_sourceTypes[i] == DataType.BIG_DECIMAL) {
+              transformToValuesFunction = TransformFunction::transformToBigDecimalValuesSV;
+              getElementFunction = (sourceArray, position) -> ((BigDecimal[]) sourceArray)[position];
+              break;
+            }
+            // throw.
           default:
             throw new IllegalStateException(
-                "Unsupported data type '" + _sourceStoredTypes[i] + "' for GROOVY transform function");
+                "Unsupported data type '" + _sourceTypes[i].getStoredType() + "' for GROOVY transform function");
         }
       } else {
-        switch (_sourceStoredTypes[i]) {
+        switch (_sourceTypes[i].getStoredType()) {
           case INT:
             transformToValuesFunction = TransformFunction::transformToIntValuesMV;
             getElementFunction = (sourceArray, position) -> ((int[][]) sourceArray)[position];
@@ -217,7 +226,7 @@ public class GroovyTransformFunction extends BaseTransformFunction {
             break;
           default:
             throw new IllegalStateException(
-                "Unsupported data type '" + _sourceStoredTypes[i] + "' for GROOVY transform function");
+                "Unsupported data type '" + _sourceTypes[i].getStoredType() + "' for GROOVY transform function");
         }
       }
       _transformToValuesFunctions[i] = transformToValuesFunction;
@@ -309,6 +318,24 @@ public class GroovyTransformFunction extends BaseTransformFunction {
       }
     }
     return _doubleResultMV;
+  }
+
+  @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    if (_bigDecimalResultSV == null) {
+      _bigDecimalResultSV = new BigDecimal[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+    for (int i = 0; i < _numGroovyArgs; i++) {
+      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
+    }
+    int length = projectionBlock.getNumDocs();
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numGroovyArgs; j++) {
+        _bindingValues[j] = _fetchElementFunctions[j].apply(_sourceArrays[j], i);
+      }
+      _bigDecimalResultSV[i] = (BigDecimal) _groovyFunctionEvaluator.evaluate(_bindingValues);
+    }
+    return _bigDecimalResultSV;
   }
 
   @Override

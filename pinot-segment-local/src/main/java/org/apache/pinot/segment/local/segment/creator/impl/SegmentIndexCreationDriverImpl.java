@@ -389,6 +389,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         if (!columnProfile.isFixedLength()) {
           useVarLengthDictionary = true;
         }
+        // Note: The default value of BIG_DECIMAL is defined as byte[].
         defaultNullValue = new ByteArray((byte[]) defaultNullValue);
       }
       _indexCreationInfoMap.put(columnName,

@@ -19,21 +19,32 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
  * A group of commonly used math transformation which has only one single parameter,
- * including abs, exp, ceil, floor, sqrt.
+ * including abs, ceil, exp, floor, ln, sqrt.
+ * Note:
+ * abs(x) -> output data type is either double or BigDecimal.
+ * ceil(x) -> output data type is either double or BigDecimal.
+ * exp(x) -> output data type is always double.
+ * floor(x) -> output data type is either double or BigDecimal.
+ * ln(x) -> output data type is always double.
+ * sqrt(x) -> output data type is always double.
  */
 public abstract class SingleParamMathTransformFunction extends BaseTransformFunction {
   private TransformFunction _transformFunction;
-  protected double[] _results;
+  protected double[] _doubleResults;
+  protected BigDecimal[] _bigDecimalResults;
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
@@ -50,21 +61,37 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
 
   @Override
   public TransformResultMetadata getResultMetadata() {
+    if (_transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BIG_DECIMAL) {
+      return BIG_DECIMAL_SV_NO_DICTIONARY_METADATA;
+    }
     return DOUBLE_SV_NO_DICTIONARY_METADATA;
   }
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_results == null) {
-      _results = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    if (_doubleResults == null) {
+      _doubleResults = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
 
     double[] values = _transformFunction.transformToDoubleValuesSV(projectionBlock);
     applyMathOperator(values, projectionBlock.getNumDocs());
-    return _results;
+    return _doubleResults;
+  }
+
+  @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    if (_bigDecimalResults == null) {
+      _bigDecimalResults = new BigDecimal[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+
+    BigDecimal[] values = _transformFunction.transformToBigDecimalValuesSV(projectionBlock);
+    applyMathOperator(values, projectionBlock.getNumDocs());
+    return _bigDecimalResults;
   }
 
   abstract protected void applyMathOperator(double[] values, int length);
+
+  abstract protected void applyMathOperator(BigDecimal[] values, int length);
 
   public static class AbsTransformFunction extends SingleParamMathTransformFunction {
     public static final String FUNCTION_NAME = "abs";
@@ -77,7 +104,14 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _results[i] = Math.abs(values[i]);
+        _doubleResults[i] = Math.abs(values[i]);
+      }
+    }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        _bigDecimalResults[i] = values[i].abs();
       }
     }
   }
@@ -93,7 +127,14 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _results[i] = Math.ceil(values[i]);
+        _doubleResults[i] = Math.ceil(values[i]);
+      }
+    }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        _bigDecimalResults[i] = values[i].setScale(0, RoundingMode.CEILING);
       }
     }
   }
@@ -109,8 +150,14 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _results[i] = Math.exp(values[i]);
+        _doubleResults[i] = Math.exp(values[i]);
       }
+    }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
+      // Euler's number is irrational and cannot be represented in BigDecimal without precision loss.
+      throw new UnsupportedOperationException();
     }
   }
 
@@ -125,7 +172,14 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _results[i] = Math.floor(values[i]);
+        _doubleResults[i] = Math.floor(values[i]);
+      }
+    }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        _bigDecimalResults[i] = values[i].setScale(0, RoundingMode.FLOOR);
       }
     }
   }
@@ -141,8 +195,13 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _results[i] = Math.log(values[i]);
+        _doubleResults[i] = Math.log(values[i]);
       }
+    }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
+      throw new UnsupportedOperationException();
     }
   }
 
@@ -157,8 +216,14 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _results[i] = Math.sqrt(values[i]);
+        _doubleResults[i] = Math.sqrt(values[i]);
       }
+    }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
+      // todo: Look into utilizing BigDecimal.sqrt() method added in JDK 9 if needed.
+      throw new UnsupportedOperationException();
     }
   }
 }

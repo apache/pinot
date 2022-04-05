@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import java.math.BigDecimal;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -136,6 +137,30 @@ public class RowBasedBlockValSet implements BlockValSet {
       }
     } else {
       throw new IllegalStateException("Cannot read double values from data type: " + _dataType);
+    }
+    return values;
+  }
+
+  @Override
+  public BigDecimal[] getBigDecimalValuesSV() {
+    int length = _rows.size();
+    BigDecimal[] values = new BigDecimal[length];
+    if (_dataType.isNumeric()) {
+      if (_dataType == FieldSpec.DataType.BIG_DECIMAL) {
+        for (int i = 0; i < length; i++) {
+          values[i] = (BigDecimal) _rows.get(i)[_columnIndex];
+        }
+      } else {
+        for (int i = 0; i < length; i++) {
+          values[i] = BigDecimal.valueOf(((Number) _rows.get(i)[_columnIndex]).doubleValue());
+        }
+      }
+    } else if (_dataType == FieldSpec.DataType.STRING) {
+      for (int i = 0; i < length; i++) {
+        values[i] = new BigDecimal((String) _rows.get(i)[_columnIndex]);
+      }
+    } else {
+      throw new IllegalStateException("Cannot read BigDecimal values from data type: " + _dataType);
     }
     return values;
   }

@@ -48,7 +48,8 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
     Schema dataSchema = _statsCollectorConfig.getSchema();
     for (FieldSpec fieldSpec : dataSchema.getAllFieldSpecs()) {
       String column = fieldSpec.getName();
-      switch (fieldSpec.getDataType().getStoredType()) {
+      FieldSpec.DataType dataType = fieldSpec.getDataType();
+      switch (dataType.getStoredType()) {
         case INT:
           _columnStatsCollectorMap.put(column, new IntColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;
@@ -65,7 +66,12 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
           _columnStatsCollectorMap.put(column, new StringColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;
         case BYTES:
-          _columnStatsCollectorMap.put(column, new BytesColumnPredIndexStatsCollector(column, _statsCollectorConfig));
+          if (dataType == FieldSpec.DataType.BIG_DECIMAL) {
+            _columnStatsCollectorMap.put(column,
+                new BigDecimalColumnPredIndexStatsCollector(column, _statsCollectorConfig));
+          } else {
+            _columnStatsCollectorMap.put(column, new BytesColumnPredIndexStatsCollector(column, _statsCollectorConfig));
+          }
           break;
         default:
           throw new IllegalStateException("Unsupported data type: " + fieldSpec.getDataType());

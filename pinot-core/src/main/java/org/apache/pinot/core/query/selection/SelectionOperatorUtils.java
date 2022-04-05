@@ -45,6 +45,7 @@ import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -251,15 +252,15 @@ public class SelectionOperatorUtils {
    */
   public static DataTable getDataTableFromRows(Collection<Object[]> rows, DataSchema dataSchema)
       throws Exception {
-    ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
-    int numColumns = storedColumnDataTypes.length;
+    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+    int numColumns = columnDataTypes.length;
 
     DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
     for (Object[] row : rows) {
       dataTableBuilder.startRow();
       for (int i = 0; i < numColumns; i++) {
         Object columnValue = row[i];
-        switch (storedColumnDataTypes[i]) {
+        switch (columnDataTypes[i].getStoredType()) {
           // Single-value column
           case INT:
             dataTableBuilder.setColumn(i, ((Number) columnValue).intValue());
@@ -277,7 +278,11 @@ public class SelectionOperatorUtils {
             dataTableBuilder.setColumn(i, ((String) columnValue));
             break;
           case BYTES:
-            dataTableBuilder.setColumn(i, (ByteArray) columnValue);
+            if (columnDataTypes[i] == ColumnDataType.BIG_DECIMAL) {
+              dataTableBuilder.setColumn(i, columnValue);
+            } else {
+              dataTableBuilder.setColumn(i, (ByteArray) columnValue);
+            }
             break;
 
           // Multi-value column
@@ -329,7 +334,7 @@ public class SelectionOperatorUtils {
 
           default:
             throw new IllegalStateException(String
-                .format("Unsupported data type: %s for column: %s", storedColumnDataTypes[i],
+                .format("Unsupported data type: %s for column: %s", columnDataTypes[i].getStoredType(),
                     dataSchema.getColumnName(i)));
         }
       }
@@ -348,12 +353,12 @@ public class SelectionOperatorUtils {
    */
   public static Object[] extractRowFromDataTable(DataTable dataTable, int rowId) {
     DataSchema dataSchema = dataTable.getDataSchema();
-    ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
-    int numColumns = storedColumnDataTypes.length;
+    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+    int numColumns = columnDataTypes.length;
 
     Object[] row = new Object[numColumns];
     for (int i = 0; i < numColumns; i++) {
-      switch (storedColumnDataTypes[i]) {
+      switch (columnDataTypes[i].getStoredType()) {
         // Single-value column
         case INT:
           row[i] = dataTable.getInt(rowId, i);
@@ -371,7 +376,11 @@ public class SelectionOperatorUtils {
           row[i] = dataTable.getString(rowId, i);
           break;
         case BYTES:
-          row[i] = dataTable.getBytes(rowId, i);
+          if (columnDataTypes[i] == ColumnDataType.BIG_DECIMAL) {
+            row[i] = dataTable.getBigDecimal(rowId, i);
+          } else {
+            row[i] = dataTable.getBytes(rowId, i);
+          }
           break;
 
         // Multi-value column
@@ -393,7 +402,7 @@ public class SelectionOperatorUtils {
 
         default:
           throw new IllegalStateException(String
-              .format("Unsupported data type: %s for column: %s", storedColumnDataTypes[i],
+              .format("Unsupported data type: %s for column: %s", columnDataTypes[i].getStoredType(),
                   dataSchema.getColumnName(i)));
       }
     }
@@ -551,6 +560,8 @@ public class SelectionOperatorUtils {
         return THREAD_LOCAL_FLOAT_FORMAT.get().format(((Number) value).floatValue());
       case DOUBLE:
         return THREAD_LOCAL_DOUBLE_FORMAT.get().format(((Number) value).doubleValue());
+      case BIG_DECIMAL:
+        return BigDecimalUtils.deserialize((ByteArray) value).toPlainString();
       case BOOLEAN:
         return (Integer) value == 1 ? "true" : "false";
       case TIMESTAMP:

@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -65,6 +66,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
   private long[] _longResults;
   private float[] _floatResults;
   private double[] _doubleResults;
+  private BigDecimal[] _bigDecimalResults;
   private String[] _stringResults;
   private byte[][] _bytesResults;
 
@@ -115,6 +117,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
       // - INT & FLOAT/DOUBLE -> DOUBLE
       // - LONG & FLOAT/DOUBLE -> DOUBLE (might lose precision)
       // - FLOAT & DOUBLE -> DOUBLE
+      // - Any numeric data type with BIG_DECIMAL -> BIG_DECIMAL
       // Use STRING to handle non-numeric types
       if (thenStatementDataType == dataType) {
         continue;
@@ -129,6 +132,9 @@ public class CaseTransformFunction extends BaseTransformFunction {
             case DOUBLE:
               dataType = DataType.DOUBLE;
               break;
+            case BIG_DECIMAL:
+              dataType = DataType.BIG_DECIMAL;
+              break;
             default:
               dataType = DataType.STRING;
               break;
@@ -142,6 +148,9 @@ public class CaseTransformFunction extends BaseTransformFunction {
             case DOUBLE:
               dataType = DataType.DOUBLE;
               break;
+            case BIG_DECIMAL:
+              dataType = DataType.BIG_DECIMAL;
+              break;
             default:
               dataType = DataType.STRING;
               break;
@@ -154,6 +163,9 @@ public class CaseTransformFunction extends BaseTransformFunction {
             case DOUBLE:
               dataType = DataType.DOUBLE;
               break;
+            case BIG_DECIMAL:
+              dataType = DataType.BIG_DECIMAL;
+              break;
             default:
               dataType = DataType.STRING;
               break;
@@ -164,6 +176,21 @@ public class CaseTransformFunction extends BaseTransformFunction {
             case INT:
             case FLOAT:
             case LONG:
+              break;
+            case BIG_DECIMAL:
+              dataType = DataType.BIG_DECIMAL;
+              break;
+            default:
+              dataType = DataType.STRING;
+              break;
+          }
+          break;
+        case BIG_DECIMAL:
+          switch (thenStatementDataType) {
+            case INT:
+            case FLOAT:
+            case LONG:
+            case DOUBLE:
               break;
             default:
               dataType = DataType.STRING;
@@ -328,6 +355,35 @@ public class CaseTransformFunction extends BaseTransformFunction {
       }
     }
     return _doubleResults;
+  }
+
+  @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    if (_resultMetadata.getDataType() != DataType.BIG_DECIMAL) {
+      return super.transformToBigDecimalValuesSV(projectionBlock);
+    }
+    int[] selected = getSelectedArray(projectionBlock);
+    int numDocs = projectionBlock.getNumDocs();
+    if (_bigDecimalResults == null || _bigDecimalResults.length < numDocs) {
+      _bigDecimalResults = new BigDecimal[numDocs];
+    }
+    int numElseThenStatements = _elseThenStatements.size();
+    for (int i = 0; i < numElseThenStatements; i++) {
+      if (_selections[i]) {
+        TransformFunction transformFunction = _elseThenStatements.get(i);
+        BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(projectionBlock);
+        if (_numSelections == 1) {
+          System.arraycopy(bigDecimalValues, 0, _bigDecimalResults, 0, numDocs);
+        } else {
+          for (int j = 0; j < numDocs; j++) {
+            if (selected[j] == i) {
+              _bigDecimalResults[j] = bigDecimalValues[j];
+            }
+          }
+        }
+      }
+    }
+    return _bigDecimalResults;
   }
 
   @Override

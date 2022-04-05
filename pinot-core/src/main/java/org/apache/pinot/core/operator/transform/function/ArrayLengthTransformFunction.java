@@ -104,6 +104,9 @@ public class ArrayLengthTransformFunction extends BaseTransformFunction {
           _results[i] = stringValuesMV[i].length;
         }
         break;
+      // Note: cannot handle BIG_DECIMAL data type (BYTES stored type) since DataFetcher does not support fetching
+      // byte[] values for a multi-valued column, and BlockValSet does not support returning a block of values for a
+      // multi-valued bytes column.
       default:
         throw new IllegalStateException();
     }

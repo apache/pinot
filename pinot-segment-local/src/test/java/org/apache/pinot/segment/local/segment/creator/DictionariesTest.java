@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.creator;
 
 import java.io.File;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -35,12 +36,14 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.BigDecimalColumnPredIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.BytesColumnPredIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.DoubleColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.index.readers.BigDecimalDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.DoubleDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.FloatDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.IntDictionary;
@@ -163,6 +166,10 @@ public class DictionariesTest {
         case DOUBLE:
           Assert.assertTrue(heapDictionary instanceof DoubleDictionary);
           Assert.assertTrue(mmapDictionary instanceof DoubleDictionary);
+          break;
+        case BIG_DECIMAL:
+          Assert.assertTrue(heapDictionary instanceof BigDecimalDictionary);
+          Assert.assertTrue(mmapDictionary instanceof BigDecimalDictionary);
           break;
         case STRING:
           Assert.assertTrue(heapDictionary instanceof StringDictionary);
@@ -298,6 +305,32 @@ public class DictionariesTest {
     statsCollector.collect(40d);
     Assert.assertFalse(statsCollector.isSorted());
     statsCollector.collect(20d);
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.seal();
+    Assert.assertEquals(statsCollector.getCardinality(), 6);
+    Assert.assertEquals(((Number) statsCollector.getMinValue()).intValue(), 1);
+    Assert.assertEquals(((Number) statsCollector.getMaxValue()).intValue(), 40);
+    Assert.assertFalse(statsCollector.isSorted());
+  }
+
+  @Test
+  public void testBigDecimalColumnPreIndexStatsCollector() {
+    AbstractColumnStatisticsCollector statsCollector = buildStatsCollector("column1", DataType.BIG_DECIMAL);
+    statsCollector.collect(BigDecimal.valueOf(1d));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(BigDecimal.valueOf(2d));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(BigDecimal.valueOf(3d));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(BigDecimal.valueOf(4d));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(BigDecimal.valueOf(4d));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(BigDecimal.valueOf(2d));
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.collect(BigDecimal.valueOf(40d));
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.collect(BigDecimal.valueOf(20d));
     Assert.assertFalse(statsCollector.isSorted());
     statsCollector.seal();
     Assert.assertEquals(statsCollector.getCardinality(), 6);
@@ -459,6 +492,8 @@ public class DictionariesTest {
       case BOOLEAN:
       case STRING:
         return new StringColumnPreIndexStatsCollector(column, statsCollectorConfig);
+      case BIG_DECIMAL:
+        return new BigDecimalColumnPredIndexStatsCollector(column, statsCollectorConfig);
       case BYTES:
         return new BytesColumnPredIndexStatsCollector(column, statsCollectorConfig);
       default:

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.common;
 
+import java.math.BigDecimal;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -225,6 +226,35 @@ public class DataBlockCache {
    */
   public void fillValues(String column, TransformEvaluator evaluator, double[] buffer) {
     _dataFetcher.fetchDoubleValues(column, evaluator, _docIds, _length, buffer);
+  }
+
+  /**
+   * Get BigDecimal[] values for the given single-valued column.
+   *
+   * @param column Column to read
+   * @return BigDecimal[] for the column
+   */
+  public BigDecimal[] getBigDecimalValuesForSVColumn(String column) {
+    BigDecimal[] bigDecimalValues = getValues(FieldSpec.DataType.BIG_DECIMAL, column);
+    if (markLoaded(FieldSpec.DataType.BIG_DECIMAL, column)) {
+      if (bigDecimalValues == null) {
+        bigDecimalValues = new BigDecimal[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+        putValues(FieldSpec.DataType.BIG_DECIMAL, column, bigDecimalValues);
+      }
+      _dataFetcher.fetchBigDecimalValues(column, _docIds, _length, bigDecimalValues);
+    }
+    return bigDecimalValues;
+  }
+
+  /**
+   * Get the BigDecimal values for a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param buffer values to fill
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, BigDecimal[] buffer) {
+    _dataFetcher.fetchBigDecimalValues(column, evaluator, _docIds, _length, buffer);
   }
 
   /**

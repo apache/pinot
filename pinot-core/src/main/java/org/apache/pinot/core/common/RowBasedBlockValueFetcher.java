@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.common;
 
+import java.math.BigDecimal;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -49,9 +51,9 @@ public class RowBasedBlockValueFetcher {
   }
 
   private ValueFetcher createFetcher(BlockValSet blockValSet) {
-    DataType storedType = blockValSet.getValueType().getStoredType();
+    DataType storedType = blockValSet.getValueType();
     if (blockValSet.isSingleValue()) {
-      switch (storedType) {
+      switch (storedType.getStoredType()) {
         case INT:
           return new IntSingleValueFetcher(blockValSet.getIntValuesSV());
         case LONG:
@@ -63,6 +65,9 @@ public class RowBasedBlockValueFetcher {
         case STRING:
           return new StringSingleValueFetcher(blockValSet.getStringValuesSV());
         case BYTES:
+          if (storedType == DataType.BIG_DECIMAL) {
+            return new BigDecimalValueFetcher(blockValSet.getBytesValuesSV());
+          }
           return new BytesValueFetcher(blockValSet.getBytesValuesSV());
         default:
           throw new IllegalStateException("Unsupported value type: " + storedType + " for single-value column");
@@ -134,6 +139,18 @@ public class RowBasedBlockValueFetcher {
 
     public Double getValue(int docId) {
       return _values[docId];
+    }
+  }
+
+  private static class BigDecimalValueFetcher implements ValueFetcher {
+    private final byte[][] _values;
+
+    BigDecimalValueFetcher(byte[][] values) {
+      _values = values;
+    }
+
+    public BigDecimal getValue(int docId) {
+      return BigDecimalUtils.deserialize(_values[docId]);
     }
   }
 

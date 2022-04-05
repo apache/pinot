@@ -35,6 +35,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -74,6 +75,8 @@ public class JsonUtils {
 
   public static <T> T stringToObject(String jsonString, Class<T> valueType)
       throws IOException {
+    // Note: DEFAULT_MAPPER does not handle exact BigDecimal, and does not use BigDecimal for floats.
+    // todo: support a MAPPER with desired BigDecimal behavior that also uses BigDecimal for float?
     return DEFAULT_READER.forType(valueType).readValue(jsonString);
   }
 
@@ -219,6 +222,8 @@ public class JsonUtils {
         return (float) jsonValue.asDouble();
       case DOUBLE:
         return jsonValue.asDouble();
+      case BIG_DECIMAL:
+        return new BigDecimal(jsonValue.asText());
       case BOOLEAN:
         return jsonValue.asBoolean();
       case TIMESTAMP:

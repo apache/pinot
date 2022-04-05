@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
@@ -117,6 +118,9 @@ public class ArrayAverageTransformFunction extends BaseTransformFunction {
           _results[i] = sumRes / doubleValuesMV[i].length;
         }
         break;
+      // Note: cannot handle BIG_DECIMAL data type (BYTES stored type) since DataFetcher does not support fetching
+      // byte[] values for a multi-valued column, and BlockValSet does not support returning a block of values for a
+      // multi-valued bytes column.
       default:
         throw new IllegalStateException();
     }

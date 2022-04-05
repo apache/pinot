@@ -23,6 +23,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
@@ -30,6 +31,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 
@@ -175,6 +177,11 @@ public abstract class BaseDataTable implements DataTable {
   public double getDouble(int rowId, int colId) {
     _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
     return _fixedSizeData.getDouble();
+  }
+
+  @Override
+  public BigDecimal getBigDecimal(int rowId, int colId) {
+    return (BigDecimal) getObject(rowId, colId);
   }
 
   @Override

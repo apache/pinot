@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.local.io.util;
 
 import java.io.Closeable;
+import java.math.BigDecimal;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
 /**
@@ -43,6 +45,10 @@ public interface ValueReader extends Closeable {
    * NOTE: The passed in reusable buffer should have capacity of at least {@code numBytesPerValue}.
    */
   String getPaddedString(int index, int numBytesPerValue, byte[] buffer);
+
+  default BigDecimal getBigDecimal(int index, int numBytesPerValue) {
+    return BigDecimalUtils.deserialize(getBytes(index, numBytesPerValue));
+  }
 
   /**
    * NOTE: Do not reuse buffer for BYTES because the return value can have variable length.

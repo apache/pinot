@@ -58,4 +58,11 @@ public class BigDecimalUtils {
     BigInteger unscaledValue = new BigInteger(unscaledValueBytes);
     return new BigDecimal(unscaledValue, scale);
   }
+
+  /**
+   * Deserializes a big decimal from ByteArray.
+   */
+  public static BigDecimal deserialize(ByteArray byteArray) {
+    return deserialize(byteArray.getBytes());
+  }
 }

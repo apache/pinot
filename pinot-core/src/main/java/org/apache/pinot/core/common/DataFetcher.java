@@ -20,6 +20,7 @@ package org.apache.pinot.core.common;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -190,6 +191,32 @@ public class DataFetcher {
   public void fetchDoubleValues(String column, TransformEvaluator evaluator, int[] inDocIds, int length,
       double[] outValues) {
     _columnValueReaderMap.get(column).readDoubleValues(evaluator, inDocIds, length, outValues);
+  }
+
+  /**
+   * Fetch and transform BigDecimal values from a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
+   */
+  public void fetchBigDecimalValues(String column, TransformEvaluator evaluator, int[] inDocIds, int length,
+      BigDecimal[] outValues) {
+    _columnValueReaderMap.get(column).readBigDecimalValues(evaluator, inDocIds, length, outValues);
+  }
+
+  /**
+   * Fetch the BigDecimal values for a single-valued column.
+   *
+   * @param column Column name
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
+   */
+  public void fetchBigDecimalValues(String column, int[] inDocIds, int length, BigDecimal[] outValues) {
+    _columnValueReaderMap.get(column).readBigDecimalValues(inDocIds, length, outValues);
   }
 
   /**
@@ -478,6 +505,22 @@ public class DataFetcher {
     }
 
     void readDoubleValues(TransformEvaluator evaluator, int[] docIds, int length, double[] valueBuffer) {
+      evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
+          valueBuffer);
+    }
+
+    void readBigDecimalValues(int[] docIds, int length, BigDecimal[] valueBuffer) {
+      ForwardIndexReaderContext readerContext = getReaderContext();
+      if (_dictionary != null) {
+        int[] dictIdBuffer = THREAD_LOCAL_DICT_IDS.get();
+        _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
+        _dictionary.readBigDecimalValues(dictIdBuffer, length, valueBuffer);
+      } else {
+        _reader.readValuesSV(docIds, length, valueBuffer, readerContext);
+      }
+    }
+
+    void readBigDecimalValues(TransformEvaluator evaluator, int[] docIds, int length, BigDecimal[] valueBuffer) {
       evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
           valueBuffer);
     }

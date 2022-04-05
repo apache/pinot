@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
@@ -84,5 +85,12 @@ public class ArraySumTransformFunction extends BaseTransformFunction {
       _results[i] = sumRes;
     }
     return _results;
+  }
+
+  @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    // Note: DataFetcher does not support fetching byte[] values for a multi-valued column, and BlockValSet
+    //  does not support returning a block of values for a multi-valued bytes column.
+    throw new UnsupportedOperationException();
   }
 }

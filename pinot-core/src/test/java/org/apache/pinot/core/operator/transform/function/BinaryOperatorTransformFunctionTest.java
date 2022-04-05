@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -41,6 +42,8 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
   abstract int getExpectedValue(float value, float toCompare);
 
   abstract int getExpectedValue(double value, double toCompare);
+
+  abstract int getExpectedValue(BigDecimal value, BigDecimal toCompare);
 
   abstract int getExpectedValue(String value, String toCompare);
 
@@ -93,6 +96,16 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
       expectedStringValues[i] = getExpectedValue(_stringSVValues[i], _stringSVValues[0]);
     }
     testTransformFunction(transformFunction, expectedStringValues);
+
+    // Note: defining decimal literals within quotes ('%s') preserves precision.
+    expression = RequestContextUtils.getExpressionFromSQL(String.format("%s(%s, '%s')",
+        getFuncName(), BIG_DECIMAL_SV_COLUMN, _bigDecimalSVValues[0]));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    int[] expectedBigDecimalValues = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedBigDecimalValues[i] = getExpectedValue(_bigDecimalSVValues[i], _bigDecimalSVValues[0]);
+    }
+    testTransformFunction(transformFunction, expectedBigDecimalValues);
   }
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
