@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
@@ -88,6 +89,11 @@ public class TrigonometricTransformFunctions {
         _doubleValuesSV[i] = Math.toDegrees(values[i]);
       }
     }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
+      throw new UnsupportedOperationException();
+    }
   }
 
   public static class AcosTransformFunction extends SingleParamMathTransformFunction {
@@ -103,6 +109,11 @@ public class TrigonometricTransformFunctions {
       for (int i = 0; i < length; i++) {
         _doubleValuesSV[i] = Math.acos(values[i]);
       }
+    }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
+      throw new UnsupportedOperationException();
     }
   }
 
@@ -120,6 +131,11 @@ public class TrigonometricTransformFunctions {
         _doubleValuesSV[i] = Math.tan(values[i]);
       }
     }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
+      throw new UnsupportedOperationException();
+    }
   }
 
   public static class SinhTransformFunction extends SingleParamMathTransformFunction {
@@ -135,6 +151,11 @@ public class TrigonometricTransformFunctions {
       for (int i = 0; i < length; i++) {
         _doubleValuesSV[i] = Math.sinh(values[i]);
       }
+    }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
+      throw new UnsupportedOperationException();
     }
   }
 
@@ -152,6 +173,11 @@ public class TrigonometricTransformFunctions {
         _doubleValuesSV[i] = 1.0 / Math.tan(values[i]);
       }
     }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
+      throw new UnsupportedOperationException();
+    }
   }
 
   public static class AtanTransformFunction extends SingleParamMathTransformFunction {
@@ -167,6 +193,11 @@ public class TrigonometricTransformFunctions {
       for (int i = 0; i < length; i++) {
         _doubleValuesSV[i] = Math.atan(values[i]);
       }
+    }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
+      throw new UnsupportedOperationException();
     }
   }
 
@@ -184,6 +215,11 @@ public class TrigonometricTransformFunctions {
         _doubleValuesSV[i] = Math.cos(values[i]);
       }
     }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
+      throw new UnsupportedOperationException();
+    }
   }
 
   public static class AsinTransformFunction extends SingleParamMathTransformFunction {
@@ -199,6 +235,11 @@ public class TrigonometricTransformFunctions {
       for (int i = 0; i < length; i++) {
         _doubleValuesSV[i] = Math.asin(values[i]);
       }
+    }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
+      throw new UnsupportedOperationException();
     }
   }
 
@@ -216,6 +257,11 @@ public class TrigonometricTransformFunctions {
         _doubleValuesSV[i] = Math.cosh(values[i]);
       }
     }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
+      throw new UnsupportedOperationException();
+    }
   }
 
   public static class SinTransformFunction extends SingleParamMathTransformFunction {
@@ -231,6 +277,11 @@ public class TrigonometricTransformFunctions {
       for (int i = 0; i < length; i++) {
         _doubleValuesSV[i] = Math.sin(values[i]);
       }
+    }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
+      throw new UnsupportedOperationException();
     }
   }
 
@@ -248,6 +299,11 @@ public class TrigonometricTransformFunctions {
         _doubleValuesSV[i] = Math.tanh(values[i]);
       }
     }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
+      throw new UnsupportedOperationException();
+    }
   }
 
   public static class RadiansTransformFunction extends SingleParamMathTransformFunction {
@@ -263,6 +319,11 @@ public class TrigonometricTransformFunctions {
       for (int i = 0; i < length; i++) {
         _doubleValuesSV[i] = Math.toRadians(values[i]);
       }
+    }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
+      throw new UnsupportedOperationException();
     }
   }
 }

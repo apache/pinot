@@ -337,7 +337,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
 
     Future[] futures = new Future[numReduceThreadsToUse];
     CountDownLatch countDownLatch = new CountDownLatch(numDataTables);
-    ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
+    ColumnDataType[] columnDataTypes = dataSchema.getStoredColumnDataTypes();
     for (int i = 0; i < numReduceThreadsToUse; i++) {
       List<DataTable> reduceGroup = reduceGroups.get(i);
       futures[i] = reducerContext.getExecutorService().submit(new TraceRunnable() {
