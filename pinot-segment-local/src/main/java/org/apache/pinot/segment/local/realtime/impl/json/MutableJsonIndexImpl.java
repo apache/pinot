@@ -38,10 +38,14 @@ import org.apache.pinot.segment.local.segment.creator.impl.inv.json.BaseJsonInde
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.index.mutable.MutableJsonIndex;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.trace.FilterType;
+import org.apache.pinot.spi.trace.InvocationRecording;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -128,12 +132,14 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         matchingFlattenedDocIds
             .forEach((IntConsumer) flattenedDocId -> matchingDocIds.add(_docIdMapping.getInt(flattenedDocId)));
         matchingDocIds.flip(0, (long) _nextDocId);
+        record(matchingDocIds, filter);
         return matchingDocIds;
       } else {
         RoaringBitmap matchingFlattenedDocIds = getMatchingFlattenedDocIds(filter);
         MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
         matchingFlattenedDocIds
             .forEach((IntConsumer) flattenedDocId -> matchingDocIds.add(_docIdMapping.getInt(flattenedDocId)));
+        record(matchingDocIds, filter);
         return matchingDocIds;
       }
     } finally {
@@ -288,6 +294,14 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       }
     } else {
       throw new IllegalStateException("Unsupported json_match predicate type: " + predicate);
+    }
+  }
+
+  private void record(ImmutableRoaringBitmap bitmap, FilterContext filter) {
+    InvocationRecording recording = Tracing.activeRecording();
+    if (recording.isEnabled()) {
+      recording.setFilter(FilterType.INDEX, filter.getPredicate().toString());
+      recording.setNumDocsMatchingAfterFilter(bitmap.getCardinality());
     }
   }
 
