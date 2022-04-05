@@ -18,45 +18,49 @@
  */
 package org.apache.pinot.common.request.context.predicate;
 
+import java.util.Objects;
 import org.apache.pinot.common.request.context.ExpressionContext;
 
 
 /**
- * The {@code Predicate} class represents the predicate in the filter.
- * <p>Currently the query engine only accepts string literals as the right-hand side of the predicate, so we store the
- * right-hand side of the predicate as string or list of strings.
+ * Represents a CONTAINS predicate.
  */
-public interface Predicate {
-  enum Type {
-    EQ, NOT_EQ(true), IN, NOT_IN(true), RANGE, REGEXP_LIKE, CONTAINS, TEXT_MATCH, JSON_MATCH, IS_NULL, IS_NOT_NULL(true);
+public class ContainsPredicate extends TextMatchPredicate {
+  private final String _value;
 
-    private final boolean _exclusive;
-
-    Type(boolean exclusive) {
-      _exclusive = exclusive;
-    }
-
-    Type() {
-      this(false);
-    }
-
-    public boolean isExclusive() {
-      return _exclusive;
-    }
+  public ContainsPredicate(ExpressionContext lhs, String value) {
+    super(lhs, value);
+    _value = value;
   }
 
-  /**
-   * Returns the type of the predicate.
-   */
-  Type getType();
+  @Override
+  public Type getType() {
+    return Type.CONTAINS;
+  }
 
-  /**
-   * Returns the left-hand side expression of the predicate.
-   */
-  ExpressionContext getLhs();
+  public String getValue() {
+    return _value;
+  }
 
-  /**
-   * Sets the left-hand side expression of the predicate.
-   */
-  void setLhs(ExpressionContext lhs);
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof ContainsPredicate)) {
+      return false;
+    }
+    ContainsPredicate that = (ContainsPredicate) o;
+    return Objects.equals(_lhs, that._lhs) && Objects.equals(_value, that._value);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(_lhs, _value);
+  }
+
+  @Override
+  public String toString() {
+    return "contains(" + _lhs + ",'" + _value + "')";
+  }
 }

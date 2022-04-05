@@ -58,6 +58,12 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
 
   private static final String TEST_TEXT_COLUMN_QUERY =
       "SELECT COUNT(*) FROM mytable WHERE TEXT_MATCH(skills, '\"machine learning\" AND spark')";
+  private static final String TEST_CONTAINS_QUERY =
+      "SELECT COUNT(*) FROM mytable WHERE skills CONTAINS '\"machine learning\"'";
+  private static final String TEST_CONTAINS_TEXTMATCH_QUERY =
+      "SELECT COUNT(*) FROM mytable WHERE TEXT_MATCH(skills, '\"machine learning\"')";
+  private static final String TEST_CONTAINS_MULTI_QUERY =
+      "SELECT COUNT(*) FROM mytable WHERE skills CONTAINS '\"machine learning\"' AND skills CONTAINS 'spark'";
 
   @Override
   public String getTimeColumnName() {
@@ -192,7 +198,7 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
     // Keep posting queries until all records are consumed
     long previousResult = 0;
     while (getCurrentCountStarResult() < NUM_RECORDS) {
-      long result = getTextColumnQueryResult();
+      long result = getTextColumnQueryResult(TEST_TEXT_COLUMN_QUERY);
       assertTrue(result >= previousResult);
       previousResult = result;
       Thread.sleep(100);
@@ -201,16 +207,66 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
     //Lucene index on consuming segments to update the latest records
     TestUtils.waitForCondition(aVoid -> {
       try {
-        return getTextColumnQueryResult() == NUM_MATCHING_RECORDS;
+        return getTextColumnQueryResult(TEST_TEXT_COLUMN_QUERY) == NUM_MATCHING_RECORDS;
       } catch (Exception e) {
-        fail("Caught exception while getting text column query result");
+        fail("Caught exception while getting text column query result " + e.getMessage());
         return false;
       }
     }, 10_000L, "Failed to reach expected number of matching records");
   }
 
-  private long getTextColumnQueryResult()
+  @Test
+  public void testContainsQuery()
       throws Exception {
-    return postQuery(TEST_TEXT_COLUMN_QUERY).get("resultTable").get("rows").get(0).get(0).asLong();
+    // Keep posting queries until all records are consumed
+    long previousResult = 0;
+    while (getCurrentCountStarResult() < NUM_RECORDS) {
+      long result = getTextColumnQueryResult(TEST_CONTAINS_TEXTMATCH_QUERY);
+      assertTrue(result >= previousResult);
+      previousResult = result;
+      Thread.sleep(100);
+    }
+
+    //Lucene index on consuming segments to update the latest records
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        long textMatchQueryResults = getTextColumnQueryResult(TEST_CONTAINS_TEXTMATCH_QUERY);
+        long containsQueryResults = getTextColumnQueryResult(TEST_CONTAINS_QUERY);
+        return textMatchQueryResults == containsQueryResults;
+      } catch (Exception e) {
+        fail("Caught exception while getting text column query result " + e.getMessage());
+        return false;
+      }
+    }, 10_000L, "Failed to reach expected number of matching records");
+  }
+
+  @Test
+  public void testContainsMultiQuery()
+      throws Exception {
+    // Keep posting queries until all records are consumed
+    long previousResult = 0;
+    while (getCurrentCountStarResult() < NUM_RECORDS) {
+      long result = getTextColumnQueryResult(TEST_TEXT_COLUMN_QUERY);
+      assertTrue(result >= previousResult);
+      previousResult = result;
+      Thread.sleep(100);
+    }
+
+    //Lucene index on consuming segments to update the latest records
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        long textMatchQueryResults = getTextColumnQueryResult(TEST_TEXT_COLUMN_QUERY);
+        long containsQueryResults = getTextColumnQueryResult(TEST_CONTAINS_MULTI_QUERY);
+        return textMatchQueryResults == containsQueryResults;
+      } catch (Exception e) {
+        fail("Caught exception while getting text column query result " + e.getMessage());
+        return false;
+      }
+    }, 10_000L, "Failed to reach expected number of matching records");
+  }
+
+  private long getTextColumnQueryResult(String query)
+      throws Exception {
+    return postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong();
   }
 }

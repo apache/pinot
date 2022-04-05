@@ -37,7 +37,8 @@ public enum FilterKind {
   IS_NULL,
   IS_NOT_NULL,
   TEXT_MATCH,
-  JSON_MATCH;
+  JSON_MATCH,
+  CONTAINS;
 
   /**
    * Helper method that returns true if the enum maps to a Range.

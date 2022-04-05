@@ -25,6 +25,7 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.context.predicate.ContainsPredicate;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.IsNotNullPredicate;
@@ -185,7 +186,8 @@ public class RequestContextUtils {
         return new FilterContext(FilterContext.Type.OR, children, null);
       case NOT:
         assert numOperands == 1;
-        return new FilterContext(FilterContext.Type.NOT, new ArrayList<>(Collections.singletonList(getFilter(operands.get(0)))), null);
+        return new FilterContext(FilterContext.Type.NOT,
+            new ArrayList<>(Collections.singletonList(getFilter(operands.get(0)))), null);
       case EQUALS:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new EqPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
@@ -239,6 +241,9 @@ public class RequestContextUtils {
       case TEXT_MATCH:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new TextMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+      case CONTAINS:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new ContainsPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
       case JSON_MATCH:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new JsonMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
@@ -286,7 +291,8 @@ public class RequestContextUtils {
         return new FilterContext(FilterContext.Type.OR, children, null);
       case NOT:
         assert numOperands == 1;
-        return new FilterContext(FilterContext.Type.NOT, new ArrayList<>(Collections.singletonList(getFilter(operands.get(0)))), null);
+        return new FilterContext(FilterContext.Type.NOT,
+            new ArrayList<>(Collections.singletonList(getFilter(operands.get(0)))), null);
       case EQUALS:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new EqPredicate(operands.get(0), getStringValue(operands.get(1))));
@@ -337,6 +343,9 @@ public class RequestContextUtils {
       case TEXT_MATCH:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new TextMatchPredicate(operands.get(0), getStringValue(operands.get(1))));
+      case CONTAINS:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new ContainsPredicate(operands.get(0), getStringValue(operands.get(1))));
       case JSON_MATCH:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new JsonMatchPredicate(operands.get(0), getStringValue(operands.get(1))));

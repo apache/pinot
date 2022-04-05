@@ -195,6 +195,14 @@ public class FilterPlanNode implements PlanNode {
             return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs);
           }
           switch (predicate.getType()) {
+            case CONTAINS:
+              if (dataSource.getTextIndex() != null) {
+                // For now, CONTAINS is executed by the TEXT_MATCH operator. With integration of native text indices
+                // the type of operator used will depend on the type of the underlying text index.
+                return new TextMatchFilterOperator(dataSource.getTextIndex(), (TextMatchPredicate) predicate, numDocs);
+              }
+
+              throw new UnsupportedOperationException("CONTAINS is supported only on text index enabled fields");
             case TEXT_MATCH:
               return new TextMatchFilterOperator(dataSource.getTextIndex(), (TextMatchPredicate) predicate, numDocs);
             case REGEXP_LIKE:
