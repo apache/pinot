@@ -69,7 +69,8 @@ public class AdditionTransformFunctionTest extends BaseTransformFunctionTest {
       double val2 = _doubleSVValues[i];
       double val3 = (double) _floatSVValues[i] + (double) _longSVValues[i];
       BigDecimal val6 = BigDecimal.valueOf(val3).add(val4).add(new BigDecimal(_intSVValues[i]));
-      expectedBigDecimalValues[i] = BigDecimal.valueOf(val1).add(BigDecimal.valueOf(val2)).add(val6).add(_bigDecimalSVValues[i]);
+      expectedBigDecimalValues[i] = BigDecimal.valueOf(val1).add(BigDecimal.valueOf(val2)).add(val6)
+          .add(_bigDecimalSVValues[i]);
     }
     testTransformFunction(transformFunction, expectedBigDecimalValues);
   }

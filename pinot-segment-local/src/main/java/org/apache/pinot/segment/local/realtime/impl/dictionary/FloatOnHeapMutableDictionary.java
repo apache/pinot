@@ -188,7 +188,7 @@ public class FloatOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   }
 
   @Override
-  public BigDecimal getBigDecimalValue(int dictId){
+  public BigDecimal getBigDecimalValue(int dictId) {
     return BigDecimal.valueOf(getFloatValue(dictId));
   }
 

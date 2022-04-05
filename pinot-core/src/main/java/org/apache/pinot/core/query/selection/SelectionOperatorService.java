@@ -126,7 +126,8 @@ public class SelectionOperatorService {
         if (isNumber[i]) {
           // BigDecimal is a Number, but underlying stored type is ByteArray.
           if (v1.getClass().equals(ByteArray.class)) {
-             result = BigDecimalUtils.deserialize((ByteArray) v1).compareTo(BigDecimalUtils.deserialize((ByteArray) v2));
+             result = BigDecimalUtils.deserialize(
+                 (ByteArray) v1).compareTo(BigDecimalUtils.deserialize((ByteArray) v2));
           } else if (v1.getClass().equals(BigDecimal.class)) {
             result = ((BigDecimal) v1).compareTo((BigDecimal) v2);
           } else {

@@ -132,7 +132,7 @@ public class CastTransformFunction extends BaseTransformFunction {
             ArrayCopyUtils.copy(decimalValues, _intValuesSV, length);
             break;
           }
-          // throw.
+          throw new IllegalStateException();
         default:
           throw new IllegalStateException();
       }
@@ -175,6 +175,7 @@ public class CastTransformFunction extends BaseTransformFunction {
             ArrayCopyUtils.copy(decimalValues, _longValuesSV, length);
             break;
           }
+          throw new IllegalStateException();
         default:
           throw new IllegalStateException();
       }
@@ -217,6 +218,7 @@ public class CastTransformFunction extends BaseTransformFunction {
             ArrayCopyUtils.copy(decimalValues, _floatValuesSV, length);
             break;
           }
+          throw new IllegalStateException();
         default:
           throw new IllegalStateException();
       }
@@ -259,6 +261,7 @@ public class CastTransformFunction extends BaseTransformFunction {
             ArrayCopyUtils.copy(decimalValues, _doubleValuesSV, length);
             break;
           }
+          throw new IllegalStateException();
         default:
           throw new IllegalStateException();
       }

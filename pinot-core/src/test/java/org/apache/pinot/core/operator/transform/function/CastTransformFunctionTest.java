@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.testng.Assert;

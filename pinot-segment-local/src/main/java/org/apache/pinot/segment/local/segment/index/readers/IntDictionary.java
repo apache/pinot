@@ -65,7 +65,7 @@ public class IntDictionary extends BaseImmutableDictionary {
   }
 
   @Override
-  public BigDecimal getBigDecimalValue(int dictId){
+  public BigDecimal getBigDecimalValue(int dictId) {
     return new BigDecimal(getInt(dictId));
   }
 

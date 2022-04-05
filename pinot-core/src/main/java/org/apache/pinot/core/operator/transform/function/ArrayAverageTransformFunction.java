@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;

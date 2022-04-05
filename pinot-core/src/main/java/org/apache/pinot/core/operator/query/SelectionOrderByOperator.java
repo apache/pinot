@@ -47,8 +47,6 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.BigDecimalUtils;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -171,7 +169,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
               result = ((BigDecimal) v1).compareTo((BigDecimal) v2);
               break;
             }
-          // throw.
+            throw new IllegalStateException();
           // NOTE: Multi-value columns are not comparable, so we should not reach here
           default:
             throw new IllegalStateException();

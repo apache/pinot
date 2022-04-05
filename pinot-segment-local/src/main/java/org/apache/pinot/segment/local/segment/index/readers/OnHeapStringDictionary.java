@@ -121,7 +121,7 @@ public class OnHeapStringDictionary extends OnHeapDictionary {
   }
 
   @Override
-  public BigDecimal getBigDecimalValue(int dictId){
+  public BigDecimal getBigDecimalValue(int dictId) {
     return new BigDecimal(_unpaddedStrings[dictId]);
   }
 

@@ -197,7 +197,8 @@ public class GroovyTransformFunction extends BaseTransformFunction {
               getElementFunction = (sourceArray, position) -> ((BigDecimal[]) sourceArray)[position];
               break;
             }
-            // throw.
+            throw new IllegalStateException(
+                "Unsupported data type '" + _sourceTypes[i].getStoredType() + "' for GROOVY transform function");
           default:
             throw new IllegalStateException(
                 "Unsupported data type '" + _sourceTypes[i].getStoredType() + "' for GROOVY transform function");

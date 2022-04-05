@@ -65,7 +65,7 @@ public class LongDictionary extends BaseImmutableDictionary {
   }
 
   @Override
-  public BigDecimal getBigDecimalValue(int dictId){
+  public BigDecimal getBigDecimalValue(int dictId) {
     return BigDecimal.valueOf(getLong(dictId));
   }
 

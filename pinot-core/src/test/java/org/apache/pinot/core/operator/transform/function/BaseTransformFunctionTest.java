@@ -292,6 +292,7 @@ public abstract class BaseTransformFunctionTest {
       Assert.assertEquals(longValues[i], expectedValues[i].longValue());
       Assert.assertEquals(floatValues[i], expectedValues[i].floatValue());
       Assert.assertEquals(doubleValues[i], expectedValues[i].doubleValue());
+
       Assert.assertEquals(bigDecimalValues[i].compareTo(expectedValues[i]), 0);
       Assert.assertEquals((new BigDecimal(stringValues[i])).compareTo(expectedValues[i]), 0);
     }

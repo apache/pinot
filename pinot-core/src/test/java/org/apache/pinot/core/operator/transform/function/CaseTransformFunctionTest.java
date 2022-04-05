@@ -96,7 +96,7 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
     Arrays.fill(expectedBigDecimalResults, val2);
     testCaseQueryWithBigDecimalResults("false", expectedBigDecimalResults);
 
-    for (TransformFunctionType functionType : new TransformFunctionType[]{TransformFunctionType.GREATER_THAN}) { // BINARY_OPERATOR_TRANSFORM_FUNCTIONS) {
+    for (TransformFunctionType functionType : BINARY_OPERATOR_TRANSFORM_FUNCTIONS) {
       testCaseQueryWithBigDecimalResults(String.format("%s(%s, %s)", functionType.getName(), INT_SV_COLUMN,
           String.format("%d", _intSVValues[INDEX_TO_COMPARE])),
           getExpectedBigDecimalResults(INT_SV_COLUMN, functionType));

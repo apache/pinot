@@ -206,7 +206,7 @@ public class LongOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   }
 
   @Override
-  public BigDecimal getBigDecimalValue(int dictId){
+  public BigDecimal getBigDecimalValue(int dictId) {
     return BigDecimal.valueOf(getLongValue(dictId));
   }
 

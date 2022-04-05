@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.common.utils;
 
-import java.math.BigDecimal;
 import com.fasterxml.jackson.core.JsonParseException;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.Base64;
 import org.apache.commons.lang3.ArrayUtils;

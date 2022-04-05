@@ -151,7 +151,8 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
 
     // Operations between a BigDecimal, and a double (returns SV BIG_DECIMAL)
     groovyTransformFunction = String.format(
-        "groovy('{\"returnType\":\"BIG_DECIMAL\", \"isSingleValue\":true}', 'arg0.min(BigDecimal.valueOf(arg1)).subtract(BigDecimal.ONE)', %s, %s)",
+        "groovy('{\"returnType\":\"BIG_DECIMAL\", \"isSingleValue\":true}', "
+            + "'arg0.min(BigDecimal.valueOf(arg1)).subtract(BigDecimal.ONE)', %s, %s)",
         BIG_DECIMAL_SV_COLUMN, DOUBLE_SV_COLUMN);
     BigDecimal[] expectedResult11 = new BigDecimal[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {

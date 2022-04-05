@@ -89,21 +89,6 @@ public class BigDecimalColumnPredIndexStatsCollector extends AbstractColumnStati
   }
 
   @Override
-  public int getLengthOfShortestElement() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public int getLengthOfLargestElement() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public int getMaxRowLengthInBytes() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public int getCardinality() {
     if (_sealed) {
       return _sortedValues.length;

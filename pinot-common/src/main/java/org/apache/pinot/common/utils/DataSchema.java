@@ -33,7 +33,6 @@ import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.EnumSet;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
@@ -400,7 +399,7 @@ public class DataSchema {
           assert value instanceof Timestamp;
           return value.toString();
         case BIG_DECIMAL:
-          return ((BigDecimal)value).toPlainString();
+          return ((BigDecimal) value).toPlainString();
         case BYTES:
           return BytesUtils.toHexString((byte[]) value);
         default:

@@ -103,7 +103,7 @@ public class OnHeapDoubleDictionary extends OnHeapDictionary {
   }
 
   @Override
-  public BigDecimal getBigDecimalValue(int dictId){
+  public BigDecimal getBigDecimalValue(int dictId) {
     return BigDecimal.valueOf(_dictIdToVal[dictId]);
   }
 

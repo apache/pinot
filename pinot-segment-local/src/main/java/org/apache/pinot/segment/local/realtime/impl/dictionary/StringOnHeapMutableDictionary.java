@@ -146,7 +146,7 @@ public class StringOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   }
 
   @Override
-  public BigDecimal getBigDecimalValue(int dictId){
+  public BigDecimal getBigDecimalValue(int dictId) {
     return new BigDecimal(getStringValue(dictId));
   }
 

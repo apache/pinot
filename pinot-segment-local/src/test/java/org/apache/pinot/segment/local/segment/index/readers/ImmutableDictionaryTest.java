@@ -66,7 +66,7 @@ public class ImmutableDictionaryTest {
   private float[] _floatValues;
   private double[] _doubleValues;
   private BigDecimal[] _bigDecimalValues;
-  private int BIG_DECIMAL_BYTES_LENGTH;
+  private int _bigDecimalByteLength;
   private String[] _stringValues;
   private ByteArray[] _bytesValues;
 
@@ -108,7 +108,7 @@ public class ImmutableDictionaryTest {
     TreeSet<BigDecimal> bigDecimalSet = new TreeSet<>();
     while (bigDecimalSet.size() < NUM_VALUES) {
       BigDecimal bigDecimal = BigDecimal.valueOf(RANDOM.nextDouble());
-      BIG_DECIMAL_BYTES_LENGTH = Math.max(BIG_DECIMAL_BYTES_LENGTH, BigDecimalUtils.serialize(bigDecimal).length);
+      _bigDecimalByteLength = Math.max(_bigDecimalByteLength, BigDecimalUtils.serialize(bigDecimal).length);
       bigDecimalSet.add(bigDecimal);
     }
     _bigDecimalValues = bigDecimalSet.toArray(new BigDecimal[0]);
@@ -324,7 +324,7 @@ public class ImmutableDictionaryTest {
       throws Exception {
     try (BigDecimalDictionary bigDecimalDictionary = new BigDecimalDictionary(PinotDataBuffer
         .mapReadOnlyBigEndianFile(new File(TEMP_DIR, BIG_DECIMAL_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
-        NUM_VALUES, BIG_DECIMAL_BYTES_LENGTH)) {
+        NUM_VALUES, _bigDecimalByteLength)) {
       testBigDecimalDictionary(bigDecimalDictionary);
     }
   }

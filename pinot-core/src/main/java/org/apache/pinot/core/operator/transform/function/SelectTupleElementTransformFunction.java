@@ -90,7 +90,10 @@ public abstract class SelectTupleElementTransformFunction extends BaseTransformF
     if (left == null || left == right) {
       return right;
     }
-    Set<FieldSpec.DataType> dataTypes = new HashSet<>() {{ add(left); add(right); }};
+    Set<FieldSpec.DataType> dataTypes = new HashSet<>() {{
+      add(left);
+      add(right);
+    }};
     assert dataTypes.size() == 2;
     if (dataTypes.contains(FieldSpec.DataType.BIG_DECIMAL)) {
       return FieldSpec.DataType.BIG_DECIMAL;

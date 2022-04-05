@@ -95,7 +95,8 @@ public class SubtractionTransformFunctionTest extends BaseTransformFunctionTest 
     Assert.assertTrue(transformFunction instanceof SubtractionTransformFunction);
     BigDecimal[] expectedBigDecimalValues = new BigDecimal[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedBigDecimalValues[i] = (BigDecimal.valueOf((((12d - Double.parseDouble(_stringSVValues[i])) - _doubleSVValues[i])
+      expectedBigDecimalValues[i] = (BigDecimal.valueOf((((12d
+          - Double.parseDouble(_stringSVValues[i])) - _doubleSVValues[i])
           - (((double) _floatSVValues[i] - (double) _longSVValues[i]) - 0.34))
           - (double) _intSVValues[i]).subtract(_bigDecimalSVValues[i]));
     }

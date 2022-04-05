@@ -97,8 +97,8 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     _leftStoredType = _leftType.getStoredType();
     _rightStoredType = _rightType.getStoredType();
     // Data type check: left and right types should be compatible.
-    if ((_leftStoredType == DataType.BYTES && _leftType != DataType.BIG_DECIMAL) ||
-        (_rightStoredType == DataType.BYTES && _rightType != DataType.BIG_DECIMAL)) {
+    if ((_leftStoredType == DataType.BYTES && _leftType != DataType.BIG_DECIMAL)
+        || (_rightStoredType == DataType.BYTES && _rightType != DataType.BIG_DECIMAL)) {
       Preconditions.checkState(_leftStoredType == _rightStoredType, String.format(
           "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right Transform "
               + "Function [%s] result type is [%s]]", _leftTransformFunction.getName(), _leftStoredType,
@@ -174,7 +174,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
           fillBigDecimalResultArray(projectionBlock, leftIntValues, length);
           break;
         }
-        // throw.
+        throw illegalState();
       default:
         throw illegalState();
     }
@@ -203,7 +203,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
           fillBigDecimalResultArray(projectionBlock, leftLongValues, length);
           break;
         }
-        // throw.
+        throw illegalState();
       default:
         throw illegalState();
     }
@@ -232,7 +232,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
           fillBigDecimalResultArray(projectionBlock, leftFloatValues, length);
           break;
         }
-        // throw.
+        throw illegalState();
       default:
         throw illegalState();
     }
@@ -261,7 +261,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
           fillBigDecimalResultArray(projectionBlock, leftDoubleValues, length);
           break;
         }
-        // throw.
+        throw illegalState();
       default:
         throw illegalState();
     }

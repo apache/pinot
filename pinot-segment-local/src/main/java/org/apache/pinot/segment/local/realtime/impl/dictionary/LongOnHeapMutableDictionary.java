@@ -188,7 +188,7 @@ public class LongOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   }
 
   @Override
-  public BigDecimal getBigDecimalValue(int dictId){
+  public BigDecimal getBigDecimalValue(int dictId) {
     return BigDecimal.valueOf(getLongValue(dictId));
   }
 

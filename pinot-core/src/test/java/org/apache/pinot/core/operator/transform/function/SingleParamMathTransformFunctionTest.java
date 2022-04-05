@@ -190,7 +190,8 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     testTransformFunction(transformFunction, expectedValues);
 
     // exp(x) always return double. Cast BigDecimal values first to double, then call exp(x).
-    expression = RequestContextUtils.getExpressionFromSQL(String.format("exp(CAST(%s AS DOUBLE))", BIG_DECIMAL_SV_COLUMN));
+    expression = RequestContextUtils.getExpressionFromSQL(
+        String.format("exp(CAST(%s AS DOUBLE))", BIG_DECIMAL_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ExpTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {

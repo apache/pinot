@@ -50,7 +50,7 @@ public class MultiplicationTransformFunctionTest extends BaseTransformFunctionTe
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof MultiplicationTransformFunction);
     Assert.assertEquals(transformFunction.getName(), MultiplicationTransformFunction.FUNCTION_NAME);
-    BigDecimal[]  expectedBigDecimalValues = new BigDecimal[NUM_ROWS];
+    BigDecimal[] expectedBigDecimalValues = new BigDecimal[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedBigDecimalValues[i] = BigDecimal.valueOf(_intSVValues[i]).multiply(BigDecimal.valueOf(_floatSVValues[i]))
           .multiply(_bigDecimalSVValues[i]);
@@ -59,7 +59,7 @@ public class MultiplicationTransformFunctionTest extends BaseTransformFunctionTe
 
     expression = RequestContextUtils.getExpressionFromSQL(String
         .format("mult(mult(%s,%s,%s),%s,%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN, FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN,
-            STRING_SV_COLUMN,BIG_DECIMAL_SV_COLUMN));
+            STRING_SV_COLUMN, BIG_DECIMAL_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof MultiplicationTransformFunction);
     Assert.assertEquals(transformFunction.getName(), MultiplicationTransformFunction.FUNCTION_NAME);
