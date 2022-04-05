@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.nodes;
 
+import java.io.Serializable;
 import java.util.List;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
@@ -42,7 +43,7 @@ public class JoinNode extends AbstractStageNode {
     return _criteria;
   }
 
-  public static class JoinClause {
+  public static class JoinClause implements Serializable {
     private final KeySelector<Object[], Object> _leftJoinKeySelector;
     private final KeySelector<Object[], Object> _rightJoinKeySelector;
 

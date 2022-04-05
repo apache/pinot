@@ -42,13 +42,14 @@ public class QueryPlanSerDeUtils {
     DistributedStagePlan distributedStagePlan = new DistributedStagePlan(stagePlan.getStageId());
     distributedStagePlan.setServerInstance(stringToInstance(stagePlan.getInstanceId()));
     distributedStagePlan.setStageRoot(StageNodeSerDeUtils.deserializeStageRoot(stagePlan.getSerializedStageRoot()));
-    Map<Integer, StageMetadata> metadataMap = distributedStagePlan.getMetadataMap();
-    distributedStagePlan.getMetadataMap().putAll(metadataMap);
+    Map<Integer, Worker.StageMetadata> metadataMap = stagePlan.getStageMetadataMap();
+    distributedStagePlan.getMetadataMap().putAll(protoMapToStageMetadataMap(metadataMap));
     return distributedStagePlan;
   }
 
   public static Worker.StagePlan serialize(DistributedStagePlan distributedStagePlan) {
     return Worker.StagePlan.newBuilder()
+        .setStageId(distributedStagePlan.getStageId())
         .setInstanceId(instanceToString(distributedStagePlan.getServerInstance()))
         .setSerializedStageRoot(StageNodeSerDeUtils.serializeStageRoot(distributedStagePlan.getStageRoot()))
         .putAllStageMetadata(stageMetadataMapToProtoMap(distributedStagePlan.getMetadataMap())).build();
@@ -64,15 +65,15 @@ public class QueryPlanSerDeUtils {
         serverInstance.getGrpcPort());
   }
 
-  public static Map<Integer, StageMetadata> getStageMetadataMap(Map<Integer, Worker.StageMetadata> protoMap) {
+  public static Map<Integer, StageMetadata> protoMapToStageMetadataMap(Map<Integer, Worker.StageMetadata> protoMap) {
     Map<Integer, StageMetadata> metadataMap = new HashMap<>();
     for (Map.Entry<Integer, Worker.StageMetadata> e : protoMap.entrySet()) {
-      metadataMap.put(e.getKey(), protoMapToStageMetadataMap(e.getValue()));
+      metadataMap.put(e.getKey(), fromWorkerStageMetadata(e.getValue()));
     }
     return metadataMap;
   }
 
-  private static StageMetadata protoMapToStageMetadataMap(Worker.StageMetadata workerStageMetadata) {
+  private static StageMetadata fromWorkerStageMetadata(Worker.StageMetadata workerStageMetadata) {
     StageMetadata stageMetadata = new StageMetadata();
     stageMetadata.getScannedTables().addAll(workerStageMetadata.getDataSourcesList());
     for (String serverInstanceString : workerStageMetadata.getInstancesList()) {
