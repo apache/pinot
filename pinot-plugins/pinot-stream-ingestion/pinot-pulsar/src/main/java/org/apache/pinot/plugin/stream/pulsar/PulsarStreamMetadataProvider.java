@@ -163,7 +163,9 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
 
   private void closeConsumer(Consumer consumer) {
     try {
-      consumer.close();
+      if (consumer != null) {
+        consumer.close();
+      }
     } catch (Exception e) {
       LOGGER.warn("Caught exception while shutting down Pulsar consumer with id {}", consumer, e);
     }
