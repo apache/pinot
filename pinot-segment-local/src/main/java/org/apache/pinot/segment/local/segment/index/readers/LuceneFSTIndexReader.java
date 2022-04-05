@@ -27,6 +27,10 @@ import org.apache.pinot.segment.local.utils.fst.PinotBufferIndexInput;
 import org.apache.pinot.segment.local.utils.fst.RegexpMatcher;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.trace.FilterType;
+import org.apache.pinot.spi.trace.InvocationRecording;
+import org.apache.pinot.spi.trace.InvocationSpan;
+import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -61,16 +65,24 @@ public class LuceneFSTIndexReader implements TextIndexReader {
 
   @Override
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
-    try {
+    try (InvocationSpan span = Tracing.getTracer().beginInvocation(LuceneFSTIndexReader.class)) {
       MutableRoaringBitmap dictIds = new MutableRoaringBitmap();
       List<Long> matchingIds = RegexpMatcher.regexMatch(searchQuery, _readFST);
       for (Long matchingId : matchingIds) {
         dictIds.add(matchingId.intValue());
       }
+      record(span, matchingIds.size());
       return dictIds.toImmutableRoaringBitmap();
     } catch (Exception ex) {
       LOGGER.error("Error getting matching Ids from FST", ex);
       throw new RuntimeException(ex);
+    }
+  }
+
+  private void record(InvocationRecording recording, int matches) {
+    if (recording.isEnabled()) {
+      recording.setFilter(FilterType.INDEX, "LUCENE_FST");
+      recording.setNumDocsMatchingAfterFilter(matches);
     }
   }
 
