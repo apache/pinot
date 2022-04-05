@@ -37,6 +37,7 @@ import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,7 +82,7 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
     // deleted/refreshed, the segment will be released after the main thread returns, which would lead to undefined
     // behavior (even JVM crash) when processing queries against it.
     Phaser phaser = new Phaser(1);
-
+    Tracing.activeRecording().setNumTasks(_numTasks);
     for (int i = 0; i < _numTasks; i++) {
       int taskIndex = i;
       _futures[i] = _executorService.submit(new TraceRunnable() {
