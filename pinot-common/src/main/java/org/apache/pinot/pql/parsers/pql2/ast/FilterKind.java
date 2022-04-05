@@ -48,4 +48,13 @@ public enum FilterKind {
     return this == GREATER_THAN || this == GREATER_THAN_OR_EQUAL || this == LESS_THAN || this == LESS_THAN_OR_EQUAL
         || this == BETWEEN || this == RANGE;
   }
+
+  /**
+   * Returns true if the filter is a predicate. Returns false otherwise. This logic should mimic FilterContext.Type.
+   *
+   * @return where the filter is a predicate.
+   */
+  public boolean isPredicate() {
+    return this != AND && this != OR && this != NOT;
+  }
 }

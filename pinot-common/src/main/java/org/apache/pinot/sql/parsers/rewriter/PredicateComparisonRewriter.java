@@ -18,28 +18,97 @@
  */
 package org.apache.pinot.sql.parsers.rewriter;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 
-
 public class PredicateComparisonRewriter implements QueryRewriter {
   @Override
   public PinotQuery rewrite(PinotQuery pinotQuery) {
-    Expression filterExpression = pinotQuery.getFilterExpression();
-    if (filterExpression != null) {
-      pinotQuery.setFilterExpression(updateComparisonPredicate(filterExpression));
+    if (pinotQuery.getFilterExpression() != null) {
+      pinotQuery.setFilterExpression(updateBooleanPredicates(pinotQuery.getFilterExpression(), null));
+      pinotQuery.setFilterExpression(updateComparisonPredicate(pinotQuery.getFilterExpression()));
     }
     Expression havingExpression = pinotQuery.getHavingExpression();
     if (havingExpression != null) {
       pinotQuery.setHavingExpression(updateComparisonPredicate(havingExpression));
     }
     return pinotQuery;
+  }
+
+  /**
+   * Updates boolean predicates that are missing an EQUALS filter.
+   * E.g. 1:  'WHERE a' will be updated to 'WHERE a = true'
+   * E.g. 2: "WHERE startsWith(col, 'str')" will be updated to "WHERE startsWith(col, 'str') = true"
+   *
+   * @param expression current expression in the expression tree
+   * @param parentFunction parent expression
+   * @return re-written expression.
+   */
+  private static Expression updateBooleanPredicates(Expression expression, Function parentFunction) {
+    ExpressionType type = expression.getType();
+    if (type == ExpressionType.FUNCTION) {
+      Function function = expression.getFunctionCall();
+
+      // If the function is not of FilterKind, we might have to rewrite the function if parentFunction is AND, OR or
+      // NOT. Example: A query like "select col1 from table where startsWith(col1, 'myStr') AND col2 > 10;" should be
+      // rewritten to "select col1 from table where startsWith(col1, 'myStr') = true AND col2 > 10;".
+      if (!EnumUtils.isValidEnum(FilterKind.class, function.getOperator())) {
+
+        // Rewrite non FilterKind functions if one of the two conditions are satified:
+        // 1. parent function is empty. Example: "select * from table where startsWith(col, 'myStr');
+        // 2. Separator is not a predicate (non predicates are AND, OR, NOT).
+        //    Example: "select * from table where startsWith(col, 'myStr') AND col2 > 10";
+        if (parentFunction == null || (EnumUtils.isValidEnum(FilterKind.class, parentFunction.getOperator())
+            && !FilterKind.valueOf(parentFunction.getOperator()).isPredicate())) {
+          Expression currExpression = expression.deepCopy();
+          expression = RequestUtils.getFunctionExpression(FilterKind.EQUALS.name());
+          List<Expression> operands = new ArrayList<>();
+          operands.add(currExpression);
+          operands.add(RequestUtils.getLiteralExpression(true));
+          expression.getFunctionCall().setOperands(operands);
+
+          return expression;
+        }
+      }
+
+      List<Expression> operands = expression.getFunctionCall().getOperands();
+
+      if (operands.size() > 0) {
+        // unset operands only within the "if" condition because 'no argument' functions expect operand list to
+        // be initialized.
+        expression.getFunctionCall().unsetOperands();
+
+        for (Expression exp : operands) {
+          expression.getFunctionCall().addToOperands(updateBooleanPredicates(exp, expression.getFunctionCall()));
+        }
+      }
+    } else if (type == ExpressionType.IDENTIFIER) {
+
+      // Rewrite identifiers  if one of the two conditions are satified:
+      // 1. parent function is empty. Example: "select * from table where col1";
+      // 2. Separator is not a predicate (non predicates are AND, OR, NOT).
+      //    Example: "select * from table where col1 AND col2 > 10";
+      if (parentFunction == null || (EnumUtils.isValidEnum(FilterKind.class, parentFunction.getOperator())
+          && !FilterKind.valueOf(parentFunction.getOperator()).isPredicate())) {
+        Expression currExpression = expression.deepCopy();
+        expression = RequestUtils.getFunctionExpression(FilterKind.EQUALS.name());
+        List<Expression> operands = new ArrayList<>();
+        operands.add(currExpression);
+        operands.add(RequestUtils.getLiteralExpression(true));
+        expression.getFunctionCall().setOperands(operands);
+      }
+    }
+
+    return expression;
   }
 
   // This method converts a predicate expression to the what Pinot could evaluate.

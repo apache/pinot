@@ -2206,6 +2206,19 @@ public class CalciteSqlCompilerTest {
     }
 
     {
+      String query = "SELECT * FROM foo WHERE col1 > 0 AND (col2 AND col3 > 0) AND startsWith(col4, 'myStr')";
+      PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+      Function functionCall = pinotQuery.getFilterExpression().getFunctionCall();
+      Assert.assertEquals(functionCall.getOperator(), FilterKind.AND.name());
+      List<Expression> operands = functionCall.getOperands();
+      Assert.assertEquals(operands.size(), 4);
+      Assert.assertEquals(operands.get(0).getFunctionCall().getOperator(), FilterKind.GREATER_THAN.name());
+      Assert.assertEquals(operands.get(1).getFunctionCall().getOperator(), FilterKind.EQUALS.name());
+      Assert.assertEquals(operands.get(2).getFunctionCall().getOperator(), FilterKind.GREATER_THAN.name());
+      Assert.assertEquals(operands.get(3).getFunctionCall().getOperator(), FilterKind.EQUALS.name());
+    }
+
+    {
       String query = "SELECT * FROM foo WHERE col1 > 0 AND (col2 AND col3 > 0) AND col4";
       PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
       Function functionCall = pinotQuery.getFilterExpression().getFunctionCall();
@@ -2213,9 +2226,9 @@ public class CalciteSqlCompilerTest {
       List<Expression> operands = functionCall.getOperands();
       Assert.assertEquals(operands.size(), 4);
       Assert.assertEquals(operands.get(0).getFunctionCall().getOperator(), FilterKind.GREATER_THAN.name());
-      Assert.assertEquals(operands.get(1).getIdentifier().getName(), "col2");
+      Assert.assertEquals(operands.get(1).getFunctionCall().getOperator(), FilterKind.EQUALS.name());
       Assert.assertEquals(operands.get(2).getFunctionCall().getOperator(), FilterKind.GREATER_THAN.name());
-      Assert.assertEquals(operands.get(3).getIdentifier().getName(), "col4");
+      Assert.assertEquals(operands.get(3).getFunctionCall().getOperator(), FilterKind.EQUALS.name());
 
       // NOTE: PQL does not support logical identifier
     }
@@ -2249,9 +2262,9 @@ public class CalciteSqlCompilerTest {
       List<Expression> operands = functionCall.getOperands();
       Assert.assertEquals(operands.size(), 4);
       Assert.assertEquals(operands.get(0).getFunctionCall().getOperator(), FilterKind.LESS_THAN_OR_EQUAL.name());
-      Assert.assertEquals(operands.get(1).getIdentifier().getName(), "col2");
+      Assert.assertEquals(operands.get(1).getFunctionCall().getOperator(), FilterKind.EQUALS.name());
       Assert.assertEquals(operands.get(2).getFunctionCall().getOperator(), FilterKind.LESS_THAN_OR_EQUAL.name());
-      Assert.assertEquals(operands.get(3).getIdentifier().getName(), "col4");
+      Assert.assertEquals(operands.get(3).getFunctionCall().getOperator(), FilterKind.EQUALS.name());
 
       // NOTE: PQL does not support logical identifier
     }
