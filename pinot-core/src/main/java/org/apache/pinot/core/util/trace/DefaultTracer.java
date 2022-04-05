@@ -20,6 +20,7 @@ package org.apache.pinot.core.util.trace;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import org.apache.pinot.spi.trace.BaseRecording;
 import org.apache.pinot.spi.trace.InvocationRecording;
 import org.apache.pinot.spi.trace.InvocationSpan;
 import org.apache.pinot.spi.trace.TraceState;
@@ -33,7 +34,11 @@ public class DefaultTracer implements Tracer {
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultTracer.class);
   private static final ThreadLocal<Deque<InvocationRecording>> STACK = ThreadLocal.withInitial(ArrayDeque::new);
 
-  private static class NoOpSpan implements InvocationSpan {
+  private static class NoOpSpan extends BaseRecording implements InvocationSpan {
+
+    public NoOpSpan() {
+      super(false);
+    }
 
     @Override
     public void close() {
@@ -42,13 +47,14 @@ public class DefaultTracer implements Tracer {
 
   private static final NoOpSpan NO_OP_SPAN = new NoOpSpan();
 
-  private static final class MilliTimeSpan implements InvocationSpan {
+  private static final class MilliTimeSpan extends BaseRecording implements InvocationSpan {
 
     private final long _startTimeMillis = System.currentTimeMillis();
     private final Class<?> _operator;
     private final Runnable _onClose;
 
     public MilliTimeSpan(Class<?> operator, Runnable onClose) {
+      super(true);
       _operator = operator;
       _onClose = onClose;
     }
