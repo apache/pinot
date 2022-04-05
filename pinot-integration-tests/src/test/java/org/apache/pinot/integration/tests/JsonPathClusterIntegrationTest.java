@@ -110,8 +110,8 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
   private File createAvroFile()
       throws Exception {
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    List<Field> fields = Arrays
-        .asList(new Field(MY_MAP_STR_FIELD_NAME, org.apache.avro.Schema.create(Type.STRING), null, null),
+    List<Field> fields =
+        Arrays.asList(new Field(MY_MAP_STR_FIELD_NAME, org.apache.avro.Schema.create(Type.STRING), null, null),
             new Field(COMPLEX_MAP_STR_FIELD_NAME, org.apache.avro.Schema.create(Type.STRING), null, null));
     avroSchema.setFields(fields);
 
@@ -129,8 +129,9 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
         complexMap.put("k1", "value-k1-" + i);
         complexMap.put("k2", "value-k2-" + i);
         complexMap.put("k3", Arrays.asList("value-k3-0-" + i, "value-k3-1-" + i, "value-k3-2-" + i));
-        complexMap.put("k4", ImmutableMap
-            .of("k4-k1", "value-k4-k1-" + i, "k4-k2", "value-k4-k2-" + i, "k4-k3", "value-k4-k3-" + i, "met", i));
+        complexMap.put("k4",
+            ImmutableMap.of("k4-k1", "value-k4-k1-" + i, "k4-k2", "value-k4-k2-" + i, "k4-k3", "value-k4-k3-" + i,
+                "met", i));
         record.put(COMPLEX_MAP_STR_FIELD_NAME, JsonUtils.objectToString(complexMap));
         fileWriter.append(record);
         _sortedSequenceIds.add(String.valueOf(i));
@@ -142,89 +143,11 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Test
-  public void testPqlQueries()
-      throws Exception {
-
-    //Selection Query
-    String pqlQuery = "Select " + MY_MAP_STR_FIELD_NAME + " from " + DEFAULT_TABLE_NAME;
-    JsonNode pinotResponse = postQuery(pqlQuery);
-    ArrayNode selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
-    Assert.assertNotNull(selectionResults);
-    Assert.assertFalse(selectionResults.isEmpty());
-    for (int i = 0; i < selectionResults.size(); i++) {
-      String value = selectionResults.get(i).get(0).textValue();
-      Assert.assertTrue(value.indexOf("-k1-") > 0);
-    }
-
-    //Filter Query
-    pqlQuery = "Select jsonExtractScalar(myMapStr,'$.k1','STRING') from " + DEFAULT_TABLE_NAME
-        + "  where jsonExtractScalar(myMapStr,'$.k1','STRING') = 'value-k1-0'";
-    pinotResponse = postQuery(pqlQuery);
-    selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
-    Assert.assertNotNull(selectionResults);
-    Assert.assertFalse(selectionResults.isEmpty());
-    for (int i = 0; i < selectionResults.size(); i++) {
-      String value = selectionResults.get(i).get(0).textValue();
-      Assert.assertEquals(value, "value-k1-0");
-    }
-    pqlQuery =
-        "Select " + MY_MAP_STR_K1_FIELD_NAME + " from " + DEFAULT_TABLE_NAME + "  where " + MY_MAP_STR_K1_FIELD_NAME
-            + " = 'value-k1-0'";
-    pinotResponse = postQuery(pqlQuery);
-    selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
-    Assert.assertNotNull(selectionResults);
-    Assert.assertFalse(selectionResults.isEmpty());
-    for (int i = 0; i < selectionResults.size(); i++) {
-      String value = selectionResults.get(i).get(0).textValue();
-      Assert.assertEquals(value, "value-k1-0");
-    }
-
-    //selection order by
-    pqlQuery = "Select jsonExtractScalar(myMapStr,'$.k1','STRING') from " + DEFAULT_TABLE_NAME
-        + " order by jsonExtractScalar(myMapStr,'$.k1','STRING')";
-    pinotResponse = postQuery(pqlQuery);
-    selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
-    Assert.assertNotNull(selectionResults);
-    Assert.assertFalse(selectionResults.isEmpty());
-    for (int i = 0; i < selectionResults.size(); i++) {
-      String value = selectionResults.get(i).get(0).textValue();
-      Assert.assertTrue(value.indexOf("-k1-") > 0);
-    }
-    pqlQuery =
-        "Select " + MY_MAP_STR_K1_FIELD_NAME + " from " + DEFAULT_TABLE_NAME + " order by " + MY_MAP_STR_K1_FIELD_NAME;
-    pinotResponse = postQuery(pqlQuery);
-    selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
-    Assert.assertNotNull(selectionResults);
-    Assert.assertFalse(selectionResults.isEmpty());
-    for (int i = 0; i < selectionResults.size(); i++) {
-      String value = selectionResults.get(i).get(0).textValue();
-      Assert.assertTrue(value.indexOf("-k1-") > 0);
-    }
-
-    //Group By Query
-    pqlQuery = "Select count(*) from " + DEFAULT_TABLE_NAME + " group by jsonExtractScalar(myMapStr,'$.k1','STRING')";
-    pinotResponse = postQuery(pqlQuery);
-    Assert.assertNotNull(pinotResponse.get("aggregationResults"));
-    JsonNode groupByResult = pinotResponse.get("aggregationResults").get(0).get("groupByResult");
-    Assert.assertNotNull(groupByResult);
-    Assert.assertTrue(groupByResult.isArray());
-    Assert.assertFalse(groupByResult.isEmpty());
-
-    pqlQuery = "Select count(*) from " + DEFAULT_TABLE_NAME + " group by " + MY_MAP_STR_K1_FIELD_NAME;
-    pinotResponse = postQuery(pqlQuery);
-    Assert.assertNotNull(pinotResponse.get("aggregationResults"));
-    groupByResult = pinotResponse.get("aggregationResults").get(0).get("groupByResult");
-    Assert.assertNotNull(groupByResult);
-    Assert.assertTrue(groupByResult.isArray());
-    Assert.assertFalse(groupByResult.isEmpty());
-  }
-
-  @Test
-  public void testSqlQueries()
+  public void testQueries()
       throws Exception {
     //Selection Query
-    String sqlQuery = "Select myMapStr from " + DEFAULT_TABLE_NAME;
-    JsonNode pinotResponse = postSqlQuery(sqlQuery);
+    String query = "Select myMapStr from " + DEFAULT_TABLE_NAME;
+    JsonNode pinotResponse = postQuery(query);
     ArrayNode rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
     Assert.assertNotNull(rows);
     Assert.assertFalse(rows.isEmpty());
@@ -234,9 +157,9 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     //Filter Query
-    sqlQuery = "Select jsonExtractScalar(myMapStr,'$.k1','STRING') from " + DEFAULT_TABLE_NAME
+    query = "Select jsonExtractScalar(myMapStr,'$.k1','STRING') from " + DEFAULT_TABLE_NAME
         + "  where jsonExtractScalar(myMapStr,'$.k1','STRING') = 'value-k1-0'";
-    pinotResponse = postSqlQuery(sqlQuery);
+    pinotResponse = postQuery(query);
     rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
     Assert.assertNotNull(rows);
     Assert.assertFalse(rows.isEmpty());
@@ -246,9 +169,9 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     //selection order by
-    sqlQuery = "Select jsonExtractScalar(myMapStr,'$.k1','STRING') from " + DEFAULT_TABLE_NAME
+    query = "Select jsonExtractScalar(myMapStr,'$.k1','STRING') from " + DEFAULT_TABLE_NAME
         + " order by jsonExtractScalar(myMapStr,'$.k1','STRING')";
-    pinotResponse = postSqlQuery(sqlQuery);
+    pinotResponse = postQuery(query);
     rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
     Assert.assertNotNull(rows);
     Assert.assertFalse(rows.isEmpty());
@@ -258,9 +181,9 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     //Group By Query
-    sqlQuery = "Select jsonExtractScalar(myMapStr,'$.k1','STRING'), count(*) from " + DEFAULT_TABLE_NAME
+    query = "Select jsonExtractScalar(myMapStr,'$.k1','STRING'), count(*) from " + DEFAULT_TABLE_NAME
         + " group by jsonExtractScalar(myMapStr,'$.k1','STRING')";
-    pinotResponse = postSqlQuery(sqlQuery);
+    pinotResponse = postQuery(query);
     Assert.assertNotNull(pinotResponse.get("resultTable"));
     rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
     for (int i = 0; i < rows.size(); i++) {
@@ -270,109 +193,11 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Test
-  public void testComplexPqlQueries()
+  public void testComplexQueries()
       throws Exception {
     //Selection Query
-    String pqlQuery = "Select " + COMPLEX_MAP_STR_FIELD_NAME + " from " + DEFAULT_TABLE_NAME;
-    JsonNode pinotResponse = postQuery(pqlQuery);
-    ArrayNode selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
-
-    Assert.assertNotNull(selectionResults);
-    Assert.assertFalse(selectionResults.isEmpty());
-    for (int i = 0; i < selectionResults.size(); i++) {
-      String value = selectionResults.get(i).get(0).textValue();
-      Map results = JsonUtils.stringToObject(value, Map.class);
-      Assert.assertTrue(value.indexOf("-k1-") > 0);
-      Assert.assertEquals(results.get("k1"), "value-k1-" + i);
-      Assert.assertEquals(results.get("k2"), "value-k2-" + i);
-      final List k3 = (List) results.get("k3");
-      Assert.assertEquals(k3.size(), 3);
-      Assert.assertEquals(k3.get(0), "value-k3-0-" + i);
-      Assert.assertEquals(k3.get(1), "value-k3-1-" + i);
-      Assert.assertEquals(k3.get(2), "value-k3-2-" + i);
-      final Map k4 = (Map) results.get("k4");
-      Assert.assertEquals(k4.size(), 4);
-      Assert.assertEquals(k4.get("k4-k1"), "value-k4-k1-" + i);
-      Assert.assertEquals(k4.get("k4-k2"), "value-k4-k2-" + i);
-      Assert.assertEquals(k4.get("k4-k3"), "value-k4-k3-" + i);
-      Assert.assertEquals(Double.parseDouble(k4.get("met").toString()), (double) i);
-    }
-
-    pqlQuery = "Select " + COMPLEX_MAP_STR_K3_FIELD_NAME + " from " + DEFAULT_TABLE_NAME;
-    pinotResponse = postQuery(pqlQuery);
-    selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
-
-    Assert.assertNotNull(selectionResults);
-    Assert.assertFalse(selectionResults.isEmpty());
-    for (int i = 0; i < selectionResults.size(); i++) {
-      JsonNode k3 = selectionResults.get(i).get(0);
-      Assert.assertEquals(k3.size(), 3);
-      Assert.assertEquals(k3.get(0).asText(), "value-k3-0-" + i);
-      Assert.assertEquals(k3.get(1).asText(), "value-k3-1-" + i);
-      Assert.assertEquals(k3.get(2).asText(), "value-k3-2-" + i);
-    }
-
-    //Filter Query
-    pqlQuery = "Select jsonExtractScalar(complexMapStr,'$.k4','STRING') from " + DEFAULT_TABLE_NAME
-        + "  where jsonExtractScalar(complexMapStr,'$.k4.k4-k1','STRING') = 'value-k4-k1-0'";
-    pinotResponse = postQuery(pqlQuery);
-    selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
-    Assert.assertNotNull(selectionResults);
-    Assert.assertEquals(selectionResults.size(), 1);
-    for (int i = 0; i < selectionResults.size(); i++) {
-      String value = selectionResults.get(i).get(0).textValue();
-      Assert.assertEquals(value,
-          "{\"k4-k1\":\"value-k4-k1-0\",\"k4-k2\":\"value-k4-k2-0\",\"k4-k3\":\"value-k4-k3-0\",\"met\":0}");
-    }
-
-    //selection order by
-    pqlQuery = "Select " + COMPLEX_MAP_STR_FIELD_NAME + " from " + DEFAULT_TABLE_NAME
-        + " order by jsonExtractScalar(complexMapStr,'$.k4.k4-k1','STRING') DESC LIMIT " + NUM_TOTAL_DOCS;
-    pinotResponse = postQuery(pqlQuery);
-    selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
-    Assert.assertNotNull(selectionResults);
-    Assert.assertFalse(selectionResults.isEmpty());
-    for (int i = 0; i < selectionResults.size(); i++) {
-      String value = selectionResults.get(i).get(0).textValue();
-      Assert.assertTrue(value.indexOf("-k1-") > 0);
-      Map results = JsonUtils.stringToObject(value, Map.class);
-      String seqId = _sortedSequenceIds.get(NUM_TOTAL_DOCS - 1 - i);
-      Assert.assertEquals(results.get("k1"), "value-k1-" + seqId);
-      Assert.assertEquals(results.get("k2"), "value-k2-" + seqId);
-      final List k3 = (List) results.get("k3");
-      Assert.assertEquals(k3.get(0), "value-k3-0-" + seqId);
-      Assert.assertEquals(k3.get(1), "value-k3-1-" + seqId);
-      Assert.assertEquals(k3.get(2), "value-k3-2-" + seqId);
-      final Map k4 = (Map) results.get("k4");
-      Assert.assertEquals(k4.get("k4-k1"), "value-k4-k1-" + seqId);
-      Assert.assertEquals(k4.get("k4-k2"), "value-k4-k2-" + seqId);
-      Assert.assertEquals(k4.get("k4-k3"), "value-k4-k3-" + seqId);
-      Assert.assertEquals(Double.parseDouble(k4.get("met").toString()), Double.parseDouble(seqId));
-    }
-
-    //Group By Query
-    pqlQuery = "Select sum(jsonExtractScalar(complexMapStr,'$.k4.met','INT')) from " + DEFAULT_TABLE_NAME
-        + " group by jsonExtractScalar(complexMapStr,'$.k1','STRING')";
-    pinotResponse = postQuery(pqlQuery);
-    Assert.assertNotNull(pinotResponse.get("aggregationResults"));
-    JsonNode groupByResult = pinotResponse.get("aggregationResults").get(0).get("groupByResult");
-    Assert.assertNotNull(groupByResult);
-    Assert.assertTrue(groupByResult.isArray());
-    Assert.assertFalse(groupByResult.isEmpty());
-    for (int i = 0; i < groupByResult.size(); i++) {
-      String seqId = _sortedSequenceIds.get(NUM_TOTAL_DOCS - 1 - i);
-      final JsonNode groupbyRes = groupByResult.get(i);
-      Assert.assertEquals(groupbyRes.get("group").get(0).asText(), "value-k1-" + seqId);
-      Assert.assertEquals(groupbyRes.get("value").asDouble(), Double.parseDouble(seqId));
-    }
-  }
-
-  @Test
-  public void testComplexSqlQueries()
-      throws Exception {
-    //Selection Query
-    String sqlQuery = "Select complexMapStr from " + DEFAULT_TABLE_NAME;
-    JsonNode pinotResponse = postSqlQuery(sqlQuery);
+    String query = "Select complexMapStr from " + DEFAULT_TABLE_NAME;
+    JsonNode pinotResponse = postQuery(query);
     ArrayNode rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
 
     Assert.assertNotNull(rows);
@@ -397,9 +222,9 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     //Filter Query
-    sqlQuery = "Select jsonExtractScalar(complexMapStr,'$.k4','STRING') from " + DEFAULT_TABLE_NAME
+    query = "Select jsonExtractScalar(complexMapStr,'$.k4','STRING') from " + DEFAULT_TABLE_NAME
         + "  where jsonExtractScalar(complexMapStr,'$.k4.k4-k1','STRING') = 'value-k4-k1-0'";
-    pinotResponse = postSqlQuery(sqlQuery);
+    pinotResponse = postQuery(query);
     rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
     Assert.assertNotNull(rows);
     Assert.assertEquals(rows.size(), 1);
@@ -410,9 +235,9 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     //selection order by
-    sqlQuery = "Select complexMapStr from " + DEFAULT_TABLE_NAME
+    query = "Select complexMapStr from " + DEFAULT_TABLE_NAME
         + " order by jsonExtractScalar(complexMapStr,'$.k4.k4-k1','STRING') DESC LIMIT " + NUM_TOTAL_DOCS;
-    pinotResponse = postSqlQuery(sqlQuery);
+    pinotResponse = postQuery(query);
     rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
     Assert.assertNotNull(rows);
     Assert.assertFalse(rows.isEmpty());
@@ -435,11 +260,11 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     //Group By Query
-    sqlQuery = "Select" + " jsonExtractScalar(complexMapStr,'$.k1','STRING'),"
+    query = "Select" + " jsonExtractScalar(complexMapStr,'$.k1','STRING'),"
         + " sum(jsonExtractScalar(complexMapStr,'$.k4.met','INT'))" + " from " + DEFAULT_TABLE_NAME
         + " group by jsonExtractScalar(complexMapStr,'$.k1','STRING')"
         + " order by sum(jsonExtractScalar(complexMapStr,'$.k4.met','INT')) DESC";
-    pinotResponse = postSqlQuery(sqlQuery);
+    pinotResponse = postQuery(query);
     Assert.assertNotNull(pinotResponse.get("resultTable").get("rows"));
     rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
     for (int i = 0; i < rows.size(); i++) {
@@ -451,24 +276,24 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Test
-  void testFailedSqlQuery()
+  void testFailedQuery()
       throws Exception {
-    String sqlQuery = "Select jsonExtractScalar(myMapStr,\"$.k1\",\"STRING\") from " + DEFAULT_TABLE_NAME;
-    JsonNode pinotResponse = postSqlQuery(sqlQuery);
+    String query = "Select jsonExtractScalar(myMapStr,\"$.k1\",\"STRING\") from " + DEFAULT_TABLE_NAME;
+    JsonNode pinotResponse = postQuery(query);
     Assert.assertEquals(pinotResponse.get("exceptions").get(0).get("errorCode").asInt(), 150);
     Assert.assertEquals(pinotResponse.get("numDocsScanned").asInt(), 0);
     Assert.assertEquals(pinotResponse.get("totalDocs").asInt(), 0);
 
-    sqlQuery = "Select myMapStr from " + DEFAULT_TABLE_NAME
+    query = "Select myMapStr from " + DEFAULT_TABLE_NAME
         + "  where jsonExtractScalar(myMapStr, '$.k1',\"STRING\") = 'value-k1-0'";
-    pinotResponse = postSqlQuery(sqlQuery);
+    pinotResponse = postQuery(query);
     Assert.assertEquals(pinotResponse.get("exceptions").get(0).get("errorCode").asInt(), 150);
     Assert.assertEquals(pinotResponse.get("numDocsScanned").asInt(), 0);
     Assert.assertEquals(pinotResponse.get("totalDocs").asInt(), 0);
 
-    sqlQuery = "Select jsonExtractScalar(myMapStr,\"$.k1\", 'STRING') from " + DEFAULT_TABLE_NAME
+    query = "Select jsonExtractScalar(myMapStr,\"$.k1\", 'STRING') from " + DEFAULT_TABLE_NAME
         + "  where jsonExtractScalar(myMapStr, '$.k1', 'STRING') = 'value-k1-0'";
-    pinotResponse = postSqlQuery(sqlQuery);
+    pinotResponse = postQuery(query);
     Assert.assertEquals(pinotResponse.get("exceptions").get(0).get("errorCode").asInt(), 150);
     Assert.assertEquals(pinotResponse.get("numDocsScanned").asInt(), 0);
     Assert.assertEquals(pinotResponse.get("totalDocs").asInt(), 0);

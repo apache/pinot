@@ -43,13 +43,11 @@ import org.apache.pinot.spi.data.FieldSpec;
  */
 public abstract class SingleParamMathTransformFunction extends BaseTransformFunction {
   private TransformFunction _transformFunction;
-  protected double[] _doubleResults;
-  protected BigDecimal[] _bigDecimalResults;
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    Preconditions
-        .checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s", getName());
+    Preconditions.checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s",
+        getName());
     TransformFunction transformFunction = arguments.get(0);
     Preconditions.checkArgument(!(transformFunction instanceof LiteralTransformFunction),
         "Argument cannot be literal for transform function: %s", getName());
@@ -69,24 +67,26 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_doubleResults == null) {
-      _doubleResults = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int length = projectionBlock.getNumDocs();
+    if (_doubleValuesSV == null || _doubleValuesSV.length < length) {
+      _doubleValuesSV = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
 
     double[] values = _transformFunction.transformToDoubleValuesSV(projectionBlock);
     applyMathOperator(values, projectionBlock.getNumDocs());
-    return _doubleResults;
+    return _doubleValuesSV;
   }
 
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
-    if (_bigDecimalResults == null) {
-      _bigDecimalResults = new BigDecimal[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int length = projectionBlock.getNumDocs();
+    if (_bigDecimalValuesSV == null || _bigDecimalValuesSV.length < length) {
+      _bigDecimalValuesSV = new BigDecimal[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
 
     BigDecimal[] values = _transformFunction.transformToBigDecimalValuesSV(projectionBlock);
     applyMathOperator(values, projectionBlock.getNumDocs());
-    return _bigDecimalResults;
+    return _bigDecimalValuesSV;
   }
 
   abstract protected void applyMathOperator(double[] values, int length);
@@ -104,14 +104,14 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _doubleResults[i] = Math.abs(values[i]);
+        _doubleValuesSV[i] = Math.abs(values[i]);
       }
     }
 
     @Override
     protected void applyMathOperator(BigDecimal[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _bigDecimalResults[i] = values[i].abs();
+        _bigDecimalValuesSV[i] = values[i].abs();
       }
     }
   }
@@ -127,14 +127,14 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _doubleResults[i] = Math.ceil(values[i]);
+        _doubleValuesSV[i] = Math.ceil(values[i]);
       }
     }
 
     @Override
     protected void applyMathOperator(BigDecimal[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _bigDecimalResults[i] = values[i].setScale(0, RoundingMode.CEILING);
+        _bigDecimalValuesSV[i] = values[i].setScale(0, RoundingMode.CEILING);
       }
     }
   }
@@ -150,7 +150,7 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _doubleResults[i] = Math.exp(values[i]);
+        _doubleValuesSV[i] = Math.exp(values[i]);
       }
     }
 
@@ -172,14 +172,14 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _doubleResults[i] = Math.floor(values[i]);
+        _doubleValuesSV[i] = Math.floor(values[i]);
       }
     }
 
     @Override
     protected void applyMathOperator(BigDecimal[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _bigDecimalResults[i] = values[i].setScale(0, RoundingMode.FLOOR);
+        _bigDecimalValuesSV[i] = values[i].setScale(0, RoundingMode.FLOOR);
       }
     }
   }
@@ -195,7 +195,50 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _doubleResults[i] = Math.log(values[i]);
+        _doubleValuesSV[i] = Math.log(values[i]);
+      }
+    }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  public static class Log2TransformFunction extends SingleParamMathTransformFunction {
+    public static final String FUNCTION_NAME = "log2";
+    public static final double LOG_BASE = Math.log(2.0);
+
+    @Override
+    public String getName() {
+      return FUNCTION_NAME;
+    }
+
+    @Override
+    protected void applyMathOperator(double[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        _doubleValuesSV[i] = Math.log(values[i]) / LOG_BASE;
+      }
+    }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  public static class Log10TransformFunction extends SingleParamMathTransformFunction {
+    public static final String FUNCTION_NAME = "log10";
+
+    @Override
+    public String getName() {
+      return FUNCTION_NAME;
+    }
+
+    @Override
+    protected void applyMathOperator(double[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        _doubleValuesSV[i] = Math.log10(values[i]);
       }
     }
 
@@ -216,13 +259,34 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     @Override
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        _doubleResults[i] = Math.sqrt(values[i]);
+        _doubleValuesSV[i] = Math.sqrt(values[i]);
       }
     }
 
     @Override
     protected void applyMathOperator(BigDecimal[] values, int length) {
       // todo: Look into utilizing BigDecimal.sqrt() method added in JDK 9 if needed.
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  public static class SignTransformFunction extends SingleParamMathTransformFunction {
+    public static final String FUNCTION_NAME = "sign";
+
+    @Override
+    public String getName() {
+      return FUNCTION_NAME;
+    }
+
+    @Override
+    protected void applyMathOperator(double[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        _doubleValuesSV[i] = Math.signum(values[i]);
+      }
+    }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
       throw new UnsupportedOperationException();
     }
   }

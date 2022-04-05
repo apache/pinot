@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
@@ -72,15 +71,16 @@ public class ArrayAverageTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_results == null) {
-      _results = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int length = projectionBlock.getNumDocs();
+
+    if (_results == null || _results.length < length) {
+      _results = new double[length];
     }
 
-    int numDocs = projectionBlock.getNumDocs();
     switch (_argument.getResultMetadata().getDataType().getStoredType()) {
       case INT:
         int[][] intValuesMV = _argument.transformToIntValuesMV(projectionBlock);
-        for (int i = 0; i < numDocs; i++) {
+        for (int i = 0; i < length; i++) {
           double sumRes = 0;
           for (int value : intValuesMV[i]) {
             sumRes += value;
@@ -90,7 +90,7 @@ public class ArrayAverageTransformFunction extends BaseTransformFunction {
         break;
       case LONG:
         long[][] longValuesMV = _argument.transformToLongValuesMV(projectionBlock);
-        for (int i = 0; i < numDocs; i++) {
+        for (int i = 0; i < length; i++) {
           double sumRes = 0;
           for (long value : longValuesMV[i]) {
             sumRes += value;
@@ -100,7 +100,7 @@ public class ArrayAverageTransformFunction extends BaseTransformFunction {
         break;
       case FLOAT:
         float[][] floatValuesMV = _argument.transformToFloatValuesMV(projectionBlock);
-        for (int i = 0; i < numDocs; i++) {
+        for (int i = 0; i < length; i++) {
           double sumRes = 0;
           for (float value : floatValuesMV[i]) {
             sumRes += value;
@@ -110,7 +110,7 @@ public class ArrayAverageTransformFunction extends BaseTransformFunction {
         break;
       case DOUBLE:
         double[][] doubleValuesMV = _argument.transformToDoubleValuesMV(projectionBlock);
-        for (int i = 0; i < numDocs; i++) {
+        for (int i = 0; i < length; i++) {
           double sumRes = 0;
           for (double value : doubleValuesMV[i]) {
             sumRes += value;

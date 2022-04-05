@@ -138,8 +138,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   public void testStringPadTransformFunction() {
     int padLength = 50;
     String padString = "#";
-    ExpressionContext expression = RequestContextUtils
-        .getExpressionFromSQL(String.format("lpad(%s, %d, '%s')", STRING_ALPHANUM_SV_COLUMN, padLength, padString));
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(
+        String.format("lpad(%s, %d, '%s')", STRING_ALPHANUM_SV_COLUMN, padLength, padString));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "lpad");
@@ -149,8 +149,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils
-        .getExpressionFromSQL(String.format("rpad(%s, %d, '%s')", STRING_ALPHANUM_SV_COLUMN, padLength, padString));
+    expression = RequestContextUtils.getExpressionFromSQL(
+        String.format("rpad(%s, %d, '%s')", STRING_ALPHANUM_SV_COLUMN, padLength, padString));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "rpad");
@@ -177,8 +177,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     assertEquals(transformFunction.getName(), "rtrim");
     testTransformFunction(transformFunction, _stringAlphaNumericSVValues);
 
-    expression = RequestContextUtils
-        .getExpressionFromSQL(String.format("trim(rpad(lpad(%s, 50, ' '), 100, ' '))", STRING_ALPHANUM_SV_COLUMN));
+    expression = RequestContextUtils.getExpressionFromSQL(
+        String.format("trim(rpad(lpad(%s, 50, ' '), 100, ' '))", STRING_ALPHANUM_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "trim");
@@ -274,6 +274,76 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
       expectedValues[i] = StringUtils.split(_stringAlphaNumericSVValues[i], ",");
     }
     testTransformFunctionMV(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpressionFromSQL(
+        String.format("split(%s, ',', %s)", STRING_ALPHANUM_SV_COLUMN, INT_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "split");
+    expectedValues = new String[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = StringUtils.split(_stringAlphaNumericSVValues[i], ",", _intSVValues[i]);
+    }
+    testTransformFunctionMV(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testStringSplitPartTransformFunction() {
+    int index = 2;
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(
+        String.format("split_part(%s, ',', %d)", STRING_ALPHANUM_SV_COLUMN, index));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "splitPart");
+    String[] expectedValues = new String[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      String[] splitString = StringUtils.split(_stringAlphaNumericSVValues[i], ",");
+      if (splitString.length > index) {
+        expectedValues[i] = splitString[i];
+      } else {
+        expectedValues[i] = "null";
+      }
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testStringRepeatTransformFunction() {
+    int timesToRepeat = 21;
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(
+        String.format("repeat(%s, %d)", STRING_ALPHANUM_SV_COLUMN, timesToRepeat));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "repeat");
+    String[] expectedValues = new String[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = StringUtils.repeat(_stringAlphaNumericSVValues[i], timesToRepeat);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    String seperator = "::";
+    expression = RequestContextUtils.getExpressionFromSQL(
+        String.format("repeat(%s, '%s', %d)", STRING_ALPHANUM_SV_COLUMN, seperator, timesToRepeat));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "repeat");
+    expectedValues = new String[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = StringUtils.repeat(_stringAlphaNumericSVValues[i], seperator, timesToRepeat);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    timesToRepeat = -1;
+    expression = RequestContextUtils.getExpressionFromSQL(
+        String.format("repeat(%s, '%s', %d)", STRING_ALPHANUM_SV_COLUMN, seperator, timesToRepeat));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "repeat");
+    expectedValues = new String[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = "";
+    }
+    testTransformFunction(transformFunction, expectedValues);
   }
 
   @Test
@@ -342,6 +412,34 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     expectedValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedValues[i] = StringUtils.lastIndexOf(_stringAlphaNumericSVValues[i], 'A', 1);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testStringStartsWithTransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpressionFromSQL(String.format("starts_with(%s, 'A')", STRING_ALPHANUM_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "startsWith");
+    int[] expectedValues = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = StringUtils.startsWith(_stringAlphaNumericSVValues[i], "A") ? 1 : 0;
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testStringEndsWithTransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpressionFromSQL(String.format("ends_with(%s, 'A')", STRING_ALPHANUM_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "endsWith");
+    int[] expectedValues = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = StringUtils.endsWith(_stringAlphaNumericSVValues[i], "A") ? 1 : 0;
     }
     testTransformFunction(transformFunction, expectedValues);
   }
@@ -642,8 +740,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
 
   @Test
   public void testArrayUnionIntTransformFunction() {
-    ExpressionContext expression = RequestContextUtils
-        .getExpressionFromSQL(String.format("array_union_int(%s, %s)", INT_MV_COLUMN, INT_MV_COLUMN));
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(
+        String.format("array_union_int(%s, %s)", INT_MV_COLUMN, INT_MV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "arrayUnionInt");
@@ -658,8 +756,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
 
   @Test
   public void testUnionStringTransformFunction() {
-    ExpressionContext expression = RequestContextUtils
-        .getExpressionFromSQL(String.format("array_union_string(%s, %s)", STRING_MV_COLUMN, STRING_MV_COLUMN));
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(
+        String.format("array_union_string(%s, %s)", STRING_MV_COLUMN, STRING_MV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "arrayUnionString");
@@ -674,8 +772,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
 
   @Test
   public void testArrayConcatIntTransformFunction() {
-    ExpressionContext expression = RequestContextUtils
-        .getExpressionFromSQL(String.format("array_concat_int(%s, %s)", INT_MV_COLUMN, INT_MV_COLUMN));
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(
+        String.format("array_concat_int(%s, %s)", INT_MV_COLUMN, INT_MV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "arrayConcatInt");
@@ -691,8 +789,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
 
   @Test
   public void testConcatStringTransformFunction() {
-    ExpressionContext expression = RequestContextUtils
-        .getExpressionFromSQL(String.format("array_concat_string(%s, %s)", STRING_MV_COLUMN, STRING_MV_COLUMN));
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(
+        String.format("array_concat_string(%s, %s)", STRING_MV_COLUMN, STRING_MV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "arrayConcatString");

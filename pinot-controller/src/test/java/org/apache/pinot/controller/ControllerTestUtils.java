@@ -99,11 +99,14 @@ public abstract class ControllerTestUtils {
   public static final int TOTAL_NUM_BROKER_INSTANCES = 2 * NUM_BROKER_INSTANCES;
 
   protected static final List<HelixManager> FAKE_INSTANCE_HELIX_MANAGERS = new ArrayList<>();
+
   protected static int _controllerPort;
   protected static String _controllerBaseApiUrl;
-
   protected static ControllerRequestURLBuilder _controllerRequestURLBuilder;
-  protected static ControllerRequestClient _controllerRequestClient;
+
+  protected static HttpClient _httpClient = null;
+  protected static ControllerRequestClient _controllerRequestClient = null;
+
   protected static String _controllerDataDir;
   protected static ControllerStarter _controllerStarter;
   protected static PinotHelixResourceManager _helixResourceManager;
@@ -115,10 +118,35 @@ public abstract class ControllerTestUtils {
   protected static ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   private static ZkStarter.ZookeeperInstance _zookeeperInstance;
-  private static HttpClient _httpClient;
 
   public static String getHelixClusterName() {
     return ControllerTestUtils.class.getSimpleName();
+  }
+
+  /** HttpClient is lazy evaluated, static object, only instantiate when first use.
+   *
+   * <p>This is because {@code ControllerTest} has HTTP utils that depends on the TLSUtils to install the security
+   * context first before the HttpClient can be initialized. However, because we have static usages of the HTTPClient,
+   * it is not possible to create normal member variable. thus the workaround.
+   */
+  protected static HttpClient getHttpClient() {
+    if (_httpClient == null) {
+      _httpClient = HttpClient.getInstance();
+    }
+    return _httpClient;
+  }
+
+  /** ControllerRequestClient is lazy evaluated, static object, only instantiate when first use.
+   *
+   * <p>This is because {@code ControllerTest} has HTTP utils that depends on the TLSUtils to install the security
+   * context first before the ControllerRequestClient can be initialized. However, because we have static usages of the
+   * ControllerRequestClient, it is not possible to create normal member variable. thus the workaround.
+   */
+  protected static ControllerRequestClient getControllerRequestClient() {
+    if (_controllerRequestClient == null) {
+      _controllerRequestClient = new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient());
+    }
+    return _controllerRequestClient;
   }
 
   protected static void startZk() {
@@ -154,8 +182,6 @@ public abstract class ControllerTestUtils {
     _controllerPort = Integer.parseInt(_controllerConfig.getControllerPort());
     _controllerBaseApiUrl = "http://localhost:" + _controllerPort;
     _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
-    _httpClient = new HttpClient();
-    _controllerRequestClient = new ControllerRequestClient(_controllerRequestURLBuilder, _httpClient);
     _controllerDataDir = _controllerConfig.getDataDir();
 
     _controllerStarter = new ControllerStarter();
@@ -455,32 +481,32 @@ public abstract class ControllerTestUtils {
    */
   public static void addSchema(Schema schema)
       throws IOException {
-    _controllerRequestClient.addSchema(schema);
+    getControllerRequestClient().addSchema(schema);
   }
 
   protected static Schema getSchema(String schemaName)
       throws IOException {
-    return _controllerRequestClient.getSchema(schemaName);
+    return getControllerRequestClient().getSchema(schemaName);
   }
 
   protected static void addTableConfig(TableConfig tableConfig)
       throws IOException {
-    _controllerRequestClient.addTableConfig(tableConfig);
+    getControllerRequestClient().addTableConfig(tableConfig);
   }
 
   public static void createBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
-    _controllerRequestClient.createBrokerTenant(tenantName, numBrokers);
+    getControllerRequestClient().createBrokerTenant(tenantName, numBrokers);
   }
 
   public static void updateBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
-    _controllerRequestClient.updateBrokerTenant(tenantName, numBrokers);
+    getControllerRequestClient().updateBrokerTenant(tenantName, numBrokers);
   }
 
   public static void createServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
       throws IOException {
-    _controllerRequestClient.createServerTenant(tenantName, numOfflineServers, numRealtimeServers);
+    getControllerRequestClient().createServerTenant(tenantName, numOfflineServers, numRealtimeServers);
   }
 
   public static void enableResourceConfigForLeadControllerResource(boolean enable) {
@@ -496,7 +522,7 @@ public abstract class ControllerTestUtils {
   public static String sendGetRequest(String urlString)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(
           new URL(urlString).toURI()));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
@@ -517,7 +543,7 @@ public abstract class ControllerTestUtils {
   public static String sendPostRequest(String urlString, String payload, Map<String, String> headers)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendJsonPostRequest(
           new URL(urlString).toURI(), payload, headers));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
@@ -538,7 +564,7 @@ public abstract class ControllerTestUtils {
   public static String sendPutRequest(String urlString, String payload, Map<String, String> headers)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPutRequest(
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendJsonPutRequest(
           new URL(urlString).toURI(), payload, headers));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
@@ -549,7 +575,7 @@ public abstract class ControllerTestUtils {
   public static String sendDeleteRequest(String urlString)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendDeleteRequest(
           new URL(urlString).toURI()));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
@@ -559,12 +585,12 @@ public abstract class ControllerTestUtils {
 
   public static SimpleHttpResponse sendMultipartPostRequest(String url, String body)
       throws IOException {
-    return _httpClient.sendMultipartPostRequest(url, body);
+    return getHttpClient().sendMultipartPostRequest(url, body);
   }
 
   public static SimpleHttpResponse sendMultipartPutRequest(String url, String body)
       throws IOException {
-    return _httpClient.sendMultipartPutRequest(url, body);
+    return getHttpClient().sendMultipartPutRequest(url, body);
   }
 
   private static String constructResponse(SimpleHttpResponse resp) {

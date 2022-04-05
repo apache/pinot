@@ -401,7 +401,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // REALTIME only
       setTableName(serverBrokerRequest, realtimeTableName);
       handleExpressionOverride(pinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
-      _queryOptimizer.optimize(pinotQuery, offlineTableConfig, schema);
+      _queryOptimizer.optimize(pinotQuery, realtimeTableConfig, schema);
       realtimeBrokerRequest = serverBrokerRequest;
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.REALTIME);
       requestStatistics.setRealtimeServerTenant(getServerTenant(realtimeTableName));

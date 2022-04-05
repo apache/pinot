@@ -20,7 +20,6 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.net.URLEncoder;
 import java.util.List;
 import java.util.Map;
@@ -125,7 +124,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testSegmentMetadataApi()
       throws Exception {
     {
-      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(getTableName()));
+      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName()));
       JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
       Assert.assertEquals(tableSegmentsMetadata.size(), 8);
 
@@ -221,23 +220,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
   @Test
   @Override
-  public void testHardcodedSqlQueries()
-      throws Exception {
-    super.testHardcodedSqlQueries();
-  }
-
-  @Test
-  @Override
   public void testQueriesFromQueryFile()
       throws Exception {
     super.testQueriesFromQueryFile();
-  }
-
-  @Test
-  @Override
-  public void testSqlQueriesFromQueryFile()
-      throws Exception {
-    super.testSqlQueriesFromQueryFile();
   }
 
   @Test
@@ -287,10 +272,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
       try {
         getDebugInfo("debug/routingTable/" + tableName);
         return false;
-      } catch (FileNotFoundException e) {
-        return true;
       } catch (Exception e) {
-        return null;
+        // only return true if 404 not found error is thrown.
+        return e.getMessage().contains("Got error status code: 404");
       }
     }, 60_000L, "Routing table is not empty after dropping all tables");
 

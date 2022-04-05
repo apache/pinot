@@ -95,11 +95,11 @@ public class DivisionTransformFunction extends BaseTransformFunction {
   @SuppressWarnings("Duplicates")
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_doubleQuotients == null) {
+    int length = projectionBlock.getNumDocs();
+    if (_doubleQuotients == null || _doubleQuotients.length < length) {
       _doubleQuotients = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
 
-    int length = projectionBlock.getNumDocs();
     if (_resultDataType == DataType.BIG_DECIMAL) {
       BigDecimal[] values = transformToBigDecimalValuesSV(projectionBlock);
       ArrayCopyUtils.copy(values, _doubleQuotients, length);
@@ -128,11 +128,11 @@ public class DivisionTransformFunction extends BaseTransformFunction {
 
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
-    if (_bigDecimalQuotients == null) {
+    int length = projectionBlock.getNumDocs();
+    if (_bigDecimalQuotients == null || _bigDecimalQuotients.length < length) {
       _bigDecimalQuotients = new BigDecimal[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
 
-    int length = projectionBlock.getNumDocs();
     if (_resultDataType == DataType.DOUBLE) {
       double[] values = transformToDoubleValuesSV(projectionBlock);
       ArrayCopyUtils.copy(values, _bigDecimalQuotients, length);

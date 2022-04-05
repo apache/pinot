@@ -191,8 +191,8 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       assertEquals(response.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), 2);
       assertEquals(responseToCompare.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), 4);
 
-      assertEquals(response.get("aggregationResults").get(0).get("value").asInt(),
-          responseToCompare.get("aggregationResults").get(0).get("value").asInt());
+      assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(),
+          responseToCompare.get("resultTable").get("rows").get(0).get(0).asInt());
     }
 
     // Query partition 1
@@ -207,8 +207,8 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       assertEquals(response.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), 2);
       assertEquals(responseToCompare.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), 4);
 
-      assertEquals(response.get("aggregationResults").get(0).get("value").asInt(),
-          responseToCompare.get("aggregationResults").get(0).get("value").asInt());
+      assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(),
+          responseToCompare.get("resultTable").get("rows").get(0).get(0).asInt());
     }
   }
 
@@ -355,8 +355,8 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       assertEquals(responseToCompare.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments);
 
       // The result should match again after all the segments with the non-partitioning records are committed
-      assertEquals(response.get("aggregationResults").get(0).get("value").asInt(),
-          responseToCompare.get("aggregationResults").get(0).get("value").asInt());
+      assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(),
+          responseToCompare.get("resultTable").get("rows").get(0).get(0).asInt());
     }
 
     // Query partition 1
@@ -372,8 +372,8 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       assertEquals(responseToCompare.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments);
 
       // The result should match again after all the segments with the non-partitioning records are committed
-      assertEquals(response.get("aggregationResults").get(0).get("value").asInt(),
-          responseToCompare.get("aggregationResults").get(0).get("value").asInt());
+      assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(),
+          responseToCompare.get("resultTable").get("rows").get(0).get(0).asInt());
     }
   }
 

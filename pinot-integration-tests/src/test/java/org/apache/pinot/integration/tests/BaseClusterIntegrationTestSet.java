@@ -22,11 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-import java.util.Random;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.client.ResultSet;
@@ -34,6 +30,7 @@ import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
+import org.apache.pinot.server.starter.helix.HelixServerStarter;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -56,28 +53,17 @@ import static org.testng.Assert.assertTrue;
  */
 public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseClusterIntegrationTestSet.class);
-  private static final Random RANDOM = new Random();
 
   // Default settings
-  private static final String DEFAULT_PQL_QUERY_FILE_NAME =
-      "On_Time_On_Time_Performance_2014_100k_subset.test_queries_200.pql";
-  private static final String DEFAULT_SQL_QUERY_FILE_NAME =
+  private static final String DEFAULT_QUERY_FILE_NAME =
       "On_Time_On_Time_Performance_2014_100k_subset.test_queries_200.sql";
   private static final int DEFAULT_NUM_QUERIES_TO_GENERATE = 100;
-  private static final int DEFAULT_MAX_NUM_QUERIES_TO_SKIP_IN_QUERY_FILE = 200;
 
   /**
    * Can be overridden to change default setting
    */
   protected String getQueryFileName() {
-    return DEFAULT_PQL_QUERY_FILE_NAME;
-  }
-
-  /**
-   * Can be overridden to change default setting
-   */
-  protected String getSqlQueryFileName() {
-    return DEFAULT_SQL_QUERY_FILE_NAME;
+    return DEFAULT_QUERY_FILE_NAME;
   }
 
   /**
@@ -88,73 +74,37 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   }
 
   /**
-   * Can be overridden to change default setting
+   * Test server table data manager deletion after the table is dropped
    */
-  protected int getMaxNumQueriesToSkipInQueryFile() {
-    return DEFAULT_MAX_NUM_QUERIES_TO_SKIP_IN_QUERY_FILE;
-  }
-
-  /**
-   * Test hardcoded queries.
-   * <p>NOTE:
-   * <p>For queries with <code>LIMIT</code> or <code>TOP</code>, need to remove limit or add <code>LIMIT 10000</code> to
-   * the H2 SQL query because the comparison only works on exhausted result with at most 10000 rows.
-   * <ul>
-   *   <li>
-   *     Eg. <code>SELECT a FROM table LIMIT 15 -> [SELECT a FROM table LIMIT 10000]</code>
-   *   </li>
-   * </ul>
-   * <p>For queries with multiple aggregation functions, need to split each of them into a separate H2 SQL query.
-   * <ul>
-   *   <li>
-   *     Eg. <code>SELECT SUM(a), MAX(b) FROM table -> [SELECT SUM(a) FROM table, SELECT MAX(b) FROM table]</code>
-   *   </li>
-   * </ul>
-   * <p>For group-by queries, need to add group-by columns to the select clause for H2 SQL query.
-   * <ul>
-   *   <li>
-   *     Eg. <code>SELECT SUM(a) FROM table GROUP BY b -> [SELECT b, SUM(a) FROM table GROUP BY b]</code>
-   *   </li>
-   * </ul>
-   *
-   * @throws Exception
-   */
-  public void testHardcodedQueries()
+  protected void cleanupTestTableDataManager(String tableNameWithType)
       throws Exception {
-    // Here are some sample queries.
-    String query;
-    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16312 AND Carrier = 'DL'";
-    testQuery(query, Collections.singletonList(query));
-    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL'";
-    testQuery(query, Collections.singletonList(query));
-    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch > 16312 AND Carrier = 'DL'";
-    testQuery(query, Collections.singletonList(query));
-    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch >= 16312 AND Carrier = 'DL'";
-    testQuery(query, Collections.singletonList(query));
-    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch < 16312 AND Carrier = 'DL'";
-    testQuery(query, Collections.singletonList(query));
-    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
-    testQuery(query, Collections.singletonList(query));
-    query = "SELECT MAX(ArrTime), MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 16312";
-    testQuery(query, Arrays.asList("SELECT MAX(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 15312",
-        "SELECT MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 15312"));
-    query =
-        "SELECT SUM(TotalAddGTime) FROM mytable WHERE DivArrDelay NOT IN (67, 260) AND Carrier IN ('F9', 'B6') OR "
-            + "DepTime BETWEEN 2144 AND 1926";
-    testQuery(query, Collections.singletonList(query));
+    List<HelixServerStarter> serverStarters = getServerStarters();
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        for (HelixServerStarter serverStarter : serverStarters) {
+          if (serverStarter.getServerInstance().getInstanceDataManager().getTableDataManager(tableNameWithType)
+              != null) {
+            return false;
+          }
+        }
+        return true;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to delete table data managers");
   }
 
   /**
    * Test hardcoded queries.
    * <p>NOTE:
-   * <p>For queries with <code>LIMIT</code> or <code>TOP</code>, need to remove limit or add <code>LIMIT 10000</code> to
-   * the H2 SQL query because the comparison only works on exhausted result with at most 10000 rows.
+   * <p>For queries with <code>LIMIT</code>, need to remove limit or add <code>LIMIT 10000</code> to the H2 SQL query
+   * because the comparison only works on exhausted result with at most 10000 rows.
    * <ul>
    *   <li>
    *     Eg. <code>SELECT a FROM table LIMIT 15 -> [SELECT a FROM table LIMIT 10000]</code>
    *   </li>
    * </ul>
-   * <p>For group-by queries, need to add group-by columns to the select clause for H2 SQL query.
+   * <p>For group-by queries, need to add group-by columns to the select clause for H2 queries.
    * <ul>
    *   <li>
    *     Eg. <code>SELECT SUM(a) FROM table GROUP BY b -> [SELECT b, SUM(a) FROM table GROUP BY b]</code>
@@ -163,130 +113,123 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    * TODO: Selection queries, Aggregation Group By queries, Order By, Distinct
    *  This list is very basic right now (aggregations only) and needs to be enriched
    */
-  public void testHardcodedSqlQueries()
+  public void testHardcodedQueries()
       throws Exception {
-    String query;
-    List<String> h2queries;
-    query = "SELECT COUNT(*) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
-    testSqlQuery(query, Collections.singletonList(query));
-    query =
-        "SELECT ArrDelay, CarrierDelay, (ArrDelay - CarrierDelay) AS diff FROM mytable WHERE CarrierDelay=15 AND "
-            + "ArrDelay > CarrierDelay ORDER BY diff, ArrDelay, CarrierDelay LIMIT 100000";
-    testSqlQuery(query, Collections.singletonList(query));
+    String query = "SELECT COUNT(*) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
+    testQuery(query);
+    query = "SELECT ArrDelay, CarrierDelay, (ArrDelay - CarrierDelay) AS diff FROM mytable WHERE CarrierDelay=15 AND "
+        + "ArrDelay > CarrierDelay ORDER BY diff, ArrDelay, CarrierDelay LIMIT 100000";
+    testQuery(query);
     query = "SELECT COUNT(*) FROM mytable WHERE ArrDelay > CarrierDelay LIMIT 1";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
     query =
         "SELECT ArrDelay, CarrierDelay, (ArrDelay - CarrierDelay) AS diff FROM mytable WHERE ArrDelay > CarrierDelay "
             + "ORDER BY diff, ArrDelay, CarrierDelay LIMIT 100000";
-    testSqlQuery(query, Collections.singletonList(query));
-    query =
-        "SELECT count(*) FROM mytable WHERE AirlineID > 20355 AND OriginState BETWEEN 'PA' AND 'DE' AND DepTime <> "
-            + "2202 LIMIT 21";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
+    query = "SELECT count(*) FROM mytable WHERE AirlineID > 20355 AND OriginState BETWEEN 'PA' AND 'DE' AND DepTime <> "
+        + "2202 LIMIT 21";
+    testQuery(query);
     query =
         "SELECT SUM(CAST(CAST(ArrTime AS varchar) AS LONG)) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = "
             + "'DL'";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
     query =
         "SELECT CAST(CAST(ArrTime AS varchar) AS LONG) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL' "
             + "ORDER BY ArrTime DESC";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
     query =
         "SELECT DistanceGroup FROM mytable WHERE \"Month\" BETWEEN 1 AND 1 AND DivAirportSeqIDs IN (1078102, 1142303,"
             + " 1530402, 1172102, 1291503) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10";
-    h2queries = Collections.singletonList(
+    String h2Query =
         "SELECT DistanceGroup FROM mytable WHERE Month BETWEEN 1 AND 1 AND (DivAirportSeqIDs__MV0 IN (1078102, "
             + "1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV1 IN (1078102, 1142303, 1530402, 1172102, "
             + "1291503) OR DivAirportSeqIDs__MV2 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR "
             + "DivAirportSeqIDs__MV3 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV4 IN "
-            + "(1078102, 1142303, 1530402, 1172102, 1291503)) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10000");
-    testSqlQuery(query, h2queries);
+            + "(1078102, 1142303, 1530402, 1172102, 1291503)) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10000";
+    testQuery(query, h2Query);
     query = "SELECT MAX(Quarter), MAX(FlightNum) FROM mytable LIMIT 8";
-    h2queries = Collections.singletonList("SELECT MAX(Quarter),MAX(FlightNum) FROM mytable LIMIT 10000");
-    testSqlQuery(query, h2queries);
+    h2Query = "SELECT MAX(Quarter),MAX(FlightNum) FROM mytable LIMIT 10000";
+    testQuery(query, h2Query);
     query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16312 AND Carrier = 'DL'";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
     query = "SELECT SUM(ArrTime) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL'";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
     query = "SELECT MAX(ArrTime) FROM mytable WHERE DaysSinceEpoch > 16312 AND Carrier = 'DL'";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
     query = "SELECT MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 16312 AND Carrier = 'DL'";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
     query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch < 16312 AND Carrier = 'DL'";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
     query = "SELECT MAX(ArrTime), MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
     query = "SELECT COUNT(*), MAX(ArrTime), MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 16312";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
     query = "SELECT COUNT(*), MAX(ArrTime), MIN(ArrTime), DaysSinceEpoch FROM mytable GROUP BY DaysSinceEpoch";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
     query = "SELECT DaysSinceEpoch, COUNT(*), MAX(ArrTime), MIN(ArrTime) FROM mytable GROUP BY DaysSinceEpoch";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
     query = "SELECT ArrTime, ArrTime * 10 FROM mytable WHERE DaysSinceEpoch >= 16312";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
     query = "SELECT ArrTime, ArrTime - ArrTime % 10 FROM mytable WHERE DaysSinceEpoch >= 16312";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
     query = "SELECT ArrTime, ArrTime + ArrTime * 9 - ArrTime * 10 FROM mytable WHERE DaysSinceEpoch >= 16312";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
     query = "SELECT ArrTime, ArrTime + ArrTime * 9 - ArrTime * 10 FROM mytable WHERE ArrTime - 100 > 0";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
     query =
         "SELECT ArrTime, ArrTime + ArrTime * 9 - ArrTime * 10, ADD(ArrTime + 5, ArrDelay), ADD(ArrTime * 5, ArrDelay)"
             + " FROM mytable WHERE mult((ArrTime - 100), (5 + ArrDelay))> 0";
-    h2queries = Collections.singletonList(
+    h2Query =
         "SELECT ArrTime, ArrTime + ArrTime * 9 - ArrTime * 10, ArrTime + 5 + ArrDelay, ArrTime * 5 + ArrDelay FROM "
-            + "mytable WHERE (ArrTime - 100) * (5 + ArrDelay)> 0");
-    testSqlQuery(query, h2queries);
+            + "mytable WHERE (ArrTime - 100) * (5 + ArrDelay)> 0";
+    testQuery(query, h2Query);
     query = "SELECT COUNT(*) AS \"date\", MAX(ArrTime) AS \"group\", MIN(ArrTime) AS min FROM myTable";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
 
     // LIKE
     query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
     query = "SELECT count(*) FROM mytable WHERE DestCityName LIKE 'C%'";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
     query = "SELECT count(*) FROM mytable WHERE DestCityName LIKE '_h%'";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
 
     // NOT
     query = "SELECT count(*) FROM mytable WHERE OriginState NOT BETWEEN 'DE' AND 'PA'";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
     query = "SELECT count(*) FROM mytable WHERE OriginState NOT LIKE 'A_'";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
     query = "SELECT count(*) FROM mytable WHERE NOT (DaysSinceEpoch = 16312 AND Carrier = 'DL')";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
     query = "SELECT count(*) FROM mytable WHERE (NOT DaysSinceEpoch = 16312) AND Carrier = 'DL'";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
 
     // Post-aggregation in ORDER-BY
     query = "SELECT MAX(ArrTime) FROM mytable GROUP BY DaysSinceEpoch ORDER BY MAX(ArrTime) - MIN(ArrTime)";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
     query = "SELECT MAX(ArrDelay), Month FROM mytable GROUP BY Month ORDER BY ABS(Month - 6) + MAX(ArrDelay)";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
 
     // Post-aggregation in SELECT
     query = "SELECT MAX(ArrDelay) + MAX(AirTime) FROM mytable";
-    testSqlQuery(query, Collections.singletonList(query));
-    query =
-        "SELECT MAX(ArrDelay) - MAX(AirTime), DaysSinceEpoch FROM mytable GROUP BY DaysSinceEpoch ORDER BY MAX"
-            + "(ArrDelay) - MIN(AirTime) DESC";
-    testSqlQuery(query, Collections.singletonList(query));
-    query =
-        "SELECT DaysSinceEpoch, MAX(ArrDelay) * 2 - MAX(AirTime) - 3 FROM mytable GROUP BY DaysSinceEpoch ORDER BY "
-            + "MAX(ArrDelay) - MIN(AirTime) DESC";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
+    query = "SELECT MAX(ArrDelay) - MAX(AirTime), DaysSinceEpoch FROM mytable GROUP BY DaysSinceEpoch ORDER BY MAX"
+        + "(ArrDelay) - MIN(AirTime) DESC";
+    testQuery(query);
+    query = "SELECT DaysSinceEpoch, MAX(ArrDelay) * 2 - MAX(AirTime) - 3 FROM mytable GROUP BY DaysSinceEpoch ORDER BY "
+        + "MAX(ArrDelay) - MIN(AirTime) DESC";
+    testQuery(query);
 
     // Having
     query = "SELECT COUNT(*) AS Count, DaysSinceEpoch FROM mytable GROUP BY DaysSinceEpoch HAVING Count > 350";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
     query =
         "SELECT MAX(ArrDelay) - MAX(AirTime) AS Diff, DaysSinceEpoch FROM mytable GROUP BY DaysSinceEpoch HAVING Diff"
             + " * 2 > 1000 ORDER BY Diff ASC";
-    testSqlQuery(query, Collections.singletonList(query));
-    query =
-        "SELECT DaysSinceEpoch, MAX(ArrDelay) - MAX(AirTime) AS Diff FROM mytable GROUP BY DaysSinceEpoch HAVING "
-            + "(Diff >= 300 AND Diff < 500) OR Diff < -500 ORDER BY Diff DESC";
-    testSqlQuery(query, Collections.singletonList(query));
+    testQuery(query);
+    query = "SELECT DaysSinceEpoch, MAX(ArrDelay) - MAX(AirTime) AS Diff FROM mytable GROUP BY DaysSinceEpoch HAVING "
+        + "(Diff >= 300 AND Diff < 500) OR Diff < -500 ORDER BY Diff DESC";
+    testQuery(query);
 
     // IN_ID_SET
     {
@@ -299,10 +242,10 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       String serializedIdSet = idSet.toBase64String();
       String inIdSetQuery = "SELECT COUNT(*) FROM mytable WHERE INIDSET(AirlineID, '" + serializedIdSet + "') = 1";
       String inQuery = "SELECT COUNT(*) FROM mytable WHERE AirlineID IN (19690, 20355, 21171, 0)";
-      testSqlQuery(inIdSetQuery, Collections.singletonList(inQuery));
+      testQuery(inIdSetQuery, inQuery);
       String notInIdSetQuery = "SELECT COUNT(*) FROM mytable WHERE INIDSET(AirlineID, '" + serializedIdSet + "') = 0";
       String notInQuery = "SELECT COUNT(*) FROM mytable WHERE AirlineID NOT IN (19690, 20355, 21171, 0)";
-      testSqlQuery(notInIdSetQuery, Collections.singletonList(notInQuery));
+      testQuery(notInIdSetQuery, notInQuery);
     }
 
     // IN_SUBQUERY
@@ -310,10 +253,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       String inSubqueryQuery =
           "SELECT COUNT(*) FROM mytable WHERE INSUBQUERY(DestAirportID, 'SELECT IDSET(DestAirportID) FROM mytable "
               + "WHERE DaysSinceEpoch = 16430') = 1";
-      String inQuery =
-          "SELECT COUNT(*) FROM mytable WHERE DestAirportID IN (SELECT DestAirportID FROM mytable WHERE "
-              + "DaysSinceEpoch = 16430)";
-      testSqlQuery(inSubqueryQuery, Collections.singletonList(inQuery));
+      String inQuery = "SELECT COUNT(*) FROM mytable WHERE DestAirportID IN (SELECT DestAirportID FROM mytable WHERE "
+          + "DaysSinceEpoch = 16430)";
+      testQuery(inSubqueryQuery, inQuery);
 
       String notInSubqueryQuery =
           "SELECT COUNT(*) FROM mytable WHERE INSUBQUERY(DestAirportID, 'SELECT IDSET(DestAirportID) FROM mytable "
@@ -321,15 +263,14 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       String notInQuery =
           "SELECT COUNT(*) FROM mytable WHERE DestAirportID NOT IN (SELECT DestAirportID FROM mytable WHERE "
               + "DaysSinceEpoch = 16430)";
-      testSqlQuery(notInSubqueryQuery, Collections.singletonList(notInQuery));
+      testQuery(notInSubqueryQuery, notInQuery);
     }
 
     // Escape quotes
-    query =
-        "SELECT DistanceGroup FROM mytable WHERE DATE_TIME_CONVERT(DaysSinceEpoch, '1:DAYS:EPOCH', "
-            + "'1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', '1:DAYS') = '2014-09-05T00:00:00.000Z'";
-    h2queries = Collections.singletonList("SELECT DistanceGroup FROM mytable WHERE DaysSinceEpoch = 16318 LIMIT 10000");
-    testSqlQuery(query, h2queries);
+    query = "SELECT DistanceGroup FROM mytable WHERE DATE_TIME_CONVERT(DaysSinceEpoch, '1:DAYS:EPOCH', "
+        + "'1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', '1:DAYS') = '2014-09-05T00:00:00.000Z'";
+    h2Query = "SELECT DistanceGroup FROM mytable WHERE DaysSinceEpoch = 16318 LIMIT 10000";
+    testQuery(query, h2Query);
   }
 
   /**
@@ -342,10 +283,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       String inPartitionedSubqueryQuery =
           "SELECT COUNT(*) FROM mytable WHERE INPARTITIONEDSUBQUERY(DestAirportID, 'SELECT IDSET(DestAirportID) FROM "
               + "mytable WHERE DaysSinceEpoch = 16430') = 1";
-      String inQuery =
-          "SELECT COUNT(*) FROM mytable WHERE DestAirportID IN (SELECT DestAirportID FROM mytable WHERE "
-              + "DaysSinceEpoch = 16430)";
-      testSqlQuery(inPartitionedSubqueryQuery, Collections.singletonList(inQuery));
+      String inQuery = "SELECT COUNT(*) FROM mytable WHERE DestAirportID IN (SELECT DestAirportID FROM mytable WHERE "
+          + "DaysSinceEpoch = 16430)";
+      testQuery(inPartitionedSubqueryQuery, inQuery);
 
       String notInPartitionedSubqueryQuery =
           "SELECT COUNT(*) FROM mytable WHERE INPARTITIONEDSUBQUERY(DestAirportID, 'SELECT IDSET(DestAirportID) FROM "
@@ -353,7 +293,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       String notInQuery =
           "SELECT COUNT(*) FROM mytable WHERE DestAirportID NOT IN (SELECT DestAirportID FROM mytable WHERE "
               + "DaysSinceEpoch = 16430)";
-      testSqlQuery(notInPartitionedSubqueryQuery, Collections.singletonList(notInQuery));
+      testQuery(notInPartitionedSubqueryQuery, notInQuery);
     }
   }
 
@@ -364,11 +304,13 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    */
   public void testBrokerResponseMetadata()
       throws Exception {
-    String[] pqlQueries = new String[]{ //
-        "SELECT count(*) FROM mytable", // matching query
-        "SELECT count(*) FROM mytable where non_existing_column='non_existing_value",
+    String[] queries = new String[]{
+        // matching query
+        "SELECT count(*) FROM mytable",
         // query that does not match any row
-        "SELECT count(*) FROM mytable_foo" // query a non existing table
+        "SELECT count(*) FROM mytable where non_existing_column='non_existing_value",
+        // query a non existing table
+        "SELECT count(*) FROM mytable_foo"
     };
     String[] statNames = new String[]{
         "totalDocs", "numServersQueried", "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed",
@@ -376,7 +318,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         "numEntriesScannedPostFilter"
     };
 
-    for (String query : pqlQueries) {
+    for (String query : queries) {
       JsonNode response = postQuery(query);
       for (String statName : statNames) {
         assertTrue(response.has(statName));
@@ -402,9 +344,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   }
 
   /**
-   * Test random queries from the query file.
-   *
-   * @throws Exception
+   * Test queries from the query file.
    */
   public void testQueriesFromQueryFile()
       throws Exception {
@@ -422,52 +362,19 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         }
 
         JsonNode query = JsonUtils.stringToJsonNode(queryString);
-        String pqlQuery = query.get("pql").asText();
+        String pinotQuery = query.get("sql").asText();
         JsonNode hsqls = query.get("hsqls");
-        List<String> sqlQueries = new ArrayList<>();
-        int length = hsqls.size();
-        for (int i = 0; i < length; i++) {
-          sqlQueries.add(hsqls.get(i).asText());
-        }
-        testQuery(pqlQuery, sqlQueries);
-      }
-    }
-  }
-
-  /**
-   * Test random SQL queries from the query file.
-   */
-  public void testSqlQueriesFromQueryFile()
-      throws Exception {
-    InputStream inputStream =
-        BaseClusterIntegrationTestSet.class.getClassLoader().getResourceAsStream(getSqlQueryFileName());
-    assertNotNull(inputStream);
-
-    try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
-      String queryString;
-      while ((queryString = reader.readLine()) != null) {
-        // Skip commented line and empty line.
-        queryString = queryString.trim();
-        if (queryString.startsWith("#") || queryString.isEmpty()) {
-          continue;
-        }
-
-        JsonNode query = JsonUtils.stringToJsonNode(queryString);
-        String sqlQuery = query.get("sql").asText();
-        JsonNode hsqls = query.get("hsqls");
-        List<String> sqlQueries = new ArrayList<>();
+        String h2Query;
         if (hsqls == null || hsqls.isEmpty()) {
-          sqlQueries.add(sqlQuery);
+          h2Query = pinotQuery;
         } else {
-          for (int i = 0; i < hsqls.size(); i++) {
-            sqlQueries.add(hsqls.get(i).asText());
-          }
+          h2Query = hsqls.get(0).asText();
         }
         try {
-          testSqlQuery(sqlQuery, sqlQueries);
+          testQuery(pinotQuery, h2Query);
         } catch (Exception e) {
           e.printStackTrace();
-          LOGGER.error("Failed to test SQL query: {} with H2 queries: {}.", sqlQuery, sqlQueries, e);
+          LOGGER.error("Failed to test Pinot query: {} with H2 query: {}.", pinotQuery, h2Query, e);
           throw e;
         }
       }
@@ -501,7 +408,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     int numQueriesToGenerate = getNumQueriesToGenerate();
     for (int i = 0; i < numQueriesToGenerate; i++) {
       QueryGenerator.Query query = queryGenerator.generateQuery();
-      testQuery(query.generatePql(), query.generateH2Sql());
+      testQuery(query.generatePinotQuery(), query.generateH2Query());
     }
   }
 
@@ -636,7 +543,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
     String selectStarQuery = "SELECT * FROM " + rawTableName;
     JsonNode queryResponse = postQuery(selectStarQuery);
-    assertEquals(queryResponse.get("selectionResults").get("columns").size(), schema.size());
+    assertEquals(queryResponse.get("resultTable").get("dataSchema").get("columnNames").size(), schema.size());
     long numTotalDocs = queryResponse.get("totalDocs").asLong();
 
     schema.addField(constructNewDimension(FieldSpec.DataType.INT, true));
@@ -675,7 +582,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         assertEquals(testQueryResponse.get("exceptions").size(), 0);
         // Total docs should not change during reload
         assertEquals(testQueryResponse.get("totalDocs").asLong(), numTotalDocs);
-        return testQueryResponse.get("aggregationResults").get(0).get("value").asLong() == countStarResult;
+        return testQueryResponse.get("resultTable").get("rows").get(0).get(0).asLong() == countStarResult;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -684,9 +591,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     // Select star query should return all the columns
     queryResponse = postQuery(selectStarQuery);
     assertEquals(queryResponse.get("exceptions").size(), 0);
-    JsonNode selectionResults = queryResponse.get("selectionResults");
-    assertEquals(selectionResults.get("columns").size(), schema.size());
-    assertEquals(selectionResults.get("results").size(), 10);
+    JsonNode resultTable = queryResponse.get("resultTable");
+    assertEquals(resultTable.get("dataSchema").get("columnNames").size(), schema.size());
+    assertEquals(resultTable.get("rows").size(), 10);
 
     // Test filter on all new added columns
     String countStarQuery = "SELECT COUNT(*) FROM " + rawTableName
@@ -697,7 +604,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         + "AND NewDoubleMetric = 0 AND NewBytesMetric = ''";
     queryResponse = postQuery(countStarQuery);
     assertEquals(queryResponse.get("exceptions").size(), 0);
-    assertEquals(queryResponse.get("aggregationResults").get(0).get("value").asLong(), countStarResult);
+    assertEquals(queryResponse.get("resultTable").get("rows").get(0).get(0).asLong(), countStarResult);
   }
 
   private DimensionFieldSpec constructNewDimension(FieldSpec.DataType dataType, boolean singleValue) {

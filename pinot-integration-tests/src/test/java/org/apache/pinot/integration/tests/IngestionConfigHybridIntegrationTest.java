@@ -154,13 +154,13 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
       throws Exception {
     // Select column created with transform function
     String sqlQuery = "Select millisSinceEpoch from " + DEFAULT_TABLE_NAME;
-    JsonNode response = postSqlQuery(sqlQuery);
+    JsonNode response = postQuery(sqlQuery);
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "millisSinceEpoch");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "LONG");
 
     // Select column created with transform function
     sqlQuery = "Select AmPm, DepTime from " + DEFAULT_TABLE_NAME;
-    response = postSqlQuery(sqlQuery);
+    response = postQuery(sqlQuery);
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "AmPm");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(1).asText(), "DepTime");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
@@ -173,7 +173,7 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
 
     // Select column created with transform function - offline table
     sqlQuery = "Select AmPm, DepTime from " + DEFAULT_TABLE_NAME + "_OFFLINE";
-    response = postSqlQuery(sqlQuery);
+    response = postQuery(sqlQuery);
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "AmPm");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(1).asText(), "DepTime");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
@@ -186,7 +186,7 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
 
     // Select column created with transform - realtime table
     sqlQuery = "Select AmPm, DepTime from " + DEFAULT_TABLE_NAME + "_REALTIME";
-    response = postSqlQuery(sqlQuery);
+    response = postQuery(sqlQuery);
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "AmPm");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(1).asText(), "DepTime");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
@@ -199,18 +199,18 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
 
     // Check there's no values that should've been filtered
     sqlQuery = "Select * from " + DEFAULT_TABLE_NAME + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
-    response = postSqlQuery(sqlQuery);
+    response = postQuery(sqlQuery);
     Assert.assertEquals(response.get("resultTable").get("rows").size(), 0);
 
     // Check there's no values that should've been filtered - realtime table
     sqlQuery =
         "Select * from " + DEFAULT_TABLE_NAME + "_REALTIME" + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
-    response = postSqlQuery(sqlQuery);
+    response = postQuery(sqlQuery);
     Assert.assertEquals(response.get("resultTable").get("rows").size(), 0);
 
     // Check there's no values that should've been filtered - offline table
     sqlQuery = "Select * from " + DEFAULT_TABLE_NAME + "_OFFLINE" + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
-    response = postSqlQuery(sqlQuery);
+    response = postQuery(sqlQuery);
     Assert.assertEquals(response.get("resultTable").get("rows").size(), 0);
   }
 

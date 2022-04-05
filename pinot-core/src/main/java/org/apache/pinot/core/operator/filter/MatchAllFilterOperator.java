@@ -55,6 +55,16 @@ public class MatchAllFilterOperator extends BaseFilterOperator {
   }
 
   @Override
+  public boolean canOptimizeCount() {
+    return true;
+  }
+
+  @Override
+  public int getNumMatchingDocs() {
+    return _numDocs;
+  }
+
+  @Override
   public String toExplainString() {
     return new StringBuilder(EXPLAIN_NAME).append("(docs:").append(_numDocs).append(')').toString();
   }

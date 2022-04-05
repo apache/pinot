@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.spi.ingestion.batch.spec;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.Serializable;
 import java.util.List;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -287,5 +289,13 @@ public class SegmentGenerationJobSpec implements Serializable {
 
   public void setAuthToken(String authToken) {
     _authToken = authToken;
+  }
+
+  public String toJSONString(boolean removeSensitiveKeys) {
+    ObjectNode jsonNode = (ObjectNode) JsonUtils.objectToJsonNode(this);
+    if (removeSensitiveKeys) {
+      jsonNode.remove("authToken"); //Removing auth token as it is a sensitive key
+    }
+    return jsonNode.toPrettyString();
   }
 }

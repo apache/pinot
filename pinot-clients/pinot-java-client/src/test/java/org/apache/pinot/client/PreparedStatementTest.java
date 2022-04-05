@@ -36,8 +36,7 @@ public class PreparedStatementTest {
     // Create a prepared statement that has to quote a string appropriately
     Connection connection =
         ConnectionFactory.fromHostList(Collections.singletonList("dummy"), _dummyPinotClientTransport);
-    PreparedStatement preparedStatement =
-        connection.prepareStatement(new Request("sql", "SELECT foo FROM bar WHERE baz = ?"));
+    PreparedStatement preparedStatement = connection.prepareStatement("SELECT foo FROM bar WHERE baz = ?");
     preparedStatement.setString(0, "'hello'");
     preparedStatement.execute();
 

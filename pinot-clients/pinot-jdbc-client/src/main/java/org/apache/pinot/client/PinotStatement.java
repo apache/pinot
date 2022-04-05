@@ -26,12 +26,10 @@ import org.apache.pinot.client.utils.DriverUtils;
 
 
 public class PinotStatement extends AbstractBaseStatement {
-
-  private static final String QUERY_FORMAT = "sql";
   private static final String LIMIT_STATEMENT = "LIMIT";
-  private Connection _connection;
-  private org.apache.pinot.client.Connection _session;
-  private ResultSetGroup _resultSetGroup;
+
+  private final Connection _connection;
+  private final org.apache.pinot.client.Connection _session;
   private boolean _closed;
   private ResultSet _resultSet;
   private int _maxRows = 1000000;
@@ -63,15 +61,14 @@ public class PinotStatement extends AbstractBaseStatement {
     validateState();
     try {
       if (!DriverUtils.queryContainsLimitStatement(sql)) {
-        sql = sql.concat(" " + LIMIT_STATEMENT + " " + _maxRows);
+        sql += " " + LIMIT_STATEMENT + " " + _maxRows;
       }
-      Request request = new Request(QUERY_FORMAT, sql);
-      _resultSetGroup = _session.execute(request);
-      if (_resultSetGroup.getResultSetCount() == 0) {
+      ResultSetGroup resultSetGroup = _session.execute(sql);
+      if (resultSetGroup.getResultSetCount() == 0) {
         _resultSet = PinotResultSet.empty();
         return _resultSet;
       }
-      _resultSet = new PinotResultSet(_resultSetGroup.getResultSet(0));
+      _resultSet = new PinotResultSet(resultSetGroup.getResultSet(0));
       return _resultSet;
     } catch (PinotClientException e) {
       throw new SQLException(String.format("Failed to execute query : %s", sql), e);

@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
@@ -85,11 +84,12 @@ public abstract class BaseTransformFunction implements TransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+
     if (_intValuesSV == null) {
-      _intValuesSV = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _intValuesSV = new int[length];
     }
 
-    int length = projectionBlock.getNumDocs();
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
@@ -128,11 +128,12 @@ public abstract class BaseTransformFunction implements TransformFunction {
 
   @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+
     if (_longValuesSV == null) {
-      _longValuesSV = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _longValuesSV = new long[length];
     }
 
-    int length = projectionBlock.getNumDocs();
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
@@ -171,11 +172,12 @@ public abstract class BaseTransformFunction implements TransformFunction {
 
   @Override
   public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+
     if (_floatValuesSV == null) {
-      _floatValuesSV = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _floatValuesSV = new float[length];
     }
 
-    int length = projectionBlock.getNumDocs();
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
@@ -214,11 +216,12 @@ public abstract class BaseTransformFunction implements TransformFunction {
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+
     if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _doubleValuesSV = new double[length];
     }
 
-    int length = projectionBlock.getNumDocs();
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
@@ -297,11 +300,12 @@ public abstract class BaseTransformFunction implements TransformFunction {
 
   @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+
     if (_stringValuesSV == null) {
-      _stringValuesSV = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _stringValuesSV = new String[length];
     }
 
-    int length = projectionBlock.getNumDocs();
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
@@ -342,11 +346,12 @@ public abstract class BaseTransformFunction implements TransformFunction {
 
   @Override
   public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+
     if (_byteValuesSV == null) {
-      _byteValuesSV = new byte[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+      _byteValuesSV = new byte[length][];
     }
 
-    int length = projectionBlock.getNumDocs();
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
@@ -362,11 +367,12 @@ public abstract class BaseTransformFunction implements TransformFunction {
 
   @Override
   public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+
     if (_intValuesMV == null) {
-      _intValuesMV = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+      _intValuesMV = new int[length][];
     }
 
-    int length = projectionBlock.getNumDocs();
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(projectionBlock);
@@ -428,11 +434,12 @@ public abstract class BaseTransformFunction implements TransformFunction {
 
   @Override
   public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+
     if (_longValuesMV == null) {
-      _longValuesMV = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+      _longValuesMV = new long[length][];
     }
 
-    int length = projectionBlock.getNumDocs();
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(projectionBlock);
@@ -494,11 +501,12 @@ public abstract class BaseTransformFunction implements TransformFunction {
 
   @Override
   public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+
     if (_floatValuesMV == null) {
-      _floatValuesMV = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+      _floatValuesMV = new float[length][];
     }
 
-    int length = projectionBlock.getNumDocs();
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(projectionBlock);
@@ -560,11 +568,12 @@ public abstract class BaseTransformFunction implements TransformFunction {
 
   @Override
   public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+
     if (_doubleValuesMV == null) {
-      _doubleValuesMV = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+      _doubleValuesMV = new double[length][];
     }
 
-    int length = projectionBlock.getNumDocs();
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(projectionBlock);
@@ -626,11 +635,12 @@ public abstract class BaseTransformFunction implements TransformFunction {
 
   @Override
   public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+
     if (_stringValuesMV == null) {
-      _stringValuesMV = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+      _stringValuesMV = new String[length][];
     }
 
-    int length = projectionBlock.getNumDocs();
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(projectionBlock);

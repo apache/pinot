@@ -130,10 +130,8 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
       int expected = 50 + 60 + 70 + 110 + 120 + 130;
       runAndAssert(query, expected);
 
-      query =
-          "select distinctCountThetaSketch(thetaSketchCol, '', 'dimName = ''gender'' and dimValue = ''Female''', "
-              + "'$1') from "
-              + DEFAULT_TABLE_NAME;
+      query = "select distinctCountThetaSketch(thetaSketchCol, '', 'dimName = ''gender'' and dimValue = ''Female''', "
+          + "'$1') from " + DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
 
       query = "select distinctCountThetaSketch(thetaSketchCol, '', "
@@ -150,8 +148,7 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
 
       query =
           "select distinctCountThetaSketch(thetaSketchCol, '', 'dimName = ''gender'' and dimValue = ''Male''', '$1') "
-              + "from "
-              + DEFAULT_TABLE_NAME;
+              + "from " + DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
 
       query = "select distinctCountThetaSketch(thetaSketchCol, '', "
@@ -168,8 +165,7 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
 
       query =
           "select distinctCountThetaSketch(thetaSketchCol, '', 'dimName = ''course'' and dimValue = ''Math''', '$1') "
-              + "from "
-              + DEFAULT_TABLE_NAME;
+              + "from " + DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
 
       query = "select distinctCountThetaSketch(thetaSketchCol, '', "
@@ -222,33 +218,15 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
 
   private void runAndAssert(String query, int expected)
       throws Exception {
-
-    // pql
-    JsonNode jsonNode = postQuery(query);
-    int actual = Integer.parseInt(jsonNode.get("aggregationResults").get(0).get("value").textValue());
-    assertEquals(actual, expected);
-
-    // sql
-    jsonNode = postSqlQuery(query, _brokerBaseApiUrl);
-    actual = Integer.parseInt(jsonNode.get("resultTable").get("rows").get(0).get(0).asText());
+    JsonNode jsonNode = postQuery(query, _brokerBaseApiUrl);
+    int actual = Integer.parseInt(jsonNode.get("resultTable").get("rows").get(0).get(0).asText());
     assertEquals(actual, expected);
   }
 
   private void runAndAssert(String query, Map<String, Integer> expectedGroupToValueMap)
       throws Exception {
-
-    // pql
     Map<String, Integer> actualGroupToValueMap = new HashMap<>();
-    JsonNode jsonNode = postQuery(query);
-    jsonNode.get("aggregationResults").get(0).get("groupByResult").forEach(node -> {
-      String group = node.get("group").get(0).textValue();
-      int value = Integer.parseInt(node.get("value").textValue());
-      actualGroupToValueMap.put(group, value);
-    });
-    assertEquals(actualGroupToValueMap, expectedGroupToValueMap);
-
-    // sql
-    jsonNode = postSqlQuery(query, _brokerBaseApiUrl);
+    JsonNode jsonNode = postQuery(query, _brokerBaseApiUrl);
     jsonNode.get("resultTable").get("rows").forEach(node -> {
       String group = node.get(0).textValue();
       int value = node.get(1).intValue();

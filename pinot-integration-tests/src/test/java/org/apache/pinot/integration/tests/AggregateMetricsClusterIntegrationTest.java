@@ -96,7 +96,7 @@ public class AggregateMetricsClusterIntegrationTest extends BaseClusterIntegrati
     String sql = "SELECT SUM(AirTime), SUM(ArrDelay) FROM mytable";
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode queryResult = postSqlQuery(sql, _brokerBaseApiUrl);
+        JsonNode queryResult = postQuery(sql, _brokerBaseApiUrl);
         JsonNode aggregationResults = queryResult.get("resultTable").get("rows").get(0);
         return aggregationResults.get(0).asInt() == -165429728 && aggregationResults.get(1).asInt() == -175625957;
       } catch (Exception e) {
@@ -108,12 +108,12 @@ public class AggregateMetricsClusterIntegrationTest extends BaseClusterIntegrati
   @Test
   public void testQueries()
       throws Exception {
-    String sql = "SELECT SUM(AirTime), SUM(ArrDelay) FROM mytable";
-    testSqlQuery(sql, Collections.singletonList(sql));
-    sql = "SELECT SUM(AirTime), DaysSinceEpoch FROM mytable GROUP BY DaysSinceEpoch ORDER BY SUM(AirTime) DESC";
-    testSqlQuery(sql, Collections.singletonList(sql));
-    sql = "SELECT Origin, SUM(ArrDelay) FROM mytable WHERE Carrier = 'AA' GROUP BY Origin ORDER BY Origin";
-    testSqlQuery(sql, Collections.singletonList(sql));
+    String query = "SELECT SUM(AirTime), SUM(ArrDelay) FROM mytable";
+    testQuery(query);
+    query = "SELECT SUM(AirTime), DaysSinceEpoch FROM mytable GROUP BY DaysSinceEpoch ORDER BY SUM(AirTime) DESC";
+    testQuery(query);
+    query = "SELECT Origin, SUM(ArrDelay) FROM mytable WHERE Carrier = 'AA' GROUP BY Origin ORDER BY Origin";
+    testQuery(query);
   }
 
   @AfterClass

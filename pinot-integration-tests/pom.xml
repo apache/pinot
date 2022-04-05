@@ -25,7 +25,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.10.0-SNAPSHOT</version>
+    <version>0.11.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-integration-tests</artifactId>
@@ -62,14 +62,6 @@
               <jvmSettings>
                 <initialMemorySize>2G</initialMemorySize>
                 <maxMemorySize>2G</maxMemorySize>
-              </jvmSettings>
-            </program>
-            <program>
-              <mainClass>org.apache.pinot.integration.tests.HybridClusterIntegrationTestCommandLineRunner</mainClass>
-              <name>pinot-hybrid-cluster-test</name>
-              <jvmSettings>
-                <initialMemorySize>4G</initialMemorySize>
-                <maxMemorySize>4G</maxMemorySize>
               </jvmSettings>
             </program>
           </programs>

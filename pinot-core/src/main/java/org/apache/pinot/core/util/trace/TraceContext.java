@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -67,7 +68,7 @@ public final class TraceContext {
 
     final String _traceId;
     final List<LogEntry> _logs = new ArrayList<>();
-    int _numChildren = 0;
+    final AtomicInteger _numChildren = new AtomicInteger(0);
 
     Trace(@Nullable Trace parent) {
       if (parent == null) {
@@ -82,7 +83,7 @@ public final class TraceContext {
     }
 
     String getChildTraceId() {
-      return _traceId + "_" + _numChildren++;
+      return _traceId + "_" + _numChildren.getAndIncrement();
     }
 
     JsonNode toJson() {

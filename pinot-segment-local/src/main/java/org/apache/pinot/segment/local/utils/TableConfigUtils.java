@@ -521,7 +521,7 @@ public final class TableConfigUtils {
                 segmentSelectorType, tierName);
         Preconditions.checkState(TimeUtils.isPeriodValid(segmentAge),
             "segmentAge: %s must be a valid period string (eg. 30d, 24h) in tier: %s", segmentAge, tierName);
-      } else {
+      } else if (!segmentSelectorType.equalsIgnoreCase(TierFactory.FIXED_SEGMENT_SELECTOR_TYPE)) {
         throw new IllegalStateException(
             "Unsupported segmentSelectorType: " + segmentSelectorType + " in tier: " + tierName);
       }

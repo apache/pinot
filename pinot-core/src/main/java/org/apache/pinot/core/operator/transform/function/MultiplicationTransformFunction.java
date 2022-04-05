@@ -90,11 +90,11 @@ public class MultiplicationTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_doubleProducts == null) {
+    int length = projectionBlock.getNumDocs();
+    if (_doubleProducts == null || _doubleProducts.length < length) {
       _doubleProducts = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
 
-    int length = projectionBlock.getNumDocs();
     if (_resultDataType == DataType.BIG_DECIMAL) {
       BigDecimal[] values = transformToBigDecimalValuesSV(projectionBlock);
       ArrayCopyUtils.copy(values, _doubleProducts, length);
@@ -112,11 +112,11 @@ public class MultiplicationTransformFunction extends BaseTransformFunction {
 
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
-    if (_bigDecimalProducts == null) {
+    int length = projectionBlock.getNumDocs();
+    if (_bigDecimalProducts == null || _bigDecimalProducts.length < length) {
       _bigDecimalProducts = new BigDecimal[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
 
-    int length = projectionBlock.getNumDocs();
     if (_resultDataType == DataType.DOUBLE) {
       double[] values = transformToDoubleValuesSV(projectionBlock);
       ArrayCopyUtils.copy(values, _bigDecimalProducts, length);

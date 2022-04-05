@@ -38,14 +38,15 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_INVERTED_INDEX";
 
   private final PredicateEvaluator _predicateEvaluator;
-  private final InvertedIndexReader _invertedIndexReader;
+  private final InvertedIndexReader<ImmutableRoaringBitmap> _invertedIndexReader;
   private final ImmutableRoaringBitmap _docIds;
   private final boolean _exclusive;
   private final int _numDocs;
 
+  @SuppressWarnings("unchecked")
   BitmapBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
     _predicateEvaluator = predicateEvaluator;
-    _invertedIndexReader = dataSource.getInvertedIndex();
+    _invertedIndexReader = (InvertedIndexReader<ImmutableRoaringBitmap>) dataSource.getInvertedIndex();
     _docIds = null;
     _exclusive = predicateEvaluator.isExclusive();
     _numDocs = numDocs;
@@ -75,7 +76,7 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
       return EmptyFilterBlock.getInstance();
     }
     if (numDictIds == 1) {
-      ImmutableRoaringBitmap docIds = (ImmutableRoaringBitmap) _invertedIndexReader.getDocIds(dictIds[0]);
+      ImmutableRoaringBitmap docIds = _invertedIndexReader.getDocIds(dictIds[0]);
       if (_exclusive) {
         if (docIds instanceof MutableRoaringBitmap) {
           MutableRoaringBitmap mutableRoaringBitmap = (MutableRoaringBitmap) docIds;
@@ -90,13 +91,74 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
     } else {
       ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[numDictIds];
       for (int i = 0; i < numDictIds; i++) {
-        bitmaps[i] = (ImmutableRoaringBitmap) _invertedIndexReader.getDocIds(dictIds[i]);
+        bitmaps[i] = _invertedIndexReader.getDocIds(dictIds[i]);
       }
       MutableRoaringBitmap docIds = ImmutableRoaringBitmap.or(bitmaps);
       if (_exclusive) {
         docIds.flip(0L, _numDocs);
       }
       return new FilterBlock(new BitmapDocIdSet(docIds, _numDocs));
+    }
+  }
+
+  @Override
+  public boolean canOptimizeCount() {
+    return true;
+  }
+
+  @Override
+  public int getNumMatchingDocs() {
+    int count = 0;
+    if (_docIds == null) {
+      int[] dictIds = _exclusive
+          ? _predicateEvaluator.getNonMatchingDictIds()
+          : _predicateEvaluator.getMatchingDictIds();
+      switch (dictIds.length) {
+        case 0:
+          break;
+        case 1: {
+          count = _invertedIndexReader.getDocIds(dictIds[0]).getCardinality();
+          break;
+        }
+        case 2: {
+          count = ImmutableRoaringBitmap.orCardinality(_invertedIndexReader.getDocIds(dictIds[0]),
+              _invertedIndexReader.getDocIds(dictIds[1]));
+          break;
+        }
+        default: {
+          // this could be optimised if the bitmaps are known to be disjoint (as in a single value bitmap index)
+          MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+          for (int dictId : dictIds) {
+            bitmap.or(_invertedIndexReader.getDocIds(dictId));
+          }
+          count = bitmap.getCardinality();
+          break;
+        }
+      }
+    } else {
+      count = _docIds.getCardinality();
+    }
+    return _exclusive ? _numDocs - count : count;
+  }
+
+  @Override
+  public boolean canProduceBitmaps() {
+    return true;
+  }
+
+  @Override
+  public BitmapCollection getBitmaps() {
+    if (_docIds == null) {
+      int[] dictIds = _exclusive
+          ? _predicateEvaluator.getNonMatchingDictIds()
+          : _predicateEvaluator.getMatchingDictIds();
+      ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[dictIds.length];
+      for (int i = 0; i < dictIds.length; i++) {
+        bitmaps[i] = _invertedIndexReader.getDocIds(dictIds[i]);
+      }
+      return new BitmapCollection(_numDocs, _exclusive, bitmaps);
+    } else {
+      return new BitmapCollection(_numDocs, _exclusive, _docIds);
     }
   }
 

@@ -224,8 +224,8 @@ public abstract class ClusterTest extends ControllerTest {
         configuration.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
         configuration.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkStr);
         configuration.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR + "-" + i);
-        configuration
-            .setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
+        configuration.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
+            Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, baseAdminApiPort - i);
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, baseNettyPort + i);
         if (configuration.getProperty(Server.CONFIG_OF_ENABLE_GRPC_SERVER, false)) {
@@ -243,6 +243,10 @@ public abstract class ClusterTest extends ControllerTest {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  protected List<HelixServerStarter> getServerStarters() {
+    return _serverStarters;
   }
 
   protected void startServerHttps() {
@@ -319,8 +323,7 @@ public abstract class ClusterTest extends ControllerTest {
     _serverStarters = null;
   }
 
-  protected void restartServers(int numServers)
-      throws InterruptedException {
+  protected void restartServers(int numServers) {
     assertNotNull(_serverStarters, "Servers are not started");
     for (HelixServerStarter helixServerStarter : _serverStarters) {
       try {
@@ -329,7 +332,6 @@ public abstract class ClusterTest extends ControllerTest {
         LOGGER.error("Encountered exception while stopping server {}", e.getMessage());
       }
     }
-    _serverStarters = null;
 
     _serverStarters = new ArrayList<>(numServers);
     String zkStr = getZkUrl();
@@ -343,8 +345,8 @@ public abstract class ClusterTest extends ControllerTest {
         configuration.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
         configuration.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkStr);
         configuration.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR + "-" + i);
-        configuration
-            .setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
+        configuration.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
+            Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, baseAdminApiPort - i);
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, baseNettyPort + i);
         if (configuration.getProperty(Server.CONFIG_OF_ENABLE_GRPC_SERVER, false)) {
@@ -392,10 +394,9 @@ public abstract class ClusterTest extends ControllerTest {
       if (numSegments == 1) {
         File segmentTarFile = segmentTarFiles[0];
         if (System.currentTimeMillis() % 2 == 0) {
-          assertEquals(fileUploadDownloadClient
-                  .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName)
-                  .getStatusCode(),
-              HttpStatus.SC_OK);
+          assertEquals(
+              fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile,
+                  tableName).getStatusCode(), HttpStatus.SC_OK);
         } else {
           assertEquals(
               uploadSegmentWithOnlyMetadata(tableName, uploadSegmentHttpURI, fileUploadDownloadClient, segmentTarFile),
@@ -408,9 +409,8 @@ public abstract class ClusterTest extends ControllerTest {
         for (File segmentTarFile : segmentTarFiles) {
           futures.add(executorService.submit(() -> {
             if (System.currentTimeMillis() % 2 == 0) {
-              return fileUploadDownloadClient
-                  .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName)
-                  .getStatusCode();
+              return fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(),
+                  segmentTarFile, tableName).getStatusCode();
             } else {
               return uploadSegmentWithOnlyMetadata(tableName, uploadSegmentHttpURI, fileUploadDownloadClient,
                   segmentTarFile);
@@ -447,21 +447,17 @@ public abstract class ClusterTest extends ControllerTest {
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       if (numSegments == 1) {
         File segmentTarFile = segmentTarFiles.get(0);
-        assertEquals(fileUploadDownloadClient
-                .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName,
-                    tableType.OFFLINE, enableParallelPushProtection, true)
-                .getStatusCode(),
-            HttpStatus.SC_OK);
+        assertEquals(
+            fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile,
+                tableName, tableType.OFFLINE, enableParallelPushProtection, true).getStatusCode(), HttpStatus.SC_OK);
       } else {
         // Upload all segments in parallel
         ExecutorService executorService = Executors.newFixedThreadPool(numSegments);
         List<Future<Integer>> futures = new ArrayList<>(numSegments);
         for (File segmentTarFile : segmentTarFiles) {
           futures.add(executorService.submit(() -> {
-            return fileUploadDownloadClient
-                .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName,
-                    tableType.OFFLINE, enableParallelPushProtection, true)
-                .getStatusCode();
+            return fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(),
+                segmentTarFile, tableName, tableType.OFFLINE, enableParallelPushProtection, true).getStatusCode();
           }));
         }
         executorService.shutdown();
@@ -476,17 +472,15 @@ public abstract class ClusterTest extends ControllerTest {
       FileUploadDownloadClient fileUploadDownloadClient, File segmentTarFile)
       throws IOException, HttpErrorStatusException {
     List<Header> headers = ImmutableList.of(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI,
-            "file://" + segmentTarFile.getParentFile().getAbsolutePath() + "/" + URLEncoder
-                .encode(segmentTarFile.getName(), StandardCharsets.UTF_8.toString())),
-        new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
-            FileUploadDownloadClient.FileUploadType.METADATA.toString()));
+        "file://" + segmentTarFile.getParentFile().getAbsolutePath() + "/" + URLEncoder.encode(segmentTarFile.getName(),
+            StandardCharsets.UTF_8.toString())), new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
+        FileUploadDownloadClient.FileUploadType.METADATA.toString()));
     // Add table name as a request parameter
     NameValuePair tableNameValuePair =
         new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, tableName);
     List<NameValuePair> parameters = Arrays.asList(tableNameValuePair);
-    return fileUploadDownloadClient
-        .uploadSegmentMetadata(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, headers, parameters,
-            HttpClient.DEFAULT_SOCKET_TIMEOUT_MS).getStatusCode();
+    return fileUploadDownloadClient.uploadSegmentMetadata(uploadSegmentHttpURI, segmentTarFile.getName(),
+        segmentTarFile, headers, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS).getStatusCode();
   }
 
   public static class AvroFileSchemaKafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
@@ -533,7 +527,7 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   /**
-   * Queries the broker's pql query endpoint (/query)
+   * Queries the broker's sql query endpoint (/query/sql)
    */
   protected JsonNode postQuery(String query)
       throws Exception {
@@ -541,7 +535,7 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   /**
-   * Queries the broker's pql query endpoint (/query)
+   * Queries the broker's sql query endpoint (/sql)
    */
   public static JsonNode postQuery(String query, String brokerBaseApiUrl)
       throws Exception {
@@ -549,54 +543,9 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   /**
-   * Queries the broker's pql query endpoint (/query)
+   * Queries the broker's sql query endpoint (/sql)
    */
   public static JsonNode postQuery(String query, String brokerBaseApiUrl, Map<String, String> headers)
-      throws Exception {
-    return postQuery(query, brokerBaseApiUrl, false, Broker.Request.PQL, headers);
-  }
-
-  /**
-   * Queries the broker's pql query endpoint (/query)
-   */
-  public static JsonNode postQuery(String query, String brokerBaseApiUrl, boolean enableTrace, String queryType)
-      throws Exception {
-    return postQuery(query, brokerBaseApiUrl, enableTrace, queryType, null);
-  }
-
-  /**
-   * Queries the broker's pql query endpoint (/query)
-   */
-  public static JsonNode postQuery(String query, String brokerBaseApiUrl, boolean enableTrace, String queryType,
-      Map<String, String> headers)
-      throws Exception {
-    ObjectNode payload = JsonUtils.newObjectNode();
-    payload.put(queryType, query);
-    payload.put("trace", enableTrace);
-
-    return JsonUtils.stringToJsonNode(sendPostRequest(brokerBaseApiUrl + "/query", payload.toString(), headers));
-  }
-
-  /**
-   * Queries the broker's sql query endpoint (/query/sql)
-   */
-  protected JsonNode postSqlQuery(String query)
-      throws Exception {
-    return postSqlQuery(query, _brokerBaseApiUrl);
-  }
-
-  /**
-   * Queries the broker's sql query endpoint (/sql)
-   */
-  public static JsonNode postSqlQuery(String query, String brokerBaseApiUrl)
-      throws Exception {
-    return postSqlQuery(query, brokerBaseApiUrl, null);
-  }
-
-  /**
-   * Queries the broker's sql query endpoint (/sql)
-   */
-  public static JsonNode postSqlQuery(String query, String brokerBaseApiUrl, Map<String, String> headers)
       throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);

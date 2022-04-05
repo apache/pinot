@@ -34,7 +34,6 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.pinot.connector.flink.common.FlinkRowGenericRowConverter;
-import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -142,7 +141,7 @@ public class PinotSinkIntegrationTest extends BaseClusterIntegrationTest {
 
   private int getNumSegments()
       throws IOException {
-    String jsonOutputStr = ControllerTest.sendGetRequest(
+    String jsonOutputStr = sendGetRequest(
         _controllerRequestURLBuilder.forSegmentListAPIWithTableType(OFFLINE_TABLE_NAME, TableType.OFFLINE.toString()));
     JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
     return array.get(0).get("OFFLINE").size();
@@ -150,14 +149,14 @@ public class PinotSinkIntegrationTest extends BaseClusterIntegrationTest {
 
   private int getTotalNumDocs()
       throws IOException {
-    String jsonOutputStr = ControllerTest.sendGetRequest(
+    String jsonOutputStr = sendGetRequest(
         _controllerRequestURLBuilder.forSegmentListAPIWithTableType(OFFLINE_TABLE_NAME, TableType.OFFLINE.toString()));
     JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
     JsonNode segments = array.get(0).get("OFFLINE");
     int totalDocCount = 0;
     for (int i = 0; i < segments.size(); i++) {
       String segmentName = segments.get(i).asText();
-      jsonOutputStr = ControllerTest.sendGetRequest(
+      jsonOutputStr = sendGetRequest(
           _controllerRequestURLBuilder.forSegmentMetadata(OFFLINE_TABLE_NAME, segmentName));
       JsonNode metadata = JsonUtils.stringToJsonNode(jsonOutputStr);
       totalDocCount += metadata.get("segment.total.docs").asInt();

@@ -57,17 +57,13 @@ import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSetGroup;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
-import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -75,7 +71,6 @@ import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
@@ -156,8 +151,8 @@ public class ClusterIntegrationTestUtils {
       }
 
       h2Connection.prepareCall("DROP TABLE IF EXISTS " + tableName).execute();
-      h2Connection.prepareCall("CREATE TABLE " + tableName + "(" + StringUtil
-          .join(",", h2FieldNameAndTypes.toArray(new String[h2FieldNameAndTypes.size()])) + ")").execute();
+      h2Connection.prepareCall("CREATE TABLE " + tableName + "(" + StringUtil.join(",",
+          h2FieldNameAndTypes.toArray(new String[h2FieldNameAndTypes.size()])) + ")").execute();
     }
 
     // Insert Avro records into H2 table
@@ -530,285 +525,21 @@ public class ClusterIntegrationTestUtils {
 
   /**
    * Run equivalent Pinot and H2 query and compare the results.
-   * <p>LIMITATIONS:
-   * <ul>
-   *   <li>Skip comparison for selection and aggregation group-by when H2 results are too large to exhaust.</li>
-   *   <li>Do not examine the order of result records.</li>
-   * </ul>
-   *
-   * @param pinotQuery Pinot query
-   * @param brokerUrl Pinot broker URL
-   * @param pinotConnection Pinot connection
-   * @param sqlQueries H2 SQL queries
-   * @param h2Connection H2 connection
-   * @throws Exception
    */
-  public static void testPqlQuery(String pinotQuery, String brokerUrl,
-      org.apache.pinot.client.Connection pinotConnection, @Nullable List<String> sqlQueries,
-      @Nullable Connection h2Connection)
+  static void testQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
+      String h2Query, Connection h2Connection)
       throws Exception {
-    testPqlQuery(pinotQuery, brokerUrl, pinotConnection, sqlQueries, h2Connection, null);
+    testQuery(pinotQuery, brokerUrl, pinotConnection, h2Query, h2Connection, null);
   }
 
   /**
    * Run equivalent Pinot and H2 query and compare the results.
-   * <p>LIMITATIONS:
-   * <ul>
-   *   <li>Skip comparison for selection and aggregation group-by when H2 results are too large to exhaust.</li>
-   *   <li>Do not examine the order of result records.</li>
-   * </ul>
-   *
-   * @param pinotQuery Pinot query
-   * @param brokerUrl Pinot broker URL
-   * @param pinotConnection Pinot connection
-   * @param sqlQueries H2 SQL queries
-   * @param h2Connection H2 connection
-   * @param headers headers
-   * @throws Exception
    */
-  public static void testPqlQuery(String pinotQuery, String brokerUrl,
-      org.apache.pinot.client.Connection pinotConnection, @Nullable List<String> sqlQueries,
-      @Nullable Connection h2Connection, @Nullable Map<String, String> headers)
-      throws Exception {
-    // Use broker response for metadata check, connection response for value check
-    JsonNode pinotResponse = ClusterTest.postQuery(pinotQuery, brokerUrl, headers);
-    Request pinotClientRequest = new Request(CommonConstants.Broker.Request.PQL, pinotQuery);
-    ResultSetGroup pinotResultSetGroup = pinotConnection.execute(pinotClientRequest);
-
-    // Skip comparison if SQL queries are not specified
-    if (sqlQueries == null) {
-      return;
-    }
-
-    Assert.assertNotNull(h2Connection);
-    Statement h2statement = h2Connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-
-    long pinotNumRecordsSelected = pinotResponse.get("numDocsScanned").asLong();
-
-    // Aggregation results
-    if (pinotResponse.has("aggregationResults")) {
-      // Check number of aggregation results
-      int numAggregationResults = pinotResultSetGroup.getResultSetCount();
-      int numSqlQueries = sqlQueries.size();
-      if (numAggregationResults != numSqlQueries) {
-        String failureMessage =
-            "Number of aggregation results: " + numAggregationResults + " does not match number of SQL queries: "
-                + numSqlQueries;
-        failure(pinotQuery, sqlQueries, failureMessage);
-      }
-
-      // Get aggregation type
-      JsonNode pinotFirstAggregationResult = pinotResponse.get("aggregationResults").get(0);
-
-      // Aggregation-only results
-      if (pinotFirstAggregationResult.has("value")) {
-        // Check over all aggregation functions
-        for (int aggregationIndex = 0; aggregationIndex < numAggregationResults; aggregationIndex++) {
-          // Get expected value for the aggregation
-          h2statement.execute(sqlQueries.get(aggregationIndex));
-          ResultSet h2ResultSet = h2statement.getResultSet();
-          h2ResultSet.first();
-          String h2Value = h2ResultSet.getString(1);
-
-          // If H2 value is null, it means no record selected in H2
-          if (h2Value == null) {
-            if (pinotNumRecordsSelected != 0) {
-              String failureMessage =
-                  "No record selected in H2 but " + pinotNumRecordsSelected + " records selected in Pinot";
-              failure(pinotQuery, sqlQueries, failureMessage);
-            }
-
-            // Skip further comparison
-            return;
-          }
-
-          // Fuzzy compare expected value and actual value
-          double expectedValue = Double.parseDouble(h2Value);
-          String pinotValue = pinotResultSetGroup.getResultSet(aggregationIndex).getString(0);
-          double actualValue = Double.parseDouble(pinotValue);
-          if (!DoubleMath.fuzzyEquals(actualValue, expectedValue, 1.0)) {
-            String failureMessage =
-                "Value: " + aggregationIndex + " does not match, expected: " + h2Value + ", got: " + pinotValue;
-            failure(pinotQuery, sqlQueries, failureMessage);
-          }
-        }
-
-        return;
-      }
-
-      // Group-by results
-      if (pinotFirstAggregationResult.has("groupByResult")) {
-        // Get number of groups
-        org.apache.pinot.client.ResultSet pinotFirstGroupByResultSet = pinotResultSetGroup.getResultSet(0);
-        int pinotNumGroups = pinotFirstGroupByResultSet.getRowCount();
-
-        // Get number of group keys in each group
-        // If no group-by result returned by Pinot, set numGroupKeys to 0 since no comparison needed
-        int pinotNumGroupKeys;
-        if (pinotNumGroups == 0) {
-          pinotNumGroupKeys = 0;
-        } else {
-          pinotNumGroupKeys = pinotFirstGroupByResultSet.getGroupKeyLength();
-        }
-
-        // Check over all aggregation functions
-        for (int aggregationIndex = 0; aggregationIndex < numAggregationResults; aggregationIndex++) {
-          // Construct expected result map from concatenated group keys to value
-          h2statement.execute(sqlQueries.get(aggregationIndex));
-          ResultSet h2ResultSet = h2statement.getResultSet();
-          Map<String, String> expectedValues = new HashMap<>();
-          int h2NumGroups;
-          for (h2NumGroups = 0; h2ResultSet.next() && h2NumGroups < MAX_NUM_ROWS_TO_COMPARE; h2NumGroups++) {
-            if (pinotNumGroupKeys != 0) {
-              StringBuilder groupKey = new StringBuilder();
-              for (int groupKeyIndex = 1; groupKeyIndex <= pinotNumGroupKeys; groupKeyIndex++) {
-                // Convert boolean value to lower case
-                groupKey.append(convertBooleanToLowerCase(h2ResultSet.getString(groupKeyIndex))).append(' ');
-              }
-              expectedValues.put(groupKey.toString(), h2ResultSet.getString(pinotNumGroupKeys + 1));
-            }
-          }
-
-          // No record selected in H2
-          if (h2NumGroups == 0) {
-            if (pinotNumGroups != 0) {
-              String failureMessage = "No group returned in H2 but " + pinotNumGroups + " groups returned in Pinot";
-              failure(pinotQuery, sqlQueries, failureMessage);
-            }
-
-            // If the query has a HAVING clause and both H2 and Pinot have no groups, that is expected, so we don't need
-            // to compare the number of docs scanned
-            if (pinotQuery.contains("HAVING")) {
-              return;
-            }
-
-            if (pinotNumRecordsSelected != 0) {
-              String failureMessage = "No group returned in Pinot but " + pinotNumRecordsSelected + " records selected";
-              failure(pinotQuery, sqlQueries, failureMessage);
-            }
-
-            // Skip further comparison
-            return;
-          }
-
-          // Only compare exhausted results
-          if (h2NumGroups < MAX_NUM_ROWS_TO_COMPARE) {
-            // Check if all Pinot results are contained in the H2 results
-            org.apache.pinot.client.ResultSet pinotGroupByResultSet =
-                pinotResultSetGroup.getResultSet(aggregationIndex);
-            for (int groupIndex = 0; groupIndex < pinotNumGroups; groupIndex++) {
-              // Concatenate Pinot group keys
-              StringBuilder groupKeyBuilder = new StringBuilder();
-              for (int groupKeyIndex = 0; groupKeyIndex < pinotNumGroupKeys; groupKeyIndex++) {
-                groupKeyBuilder.append(pinotGroupByResultSet.getGroupKeyString(groupIndex, groupKeyIndex)).append(' ');
-              }
-              String groupKey = groupKeyBuilder.toString();
-
-              // Fuzzy compare expected value and actual value
-              String h2Value = expectedValues.get(groupKey);
-              if (h2Value == null) {
-                String failureMessage = "Group returned in Pinot but not in H2: " + groupKey;
-                failure(pinotQuery, sqlQueries, failureMessage);
-                return;
-              }
-              double expectedValue = Double.parseDouble(h2Value);
-              String pinotValue = pinotGroupByResultSet.getString(groupIndex);
-              double actualValue = Double.parseDouble(pinotValue);
-              if (!DoubleMath.fuzzyEquals(actualValue, expectedValue, 1.0)) {
-                String failureMessage =
-                    "Value: " + aggregationIndex + " does not match, expected: " + h2Value + ", got: " + pinotValue
-                        + ", for group: " + groupKey;
-                failure(pinotQuery, sqlQueries, failureMessage);
-              }
-            }
-          }
-        }
-
-        return;
-      }
-
-      // Neither aggregation-only or group-by results
-      String failureMessage = "Inside aggregation results, no aggregation-only or group-by results found";
-      failure(pinotQuery, sqlQueries, failureMessage);
-    }
-
-    // Selection results
-    if (pinotResponse.has("selectionResults")) {
-      // Construct expected result set
-      h2statement.execute(sqlQueries.get(0));
-      ResultSet h2ResultSet = h2statement.getResultSet();
-      ResultSetMetaData h2MetaData = h2ResultSet.getMetaData();
-
-      // pinotResponse will have "selectionResults" in case of DISTINCT query too
-      // so here we need to check if selection is null or not
-      List<SelectionSort> sortSequence;
-      BrokerRequest brokerRequest =
-          PinotQueryParserFactory.get(CommonConstants.Broker.Request.PQL).compileToBrokerRequest(pinotQuery);
-      if (brokerRequest.isSetSelections()) {
-        sortSequence = brokerRequest.getSelections().getSelectionSortSequence();
-      } else {
-        sortSequence = new ArrayList<>();
-      }
-
-      List<String> orderByColumns;
-      if (sortSequence == null) {
-        orderByColumns = Collections.emptyList();
-      } else {
-        orderByColumns = new ArrayList<>();
-        for (SelectionSort selectionSort : sortSequence) {
-          orderByColumns.add(selectionSort.getColumn());
-        }
-      }
-      Set<String> expectedValues = new HashSet<>();
-      List<String> expectedOrderByValues = new ArrayList<>();
-
-      int h2NumRows =
-          getH2ExpectedValues(expectedValues, expectedOrderByValues, h2ResultSet, h2MetaData, orderByColumns);
-
-      org.apache.pinot.client.ResultSet pinotSelectionResultSet = pinotResultSetGroup.getResultSet(0);
-
-      // Only compare exhausted results
-      comparePinotResultsWithExpectedValues(expectedValues, expectedOrderByValues, pinotSelectionResultSet,
-          orderByColumns, pinotQuery, sqlQueries, h2NumRows, pinotNumRecordsSelected);
-    } else {
-      // Neither aggregation or selection results
-      String failureMessage = "No aggregation or selection results found for query: " + pinotQuery;
-      failure(pinotQuery, sqlQueries, failureMessage);
-    }
-  }
-
-  /**
-   * Run equivalent Pinot SQL and H2 query and compare the results.
-   *
-   * @param pinotQuery Pinot sql query
-   * @param brokerUrl Pinot broker URL
-   * @param pinotConnection Pinot connection
-   * @param h2Queries H2 queries
-   * @param h2Connection H2 connection
-   * @throws Exception
-   */
-  static void testSqlQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
-      List<String> h2Queries, Connection h2Connection)
-      throws Exception {
-    testSqlQuery(pinotQuery, brokerUrl, pinotConnection, h2Queries, h2Connection, null);
-  }
-
-  /**
-   * Run equivalent Pinot SQL and H2 query and compare the results.
-   *
-   * @param pinotQuery Pinot sql query
-   * @param brokerUrl Pinot broker URL
-   * @param pinotConnection Pinot connection
-   * @param h2Queries H2 queries
-   * @param h2Connection H2 connection
-   * @param headers headers
-   * @throws Exception
-   */
-  static void testSqlQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
-      List<String> h2Queries, Connection h2Connection, @Nullable Map<String, String> headers)
+  static void testQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
+      String h2Query, Connection h2Connection, @Nullable Map<String, String> headers)
       throws Exception {
     // broker response
-    JsonNode pinotResponse = ClusterTest.postSqlQuery(pinotQuery, brokerUrl, headers);
+    JsonNode pinotResponse = ClusterTest.postQuery(pinotQuery, brokerUrl, headers);
     if (!pinotResponse.get("exceptions").isEmpty()) {
       throw new RuntimeException("Got Exceptions from Query Response: " + pinotResponse);
     }
@@ -816,14 +547,12 @@ public class ClusterIntegrationTestUtils {
     long pinotNumRecordsSelected = pinotResponse.get("numDocsScanned").asLong();
 
     // connection response
-    Request pinotClientRequest = new Request("sql", pinotQuery);
-    ResultSetGroup pinotResultSetGroup = pinotConnection.execute(pinotClientRequest);
+    ResultSetGroup pinotResultSetGroup = pinotConnection.execute(pinotQuery);
     org.apache.pinot.client.ResultSet resultTableResultSet = pinotResultSetGroup.getResultSet(0);
     int numRows = resultTableResultSet.getRowCount();
     int numColumns = resultTableResultSet.getColumnCount();
 
     // h2 response
-    String h2Query = h2Queries.get(0);
     Assert.assertNotNull(h2Connection);
     Statement h2statement = h2Connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
     h2statement.execute(h2Query);
@@ -846,7 +575,7 @@ public class ClusterIntegrationTestUtils {
           orderByColumns);
 
       comparePinotResultsWithExpectedValues(expectedValues, expectedOrderByValues, resultTableResultSet, orderByColumns,
-          pinotQuery, h2Queries, h2NumRows, pinotNumRecordsSelected);
+          pinotQuery, h2Query, h2NumRows, pinotNumRecordsSelected);
     } else {
       if (queryContext.getGroupByExpressions() == null) {
         // aggregation only
@@ -862,7 +591,7 @@ public class ClusterIntegrationTestUtils {
             if (pinotNumRecordsSelected != 0) {
               String failureMessage =
                   "No record selected in H2 but " + pinotNumRecordsSelected + " records selected in Pinot";
-              failure(pinotQuery, h2Queries, failureMessage);
+              failure(pinotQuery, h2Query, failureMessage);
             }
 
             // Skip further comparison
@@ -878,7 +607,7 @@ public class ClusterIntegrationTestUtils {
             String failureMessage =
                 "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
                     + ", got client value:" + connectionValue;
-            failure(pinotQuery, h2Queries, failureMessage);
+            failure(pinotQuery, h2Query, failureMessage);
           }
         }
       } else {
@@ -902,7 +631,7 @@ public class ClusterIntegrationTestUtils {
                   String failureMessage =
                       "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
                           + ", got client value:" + connectionValue;
-                  failure(pinotQuery, h2Queries, failureMessage);
+                  failure(pinotQuery, h2Query, failureMessage);
                 }
               }
               if (!h2ResultSet.next()) {
@@ -988,23 +717,22 @@ public class ClusterIntegrationTestUtils {
 
   private static void comparePinotResultsWithExpectedValues(Set<String> expectedValues,
       List<String> expectedOrderByValues, org.apache.pinot.client.ResultSet connectionResultSet,
-      Collection<String> orderByColumns, String pinotQuery, List<String> sqlQueries, int h2NumRows,
-      long pinotNumRecordsSelected)
-      throws IOException, SQLException {
+      Collection<String> orderByColumns, String pinotQuery, String h2Query, int h2NumRows,
+      long pinotNumRecordsSelected) {
 
     int pinotNumRows = connectionResultSet.getRowCount();
     // No record selected in H2
     if (h2NumRows == 0) {
       if (pinotNumRows != 0) {
         String failureMessage = "No record selected in H2 but number of records selected in Pinot: " + pinotNumRows;
-        failure(pinotQuery, sqlQueries, failureMessage);
+        failure(pinotQuery, h2Query, failureMessage);
         return;
       }
 
       if (pinotNumRecordsSelected != 0) {
         String failureMessage =
             "No selection result returned in Pinot but number of records selected: " + pinotNumRecordsSelected;
-        failure(pinotQuery, sqlQueries, failureMessage);
+        failure(pinotQuery, h2Query, failureMessage);
         return;
       }
 
@@ -1067,7 +795,7 @@ public class ClusterIntegrationTestUtils {
         if ((!isLimitSet || limit > h2NumRows) && !expectedValues.contains(actualValue)) {
           String failureMessage =
               "Selection result returned in Pinot but not in H2: " + actualValue + ", " + expectedValues;
-          failure(pinotQuery, sqlQueries, failureMessage);
+          failure(pinotQuery, h2Query, failureMessage);
           return;
         }
         if (!orderByColumns.isEmpty()) {
@@ -1076,7 +804,7 @@ public class ClusterIntegrationTestUtils {
             String failureMessage = String.format(
                 "Selection Order by result at row index: %d in Pinot: [ %s ] is different than result in H2: [ %s ].",
                 rowIndex, actualOrderByValue, expectedOrderByValues.get(rowIndex));
-            failure(pinotQuery, sqlQueries, failureMessage);
+            failure(pinotQuery, h2Query, failureMessage);
             return;
           }
         }
@@ -1094,21 +822,6 @@ public class ClusterIntegrationTestUtils {
       }
     }
     return value;
-  }
-
-  private static List<String> appendColumnsToSelectionRequests(Collection<String> columns, List<String> requests) {
-    final int firstColumnIndex = 7;
-    List<String> resultRequests = new ArrayList<>();
-    StringBuilder columnsString = new StringBuilder();
-    for (String column : columns) {
-      columnsString.append(column + ", ");
-    }
-
-    for (String request : requests) {
-      String resultRequest = "Select " + columnsString + request.trim().substring(firstColumnIndex);
-      resultRequests.add(resultRequest);
-    }
-    return resultRequests;
   }
 
   private static boolean fuzzyCompare(String h2Value, String brokerValue, String connectionValue) {
@@ -1133,17 +846,13 @@ public class ClusterIntegrationTestUtils {
   /**
    * Helper method to report failures.
    *
-   * @param pqlQuery Pinot PQL query
-   * @param sqlQueries H2 SQL queries
+   * @param pinotQuery Pinot query
+   * @param h2Query H2 query
    * @param failureMessage Failure message
    * @param e Exception
    */
-  private static void failure(String pqlQuery, @Nullable List<String> sqlQueries, String failureMessage,
-      @Nullable Exception e) {
-    failureMessage += "\nPQL: " + pqlQuery;
-    if (sqlQueries != null) {
-      failureMessage += "\nSQL: " + sqlQueries;
-    }
+  private static void failure(String pinotQuery, String h2Query, String failureMessage, @Nullable Exception e) {
+    failureMessage += "\nPinot query: " + pinotQuery + "\nH2 query: " + h2Query;
     if (e == null) {
       Assert.fail(failureMessage);
     } else {
@@ -1154,12 +863,12 @@ public class ClusterIntegrationTestUtils {
   /**
    * Helper method to report failures.
    *
-   * @param pqlQuery Pinot PQL query
-   * @param sqlQueries H2 SQL queries
+   * @param pinotQuery Pinot query
+   * @param h2Query H2 query
    * @param failureMessage Failure message
    */
-  private static void failure(String pqlQuery, @Nullable List<String> sqlQueries, String failureMessage) {
-    failure(pqlQuery, sqlQueries, failureMessage, null);
+  private static void failure(String pinotQuery, String h2Query, String failureMessage) {
+    failure(pinotQuery, h2Query, failureMessage, null);
   }
 
   /**

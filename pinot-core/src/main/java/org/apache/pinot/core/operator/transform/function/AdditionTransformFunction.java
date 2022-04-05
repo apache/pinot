@@ -89,11 +89,11 @@ public class AdditionTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_doubleSums == null) {
+    int length = projectionBlock.getNumDocs();
+    if (_doubleSums == null || _doubleSums.length < length) {
       _doubleSums = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
 
-    int length = projectionBlock.getNumDocs();
     if (_resultDataType == DataType.BIG_DECIMAL) {
       BigDecimal[] values = transformToBigDecimalValuesSV(projectionBlock);
       ArrayCopyUtils.copy(values, _doubleSums, length);
@@ -111,11 +111,11 @@ public class AdditionTransformFunction extends BaseTransformFunction {
 
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
-    if (_bigDecimalSums == null) {
+    int length = projectionBlock.getNumDocs();
+    if (_bigDecimalSums == null || _bigDecimalSums.length < length) {
       _bigDecimalSums = new BigDecimal[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
 
-    int length = projectionBlock.getNumDocs();
     if (_resultDataType == DataType.DOUBLE) {
       double[] values = transformToDoubleValuesSV(projectionBlock);
       ArrayCopyUtils.copy(values, _bigDecimalSums, length);

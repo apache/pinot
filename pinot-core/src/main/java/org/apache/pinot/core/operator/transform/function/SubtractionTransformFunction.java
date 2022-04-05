@@ -94,11 +94,11 @@ public class SubtractionTransformFunction extends BaseTransformFunction {
   @SuppressWarnings("Duplicates")
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_doubleDifferences == null) {
+    int length = projectionBlock.getNumDocs();
+    if (_doubleDifferences == null || _doubleDifferences.length < length) {
       _doubleDifferences = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
 
-    int length = projectionBlock.getNumDocs();
     if (_resultDataType == DataType.BIG_DECIMAL) {
       BigDecimal[] values = transformToBigDecimalValuesSV(projectionBlock);
       ArrayCopyUtils.copy(values, _doubleDifferences, length);
@@ -127,11 +127,11 @@ public class SubtractionTransformFunction extends BaseTransformFunction {
 
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
-    if (_bigDecimalDifferences == null) {
+    int length = projectionBlock.getNumDocs();
+    if (_bigDecimalDifferences == null || _bigDecimalDifferences.length < length) {
       _bigDecimalDifferences = new BigDecimal[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
 
-    int length = projectionBlock.getNumDocs();
     if (_resultDataType == DataType.DOUBLE) {
       double[] values = transformToDoubleValuesSV(projectionBlock);
       ArrayCopyUtils.copy(values, _bigDecimalDifferences, length);
