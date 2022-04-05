@@ -53,6 +53,11 @@ public class IndexingConfig extends BaseJsonConfig {
   private SegmentPartitionConfig _segmentPartitionConfig;
   private boolean _aggregateMetrics;
   private boolean _nullHandlingEnabled;
+
+  /**
+   * If `optimizeDictionaryForMetrics` enabled, dictionary is not created for the metric columns
+   * for which percent savings in storage exceed the `noDictionaryStorageSavedRatio`.
+   */
   private boolean _optimizeDictionaryForMetrics;
   private double _noDictionaryStorageSavedRatio;
 
