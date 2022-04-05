@@ -137,8 +137,8 @@ public class DictionaryOptimiserTest {
     segmentGenSpec.setSegmentVersion(SegmentVersion.v1);
     segmentGenSpec.setTableName(tableName);
     segmentGenSpec.setOutDir(outputDir.getAbsolutePath());
-    segmentGenSpec.setOptimizeDictionaryEnabled(true);
-    segmentGenSpec.setThresholdMinPercentDictionaryStorageSaved(0.1);
+    segmentGenSpec.setOptimizeDictionaryForMetrics(true);
+    segmentGenSpec.setNoDictionaryStorageSavedRatio(0.1);
     return segmentGenSpec;
   }
 

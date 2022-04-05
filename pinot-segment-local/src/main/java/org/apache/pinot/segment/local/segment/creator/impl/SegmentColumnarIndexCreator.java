@@ -261,10 +261,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       return false;
     }
 
-    // Do not create dictionary if size with dictionary is going to be larger than size without dictionary
+    // Do not create dictionary if index size with dictionary is going to be larger than index size without dictionary
     // This is done to reduce the cost of dictionary for high cardinality columns
     // Off by default and needs optimizeDictionaryEnabled to be set to true
-    if (config.isOptimizeDictionaryEnabled() && spec.getFieldType() == FieldType.METRIC
+    if (config.isOptimizeDictionaryForMetrics() && spec.getFieldType() == FieldType.METRIC
         && spec.isSingleValueField() && spec.getDataType().isFixedWidth()) {
       long dictionarySize = info.getDistinctValueCount() * spec.getDataType().size();
       long forwardIndexSize =
@@ -275,7 +275,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       double indexWithoutDictSize = info.getTotalNumberOfEntries() * spec.getDataType().size();
 
       double storageSaved = (indexWithDictSize - indexWithoutDictSize) / indexWithDictSize;
-      if (storageSaved > config.getThresholdMinPercentDictionaryStorageSaved()) {
+      if (storageSaved > config.getNoDictionaryStorageSavedRatio()) {
         return false;
       }
     }

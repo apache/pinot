@@ -65,7 +65,7 @@ public class SegmentGeneratorConfig implements Serializable {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGeneratorConfig.class);
-  public static final double DEFAULT_THRESHOLD_MIN_PERCENT_STORAGE_SAVED = 0.15d;
+  public static final double DEFAULT_THRESHOLD_MIN_PERCENT_STORAGE_SAVED = 1.0d;
 
   private TableConfig _tableConfig;
   private final Map<String, String> _customProperties = new HashMap<>();
@@ -108,8 +108,8 @@ public class SegmentGeneratorConfig implements Serializable {
   private boolean _skipTimeValueCheck = false;
   private boolean _nullHandlingEnabled = false;
   private boolean _failOnEmptySegment = false;
-  private boolean _optimizeDictionaryEnabled = false;
-  private double _thresholdMinPercentDictionaryStorageSaved = DEFAULT_THRESHOLD_MIN_PERCENT_STORAGE_SAVED;
+  private boolean _optimizeDictionaryForMetrics = false;
+  private double _noDictionaryStorageSavedRatio = DEFAULT_THRESHOLD_MIN_PERCENT_STORAGE_SAVED;
 
   // constructed from FieldConfig
   private Map<String, Map<String, String>> _columnProperties = new HashMap<>();
@@ -202,7 +202,8 @@ public class SegmentGeneratorConfig implements Serializable {
       _fstTypeForFSTIndex = tableConfig.getIndexingConfig().getFSTIndexType();
 
       _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
-      _optimizeDictionaryEnabled = indexingConfig.isOptimizeDictionaryEnabled();
+      _optimizeDictionaryForMetrics = indexingConfig.isOptimizeDictionaryForMetrics();
+      _noDictionaryStorageSavedRatio = indexingConfig.getNoDictionaryStorageSavedRatio();
     }
   }
 
@@ -710,20 +711,20 @@ public class SegmentGeneratorConfig implements Serializable {
     _nullHandlingEnabled = nullHandlingEnabled;
   }
 
-  public boolean isOptimizeDictionaryEnabled() {
-    return _optimizeDictionaryEnabled;
+  public boolean isOptimizeDictionaryForMetrics() {
+    return _optimizeDictionaryForMetrics;
   }
 
-  public void setOptimizeDictionaryEnabled(boolean optimizeDictionaryEnabled) {
-    _optimizeDictionaryEnabled = optimizeDictionaryEnabled;
+  public void setOptimizeDictionaryForMetrics(boolean optimizeDictionaryForMetrics) {
+    _optimizeDictionaryForMetrics = optimizeDictionaryForMetrics;
   }
 
-  public double getThresholdMinPercentDictionaryStorageSaved() {
-    return _thresholdMinPercentDictionaryStorageSaved;
+  public double getNoDictionaryStorageSavedRatio() {
+    return _noDictionaryStorageSavedRatio;
   }
 
-  public void setThresholdMinPercentDictionaryStorageSaved(double thresholdMinPercentDictionaryStorageSaved) {
-    _thresholdMinPercentDictionaryStorageSaved = thresholdMinPercentDictionaryStorageSaved;
+  public void setNoDictionaryStorageSavedRatio(double noDictionaryStorageSavedRatio) {
+    _noDictionaryStorageSavedRatio = noDictionaryStorageSavedRatio;
   }
 
   public boolean isFailOnEmptySegment() {
