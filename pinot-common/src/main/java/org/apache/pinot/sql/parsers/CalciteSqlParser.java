@@ -703,10 +703,6 @@ public class CalciteSqlParser {
         negated = ((SqlLikeOperator) functionNode.getOperator()).isNegated();
         canonicalName = SqlKind.LIKE.name();
         break;
-      case CONTAINS:
-        negated = ((SqlLikeOperator) functionNode.getOperator()).isNegated();
-        canonicalName = SqlKind.CONTAINS.name();
-        break;
       case OTHER:
       case OTHER_FUNCTION:
       case DOT:
