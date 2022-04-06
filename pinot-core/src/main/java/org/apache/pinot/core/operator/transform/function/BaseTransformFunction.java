@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
@@ -261,11 +260,11 @@ public abstract class BaseTransformFunction implements TransformFunction {
 
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
     if (_bigDecimalValuesSV == null) {
-      _bigDecimalValuesSV = new BigDecimal[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _bigDecimalValuesSV = new BigDecimal[length];
     }
 
-    int length = projectionBlock.getNumDocs();
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);

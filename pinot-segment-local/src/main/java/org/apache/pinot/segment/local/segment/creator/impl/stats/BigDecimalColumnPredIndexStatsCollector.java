@@ -32,6 +32,9 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 public class BigDecimalColumnPredIndexStatsCollector extends AbstractColumnStatisticsCollector {
   private final Set<BigDecimal> _values = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
 
+  private int _minLength = Integer.MAX_VALUE;
+  private int _maxLength = 0;
+  private int _maxRowLength = 0;
   private BigDecimal[] _sortedValues;
   private boolean _sealed = false;
 
@@ -43,22 +46,34 @@ public class BigDecimalColumnPredIndexStatsCollector extends AbstractColumnStati
   public void collect(Object entry) {
     if (entry instanceof Object[]) {
       Object[] values = (Object[]) entry;
+      int rowLength = 0;
       for (Object obj : values) {
         BigDecimal value = (BigDecimal) obj;
         _values.add(value);
+        int length = BigDecimalUtils.byteSize(value);
+        _minLength = Math.min(_minLength, length);
+        _maxLength = Math.max(_maxLength, length);
+        rowLength += length;
       }
       _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
+      _maxRowLength = Math.max(_maxRowLength, rowLength);
       updateTotalNumberOfEntries(values);
     } else {
       BigDecimal value;
+      int length;
       if (entry.getClass() == BigDecimal.class) {
         value = (BigDecimal) entry;
+        length = BigDecimalUtils.byteSize(value);
       } else {
         value = BigDecimalUtils.deserialize((byte[]) entry);
+        length = ((byte[]) entry).length;
       }
       addressSorted(value);
       if (_values.add(value)) {
         updatePartition(value);
+        _minLength = Math.min(_minLength, length);
+        _maxLength = Math.max(_maxLength, length);
+        _maxRowLength = _maxLength;
       }
       _totalNumberOfEntries++;
     }
@@ -86,6 +101,24 @@ public class BigDecimalColumnPredIndexStatsCollector extends AbstractColumnStati
       return _sortedValues;
     }
     throw new IllegalStateException("you must seal the collector first before asking for unique values set");
+  }
+
+  @Override
+  public int getLengthOfShortestElement() {
+    return _minLength;
+  }
+
+  @Override
+  public int getLengthOfLargestElement() {
+    if (_sealed) {
+      return _maxLength;
+    }
+    throw new IllegalStateException("you must seal the collector first before asking for longest value");
+  }
+
+  @Override
+  public int getMaxRowLengthInBytes() {
+    return _maxRowLength;
   }
 
   @Override

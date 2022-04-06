@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
 
@@ -69,7 +68,7 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_doubleValuesSV == null || _doubleValuesSV.length < length) {
-      _doubleValuesSV = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _doubleValuesSV = new double[length];
     }
 
     double[] values = _transformFunction.transformToDoubleValuesSV(projectionBlock);
@@ -81,7 +80,7 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_bigDecimalValuesSV == null || _bigDecimalValuesSV.length < length) {
-      _bigDecimalValuesSV = new BigDecimal[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _bigDecimalValuesSV = new BigDecimal[length];
     }
 
     BigDecimal[] values = _transformFunction.transformToBigDecimalValuesSV(projectionBlock);

@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
@@ -96,7 +95,7 @@ public class SubtractionTransformFunction extends BaseTransformFunction {
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_doubleDifferences == null || _doubleDifferences.length < length) {
-      _doubleDifferences = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _doubleDifferences = new double[length];
     }
 
     if (_resultDataType == DataType.BIG_DECIMAL) {
@@ -129,7 +128,7 @@ public class SubtractionTransformFunction extends BaseTransformFunction {
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_bigDecimalDifferences == null || _bigDecimalDifferences.length < length) {
-      _bigDecimalDifferences = new BigDecimal[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _bigDecimalDifferences = new BigDecimal[length];
     }
 
     if (_resultDataType == DataType.DOUBLE) {

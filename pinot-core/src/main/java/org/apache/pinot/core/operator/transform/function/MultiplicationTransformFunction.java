@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
@@ -92,7 +91,7 @@ public class MultiplicationTransformFunction extends BaseTransformFunction {
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_doubleProducts == null || _doubleProducts.length < length) {
-      _doubleProducts = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _doubleProducts = new double[length];
     }
 
     if (_resultDataType == DataType.BIG_DECIMAL) {
@@ -114,7 +113,7 @@ public class MultiplicationTransformFunction extends BaseTransformFunction {
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     if (_bigDecimalProducts == null || _bigDecimalProducts.length < length) {
-      _bigDecimalProducts = new BigDecimal[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _bigDecimalProducts = new BigDecimal[length];
     }
 
     if (_resultDataType == DataType.DOUBLE) {

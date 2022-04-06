@@ -58,12 +58,22 @@ public class AdditionTransformFunctionTest extends BaseTransformFunctionTest {
     testTransformFunction(transformFunction, expectedValues);
 
     expression = RequestContextUtils.getExpressionFromSQL(String
+        .format("add(%s,%s)", DOUBLE_SV_COLUMN, BIG_DECIMAL_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof AdditionTransformFunction);
+    BigDecimal[] expectedBigDecimalValues = new BigDecimal[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedBigDecimalValues[i] = BigDecimal.valueOf(_doubleSVValues[i]).add(_bigDecimalSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedBigDecimalValues);
+
+    expression = RequestContextUtils.getExpressionFromSQL(String
         .format("add(add(12,%s),%s,add(add(%s,%s),'12110.34556677889901122335678',%s),%s)", STRING_SV_COLUMN,
             DOUBLE_SV_COLUMN, FLOAT_SV_COLUMN, LONG_SV_COLUMN, INT_SV_COLUMN, BIG_DECIMAL_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof AdditionTransformFunction);
-    BigDecimal[] expectedBigDecimalValues = new BigDecimal[NUM_ROWS];
     BigDecimal val4 = new BigDecimal("12110.34556677889901122335678");
+    expectedBigDecimalValues = new BigDecimal[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       double val1 = 12d + Double.parseDouble(_stringSVValues[i]);
       double val2 = _doubleSVValues[i];
