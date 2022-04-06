@@ -31,7 +31,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.config.TlsConfig;
-import org.apache.pinot.core.auth.BasicAuthUtils;
+import org.apache.pinot.common.utils.AuthUtils;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
@@ -127,9 +127,9 @@ public class AccessControlTest {
   @Test
   public void testGrpcBasicAuth() {
     testBasicAuth(new GrpcRequesterIdentity(
-        ImmutableMap.of("authorization", BasicAuthUtils.toBasicAuthToken("admin123", "verysecret"))), true);
+        ImmutableMap.of("authorization", AuthUtils.toBase64AuthToken("admin123", "verysecret"))), true);
     testBasicAuth(new GrpcRequesterIdentity(
-        ImmutableMap.of("authorization", BasicAuthUtils.toBasicAuthToken("user456", "kindasecret"))), false);
+        ImmutableMap.of("authorization", AuthUtils.toBase64AuthToken("user456", "kindasecret"))), false);
 
     testBasicAuth(new GrpcRequesterIdentity(
         ImmutableMap.of("authorization", "Basic YWRtaW4xMjM6dmVyeXNlY3JldA")), true);
@@ -141,10 +141,10 @@ public class AccessControlTest {
   public void testHttpBasicAuth() {
     HttpHeaders headers = new ContainerRequest(null, null, null, null, new MapPropertiesDelegate());
     headers.getRequestHeaders()
-        .put("authorization", Arrays.asList(BasicAuthUtils.toBasicAuthToken("admin123", "verysecret")));
+        .put("authorization", Arrays.asList(AuthUtils.toBase64AuthToken("admin123", "verysecret")));
     testBasicAuth(new HttpRequesterIdentity(headers), true);
     headers.getRequestHeaders()
-        .put("authorization", Arrays.asList(BasicAuthUtils.toBasicAuthToken("user456", "kindasecret")));
+        .put("authorization", Arrays.asList(AuthUtils.toBase64AuthToken("user456", "kindasecret")));
     testBasicAuth(new HttpRequesterIdentity(headers), false);
     headers.getRequestHeaders().put("authorization", Arrays.asList("Basic YWRtaW4xMjM6dmVyeXNlY3JldA"));
     testBasicAuth(new HttpRequesterIdentity(headers), true);
