@@ -27,6 +27,7 @@ import org.apache.pinot.spi.trace.TraceState;
 final class TracedThread extends Thread implements TraceState {
 
   private long _traceId = Long.MIN_VALUE;
+  private int _counter;
   private final Deque<InvocationRecording> _stack = new ArrayDeque<>();
 
   public TracedThread(Runnable target) {
@@ -36,6 +37,16 @@ final class TracedThread extends Thread implements TraceState {
   @Override
   public void setTraceId(long traceId) {
     _traceId = traceId;
+  }
+
+  @Override
+  public int getAndIncrementCounter() {
+    return _counter++;
+  }
+
+  @Override
+  public void resetCounter() {
+    _counter = 0;
   }
 
   @Override

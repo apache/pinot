@@ -27,5 +27,9 @@ public interface TraceState {
 
   void setTraceId(long traceId);
 
+  int getAndIncrementCounter();
+
+  void resetCounter();
+
   Deque<InvocationRecording> getRecordings();
 }
