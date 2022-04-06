@@ -27,16 +27,17 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
-import org.apache.pinot.segment.spi.index.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.mockito.stubbing.Answer;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
 
 
 public class FilterPlanNodeTest {
+
   @Test
   public void testConsistentSnapshot()
       throws Exception {
@@ -55,10 +56,9 @@ public class FilterPlanNodeTest {
     bitmap.add(1);
     bitmap.add(2);
 
-        /* Continuously update the last value by moving it one doc id forward
-           Follow the order of MutableIndexSegmentImpl: first add the row, update the doc count
-           and then change the validDocId bitmap
-        */
+    // Continuously update the last value by moving it one doc id forward
+    // Follow the order of MutableIndexSegmentImpl: first add the row, update the doc count and then change the
+    // validDocId bitmap
     Thread updater = new Thread(() -> {
       for (int i = 3; i < 10_000_000; i++) {
         numDocs.incrementAndGet();
@@ -67,7 +67,7 @@ public class FilterPlanNodeTest {
     });
     updater.start();
 
-    // result should be invariant - always exactly 3 docs
+    // Result should be invariant - always exactly 3 docs
     for (int i = 0; i < 10_000; i++) {
       assertEquals(getNumberOfFilteredDocs(segment, ctx), 3);
     }
