@@ -20,7 +20,6 @@ package org.apache.pinot.segment.spi.creator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -213,14 +212,15 @@ public class SegmentGeneratorConfig implements Serializable {
       return schema;
     }
     List<FieldSpec> timestampColumnWithGranularityFieldSpecs = new ArrayList<>();
-    for (String columnName : timestampIndexConfigs.keySet()) {
+    for (Map.Entry<String, List<TimestampIndexGranularity>> entry : timestampIndexConfigs.entrySet()) {
+      String columnName = entry.getKey();
       Preconditions.checkState(schema.hasColumn(columnName),
           "Cannot create Timestamp index for column: %s because it is not in schema", columnName);
-      FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
-      for (TimestampIndexGranularity granularity : timestampIndexConfigs.get(columnName)) {
-        timestampColumnWithGranularityFieldSpecs.add(
-            TimestampIndexGranularity.getFieldSpecForTimestampColumnWithGranularity(fieldSpec, granularity));
-      }
+      entry.getValue().stream().filter(granularity -> !schema.hasColumn(
+          TimestampIndexGranularity.getColumnNameWithGranularity(columnName, granularity))).forEach(
+          granularity -> timestampColumnWithGranularityFieldSpecs.add(
+              TimestampIndexGranularity.getFieldSpecForTimestampColumnWithGranularity(
+                  schema.getFieldSpecFor(columnName), granularity)));
     }
     if (timestampColumnWithGranularityFieldSpecs.isEmpty()) {
       return schema;
@@ -296,7 +296,7 @@ public class SegmentGeneratorConfig implements Serializable {
   public static Map<String, List<TimestampIndexGranularity>> extractTimestampIndexConfigsFromTableConfig(
       TableConfig tableConfig) {
     if (tableConfig == null) {
-      return ImmutableMap.of();
+      return Collections.emptyMap();
     }
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     Map<String, List<TimestampIndexGranularity>> timestampIndexConfigs = new HashMap<>();

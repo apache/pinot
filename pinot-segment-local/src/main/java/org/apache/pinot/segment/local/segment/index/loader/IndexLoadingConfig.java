@@ -41,6 +41,7 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
@@ -155,10 +156,20 @@ public class IndexLoadingConfig {
     extractH3IndexConfigsFromTableConfig(tableConfig);
     _timestampIndexConfigs.putAll(SegmentGeneratorConfig.extractTimestampIndexConfigsFromTableConfig(tableConfig));
 
-    // Apply range index for all Timestamp column with granularities columns.
+    // Apply range index and transform functions for all Timestamp column with granularities columns.
     for (String timestampColumn : _timestampIndexConfigs.keySet()) {
       for (TimestampIndexGranularity granularity : _timestampIndexConfigs.get(timestampColumn)) {
+        // Apply range index
         _rangeIndexColumns.add(TimestampIndexGranularity.getColumnNameWithGranularity(timestampColumn, granularity));
+
+        // Apply transform functions
+        TransformConfig transformConfig =
+            new TransformConfig(TimestampIndexGranularity.getColumnNameWithGranularity(timestampColumn, granularity),
+                TimestampIndexGranularity.getTransformExpression(timestampColumn, granularity));
+        List<TransformConfig> transformConfigs = tableConfig.getIngestionConfig().getTransformConfigs();
+        if (!transformConfigs.contains(transformConfig)) {
+          transformConfigs.add(transformConfig);
+        }
       }
     }
 

@@ -40,16 +40,6 @@ public enum TimestampIndexGranularity {
     return "$" + column + "$" + granularity;
   }
 
-  public static String extractColumnNameFromColumnWithGranularity(String columnWithGranularity) {
-    int index = columnWithGranularity.indexOf('$', 1);
-    return index < 0 ? columnWithGranularity : columnWithGranularity.substring(1, index);
-  }
-
-  public static TimestampIndexGranularity extractGranularityFromColumnWithGranularity(String columnWithGranularity) {
-    return TimestampIndexGranularity.valueOf(
-        columnWithGranularity.substring(columnWithGranularity.indexOf('$', 1) + 1));
-  }
-
   public static boolean isValidTimeColumnWithGranularityName(String columnName) {
     if (columnName.charAt(0) != '$') {
       return false;
@@ -103,5 +93,17 @@ public enum TimestampIndexGranularity {
     }
     // DIMENSION, METRIC, TIMESTAMP types are not supported
     return null;
+  }
+
+  /**
+   * Generate the dateTrunc expression to convert the base time column to the time column with granularity value
+   * E.g. $ts$DAY -> dateTrunc('DAY', ts)
+   *
+   * @param timeColumn
+   * @param granularity
+   * @return Time conversion expression
+   */
+  public static String getTransformExpression(String timeColumn, TimestampIndexGranularity granularity) {
+    return "dateTrunc(\'" + granularity + "\', " + timeColumn + ")";
   }
 }

@@ -92,8 +92,6 @@ public class TableCache implements PinotConfigProvider {
   // Key is schema name, value is schema info
   private final Map<String, SchemaInfo> _schemaInfoMap = new ConcurrentHashMap<>();
 
-  private final Map<String, Set<String>> _timestampIndexColumnsMap = new ConcurrentHashMap<>();
-
   public TableCache(ZkHelixPropertyStore<ZNRecord> propertyStore, boolean caseInsensitive) {
     _propertyStore = propertyStore;
     _caseInsensitive = caseInsensitive;
@@ -178,6 +176,15 @@ public class TableCache implements PinotConfigProvider {
   }
 
   /**
+   * Returns the timestamp index columns for the given table, or {@code null} if table does not exist.
+   */
+  @Nullable
+  public Set<String> getTimestampIndexColumns(String tableNameWithType) {
+    TableConfigInfo tableConfigInfo = _tableConfigInfoMap.get(tableNameWithType);
+    return tableConfigInfo != null ? tableConfigInfo._timestampIndexColumns : null;
+  }
+
+  /**
    * Returns the table config for the given table, or {@code null} if it does not exist.
    */
   @Nullable
@@ -185,15 +192,6 @@ public class TableCache implements PinotConfigProvider {
   public TableConfig getTableConfig(String tableNameWithType) {
     TableConfigInfo tableConfigInfo = _tableConfigInfoMap.get(tableNameWithType);
     return tableConfigInfo != null ? tableConfigInfo._tableConfig : null;
-  }
-
-  /**
-   * Returns the timestamp index columns for the given table, or {@code null} if it does not exist.
-   */
-  @Nullable
-  public Set<String> getTimestampIndexColumns(String tableNameWithType) {
-    Set<String> timestampIndexColumns = _timestampIndexColumnsMap.get(tableNameWithType);
-    return timestampIndexColumns != null ? timestampIndexColumns : null;
   }
 
   @Override
@@ -251,8 +249,6 @@ public class TableCache implements PinotConfigProvider {
     TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);
     String tableNameWithType = tableConfig.getTableName();
     _tableConfigInfoMap.put(tableNameWithType, new TableConfigInfo(tableConfig));
-    _timestampIndexColumnsMap.put(tableNameWithType,
-        TimestampIndexGranularity.extractTimestampIndexGranularityColumnNames(tableConfig));
 
     String schemaName = tableConfig.getValidationConfig().getSchemaName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
@@ -270,6 +266,23 @@ public class TableCache implements PinotConfigProvider {
       _tableNameMap.put(tableNameWithType, tableNameWithType);
       _tableNameMap.put(rawTableName, rawTableName);
     }
+    addOverrideHintsColumns(tableConfig, schemaName, _caseInsensitive);
+  }
+
+  private void addOverrideHintsColumns(TableConfig tableConfig, String schemaName, boolean caseInsensitive) {
+    SchemaInfo schemaInfo =
+        (schemaName == null) ? _schemaInfoMap.get(TableNameBuilder.extractRawTableName(tableConfig.getTableName()))
+            : _schemaInfoMap.get(schemaName);
+    if (schemaInfo == null) {
+      return;
+    }
+    TimestampIndexGranularity.extractTimestampIndexGranularityColumnNames(tableConfig).forEach(column -> {
+      if (caseInsensitive) {
+        schemaInfo._columnNameMap.put(column.toLowerCase(), column);
+      } else {
+        schemaInfo._columnNameMap.put(column, column);
+      }
+    });
   }
 
   private void removeTableConfig(String path) {
@@ -278,7 +291,6 @@ public class TableCache implements PinotConfigProvider {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     _tableConfigInfoMap.remove(tableNameWithType);
     removeSchemaName(tableNameWithType);
-    _timestampIndexColumnsMap.remove(tableNameWithType);
     if (_caseInsensitive) {
       _tableNameMap.remove(tableNameWithType.toLowerCase());
       String lowerCaseRawTableName = rawTableName.toLowerCase();
@@ -500,6 +512,8 @@ public class TableCache implements PinotConfigProvider {
   private static class TableConfigInfo {
     final TableConfig _tableConfig;
     final Map<Expression, Expression> _expressionOverrideMap;
+    // All the timestamp with granularity column names
+    final Set<String> _timestampIndexColumns;
 
     private TableConfigInfo(TableConfig tableConfig) {
       _tableConfig = tableConfig;
@@ -528,6 +542,7 @@ public class TableCache implements PinotConfigProvider {
       } else {
         _expressionOverrideMap = null;
       }
+      _timestampIndexColumns = TimestampIndexGranularity.extractTimestampIndexGranularityColumnNames(tableConfig);
     }
   }
 

@@ -38,10 +38,6 @@ public class TimestampIndexGranularityTest {
     String timeColumnWithGranularity = "$testTs$DAY";
     Assert.assertEquals(TimestampIndexGranularity.getColumnNameWithGranularity(timeColumn, granularity),
         timeColumnWithGranularity);
-    Assert.assertEquals(
-        TimestampIndexGranularity.extractColumnNameFromColumnWithGranularity(timeColumnWithGranularity), timeColumn);
-    Assert.assertEquals(
-        TimestampIndexGranularity.extractGranularityFromColumnWithGranularity(timeColumnWithGranularity), granularity);
     Assert.assertTrue(TimestampIndexGranularity.isValidTimeColumnWithGranularityName(timeColumnWithGranularity));
     Assert.assertFalse(TimestampIndexGranularity.isValidTimeColumnWithGranularityName(timeColumn));
     Assert.assertFalse(TimestampIndexGranularity.isValidTimeColumnWithGranularityName("$docId"));
@@ -75,5 +71,15 @@ public class TimestampIndexGranularityTest {
     Set<String> timestampIndexGranularityColumnNames =
         TimestampIndexGranularity.extractTimestampIndexGranularityColumnNames(tableConfig);
     Assert.assertEquals(ImmutableSet.of("$f1$DAY", "$f2$WEEK", "$f3$MONTH"), timestampIndexGranularityColumnNames);
+  }
+
+  @Test
+  public void testGetTransformExpression() {
+    Assert.assertEquals(TimestampIndexGranularity.getTransformExpression("ts", TimestampIndexGranularity.DAY),
+        "dateTrunc('DAY', ts)");
+    Assert.assertEquals(TimestampIndexGranularity.getTransformExpression("ts", TimestampIndexGranularity.WEEK),
+        "dateTrunc('WEEK', ts)");
+    Assert.assertEquals(TimestampIndexGranularity.getTransformExpression("ts", TimestampIndexGranularity.MONTH),
+        "dateTrunc('MONTH', ts)");
   }
 }

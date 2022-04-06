@@ -575,7 +575,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     Set<String> timestampIndexColumns = _tableCache.getTimestampIndexColumns(tableConfig.getTableName());
-    if (timestampIndexColumns.isEmpty()) {
+    if (CollectionUtils.isEmpty(timestampIndexColumns)) {
       return;
     }
     for (Expression expression : pinotQuery.getSelectList()) {
