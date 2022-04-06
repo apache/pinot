@@ -24,10 +24,10 @@ import java.util.List;
 
 public abstract class AbstractStageNode implements StageNode {
 
-  protected final String _stageId;
+  protected final int _stageId;
   protected final List<StageNode> _inputs;
 
-  public AbstractStageNode(String stageId) {
+  public AbstractStageNode(int stageId) {
     _stageId = stageId;
     _inputs = new ArrayList<>();
   }
@@ -43,7 +43,7 @@ public abstract class AbstractStageNode implements StageNode {
   }
 
   @Override
-  public String getStageId() {
+  public int getStageId() {
     return _stageId;
   }
 }

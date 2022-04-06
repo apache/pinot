@@ -55,7 +55,7 @@ public class StageMetadata implements Serializable {
 
   public void attach(StageNode stageNode) {
     if (stageNode instanceof TableScanNode) {
-      _scannedTables.add(((TableScanNode) stageNode).getTableName().get(0));
+      _scannedTables.add(((TableScanNode) stageNode).getTableName());
     }
   }
 

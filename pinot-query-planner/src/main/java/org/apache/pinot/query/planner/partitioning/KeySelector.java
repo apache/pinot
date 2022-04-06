@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.query.planner.partitioning;
 
+import java.io.Serializable;
+
+
 /**
  * The {@code KeySelector} provides a partitioning function to encode a specific input data type into a key.
  *
@@ -25,7 +28,7 @@ package org.apache.pinot.query.planner.partitioning;
  *
  * <p>Key selector should always produce the same selection hash key when the same input is provided.
  */
-public interface KeySelector<IN, OUT> {
+public interface KeySelector<IN, OUT> extends Serializable {
 
   /**
    * Extract the key out of an input data construct.
