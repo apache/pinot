@@ -19,13 +19,12 @@
 package org.apache.pinot.plugin.stream.pulsar;
 
 import com.google.common.base.Preconditions;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pulsar.client.api.MessageId;
+import org.apache.pulsar.client.api.SubscriptionInitialPosition;
 
 
 /**
@@ -40,6 +39,7 @@ public class PulsarConfig {
   private String _subscriberId;
   private String _bootstrapServers;
   private MessageId _initialMessageId;
+  private SubscriptionInitialPosition _subscriptionInitialPosition;
 
   public PulsarConfig(StreamConfig streamConfig, String subscriberId) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
@@ -52,17 +52,8 @@ public class PulsarConfig {
 
     OffsetCriteria offsetCriteria = streamConfig.getOffsetCriteria();
 
-    if (offsetCriteria.isSmallest()) {
-      _initialMessageId = MessageId.earliest;
-    } else if (offsetCriteria.isLargest()) {
-      _initialMessageId = MessageId.latest;
-    } else if (offsetCriteria.isCustom()) {
-      try {
-        _initialMessageId = MessageId.fromByteArray(offsetCriteria.getOffsetString().getBytes(StandardCharsets.UTF_8));
-      } catch (IOException e) {
-        throw new RuntimeException("Invalid offset string found: " + offsetCriteria.getOffsetString());
-      }
-    }
+    _subscriptionInitialPosition = PulsarUtils.offsetCriteriaToSubscription(offsetCriteria);
+    _initialMessageId = PulsarUtils.offsetCriteriaToMessageId(offsetCriteria);
   }
 
   public String getPulsarTopicName() {
@@ -79,5 +70,9 @@ public class PulsarConfig {
 
   public MessageId getInitialMessageId() {
     return _initialMessageId;
+  }
+
+  public SubscriptionInitialPosition getInitialSubscriberPosition() {
+   return _subscriptionInitialPosition;
   }
 }
