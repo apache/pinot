@@ -34,10 +34,10 @@ import org.apache.pinot.query.planner.nodes.StageNode;
  * </ul>
  */
 public class QueryPlan {
-  private Map<String, StageNode> _queryStageMap;
-  private Map<String, StageMetadata> _stageMetadataMap;
+  private Map<Integer, StageNode> _queryStageMap;
+  private Map<Integer, StageMetadata> _stageMetadataMap;
 
-  public QueryPlan(Map<String, StageNode> queryStageMap, Map<String, StageMetadata> stageMetadataMap) {
+  public QueryPlan(Map<Integer, StageNode> queryStageMap, Map<Integer, StageMetadata> stageMetadataMap) {
     _queryStageMap = queryStageMap;
     _stageMetadataMap = stageMetadataMap;
   }
@@ -46,7 +46,7 @@ public class QueryPlan {
    * Get the map between stageID and the stage plan root node.
    * @return stage plan map.
    */
-  public Map<String, StageNode> getQueryStageMap() {
+  public Map<Integer, StageNode> getQueryStageMap() {
     return _queryStageMap;
   }
 
@@ -54,7 +54,7 @@ public class QueryPlan {
    * Get the stage metadata information.
    * @return stage metadata info.
    */
-  public Map<String, StageMetadata> getStageMetadataMap() {
+  public Map<Integer, StageMetadata> getStageMetadataMap() {
     return _stageMetadataMap;
   }
 }

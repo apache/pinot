@@ -18,14 +18,26 @@
  */
 package org.apache.pinot.query.planner;
 
+import com.google.common.base.Preconditions;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.logical.LogicalCalc;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalTableScan;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeField;
+import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexInputRef;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.query.planner.nodes.CalcNode;
 import org.apache.pinot.query.planner.nodes.JoinNode;
 import org.apache.pinot.query.planner.nodes.StageNode;
 import org.apache.pinot.query.planner.nodes.TableScanNode;
+import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
+import org.apache.pinot.query.planner.partitioning.KeySelector;
 
 
 /**
@@ -45,7 +57,7 @@ public final class RelToStageConverter {
    * @param node relational node
    * @return stage node.
    */
-  public static StageNode toStageNode(RelNode node, String currentStageId) {
+  public static StageNode toStageNode(RelNode node, int currentStageId) {
     if (node instanceof LogicalCalc) {
       return convertLogicalCal((LogicalCalc) node, currentStageId);
     } else if (node instanceof LogicalTableScan) {
@@ -57,15 +69,34 @@ public final class RelToStageConverter {
     }
   }
 
-  private static StageNode convertLogicalTableScan(LogicalTableScan node, String currentStageId) {
-    return new TableScanNode(node, currentStageId);
+  private static StageNode convertLogicalTableScan(LogicalTableScan node, int currentStageId) {
+    String tableName = node.getTable().getQualifiedName().get(0);
+    List<String> columnNames = node.getRowType().getFieldList().stream()
+        .map(RelDataTypeField::getName).collect(Collectors.toList());
+    return new TableScanNode(currentStageId, tableName, columnNames);
   }
 
-  private static StageNode convertLogicalCal(LogicalCalc node, String currentStageId) {
-    return new CalcNode(node, currentStageId);
+  private static StageNode convertLogicalCal(LogicalCalc node, int currentStageId) {
+    // TODO: support actual calcNode
+    return new CalcNode(currentStageId, node.getDigest());
   }
 
-  private static StageNode convertLogicalJoin(LogicalJoin node, String currentStageId) {
-    return new JoinNode(node, currentStageId);
+  private static StageNode convertLogicalJoin(LogicalJoin node, int currentStageId) {
+    JoinRelType joinType = node.getJoinType();
+    RexCall joinCondition = (RexCall) node.getCondition();
+    Preconditions.checkState(
+        joinCondition.getOperator().getKind().equals(SqlKind.EQUALS) && joinCondition.getOperands().size() == 2,
+        "only equality JOIN is supported");
+    Preconditions.checkState(joinCondition.getOperands().get(0) instanceof RexInputRef, "only reference supported");
+    Preconditions.checkState(joinCondition.getOperands().get(1) instanceof RexInputRef, "only reference supported");
+    RelDataType leftRowType = node.getLeft().getRowType();
+    RelDataType rightRowType = node.getRight().getRowType();
+    int leftOperandIndex = ((RexInputRef) joinCondition.getOperands().get(0)).getIndex();
+    int rightOperandIndex = ((RexInputRef) joinCondition.getOperands().get(1)).getIndex();
+    KeySelector<Object[], Object> leftFieldSelectionKeySelector = new FieldSelectionKeySelector(leftOperandIndex);
+    KeySelector<Object[], Object> rightFieldSelectionKeySelector =
+          new FieldSelectionKeySelector(rightOperandIndex - leftRowType.getFieldNames().size());
+    return new JoinNode(currentStageId, joinType, Collections.singletonList(new JoinNode.JoinClause(
+        leftFieldSelectionKeySelector, rightFieldSelectionKeySelector)));
   }
 }

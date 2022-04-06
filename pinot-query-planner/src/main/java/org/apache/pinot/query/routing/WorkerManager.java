@@ -27,6 +27,7 @@ import java.util.Map;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -56,14 +57,14 @@ public class WorkerManager {
     _routingManager = routingManager;
   }
 
-  public void assignWorkerToStage(String stageId, StageMetadata stageMetadata) {
+  public void assignWorkerToStage(int stageId, StageMetadata stageMetadata) {
     List<String> scannedTables = stageMetadata.getScannedTables();
     if (scannedTables.size() == 1) { // table scan stage, need to attach server as well as segment info.
       RoutingTable routingTable = getRoutingTable(scannedTables.get(0));
       Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = routingTable.getServerInstanceToSegmentsMap();
       stageMetadata.setServerInstances(new ArrayList<>(serverInstanceToSegmentsMap.keySet()));
       stageMetadata.setServerInstanceToSegmentsMap(new HashMap<>(serverInstanceToSegmentsMap));
-    } else if (stageId.equalsIgnoreCase("ROOT")) {
+    } else if (PlannerUtils.isRootStage(stageId)) {
       // ROOT stage doesn't have a QueryServer as it is strictly only reducing results.
       // here we simply assign the worker instance with identical server/mailbox port number.
       stageMetadata.setServerInstances(Lists.newArrayList(new WorkerInstance(_hostName, _port, _port)));
