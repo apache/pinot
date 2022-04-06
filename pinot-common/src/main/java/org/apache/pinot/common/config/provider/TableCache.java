@@ -65,8 +65,10 @@ public class TableCache implements PinotConfigProvider {
   private static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
   private static final String SCHEMA_PARENT_PATH = "/SCHEMAS";
   private static final String SCHEMA_PATH_PREFIX = "/SCHEMAS/";
-  private static final String LOWER_CASE_OFFLINE_TABLE_SUFFIX = "_offline";
-  private static final String LOWER_CASE_REALTIME_TABLE_SUFFIX = "_realtime";
+  private static final String OFFLINE_TABLE_SUFFIX = "_OFFLINE";
+  private static final String REALTIME_TABLE_SUFFIX = "_REALTIME";
+  private static final String LOWER_CASE_OFFLINE_TABLE_SUFFIX = OFFLINE_TABLE_SUFFIX.toLowerCase();
+  private static final String LOWER_CASE_REALTIME_TABLE_SUFFIX = REALTIME_TABLE_SUFFIX.toLowerCase();
 
   // NOTE: No need to use concurrent set because it is always accessed within the ZK change listener lock
   private final Set<TableConfigChangeListener> _tableConfigChangeListeners = new HashSet<>();
@@ -145,8 +147,16 @@ public class TableCache implements PinotConfigProvider {
   }
 
   /**
-   * Returns a map from lower case column name to actual column name for the given table, or {@code null} if the table
-   * schema does not exist.
+   * Returns a map from table name to actual table name. For case-insensitive case, the keys of the map are in lower
+   * case.
+   */
+  public Map<String, String> getTableNameMap() {
+    return _tableNameMap;
+  }
+
+  /**
+   * Returns a map from column name to actual column name for the given table, or {@code null} if the table schema does
+   * not exist. For case-insensitive case, the keys of the map are in lower case.
    */
   @Nullable
   public Map<String, String> getColumnNameMap(String rawTableName) {
@@ -269,11 +279,11 @@ public class TableCache implements PinotConfigProvider {
     } else {
       _tableNameMap.remove(tableNameWithType);
       if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
-        if (!_tableNameMap.containsKey(TableNameBuilder.REALTIME.tableNameWithType(rawTableName))) {
+        if (!_tableNameMap.containsKey(rawTableName + REALTIME_TABLE_SUFFIX)) {
           _tableNameMap.remove(rawTableName);
         }
       } else {
-        if (!_tableNameMap.containsKey(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName))) {
+        if (!_tableNameMap.containsKey(rawTableName + OFFLINE_TABLE_SUFFIX)) {
           _tableNameMap.remove(rawTableName);
         }
       }
