@@ -37,6 +37,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
@@ -56,6 +57,7 @@ import org.apache.pinot.segment.local.utils.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.IdMap;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
+import org.apache.pinot.segment.local.utils.ingestionaggregation.IngestionAggregator;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -128,6 +130,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private final IdMap<FixedIntArray> _recordIdMap;
   private boolean _aggregateMetrics;
+  private final IngestionAggregator _ingestionAggregator;
 
   private volatile int _numDocsIndexed = 0;
   private final int _numKeyColumns;
@@ -197,6 +200,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _partitionFunction = config.getPartitionFunction();
     _nullHandlingEnabled = config.isNullHandlingEnabled();
     _aggregateMetrics = config.aggregateMetrics();
+    _ingestionAggregator = IngestionAggregator.fromRealtimeSegmentConfig(config);
 
     Collection<FieldSpec> allFieldSpecs = _schema.getAllFieldSpecs();
     List<FieldSpec> physicalFieldSpecs = new ArrayList<>(allFieldSpecs.size());
@@ -356,7 +360,8 @@ public class MutableSegmentImpl implements MutableSegment {
     // init upsert-related data structure
     _upsertMode = config.getUpsertMode();
     if (isUpsertEnabled()) {
-      Preconditions.checkState(!_aggregateMetrics, "Metrics aggregation and upsert cannot be enabled together");
+      Preconditions.checkState(!isAggregateMetricsEnabled(),
+          "Metrics aggregation and upsert cannot be enabled together");
       _partitionUpsertMetadataManager = config.getPartitionUpsertMetadataManager();
       _validDocIds = new ThreadSafeMutableRoaringBitmap();
       String upsertComparisonColumn = config.getUpsertComparisonColumn();
@@ -390,7 +395,8 @@ public class MutableSegmentImpl implements MutableSegment {
       // of noDict on STRING/BYTES. Without metrics aggregation, memory pressure increases.
       // So to continue aggregating metrics for such cases, we will create dictionary even
       // if the column is part of noDictionary set from table config
-      if (fieldSpec instanceof DimensionFieldSpec && _aggregateMetrics && (dataType == STRING || dataType == BYTES)) {
+      if (fieldSpec instanceof DimensionFieldSpec && isAggregateMetricsEnabled() && (dataType == STRING
+          || dataType == BYTES)) {
         _logger.info(
             "Aggregate metrics is enabled. Will create dictionary in consuming segment for column {} of type {}",
             column, dataType.toString());
@@ -478,7 +484,7 @@ public class MutableSegmentImpl implements MutableSegment {
         // Update number of documents indexed at last to make the latest row queryable
         canTakeMore = numDocsIndexed++ < _capacity;
       } else {
-        assert _aggregateMetrics;
+        assert isAggregateMetricsEnabled();
         aggregateMetrics(row, docId);
         canTakeMore = true;
       }
@@ -506,13 +512,26 @@ public class MutableSegmentImpl implements MutableSegment {
     return new PartitionUpsertMetadataManager.RecordInfo(primaryKey, docId, (Comparable) upsertComparisonValue);
   }
 
+  /**
+   *
+   * This helper function checks if the value is null, which is only applicable if the column isn't "*",
+   * which is a side effect of metrics aggregation "COUNT" operation.
+   *
+   * @param column
+   * @param value
+   * @return is the value null if the column is an actual data column (not "*").
+   */
+  private boolean isColumnValueNull(String column, Object value) {
+    return !column.equals("*") && value == null;
+  }
+
   private void updateDictionary(GenericRow row) {
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
-      String column = entry.getKey();
+      String column = _ingestionAggregator.getMetricName(entry.getKey());
       IndexContainer indexContainer = entry.getValue();
       Object value = row.getValue(column);
       MutableDictionary dictionary = indexContainer._dictionary;
-      if (value == null) {
+      if (isColumnValueNull(column, value)) {
         recordIndexingError("DICTIONARY");
       } else if (dictionary != null) {
         if (indexContainer._fieldSpec.isSingleValueField()) {
@@ -530,7 +549,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private void addNewRow(int docId, GenericRow row) {
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
-      String column = entry.getKey();
+      String column = _ingestionAggregator.getMetricName(entry.getKey());
       IndexContainer indexContainer = entry.getValue();
 
       // Update the null value vector even if a null value is somehow produced
@@ -539,7 +558,7 @@ public class MutableSegmentImpl implements MutableSegment {
       }
 
       Object value = row.getValue(column);
-      if (value == null) {
+      if (isColumnValueNull(column, value)) {
         // the value should not be null unless something is broken upstream but this will lead to inappropriate reuse
         // of the dictionary id if this somehow happens. An NPE here can corrupt indexes leading to incorrect query
         // results, hence the extra care. A metric will already have been emitted when trying to update the dictionary.
@@ -586,6 +605,12 @@ public class MutableSegmentImpl implements MutableSegment {
 
           // Update forward index
           DataType dataType = fieldSpec.getDataType();
+          ValueAggregator valueAggregator = _ingestionAggregator.getAggregator(entry.getKey());
+          if (valueAggregator != null) {
+            dataType = valueAggregator.getAggregatedValueType();
+            value = valueAggregator.getInitialAggregatedValue(value);
+          }
+
           switch (dataType.getStoredType()) {
             case INT:
               forwardIndex.setInt(docId, (Integer) value);
@@ -612,7 +637,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
           // Update min/max value from raw value
           // NOTE: Skip updating min/max value for aggregated metrics because the value will change over time.
-          if (!_aggregateMetrics || fieldSpec.getFieldType() != FieldSpec.FieldType.METRIC) {
+          if (!isAggregateMetricsEnabled() || fieldSpec.getFieldType() != FieldSpec.FieldType.METRIC) {
             Comparable comparable;
             if (dataType == BYTES) {
               comparable = new ByteArray((byte[]) value);
@@ -706,26 +731,43 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private void aggregateMetrics(GenericRow row, int docId) {
     for (MetricFieldSpec metricFieldSpec : _physicalMetricFieldSpecs) {
-      String column = metricFieldSpec.getName();
+      String column = _ingestionAggregator.getMetricName(metricFieldSpec.getName());
       Object value = row.getValue(column);
-      MutableForwardIndex forwardIndex = _indexContainerMap.get(column)._forwardIndex;
+      MutableForwardIndex forwardIndex = _indexContainerMap.get(metricFieldSpec.getName())._forwardIndex;
       DataType dataType = metricFieldSpec.getDataType();
-      switch (dataType) {
-        case INT:
-          forwardIndex.setInt(docId, (Integer) value + forwardIndex.getInt(docId));
-          break;
-        case LONG:
-          forwardIndex.setLong(docId, (Long) value + forwardIndex.getLong(docId));
-          break;
-        case FLOAT:
-          forwardIndex.setFloat(docId, (Float) value + forwardIndex.getFloat(docId));
-          break;
-        case DOUBLE:
-          forwardIndex.setDouble(docId, (Double) value + forwardIndex.getDouble(docId));
-          break;
-        default:
-          throw new UnsupportedOperationException(
-              "Unsupported data type: " + dataType + " for aggregate metric column: " + column);
+      ValueAggregator valueAggregator = _ingestionAggregator.getAggregator(metricFieldSpec.getName());
+
+      if (valueAggregator != null) {
+        switch (valueAggregator.getAggregatedValueType()) {
+          case DOUBLE:
+            forwardIndex.setDouble(docId, (Double) valueAggregator.applyRawValue(forwardIndex.getDouble(docId), value));
+            break;
+          case LONG:
+            forwardIndex.setLong(docId, (Long) valueAggregator.applyRawValue(forwardIndex.getLong(docId), value));
+            break;
+          default:
+            throw new UnsupportedOperationException(
+                String.format("Aggregation type %s of %s not supported", valueAggregator.getAggregatedValueType(),
+                    valueAggregator.getAggregationType()));
+        }
+      } else {
+        switch (dataType) {
+          case INT:
+            forwardIndex.setInt(docId, (Integer) value + forwardIndex.getInt(docId));
+            break;
+          case LONG:
+            forwardIndex.setLong(docId, (Long) value + forwardIndex.getLong(docId));
+            break;
+          case FLOAT:
+            forwardIndex.setFloat(docId, (Float) value + forwardIndex.getFloat(docId));
+            break;
+          case DOUBLE:
+            forwardIndex.setDouble(docId, (Double) value + forwardIndex.getDouble(docId));
+            break;
+          default:
+            throw new UnsupportedOperationException(
+                "Unsupported data type: " + dataType + " for aggregate metric column: " + column);
+        }
       }
     }
   }
@@ -801,7 +843,7 @@ public class MutableSegmentImpl implements MutableSegment {
       String column = entry.getKey();
       IndexContainer indexContainer = entry.getValue();
       Object value = getValue(docId, indexContainer._forwardIndex, indexContainer._dictionary,
-          indexContainer._numValuesInfo._maxNumValuesPerMVEntry);
+          indexContainer._numValuesInfo._maxNumValuesPerMVEntry, _ingestionAggregator.getAggregator(column));
       if (_nullHandlingEnabled && indexContainer._nullValueVector.isNull(docId)) {
         reuse.putDefaultNullValue(column, value);
       } else {
@@ -815,7 +857,7 @@ public class MutableSegmentImpl implements MutableSegment {
    * Helper method to read the value for the given document id.
    */
   private static Object getValue(int docId, MutableForwardIndex forwardIndex, @Nullable MutableDictionary dictionary,
-      int maxNumMultiValues) {
+      int maxNumMultiValues, @Nullable ValueAggregator valueAggregator) {
     if (dictionary != null) {
       // Dictionary based
       if (forwardIndex.isSingleValue()) {
@@ -969,7 +1011,7 @@ public class MutableSegmentImpl implements MutableSegment {
    *
    * */
   private int getOrCreateDocId() {
-    if (!_aggregateMetrics) {
+    if (!isAggregateMetricsEnabled()) {
       return _numDocsIndexed;
     }
 
@@ -1005,7 +1047,7 @@ public class MutableSegmentImpl implements MutableSegment {
    */
   private IdMap<FixedIntArray> enableMetricsAggregationIfPossible(RealtimeSegmentConfig config,
       Set<String> noDictionaryColumns) {
-    if (!_aggregateMetrics) {
+    if (!isAggregateMetricsEnabled()) {
       _logger.info("Metrics aggregation is disabled.");
       return null;
     }
@@ -1018,6 +1060,7 @@ public class MutableSegmentImpl implements MutableSegment {
         _logger.warn("Metrics aggregation cannot be turned ON in presence of dictionary encoded metrics, eg: {}",
             metric);
         _aggregateMetrics = false;
+        _ingestionAggregator.setDisabled();
         break;
       }
 
@@ -1025,6 +1068,7 @@ public class MutableSegmentImpl implements MutableSegment {
         _logger.warn("Metrics aggregation cannot be turned ON in presence of multi-value metric columns, eg: {}",
             metric);
         _aggregateMetrics = false;
+        _ingestionAggregator.setDisabled();
         break;
       }
     }
@@ -1037,6 +1081,7 @@ public class MutableSegmentImpl implements MutableSegment {
         _logger.warn("Metrics aggregation cannot be turned ON in presence of no-dictionary dimensions, eg: {}",
             dimension);
         _aggregateMetrics = false;
+        _ingestionAggregator.setDisabled();
         break;
       }
 
@@ -1044,6 +1089,7 @@ public class MutableSegmentImpl implements MutableSegment {
         _logger.warn("Metrics aggregation cannot be turned ON in presence of multi-value dimension columns, eg: {}",
             dimension);
         _aggregateMetrics = false;
+        _ingestionAggregator.setDisabled();
         break;
       }
     }
@@ -1055,11 +1101,12 @@ public class MutableSegmentImpl implements MutableSegment {
             "Metrics aggregation cannot be turned ON in presence of no-dictionary datetime/time columns, eg: {}",
             timeColumnName);
         _aggregateMetrics = false;
+        _ingestionAggregator.setDisabled();
         break;
       }
     }
 
-    if (!_aggregateMetrics) {
+    if (!isAggregateMetricsEnabled()) {
       return null;
     }
 
@@ -1080,6 +1127,10 @@ public class MutableSegmentImpl implements MutableSegment {
         maxOverFlowHashSize);
     return new FixedIntArrayOffHeapIdMap(estimatedRowsToIndex, maxOverFlowHashSize, _numKeyColumns, _memoryManager,
         RECORD_ID_MAP);
+  }
+
+  private boolean isAggregateMetricsEnabled() {
+    return _aggregateMetrics || _ingestionAggregator.isEnabled();
   }
 
   // NOTE: Okay for single-writer

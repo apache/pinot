@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.tier.TierFactory;
+import org.apache.pinot.spi.config.table.AggregationConfig;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -267,6 +268,8 @@ public class TableConfigSerDeTest {
     }
     {
       // With ingestion config
+      List<AggregationConfig> aggregationConfigs = Lists.newArrayList(new AggregationConfig("SUM__bar", "SUM(bar)"),
+          new AggregationConfig("MIN_foo", "MIN(foo)"));
       List<TransformConfig> transformConfigs =
           Lists.newArrayList(new TransformConfig("bar", "func(moo)"), new TransformConfig("zoo", "myfunc()"));
       Map<String, String> batchConfigMap = new HashMap<>();
@@ -281,9 +284,9 @@ public class TableConfigSerDeTest {
       Map<String, String> prefixesToRename = new HashMap<>();
       IngestionConfig ingestionConfig =
           new IngestionConfig(new BatchIngestionConfig(batchConfigMaps, "APPEND", "HOURLY"),
-              new StreamIngestionConfig(streamConfigMaps), new FilterConfig("filterFunc(foo)"), transformConfigs,
-              new ComplexTypeConfig(fieldsToUnnest, ".", ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE,
-                  prefixesToRename));
+              new StreamIngestionConfig(streamConfigMaps), new FilterConfig("filterFunc(foo)"), aggregationConfigs, transformConfigs,
+              new ComplexTypeConfig(fieldsToUnnest, ".",
+                      ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE, prefixesToRename));
       TableConfig tableConfig = tableConfigBuilder.setIngestionConfig(ingestionConfig).build();
 
       checkIngestionConfig(tableConfig);

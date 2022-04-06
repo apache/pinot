@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.config.table.AggregationConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -64,6 +65,7 @@ public class RealtimeSegmentConfig {
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final String _consumerDir;
   private final List<FieldConfig> _fieldConfigList;
+  private final List<AggregationConfig> _ingestionAggregationConfigs;
 
   // TODO: Clean up this constructor. Most of these things can be extracted from tableConfig.
   private RealtimeSegmentConfig(String tableNameWithType, String segmentName, String streamName, Schema schema,
@@ -74,7 +76,7 @@ public class RealtimeSegmentConfig {
       RealtimeSegmentStatsHistory statsHistory, String partitionColumn, PartitionFunction partitionFunction,
       int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled, String consumerDir,
       UpsertConfig.Mode upsertMode, String upsertComparisonColumn, UpsertConfig.HashFunction hashFunction,
-      PartitionUpsertMetadataManager partitionUpsertMetadataManager, List<FieldConfig> fieldConfigList) {
+      PartitionUpsertMetadataManager partitionUpsertMetadataManager, List<FieldConfig> fieldConfigList, List<AggregationConfig> ingestionAggregationConfigs) {
     _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;
     _streamName = streamName;
@@ -104,6 +106,7 @@ public class RealtimeSegmentConfig {
     _upsertComparisonColumn = upsertComparisonColumn;
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
     _fieldConfigList = fieldConfigList;
+    _ingestionAggregationConfigs = ingestionAggregationConfigs;
   }
 
   public String getTableNameWithType() {
@@ -227,6 +230,10 @@ public class RealtimeSegmentConfig {
     return _fieldConfigList;
   }
 
+  public List<AggregationConfig> getIngestionAggregationConfigs() {
+    return _ingestionAggregationConfigs;
+  }
+
   public static class Builder {
     private String _tableNameWithType;
     private String _segmentName;
@@ -257,6 +264,7 @@ public class RealtimeSegmentConfig {
     private String _upsertComparisonColumn;
     private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
     private List<FieldConfig> _fieldConfigList;
+    private List<AggregationConfig> _ingestionAggregationConfigs;
 
     public Builder() {
     }
@@ -414,13 +422,18 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    public Builder setIngestionAggregationConfigs(List<AggregationConfig> ingestionAggregationConfigs) {
+      _ingestionAggregationConfigs = ingestionAggregationConfigs;
+      return this;
+    }
+
     public RealtimeSegmentConfig build() {
       return new RealtimeSegmentConfig(_tableNameWithType, _segmentName, _streamName, _schema, _timeColumnName,
           _capacity, _avgNumMultiValues, _noDictionaryColumns, _varLengthDictionaryColumns, _invertedIndexColumns,
           _textIndexColumns, _fstIndexColumns, _jsonIndexColumns, _h3IndexConfigs, _segmentZKMetadata, _offHeap,
           _memoryManager, _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
           _nullHandlingEnabled, _consumerDir, _upsertMode, _upsertComparisonColumn, _hashFunction,
-          _partitionUpsertMetadataManager, _fieldConfigList);
+          _partitionUpsertMetadataManager, _fieldConfigList, _ingestionAggregationConfigs);
     }
   }
 }

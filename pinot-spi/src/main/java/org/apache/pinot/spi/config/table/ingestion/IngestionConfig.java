@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.config.table.AggregationConfig;
 
 
 /**
@@ -44,6 +45,9 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Configs related to record transformation functions applied during ingestion")
   private List<TransformConfig> _transformConfigs;
 
+  @JsonPropertyDescription("Configs related to record aggregation function applied during ingestion")
+  private final List<AggregationConfig> _aggregationConfigs;
+
   @JsonPropertyDescription("Config related to handling complex type")
   private ComplexTypeConfig _complexTypeConfig;
 
@@ -51,11 +55,13 @@ public class IngestionConfig extends BaseJsonConfig {
   public IngestionConfig(@JsonProperty("batchIngestionConfig") @Nullable BatchIngestionConfig batchIngestionConfig,
       @JsonProperty("streamIngestionConfig") @Nullable StreamIngestionConfig streamIngestionConfig,
       @JsonProperty("filterConfig") @Nullable FilterConfig filterConfig,
+      @JsonProperty("aggregationConfigs") @Nullable List<AggregationConfig> aggregationConfigs,
       @JsonProperty("transformConfigs") @Nullable List<TransformConfig> transformConfigs,
       @JsonProperty("complexTypeConfig") @Nullable ComplexTypeConfig complexTypeConfig) {
     _batchIngestionConfig = batchIngestionConfig;
     _streamIngestionConfig = streamIngestionConfig;
     _filterConfig = filterConfig;
+    _aggregationConfigs = aggregationConfigs;
     _transformConfigs = transformConfigs;
     _complexTypeConfig = complexTypeConfig;
   }
@@ -76,6 +82,11 @@ public class IngestionConfig extends BaseJsonConfig {
   @Nullable
   public FilterConfig getFilterConfig() {
     return _filterConfig;
+  }
+
+  @Nullable
+  public List<AggregationConfig> getAggregationConfigs() {
+    return _aggregationConfigs;
   }
 
   @Nullable

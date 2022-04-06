@@ -92,7 +92,7 @@ public class RecordTransformerTest {
     // expression false, not filtered
     GenericRow genericRow = getRecord();
     tableConfig.setIngestionConfig(
-        new IngestionConfig(null, null, new FilterConfig("Groovy({svInt > 123}, svInt)"), null, null));
+        new IngestionConfig(null, null, new FilterConfig("Groovy({svInt > 123}, svInt)"), null, null, null));
     RecordTransformer transformer = new FilterTransformer(tableConfig);
     transformer.transform(genericRow);
     Assert.assertFalse(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
@@ -100,7 +100,7 @@ public class RecordTransformerTest {
     // expression true, filtered
     genericRow = getRecord();
     tableConfig.setIngestionConfig(
-        new IngestionConfig(null, null, new FilterConfig("Groovy({svInt <= 123}, svInt)"), null, null));
+        new IngestionConfig(null, null, new FilterConfig("Groovy({svInt <= 123}, svInt)"), null, null, null));
     transformer = new FilterTransformer(tableConfig);
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
@@ -108,14 +108,14 @@ public class RecordTransformerTest {
     // value not found
     genericRow = getRecord();
     tableConfig.setIngestionConfig(
-        new IngestionConfig(null, null, new FilterConfig("Groovy({notPresent == 123}, notPresent)"), null, null));
+        new IngestionConfig(null, null, new FilterConfig("Groovy({notPresent == 123}, notPresent)"), null, null, null));
     transformer = new FilterTransformer(tableConfig);
     transformer.transform(genericRow);
     Assert.assertFalse(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // invalid function
     tableConfig.setIngestionConfig(
-        new IngestionConfig(null, null, new FilterConfig("Groovy(svInt == 123)"), null, null));
+        new IngestionConfig(null, null, new FilterConfig("Groovy(svInt == 123)"), null, null, null));
     try {
       new FilterTransformer(tableConfig);
       Assert.fail("Should have failed constructing FilterTransformer");
@@ -126,7 +126,7 @@ public class RecordTransformerTest {
     // multi value column
     genericRow = getRecord();
     tableConfig.setIngestionConfig(
-        new IngestionConfig(null, null, new FilterConfig("Groovy({svFloat.max() < 500}, svFloat)"), null, null));
+        new IngestionConfig(null, null, new FilterConfig("Groovy({svFloat.max() < 500}, svFloat)"), null, null, null));
     transformer = new FilterTransformer(tableConfig);
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));

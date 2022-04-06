@@ -100,7 +100,7 @@ public class SegmentLineageCleanupTest {
     ControllerTestUtils.getHelixResourceManager().addTable(tableConfig);
 
     IngestionConfig ingestionConfig =
-        new IngestionConfig(new BatchIngestionConfig(null, "REFRESH", "DAILY"), null, null, null, null);
+        new IngestionConfig(new BatchIngestionConfig(null, "REFRESH", "DAILY"), null, null, null, null, null);
     TableConfig refreshTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(REFRESH_OFFLINE_TABLE_NAME)
         .setBrokerTenant(BROKER_TENANT_NAME).setServerTenant(SERVER_TENANT_NAME).setNumReplicas(1)
         .setRetentionTimeUnit(RETENTION_TIME_UNIT).setRetentionTimeValue(RETENTION_TIME_VALUE)

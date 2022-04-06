@@ -31,7 +31,6 @@ import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TCompactProtocol;
 
-
 public class GrpcRequestBuilder {
   private int _requestId;
   private String _brokerId = "unknown";
