@@ -240,10 +240,10 @@ public class RequestContextUtils {
                 RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));
       case TEXT_MATCH:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new TextMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+            new TextMatchPredicate(getExpression(operands.get(0)), RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(getStringValue(operands.get(1)))));
       case CONTAINS:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new ContainsPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+            new ContainsPredicate(getExpression(operands.get(0)), RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(getStringValue(operands.get(1)))));
       case JSON_MATCH:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new JsonMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
@@ -345,7 +345,7 @@ public class RequestContextUtils {
             new TextMatchPredicate(operands.get(0), getStringValue(operands.get(1))));
       case CONTAINS:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new ContainsPredicate(operands.get(0), getStringValue(operands.get(1))));
+            new ContainsPredicate(operands.get(0), RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(getStringValue(operands.get(1)))));
       case JSON_MATCH:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new JsonMatchPredicate(operands.get(0), getStringValue(operands.get(1))));

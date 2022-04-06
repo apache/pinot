@@ -230,6 +230,11 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(func.getOperands().get(2).getLiteral().getLongValue(), 13L);
     Assert.assertEquals(func.getOperands().get(3).getLiteral().getDoubleValue(), 15.2);
     Assert.assertEquals(func.getOperands().get(4).getLiteral().getLongValue(), 17L);
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from vegetables where E CONTAINS '^U.*'");
+    func = pinotQuery.getFilterExpression().getFunctionCall();
+    Assert.assertEquals(func.getOperator(), "CONTAINS");
+    Assert.assertEquals(func.getOperands().get(0).getIdentifier().getName(), "E");
+    Assert.assertEquals(func.getOperands().get(1).getLiteral().getStringValue(), "^U.*");
   }
 
   @Test
