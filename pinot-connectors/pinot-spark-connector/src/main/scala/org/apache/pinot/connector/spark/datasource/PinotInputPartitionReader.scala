@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.connector.spark.datasource
 
-import org.apache.pinot.connector.spark.connector.{PinotServerDataFetcher, PinotSplit, PinotUtils}
+import org.apache.pinot.connector.spark.connector.{PinotGrpcServerDataFetcher, PinotServerDataFetcher, PinotSplit, PinotUtils}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.sources.v2.reader.InputPartitionReader
 import org.apache.spark.sql.types.StructType
@@ -51,9 +51,15 @@ class PinotInputPartitionReader(
   override def close(): Unit = {}
 
   private def fetchDataAndConvertToInternalRows(): Iterator[InternalRow] = {
-    PinotServerDataFetcher(partitionId, pinotSplit, dataSourceOptions)
-      .fetchData()
-      .flatMap(PinotUtils.pinotDataTableToInternalRows(_, schema))
-      .toIterator
+    if (dataSourceOptions.useGrpcServer)
+      PinotGrpcServerDataFetcher(partitionId, pinotSplit, dataSourceOptions)
+        .fetchData()
+        .flatMap(PinotUtils.pinotDataTableToInternalRows(_, schema))
+        .toIterator
+    else
+      PinotServerDataFetcher(partitionId, pinotSplit, dataSourceOptions)
+        .fetchData()
+        .flatMap(PinotUtils.pinotDataTableToInternalRows(_, schema))
+        .toIterator
   }
 }

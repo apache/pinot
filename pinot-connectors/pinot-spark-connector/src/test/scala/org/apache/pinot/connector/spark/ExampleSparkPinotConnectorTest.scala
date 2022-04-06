@@ -37,10 +37,11 @@ object ExampleSparkPinotConnectorTest extends Logging {
       .getOrCreate()
 
     readOffline()
+    readOfflineViaGrpc()
     readHybrid()
     readHybridWithSpecificSchema()
-    readOfflineWithFilters()
     readHybridWithFilters()
+    readOfflineWithFiltersViaGrpc()
     readRealtimeWithSelectionColumns()
     applyJustSomeFilters()
   }
@@ -136,6 +137,37 @@ object ExampleSparkPinotConnectorTest extends Logging {
 
     data.show()
   }
+
+  def readOfflineViaGrpc()(implicit spark: SparkSession): Unit = {
+    log.info("## Reading `airlineStats_OFFLINE` table... ##")
+    val data = spark.read
+      .format("pinot")
+      .option("table", "airlineStats")
+      .option("tableType", "offline")
+      .option("useGrpcServer", "true")
+      .option("grpcPort", "8090")
+      .load()
+
+    data.show()
+    print(data.count())
+  }
+
+  def readOfflineWithFiltersViaGrpc()(implicit spark: SparkSession): Unit = {
+    import spark.implicits._
+    log.info("## Reading `airlineStats_OFFLINE` table with filter push down... ##")
+    val data = spark.read
+      .format("pinot")
+      .option("table", "airlineStats")
+      .option("tableType", "OFFLINE")
+      .option("useGrpcServer", "true")
+      .option("grpcPort", "8090")
+      .load()
+      .filter($"DestStateName" === "Florida")
+
+    data.show()
+    print(data.count())
+  }
+
 
   def applyJustSomeFilters()(implicit spark: SparkSession): Unit = {
     import spark.implicits._
