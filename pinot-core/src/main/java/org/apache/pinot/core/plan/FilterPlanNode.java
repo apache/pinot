@@ -28,6 +28,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.predicate.ContainsPredicate;
 import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
@@ -35,6 +36,7 @@ import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
+import org.apache.pinot.core.operator.filter.ContainsFilterOperator;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
 import org.apache.pinot.core.operator.filter.ExpressionFilterOperator;
 import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
@@ -47,11 +49,13 @@ import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEv
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -240,7 +244,26 @@ public class FilterPlanNode implements PlanNode {
             return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs);
           }
           switch (predicate.getType()) {
+            case CONTAINS:
+              if (dataSource.getTextIndex() == null) {
+                throw new IllegalStateException("CONTAINS requested on a non text index enabled field");
+              }
+              TextIndexReader nativeTextIndexReader = dataSource.getTextIndex();
+              if (!(nativeTextIndexReader instanceof NativeTextIndexReader)) {
+                throw new UnsupportedOperationException("CONTAINS is supported only on native text indices");
+              }
+
+              return new ContainsFilterOperator((NativeTextIndexReader) nativeTextIndexReader,
+                  (ContainsPredicate) predicate, numDocs);
             case TEXT_MATCH:
+              TextIndexReader textIndexReader = dataSource.getTextIndex();
+              if (textIndexReader == null) {
+                throw new IllegalStateException("TEXT_MATCH requested on a non text index enabled field");
+              }
+              if (textIndexReader instanceof NativeTextIndexReader) {
+                throw new UnsupportedOperationException("TEXT_MATCH is not supported on native text indices");
+              }
+
               return new TextMatchFilterOperator(dataSource.getTextIndex(), (TextMatchPredicate) predicate, numDocs);
             case REGEXP_LIKE:
               // FST Index is available only for rolled out segments. So, we use different evaluator for rolled out and

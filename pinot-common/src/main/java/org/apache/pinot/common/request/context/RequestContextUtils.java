@@ -26,6 +26,7 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.context.predicate.ContainsPredicate;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.IsNotNullPredicate;
@@ -266,6 +267,10 @@ public class RequestContextUtils {
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new RegexpLikePredicate(getExpression(operands.get(0)),
                 RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));
+      case CONTAINS:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new ContainsPredicate(getExpression(operands.get(0)),
+                RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));
       case TEXT_MATCH:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new TextMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
@@ -390,6 +395,9 @@ public class RequestContextUtils {
             new RegexpLikePredicate(operands.get(0), getStringValue(operands.get(1))));
       case LIKE:
         return new FilterContext(FilterContext.Type.PREDICATE, null, new RegexpLikePredicate(operands.get(0),
+            RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));
+      case CONTAINS:
+        return new FilterContext(FilterContext.Type.PREDICATE, null, new ContainsPredicate(operands.get(0),
             RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));
       case TEXT_MATCH:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
