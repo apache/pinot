@@ -37,7 +37,6 @@ import org.apache.pinot.query.planner.nodes.JoinNode;
 import org.apache.pinot.query.planner.nodes.StageNode;
 import org.apache.pinot.query.planner.nodes.TableScanNode;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
-import org.apache.pinot.query.planner.partitioning.KeySelector;
 
 
 /**
