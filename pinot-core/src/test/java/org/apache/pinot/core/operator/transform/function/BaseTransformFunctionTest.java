@@ -263,9 +263,11 @@ public abstract class BaseTransformFunctionTest {
     double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
     BigDecimal[] bigDecimalValues = null;
     try {
-      // Some transform functions cannot work with BigDecimal (e.g. exp, ln, and sqrt).
+      // 1- Some transform functions cannot work with BigDecimal (e.g. exp, ln, and sqrt).
+      // 2- NumberFormatException is thrown when converting double.NaN, Double.POSITIVE_INFINITY,
+      // or Double.NEGATIVE_INFINITY.
       bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
-    } catch (UnsupportedOperationException ignored) {
+    } catch (UnsupportedOperationException | NumberFormatException ignored) {
     }
     String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
