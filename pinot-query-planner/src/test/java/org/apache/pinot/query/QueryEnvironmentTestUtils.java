@@ -112,11 +112,11 @@ public class QueryEnvironmentTestUtils {
     return mock;
   }
 
-  public static String getTestStageByServerCount(QueryPlan queryPlan, int serverCount) {
-    List<String> stageIds = queryPlan.getStageMetadataMap().entrySet().stream()
-        .filter(e -> !e.getKey().equals("ROOT") && e.getValue().getServerInstances().size() == serverCount)
+  public static int getTestStageByServerCount(QueryPlan queryPlan, int serverCount) {
+    List<Integer> stageIds = queryPlan.getStageMetadataMap().entrySet().stream()
+        .filter(e -> !e.getKey().equals(0) && e.getValue().getServerInstances().size() == serverCount)
         .map(Map.Entry::getKey).collect(Collectors.toList());
-    return stageIds.size() > 0 ? stageIds.get(0) : null;
+    return stageIds.size() > 0 ? stageIds.get(0) : -1;
   }
 
   public static int getAvailablePort() {
