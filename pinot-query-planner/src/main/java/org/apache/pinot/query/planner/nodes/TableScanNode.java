@@ -19,6 +19,7 @@
 package org.apache.pinot.query.planner.nodes;
 
 import java.util.List;
+import org.apache.calcite.rel.type.RelDataType;
 
 
 public class TableScanNode extends AbstractStageNode {
@@ -26,11 +27,11 @@ public class TableScanNode extends AbstractStageNode {
   private List<String> _tableScanColumns;
 
   public TableScanNode(int stageId) {
-    super(stageId);
+    super(stageId, null);
   }
 
-  public TableScanNode(int stageId, String tableName, List<String> tableScanColumns) {
-    super(stageId);
+  public TableScanNode(int stageId, RelDataType rowType, String tableName, List<String> tableScanColumns) {
+    super(stageId, rowType);
     _tableName = tableName;
     _tableScanColumns = tableScanColumns;
   }

@@ -24,16 +24,18 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.JoinRelType;
-import org.apache.calcite.rel.logical.LogicalCalc;
+import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
+import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalTableScan;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.pinot.query.planner.nodes.CalcNode;
+import org.apache.pinot.query.planner.nodes.FilterNode;
 import org.apache.pinot.query.planner.nodes.JoinNode;
+import org.apache.pinot.query.planner.nodes.ProjectNode;
 import org.apache.pinot.query.planner.nodes.StageNode;
 import org.apache.pinot.query.planner.nodes.TableScanNode;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
@@ -57,27 +59,32 @@ public final class RelToStageConverter {
    * @return stage node.
    */
   public static StageNode toStageNode(RelNode node, int currentStageId) {
-    if (node instanceof LogicalCalc) {
-      return convertLogicalCal((LogicalCalc) node, currentStageId);
-    } else if (node instanceof LogicalTableScan) {
+    if (node instanceof LogicalTableScan) {
       return convertLogicalTableScan((LogicalTableScan) node, currentStageId);
     } else if (node instanceof LogicalJoin) {
       return convertLogicalJoin((LogicalJoin) node, currentStageId);
+    } else if (node instanceof LogicalProject) {
+      return convertLogicalProject((LogicalProject) node, currentStageId);
+    } else if (node instanceof LogicalFilter) {
+      return convertLogicalFilter((LogicalFilter) node, currentStageId);
     } else {
       throw new UnsupportedOperationException("Unsupported logical plan node: " + node);
     }
+  }
+
+  private static StageNode convertLogicalProject(LogicalProject node, int currentStageId) {
+    return new ProjectNode(currentStageId, node.getProjects(), node.getRowType());
+  }
+
+  private static StageNode convertLogicalFilter(LogicalFilter node, int currentStageId) {
+    return new FilterNode(currentStageId, node.getRowType(), node.getCondition(), node.getVariablesSet());
   }
 
   private static StageNode convertLogicalTableScan(LogicalTableScan node, int currentStageId) {
     String tableName = node.getTable().getQualifiedName().get(0);
     List<String> columnNames = node.getRowType().getFieldList().stream()
         .map(RelDataTypeField::getName).collect(Collectors.toList());
-    return new TableScanNode(currentStageId, tableName, columnNames);
-  }
-
-  private static StageNode convertLogicalCal(LogicalCalc node, int currentStageId) {
-    // TODO: support actual calcNode
-    return new CalcNode(currentStageId, node.getDigest());
+    return new TableScanNode(currentStageId, node.getRowType(), tableName, columnNames);
   }
 
   private static StageNode convertLogicalJoin(LogicalJoin node, int currentStageId) {
@@ -95,7 +102,7 @@ public final class RelToStageConverter {
     FieldSelectionKeySelector leftFieldSelectionKeySelector = new FieldSelectionKeySelector(leftOperandIndex);
     FieldSelectionKeySelector rightFieldSelectionKeySelector =
           new FieldSelectionKeySelector(rightOperandIndex - leftRowType.getFieldNames().size());
-    return new JoinNode(currentStageId, joinType, Collections.singletonList(new JoinNode.JoinClause(
+    return new JoinNode(currentStageId, node.getRowType(), joinType, Collections.singletonList(new JoinNode.JoinClause(
         leftFieldSelectionKeySelector, rightFieldSelectionKeySelector)));
   }
 }

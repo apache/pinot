@@ -52,8 +52,10 @@ public final class SerDeUtils {
         return new TableScanNode(stageId);
       case "JoinNode":
         return new JoinNode(stageId);
-      case "CalcNode":
-        return new CalcNode(stageId);
+      case "ProjectNode":
+        return new ProjectNode(stageId);
+      case "FilterNode":
+        return new FilterNode(stageId);
       case "MailboxSendNode":
         return new MailboxSendNode(stageId);
       case "MailboxReceiveNode":

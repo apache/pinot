@@ -18,12 +18,18 @@
  */
 package org.apache.pinot.query.parser;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexInputRef;
+import org.apache.calcite.rex.RexLiteral;
+import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlDataTypeSpec;
 import org.apache.calcite.sql.SqlIdentifier;
@@ -34,10 +40,12 @@ import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
+import org.apache.calcite.util.NlsString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
@@ -138,6 +146,10 @@ public class CalciteExpressionParser {
     }
     return toExpression(sqlNode);
   }
+
+  // --------------------------------------------------------------------------
+  // SQL (SqlNode) conversion Utils
+  // --------------------------------------------------------------------------
 
   private static List<Expression> convertDistinctSelectList(SqlNodeList selectList) {
     List<Expression> selectExpr = new ArrayList<>();
@@ -498,5 +510,172 @@ public class CalciteExpressionParser {
       return false;
     }
     return false;
+  }
+
+  // --------------------------------------------------------------------------
+  // Relational conversion Utils
+  // --------------------------------------------------------------------------
+
+  private static List<Expression> convertDistinctSelectList(RexCall rexCall, PinotQuery pinotQuery) {
+    List<Expression> selectExpr = new ArrayList<>();
+    selectExpr.add(convertDistinctAndSelectListToFunctionExpression(rexCall, pinotQuery));
+    return selectExpr;
+  }
+
+  public static List<Expression> convertSelectList(List<RexNode> rexNodeList, PinotQuery pinotQuery) {
+    List<Expression> selectExpr = new ArrayList<>();
+
+    final Iterator<RexNode> iterator = rexNodeList.iterator();
+    while (iterator.hasNext()) {
+      final RexNode next = iterator.next();
+      selectExpr.add(toExpression(next, pinotQuery));
+    }
+
+    return selectExpr;
+  }
+
+  private static List<Expression> convertOrderByList(RexCall rexCall, PinotQuery pinotQuery) {
+    Preconditions.checkState(rexCall.getKind() == SqlKind.ORDER_BY);
+    List<Expression> orderByExpr = new ArrayList<>();
+
+    final Iterator<RexNode> iterator = rexCall.getOperands().iterator();
+    while (iterator.hasNext()) {
+      final RexNode next = iterator.next();
+      orderByExpr.add(convertOrderBy(next, pinotQuery));
+    }
+    return orderByExpr;
+  }
+
+  private static Expression convertOrderBy(RexNode rexNode, PinotQuery pinotQuery) {
+    final SqlKind kind = rexNode.getKind();
+    Expression expression;
+    switch (kind) {
+      case DESCENDING:
+        RexCall rexCall = (RexCall) rexNode;
+        expression = RequestUtils.getFunctionExpression("DESC");
+        expression.getFunctionCall().addToOperands(toExpression(rexCall.getOperands().get(0), pinotQuery));
+        break;
+      case IDENTIFIER:
+      default:
+        expression = RequestUtils.getFunctionExpression("ASC");
+        expression.getFunctionCall().addToOperands(toExpression(rexNode, pinotQuery));
+        break;
+    }
+    return expression;
+  }
+
+  private static Expression convertDistinctAndSelectListToFunctionExpression(RexCall rexCall, PinotQuery pinotQuery) {
+    String functionName = AggregationFunctionType.DISTINCT.getName();
+    Expression functionExpression = RequestUtils.getFunctionExpression(functionName);
+    for (RexNode node : rexCall.getOperands()) {
+      Expression columnExpression = toExpression(node, pinotQuery);
+      if (columnExpression.getType() == ExpressionType.IDENTIFIER && columnExpression.getIdentifier().getName()
+          .equals("*")) {
+        throw new SqlCompilationException(
+            "Syntax error: Pinot currently does not support DISTINCT with *. Please specify each column name after "
+                + "DISTINCT keyword");
+      } else if (columnExpression.getType() == ExpressionType.FUNCTION) {
+        Function functionCall = columnExpression.getFunctionCall();
+        String function = functionCall.getOperator();
+        if (AggregationFunctionType.isAggregationFunction(function)) {
+          throw new SqlCompilationException(
+              "Syntax error: Use of DISTINCT with aggregation functions is not supported");
+        }
+      }
+      functionExpression.getFunctionCall().addToOperands(columnExpression);
+    }
+    return functionExpression;
+  }
+
+  public static Expression toExpression(RexNode rexNode, PinotQuery pinotQuery) {
+    LOGGER.debug("Current processing RexNode: {}, node.getKind(): {}", rexNode, rexNode.getKind());
+    switch (rexNode.getKind()) {
+      case INPUT_REF:
+        RexInputRef rexInputRef = (RexInputRef) rexNode;
+        return inputRefToIdentifier(rexInputRef, pinotQuery);
+      case LITERAL:
+        return rexLiteralToExpression((RexLiteral) rexNode);
+      default:
+        return compileFunctionExpression((RexCall) rexNode, pinotQuery);
+    }
+  }
+
+  private static Expression rexLiteralToExpression(RexLiteral rexLiteral) {
+    RelDataType type = rexLiteral.getType();
+    switch (type.getSqlTypeName()) {
+      case VARCHAR:
+        return RequestUtils.getLiteralExpression(((NlsString) rexLiteral.getValue()).getValue());
+      default:
+        return RequestUtils.getLiteralExpression(rexLiteral.getValue());
+    }
+  }
+
+  public static Expression inputRefToIdentifier(RexInputRef inputRef, PinotQuery pinotQuery) {
+    List<Expression> selectList = pinotQuery.getSelectList();
+    return selectList.get(inputRef.getIndex());
+  }
+
+  private static Expression compileFunctionExpression(RexCall rexCall, PinotQuery pinotQuery) {
+    SqlKind functionKind = rexCall.getKind();
+    String functionName;
+    switch (functionKind) {
+      case AND:
+        return compileAndExpression(rexCall, pinotQuery);
+      case OR:
+        return compileOrExpression(rexCall, pinotQuery);
+      case COUNT:
+      case OTHER:
+      case OTHER_FUNCTION:
+      case DOT:
+      default:
+        functionName = functionKind.name();
+        break;
+    }
+    // When there is no argument, set an empty list as the operands
+    List<RexNode> childNodes = rexCall.getOperands();
+    List<Expression> operands = new ArrayList<>(childNodes.size());
+    for (RexNode childNode : childNodes) {
+      operands.add(toExpression(childNode, pinotQuery));
+    }
+    validateFunction(functionName, operands);
+    Expression functionExpression = RequestUtils.getFunctionExpression(functionName);
+    functionExpression.getFunctionCall().setOperands(operands);
+    return functionExpression;
+  }
+
+  /**
+   * Helper method to flatten the operands for the AND expression.
+   */
+  private static Expression compileAndExpression(RexCall andNode, PinotQuery pinotQuery) {
+    List<Expression> operands = new ArrayList<>();
+    for (RexNode childNode : andNode.getOperands()) {
+      if (childNode.getKind() == SqlKind.AND) {
+        Expression childAndExpression = compileAndExpression((RexCall) childNode, pinotQuery);
+        operands.addAll(childAndExpression.getFunctionCall().getOperands());
+      } else {
+        operands.add(toExpression(childNode, pinotQuery));
+      }
+    }
+    Expression andExpression = RequestUtils.getFunctionExpression(SqlKind.AND.name());
+    andExpression.getFunctionCall().setOperands(operands);
+    return andExpression;
+  }
+
+  /**
+   * Helper method to flatten the operands for the OR expression.
+   */
+  private static Expression compileOrExpression(RexCall orNode, PinotQuery pinotQuery) {
+    List<Expression> operands = new ArrayList<>();
+    for (RexNode childNode : orNode.getOperands()) {
+      if (childNode.getKind() == SqlKind.OR) {
+        Expression childAndExpression = compileOrExpression((RexCall) childNode, pinotQuery);
+        operands.addAll(childAndExpression.getFunctionCall().getOperands());
+      } else {
+        operands.add(toExpression(childNode, pinotQuery));
+      }
+    }
+    Expression andExpression = RequestUtils.getFunctionExpression(SqlKind.OR.name());
+    andExpression.getFunctionCall().setOperands(operands);
+    return andExpression;
   }
 }

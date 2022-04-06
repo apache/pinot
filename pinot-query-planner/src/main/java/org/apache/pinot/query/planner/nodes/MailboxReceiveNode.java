@@ -19,6 +19,7 @@
 package org.apache.pinot.query.planner.nodes;
 
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.type.RelDataType;
 
 
 public class MailboxReceiveNode extends AbstractStageNode {
@@ -26,11 +27,11 @@ public class MailboxReceiveNode extends AbstractStageNode {
   private RelDistribution.Type _exchangeType;
 
   public MailboxReceiveNode(int stageId) {
-    super(stageId);
+    super(stageId, null);
   }
 
-  public MailboxReceiveNode(int stageId, int senderStageId, RelDistribution.Type exchangeType) {
-    super(stageId);
+  public MailboxReceiveNode(int stageId, RelDataType rowType, int senderStageId, RelDistribution.Type exchangeType) {
+    super(stageId, rowType);
     _senderStageId = senderStageId;
     _exchangeType = exchangeType;
   }

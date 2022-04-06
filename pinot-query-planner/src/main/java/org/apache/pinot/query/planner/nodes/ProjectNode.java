@@ -18,29 +18,26 @@
  */
 package org.apache.pinot.query.planner.nodes;
 
-import org.apache.calcite.rel.RelDistribution;
+import java.util.List;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rex.RexNode;
 
+public class ProjectNode extends AbstractStageNode {
+  private List<RexNode> _projects;
 
-public class MailboxSendNode extends AbstractStageNode {
-  private int _receiverStageId;
-  private RelDistribution.Type _exchangeType;
-
-  public MailboxSendNode(int stageId) {
+  public ProjectNode(int stageId) {
     super(stageId, null);
   }
-
-  public MailboxSendNode(int stageId, RelDataType rowType, int receiverStageId, RelDistribution.Type exchangeType) {
-    super(stageId, rowType);
-    _receiverStageId = receiverStageId;
-    _exchangeType = exchangeType;
+  public ProjectNode(int currentStageId, List<RexNode> projects, RelDataType rowType) {
+    super(currentStageId, rowType);
+    _projects = projects;
   }
 
-  public int getReceiverStageId() {
-    return _receiverStageId;
+  public List<RexNode> getProjects() {
+    return _projects;
   }
 
-  public RelDistribution.Type getExchangeType() {
-    return _exchangeType;
+  public RelDataType getRowType() {
+    return _rowType;
   }
 }

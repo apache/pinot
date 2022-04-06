@@ -268,6 +268,59 @@ public class QueryRunnerTest {
     Assert.assertTrue(DataTableBlockUtils.isEndOfStream(dataTableBlock));
   }
 
+  @Test
+  public void testJoinProjectFilterPushDown()
+      throws Exception {
+    String sqlQuery = "SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2"
+        + " WHERE a.col3 >= 0 AND a.col2 = 'foo' AND b.col3 >= 0";
+    QueryPlan queryPlan = _queryEnvironment.planQuery(sqlQuery);
+    Map<String, String> requestMetadataMap =
+        ImmutableMap.of("REQUEST_ID", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
+    MailboxReceiveOperator mailboxReceiveOperator = null;
+    for (int stageId : queryPlan.getStageMetadataMap().keySet()) {
+      if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
+        MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(stageId);
+        mailboxReceiveOperator = createReduceStageOperator(
+            queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
+            Long.parseLong(requestMetadataMap.get("REQUEST_ID")), reduceNode.getSenderStageId(), _reducerGrpcPort);
+      } else {
+        for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
+          DistributedStagePlan distributedStagePlan =
+              QueryDispatcher.constructDistributedStagePlan(queryPlan, stageId, serverInstance);
+          _servers.get(serverInstance).processQuery(distributedStagePlan, requestMetadataMap);
+        }
+      }
+    }
+    Preconditions.checkNotNull(mailboxReceiveOperator);
+
+    int count = 0;
+    int rowCount = 0;
+    List<Object[]> resultRows = new ArrayList<>();
+    DataTableBlock dataTableBlock;
+    while (count < 2) { // we have 2 servers sending data.
+      dataTableBlock = mailboxReceiveOperator.nextBlock();
+      if (dataTableBlock.getDataTable() != null) {
+        DataTable dataTable = dataTableBlock.getDataTable();
+        int numRows = dataTable.getNumberOfRows();
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          resultRows.add(extractRowFromDataTable(dataTable, rowId));
+        }
+        rowCount += numRows;
+      }
+      count++;
+    }
+
+    // Assert that each of the 5 categories from left table is joined with right table.
+    // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
+    // but only 1 out of 5 rows from table A will be selected out; and all in table B will be selected.
+    // thus the final JOIN result will be 1 x 3 x 1 = 6.
+    Assert.assertEquals(rowCount, 3);
+
+    // assert that the next block is null (e.g. finished receiving).
+    dataTableBlock = mailboxReceiveOperator.nextBlock();
+    Assert.assertTrue(DataTableBlockUtils.isEndOfStream(dataTableBlock));
+  }
+
   protected MailboxReceiveOperator createReduceStageOperator(List<ServerInstance> sendingInstances, long jobId,
       int stageId, int port) {
     MailboxReceiveOperator mailboxReceiveOperator =

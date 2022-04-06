@@ -29,9 +29,10 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
-import org.apache.pinot.query.planner.nodes.CalcNode;
-import org.apache.pinot.query.planner.nodes.MailboxReceiveNode;
+import org.apache.pinot.query.parser.CalciteExpressionParser;
+import org.apache.pinot.query.planner.nodes.FilterNode;
 import org.apache.pinot.query.planner.nodes.MailboxSendNode;
+import org.apache.pinot.query.planner.nodes.ProjectNode;
 import org.apache.pinot.query.planner.nodes.StageNode;
 import org.apache.pinot.query.planner.nodes.TableScanNode;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
@@ -88,22 +89,28 @@ public class ServerRequestUtils {
   }
 
   private static void walkStageTree(StageNode node, PinotQuery pinotQuery) {
-    if (node instanceof CalcNode) {
-      // TODO: add conversion for CalcNode, specifically filter/alias/...
-    } else if (node instanceof TableScanNode) {
+    // this walkStageTree should only be a sequential walk.
+    for (StageNode child : node.getInputs()) {
+      walkStageTree(child, pinotQuery);
+    }
+    if (node instanceof TableScanNode) {
       TableScanNode tableScanNode = (TableScanNode) node;
       DataSource dataSource = new DataSource();
       dataSource.setTableName(tableScanNode.getTableName());
       pinotQuery.setDataSource(dataSource);
       pinotQuery.setSelectList(tableScanNode.getTableScanColumns().stream().map(RequestUtils::getIdentifierExpression)
           .collect(Collectors.toList()));
-    } else if (node instanceof MailboxSendNode || node instanceof MailboxReceiveNode) {
-      // ignore for now. continue to child.
+    } else if (node instanceof FilterNode) {
+      pinotQuery.setFilterExpression(CalciteExpressionParser.toExpression(
+          ((FilterNode) node).getCondition(), pinotQuery));
+    } else if (node instanceof ProjectNode) {
+      pinotQuery.setSelectList(CalciteExpressionParser.convertSelectList(
+          ((ProjectNode) node).getProjects(), pinotQuery));
+    } else if (node instanceof MailboxSendNode) {
+      // TODO: MailboxSendNode should be the root of the leaf stage. but ignore for now since it is handle seperately
+      // in QueryRunner as a single step sender.
     } else {
       throw new UnsupportedOperationException("Unsupported logical plan node: " + node);
-    }
-    for (StageNode child : node.getInputs()) {
-      walkStageTree(child, pinotQuery);
     }
   }
 }

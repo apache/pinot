@@ -20,6 +20,7 @@ package org.apache.pinot.query.planner.nodes;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.query.planner.nodes.serde.ProtoSerializable;
 import org.apache.pinot.query.planner.nodes.serde.ProtoSerializationUtils;
@@ -29,9 +30,11 @@ public abstract class AbstractStageNode implements StageNode, ProtoSerializable 
 
   protected final int _stageId;
   protected final List<StageNode> _inputs;
+  protected RelDataType _rowType;
 
-  public AbstractStageNode(int stageId) {
+  public AbstractStageNode(int stageId, RelDataType rowType) {
     _stageId = stageId;
+    _rowType = rowType;
     _inputs = new ArrayList<>();
   }
 
@@ -58,5 +61,9 @@ public abstract class AbstractStageNode implements StageNode, ProtoSerializable 
   @Override
   public Plan.ObjectField getObjectField() {
     return ProtoSerializationUtils.toObjectField(this);
+  }
+
+  public RelDataType getRowType() {
+    return _rowType;
   }
 }

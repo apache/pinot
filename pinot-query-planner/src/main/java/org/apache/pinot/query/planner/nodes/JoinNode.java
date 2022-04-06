@@ -20,6 +20,7 @@ package org.apache.pinot.query.planner.nodes;
 
 import java.util.List;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 
@@ -29,12 +30,11 @@ public class JoinNode extends AbstractStageNode {
   private List<JoinClause> _criteria;
 
   public JoinNode(int stageId) {
-    super(stageId);
+    super(stageId, null);
   }
 
-  public JoinNode(int stageId, JoinRelType joinRelType, List<JoinClause> criteria
-  ) {
-    super(stageId);
+  public JoinNode(int stageId, RelDataType rowType, JoinRelType joinRelType, List<JoinClause> criteria) {
+    super(stageId, rowType);
     _joinRelType = joinRelType;
     _criteria = criteria;
   }
