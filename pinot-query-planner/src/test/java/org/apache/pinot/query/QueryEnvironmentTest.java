@@ -35,6 +35,7 @@ import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.context.PlannerContext;
+import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.routing.WorkerManager;
@@ -72,7 +73,7 @@ public class QueryEnvironmentTest {
     QueryPlan queryPlan = _queryEnvironment.planQuery(query);
     Assert.assertEquals(queryPlan.getQueryStageMap().size(), 4);
     Assert.assertEquals(queryPlan.getStageMetadataMap().size(), 4);
-    for (Map.Entry<String, StageMetadata> e : queryPlan.getStageMetadataMap().entrySet()) {
+    for (Map.Entry<Integer, StageMetadata> e : queryPlan.getStageMetadataMap().entrySet()) {
       List<String> tables = e.getValue().getScannedTables();
       if (tables.size() == 1) {
         // table scan stages; for tableA it should have 2 hosts, for tableB it should have only 1
@@ -80,7 +81,7 @@ public class QueryEnvironmentTest {
             e.getValue().getServerInstances().stream().map(ServerInstance::toString).collect(Collectors.toList()),
             tables.get(0).equals("a") ? ImmutableList.of("Server_localhost_1", "Server_localhost_2")
                 : ImmutableList.of("Server_localhost_1"));
-      } else if (!e.getKey().equals("ROOT")) {
+      } else if (!PlannerUtils.isRootStage(e.getKey())) {
         // join stage should have both servers used.
         Assert.assertEquals(
             e.getValue().getServerInstances().stream().map(ServerInstance::toString).collect(Collectors.toList()),
