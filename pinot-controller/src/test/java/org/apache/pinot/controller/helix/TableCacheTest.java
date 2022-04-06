@@ -36,6 +36,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -56,10 +57,10 @@ public class TableCacheTest {
     ControllerTestUtils.setupClusterAndValidate();
   }
 
-  @Test
-  public void testTableCache()
+  @Test(dataProvider = "testTableCacheDataProvider")
+  public void testTableCache(boolean isCaseInsensitive)
       throws Exception {
-    TableCache tableCache = new TableCache(ControllerTestUtils.getPropertyStore(), true);
+    TableCache tableCache = new TableCache(ControllerTestUtils.getPropertyStore(), isCaseInsensitive);
 
     assertNull(tableCache.getSchema(SCHEMA_NAME));
     assertNull(tableCache.getColumnNameMap(SCHEMA_NAME));
@@ -83,10 +84,10 @@ public class TableCacheTest {
             .addSingleValueDimension(BuiltInVirtualColumn.HOSTNAME, DataType.STRING)
             .addSingleValueDimension(BuiltInVirtualColumn.SEGMENTNAME, DataType.STRING).build();
     Map<String, String> expectedColumnMap = new HashMap<>();
-    expectedColumnMap.put("testcolumn", "testColumn");
-    expectedColumnMap.put("$docid", "$docId");
-    expectedColumnMap.put("$hostname", "$hostName");
-    expectedColumnMap.put("$segmentname", "$segmentName");
+    expectedColumnMap.put(isCaseInsensitive ? "testcolumn" : "testColumn", "testColumn");
+    expectedColumnMap.put(isCaseInsensitive ? "$docid" : "$docId", "$docId");
+    expectedColumnMap.put(isCaseInsensitive ? "$hostname" : "$hostName", "$hostName");
+    expectedColumnMap.put(isCaseInsensitive ? "$segmentname" : "$segmentName", "$segmentName");
     assertEquals(tableCache.getSchema(SCHEMA_NAME), expectedSchema);
     assertEquals(tableCache.getColumnNameMap(SCHEMA_NAME), expectedColumnMap);
     assertNull(tableCache.getSchema(RAW_TABLE_NAME));
@@ -101,9 +102,10 @@ public class TableCacheTest {
     // Wait for at most 10 seconds for the callback to add the table config to the cache
     TestUtils.waitForCondition(
         aVoid -> tableConfig.equals(tableCache.getTableConfig(OFFLINE_TABLE_NAME)) && RAW_TABLE_NAME.equals(
-            tableCache.getActualTableName(MANGLED_RAW_TABLE_NAME)) && OFFLINE_TABLE_NAME.equals(
-            tableCache.getActualTableName(MANGLED_OFFLINE_TABLE_NAME)), 10_000L,
+            tableCache.getActualTableName(RAW_TABLE_NAME)) && OFFLINE_TABLE_NAME.equals(
+            tableCache.getActualTableName(OFFLINE_TABLE_NAME)), 10_000L,
         "Failed to add the table config to the cache");
+    // It should only add OFFLINE and normal table.
     assertNull(tableCache.getActualTableName(REALTIME_TABLE_NAME));
     // Schema can be accessed by both the schema name and the raw table name
     assertEquals(tableCache.getSchema(SCHEMA_NAME), expectedSchema);
@@ -134,7 +136,7 @@ public class TableCacheTest {
     // - Verify if the callback is fully done by checking the schema change lister because it is the last step of the
     //   callback handling
     expectedSchema.addField(new DimensionFieldSpec("newColumn", DataType.LONG, true));
-    expectedColumnMap.put("newcolumn", "newColumn");
+    expectedColumnMap.put(isCaseInsensitive ? "newcolumn" : "newColumn", "newColumn");
     TestUtils.waitForCondition(aVoid -> {
       assertNotNull(tableCache.getSchema(SCHEMA_NAME));
       assertEquals(schemaChangeListener._schemaList.size(), 1);
@@ -165,8 +167,15 @@ public class TableCacheTest {
     assertEquals(tableCache.getTableConfig(OFFLINE_TABLE_NAME), tableConfig);
     assertNull(tableCache.getSchema(RAW_TABLE_NAME));
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
-    assertEquals(tableCache.getActualTableName(MANGLED_RAW_TABLE_NAME), RAW_TABLE_NAME);
-    assertEquals(tableCache.getActualTableName(MANGLED_OFFLINE_TABLE_NAME), OFFLINE_TABLE_NAME);
+    if (isCaseInsensitive) {
+      assertEquals(tableCache.getActualTableName(MANGLED_RAW_TABLE_NAME), RAW_TABLE_NAME);
+      assertEquals(tableCache.getActualTableName(MANGLED_OFFLINE_TABLE_NAME), OFFLINE_TABLE_NAME);
+    } else {
+      assertNull(tableCache.getActualTableName(MANGLED_RAW_TABLE_NAME));
+      assertNull(tableCache.getActualTableName(MANGLED_OFFLINE_TABLE_NAME));
+      assertEquals(tableCache.getActualTableName(RAW_TABLE_NAME), RAW_TABLE_NAME);
+      assertEquals(tableCache.getActualTableName(OFFLINE_TABLE_NAME), OFFLINE_TABLE_NAME);
+    }
     assertNull(tableCache.getActualTableName(REALTIME_TABLE_NAME));
     assertEquals(tableCache.getSchema(SCHEMA_NAME), expectedSchema);
     assertEquals(tableCache.getColumnNameMap(SCHEMA_NAME), expectedColumnMap);
@@ -200,6 +209,11 @@ public class TableCacheTest {
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
     assertEquals(schemaChangeListener._schemaList.size(), 0);
     assertEquals(tableConfigChangeListener._tableConfigList.size(), 0);
+  }
+
+  @DataProvider(name = "testTableCacheDataProvider")
+  public Object[][] provideCaseInsensitiveSetting() {
+    return new Object[][]{new Object[]{true}, new Object[]{false}};
   }
 
   private static class TestTableConfigChangeListener implements TableConfigChangeListener {

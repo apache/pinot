@@ -132,8 +132,8 @@ public class TableCache implements PinotConfigProvider {
   }
 
   /**
-   * For case-insensitive only, returns the actual table name for the given case-insensitive table name (with or without
-   * type suffix), or {@code null} if the table does not exist.
+   * Returns the actual table name for the given table name (with or without type suffix), or {@code null} if the table
+   * does not exist.
    */
   @Nullable
   public String getActualTableName(String tableName) {
@@ -145,8 +145,8 @@ public class TableCache implements PinotConfigProvider {
   }
 
   /**
-   * For case-insensitive only, returns a map from lower case column name to actual column name for the given table, or
-   * {@code null} if the table schema does not exist.
+   * Returns a map from lower case column name to actual column name for the given table, or {@code null} if the table
+   * schema does not exist.
    */
   @Nullable
   public Map<String, String> getColumnNameMap(String rawTableName) {
