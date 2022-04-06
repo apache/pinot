@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.lang.StringUtils;
+import org.apache.pinot.common.utils.AuthUtils;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -64,7 +65,7 @@ public class BasicAuthAccessFactory implements AccessControlFactory {
     public boolean hasDataAccess(RequesterIdentity requesterIdentity, String tableName) {
       Collection<String> tokens = getTokens(requesterIdentity);
       return tokens.stream()
-          .map(BasicAuthUtils::normalizeBase64Token)
+          .map(AuthUtils::normalizeBase64Token)
           .map(_token2principal::get)
           .filter(Objects::nonNull)
           .findFirst()
