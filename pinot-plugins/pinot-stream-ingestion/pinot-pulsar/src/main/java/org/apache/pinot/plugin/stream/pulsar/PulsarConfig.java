@@ -52,15 +52,8 @@ public class PulsarConfig {
 
     OffsetCriteria offsetCriteria = streamConfig.getOffsetCriteria();
 
-    if (offsetCriteria.isSmallest()) {
-      _initialMessageId = MessageId.earliest;
-      _subscriptionInitialPosition = SubscriptionInitialPosition.Earliest;
-    } else if (offsetCriteria.isLargest()) {
-      _initialMessageId = MessageId.latest;
-      _subscriptionInitialPosition = SubscriptionInitialPosition.Latest;
-    } else {
-      throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria);
-    }
+    _subscriptionInitialPosition = PulsarUtils.offsetCriteriaToSubscription(offsetCriteria);
+    _initialMessageId = PulsarUtils.offsetCriteriaToMessageId(offsetCriteria);
   }
 
   public String getPulsarTopicName() {

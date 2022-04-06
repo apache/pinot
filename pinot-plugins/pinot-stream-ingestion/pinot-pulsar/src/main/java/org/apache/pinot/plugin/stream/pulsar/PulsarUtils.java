@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.stream.pulsar;
 
 import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.SubscriptionInitialPosition;
 
 
@@ -34,6 +35,18 @@ public class PulsarUtils {
     }
     if (offsetCriteria.isSmallest()) {
       return SubscriptionInitialPosition.Earliest;
+    }
+
+    throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria);
+  }
+
+  public static MessageId offsetCriteriaToMessageId(OffsetCriteria offsetCriteria)
+      throws IllegalArgumentException {
+    if (offsetCriteria.isLargest()) {
+      return MessageId.latest;
+    }
+    if (offsetCriteria.isSmallest()) {
+      return MessageId.earliest;
     }
 
     throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria);
