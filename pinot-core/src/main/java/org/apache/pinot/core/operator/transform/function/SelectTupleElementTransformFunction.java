@@ -90,7 +90,7 @@ public abstract class SelectTupleElementTransformFunction extends BaseTransformF
     if (left == null || left == right) {
       return right;
     }
-    Set<FieldSpec.DataType> dataTypes = new HashSet<>() {{
+    Set<FieldSpec.DataType> dataTypes = new HashSet<FieldSpec.DataType>() {{
       add(left);
       add(right);
     }};
