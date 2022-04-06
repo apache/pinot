@@ -65,7 +65,7 @@ public class SegmentGeneratorConfig implements Serializable {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGeneratorConfig.class);
-  public static final double DEFAULT_THRESHOLD_MIN_PERCENT_STORAGE_SAVED = 1.0d;
+  public static final double DEFAULT_DICTIONARY_INDEX_SIZE_RATIO = 0.85d;
 
   private TableConfig _tableConfig;
   private final Map<String, String> _customProperties = new HashMap<>();
@@ -109,7 +109,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private boolean _nullHandlingEnabled = false;
   private boolean _failOnEmptySegment = false;
   private boolean _optimizeDictionaryForMetrics = false;
-  private double _noDictionaryStorageSavedRatio = DEFAULT_THRESHOLD_MIN_PERCENT_STORAGE_SAVED;
+  private double _noDictionaryStorageSavedRatio = DEFAULT_DICTIONARY_INDEX_SIZE_RATIO;
 
   // constructed from FieldConfig
   private Map<String, Map<String, String>> _columnProperties = new HashMap<>();

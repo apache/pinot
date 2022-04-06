@@ -56,7 +56,7 @@ public class IndexingConfig extends BaseJsonConfig {
 
   /**
    * If `optimizeDictionaryForMetrics` enabled, dictionary is not created for the metric columns
-   * for which percent savings in storage exceed the `noDictionaryStorageSavedRatio`.
+   * for which rawIndexSize / forwardIndexSize is less than the `noDictionaryStorageSavedRatio`.
    */
   private boolean _optimizeDictionaryForMetrics;
   private double _noDictionaryStorageSavedRatio;
