@@ -35,8 +35,8 @@ import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
-import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.utils.AuthUtils;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
 
