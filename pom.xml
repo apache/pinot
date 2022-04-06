@@ -58,6 +58,7 @@
     <module>pinot-compatibility-verifier</module>
 
     <module>pinot-query-planner</module>
+    <module>pinot-query-runtime</module>
   </modules>
 
   <licenses>
@@ -413,6 +414,24 @@
         <version>${project.version}</version>
         <type>test-jar</type>
       </dependency>
+
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-query-planner</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-query-planner</artifactId>
+        <version>${project.version}</version>
+        <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-query-runtime</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+
       <dependency>
         <groupId>nl.jqno.equalsverifier</groupId>
         <artifactId>equalsverifier</artifactId>
