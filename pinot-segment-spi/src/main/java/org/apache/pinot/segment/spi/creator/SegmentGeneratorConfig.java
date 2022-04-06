@@ -65,7 +65,7 @@ public class SegmentGeneratorConfig implements Serializable {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGeneratorConfig.class);
-  public static final double DEFAULT_DICTIONARY_INDEX_SIZE_RATIO = 0.85d;
+  public static final double DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD = 0.85d;
 
   private TableConfig _tableConfig;
   private final Map<String, String> _customProperties = new HashMap<>();
@@ -109,7 +109,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private boolean _nullHandlingEnabled = false;
   private boolean _failOnEmptySegment = false;
   private boolean _optimizeDictionaryForMetrics = false;
-  private double _noDictionaryStorageSavedRatio = DEFAULT_DICTIONARY_INDEX_SIZE_RATIO;
+  private double _noDictionarySizeRatioThreshold = DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD;
 
   // constructed from FieldConfig
   private Map<String, Map<String, String>> _columnProperties = new HashMap<>();
@@ -203,7 +203,7 @@ public class SegmentGeneratorConfig implements Serializable {
 
       _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
       _optimizeDictionaryForMetrics = indexingConfig.isOptimizeDictionaryForMetrics();
-      _noDictionaryStorageSavedRatio = indexingConfig.getNoDictionaryStorageSavedRatio();
+      _noDictionarySizeRatioThreshold = indexingConfig.getNoDictionarySizeRatioThreshold();
     }
   }
 
@@ -719,12 +719,12 @@ public class SegmentGeneratorConfig implements Serializable {
     _optimizeDictionaryForMetrics = optimizeDictionaryForMetrics;
   }
 
-  public double getNoDictionaryStorageSavedRatio() {
-    return _noDictionaryStorageSavedRatio;
+  public double getNoDictionarySizeRatioThreshold() {
+    return _noDictionarySizeRatioThreshold;
   }
 
-  public void setNoDictionaryStorageSavedRatio(double noDictionaryStorageSavedRatio) {
-    _noDictionaryStorageSavedRatio = noDictionaryStorageSavedRatio;
+  public void setNoDictionarySizeRatioThreshold(double noDictionarySizeRatioThreshold) {
+    _noDictionarySizeRatioThreshold = noDictionarySizeRatioThreshold;
   }
 
   public boolean isFailOnEmptySegment() {

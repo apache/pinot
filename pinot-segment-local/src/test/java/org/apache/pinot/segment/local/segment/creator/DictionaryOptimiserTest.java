@@ -138,7 +138,7 @@ public class DictionaryOptimiserTest {
     segmentGenSpec.setTableName(tableName);
     segmentGenSpec.setOutDir(outputDir.getAbsolutePath());
     segmentGenSpec.setOptimizeDictionaryForMetrics(true);
-    segmentGenSpec.setNoDictionaryStorageSavedRatio(0.1);
+    segmentGenSpec.setNoDictionarySizeRatioThreshold(0.9);
     return segmentGenSpec;
   }
 

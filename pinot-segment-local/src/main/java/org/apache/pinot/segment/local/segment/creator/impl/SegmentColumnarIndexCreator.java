@@ -275,7 +275,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       double indexWithoutDictSize = info.getTotalNumberOfEntries() * spec.getDataType().size();
 
       double indexSizeRatio = indexWithoutDictSize / indexWithDictSize;
-      if (indexSizeRatio <= config.getNoDictionaryStorageSavedRatio()) {
+      if (indexSizeRatio <= config.getNoDictionarySizeRatioThreshold()) {
         return false;
       }
     }
