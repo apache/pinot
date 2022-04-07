@@ -53,12 +53,14 @@ message ObjectFields {
 }
 
 message LiteralField {
-  optional bool boolField = 1;
-  optional int32 intField = 2;
-  optional int64 longField = 3;
-  optional double doubleField = 4;
-  optional string stringField = 5;
-  optional bytes bytesField = 6;
+  oneof literal_field {
+    bool boolField = 1;
+    int32 intField = 2;
+    int64 longField = 3;
+    double doubleField = 4;
+    string stringField = 5;
+    bytes bytesField = 6;
+  }
 }
 
 message ListField {

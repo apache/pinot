@@ -217,16 +217,6 @@ public class TableCache implements PinotConfigProvider {
     }
   }
 
-  /**
-   * Return a map between lower-case table name and their canonicalized form. Key-value pair are only different in
-   * case-sensitive environment.
-   *
-   * @return the table name map.
-   */
-  public Map<String, String> getTableNameMap() {
-    return _tableNameMap;
-  }
-
   private void addTableConfigs(List<String> paths) {
     // Subscribe data changes before reading the data to avoid missing changes
     for (String path : paths) {
