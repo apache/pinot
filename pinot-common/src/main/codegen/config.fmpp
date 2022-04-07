@@ -1,0 +1,105 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to you under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+data: {
+  # Data declarations for this parser.
+  #
+  # Default declarations are in default_config.fmpp; if you do not include a
+  # declaration ('imports' or 'nonReservedKeywords', for example) in this file,
+  # FMPP will use the declaration from default_config.fmpp.
+  parser: {
+    # Generated parser implementation class package and name
+    package: "org.apache.pinot.sql.parsers.parser",
+    class: "SqlParserImpl",
+
+    # List of import statements.
+    imports: [
+      "org.apache.pinot.sql.parsers.parser.*"
+      "java.util.*"
+    ]
+
+    # List of new keywords.
+    keywords: [
+      "LOAD"
+      "FILE"
+      "ARCHIVE"
+    ]
+
+    # List of non-reserved keywords to add
+    nonReservedKeywordsToAdd: [
+      "LOAD"
+      "FILE"
+      "ARCHIVE"
+    ]
+
+    # List of methods for parsing extensions to a generic syntax.
+    # Each must accept arguments "(SqlParserPos pos, boolean replace)".
+    statementParserMethods: [
+    ]
+
+    # List of methods for parsing custom literals.
+    literalParserMethods: [
+    ],
+
+    # List of methods for parsing custom data types.
+    dataTypeParserMethods: [
+    ],
+
+    # List of methods for parsing extensions to "ALTER <scope>" calls.
+    # Each must accept arguments "(SqlParserPos pos, String scope)".
+    alterStatementParserMethods: [
+    ]
+
+    # List of methods for parsing extensions to "INSERT <scope>" calls.
+    # Each must accept arguments "(SqlParserPos pos, String scope)".
+    insertStatementParserMethods: [
+    ]
+
+    # List of methods for parsing extensions to "CREATE [OR REPLACE]" calls.
+    # Each must accept arguments "(SqlParserPos pos, boolean replace)".
+    createStatementParserMethods: [
+    ]
+
+    # List of methods for parsing extensions to "DROP" calls.
+    # Each must accept arguments "(SqlParserPos pos)".
+    dropStatementParserMethods: [
+    ]
+
+    # List of files in @includes directory that have parser method
+    # implementations for custom SQL statements, literals or types
+    # given as part of "statementParserMethods", "literalParserMethods" or
+    # "dataTypeParserMethods".
+    implementationFiles: [
+      "parserImpls.ftl"
+    ],
+
+    # List of files in @includes directory that have parser method
+    # implementations for parsing custom SQL statements, literals or types
+    # given as part of "statementParserMethods", "literalParserMethods" or
+    # "dataTypeParserMethods".
+    # Example: "parserImpls.ftl".
+    implementationFiles: [
+      "parserImpls.ftl"
+    ],
+
+    includeCompoundIdentifier: true,
+    includeBraces: true,
+    includeAdditionalDeclarations: false
+  }
+}
+
+freemarkerLinks: {
+  includes: includes/
+}
