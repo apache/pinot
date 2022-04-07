@@ -272,7 +272,7 @@ public class ExpressionTransformerTest {
     transformConfigs.add(new TransformConfig("a", "plus(b,10)"));
     transformConfigs.add(new TransformConfig("a", "plus(c,10)"));
 
-    IngestionConfig ingestionConfig = new IngestionConfig(null, null, null, transformConfigs, null);
+    IngestionConfig ingestionConfig = new IngestionConfig(null, null, null, null, transformConfigs, null);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("testMultipleTransformFunctionSortOrder")
             .setIngestionConfig(ingestionConfig).build();
@@ -295,7 +295,7 @@ public class ExpressionTransformerTest {
     transformConfigs.add(new TransformConfig("d", "plus(e,10)"));
     transformConfigs.add(new TransformConfig("c", "plus(d,e)"));
 
-    IngestionConfig ingestionConfig = new IngestionConfig(null, null, null, transformConfigs, null);
+    IngestionConfig ingestionConfig = new IngestionConfig(null, null, null, null, transformConfigs, null);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("testNonCyclicTransformFunctionSortOrder")
             .setIngestionConfig(ingestionConfig).build();
@@ -323,7 +323,7 @@ public class ExpressionTransformerTest {
     transformConfigs.add(new TransformConfig("b", "plus(c,10)"));
     transformConfigs.add(new TransformConfig("c", "plus(a,10)"));
 
-    IngestionConfig ingestionConfig = new IngestionConfig(null, null, null, transformConfigs, null);
+    IngestionConfig ingestionConfig = new IngestionConfig(null, null, null, null, transformConfigs, null);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("testRecrusiveTransformFunctionSortOrder")
             .setIngestionConfig(ingestionConfig).build();
