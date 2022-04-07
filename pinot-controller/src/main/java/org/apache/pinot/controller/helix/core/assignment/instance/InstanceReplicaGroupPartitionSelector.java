@@ -37,8 +37,8 @@ import org.slf4j.LoggerFactory;
 public class InstanceReplicaGroupPartitionSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceReplicaGroupPartitionSelector.class);
 
-  private final InstanceReplicaGroupPartitionConfig _replicaGroupPartitionConfig;
-  private final String _tableNameWithType;
+  protected final InstanceReplicaGroupPartitionConfig _replicaGroupPartitionConfig;
+  protected final String _tableNameWithType;
 
   public InstanceReplicaGroupPartitionSelector(InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig,
       String tableNameWithType) {
@@ -163,31 +163,44 @@ public class InstanceReplicaGroupPartitionSelector {
       }
     } else {
       // Non-replica-group based selection
-
-      // Pick one pool based on the table name hash
-      int pool = pools.get(tableNameHash % numPools);
-      LOGGER.info("Selecting pool: {} for table: {}", pool, _tableNameWithType);
-      List<InstanceConfig> instanceConfigs = poolToInstanceConfigsMap.get(pool);
-      int numInstanceConfigs = instanceConfigs.size();
-
-      // Assign all instances if not configured
-      int numInstancesToSelect = _replicaGroupPartitionConfig.getNumInstances();
-      if (numInstancesToSelect > 0) {
-        Preconditions.checkState(numInstancesToSelect <= numInstanceConfigs,
-            "Not enough qualified instances from pool: %s (%s in the pool, asked for %s)", pool, numInstanceConfigs,
-            numInstancesToSelect);
-      } else {
-        numInstancesToSelect = numInstanceConfigs;
-      }
-
-      List<String> instancesToSelect = new ArrayList<>(numInstancesToSelect);
-      for (int i = 0; i < numInstancesToSelect; i++) {
-        instancesToSelect.add(instanceConfigs.get(i).getInstanceName());
-      }
-      instancesToSelect.sort(null);
-      LOGGER.info("Selecting instances: {} for table: {}", instancesToSelect, _tableNameWithType);
-      // Set the instances as partition 0 replica 0
-      instancePartitions.setInstances(0, 0, instancesToSelect);
+      selectForNonReplicaGroupBased(poolToInstanceConfigsMap, instancePartitions);
     }
+  }
+
+  protected void selectForNonReplicaGroupBased(Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap,
+      InstancePartitions instancePartitions) {
+    int numPools = poolToInstanceConfigsMap.size();
+    Preconditions.checkState(numPools != 0, "No pool qualified for selection");
+
+    int tableNameHash = Math.abs(_tableNameWithType.hashCode());
+    List<Integer> pools = new ArrayList<>(poolToInstanceConfigsMap.keySet());
+    pools.sort(null);
+    LOGGER.info("Starting instance replica-group/partition selection for table: {} with hash: {} from pools: {}",
+        _tableNameWithType, tableNameHash, pools);
+
+    // Pick one pool based on the table name hash
+    int pool = pools.get(tableNameHash % numPools);
+    LOGGER.info("Selecting pool: {} for table: {}", pool, _tableNameWithType);
+    List<InstanceConfig> instanceConfigs = poolToInstanceConfigsMap.get(pool);
+    int numInstanceConfigs = instanceConfigs.size();
+
+    // Assign all instances if not configured
+    int numInstancesToSelect = _replicaGroupPartitionConfig.getNumInstances();
+    if (numInstancesToSelect > 0) {
+      Preconditions.checkState(numInstancesToSelect <= numInstanceConfigs,
+          "Not enough qualified instances from pool: %s (%s in the pool, asked for %s)", pool, numInstanceConfigs,
+          numInstancesToSelect);
+    } else {
+      numInstancesToSelect = numInstanceConfigs;
+    }
+
+    List<String> instancesToSelect = new ArrayList<>(numInstancesToSelect);
+    for (int i = 0; i < numInstancesToSelect; i++) {
+      instancesToSelect.add(instanceConfigs.get(i).getInstanceName());
+    }
+    instancesToSelect.sort(null);
+    LOGGER.info("Selecting instances: {} for table: {}", instancesToSelect, _tableNameWithType);
+    // Set the instances as partition 0 replica 0
+    instancePartitions.setInstances(0, 0, instancesToSelect);
   }
 }

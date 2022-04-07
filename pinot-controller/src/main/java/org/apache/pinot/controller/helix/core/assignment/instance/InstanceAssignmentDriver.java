@@ -52,7 +52,7 @@ public class InstanceAssignmentDriver {
   }
 
   public InstancePartitions assignInstances(InstancePartitionsType instancePartitionsType,
-      List<InstanceConfig> instanceConfigs) {
+      List<InstanceConfig> instanceConfigs, InstancePartitions existingInstancePartitions) {
     String tableNameWithType = _tableConfig.getTableName();
     LOGGER.info("Starting {} instance assignment for table: {}", instancePartitionsType, tableNameWithType);
 
@@ -73,8 +73,9 @@ public class InstanceAssignmentDriver {
       poolToInstanceConfigsMap = constraintApplier.applyConstraint(poolToInstanceConfigsMap);
     }
 
-    InstanceReplicaGroupPartitionSelector replicaPartitionSelector =
-        new InstanceReplicaGroupPartitionSelector(assignmentConfig.getReplicaGroupPartitionConfig(), tableNameWithType);
+    InstanceReplicaGroupPartitionSelector replicaPartitionSelector = InstanceReplicaGroupPartitionSelectorFactory
+        .generateInstanceReplicaGroupPartitionSelector(assignmentConfig.getReplicaGroupPartitionConfig(),
+            tableNameWithType, existingInstancePartitions);
     InstancePartitions instancePartitions = new InstancePartitions(
         instancePartitionsType.getInstancePartitionsName(TableNameBuilder.extractRawTableName(tableNameWithType)));
     replicaPartitionSelector.selectInstances(poolToInstanceConfigsMap, instancePartitions);
