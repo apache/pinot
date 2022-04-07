@@ -16,30 +16,41 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator;
+package org.apache.pinot.spi.trace;
 
-import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.trace.InvocationScope;
-import org.apache.pinot.spi.trace.Tracing;
+import java.util.Deque;
 
 
 /**
- * Any other Pinot Operators should extend BaseOperator
+ * Encapsulation of thread-local state used for tracing. The implementor must ensure this is not passed
+ * across threads.
  */
-public abstract class BaseOperator<T extends Block> implements Operator<T> {
+public interface TraceState {
 
-  @Override
-  public final T nextBlock() {
-    if (Thread.interrupted()) {
-      throw new EarlyTerminationException();
-    }
-    try (InvocationScope execution = Tracing.getTracer().createScope(getClass())) {
-      return getNextBlock();
-    }
-  }
+  /**
+   * The trace ID - corresponds to a single request or query
+   */
+  long getTraceId();
 
-  // Make it protected because we should always call nextBlock()
-  protected abstract T getNextBlock();
+  /**
+   * Set the trace ID
+   */
+  void setTraceId(long traceId);
+
+  /**
+   * returns and increments a counter which can be used for labeling events.
+   *
+   */
+  int getAndIncrementCounter();
+
+  /**
+   * Sets the counter to its undefined base value.
+   */
+  void resetCounter();
+
+  /**
+   * Get the stack of recordings. The implementor is responsible for ensuring only recordings started on the current
+   * thread are added to this stack.
+   */
+  Deque<InvocationRecording> getRecordings();
 }

@@ -16,30 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator;
-
-import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.trace.InvocationScope;
-import org.apache.pinot.spi.trace.Tracing;
-
+package org.apache.pinot.spi.trace;
 
 /**
- * Any other Pinot Operators should extend BaseOperator
+ * The type of filter - currently SCAN and INDEX (everything not implemented as a scan).
  */
-public abstract class BaseOperator<T extends Block> implements Operator<T> {
-
-  @Override
-  public final T nextBlock() {
-    if (Thread.interrupted()) {
-      throw new EarlyTerminationException();
-    }
-    try (InvocationScope execution = Tracing.getTracer().createScope(getClass())) {
-      return getNextBlock();
-    }
-  }
-
-  // Make it protected because we should always call nextBlock()
-  protected abstract T getNextBlock();
+public enum FilterType {
+  /**
+   * To be used by index based filters
+   */
+  INDEX,
+  /**
+   * To be used by scan based filters
+   */
+  SCAN
 }

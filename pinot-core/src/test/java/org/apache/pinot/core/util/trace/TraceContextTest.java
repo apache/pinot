@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -73,7 +74,7 @@ public class TraceContextTest {
   private void testSingleRequest(ExecutorService executorService, final long requestId)
       throws Exception {
     Set<String> expectedTraces = new HashSet<>(NUM_CHILDREN_PER_REQUEST + 1);
-    TraceContext.register(requestId);
+    Tracing.getTracer().register(requestId);
     String key = Integer.toString(RANDOM.nextInt());
     int value = RANDOM.nextInt();
     expectedTraces.add(getTraceString(key, value));
