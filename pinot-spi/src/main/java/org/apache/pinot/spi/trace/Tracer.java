@@ -18,6 +18,11 @@
  */
 package org.apache.pinot.spi.trace;
 
+/**
+ * Tracer responsible for trace state management. Users can implement this to filter
+ * what data is recorded, choose what format it is reported in (e.g. logs, JFR events, in-memory)
+ * and where it goes.
+ */
 public interface Tracer {
 
     /**
@@ -26,12 +31,20 @@ public interface Tracer {
      */
     void register(long requestId);
 
+    /**
+     * Detach a trace from the current thread.
+     */
     void unregister();
 
-    InvocationSpan beginInvocation(Class<?> clazz);
+    /**
+     *
+     * @param clazz the enclosing context, e.g. Operator, PlanNode, BlockValSet...
+     * @return a new scope which MUST be closed on the current thread.
+     */
+    InvocationScope createScope(Class<?> clazz);
 
     /**
-     * @return the active execution
+     * @return the active recording
      */
     InvocationRecording activeRecording();
 }

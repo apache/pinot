@@ -22,8 +22,8 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import org.apache.pinot.spi.trace.BaseRecording;
 import org.apache.pinot.spi.trace.InvocationRecording;
-import org.apache.pinot.spi.trace.InvocationSpan;
-import org.apache.pinot.spi.trace.NoOpSpan;
+import org.apache.pinot.spi.trace.InvocationScope;
+import org.apache.pinot.spi.trace.NoOpRecording;
 import org.apache.pinot.spi.trace.TraceState;
 import org.apache.pinot.spi.trace.Tracer;
 import org.slf4j.Logger;
@@ -35,7 +35,7 @@ public class BuiltInTracer implements Tracer {
   private static final Logger LOGGER = LoggerFactory.getLogger(BuiltInTracer.class);
   private static final ThreadLocal<Deque<InvocationRecording>> STACK = ThreadLocal.withInitial(ArrayDeque::new);
 
-  private static final class MilliTimeSpan extends BaseRecording implements InvocationSpan {
+  private static final class MilliTimeSpan extends BaseRecording implements InvocationScope {
 
     private final long _startTimeMillis = System.currentTimeMillis();
     private final Class<?> _operator;
@@ -70,20 +70,20 @@ public class BuiltInTracer implements Tracer {
   }
 
   @Override
-  public InvocationSpan beginInvocation(Class<?> operatorClass) {
+  public InvocationScope createScope(Class<?> operatorClass) {
     if (TraceContext.traceEnabled()) {
       Deque<InvocationRecording> stack = getStack();
       MilliTimeSpan execution = new MilliTimeSpan(operatorClass, stack::removeLast);
       stack.addLast(execution);
       return execution;
     }
-    return NoOpSpan.INSTANCE;
+    return NoOpRecording.INSTANCE;
   }
 
   @Override
   public InvocationRecording activeRecording() {
     Deque<InvocationRecording> stack = getStack();
-    return stack.isEmpty() ? NoOpSpan.INSTANCE : stack.peekLast();
+    return stack.isEmpty() ? NoOpRecording.INSTANCE : stack.peekLast();
   }
 
   private Deque<InvocationRecording> getStack() {

@@ -18,8 +18,18 @@
  */
 package org.apache.pinot.spi.trace;
 
-public interface Span extends AutoCloseable {
+/**
+ * Used when tracing is disabled.
+ */
+public final class NoOpRecording extends BaseRecording implements InvocationScope {
+
+  public static final NoOpRecording INSTANCE = new NoOpRecording();
+
+  public NoOpRecording() {
+    super(false);
+  }
 
   @Override
-  void close();
+  public void close() {
+  }
 }

@@ -21,7 +21,7 @@ package org.apache.pinot.core.operator;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.trace.InvocationSpan;
+import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
 
 
@@ -35,7 +35,7 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
     if (Thread.interrupted()) {
       throw new EarlyTerminationException();
     }
-    try (InvocationSpan execution = Tracing.getTracer().beginInvocation(getClass())) {
+    try (InvocationScope execution = Tracing.getTracer().createScope(getClass())) {
       return getNextBlock();
     }
   }

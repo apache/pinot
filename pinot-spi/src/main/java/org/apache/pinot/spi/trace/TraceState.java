@@ -21,15 +21,36 @@ package org.apache.pinot.spi.trace;
 import java.util.Deque;
 
 
+/**
+ * Encapsulation of thread-local state used for tracing. The implementor must ensure this is not passed
+ * across threads.
+ */
 public interface TraceState {
 
+  /**
+   * The trace ID - corresponds to a single request or query
+   */
   long getTraceId();
 
+  /**
+   * Set the trace ID
+   */
   void setTraceId(long traceId);
 
+  /**
+   * returns and increments a counter which can be used for labeling events.
+   *
+   */
   int getAndIncrementCounter();
 
+  /**
+   * Sets the counter to its undefined base value.
+   */
   void resetCounter();
 
+  /**
+   * Get the stack of recordings. The implementor is responsible for ensuring only recordings started on the current
+   * thread are added to this stack.
+   */
   Deque<InvocationRecording> getRecordings();
 }

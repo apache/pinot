@@ -18,7 +18,16 @@
  */
 package org.apache.pinot.spi.trace;
 
+/**
+ * The type of filter - currently SCAN and INDEX (everything not implemented as a scan).
+ */
 public enum FilterType {
+  /**
+   * To be used by index based filters
+   */
   INDEX,
+  /**
+   * To be used by scan based filters
+   */
   SCAN
 }

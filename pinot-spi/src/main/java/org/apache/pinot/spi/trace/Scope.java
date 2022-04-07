@@ -18,15 +18,12 @@
  */
 package org.apache.pinot.spi.trace;
 
-public final class NoOpSpan extends BaseRecording implements InvocationSpan {
-
-  public static final NoOpSpan INSTANCE = new NoOpSpan();
-
-  public NoOpSpan() {
-    super(false);
-  }
+/**
+ * Models the lifecycle of a span of synchronous work, analogous to the Scope concept in tracing libraries.
+ * Must be created and closed on the same thread.
+ */
+public interface Scope extends AutoCloseable {
 
   @Override
-  public void close() {
-  }
+  void close();
 }

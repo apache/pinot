@@ -21,18 +21,24 @@ package org.apache.pinot.spi.trace;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.concurrent.atomic.AtomicReference;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
+/**
+ * This is the registration point for third party tracing implementations, which can register an {@see Tracer} here.
+ * Only one tracer can be registered to avoid the overhead of polymorphic calls in what can be hot code paths.
+ * The tracer registered here will be used by pinot for all manually instrumented scopes, so long as it is
+ * registered before the first call to {@see getTracer} or {@see activeRecording}.
+ */
 public class Tracing {
 
   private Tracing() {
   }
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(Tracing.class);
-
   private static final AtomicReference<Tracer> REGISTRATION = new AtomicReference<>();
+
+  private static final class Holder {
+    static final Tracer TRACER = REGISTRATION.get() == null ? createDefaultTracer() : REGISTRATION.get();
+  }
 
   /**
    * User once registration point to allow customization of tracing behaviour. Registration will be successful
@@ -42,10 +48,6 @@ public class Tracing {
    */
   public static boolean register(Tracer tracer) {
     return REGISTRATION.compareAndSet(null, tracer);
-  }
-
-  private static final class Holder {
-    static final Tracer TRACER = REGISTRATION.get() == null ? createDefaultTracer() : REGISTRATION.get();
   }
 
   /**
@@ -71,14 +73,17 @@ public class Tracing {
       return (Tracer) MethodHandles.publicLookup()
           .findConstructor(clazz, MethodType.methodType(void.class)).invoke();
     } catch (Throwable missing) {
-      LOGGER.error("could not construct MethodHandle for {}", defaultImplementationClassName, missing);
-      return NoOpTracer.INSTANCE;
+      return FallbackTracer.INSTANCE;
     }
   }
 
-  private static final class NoOpTracer implements Tracer {
+  /**
+   * Used only when something has gone wrong and even the default tracer cannot be loaded
+   * (won't happen except in tests or completely custom deployments which exclude pinot-segment-local).
+   */
+  private static final class FallbackTracer implements Tracer {
 
-    static final NoOpTracer INSTANCE = new NoOpTracer();
+    static final FallbackTracer INSTANCE = new FallbackTracer();
 
     @Override
     public void register(long requestId) {
@@ -89,13 +94,13 @@ public class Tracing {
     }
 
     @Override
-    public InvocationSpan beginInvocation(Class<?> clazz) {
-      return NoOpSpan.INSTANCE;
+    public InvocationScope createScope(Class<?> clazz) {
+      return NoOpRecording.INSTANCE;
     }
 
     @Override
     public InvocationRecording activeRecording() {
-      return NoOpSpan.INSTANCE;
+      return NoOpRecording.INSTANCE;
     }
   }
 }

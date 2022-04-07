@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.spi.trace;
 
+/**
+ * A base recording class. SPI users should extend this class to ensure that {@see isEnabled} checks are cheap.
+ */
 public class BaseRecording implements InvocationRecording {
 
   private final boolean _enabled;
@@ -26,8 +29,11 @@ public class BaseRecording implements InvocationRecording {
     _enabled = enabled;
   }
 
+  /**
+   * This should not be overridden to keep the isEnabled checks as cheap as possible.
+   */
   @Override
-  public boolean isEnabled() {
+  public final boolean isEnabled() {
     return _enabled;
   }
 }

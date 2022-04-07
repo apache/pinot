@@ -21,13 +21,18 @@ package org.apache.pinot.spi.trace;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
+/**
+ * Interface for recording data about query execution. By default, nothing happens with this data and regular tracing
+ * is used. The user needs to register a {@see Tracer} implementation which produces recordings implementing this
+ * interface for output to be captured.
+ */
 public interface InvocationRecording {
 
   /**
    * Sets the number of docs scanned by the operator.
-   * @param docsScanned how many docs were scanned.
+   * @param numDocsScanned how many docs were scanned.
    */
-  default void setDocsScanned(int docsScanned) {
+  default void setNumDocsScanned(int numDocsScanned) {
   }
 
   /**
@@ -107,7 +112,8 @@ public interface InvocationRecording {
   }
 
   /**
-   * @return true if the recording is enabled.
+   * @return true if the recording is enabled. If producing a value is costly, the caller should check whether
+   * the recording is enabled before producing the value to keep tracing overhead down.
    */
   boolean isEnabled();
 }

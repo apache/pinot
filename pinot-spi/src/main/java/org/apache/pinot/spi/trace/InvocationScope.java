@@ -18,5 +18,8 @@
  */
 package org.apache.pinot.spi.trace;
 
-public interface InvocationSpan extends Span, InvocationRecording {
+/**
+ * Convergence of {@see Span} (the lifecycle) and {@see InvocationRecording} (the data).
+ */
+public interface InvocationScope extends Scope, InvocationRecording {
 }
