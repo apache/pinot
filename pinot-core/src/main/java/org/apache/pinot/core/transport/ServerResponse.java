@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.transport;
 
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.utils.DataTable;
 
@@ -39,6 +40,7 @@ public class ServerResponse {
     _startTimeMs = startTimeMs;
   }
 
+  @Nullable
   public DataTable getDataTable() {
     return _dataTable;
   }

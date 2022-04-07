@@ -249,6 +249,19 @@ public class CommonConstants {
         public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
       }
     }
+
+    public static class FailureDetector {
+      public static final String CONFIG_OF_CLASS_NAME = "pinot.broker.failure.detector.class";
+
+      // Exponential backoff delay of retrying an unhealthy server when a failure is detected
+      public static final String CONFIG_OF_RETRY_INITIAL_DELAY_MS =
+          "pinot.broker.failure.detector.retry.initial.delay.ms";
+      public static final long DEFAULT_RETRY_INITIAL_DELAY_MS = 5_000L;
+      public static final String CONFIG_OF_RETRY_DELAY_FACTOR = "pinot.broker.failure.detector.retry.delay.factor";
+      public static final double DEFAULT_RETRY_DELAY_FACTOR = 2.0;
+      public static final String CONFIG_OF_MAX_RETRIES = "pinot.broker.failure.detector.max.retries";
+      public static final int DEFAULT_MAX_RETIRES = 10;
+    }
   }
 
   public static class Server {
