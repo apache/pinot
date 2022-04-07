@@ -85,6 +85,10 @@ public class Tracing {
     }
 
     @Override
+    public void unregister() {
+    }
+
+    @Override
     public InvocationSpan beginInvocation(Class<?> clazz) {
       return NoOpSpan.INSTANCE;
     }

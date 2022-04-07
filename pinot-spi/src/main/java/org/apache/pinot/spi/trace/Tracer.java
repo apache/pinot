@@ -26,6 +26,8 @@ public interface Tracer {
      */
     void register(long requestId);
 
+    void unregister();
+
     InvocationSpan beginInvocation(Class<?> clazz);
 
     /**

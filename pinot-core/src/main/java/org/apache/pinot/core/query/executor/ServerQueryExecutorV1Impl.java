@@ -220,10 +220,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         tableDataManager.releaseSegment(segmentDataManager);
       }
       if (enableTrace) {
-        if (dataTable != null) {
+        if (TraceContext.traceEnabled() && dataTable != null) {
           dataTable.getMetadata().put(MetadataKey.TRACE_INFO.getName(), TraceContext.getTraceInfo());
         }
-        TraceContext.unregister();
+        Tracing.getTracer().unregister();
       }
     }
 

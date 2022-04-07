@@ -65,6 +65,11 @@ public class BuiltInTracer implements Tracer {
   }
 
   @Override
+  public void unregister() {
+    TraceContext.unregister();
+  }
+
+  @Override
   public InvocationSpan beginInvocation(Class<?> operatorClass) {
     if (TraceContext.traceEnabled()) {
       Deque<InvocationRecording> stack = getStack();
