@@ -200,7 +200,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     // Task deletion requires the task queue to be stopped,
     // so deleting task1 here before resuming the task queue.
     assertTrue(_helixTaskResourceManager.getTaskStates(TASK_TYPE).containsKey(task1));
-    _helixTaskResourceManager.deleteTasks(TASK_TYPE, task1, false);
+    _helixTaskResourceManager.deleteTask(task1, false);
     // Resume the task queue, and let the task complete
     _helixTaskResourceManager.resumeTaskQueue(TASK_TYPE);
     HOLD.set(false);

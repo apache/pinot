@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
 import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.JobContext;
@@ -165,23 +166,22 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
-   * Delete tasks from the task queue for the given task type.
+   * Delete a single task from the task queue. The task queue should be
+   * stopped before deleting the task, otherwise it fails with exception.
    *
-   * @param taskType to find the task queue.
-   * @param taskNames a list of tasks to delete from the queue.
+   * @param taskName the task to delete from the queue.
    * @param forceDelete as said in helix comment, if set true, all job's related zk nodes will
    *                    be clean up from zookeeper even if its workflow information can not be found.
    */
-  public synchronized void deleteTasks(String taskType, String taskNames, boolean forceDelete) {
+  public synchronized void deleteTask(String taskName, boolean forceDelete) {
+    String taskType = getTaskType(taskName);
     String helixJobQueueName = getHelixJobQueueName(taskType);
-    for (String taskName : StringUtils.split(taskNames, ",")) {
-      if (forceDelete) {
-        LOGGER.warn("Force deleting task: {} from queue: {} of task type: {}", taskName, helixJobQueueName, taskType);
-      } else {
-        LOGGER.info("Deleting task: {} from queue: {} of task type: {}", taskName, helixJobQueueName, taskType);
-      }
-      _taskDriver.deleteJob(helixJobQueueName, taskName, forceDelete);
+    if (forceDelete) {
+      LOGGER.warn("Force deleting task: {} from queue: {} of task type: {}", taskName, helixJobQueueName, taskType);
+    } else {
+      LOGGER.info("Deleting task: {} from queue: {} of task type: {}", taskName, helixJobQueueName, taskType);
     }
+    _taskDriver.deleteJob(helixJobQueueName, taskName, forceDelete);
   }
 
   /**
@@ -351,11 +351,12 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
-   * Get states of the sub tasks for a given task.
+   * Get states of all the sub tasks for a given task.
+   *
    * @param taskName the task whose sub tasks to check
-   * @return states of the sub tasks
+   * @return states of all the sub tasks
    */
-  public synchronized Map<String, TaskPartitionState> getSubTaskStates(String taskName) {
+  public synchronized Map<String, TaskPartitionState> getSubtaskStates(String taskName) {
     String taskType = getTaskType(taskName);
     WorkflowContext workflowContext = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType));
     if (workflowContext == null) {
@@ -393,26 +394,27 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
-   * Get the configs of specified sub task for the given task name.
+   * Get configs of the specified sub task for a given task.
+   *
    * @param taskName the task whose sub tasks to check
-   * @param subTaskNames the sub tasks to check
+   * @param subtaskNames the sub tasks to check
    * @return the configs of the sub tasks
    */
-  public synchronized Map<String, PinotTaskConfig> getSubTaskConfigs(String taskName, String subTaskNames) {
+  public synchronized Map<String, PinotTaskConfig> getSubtaskConfigs(String taskName, @Nullable String subtaskNames) {
     JobConfig jobConfig = _taskDriver.getJobConfig(getHelixJobName(taskName));
     if (jobConfig == null) {
       return Collections.emptyMap();
     }
     Map<String, TaskConfig> helixTaskConfigs = jobConfig.getTaskConfigMap();
     Map<String, PinotTaskConfig> taskConfigs = new HashMap<>(helixTaskConfigs.size());
-    if (StringUtils.isEmpty(subTaskNames)) {
+    if (StringUtils.isEmpty(subtaskNames)) {
       helixTaskConfigs.forEach((sub, cfg) -> taskConfigs.put(sub, PinotTaskConfig.fromHelixTaskConfig(cfg)));
       return taskConfigs;
     }
-    for (String subTaskName : StringUtils.split(subTaskNames, ",")) {
-      TaskConfig taskConfig = helixTaskConfigs.get(subTaskName);
+    for (String subtaskName : StringUtils.split(subtaskNames, ',')) {
+      TaskConfig taskConfig = helixTaskConfigs.get(subtaskName);
       if (taskConfig != null) {
-        taskConfigs.put(subTaskName, PinotTaskConfig.fromHelixTaskConfig(taskConfig));
+        taskConfigs.put(subtaskName, PinotTaskConfig.fromHelixTaskConfig(taskConfig));
       }
     }
     return taskConfigs;
