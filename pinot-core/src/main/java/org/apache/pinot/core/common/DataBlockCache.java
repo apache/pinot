@@ -64,7 +64,9 @@ public class DataBlockCache {
   public void initNewBlock(int[] docIds, int length) {
     _docIds = docIds;
     if (length > _length) {
+      _dictIdsMap.clear();
       _valuesMap.clear();
+      _numValuesMap.clear();
     }
     _length = length;
     _columnDictIdLoaded.clear();
