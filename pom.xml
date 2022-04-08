@@ -1724,6 +1724,8 @@
             <config>SCRIPT_STYLE</config>
             <queries>SCRIPT_STYLE</queries>
             <results>SCRIPT_STYLE</results>
+            <fmpp>SCRIPT_STYLE</fmpp>
+            <ftl>FTL_STYLE</ftl>
             <MockMaker>SCRIPT_STYLE</MockMaker>
             <appAssemblerScriptTemplate>SCRIPT_STYLE</appAssemblerScriptTemplate>
             <pql>SCRIPT_STYLE</pql>

@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.sql.parsers.parser;
 
+import java.util.Arrays;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlWriter;
 
-import java.util.Arrays;
 
 class UnparseUtils {
   private final SqlWriter _writer;
