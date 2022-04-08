@@ -75,7 +75,7 @@
     "json-bigint": "^1.0.0",
     "jsonlint": "^1.6.3",
     "lodash": "^4.17.17",
-    "moment": "^2.27.0",
+    "moment": "^2.29.2",
     "prop-types": "^15.7.2",
     "re-resizable": "^6.9.0",
     "react": "16.13.1",
