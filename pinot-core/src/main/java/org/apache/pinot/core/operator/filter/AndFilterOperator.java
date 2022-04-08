@@ -24,6 +24,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
+import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.BufferFastAggregation;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
@@ -40,6 +41,7 @@ public class AndFilterOperator extends BaseFilterOperator {
 
   @Override
   protected FilterBlock getNextBlock() {
+    Tracing.activeRecording().setNumChildren(_filterOperators.size());
     List<FilterBlockDocIdSet> filterBlockDocIdSets = new ArrayList<>(_filterOperators.size());
     for (BaseFilterOperator filterOperator : _filterOperators) {
       filterBlockDocIdSets.add(filterOperator.nextBlock().getBlockDocIdSet());
