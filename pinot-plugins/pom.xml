@@ -49,6 +49,7 @@
     <module>pinot-segment-writer</module>
     <module>pinot-segment-uploader</module>
     <module>pinot-environment</module>
+    <module>pinot-fmpp-maven-plugin</module>
   </modules>
 
   <dependencies>

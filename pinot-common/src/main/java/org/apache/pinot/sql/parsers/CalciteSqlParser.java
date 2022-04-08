@@ -19,6 +19,7 @@
 package org.apache.pinot.sql.parsers;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -45,6 +46,7 @@ import org.apache.calcite.sql.SqlSelectKeyword;
 import org.apache.calcite.sql.fun.SqlBetweenOperator;
 import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.fun.SqlLikeOperator;
+import org.apache.calcite.sql.parser.SqlAbstractParserImpl;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.babel.SqlBabelParserImpl;
@@ -60,10 +62,13 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.Pairs;
+import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.calcite.sql.parser.SqlParser.DEFAULT_IDENTIFIER_MAX_LENGTH;
 
 
 public class CalciteSqlParser {
@@ -131,11 +136,17 @@ public class CalciteSqlParser {
       sql = removeOptionsFromSql(sql);
     }
 
-    SqlParser sqlParser = SqlParser.create(sql, PARSER_CONFIG);
     SqlNode sqlNode;
-    try {
-      sqlNode = sqlParser.parseQuery();
-    } catch (SqlParseException e) {
+    try (StringReader inStream = new StringReader(sql)) {
+      SqlParserImpl sqlParser = new SqlParserImpl(inStream);
+      sqlParser.switchTo(SqlAbstractParserImpl.LexicalState.BTID);
+      sqlParser.setTabSize(1);
+      sqlParser.setConformance(SqlConformanceEnum.BABEL);
+      sqlParser.setQuotedCasing(Lex.JAVA.quotedCasing);
+      sqlParser.setUnquotedCasing(Lex.JAVA.unquotedCasing);
+      sqlParser.setIdentifierMaxLength(DEFAULT_IDENTIFIER_MAX_LENGTH);
+      sqlNode = sqlParser.parseSqlStmtEof();
+    } catch (Exception e) {
       throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
     }
 

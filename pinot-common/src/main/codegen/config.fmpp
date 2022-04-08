@@ -30,7 +30,7 @@ data: {
       "java.util.*"
     ]
 
-    # List of new keywords.
+    # List of new keywords to add
     keywords: [
       "LOAD"
       "FILE"
@@ -43,60 +43,6 @@ data: {
       "FILE"
       "ARCHIVE"
     ]
-
-    # List of methods for parsing extensions to a generic syntax.
-    # Each must accept arguments "(SqlParserPos pos, boolean replace)".
-    statementParserMethods: [
-    ]
-
-    # List of methods for parsing custom literals.
-    literalParserMethods: [
-    ],
-
-    # List of methods for parsing custom data types.
-    dataTypeParserMethods: [
-    ],
-
-    # List of methods for parsing extensions to "ALTER <scope>" calls.
-    # Each must accept arguments "(SqlParserPos pos, String scope)".
-    alterStatementParserMethods: [
-    ]
-
-    # List of methods for parsing extensions to "INSERT <scope>" calls.
-    # Each must accept arguments "(SqlParserPos pos, String scope)".
-    insertStatementParserMethods: [
-    ]
-
-    # List of methods for parsing extensions to "CREATE [OR REPLACE]" calls.
-    # Each must accept arguments "(SqlParserPos pos, boolean replace)".
-    createStatementParserMethods: [
-    ]
-
-    # List of methods for parsing extensions to "DROP" calls.
-    # Each must accept arguments "(SqlParserPos pos)".
-    dropStatementParserMethods: [
-    ]
-
-    # List of files in @includes directory that have parser method
-    # implementations for custom SQL statements, literals or types
-    # given as part of "statementParserMethods", "literalParserMethods" or
-    # "dataTypeParserMethods".
-    implementationFiles: [
-      "parserImpls.ftl"
-    ],
-
-    # List of files in @includes directory that have parser method
-    # implementations for parsing custom SQL statements, literals or types
-    # given as part of "statementParserMethods", "literalParserMethods" or
-    # "dataTypeParserMethods".
-    # Example: "parserImpls.ftl".
-    implementationFiles: [
-      "parserImpls.ftl"
-    ],
-
-    includeCompoundIdentifier: true,
-    includeBraces: true,
-    includeAdditionalDeclarations: false
   }
 }
 
