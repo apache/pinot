@@ -26,6 +26,7 @@ data: {
 
     # List of import statements.
     imports: [
+      "com.google.common.collect.*"
       "org.apache.pinot.sql.parsers.parser.*"
       "java.util.*"
     ]
@@ -42,7 +43,24 @@ data: {
       "LOAD"
       "FILE"
       "ARCHIVE"
+      "MIN"
+      "MAX"
+      "AVG"
+      "SUM"
+      "VALUE"
+      "COUNT"
+      "GROUPS"
     ]
+
+    # List of extended statement syntax to add
+    statementParserMethods: [
+      "SqlInsertFromFile()"
+    ]
+
+    # List of files in @includes directory that have parser method
+    implementationFiles: [
+      "parserImpls.ftl"
+    ],
   }
 }
 

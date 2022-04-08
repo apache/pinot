@@ -68,8 +68,6 @@ import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.calcite.sql.parser.SqlParser.DEFAULT_IDENTIFIER_MAX_LENGTH;
-
 
 public class CalciteSqlParser {
   private CalciteSqlParser() {
@@ -144,7 +142,7 @@ public class CalciteSqlParser {
       sqlParser.setConformance(SqlConformanceEnum.BABEL);
       sqlParser.setQuotedCasing(Lex.JAVA.quotedCasing);
       sqlParser.setUnquotedCasing(Lex.JAVA.unquotedCasing);
-      sqlParser.setIdentifierMaxLength(DEFAULT_IDENTIFIER_MAX_LENGTH);
+      sqlParser.setIdentifierMaxLength(SqlParser.DEFAULT_IDENTIFIER_MAX_LENGTH);
       sqlNode = sqlParser.parseSqlStmtEof();
     } catch (Exception e) {
       throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);

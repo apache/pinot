@@ -34,7 +34,7 @@ SqlNodeList DataFileDefList() :
     List<SqlNode> list = Lists.newArrayList();
 }
 {
-    <USING> { pos = getPos(); }
+    <FROM> { pos = getPos(); }
     { pos = getPos(); }
     DataFileDef(list)
     ( <COMMA> DataFileDef(list) )*
@@ -47,7 +47,7 @@ SqlNodeList DataFileDefList() :
  * INSERT INTO [db_name.]table_name
  *   FROM [ FILE | ARCHIVE ] 'file_uri' [, [ FILE | ARCHIVE ] 'file_uri' ]
  */
-SqlInsertFromFile SqlInsertIntoFile() :
+SqlInsertFromFile SqlInsertFromFile() :
 {
     SqlParserPos pos;
     SqlIdentifier dbName = null;
@@ -63,11 +63,39 @@ SqlInsertFromFile SqlInsertIntoFile() :
     ]
 
     tableName = SimpleIdentifier()
-    <FROM>
     [
-    fileList = DataFileDefList()
+        fileList = DataFileDefList()
     ]
     {
         return new SqlInsertFromFile(pos, dbName, tableName, fileList);
+    }
+}
+
+/* define the rest of the sql into SqlStmtList
+ */
+private void SqlStatementList(SqlNodeList list) :
+{
+}
+{
+    {
+        list.add(SqlStmt());
+    }
+}
+
+SqlNodeList SqlStmtsEof() :
+{
+    SqlParserPos pos;
+    SqlNodeList stmts;
+}
+{
+    {
+        pos = getPos();
+        stmts = new SqlNodeList(pos);
+        stmts.add(SqlStmt());
+    }
+    ( LOOKAHEAD(2, <SEMICOLON> SqlStmt()) <SEMICOLON> SqlStatementList(stmts) )*
+    [ <SEMICOLON> ] <EOF>
+    {
+        return stmts;
     }
 }
