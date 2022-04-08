@@ -65,13 +65,16 @@ public class TransformBlockValSet implements BlockValSet {
 
   @Override
   public int[] getDictionaryIdsSV() {
-    return _transformFunction.transformToDictIdsSV(_projectionBlock);
+    try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
+      recordTransformValues(scope, DataType.INT, true);
+      return _transformFunction.transformToDictIdsSV(_projectionBlock);
+    }
   }
 
   @Override
   public int[] getIntValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
-      recordTransformValues(scope);
+      recordTransformValues(scope, DataType.INT, true);
       return _transformFunction.transformToIntValuesSV(_projectionBlock);
     }
   }
@@ -79,7 +82,7 @@ public class TransformBlockValSet implements BlockValSet {
   @Override
   public long[] getLongValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
-      recordTransformValues(scope);
+      recordTransformValues(scope, DataType.LONG, true);
       return _transformFunction.transformToLongValuesSV(_projectionBlock);
     }
   }
@@ -87,7 +90,7 @@ public class TransformBlockValSet implements BlockValSet {
   @Override
   public float[] getFloatValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
-      recordTransformValues(scope);
+      recordTransformValues(scope, DataType.FLOAT, true);
       return _transformFunction.transformToFloatValuesSV(_projectionBlock);
     }
   }
@@ -95,7 +98,7 @@ public class TransformBlockValSet implements BlockValSet {
   @Override
   public double[] getDoubleValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
-      recordTransformValues(scope);
+      recordTransformValues(scope, DataType.DOUBLE, true);
       return _transformFunction.transformToDoubleValuesSV(_projectionBlock);
     }
   }
@@ -103,7 +106,7 @@ public class TransformBlockValSet implements BlockValSet {
   @Override
   public String[] getStringValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
-      recordTransformValues(scope);
+      recordTransformValues(scope, DataType.STRING, true);
       return _transformFunction.transformToStringValuesSV(_projectionBlock);
     }
   }
@@ -111,7 +114,7 @@ public class TransformBlockValSet implements BlockValSet {
   @Override
   public byte[][] getBytesValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
-      recordTransformValues(scope);
+      recordTransformValues(scope, DataType.BYTES, true);
       return _transformFunction.transformToBytesValuesSV(_projectionBlock);
     }
   }
@@ -119,7 +122,7 @@ public class TransformBlockValSet implements BlockValSet {
   @Override
   public int[][] getDictionaryIdsMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
-      recordTransformValues(scope);
+      recordTransformValues(scope, DataType.INT, false);
       return _transformFunction.transformToDictIdsMV(_projectionBlock);
     }
   }
@@ -127,7 +130,7 @@ public class TransformBlockValSet implements BlockValSet {
   @Override
   public int[][] getIntValuesMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
-      recordTransformValues(scope);
+      recordTransformValues(scope, DataType.INT, false);
       return _transformFunction.transformToIntValuesMV(_projectionBlock);
     }
   }
@@ -135,7 +138,7 @@ public class TransformBlockValSet implements BlockValSet {
   @Override
   public long[][] getLongValuesMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
-      recordTransformValues(scope);
+      recordTransformValues(scope, DataType.LONG, false);
       return _transformFunction.transformToLongValuesMV(_projectionBlock);
     }
   }
@@ -143,7 +146,7 @@ public class TransformBlockValSet implements BlockValSet {
   @Override
   public float[][] getFloatValuesMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
-      recordTransformValues(scope);
+      recordTransformValues(scope, DataType.FLOAT, false);
       return _transformFunction.transformToFloatValuesMV(_projectionBlock);
     }
   }
@@ -151,7 +154,7 @@ public class TransformBlockValSet implements BlockValSet {
   @Override
   public double[][] getDoubleValuesMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
-      recordTransformValues(scope);
+      recordTransformValues(scope, DataType.DOUBLE, false);
       return _transformFunction.transformToDoubleValuesMV(_projectionBlock);
     }
   }
@@ -159,7 +162,7 @@ public class TransformBlockValSet implements BlockValSet {
   @Override
   public String[][] getStringValuesMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
-      recordTransformValues(scope);
+      recordTransformValues(scope, DataType.STRING, false);
       return _transformFunction.transformToStringValuesMV(_projectionBlock);
     }
   }
@@ -215,11 +218,12 @@ public class TransformBlockValSet implements BlockValSet {
     }
   }
 
-  private void recordTransformValues(InvocationRecording recording) {
+  private void recordTransformValues(InvocationRecording recording, DataType dataType, boolean singleValue) {
     if (recording.isEnabled()) {
       int numDocs = _projectionBlock.getNumDocs();
       recording.setNumDocsScanned(numDocs);
       recording.setFunctionName(_transformFunction.getName());
+      recording.setOutputDataType(dataType, singleValue);
     }
   }
 }

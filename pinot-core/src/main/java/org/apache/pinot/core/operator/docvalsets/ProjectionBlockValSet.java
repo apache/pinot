@@ -70,7 +70,7 @@ public class ProjectionBlockValSet implements BlockValSet {
   @Override
   public int[] getDictionaryIdsSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
-      recordReadValues(scope);
+      recordReadValues(scope, DataType.INT, true);
       return _dataBlockCache.getDictIdsForSVColumn(_column);
     }
   }
@@ -78,7 +78,7 @@ public class ProjectionBlockValSet implements BlockValSet {
   @Override
   public int[] getIntValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
-      recordReadValues(scope);
+      recordReadValues(scope, DataType.INT, true);
       return _dataBlockCache.getIntValuesForSVColumn(_column);
     }
   }
@@ -86,7 +86,7 @@ public class ProjectionBlockValSet implements BlockValSet {
   @Override
   public long[] getLongValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
-      recordReadValues(scope);
+      recordReadValues(scope, DataType.LONG, true);
       return _dataBlockCache.getLongValuesForSVColumn(_column);
     }
   }
@@ -94,7 +94,7 @@ public class ProjectionBlockValSet implements BlockValSet {
   @Override
   public float[] getFloatValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
-      recordReadValues(scope);
+      recordReadValues(scope, DataType.FLOAT, true);
       return _dataBlockCache.getFloatValuesForSVColumn(_column);
     }
   }
@@ -102,7 +102,7 @@ public class ProjectionBlockValSet implements BlockValSet {
   @Override
   public double[] getDoubleValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
-      recordReadValues(scope);
+      recordReadValues(scope, DataType.DOUBLE, true);
       return _dataBlockCache.getDoubleValuesForSVColumn(_column);
     }
   }
@@ -110,7 +110,7 @@ public class ProjectionBlockValSet implements BlockValSet {
   @Override
   public String[] getStringValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
-      recordReadValues(scope);
+      recordReadValues(scope, DataType.STRING, true);
       return _dataBlockCache.getStringValuesForSVColumn(_column);
     }
   }
@@ -118,7 +118,7 @@ public class ProjectionBlockValSet implements BlockValSet {
   @Override
   public byte[][] getBytesValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
-      recordReadValues(scope);
+      recordReadValues(scope, DataType.BYTES, true);
       return _dataBlockCache.getBytesValuesForSVColumn(_column);
     }
   }
@@ -126,7 +126,7 @@ public class ProjectionBlockValSet implements BlockValSet {
   @Override
   public int[][] getDictionaryIdsMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
-      recordReadValues(scope);
+      recordReadValues(scope, DataType.INT, false);
       return _dataBlockCache.getDictIdsForMVColumn(_column);
     }
   }
@@ -134,7 +134,7 @@ public class ProjectionBlockValSet implements BlockValSet {
   @Override
   public int[][] getIntValuesMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
-      recordReadValues(scope);
+      recordReadValues(scope, DataType.INT, false);
       return _dataBlockCache.getIntValuesForMVColumn(_column);
     }
   }
@@ -142,7 +142,7 @@ public class ProjectionBlockValSet implements BlockValSet {
   @Override
   public long[][] getLongValuesMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
-      recordReadValues(scope);
+      recordReadValues(scope, DataType.LONG, false);
       return _dataBlockCache.getLongValuesForMVColumn(_column);
     }
   }
@@ -150,7 +150,7 @@ public class ProjectionBlockValSet implements BlockValSet {
   @Override
   public float[][] getFloatValuesMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
-      recordReadValues(scope);
+      recordReadValues(scope, DataType.FLOAT, false);
       return _dataBlockCache.getFloatValuesForMVColumn(_column);
     }
   }
@@ -158,7 +158,7 @@ public class ProjectionBlockValSet implements BlockValSet {
   @Override
   public double[][] getDoubleValuesMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
-      recordReadValues(scope);
+      recordReadValues(scope, DataType.DOUBLE, false);
       return _dataBlockCache.getDoubleValuesForMVColumn(_column);
     }
   }
@@ -166,7 +166,7 @@ public class ProjectionBlockValSet implements BlockValSet {
   @Override
   public String[][] getStringValuesMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
-      recordReadValues(scope);
+      recordReadValues(scope, DataType.STRING, false);
       return _dataBlockCache.getStringValuesForMVColumn(_column);
     }
   }
@@ -176,11 +176,12 @@ public class ProjectionBlockValSet implements BlockValSet {
     return _dataBlockCache.getNumValuesForMVColumn(_column);
   }
 
-  private void recordReadValues(InvocationRecording recording) {
+  private void recordReadValues(InvocationRecording recording, DataType dataType, boolean singleValue) {
     if (recording.isEnabled()) {
       int numDocs = _dataBlockCache.getNumDocs();
       recording.setNumDocsScanned(numDocs);
       recording.setColumnName(_column);
+      recording.setOutputDataType(dataType, singleValue);
     }
   }
 }

@@ -70,23 +70,21 @@ public interface InvocationRecording {
   default void setFilter(FilterType filterType, String predicateType) {
   }
 
+
   /**
-   * Records whether type transformation took place during the operator's invocation and what the types were
-   * @param inputDataType the input data type
-   * @param inputSV if the input data type is single-value
-   * @param outputDataType the output data type
-   * @param outputSV if the output data type is single-value
+   * Records the input datatype before a stage of query execution
+   * @param dataType the output data type
+   * @param singleValue if the output data type is single-value
    */
-  default void setDataTypes(FieldSpec.DataType inputDataType, boolean inputSV, FieldSpec.DataType outputDataType,
-      boolean outputSV) {
+  default void setInputDataType(FieldSpec.DataType dataType, boolean singleValue) {
   }
 
   /**
-   * Records whether type transformation took place during the operator's invocation and what the types were
-   * @param inputDataType the input data type
-   * @param outputDataType the output data type
+   * Records the output datatype after a stage of query execution
+   * @param dataType the output data type
+   * @param singleValue if the output data type is single-value
    */
-  default void setDataTypes(String inputDataType, String outputDataType) {
+  default void setOutputDataType(FieldSpec.DataType dataType, boolean singleValue) {
   }
 
   /**
