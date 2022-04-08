@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.common;
 
-import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -49,6 +48,13 @@ public interface BlockValSet {
   /**
    * SINGLE-VALUED COLUMN APIs
    */
+
+  /**
+   * Returns the number of entries for a single-valued column.
+   *
+   * @return number of single-valued entries
+   */
+  int getNumSVEntries();
 
   /**
    * Returns the dictionary Ids for a single-valued column.
@@ -84,13 +90,6 @@ public interface BlockValSet {
    * @return Array of double values
    */
   double[] getDoubleValuesSV();
-
-  /**
-   * Returns the BigDecimal[] values for a single-valued column.
-   *
-   * @return Array of BigDecimal[] values
-   */
-  BigDecimal[] getBigDecimalValuesSV();
 
   /**
    * Returns the string values for a single-valued column.

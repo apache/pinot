@@ -351,7 +351,7 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
     BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       assertEquals(bigDecimalValues[i],
-          (new BigDecimal(_intSVValues[i])).max(_bigDecimalSVValues[i].max(BigDecimal.valueOf(_doubleSVValues[i]))));
+          (BigDecimal.valueOf(_intSVValues[i])).max(_bigDecimalSVValues[i].max(BigDecimal.valueOf(_doubleSVValues[i]))));
     }
   }
 

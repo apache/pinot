@@ -58,6 +58,7 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
 /**
@@ -371,7 +372,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
                       break;
                     case BYTES:
                       if (columnDataTypes[colId] == ColumnDataType.BIG_DECIMAL) {
-                        values[colId] = dataTable.getBigDecimal(rowId, colId);
+                        values[colId] = BigDecimalUtils.deserialize(dataTable.getBytes(rowId, colId));
                       } else {
                         values[colId] = dataTable.getBytes(rowId, colId);
                       }

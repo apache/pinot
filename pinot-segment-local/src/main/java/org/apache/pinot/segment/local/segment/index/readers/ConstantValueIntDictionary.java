@@ -92,7 +92,7 @@ public class ConstantValueIntDictionary extends BaseImmutableDictionary {
 
   @Override
   public BigDecimal getBigDecimalValue(int dictId) {
-    return new BigDecimal(_value);
+    return BigDecimal.valueOf(_value);
   }
 
   @Override

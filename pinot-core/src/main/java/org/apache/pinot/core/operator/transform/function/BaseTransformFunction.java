@@ -261,7 +261,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-    if (_bigDecimalValuesSV == null) {
+    if (_bigDecimalValuesSV == null || _bigDecimalValuesSV.length < length) {
       _bigDecimalValuesSV = new BigDecimal[length];
     }
 

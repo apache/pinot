@@ -42,8 +42,8 @@ public class FunctionUtils {
     put(Float.class, PinotDataType.FLOAT);
     put(double.class, PinotDataType.DOUBLE);
     put(Double.class, PinotDataType.DOUBLE);
-    put(boolean.class, PinotDataType.BOOLEAN);
     put(BigDecimal.class, PinotDataType.BIG_DECIMAL);
+    put(boolean.class, PinotDataType.BOOLEAN);
     put(Boolean.class, PinotDataType.BOOLEAN);
     put(Timestamp.class, PinotDataType.TIMESTAMP);
     put(String.class, PinotDataType.STRING);

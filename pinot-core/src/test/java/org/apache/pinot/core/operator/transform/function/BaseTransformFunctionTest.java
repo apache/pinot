@@ -115,7 +115,7 @@ public abstract class BaseTransformFunctionTest {
       _longSVValues[i] = RANDOM.nextLong();
       _floatSVValues[i] = _intSVValues[i] * RANDOM.nextFloat();
       _doubleSVValues[i] = _intSVValues[i] * RANDOM.nextDouble();
-      _bigDecimalSVValues[i] = BigDecimal.valueOf(RANDOM.nextDouble()).multiply(new BigDecimal(_intSVValues[i]));
+      _bigDecimalSVValues[i] = BigDecimal.valueOf(RANDOM.nextDouble()).multiply(BigDecimal.valueOf(_intSVValues[i]));
       _stringSVValues[i] = df.format(_intSVValues[i] * RANDOM.nextDouble());
       _stringAlphaNumericSVValues[i] = RandomStringUtils.randomAlphanumeric(26);
       _bytesSVValues[i] = RandomStringUtils.randomAlphanumeric(26).getBytes();

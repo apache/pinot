@@ -72,7 +72,7 @@ public class RecordTransformerTest {
     record.putValue("svLong", (char) 123);
     record.putValue("svFloat", Collections.singletonList((short) 123));
     record.putValue("svDouble", new String[]{"123"});
-    record.putValue("svBigDecimal", new BigDecimal(123));
+    record.putValue("svBigDecimal", BigDecimal.valueOf(123));
     record.putValue("svBoolean", "true");
     record.putValue("svTimestamp", "2020-02-02 22:22:22.222");
     record.putValue("svBytes", "7b7b"/*new byte[]{123, 123}*/);
@@ -146,7 +146,7 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("svLong"), 123L);
       assertEquals(record.getValue("svFloat"), 123f);
       assertEquals(record.getValue("svDouble"), 123d);
-      assertEquals(record.getValue("svBigDecimal"), BigDecimalUtils.serialize(new BigDecimal(123)));
+      assertEquals(record.getValue("svBigDecimal"), BigDecimalUtils.serialize(BigDecimal.valueOf(123)));
       assertEquals(record.getValue("svBoolean"), 1);
       assertEquals(record.getValue("svTimestamp"), Timestamp.valueOf("2020-02-02 22:22:22.222").getTime());
       assertEquals(record.getValue("svBytes"), new byte[]{123, 123});
@@ -318,7 +318,7 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("svLong"), 123L);
       assertEquals(record.getValue("svFloat"), 123f);
       assertEquals(record.getValue("svDouble"), 123d);
-      assertEquals(record.getValue("svBigDecimal"), BigDecimalUtils.serialize(new BigDecimal(123)));
+      assertEquals(record.getValue("svBigDecimal"), BigDecimalUtils.serialize(BigDecimal.valueOf(123)));
       assertEquals(record.getValue("svBoolean"), 1);
       assertEquals(record.getValue("svTimestamp"), Timestamp.valueOf("2020-02-02 22:22:22.222").getTime());
       assertEquals(record.getValue("svJson"), "{\"first\":\"daffy\",\"last\":\"duck\"}");

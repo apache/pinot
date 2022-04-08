@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.selection;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -377,7 +378,7 @@ public class SelectionOperatorUtils {
           break;
         case BYTES:
           if (columnDataTypes[i] == ColumnDataType.BIG_DECIMAL) {
-            row[i] = dataTable.getBigDecimal(rowId, i);
+            row[i] = dataTable.getObject(rowId, i);
           } else {
             row[i] = dataTable.getBytes(rowId, i);
           }

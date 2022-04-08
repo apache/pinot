@@ -38,6 +38,7 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -311,7 +312,7 @@ public class DistinctTable {
             break;
           case BYTES:
             if (columnDataTypes[j] == ColumnDataType.BIG_DECIMAL) {
-              values[j] = dataTable.getBigDecimal(i, j);
+              values[j] = dataTable.getObject(i, j);
             } else {
               values[j] = dataTable.getBytes(i, j);
             }

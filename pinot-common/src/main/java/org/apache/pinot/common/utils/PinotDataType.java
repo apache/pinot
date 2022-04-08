@@ -145,7 +145,7 @@ public enum PinotDataType {
 
     @Override
     public BigDecimal toBigDecimal(Object value) {
-      return new BigDecimal(toInt(value));
+      return BigDecimal.valueOf(toInt(value));
     }
 
     @Override
@@ -192,7 +192,7 @@ public enum PinotDataType {
 
     @Override
     public BigDecimal toBigDecimal(Object value) {
-      return new BigDecimal(toInt(value));
+      return BigDecimal.valueOf(toInt(value));
     }
 
     @Override
@@ -239,7 +239,7 @@ public enum PinotDataType {
 
     @Override
     public BigDecimal toBigDecimal(Object value) {
-      return new BigDecimal(toInt(value));
+      return BigDecimal.valueOf(toInt(value));
     }
 
     @Override
@@ -286,7 +286,7 @@ public enum PinotDataType {
 
     @Override
     public BigDecimal toBigDecimal(Object value) {
-      return new BigDecimal((Integer) value);
+      return BigDecimal.valueOf((Integer) value);
     }
 
     @Override
@@ -1327,9 +1327,6 @@ public enum PinotDataType {
     if (cls == String.class) {
       return STRING;
     }
-    if (cls == BigDecimal.class) {
-      return BIG_DECIMAL;
-    }
     if (cls == byte[].class) {
       return BYTES;
     }
@@ -1338,6 +1335,9 @@ public enum PinotDataType {
     }
     if (cls == Timestamp.class) {
       return TIMESTAMP;
+    }
+    if (cls == BigDecimal.class) {
+      return BIG_DECIMAL;
     }
     if (cls == Byte.class) {
       return BYTE;
@@ -1423,7 +1423,7 @@ public enum PinotDataType {
         if (fieldSpec.isSingleValueField()) {
           return BIG_DECIMAL;
         }
-        throw new UnsupportedOperationException("Multi-value BigDecimal data type is not currently supported");
+        throw new IllegalStateException("There is no multi-value type for BigDecimal");
       case BOOLEAN:
         return fieldSpec.isSingleValueField() ? BOOLEAN : BOOLEAN_ARRAY;
       case TIMESTAMP:

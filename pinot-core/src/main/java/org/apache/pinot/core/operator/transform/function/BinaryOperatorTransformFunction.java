@@ -350,7 +350,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   private void fillBigDecimalResultArray(ProjectionBlock projectionBlock, int[] leftValues, int length) {
     BigDecimal[] rightBigDecimalValues = _rightTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
-      _results[i] = getIntResult(new BigDecimal(leftValues[i]).compareTo(rightBigDecimalValues[i]));
+      _results[i] = getIntResult(BigDecimal.valueOf(leftValues[i]).compareTo(rightBigDecimalValues[i]));
     }
   }
 
@@ -506,7 +506,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   private void fillIntResultArray(ProjectionBlock projectionBlock, BigDecimal[] leftValues, int length) {
     int[] rightIntValues = _rightTransformFunction.transformToIntValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
-      _results[i] = getIntResult(leftValues[i].compareTo(new BigDecimal(rightIntValues[i])));
+      _results[i] = getIntResult(leftValues[i].compareTo(BigDecimal.valueOf(rightIntValues[i])));
     }
   }
 

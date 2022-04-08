@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.docvalsets;
 
-import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
@@ -62,6 +61,11 @@ public class TransformBlockValSet implements BlockValSet {
   }
 
   @Override
+  public int getNumSVEntries() {
+    return _projectionBlock.getNumDocs();
+  }
+
+  @Override
   public int[] getDictionaryIdsSV() {
     return _transformFunction.transformToDictIdsSV(_projectionBlock);
   }
@@ -84,11 +88,6 @@ public class TransformBlockValSet implements BlockValSet {
   @Override
   public double[] getDoubleValuesSV() {
     return _transformFunction.transformToDoubleValuesSV(_projectionBlock);
-  }
-
-  @Override
-  public BigDecimal[] getBigDecimalValuesSV() {
-    return _transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
   }
 
   @Override

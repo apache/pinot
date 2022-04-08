@@ -20,7 +20,6 @@ package org.apache.pinot.core.common;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -194,32 +193,6 @@ public class DataFetcher {
   }
 
   /**
-   * Fetch and transform BigDecimal values from a column.
-   *
-   * @param column Column name
-   * @param evaluator transform evaluator
-   * @param inDocIds Input document Ids buffer
-   * @param length Number of input document Ids
-   * @param outValues Buffer for output
-   */
-  public void fetchBigDecimalValues(String column, TransformEvaluator evaluator, int[] inDocIds, int length,
-      BigDecimal[] outValues) {
-    _columnValueReaderMap.get(column).readBigDecimalValues(evaluator, inDocIds, length, outValues);
-  }
-
-  /**
-   * Fetch the BigDecimal values for a single-valued column.
-   *
-   * @param column Column name
-   * @param inDocIds Input document Ids buffer
-   * @param length Number of input document Ids
-   * @param outValues Buffer for output
-   */
-  public void fetchBigDecimalValues(String column, int[] inDocIds, int length, BigDecimal[] outValues) {
-    _columnValueReaderMap.get(column).readBigDecimalValues(inDocIds, length, outValues);
-  }
-
-  /**
    * Fetch the string values for a single-valued column.
    *
    * @param column Column name
@@ -242,7 +215,21 @@ public class DataFetcher {
    */
   public void fetchStringValues(String column, TransformEvaluator evaluator, int[] inDocIds, int length,
       String[] outValues) {
-    _columnValueReaderMap.get(column).readStringValues(evaluator, inDocIds, length, outValues);
+    _columnValueReaderMap.get(column).readStringValues(evaluator, inDocIds, length, outValues, false);
+  }
+
+  /**
+   * Fetch and transform String values from a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
+   */
+  public void fetchStringValues(String column, TransformEvaluator evaluator, int[] inDocIds, int length,
+      String[] outValues, boolean exactBigDecimal) {
+    _columnValueReaderMap.get(column).readStringValues(evaluator, inDocIds, length, outValues, exactBigDecimal);
   }
 
   /**
@@ -509,22 +496,6 @@ public class DataFetcher {
           valueBuffer);
     }
 
-    void readBigDecimalValues(int[] docIds, int length, BigDecimal[] valueBuffer) {
-      ForwardIndexReaderContext readerContext = getReaderContext();
-      if (_dictionary != null) {
-        int[] dictIdBuffer = THREAD_LOCAL_DICT_IDS.get();
-        _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
-        _dictionary.readBigDecimalValues(dictIdBuffer, length, valueBuffer);
-      } else {
-        _reader.readValuesSV(docIds, length, valueBuffer, readerContext);
-      }
-    }
-
-    void readBigDecimalValues(TransformEvaluator evaluator, int[] docIds, int length, BigDecimal[] valueBuffer) {
-      evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
-          valueBuffer);
-    }
-
     void readStringValues(int[] docIds, int length, String[] valueBuffer) {
       ForwardIndexReaderContext readerContext = getReaderContext();
       if (_dictionary != null) {
@@ -569,9 +540,10 @@ public class DataFetcher {
       }
     }
 
-    void readStringValues(TransformEvaluator evaluator, int[] docIds, int length, String[] valueBuffer) {
+    void readStringValues(TransformEvaluator evaluator, int[] docIds, int length, String[] valueBuffer,
+        boolean exactBigDecimal) {
       evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
-          valueBuffer);
+          valueBuffer, exactBigDecimal);
     }
 
     void readBytesValues(int[] docIds, int length, byte[][] valueBuffer) {

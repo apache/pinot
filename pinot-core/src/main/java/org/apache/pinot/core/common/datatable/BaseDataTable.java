@@ -179,11 +179,6 @@ public abstract class BaseDataTable implements DataTable {
   }
 
   @Override
-  public BigDecimal getBigDecimal(int rowId, int colId) {
-    return (BigDecimal) getObject(rowId, colId);
-  }
-
-  @Override
   public String getString(int rowId, int colId) {
     _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
     int dictId = _fixedSizeData.getInt();

@@ -111,7 +111,7 @@ public class DivisionTransformFunctionTest extends BaseTransformFunctionTest {
       BigDecimal val1 = new BigDecimal(_stringSVValues[i]).divide(constant1, RoundingMode.HALF_EVEN);
       BigDecimal val2 = constant2.divide(val1, RoundingMode.HALF_EVEN);
       BigDecimal val3 = val2.divide(_bigDecimalSVValues[i], RoundingMode.HALF_EVEN);
-      expectedBigDecimalValues[i] = val3.divide(new BigDecimal(_intSVValues[i]), RoundingMode.HALF_EVEN);
+      expectedBigDecimalValues[i] = val3.divide(BigDecimal.valueOf(_intSVValues[i]), RoundingMode.HALF_EVEN);
     }
     testTransformFunction(transformFunction, expectedBigDecimalValues);
   }

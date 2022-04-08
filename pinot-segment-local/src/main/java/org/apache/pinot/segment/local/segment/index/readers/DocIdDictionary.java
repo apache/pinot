@@ -77,7 +77,7 @@ public class DocIdDictionary extends BaseImmutableDictionary {
 
   @Override
   public BigDecimal getBigDecimalValue(int dictId) {
-    return new BigDecimal(dictId);
+    return BigDecimal.valueOf(dictId);
   }
 
   @Override

@@ -230,7 +230,9 @@ public class ArrayCopyUtils {
 
   public static void copy(byte[][] src, BigDecimal[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = BigDecimalUtils.deserialize(src[i]);
+      if (src[i] != null) {
+        dest[i] = BigDecimalUtils.deserialize(src[i]);
+      }
     }
   }
 }

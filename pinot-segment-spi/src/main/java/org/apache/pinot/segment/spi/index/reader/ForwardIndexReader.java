@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.spi.index.reader;
 
 import java.io.Closeable;
-import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -252,45 +251,6 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
       case STRING:
         for (int i = 0; i < length; i++) {
           values[i] = Double.parseDouble(getString(docIds[i], context));
-        }
-        break;
-      default:
-        throw new IllegalArgumentException();
-    }
-  }
-
-  /**
-   * Fills the values
-   * @param docIds Array containing the document ids to read
-   * @param length Number of values to read
-   * @param values Values to fill
-   * @param context Reader context
-   */
-  default void readValuesSV(int[] docIds, int length, BigDecimal[] values, T context) {
-    switch (getValueType()) {
-      case INT:
-        for (int i = 0; i < length; i++) {
-          values[i] = new BigDecimal(getInt(docIds[i], context));
-        }
-        break;
-      case LONG:
-        for (int i = 0; i < length; i++) {
-          values[i] = BigDecimal.valueOf(getLong(docIds[i], context));
-        }
-        break;
-      case FLOAT:
-        for (int i = 0; i < length; i++) {
-          values[i] = BigDecimal.valueOf(getFloat(docIds[i], context));
-        }
-        break;
-      case DOUBLE:
-        for (int i = 0; i < length; i++) {
-          values[i] = BigDecimal.valueOf(getDouble(docIds[i], context));
-        }
-        break;
-      case STRING:
-        for (int i = 0; i < length; i++) {
-          values[i] = new BigDecimal(getString(docIds[i], context));
         }
         break;
       default:

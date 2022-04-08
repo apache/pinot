@@ -252,37 +252,37 @@ public class NoDictionaryRangePredicateEvaluatorTest {
     PredicateEvaluator predicateEvaluator = buildRangePredicate("[-10\00010]",
         FieldSpec.DataType.BIG_DECIMAL);
     for (int i = -20; i < 20; i++) {
-      Assert.assertEquals(predicateEvaluator.applySV(new BigDecimal(i)), (i >= -10 && i <= 10));
+      Assert.assertEquals(predicateEvaluator.applySV(BigDecimal.valueOf(i)), (i >= -10 && i <= 10));
     }
 
     predicateEvaluator = buildRangePredicate("(-10\00010]", FieldSpec.DataType.BIG_DECIMAL);
     for (int i = -20; i < 20; i++) {
-      Assert.assertEquals(predicateEvaluator.applySV(new BigDecimal(i)), (i > -10 && i <= 10));
+      Assert.assertEquals(predicateEvaluator.applySV(BigDecimal.valueOf(i)), (i > -10 && i <= 10));
     }
 
     predicateEvaluator = buildRangePredicate("(-10\00010)", FieldSpec.DataType.BIG_DECIMAL);
     for (int i = -20; i < 20; i++) {
-      Assert.assertEquals(predicateEvaluator.applySV(new BigDecimal(i)), (i > -10 && i < 10));
+      Assert.assertEquals(predicateEvaluator.applySV(BigDecimal.valueOf(i)), (i > -10 && i < 10));
     }
 
     predicateEvaluator = buildRangePredicate("(*\00010]", FieldSpec.DataType.BIG_DECIMAL);
     for (int i = -20; i < 20; i++) {
-      Assert.assertEquals(predicateEvaluator.applySV(new BigDecimal(i)), (i <= 10), "Value: " + i);
+      Assert.assertEquals(predicateEvaluator.applySV(BigDecimal.valueOf(i)), (i <= 10), "Value: " + i);
     }
 
     predicateEvaluator = buildRangePredicate("(*\00010)", FieldSpec.DataType.BIG_DECIMAL);
     for (int i = -20; i < 20; i++) {
-      Assert.assertEquals(predicateEvaluator.applySV(new BigDecimal(i)), (i < 10));
+      Assert.assertEquals(predicateEvaluator.applySV(BigDecimal.valueOf(i)), (i < 10));
     }
 
     predicateEvaluator = buildRangePredicate("[10\000*)", FieldSpec.DataType.BIG_DECIMAL);
     for (int i = -20; i < 20; i++) {
-      Assert.assertEquals(predicateEvaluator.applySV(new BigDecimal(i)), (i >= 10), "Value: " + i);
+      Assert.assertEquals(predicateEvaluator.applySV(BigDecimal.valueOf(i)), (i >= 10), "Value: " + i);
     }
 
     predicateEvaluator = buildRangePredicate("(*\000*)", FieldSpec.DataType.BIG_DECIMAL);
     for (int i = -20; i < 20; i++) {
-      Assert.assertTrue(predicateEvaluator.applySV(new BigDecimal(i)));
+      Assert.assertTrue(predicateEvaluator.applySV(BigDecimal.valueOf(i)));
     }
   }
 

@@ -104,7 +104,7 @@ public class OnHeapLongDictionary extends OnHeapDictionary {
 
   @Override
   public BigDecimal getBigDecimalValue(int dictId) {
-    return new BigDecimal(_dictIdToVal[dictId]);
+    return BigDecimal.valueOf(_dictIdToVal[dictId]);
   }
 
   @Override
