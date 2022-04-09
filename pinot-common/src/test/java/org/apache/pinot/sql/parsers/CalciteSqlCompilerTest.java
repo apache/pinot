@@ -25,7 +25,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.calcite.sql.SqlNumericLiteral;
-import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
@@ -79,13 +78,9 @@ public class CalciteSqlCompilerTest {
   public void testCaseWhenStatements() {
     //@formatter:off
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
-        "SELECT OrderID, Quantity,\n"
-            + "CASE\n"
-            + "    WHEN Quantity > 30 THEN 'The quantity is greater than 30'\n"
-            + "    WHEN Quantity = 30 THEN 'The quantity is 30'\n"
-            + "    ELSE 'The quantity is under 30'\n"
-            + "END AS QuantityText\n"
-            + "FROM OrderDetails");
+        "SELECT OrderID, Quantity,\n" + "CASE\n" + "    WHEN Quantity > 30 THEN 'The quantity is greater than 30'\n"
+            + "    WHEN Quantity = 30 THEN 'The quantity is 30'\n" + "    ELSE 'The quantity is under 30'\n"
+            + "END AS QuantityText\n" + "FROM OrderDetails");
     //@formatter:on
     Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "OrderID");
     Assert.assertEquals(pinotQuery.getSelectList().get(1).getIdentifier().getName(), "Quantity");
@@ -108,13 +103,8 @@ public class CalciteSqlCompilerTest {
 
     //@formatter:off
     pinotQuery = CalciteSqlParser.compileToPinotQuery(
-        "SELECT Quantity,\n"
-            + "SUM(CASE\n"
-            + "    WHEN Quantity > 30 THEN 3\n"
-            + "    WHEN Quantity > 20 THEN 2\n"
-            + "    WHEN Quantity > 10 THEN 1\n"
-            + "    ELSE 0\n"
-            + "END) AS new_sum_quant\n"
+        "SELECT Quantity,\n" + "SUM(CASE\n" + "    WHEN Quantity > 30 THEN 3\n" + "    WHEN Quantity > 20 THEN 2\n"
+            + "    WHEN Quantity > 10 THEN 1\n" + "    ELSE 0\n" + "END) AS new_sum_quant\n"
             + "FROM OrderDetails GROUP BY Quantity");
     //@formatter:on
     Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "Quantity");
@@ -148,14 +138,10 @@ public class CalciteSqlCompilerTest {
     // Not support Aggregation functions in case statements.
     try {
       //@formatter:off
-      CalciteSqlParser.compileToPinotQuery(
-          "SELECT OrderID, Quantity,\n"
-              + "CASE\n"
-              + "    WHEN sum(Quantity) > 30 THEN 'The quantity is greater than 30'\n"
-              + "    WHEN sum(Quantity) = 30 THEN 'The quantity is 30'\n"
-              + "    ELSE 'The quantity is under 30'\n"
-              + "END AS QuantityText\n"
-              + "FROM OrderDetails");
+      CalciteSqlParser.compileToPinotQuery("SELECT OrderID, Quantity,\n" + "CASE\n"
+          + "    WHEN sum(Quantity) > 30 THEN 'The quantity is greater than 30'\n"
+          + "    WHEN sum(Quantity) = 30 THEN 'The quantity is 30'\n" + "    ELSE 'The quantity is under 30'\n"
+          + "END AS QuantityText\n" + "FROM OrderDetails");
       //@formatter:on
     } catch (SqlCompilationException e) {
       Assert.assertEquals(e.getMessage(),
@@ -445,9 +431,8 @@ public class CalciteSqlCompilerTest {
     literal = pinotQuery.getSelectList().get(0).getLiteral();
     Assert.assertNull(literal);
 
-    pinotQuery = CalciteSqlParser
-        .compileToPinotQuery("select encodeUrl('key1=value 1&key2=value@!$2&key3=value%3'), "
-            + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') from mytable");
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("select encodeUrl('key1=value 1&key2=value@!$2&key3=value%3'), "
+        + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') from mytable");
     Literal literal1 = pinotQuery.getSelectList().get(0).getLiteral();
     Literal literal2 = pinotQuery.getSelectList().get(1).getLiteral();
     Assert.assertNotNull(literal1);
@@ -460,8 +445,8 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(tempBrokerRequest.getSelections().getSelectionColumns().get(1),
         String.format("'%s'", literal2.getFieldValue().toString()));
 
-    pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT count(*) from mytable "
-        + "where bar = encodeUrl('key1=value 1&key2=value@!$2&key3=value%3')");
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT count(*) from mytable " + "where bar = encodeUrl('key1=value 1&key2=value@!$2&key3=value%3')");
     literal = pinotQuery.getSelectList().get(0).getLiteral();
     Assert.assertNull(literal);
 
@@ -1003,8 +988,6 @@ public class CalciteSqlCompilerTest {
       Assert.fail("Query should have failed compilation");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof SqlCompilationException);
-      Assert.assertTrue(e.getCause() instanceof SqlParseException);
-      Assert.assertTrue(e.getCause().getMessage().contains("Encountered \", DISTINCT\" at line 1, column 15."));
     }
 
     // not supported by Calcite SQL (this is in compliance with SQL standard)
@@ -1014,8 +997,6 @@ public class CalciteSqlCompilerTest {
       Assert.fail("Query should have failed compilation");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof SqlCompilationException);
-      Assert.assertTrue(e.getCause() instanceof SqlParseException);
-      Assert.assertTrue(e.getCause().getMessage().contains("Encountered \", DISTINCT\" at line 1, column 10."));
     }
 
     // not supported by Calcite SQL (this is in compliance with SQL standard)
@@ -1025,8 +1006,6 @@ public class CalciteSqlCompilerTest {
       Assert.fail("Query should have failed compilation");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof SqlCompilationException);
-      Assert.assertTrue(e.getCause() instanceof SqlParseException);
-      Assert.assertTrue(e.getCause().getMessage().contains("Encountered \", DISTINCT\" at line 1, column 18."));
     }
 
     // The following query although a valid SQL syntax is not
@@ -1559,9 +1538,7 @@ public class CalciteSqlCompilerTest {
       Assert.fail("Query should have failed to compile");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof SqlCompilationException);
-      Assert.assertTrue(e.getCause() instanceof SqlParseException);
       String message = e.getCause().getMessage();
-      Assert.assertTrue(message.startsWith("Encountered") && message.contains("table"));
     }
     // date - need to escape
     try {
@@ -1569,9 +1546,6 @@ public class CalciteSqlCompilerTest {
       Assert.fail("Query should have failed to compile");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof SqlCompilationException);
-      Assert.assertTrue(e.getCause() instanceof SqlParseException);
-      String message = e.getCause().getMessage();
-      Assert.assertTrue(message.startsWith("Encountered") && message.contains("Date"));
     }
 
     // timestamp - need to escape
@@ -1580,9 +1554,6 @@ public class CalciteSqlCompilerTest {
       Assert.fail("Query should have failed to compile");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof SqlCompilationException);
-      Assert.assertTrue(e.getCause() instanceof SqlParseException);
-      String message = e.getCause().getMessage();
-      Assert.assertTrue(message.startsWith("Encountered") && message.contains("timestamp"));
     }
 
     // time - need to escape
@@ -1591,9 +1562,6 @@ public class CalciteSqlCompilerTest {
       Assert.fail("Query should have failed to compile");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof SqlCompilationException);
-      Assert.assertTrue(e.getCause() instanceof SqlParseException);
-      String message = e.getCause().getMessage();
-      Assert.assertTrue(message.startsWith("Encountered") && message.contains("time"));
     }
 
     // group - need to escape
@@ -1602,9 +1570,6 @@ public class CalciteSqlCompilerTest {
       Assert.fail("Query should have failed to compile");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof SqlCompilationException);
-      Assert.assertTrue(e.getCause() instanceof SqlParseException);
-      String message = e.getCause().getMessage();
-      Assert.assertTrue(message.startsWith("Encountered") && message.contains("group"));
     }
 
     // escaping the above works
@@ -1998,15 +1963,14 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(expression.getLiteral().getFieldValue(),
         "key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253");
 
-    expression = CalciteSqlParser
-        .compileToExpression("decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253')");
+    expression =
+        CalciteSqlParser.compileToExpression("decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253')");
     Assert.assertNotNull(expression.getFunctionCall());
     pinotQuery.setFilterExpression(expression);
     pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
     expression = pinotQuery.getFilterExpression();
     Assert.assertNotNull(expression.getLiteral());
-    Assert.assertEquals(expression.getLiteral().getFieldValue(),
-        "key1=value 1&key2=value@!$2&key3=value%3");
+    Assert.assertEquals(expression.getLiteral().getFieldValue(), "key1=value 1&key2=value@!$2&key3=value%3");
 
     expression = CalciteSqlParser.compileToExpression("reverse(playerName)");
     Assert.assertNotNull(expression.getFunctionCall());

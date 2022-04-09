@@ -30,7 +30,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.apache.calcite.config.Lex;
+import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlDataTypeSpec;
 import org.apache.calcite.sql.SqlExplain;
@@ -47,9 +47,7 @@ import org.apache.calcite.sql.fun.SqlBetweenOperator;
 import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.fun.SqlLikeOperator;
 import org.apache.calcite.sql.parser.SqlAbstractParserImpl;
-import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
-import org.apache.calcite.sql.parser.babel.SqlBabelParserImpl;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.request.DataSource;
@@ -76,18 +74,6 @@ public class CalciteSqlParser {
   public static final List<QueryRewriter> QUERY_REWRITERS = new ArrayList<>(QueryRewriterFactory.getQueryRewriters());
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlParser.class);
 
-  /** Lexical policy similar to MySQL with ANSI_QUOTES option enabled. (To be
-   * precise: MySQL on Windows; MySQL on Linux uses case-sensitive matching,
-   * like the Linux file system.) The case of identifiers is preserved whether
-   * or not they quoted; after which, identifiers are matched
-   * case-insensitively. Double quotes allow identifiers to contain
-   * non-alphanumeric characters. */
-  private static final Lex PINOT_LEX = Lex.MYSQL_ANSI;
-
-  // BABEL is a very liberal conformance value that allows anything supported by any dialect
-  private static final SqlParser.Config PARSER_CONFIG =
-      SqlParser.configBuilder().setLex(PINOT_LEX).setConformance(SqlConformanceEnum.BABEL)
-          .setParserFactory(SqlBabelParserImpl.FACTORY).build();
   // To Keep the backward compatibility with 'OPTION' Functionality in PQL, which is used to
   // provide more hints for query processing.
   //
@@ -136,15 +122,9 @@ public class CalciteSqlParser {
 
     SqlNode sqlNode;
     try (StringReader inStream = new StringReader(sql)) {
-      SqlParserImpl sqlParser = new SqlParserImpl(inStream);
-      sqlParser.switchTo(SqlAbstractParserImpl.LexicalState.BTID);
-      sqlParser.setTabSize(1);
-      sqlParser.setConformance(SqlConformanceEnum.BABEL);
-      sqlParser.setQuotedCasing(Lex.JAVA.quotedCasing);
-      sqlParser.setUnquotedCasing(Lex.JAVA.unquotedCasing);
-      sqlParser.setIdentifierMaxLength(SqlParser.DEFAULT_IDENTIFIER_MAX_LENGTH);
+      SqlParserImpl sqlParser = newSqlParser(inStream);
       sqlNode = sqlParser.parseSqlStmtEof();
-    } catch (Exception e) {
+    } catch (Throwable e) {
       throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
     }
 
@@ -320,14 +300,25 @@ public class CalciteSqlParser {
    * @throws SqlCompilationException if String is not a valid expression.
    */
   public static Expression compileToExpression(String expression) {
-    SqlParser sqlParser = SqlParser.create(expression, PARSER_CONFIG);
     SqlNode sqlNode;
-    try {
-      sqlNode = sqlParser.parseExpression();
-    } catch (SqlParseException e) {
+    try (StringReader inStream = new StringReader(expression)) {
+      SqlParserImpl sqlParser = newSqlParser(inStream);
+      sqlNode = sqlParser.parseSqlExpressionEof();
+    } catch (Throwable e) {
       throw new SqlCompilationException("Caught exception while parsing expression: " + expression, e);
     }
     return toExpression(sqlNode);
+  }
+
+  private static SqlParserImpl newSqlParser(StringReader inStream) {
+    SqlParserImpl sqlParser = new SqlParserImpl(inStream);
+    sqlParser.switchTo(SqlAbstractParserImpl.LexicalState.DQID);
+    sqlParser.setConformance(SqlConformanceEnum.BABEL);
+    sqlParser.setTabSize(1);
+    sqlParser.setQuotedCasing(Casing.UNCHANGED);
+    sqlParser.setUnquotedCasing(Casing.UNCHANGED);
+    sqlParser.setIdentifierMaxLength(SqlParser.DEFAULT_IDENTIFIER_MAX_LENGTH);
+    return sqlParser;
   }
 
   private static void setOptions(PinotQuery pinotQuery, List<String> optionsStatements) {
