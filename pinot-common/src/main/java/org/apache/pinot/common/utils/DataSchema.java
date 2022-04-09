@@ -28,6 +28,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -205,6 +206,29 @@ public class DataSchema {
       columnDataTypes[i] = ColumnDataType.valueOf(new String(bytes, UTF_8));
     }
 
+    return new DataSchema(columnNames, columnDataTypes);
+  }
+
+  public static DataSchema fromBytes(ByteBuffer buffer)
+      throws IOException {
+    // Read the number of columns.
+    int numColumns = buffer.getInt();
+    String[] columnNames = new String[numColumns];
+    ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
+    // Read the column names.
+    for (int i = 0; i < numColumns; i++) {
+      int length = buffer.getInt();
+      byte[] bytes = new byte[length];
+      buffer.get(bytes);
+      columnNames[i] = new String(bytes, UTF_8);
+    }
+    // Read the column types.
+    for (int i = 0; i < numColumns; i++) {
+      int length = buffer.getInt();
+      byte[] bytes = new byte[length];
+      buffer.get(bytes);
+      columnDataTypes[i] = ColumnDataType.valueOf(new String(bytes, UTF_8));
+    }
     return new DataSchema(columnNames, columnDataTypes);
   }
 
