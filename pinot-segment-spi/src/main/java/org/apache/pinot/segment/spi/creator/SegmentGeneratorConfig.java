@@ -225,12 +225,8 @@ public class SegmentGeneratorConfig implements Serializable {
     if (timestampColumnWithGranularityFieldSpecs.isEmpty()) {
       return schema;
     }
-    Schema newSchema = new Schema.SchemaBuilder()
-        .setSchemaName(schema.getSchemaName())
-        .setPrimaryKeyColumns(schema.getPrimaryKeyColumns())
-        .build();
+    Schema newSchema = schema.clone();
     timestampColumnWithGranularityFieldSpecs.forEach(fieldSpec -> newSchema.addField(fieldSpec));
-    schema.getAllFieldSpecs().forEach(fieldSpec -> newSchema.addField(fieldSpec));
     return newSchema;
   }
 

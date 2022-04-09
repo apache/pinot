@@ -91,23 +91,10 @@ public class TimestampIndexQuickstart extends QuickStartBase {
         e.printStackTrace();
       }
     }));
-    printStatus(Color.YELLOW, "***** Bootstrap airlineStats offline and realtime table *****");
+    printStatus(Color.YELLOW, "***** Bootstrap airlineStats offline table *****");
     runner.bootstrapTable();
-
     printStatus(Color.YELLOW, "***** Pinot Timestamp with timestamp table setup is complete *****");
-    printStatus(Color.YELLOW, "***** Sequence of operations *****");
-    printStatus(Color.YELLOW, "*****    1. Started 1 controller instance where tenant creation is enabled *****");
-    printStatus(Color.YELLOW, "*****    2. Started 1 servers and 1 brokers *****");
-    printStatus(Color.YELLOW, "*****    3. Created a server tenant with 1 offline and 1 realtime instance *****");
-    printStatus(Color.YELLOW, "*****    4. Created a broker tenant with 2 instances *****");
-    printStatus(Color.YELLOW, "*****    5. Added a schema *****");
-    printStatus(Color.YELLOW,
-        "*****    6. Created an offline and a realtime table with the tenant names created above *****");
-    printStatus(Color.YELLOW, "*****    7. Built and pushed an offline segment *****");
-    printStatus(Color.YELLOW,
-        "*****    8. Started publishing a Kafka stream for the realtime instance to start consuming *****");
-    printStatus(Color.YELLOW, "*****    9. Sleep 5 Seconds to wait for all components brought up *****");
-    Thread.sleep(5000);
+
 
     String q1 = "select ts, $ts$DAY, $ts$WEEK, $ts$MONTH from airlineStats limit 1";
     printStatus(Color.YELLOW, "Pick one row with timestamp and different granularity using generated column name ");

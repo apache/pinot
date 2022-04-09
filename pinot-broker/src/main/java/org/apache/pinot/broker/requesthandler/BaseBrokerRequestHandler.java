@@ -1859,6 +1859,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         return actualAlias;
       }
     }
+    if (columnName.charAt(0) == '$') {
+      return columnName;
+    }
     throw new BadQueryRequestException("Unknown columnName '" + columnName + "' found in the query");
   }
 

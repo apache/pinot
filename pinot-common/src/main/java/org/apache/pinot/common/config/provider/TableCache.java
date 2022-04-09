@@ -266,23 +266,6 @@ public class TableCache implements PinotConfigProvider {
       _tableNameMap.put(tableNameWithType, tableNameWithType);
       _tableNameMap.put(rawTableName, rawTableName);
     }
-    addOverrideHintsColumns(tableConfig, schemaName, _caseInsensitive);
-  }
-
-  private void addOverrideHintsColumns(TableConfig tableConfig, String schemaName, boolean caseInsensitive) {
-    SchemaInfo schemaInfo =
-        (schemaName == null) ? _schemaInfoMap.get(TableNameBuilder.extractRawTableName(tableConfig.getTableName()))
-            : _schemaInfoMap.get(schemaName);
-    if (schemaInfo == null) {
-      return;
-    }
-    TimestampIndexGranularity.extractTimestampIndexGranularityColumnNames(tableConfig).forEach(column -> {
-      if (caseInsensitive) {
-        schemaInfo._columnNameMap.put(column.toLowerCase(), column);
-      } else {
-        schemaInfo._columnNameMap.put(column, column);
-      }
-    });
   }
 
   private void removeTableConfig(String path) {
