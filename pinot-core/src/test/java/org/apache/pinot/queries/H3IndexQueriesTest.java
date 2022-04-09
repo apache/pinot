@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.queries;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -64,15 +66,22 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
   private static final int NUM_RECORDS = 10000;
 
   private static final String H3_INDEX_COLUMN = "h3Column";
+  private static final String H3_INDEX_GEOMETRY_COLUMN = "h3Column_geometry";
   private static final String NON_H3_INDEX_COLUMN = "nonH3Column";
+  private static final String NON_H3_INDEX_GEOMETRY_COLUMN = "nonH3Column_geometry";
   private static final Schema SCHEMA =
       new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME).addSingleValueDimension(H3_INDEX_COLUMN, DataType.BYTES)
-          .addSingleValueDimension(NON_H3_INDEX_COLUMN, DataType.BYTES).build();
+          .addSingleValueDimension(NON_H3_INDEX_COLUMN, DataType.BYTES)
+          .addSingleValueDimension(H3_INDEX_GEOMETRY_COLUMN, DataType.BYTES)
+          .addSingleValueDimension(NON_H3_INDEX_GEOMETRY_COLUMN, DataType.BYTES).build();
   private static final Map<String, String> H3_INDEX_PROPERTIES = Collections.singletonMap("resolutions", "5");
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-      .setFieldConfigList(Collections.singletonList(
+      .setFieldConfigList(ImmutableList.of(
           new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3, null,
-              H3_INDEX_PROPERTIES))).build();
+              H3_INDEX_PROPERTIES),
+          new FieldConfig(H3_INDEX_GEOMETRY_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3, null,
+      H3_INDEX_PROPERTIES)
+      )).build();
 
   private IndexSegment _indexSegment;
 
@@ -102,9 +111,13 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
       double latitude = 37 + RANDOM.nextDouble();
       byte[] value = GeometrySerializer
           .serialize(GeometryUtils.GEOGRAPHY_FACTORY.createPoint(new Coordinate(longitude, latitude)));
+      byte[] geometryValue = GeometrySerializer
+          .serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(longitude, latitude)));
       GenericRow record = new GenericRow();
       record.putValue(H3_INDEX_COLUMN, value);
       record.putValue(NON_H3_INDEX_COLUMN, value);
+      record.putValue(H3_INDEX_GEOMETRY_COLUMN, geometryValue);
+      record.putValue(NON_H3_INDEX_GEOMETRY_COLUMN, geometryValue);
       records.add(record);
     }
 
@@ -119,7 +132,10 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
     indexLoadingConfig
-        .setH3IndexConfigs(Collections.singletonMap(H3_INDEX_COLUMN, new H3IndexConfig(H3_INDEX_PROPERTIES)));
+        .setH3IndexConfigs(ImmutableMap.of(
+            H3_INDEX_COLUMN, new H3IndexConfig(H3_INDEX_PROPERTIES),
+            H3_INDEX_GEOMETRY_COLUMN, new H3IndexConfig(H3_INDEX_PROPERTIES)
+            ));
     _indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
   }
 
@@ -210,11 +226,47 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
       Assert.assertNotNull(aggregationResult);
       Assert.assertEquals((long) aggregationResult.get(0), NUM_RECORDS);
     }
+
+    // Test st contains in polygon
+    testQueryStContain("SELECT COUNT(*) FROM testTable WHERE ST_Contains(ST_GeomFromText('POLYGON ((\n"
+        + "             -122.0008564 37.5004316, \n"
+        + "             -121.9991291 37.5005168, \n"
+        + "             -121.9990325 37.4995294, \n"
+        + "             -122.0001268 37.4993506,  \n"
+        + "             -122.0008564 37.5004316))'), %s) = 1");
+    {
+      // Test st contains in polygon, doesn't have
+      String query = "SELECT COUNT(*) FROM testTable WHERE ST_Contains(ST_GeomFromText('POLYGON ((\n"
+          + "             122.0008564 -37.5004316, \n"
+          + "             121.9991291 -37.5005168, \n"
+          + "             121.9990325 -37.4995294, \n"
+          + "             122.0001268 -37.4993506,  \n"
+          + "             122.0008564 -37.5004316))'), h3Column_geometry) = 1";
+      AggregationOperator aggregationOperator = getOperator(query);
+      IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+      // Expect 0 entries scanned in filter
+      QueriesTestUtils
+          .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, NUM_RECORDS, 0,
+              NUM_RECORDS);
+      List<Object> aggregationResult = resultsBlock.getAggregationResult();
+      Assert.assertNotNull(aggregationResult);
+      Assert.assertEquals((long) aggregationResult.get(0), 0);
+    }
   }
 
   private void testQuery(String queryTemplate) {
     String h3IndexQuery = String.format(queryTemplate, H3_INDEX_COLUMN);
     String nonH3IndexQuery = String.format(queryTemplate, NON_H3_INDEX_COLUMN);
+    validateQueryResult(h3IndexQuery, nonH3IndexQuery);
+  }
+
+  private void testQueryStContain(String queryTemplate) {
+    String h3IndexQuery = String.format(queryTemplate, H3_INDEX_GEOMETRY_COLUMN);
+    String nonH3IndexQuery = String.format(queryTemplate, NON_H3_INDEX_GEOMETRY_COLUMN);
+    validateQueryResult(h3IndexQuery, nonH3IndexQuery);
+  }
+
+  private void validateQueryResult(String h3IndexQuery, String nonH3IndexQuery) {
     AggregationOperator h3IndexOperator = getOperator(h3IndexQuery);
     AggregationOperator nonH3IndexOperator = getOperator(nonH3IndexQuery);
     IntermediateResultsBlock h3IndexResultsBlock = h3IndexOperator.nextBlock();

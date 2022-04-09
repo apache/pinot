@@ -19,11 +19,13 @@
 package org.apache.pinot.core.plan;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -32,12 +34,12 @@ import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
-import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
 import org.apache.pinot.core.operator.filter.ExpressionFilterOperator;
 import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
+import org.apache.pinot.core.operator.filter.H3InclusionIndexFilterOperator;
 import org.apache.pinot.core.operator.filter.H3IndexFilterOperator;
 import org.apache.pinot.core.operator.filter.JsonMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
@@ -56,6 +58,10 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class FilterPlanNode implements PlanNode {
+
+  private static final Set<String> CAN_APPLY_H3_INDEX_FUNCTION_NAMES =
+      ImmutableSet.of("st_distance", "stdistance", "st_contains", "stcontains");
+
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;
   private final FilterContext _filter;
@@ -108,23 +114,24 @@ public class FilterPlanNode implements PlanNode {
   /**
    * H3 index can be applied iff:
    * <ul>
-   *   <li>Predicate is of type RANGE</li>
-   *   <li>Left-hand-side of the predicate is an ST_Distance function</li>
-   *   <li>One argument of the ST_Distance function is an identifier, the other argument is an literal</li>
+   *   <li>Predicate is of type RANGE or EQ</li>
+   *   <li>Left-hand-side of the predicate is an ST_Distance or ST_Contains function</li>
+   *   <li>One argument of the ST_Distance or ST_Contains function is an identifier, the other argument is an
+   *   literal</li>
    *   <li>The identifier column has H3 index</li>
    * </ul>
    */
   private boolean canApplyH3Index(Predicate predicate, FunctionContext function) {
-    if (predicate.getType() != Predicate.Type.RANGE) {
+    if (predicate.getType() != Predicate.Type.RANGE && predicate.getType() != Predicate.Type.EQ) {
       return false;
     }
     String functionName = function.getFunctionName();
-    if (!functionName.equals("st_distance") && !functionName.equals("stdistance")) {
+    if (!CAN_APPLY_H3_INDEX_FUNCTION_NAMES.contains(functionName)) {
       return false;
     }
     List<ExpressionContext> arguments = function.getArguments();
     if (arguments.size() != 2) {
-      throw new BadQueryRequestException("Expect 2 arguments for function: " + StDistanceFunction.FUNCTION_NAME);
+      throw new BadQueryRequestException("Expect 2 arguments for function: " + functionName);
     }
     // TODO: handle nested geography/geometry conversion functions
     String columnName = null;
@@ -182,7 +189,12 @@ public class FilterPlanNode implements PlanNode {
         ExpressionContext lhs = predicate.getLhs();
         if (lhs.getType() == ExpressionContext.Type.FUNCTION) {
           if (canApplyH3Index(predicate, lhs.getFunction())) {
-            return new H3IndexFilterOperator(_indexSegment, predicate, numDocs);
+            String functionName = lhs.getFunction().getFunctionName();
+            if (functionName.equals("st_distance") || functionName.equals("stdistance")) {
+              return new H3IndexFilterOperator(_indexSegment, predicate, numDocs);
+            } else {
+              return new H3InclusionIndexFilterOperator(_indexSegment, predicate, numDocs);
+            }
           }
           // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (IS_NULL,
           //       IS_NOT_NULL, TEXT_MATCH)
@@ -207,20 +219,20 @@ public class FilterPlanNode implements PlanNode {
               // Consuming segments: When FST is enabled, use AutomatonBasedEvaluator so that regexp matching logic is
               // similar to that of FSTBasedEvaluator, else use regular flow of getting predicate evaluator.
               if (dataSource.getFSTIndex() != null) {
-                predicateEvaluator =
-                    FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator((RegexpLikePredicate) predicate,
-                        dataSource.getFSTIndex(), dataSource.getDictionary());
+                predicateEvaluator = FSTBasedRegexpPredicateEvaluatorFactory
+                    .newFSTBasedEvaluator((RegexpLikePredicate) predicate, dataSource.getFSTIndex(),
+                        dataSource.getDictionary());
               } else {
-                predicateEvaluator =
-                    PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
+                predicateEvaluator = PredicateEvaluatorProvider
+                    .getPredicateEvaluator(predicate, dataSource.getDictionary(),
                         dataSource.getDataSourceMetadata().getDataType());
               }
               _predicateEvaluatorMap.put(predicate, predicateEvaluator);
               return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs);
             case JSON_MATCH:
               JsonIndexReader jsonIndex = dataSource.getJsonIndex();
-              Preconditions.checkState(jsonIndex != null, "Cannot apply JSON_MATCH on column: %s without json index",
-                  column);
+              Preconditions
+                  .checkState(jsonIndex != null, "Cannot apply JSON_MATCH on column: %s without json index", column);
               return new JsonMatchFilterOperator(jsonIndex, (JsonMatchPredicate) predicate, numDocs);
             case IS_NULL:
               NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
@@ -237,8 +249,8 @@ public class FilterPlanNode implements PlanNode {
                 return new MatchAllFilterOperator(numDocs);
               }
             default:
-              predicateEvaluator =
-                  PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
+              predicateEvaluator = PredicateEvaluatorProvider
+                  .getPredicateEvaluator(predicate, dataSource.getDictionary(),
                       dataSource.getDataSourceMetadata().getDataType());
               _predicateEvaluatorMap.put(predicate, predicateEvaluator);
               return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs);
