@@ -36,6 +36,7 @@ import org.apache.pinot.query.planner.nodes.StageNode;
 import org.apache.pinot.query.routing.WorkerInstance;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
+import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -82,6 +83,7 @@ public class QueryServerTest {
     }
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void testWorkerAcceptsWorkerRequestCorrect()
       throws Exception {
@@ -97,12 +99,20 @@ public class QueryServerTest {
     StageMetadata stageMetadata = queryPlan.getStageMetadataMap().get(singleServerStageId);
 
     // ensure mock query runner received correctly deserialized payload.
+    // since submitRequest is async, we need to wait for the mockRunner to receive the query payload.
     QueryRunner mockRunner = _queryRunnerMap.get(stageMetadata.getServerInstances().get(0).getPort());
-    Mockito.verify(mockRunner).processQuery(Mockito.argThat(distributedStagePlan -> {
-      StageNode stageNode = queryPlan.getQueryStageMap().get(singleServerStageId);
-      return isStageNodesEqual(stageNode, distributedStagePlan.getStageRoot())
-          && isMetadataMapsEqual(stageMetadata, distributedStagePlan.getMetadataMap().get(singleServerStageId));
-    }), any(ExecutorService.class), any(Map.class));
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        Mockito.verify(mockRunner).processQuery(Mockito.argThat(distributedStagePlan -> {
+          StageNode stageNode = queryPlan.getQueryStageMap().get(singleServerStageId);
+          return isStageNodesEqual(stageNode, distributedStagePlan.getStageRoot()) && isMetadataMapsEqual(stageMetadata,
+              distributedStagePlan.getMetadataMap().get(singleServerStageId));
+        }), any(ExecutorService.class), any(Map.class));
+        return true;
+      } catch (Throwable t) {
+        return false;
+      }
+    }, 1000L, "Error verifying mock QueryRunner intercepted query payload!");
   }
 
   private static boolean isMetadataMapsEqual(StageMetadata left, StageMetadata right) {
