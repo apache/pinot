@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter;
 
-import java.util.Collection;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -34,6 +34,8 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.locationtech.jts.geom.Geometry;
+import org.roaringbitmap.buffer.BufferFastAggregation;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -50,7 +52,7 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
   private final Predicate _predicate;
   private final int _numDocs;
   private final H3IndexReader _h3IndexReader;
-  private final Collection<Long> _h3Ids;
+  private final LongSet _h3Ids;
 
   public H3InclusionIndexFilterOperator(IndexSegment segment, Predicate predicate, int numDocs) {
     _segment = segment;
@@ -77,12 +79,17 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
   protected FilterBlock getNextBlock() {
     // have list of h3 cell ids for polygon provided
     // return filtered num_docs
-    MutableRoaringBitmap partialMatchDocIds = new MutableRoaringBitmap();
+    ImmutableRoaringBitmap[] partialMatchDocIds = new ImmutableRoaringBitmap[_h3Ids.size()];
+    int i = 0;
     for (long h3IndexId : _h3Ids) {
-      partialMatchDocIds.or(_h3IndexReader.getDocIds(h3IndexId));
+      partialMatchDocIds[i++] = _h3IndexReader.getDocIds(h3IndexId);
     }
-    partialMatchDocIds.flip(0L, _numDocs);
-    return getFilterBlock(partialMatchDocIds);
+    MutableRoaringBitmap mutableRoaringBitmap = BufferFastAggregation.or(partialMatchDocIds);
+    if (mutableRoaringBitmap.getCardinality() == 0) {
+      // No doc is coverd by the geometry.
+      mutableRoaringBitmap.flip(0L, _numDocs);
+    }
+    return getFilterBlock(mutableRoaringBitmap);
   }
 
   /**
