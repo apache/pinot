@@ -24,10 +24,10 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <artifactId>pinot-plugins</artifactId>
+    <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>0.11.0-SNAPSHOT</version>
-    <relativePath>..</relativePath>
+    <relativePath>../..</relativePath>
   </parent>
 
   <artifactId>pinot-fmpp-maven-plugin</artifactId>
@@ -40,7 +40,6 @@
     <fmpp.version>0.9.16</fmpp.version>
     <freemarker.version>2.3.28</freemarker.version>
   </properties>
-
 
   <dependencies>
     <dependency>
@@ -77,6 +76,7 @@
   <build>
     <plugins>
       <plugin>
+        <!-- Checkstyle shouldn't apply to Mojo classes -->
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
         <configuration>

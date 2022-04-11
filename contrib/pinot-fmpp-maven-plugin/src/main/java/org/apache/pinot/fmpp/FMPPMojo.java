@@ -51,6 +51,7 @@ public class FMPPMojo extends AbstractMojo {
 
   /**
    * Used to add new source directories to the build.
+   *
    * @parameter default-value="${project}"
    * @required
    * @readonly
@@ -90,7 +91,10 @@ public class FMPPMojo extends AbstractMojo {
   private String scope;
 
   /**
-   * @parameter
+   * FMPP data model build parameter.
+   *
+   * @see <a href="http://fmpp.sourceforge.net/settings.html#key_data">FMPP Data Model Building</a>
+   * @parameter default-value=""
    */
   private String data;
 
