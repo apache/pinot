@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.reduce;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -30,19 +31,20 @@ import org.apache.pinot.core.util.GapfillUtils;
 /**
  * Helper class to reduce and set gap fill results into the BrokerResponseNative
  */
-@SuppressWarnings({"rawtypes", "unchecked"})
 class ScalableGapfillProcessorForSumAvg extends ScalableGapfillProcessor {
   private double [] _sumes;
   private int [] _columnTypes;
   private int [] _sumArgIndexes;
   private final static int COLUMN_TYPE_SUM = 1;
   private final static int COLUMN_TYPE_AVG = 2;
+  protected Map<Integer, Integer> _filteredMap;
+  protected final Map<Key, Integer> _groupByKeys;
 
   ScalableGapfillProcessorForSumAvg(QueryContext queryContext, GapfillUtils.GapfillType gapfillType) {
     super(queryContext, gapfillType);
+    _groupByKeys = new HashMap<>();
   }
 
-  @Override
   protected void initializeAggregationValues(List<Object[]> rows, DataSchema dataSchema) {
     _columnTypes = new int[_queryContext.getSelectExpressions().size()];
     _sumArgIndexes = new int[_columnTypes.length];
@@ -69,10 +71,10 @@ class ScalableGapfillProcessorForSumAvg extends ScalableGapfillProcessor {
       if (_previousByGroupKey.containsKey(entry.getKey())) {
         if (_postGapfillFilterHandler == null
             || _postGapfillFilterHandler.isMatch(_previousByGroupKey.get(entry.getKey()))) {
-          _filteredArray[entry.getValue()] = entry.getValue();
+          _filteredMap.put(entry.getValue(), entry.getValue());
           for (int i = 0; i < _columnTypes.length; i++) {
             if (_columnTypes[i] != 0) {
-              _sumes[i] += ((Number) rows.get(_filteredArray[entry.getValue()])[_sumArgIndexes[i]]).doubleValue();
+              _sumes[i] += ((Number) rows.get(entry.getValue())[_sumArgIndexes[i]]).doubleValue();
             }
           }
           _count++;
@@ -82,7 +84,56 @@ class ScalableGapfillProcessorForSumAvg extends ScalableGapfillProcessor {
   }
 
   @Override
-  protected List<Object[]> gapFillAndAggregate(List<Integer> timeBucketedRawRows, List<Object[]> rows) {
+  protected List<Object[]> gapFillAndAggregate(
+      List<Object[]> rows, DataSchema dataSchema, DataSchema resultTableSchema) {
+    List<Integer> timeBucketedRawRows = new ArrayList<>(_numOfTimeBuckets + 1);
+    for (int i = 0; i < rows.size(); i++) {
+      Object[] row = rows.get(i);
+      long time = _dateTimeFormatter.fromFormatToMillis(String.valueOf(row[_timeBucketColumnIndex]));
+      int index = findGapfillBucketIndex(time);
+      if (index >= _numOfTimeBuckets) {
+        timeBucketedRawRows.add(i);
+        break;
+      }
+      Key key = constructGroupKeys(row);
+      _groupByKeys.putIfAbsent(key, _groupByKeys.size());
+      if (index < 0) {
+        // the data can potentially be used for previous value
+        _previousByGroupKey.compute(key, (k, previousRow) -> {
+          if (previousRow == null) {
+            return row;
+          } else {
+            if ((Long) row[_timeBucketColumnIndex] > (Long) previousRow[_timeBucketColumnIndex]) {
+              return row;
+            } else {
+              return previousRow;
+            }
+          }
+        });
+      } else if (index >= timeBucketedRawRows.size()) {
+        while (index >= timeBucketedRawRows.size()) {
+          timeBucketedRawRows.add(i);
+        }
+      }
+    }
+    while (timeBucketedRawRows.size() < _numOfTimeBuckets + 1) {
+      timeBucketedRawRows.add(rows.size());
+    }
+
+    _filteredMap = new HashMap<>();
+    replaceColumnNameWithAlias(dataSchema);
+
+    if (_queryContext.getSubquery() != null && _queryContext.getFilter() != null) {
+      _postGapfillFilterHandler = new GapfillFilterHandler(_queryContext.getFilter(), dataSchema);
+    }
+
+    if (_queryContext.getHavingFilter() != null) {
+      _postAggregateHavingFilterHandler =
+          new GapfillFilterHandler(_queryContext.getHavingFilter(), resultTableSchema);
+    }
+
+    initializeAggregationValues(rows, dataSchema);
+
     List<Object[]> result = new ArrayList<>();
 
     for (long time = _startMs; time < _endMs; time += _gapfillTimeBucketSize) {
@@ -95,13 +146,14 @@ class ScalableGapfillProcessorForSumAvg extends ScalableGapfillProcessor {
           boolean isFilter = _postGapfillFilterHandler == null || _postGapfillFilterHandler.isMatch(resultRow);
           Key key = constructGroupKeys(resultRow);
           int groupKeyIndex = _groupByKeys.get(key);
-          if ((_filteredArray[groupKeyIndex] >= 0)) {
+          if ((_filteredMap.containsKey(groupKeyIndex))) {
             for (int j = 0; j < _columnTypes.length; j++) {
               if (_columnTypes[j] == 0) {
                 continue;
               }
-              _sumes[j] -= ((Number) (rows.get(_filteredArray[groupKeyIndex])[_sumArgIndexes[j]])).doubleValue();
+              _sumes[j] -= ((Number) (rows.get(_filteredMap.get(groupKeyIndex))[_sumArgIndexes[j]])).doubleValue();
             }
+            _filteredMap.remove(groupKeyIndex);
             _count--;
           }
           if (isFilter) {
@@ -112,7 +164,7 @@ class ScalableGapfillProcessorForSumAvg extends ScalableGapfillProcessor {
               }
               _sumes[j] += ((Number) (resultRow[_sumArgIndexes[j]])).doubleValue();
             }
-            _filteredArray[groupKeyIndex] = i;
+            _filteredMap.put(groupKeyIndex, i);
           }
         }
       }
@@ -120,7 +172,7 @@ class ScalableGapfillProcessorForSumAvg extends ScalableGapfillProcessor {
         Object[] aggregatedRow = new Object[_queryContext.getSelectExpressions().size()];
         for (int i = 0; i < _columnTypes.length; i++) {
           if (_columnTypes[i] == 0) {
-            aggregatedRow[i] = rows.get(start)[_timeBucketColumnIndex];
+            aggregatedRow[i] = _dateTimeFormatter.fromMillisToFormat(time);
           } else if (_columnTypes[i] == COLUMN_TYPE_SUM) {
             aggregatedRow[i] = _sumes[i];
           } else { //COLUMN_TYPE_AVG

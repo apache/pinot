@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.reduce;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -42,7 +41,6 @@ import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 /**
  * Helper class to reduce and set gap fill results into the BrokerResponseNative
  */
-@SuppressWarnings({"rawtypes", "unchecked"})
 abstract class ScalableGapfillProcessor {
   protected final QueryContext _queryContext;
 
@@ -54,9 +52,7 @@ abstract class ScalableGapfillProcessor {
   protected final long _gapfillTimeBucketSize;
   protected final int _numOfTimeBuckets;
   protected final List<Integer> _groupByKeyIndexes;
-  protected final Map<Key, Integer> _groupByKeys;
   protected final Map<Key, Object[]> _previousByGroupKey;
-  protected int [] _filteredArray;
   protected long _count = 0;
   protected final List<ExpressionContext> _timeSeries;
   protected final int _timeBucketColumnIndex;
@@ -83,7 +79,6 @@ abstract class ScalableGapfillProcessor {
 
     _previousByGroupKey = new HashMap<>();
     _groupByKeyIndexes = new ArrayList<>();
-    _groupByKeys = new HashMap<>();
 
     ExpressionContext timeseriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);
     _timeSeries = timeseriesOn.getFunction().getArguments();
@@ -93,7 +88,7 @@ abstract class ScalableGapfillProcessor {
     return (int) ((time - _startMs) / _gapfillTimeBucketSize);
   }
 
-  private void replaceColumnNameWithAlias(DataSchema dataSchema) {
+  protected void replaceColumnNameWithAlias(DataSchema dataSchema) {
     QueryContext queryContext;
     queryContext = _queryContext.getSubquery().getSubquery();
     List<String> aliasList = queryContext.getAliasList();
@@ -150,22 +145,7 @@ abstract class ScalableGapfillProcessor {
     }
 
     List<Object[]> rows = brokerResponseNative.getResultTable().getRows();
-    List<Integer> timeBucketedRawRows = putRawRowsIntoTimeBucket(rows);
-    _filteredArray = new int[_groupByKeys.size()];
-    Arrays.fill(_filteredArray, -1);
-    replaceColumnNameWithAlias(dataSchema);
-
-    if (_queryContext.getSubquery() != null && _queryContext.getFilter() != null) {
-      _postGapfillFilterHandler = new GapfillFilterHandler(_queryContext.getFilter(), dataSchema);
-    }
-    if (_queryContext.getHavingFilter() != null) {
-      _postAggregateHavingFilterHandler =
-          new GapfillFilterHandler(_queryContext.getHavingFilter(), resultTableSchema);
-    }
-
-    initializeAggregationValues(rows, dataSchema);
-
-    List<Object[]> resultRows = gapFillAndAggregate(timeBucketedRawRows, rows);
+    List<Object[]> resultRows = gapFillAndAggregate(rows, dataSchema, resultTableSchema);
     brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, resultRows));
   }
 
@@ -208,44 +188,6 @@ abstract class ScalableGapfillProcessor {
     return epoch / sz * sz;
   }
 
-  abstract protected void initializeAggregationValues(List<Object[]> rows, DataSchema dataSchema);
-
-  abstract protected List<Object[]> gapFillAndAggregate(List<Integer> timeBucketedRawRows, List<Object[]> rows);
-
-  private List<Integer> putRawRowsIntoTimeBucket(List<Object[]> rows) {
-    List<Integer> bucketedItems = new ArrayList<>(_numOfTimeBuckets + 1);
-    for (int i = 0; i < rows.size(); i++) {
-      Object[] row = rows.get(i);
-      long time = _dateTimeFormatter.fromFormatToMillis(String.valueOf(row[_timeBucketColumnIndex]));
-      int index = findGapfillBucketIndex(time);
-      if (index >= _numOfTimeBuckets) {
-        bucketedItems.add(i);
-        break;
-      }
-      Key key = constructGroupKeys(row);
-      _groupByKeys.putIfAbsent(key, _groupByKeys.size());
-      if (index < 0) {
-        // the data can potentially be used for previous value
-        _previousByGroupKey.compute(key, (k, previousRow) -> {
-          if (previousRow == null) {
-            return row;
-          } else {
-            if ((Long) row[_timeBucketColumnIndex] > (Long) previousRow[_timeBucketColumnIndex]) {
-              return row;
-            } else {
-              return previousRow;
-            }
-          }
-        });
-      } else if (index >= bucketedItems.size()) {
-        while (index >= bucketedItems.size()) {
-          bucketedItems.add(i);
-        }
-      }
-    }
-    while (bucketedItems.size() < _numOfTimeBuckets + 1) {
-      bucketedItems.add(rows.size());
-    }
-    return bucketedItems;
-  }
+  abstract protected List<Object[]> gapFillAndAggregate(
+      List<Object[]> rows, DataSchema dataSchema, DataSchema resultTableSchema);
 }
