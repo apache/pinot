@@ -131,6 +131,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     QueryContext queryContext = queryRequest.getQueryContext();
     LOGGER.debug("Incoming request Id: {}, query: {}", requestId, queryContext);
 
+    boolean enableTrace = queryRequest.isEnableTrace();
+    if (enableTrace) {
+      Tracing.getTracer().register(requestId);
+    }
+
     // Use the timeout passed from the request if exists, or the instance-level timeout
     long queryTimeoutMs = _defaultTimeoutMs;
     Long timeoutFromQueryOptions = QueryOptionsUtils.getTimeoutMs(queryContext.getQueryOptions());
@@ -192,11 +197,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           minIngestionTimeMs = ingestionTimeMs;
         }
       }
-    }
-
-    boolean enableTrace = queryRequest.isEnableTrace();
-    if (enableTrace) {
-      Tracing.getTracer().register(requestId);
     }
 
     DataTable dataTable = null;
