@@ -19,14 +19,14 @@
 package org.apache.pinot.integration.tests;
 
 import java.io.File;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -35,7 +35,7 @@ import org.testng.annotations.Test;
 /**
  * Integration test that converts Avro data for 12 segments and runs queries against it.
  */
-public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTestSet {
+public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final String TENANT_NAME = "TestTenant";
   private static final int NUM_OFFLINE_SEGMENTS = 8;
   private static final int NUM_REALTIME_SEGMENTS = 6;
@@ -51,7 +51,13 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
   }
 
   @Override
-  protected void overrideServerConf(PinotConfiguration configuration) {
+  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
+    brokerConf.setProperty(Broker.BROKER_REQUEST_HANDLER_TYPE, "grpc");
+  }
+
+  @Override
+  protected void overrideServerConf(PinotConfiguration serverConf) {
+    serverConf.setProperty(Server.CONFIG_OF_ENABLE_GRPC_SERVER, true);
   }
 
   @BeforeClass
@@ -102,16 +108,9 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
     // Start the Pinot cluster
     Map<String, Object> properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
-
     startController(properties);
-
-    startBrokers(1, DEFAULT_BROKER_PORT, getZkUrl(),
-        Collections.singletonMap(CommonConstants.Broker.BROKER_REQUEST_HANDLER_TYPE, "grpc"));
-
-    // Enable gRPC server
-    PinotConfiguration serverConfig = getDefaultServerConfiguration();
-    serverConfig.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_GRPC_SERVER, true);
-    startServers(2, serverConfig);
+    startBrokers(1);
+    startServers(2);
 
     // Create tenants
     createBrokerTenant(TENANT_NAME, 1);

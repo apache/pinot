@@ -60,7 +60,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -166,7 +165,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Start the Pinot cluster
     startZk();
     startController();
-    startBrokers(getNumBrokers());
+    startBrokers();
     startServers();
 
     // Create and upload the schema and table config
@@ -217,10 +216,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     waitForAllDocsLoaded(600_000L);
   }
 
-  protected void startServers() {
-    // Enable gRPC server
-    PinotConfiguration serverConfig = getDefaultServerConfiguration();
-    startServer(serverConfig);
+  protected void startBrokers()
+      throws Exception {
+    startBrokers(getNumBrokers());
+  }
+
+  protected void startServers()
+      throws Exception {
+    startServers(getNumServers());
   }
 
   private void registerCallbackHandlers() {
@@ -428,8 +431,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       }
       Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
     } while (System.currentTimeMillis() < endTimeMs);
-    throw new TimeoutException(String
-        .format("Time out while waiting segments become ONLINE. (tableNameWithType = %s)", tableNameWithType));
+    throw new TimeoutException(
+        String.format("Time out while waiting segments become ONLINE. (tableNameWithType = %s)", tableNameWithType));
   }
 
   @Test(dependsOnMethods = "testRangeIndexTriggering")

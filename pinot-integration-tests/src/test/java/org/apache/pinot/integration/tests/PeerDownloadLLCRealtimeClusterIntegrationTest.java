@@ -114,7 +114,8 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
   }
 
   @Override
-  public void startServer() {
+  public void startServer()
+      throws Exception {
     startServers(NUM_SERVERS);
   }
 
