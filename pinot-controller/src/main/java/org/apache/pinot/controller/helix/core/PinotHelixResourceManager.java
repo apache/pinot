@@ -1384,7 +1384,7 @@ public class PinotHelixResourceManager {
   public void addTable(TableConfig tableConfig)
       throws IOException {
     String tableNameWithType = tableConfig.getTableName();
-    if (getTableConfig(tableNameWithType) != null) {
+    if (hasTable(tableNameWithType)) {
       throw new TableAlreadyExistsException("Table " + tableNameWithType + " already exists");
     }
 
