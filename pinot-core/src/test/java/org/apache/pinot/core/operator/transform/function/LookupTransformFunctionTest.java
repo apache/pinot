@@ -37,7 +37,6 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.testng.AssertJUnit.assertEquals;
 import static org.testng.AssertJUnit.fail;
 
 
@@ -190,7 +189,8 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
 
     try {
       ExpressionContext expression = RequestContextUtils
-          .getExpressionFromSQL(String.format("lookup('baseballLeagues','leagueName','leagueID',%s)", STRING_SV_COLUMN));
+          .getExpressionFromSQL(String.format("lookup('baseballLeagues','leagueName','leagueID',%s)",
+              STRING_SV_COLUMN));
       TransformFunctionFactory.get(expression, _dataSourceMap);
       fail("Should have thrown BadQueryRequestException");
     } catch (Exception ex) {
@@ -211,7 +211,8 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     DimensionTableDataManager.registerDimensionTable("baseballPlayers_OFFLINE", tableManager);
 
       ExpressionContext expression = RequestContextUtils
-          .getExpressionFromSQL(String.format("lookup('baseballPlayers','playerName','playerID',%s)", STRING_SV_COLUMN));
+          .getExpressionFromSQL(String.format("lookup('baseballPlayers','playerName','playerID',%s)",
+              STRING_SV_COLUMN));
       TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 
