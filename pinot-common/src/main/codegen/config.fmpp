@@ -37,7 +37,6 @@ data: {
 
     # List of new keywords to add
     keywords: [
-      "LOAD"
       "FILE"
       "ARCHIVE"
     ]
@@ -45,7 +44,6 @@ data: {
     # List of non-reserved keywords to add
     nonReservedKeywordsToAdd: [
       # customized for Pinot
-      "LOAD"
       "FILE"
       "ARCHIVE"
 
