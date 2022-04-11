@@ -102,13 +102,15 @@ public class RealtimeSegmentConverterTest {
     String segmentName = "testTable__0__0__123456";
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
 
+    SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(segmentName);
+
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
             .setStreamName(tableNameWithType).setSchema(schema).setTimeColumnName(DATE_TIME_COLUMN).setCapacity(1000)
             .setAvgNumMultiValues(3).setNoDictionaryColumns(Sets.newHashSet(LONG_COLUMN2))
             .setVarLengthDictionaryColumns(Sets.newHashSet(STRING_COLUMN3))
             .setInvertedIndexColumns(Sets.newHashSet(STRING_COLUMN1))
-            .setSegmentZKMetadata(getSegmentZKMetadata(segmentName)).setOffHeap(true)
+            .setSegmentZKMetadata(segmentZKMetadata).setOffHeap(true)
             .setMemoryManager(new DirectMemoryManager(segmentName))
             .setStatsHistory(RealtimeSegmentStatsHistory.deserialzeFrom(new File(tmpDir, "stats")))
             .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());
@@ -118,9 +120,10 @@ public class RealtimeSegmentConverterTest {
 
     File outputDir = new File(tmpDir, "outputDir");
     RealtimeSegmentConverter converter =
-        new RealtimeSegmentConverter(mutableSegmentImpl, outputDir.getAbsolutePath(), schema, tableNameWithType,
-            tableConfig, segmentName, indexingConfig.getSortedColumn().get(0), indexingConfig.getInvertedIndexColumns(),
-            null, null, indexingConfig.getNoDictionaryColumns(), indexingConfig.getVarLengthDictionaryColumns(), false);
+        new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKMetadata, outputDir.getAbsolutePath(), schema,
+            tableNameWithType, tableConfig, segmentName, indexingConfig.getSortedColumn().get(0),
+            indexingConfig.getInvertedIndexColumns(), null, null, indexingConfig.getNoDictionaryColumns(),
+            indexingConfig.getVarLengthDictionaryColumns(), false);
 
     converter.build(SegmentVersion.v3, null);
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(new File(outputDir, segmentName));

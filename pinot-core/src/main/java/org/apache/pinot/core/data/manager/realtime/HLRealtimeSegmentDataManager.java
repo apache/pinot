@@ -288,8 +288,8 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           // lets convert the segment now
 
           RealtimeSegmentConverter converter =
-              new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
-                  _tableNameWithType, tableConfig, segmentZKMetadata.getSegmentName(), _sortedColumn,
+              new RealtimeSegmentConverter(_realtimeSegment, segmentZKMetadata, tempSegmentFolder.getAbsolutePath(),
+                  schema, _tableNameWithType, tableConfig, segmentZKMetadata.getSegmentName(), _sortedColumn,
                   _invertedIndexColumns, Collections.emptyList(), Collections.emptyList(), _noDictionaryColumns,
                   _varLengthDictionaryColumns, indexingConfig.isNullHandlingEnabled());
 

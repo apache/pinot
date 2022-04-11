@@ -815,8 +815,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + _segmentNameStr + "-" + now());
       // lets convert the segment now
       RealtimeSegmentConverter converter =
-          new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), _schema,
-              _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(), _sortedColumn,
+          new RealtimeSegmentConverter(_realtimeSegment, _segmentZKMetadata, tempSegmentFolder.getAbsolutePath(),
+              _schema, _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(), _sortedColumn,
               _invertedIndexColumns, _textIndexColumns, _fstIndexColumns, _noDictionaryColumns,
               _varLengthDictionaryColumns, _nullHandlingEnabled);
       _segmentLogger.info("Trying to build segment");
