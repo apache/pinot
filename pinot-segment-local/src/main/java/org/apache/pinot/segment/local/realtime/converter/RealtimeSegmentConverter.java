@@ -42,7 +42,7 @@ import org.apache.pinot.spi.data.Schema;
 
 public class RealtimeSegmentConverter {
   private MutableSegmentImpl _realtimeSegmentImpl;
-  private final SegmentZKMetadata _segmentZKMetadata;
+  private final SegmentZKMetadataConfig _segmentZKMetadataConfig;
   private final String _outputPath;
   private final Schema _dataSchema;
   private final String _tableName;
@@ -56,13 +56,13 @@ public class RealtimeSegmentConverter {
   private final List<String> _varLengthDictionaryColumns;
   private final boolean _nullHandlingEnabled;
 
-  public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, SegmentZKMetadata segmentZKMetadata,
+  public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, SegmentZKMetadataConfig segmentZKMetadataConfig,
       String outputPath, Schema schema, String tableName, TableConfig tableConfig, String segmentName,
       String sortedColumn, List<String> invertedIndexColumns, List<String> textIndexColumns,
       List<String> fstIndexColumns, List<String> noDictionaryColumns, List<String> varLengthDictionaryColumns,
       boolean nullHandlingEnabled) {
     _realtimeSegmentImpl = realtimeSegment;
-    _segmentZKMetadata = segmentZKMetadata;
+    _segmentZKMetadataConfig = segmentZKMetadataConfig;
     _outputPath = outputPath;
     _invertedIndexColumns = new ArrayList<>(invertedIndexColumns);
     if (sortedColumn != null) {
@@ -110,10 +110,7 @@ public class RealtimeSegmentConverter {
     SegmentPartitionConfig segmentPartitionConfig = _realtimeSegmentImpl.getSegmentPartitionConfig();
     genConfig.setSegmentPartitionConfig(segmentPartitionConfig);
     genConfig.setNullHandlingEnabled(_nullHandlingEnabled);
-    SegmentZKMetadataConfig segmentZKMetadataConfig = new SegmentZKMetadataConfig();
-    segmentZKMetadataConfig.setStartOffset(_segmentZKMetadata.getStartOffset());
-    segmentZKMetadataConfig.setEndOffset(_segmentZKMetadata.getEndOffset());
-    genConfig.setSegmentZKMetadataConfig(segmentZKMetadataConfig);
+    genConfig.setSegmentZKMetadataConfig(_segmentZKMetadataConfig);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
