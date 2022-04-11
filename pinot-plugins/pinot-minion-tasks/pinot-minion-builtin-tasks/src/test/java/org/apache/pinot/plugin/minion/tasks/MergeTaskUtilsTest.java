@@ -190,10 +190,10 @@ public class MergeTaskUtilsTest {
     segmentZKMetadata.setCustomMap(Map.of());
     assertTrue(MergeTaskUtils.allowMerge(segmentZKMetadata));
 
-    segmentZKMetadata.setCustomMap(Map.of(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE, "false"));
+    segmentZKMetadata.setCustomMap(Map.of(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY, "false"));
     assertTrue(MergeTaskUtils.allowMerge(segmentZKMetadata));
 
-    segmentZKMetadata.setCustomMap(Map.of(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE, "true"));
+    segmentZKMetadata.setCustomMap(Map.of(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY, "true"));
     assertFalse(MergeTaskUtils.allowMerge(segmentZKMetadata));
   }
 }

@@ -105,7 +105,7 @@ public class MinionConstants {
     // This field is set in segment metadata custom map to indicate if the segment is safe to be merged.
     // Tasks can take use of this field to coordinate with the merge task. By default, segment is safe
     // to merge, so existing segments w/o this field can be merged just as before.
-    public static final String SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE = "shouldNotMerge";
+    public static final String SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY = "shouldNotMerge";
   }
 
   public static class MergeRollupTask extends MergeTask {

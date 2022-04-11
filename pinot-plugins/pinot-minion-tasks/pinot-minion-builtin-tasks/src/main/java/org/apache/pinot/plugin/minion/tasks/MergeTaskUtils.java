@@ -156,6 +156,6 @@ public class MergeTaskUtils {
   public static boolean allowMerge(SegmentZKMetadata segmentZKMetadata) {
     Map<String, String> customMap = segmentZKMetadata.getCustomMap();
     return MapUtils.isEmpty(customMap) || !Boolean
-        .parseBoolean(customMap.get(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE));
+        .parseBoolean(customMap.get(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY));
   }
 }
