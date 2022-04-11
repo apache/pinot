@@ -48,14 +48,17 @@ import org.apache.http.HttpStatus;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
+import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.minion.BaseMinionStarter;
 import org.apache.pinot.minion.MinionStarter;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
+import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
 import org.apache.pinot.spi.config.table.TableType;
@@ -86,10 +89,10 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected String _brokerBaseApiUrl;
 
-  private List<HelixBrokerStarter> _brokerStarters;
-  private List<HelixServerStarter> _serverStarters;
-  private MinionStarter _minionStarter;
-  private List<Integer> _brokerPorts;
+  protected List<BaseBrokerStarter> _brokerStarters;
+  protected List<BaseServerStarter> _serverStarters;
+  protected List<Integer> _brokerPorts;
+  protected BaseMinionStarter _minionStarter;
 
   protected PinotConfiguration getDefaultBrokerConfiguration() {
     return new PinotConfiguration();
@@ -97,6 +100,17 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
     // Do nothing, to be overridden by tests if they need something specific
+  }
+
+  protected PinotConfiguration getBrokerConf(int brokerId) {
+    PinotConfiguration brokerConf = getDefaultBrokerConfiguration();
+    brokerConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
+    brokerConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+    brokerConf.setProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
+    brokerConf.setProperty(Helix.KEY_OF_BROKER_QUERY_PORT, NetUtils.findOpenPort(DEFAULT_BROKER_PORT + brokerId));
+    brokerConf.setProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
+    overrideBrokerConf(brokerConf);
+    return brokerConf;
   }
 
   protected void startBroker()
@@ -109,25 +123,17 @@ public abstract class ClusterTest extends ControllerTest {
     _brokerStarters = new ArrayList<>(numBrokers);
     _brokerPorts = new ArrayList<>();
     for (int i = 0; i < numBrokers; i++) {
-      HelixBrokerStarter brokerStarter = startOneBroker(i);
+      BaseBrokerStarter brokerStarter = startOneBroker(i);
       _brokerStarters.add(brokerStarter);
       _brokerPorts.add(brokerStarter.getPort());
     }
     _brokerBaseApiUrl = "http://localhost:" + _brokerPorts.get(0);
   }
 
-  protected HelixBrokerStarter startOneBroker(int brokerId)
+  protected BaseBrokerStarter startOneBroker(int brokerId)
       throws Exception {
-    PinotConfiguration brokerConf = getDefaultBrokerConfiguration();
-    brokerConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
-    brokerConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
-    brokerConf.setProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
-    brokerConf.setProperty(Helix.KEY_OF_BROKER_QUERY_PORT, NetUtils.findOpenPort(DEFAULT_BROKER_PORT + brokerId));
-    brokerConf.setProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
-    overrideBrokerConf(brokerConf);
-
     HelixBrokerStarter brokerStarter = new HelixBrokerStarter();
-    brokerStarter.init(brokerConf);
+    brokerStarter.init(getBrokerConf(brokerId));
     brokerStarter.start();
     return brokerStarter;
   }
@@ -181,6 +187,23 @@ public abstract class ClusterTest extends ControllerTest {
     // Do nothing, to be overridden by tests if they need something specific
   }
 
+  protected PinotConfiguration getServerConf(int serverId) {
+    PinotConfiguration serverConf = getDefaultServerConfiguration();
+    serverConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
+    serverConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+    serverConf.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR + "-" + serverId);
+    serverConf.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
+        Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + serverId);
+    serverConf.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, Server.DEFAULT_ADMIN_API_PORT - serverId);
+    serverConf.setProperty(Server.CONFIG_OF_NETTY_PORT, Helix.DEFAULT_SERVER_NETTY_PORT + serverId);
+    serverConf.setProperty(Server.CONFIG_OF_GRPC_PORT, Server.DEFAULT_GRPC_PORT + serverId);
+    // Thread time measurement is disabled by default, enable it in integration tests.
+    // TODO: this can be removed when we eventually enable thread time measurement by default.
+    serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    overrideServerConf(serverConf);
+    return serverConf;
+  }
+
   protected void startServer()
       throws Exception {
     startServers(1);
@@ -195,24 +218,10 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  protected HelixServerStarter startOneServer(int serverId)
+  protected BaseServerStarter startOneServer(int serverId)
       throws Exception {
-    PinotConfiguration serverConf = getDefaultServerConfiguration();
-    serverConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
-    serverConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
-    serverConf.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR + "-" + serverId);
-    serverConf.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
-        Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + serverId);
-    serverConf.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, Server.DEFAULT_ADMIN_API_PORT - serverId);
-    serverConf.setProperty(Server.CONFIG_OF_NETTY_PORT, Helix.DEFAULT_SERVER_NETTY_PORT + serverId);
-    serverConf.setProperty(Server.CONFIG_OF_GRPC_PORT, Server.DEFAULT_GRPC_PORT + serverId);
-    // Thread time measurement is disabled by default, enable it in integration tests.
-    // TODO: this can be removed when we eventually enable thread time measurement by default.
-    serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
-    overrideServerConf(serverConf);
-
     HelixServerStarter serverStarter = new HelixServerStarter();
-    serverStarter.init(serverConf);
+    serverStarter.init(getServerConf(serverId));
     serverStarter.start();
     return serverStarter;
   }
@@ -231,10 +240,6 @@ public abstract class ClusterTest extends ControllerTest {
     serverStarter.init(serverConf);
     serverStarter.start();
     _serverStarters.add(serverStarter);
-  }
-
-  protected List<HelixServerStarter> getServerStarters() {
-    return _serverStarters;
   }
 
   protected PinotConfiguration getDefaultMinionConfiguration() {
@@ -256,7 +261,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void stopBroker() {
     assertNotNull(_brokerStarters, "Brokers are not started");
-    for (HelixBrokerStarter brokerStarter : _brokerStarters) {
+    for (BaseBrokerStarter brokerStarter : _brokerStarters) {
       brokerStarter.stop();
     }
     _brokerStarters = null;
@@ -264,7 +269,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void stopServer() {
     assertNotNull(_serverStarters, "Servers are not started");
-    for (HelixServerStarter serverStarter : _serverStarters) {
+    for (BaseServerStarter serverStarter : _serverStarters) {
       serverStarter.stop();
     }
     FileUtils.deleteQuietly(new File(Server.DEFAULT_INSTANCE_BASE_DIR));
@@ -281,7 +286,7 @@ public abstract class ClusterTest extends ControllerTest {
   protected void restartServers()
       throws Exception {
     assertNotNull(_serverStarters, "Servers are not started");
-    for (HelixServerStarter serverStarter : _serverStarters) {
+    for (BaseServerStarter serverStarter : _serverStarters) {
       serverStarter.stop();
     }
     int numServers = _serverStarters.size();
