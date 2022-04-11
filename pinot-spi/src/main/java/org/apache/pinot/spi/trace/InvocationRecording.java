@@ -63,6 +63,12 @@ public interface InvocationRecording {
   }
 
   /**
+   * @param numSegments the number of segments
+   */
+  default void setNumSegments(int numSegments) {
+  }
+
+  /**
    * If the operator is a filter, determines the filter type (scan or index) and the predicate type
    * @param filterType SCAN or INDEX
    * @param predicateType e.g. BETWEEN, REGEXP_LIKE
