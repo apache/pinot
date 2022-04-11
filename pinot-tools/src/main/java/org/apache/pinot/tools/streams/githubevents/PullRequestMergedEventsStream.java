@@ -30,12 +30,15 @@ import java.util.concurrent.Executors;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Quickstart;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
+import org.apache.pinot.tools.utils.KinesisStarterUtils;
+import org.apache.pinot.tools.utils.StreamSourceType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,6 +63,21 @@ public class PullRequestMergedEventsStream {
   private final GitHubAPICaller _gitHubAPICaller;
 
   private StreamDataProducer _producer;
+
+  public PullRequestMergedEventsStream(File schemaFile, String topicName, String personalAccessToken,
+      StreamDataProducer producer)
+      throws Exception {
+    _service = Executors.newFixedThreadPool(2);
+    try {
+      _avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(org.apache.pinot.spi.data.Schema.fromFile(schemaFile));
+    } catch (Exception e) {
+      LOGGER.error("Got exception while reading Pinot schema from file: [" + schemaFile.getName() + "]");
+      throw e;
+    }
+    _topicName = topicName;
+    _gitHubAPICaller = new GitHubAPICaller(personalAccessToken);
+    _producer = producer;
+  }
 
   public PullRequestMergedEventsStream(String schemaFilePath, String topicName, String personalAccessToken,
       StreamDataProducer producer)
@@ -97,6 +115,40 @@ public class PullRequestMergedEventsStream {
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
     properties.put("request.required.acks", "1");
     return StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
+  }
+
+  public static StreamDataProducer getKinesisStreamDataProducer(String endpoint, String region, String access,
+      String secret)
+      throws Exception {
+    Properties properties = new Properties();
+
+    if (StringUtils.isNotEmpty(access) && StringUtils.isNotEmpty(secret)) {
+      properties.put("access", access);
+      properties.put("secret", secret);
+    }
+
+    if (StringUtils.isNotEmpty(endpoint)) {
+      properties.put("endpoint", endpoint);
+    }
+    properties.put("region", region);
+    return StreamDataProvider.getStreamDataProducer(KinesisStarterUtils.KINESIS_PRODUCER_CLASS_NAME, properties);
+  }
+
+  public static StreamDataProducer getKinesisStreamDataProducer()
+      throws Exception {
+    return getKinesisStreamDataProducer("http://localhost:4566", "us-east-1", "access", "secret");
+  }
+
+  public static StreamDataProducer getStreamDataProducer(StreamSourceType streamSourceType)
+      throws Exception {
+    switch (streamSourceType) {
+      case KAFKA:
+        return getKafkaStreamDataProducer();
+      case KINESIS:
+        return getKinesisStreamDataProducer();
+      default:
+        throw new RuntimeException("Invalid streamSourceType specified: " + streamSourceType);
+    }
   }
 
   public static void main(String[] args)

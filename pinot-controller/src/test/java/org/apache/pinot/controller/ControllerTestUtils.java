@@ -19,16 +19,10 @@
 package org.apache.pinot.controller;
 
 import com.google.common.base.Preconditions;
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.net.HttpURLConnection;
+import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -36,12 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.methods.PostMethod;
-import org.apache.commons.httpclient.methods.PutMethod;
-import org.apache.commons.httpclient.methods.multipart.MultipartRequestEntity;
-import org.apache.commons.httpclient.methods.multipart.Part;
-import org.apache.commons.httpclient.methods.multipart.StringPart;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.helix.ConfigAccessor;
@@ -62,14 +50,16 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.api.AccessControlTest;
+import org.apache.pinot.controller.helix.ControllerRequestClient;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.tenant.Tenant;
-import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -87,8 +77,6 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.LEAD_CONTROLLER_R
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
 
 
 /**
@@ -111,10 +99,14 @@ public abstract class ControllerTestUtils {
   public static final int TOTAL_NUM_BROKER_INSTANCES = 2 * NUM_BROKER_INSTANCES;
 
   protected static final List<HelixManager> FAKE_INSTANCE_HELIX_MANAGERS = new ArrayList<>();
+
   protected static int _controllerPort;
   protected static String _controllerBaseApiUrl;
-
   protected static ControllerRequestURLBuilder _controllerRequestURLBuilder;
+
+  protected static HttpClient _httpClient = null;
+  protected static ControllerRequestClient _controllerRequestClient = null;
+
   protected static String _controllerDataDir;
   protected static ControllerStarter _controllerStarter;
   protected static PinotHelixResourceManager _helixResourceManager;
@@ -129,6 +121,32 @@ public abstract class ControllerTestUtils {
 
   public static String getHelixClusterName() {
     return ControllerTestUtils.class.getSimpleName();
+  }
+
+  /** HttpClient is lazy evaluated, static object, only instantiate when first use.
+   *
+   * <p>This is because {@code ControllerTest} has HTTP utils that depends on the TLSUtils to install the security
+   * context first before the HttpClient can be initialized. However, because we have static usages of the HTTPClient,
+   * it is not possible to create normal member variable. thus the workaround.
+   */
+  protected static HttpClient getHttpClient() {
+    if (_httpClient == null) {
+      _httpClient = HttpClient.getInstance();
+    }
+    return _httpClient;
+  }
+
+  /** ControllerRequestClient is lazy evaluated, static object, only instantiate when first use.
+   *
+   * <p>This is because {@code ControllerTest} has HTTP utils that depends on the TLSUtils to install the security
+   * context first before the ControllerRequestClient can be initialized. However, because we have static usages of the
+   * ControllerRequestClient, it is not possible to create normal member variable. thus the workaround.
+   */
+  protected static ControllerRequestClient getControllerRequestClient() {
+    if (_controllerRequestClient == null) {
+      _controllerRequestClient = new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient());
+    }
+    return _controllerRequestClient;
   }
 
   protected static void startZk() {
@@ -463,48 +481,32 @@ public abstract class ControllerTestUtils {
    */
   public static void addSchema(Schema schema)
       throws IOException {
-    String url = _controllerRequestURLBuilder.forSchemaCreate();
-    PostMethod postMethod = sendMultipartPostRequest(url, schema.toSingleLineJsonString());
-    assertEquals(postMethod.getStatusCode(), 200);
+    getControllerRequestClient().addSchema(schema);
   }
 
-  protected static Schema getSchema(String schemaName) {
-    Schema schema = _helixResourceManager.getSchema(schemaName);
-    assertNotNull(schema);
-    return schema;
+  protected static Schema getSchema(String schemaName)
+      throws IOException {
+    return getControllerRequestClient().getSchema(schemaName);
   }
 
   protected static void addTableConfig(TableConfig tableConfig)
       throws IOException {
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
-  }
-
-  protected static String getBrokerTenantRequestPayload(String tenantName, int numBrokers) {
-    return new Tenant(TenantRole.BROKER, tenantName, numBrokers, 0, 0).toJsonString();
+    getControllerRequestClient().addTableConfig(tableConfig);
   }
 
   public static void createBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
-    sendPostRequest(_controllerRequestURLBuilder.forTenantCreate(),
-        getBrokerTenantRequestPayload(tenantName, numBrokers));
+    getControllerRequestClient().createBrokerTenant(tenantName, numBrokers);
   }
 
   public static void updateBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
-    sendPutRequest(_controllerRequestURLBuilder.forTenantCreate(),
-        getBrokerTenantRequestPayload(tenantName, numBrokers));
-  }
-
-  protected static String getServerTenantRequestPayload(String tenantName, int numOfflineServers,
-      int numRealtimeServers) {
-    return new Tenant(TenantRole.SERVER, tenantName, numOfflineServers + numRealtimeServers, numOfflineServers,
-        numRealtimeServers).toJsonString();
+    getControllerRequestClient().updateBrokerTenant(tenantName, numBrokers);
   }
 
   public static void createServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
       throws IOException {
-    sendPostRequest(_controllerRequestURLBuilder.forTenantCreate(),
-        getServerTenantRequestPayload(tenantName, numOfflineServers, numRealtimeServers));
+    getControllerRequestClient().createServerTenant(tenantName, numOfflineServers, numRealtimeServers);
   }
 
   public static void enableResourceConfigForLeadControllerResource(boolean enable) {
@@ -519,7 +521,13 @@ public abstract class ControllerTestUtils {
 
   public static String sendGetRequest(String urlString)
       throws IOException {
-    return constructResponse(new URL(urlString).openStream());
+    try {
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(
+          new URL(urlString).toURI()));
+      return constructResponse(resp);
+    } catch (URISyntaxException | HttpErrorStatusException e) {
+      throw new IOException(e);
+    }
   }
 
   public static String sendGetRequestRaw(String urlString)
@@ -529,115 +537,64 @@ public abstract class ControllerTestUtils {
 
   public static String sendPostRequest(String urlString, String payload)
       throws IOException {
-    return sendPostRequest(urlString, payload, Collections.EMPTY_MAP);
+    return sendPostRequest(urlString, payload, null);
   }
 
   public static String sendPostRequest(String urlString, String payload, Map<String, String> headers)
       throws IOException {
-    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
-    httpConnection.setRequestMethod("POST");
-    if (headers != null) {
-      for (String key : headers.keySet()) {
-        httpConnection.setRequestProperty(key, headers.get(key));
-      }
+    try {
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendJsonPostRequest(
+          new URL(urlString).toURI(), payload, headers));
+      return constructResponse(resp);
+    } catch (URISyntaxException | HttpErrorStatusException e) {
+      throw new IOException(e);
     }
-
-    if (payload != null && !payload.isEmpty()) {
-      httpConnection.setDoOutput(true);
-      try (BufferedWriter writer = new BufferedWriter(
-          new OutputStreamWriter(httpConnection.getOutputStream(), StandardCharsets.UTF_8))) {
-        writer.write(payload, 0, payload.length());
-        writer.flush();
-      }
-    }
-
-    return constructResponse(httpConnection.getInputStream());
-  }
-
-  public static String sendPutRequest(String urlString, String payload)
-      throws IOException {
-    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
-    httpConnection.setDoOutput(true);
-    httpConnection.setRequestMethod("PUT");
-
-    try (BufferedWriter writer = new BufferedWriter(
-        new OutputStreamWriter(httpConnection.getOutputStream(), StandardCharsets.UTF_8))) {
-      writer.write(payload);
-      writer.flush();
-    }
-
-    return constructResponse(httpConnection.getInputStream());
-  }
-
-  public static String sendPutRequest(String urlString, Map<String, String> headers, String payload)
-      throws IOException {
-    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
-    httpConnection.setDoOutput(true);
-    httpConnection.setRequestMethod("PUT");
-    if (headers != null) {
-      for (Map.Entry<String, String> kv : headers.entrySet()) {
-        httpConnection.setRequestProperty(kv.getKey(), kv.getValue());
-      }
-    }
-
-    try (BufferedWriter writer = new BufferedWriter(
-        new OutputStreamWriter(httpConnection.getOutputStream(), StandardCharsets.UTF_8))) {
-      writer.write(payload);
-      writer.flush();
-    }
-
-    return constructResponse(httpConnection.getInputStream());
   }
 
   public static String sendPutRequest(String urlString)
       throws IOException {
-    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
-    httpConnection.setDoOutput(true);
-    httpConnection.setRequestMethod("PUT");
-    return constructResponse(httpConnection.getInputStream());
+    return sendPutRequest(urlString, null, null);
+  }
+
+  public static String sendPutRequest(String urlString, String payload)
+      throws IOException {
+    return sendPutRequest(urlString, payload, null);
+  }
+
+  public static String sendPutRequest(String urlString, String payload, Map<String, String> headers)
+      throws IOException {
+    try {
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendJsonPutRequest(
+          new URL(urlString).toURI(), payload, headers));
+      return constructResponse(resp);
+    } catch (URISyntaxException | HttpErrorStatusException e) {
+      throw new IOException(e);
+    }
   }
 
   public static String sendDeleteRequest(String urlString)
       throws IOException {
-    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
-    httpConnection.setRequestMethod("DELETE");
-    httpConnection.connect();
-
-    return constructResponse(httpConnection.getInputStream());
-  }
-
-  private static String constructResponse(InputStream inputStream)
-      throws IOException {
-    try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-      StringBuilder responseBuilder = new StringBuilder();
-      String line;
-      while ((line = reader.readLine()) != null) {
-        responseBuilder.append(line);
-      }
-      return responseBuilder.toString();
+    try {
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendDeleteRequest(
+          new URL(urlString).toURI()));
+      return constructResponse(resp);
+    } catch (URISyntaxException | HttpErrorStatusException e) {
+      throw new IOException(e);
     }
   }
 
-  public static PostMethod sendMultipartPostRequest(String url, String body)
+  public static SimpleHttpResponse sendMultipartPostRequest(String url, String body)
       throws IOException {
-    HttpClient httpClient = new HttpClient();
-    PostMethod postMethod = new PostMethod(url);
-    // our handlers ignore key...so we can put anything here
-    Part[] parts = {new StringPart("body", body)};
-    postMethod.setRequestEntity(new MultipartRequestEntity(parts, postMethod.getParams()));
-    httpClient.executeMethod(postMethod);
-    return postMethod;
+    return getHttpClient().sendMultipartPostRequest(url, body);
   }
 
-  public static PutMethod sendMultipartPutRequest(String url, String body)
+  public static SimpleHttpResponse sendMultipartPutRequest(String url, String body)
       throws IOException {
-    HttpClient httpClient = new HttpClient();
-    PutMethod putMethod = new PutMethod(url);
-    // our handlers ignore key...so we can put anything here
-    Part[] parts = {new StringPart("body", body)};
-    putMethod.setRequestEntity(new MultipartRequestEntity(parts, putMethod.getParams()));
-    httpClient.executeMethod(putMethod);
-    return putMethod;
+    return getHttpClient().sendMultipartPutRequest(url, body);
+  }
+
+  private static String constructResponse(SimpleHttpResponse resp) {
+    return resp.getResponse();
   }
 
   /**

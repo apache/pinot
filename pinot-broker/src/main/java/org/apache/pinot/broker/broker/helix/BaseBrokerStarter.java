@@ -43,8 +43,9 @@ import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManage
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.GrpcBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
-import org.apache.pinot.broker.routing.RoutingManager;
+import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -84,6 +85,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected String _zkServers;
   protected String _hostname;
   protected int _port;
+  protected int _tlsPort;
   protected String _instanceId;
   private volatile boolean _isStarting = false;
   private volatile boolean _isShuttingDown = false;
@@ -98,7 +100,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected HelixDataAccessor _helixDataAccessor;
   protected PinotMetricsRegistry _metricsRegistry;
   protected BrokerMetrics _brokerMetrics;
-  protected RoutingManager _routingManager;
+  protected BrokerRoutingManager _routingManager;
   protected AccessControlFactory _accessControlFactory;
   protected BrokerRequestHandler _brokerRequestHandler;
   protected BrokerAdminApiApplication _brokerAdminApplication;
@@ -124,6 +126,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
               : NetUtils.getHostAddress();
     }
     _port = _listenerConfigs.get(0).getPort();
+    _tlsPort = ListenerConfigUtil.findLastTlsPort(_listenerConfigs, -1);
 
     _instanceId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY);
     if (_instanceId != null) {
@@ -221,7 +224,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         _brokerConf.getProperty(Broker.CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS, Collections.emptyList()));
     _brokerMetrics.initializeGlobalMeters();
     // Set up request handling classes
-    _routingManager = new RoutingManager(_brokerMetrics);
+    _routingManager = new BrokerRoutingManager(_brokerMetrics);
     _routingManager.init(_spectatorHelixManager);
     _accessControlFactory = AccessControlFactory.loadFactory(_brokerConf.subset(Broker.ACCESS_CONTROL_CONFIG_PREFIX));
     HelixExternalViewBasedQueryQuotaManager queryQuotaManager =
@@ -238,23 +241,24 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     TableCache tableCache = new TableCache(_propertyStore, caseInsensitive);
     // Configure TLS for netty connection to server
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_TLS_PREFIX);
+    NettyConfig nettyDefaults = NettyConfig.extractNettyConfig(_brokerConf, Broker.BROKER_NETTY_PREFIX);
 
     if (_brokerConf.getProperty(Broker.BROKER_REQUEST_HANDLER_TYPE, Broker.DEFAULT_BROKER_REQUEST_HANDLER_TYPE)
         .equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
       LOGGER.info("Starting Grpc BrokerRequestHandler.");
       _brokerRequestHandler =
-          new GrpcBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
-              queryQuotaManager, tableCache, _brokerMetrics, null);
+          new GrpcBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory, queryQuotaManager,
+              tableCache, _brokerMetrics, null);
     } else { // default request handler type, e.g. netty
       LOGGER.info("Starting Netty BrokerRequestHandler.");
       if (_brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false)) {
         _brokerRequestHandler =
             new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
-                queryQuotaManager, tableCache, _brokerMetrics, tlsDefaults);
+                queryQuotaManager, tableCache, _brokerMetrics, nettyDefaults, tlsDefaults);
       } else {
         _brokerRequestHandler =
             new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
-                queryQuotaManager, tableCache, _brokerMetrics, null);
+                queryQuotaManager, tableCache, _brokerMetrics, nettyDefaults, null);
       }
     }
 
@@ -310,7 +314,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
             new BrokerUserDefinedMessageHandlerFactory(_routingManager, queryQuotaManager));
     _participantHelixManager.connect();
-    updateInstanceConfigIfNeeded();
+    updateInstanceConfigAndBrokerResourceIfNeeded();
     _brokerMetrics.addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME,
         () -> _participantHelixManager.isConnected() ? 1L : 0L);
     _participantHelixManager.addPreConnectCallback(
@@ -323,18 +327,37 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     LOGGER.info("Finish starting Pinot broker");
   }
 
-  private void updateInstanceConfigIfNeeded() {
+  private void updateInstanceConfigAndBrokerResourceIfNeeded() {
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_participantHelixManager, _instanceId);
-    boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
-    updated |= HelixHelper.addDefaultTags(instanceConfig, () -> {
+    boolean instanceConfigUpdated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
+    if (_tlsPort > 0) {
+      HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
+    }
+    boolean shouldUpdateBrokerResource = false;
+    String brokerTag = null;
+    List<String> instanceTags = instanceConfig.getTags();
+    if (instanceTags.isEmpty()) {
+      // This is a new broker (first time joining the cluster)
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
-        return Collections.singletonList(TagNameUtils.getBrokerTagForTenant(null));
+        brokerTag = TagNameUtils.getBrokerTagForTenant(null);
+        shouldUpdateBrokerResource = true;
       } else {
-        return Collections.singletonList(Helix.UNTAGGED_BROKER_INSTANCE);
+        brokerTag = Helix.UNTAGGED_BROKER_INSTANCE;
       }
-    });
-    if (updated) {
+      instanceConfig.addTag(brokerTag);
+      instanceConfigUpdated = true;
+    }
+    if (instanceConfigUpdated) {
       HelixHelper.updateInstanceConfig(_participantHelixManager, instanceConfig);
+    }
+    if (shouldUpdateBrokerResource) {
+      // Update broker resource to include the new broker
+      long startTimeMs = System.currentTimeMillis();
+      List<String> tablesAdded = new ArrayList<>();
+      HelixHelper.updateBrokerResource(_participantHelixManager, _instanceId, Collections.singletonList(brokerTag),
+          tablesAdded, null);
+      LOGGER.info("Updated broker resource for new joining broker: {} in {}ms, tables added: {}", _instanceId,
+          System.currentTimeMillis() - startTimeMs, tablesAdded);
     }
   }
 
@@ -365,8 +388,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
                 _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup),
             new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_participantHelixManager,
                 _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup),
-            new ServiceStatus.LifecycleServiceStatusCallback(this::isStarting, this::isShuttingDown)
-        )));
+            new ServiceStatus.LifecycleServiceStatusCallback(this::isStarting, this::isShuttingDown))));
   }
 
   @Override
@@ -426,7 +448,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     return _brokerMetrics;
   }
 
-  public RoutingManager getRoutingManager() {
+  public BrokerRoutingManager getRoutingManager() {
     return _routingManager;
   }
 

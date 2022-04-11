@@ -32,7 +32,8 @@ ENV PINOT_BUILD_DIR=/opt/pinot-build
 
 # extra dependency for running launcher
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends vim wget curl git automake bison flex g++ libboost-all-dev libevent-dev libssl-dev libtool make pkg-config && \
+    apt-get install -y --no-install-recommends vim wget curl git automake bison flex g++ libboost-all-dev libevent-dev \
+    libssl-dev libtool make pkg-config && \
     rm -rf /var/lib/apt/lists/*
 
 # install maven
@@ -55,7 +56,7 @@ RUN  wget http://archive.apache.org/dist/thrift/0.12.0/thrift-0.12.0.tar.gz -O /
 RUN git clone ${PINOT_GIT_URL} ${PINOT_BUILD_DIR} && \
     cd ${PINOT_BUILD_DIR} && \
     git checkout ${PINOT_BRANCH} && \
-    mvn install package -DskipTests -Pbin-dist -Pbuild-shaded-jar -Dkafka.version=${KAFKA_VERSION} -Djdk.version=${JDK_VERSION} && \
+    mvn install package -DskipTests -Pbin-dist -Pbuild-shaded-jar -Dkafka.version=${KAFKA_VERSION} -Djdk.version=${JDK_VERSION} -T1C && \
     mkdir -p ${PINOT_HOME}/configs && \
     mkdir -p ${PINOT_HOME}/data && \
     cp -r build/* ${PINOT_HOME}/. && \
@@ -71,8 +72,17 @@ ENV JAVA_OPTS="-Xms4G -Xmx4G -Dpinot.admin.system.exit=false"
 VOLUME ["${PINOT_HOME}/configs", "${PINOT_HOME}/data"]
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends vim wget curl git python && \
+    apt-get install -y --no-install-recommends vim less wget curl git python sysstat procps linux-perf openjdk-11-dbg && \
     rm -rf /var/lib/apt/lists/*
+
+RUN case `uname -m` in \
+    x86_64) arch=x64; ;; \
+    aarch64) arch=arm64; ;; \
+    *) echo "platform=$(uname -m) un-supported, exit ..."; exit 1; ;; \
+  esac \
+  && mkdir -p /usr/local/lib/async-profiler \
+  && curl -L https://github.com/jvm-profiling-tools/async-profiler/releases/download/v2.5.1/async-profiler-2.5.1-linux-${arch}.tar.gz | tar -xz --strip-components 1 -C /usr/local/lib/async-profiler \
+  && ln -s /usr/local/lib/async-profiler/profiler.sh /usr/local/bin/async-profiler
 
 COPY --from=pinot_build_env ${PINOT_HOME} ${PINOT_HOME}
 COPY bin ${PINOT_HOME}/bin

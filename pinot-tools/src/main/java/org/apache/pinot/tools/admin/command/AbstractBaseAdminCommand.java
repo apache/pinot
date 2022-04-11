@@ -35,7 +35,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
-import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
@@ -126,13 +126,13 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
 
   /**
    * Generate an (optional) HTTP Authorization header given an auth token
-   * @see FileUploadDownloadClient#makeAuthHeader(String)
+   * @see HttpClient#makeAuthHeader(String)
    *
    * @param authToken auth token
    * @return list of 0 or 1 "Authorization" headers
    */
   static List<Header> makeAuthHeader(String authToken) {
-    return FileUploadDownloadClient.makeAuthHeader(authToken);
+    return HttpClient.makeAuthHeader(authToken);
   }
 
   /**

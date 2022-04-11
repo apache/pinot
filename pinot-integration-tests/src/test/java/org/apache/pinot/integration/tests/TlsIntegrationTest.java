@@ -28,9 +28,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.http.Header;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -43,9 +44,11 @@ import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
-import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSetGroup;
-import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.helix.ExtraInstanceConfig;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.TlsUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.integration.tests.access.CertBasedTlsChannelAccessControlFactory;
@@ -242,7 +245,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @Override
   protected void addSchema(Schema schema)
       throws IOException {
-    PostMethod response =
+    SimpleHttpResponse response =
         sendMultipartPostRequest(_controllerRequestURLBuilder.forSchemaCreate(), schema.toSingleLineJsonString(),
             AUTH_HEADER);
     Assert.assertEquals(response.getStatusCode(), 200);
@@ -260,7 +263,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
       JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
       factory.setHeaders(AUTH_HEADER);
       factory.setScheme(CommonConstants.HTTPS_PROTOCOL);
-      factory.setSslContext(FileUploadDownloadClient._defaultSSLContext);
+      factory.setSslContext(TlsUtils.getSslContext());
 
       _pinotConnection =
           ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(), factory.buildTransport());
@@ -274,6 +277,17 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     sendDeleteRequest(
         _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)),
         AUTH_HEADER);
+  }
+
+  @Test
+  public void testUpdatedBrokerTlsPort() {
+
+    List<InstanceConfig> instanceConfigs = HelixHelper.getInstanceConfigs(_helixManager);
+    List<ExtraInstanceConfig> securedInstances =
+        instanceConfigs.stream().map(ExtraInstanceConfig::new)
+            .filter(pinotInstanceConfig -> pinotInstanceConfig.getTlsPort() != null)
+            .collect(Collectors.toList());
+    Assert.assertFalse(securedInstances.isEmpty());
   }
 
   @Test
@@ -452,7 +466,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testRealtimeSegmentUploadDownload()
       throws Exception {
-    final Request query = new Request("sql", "SELECT count(*) FROM " + getTableName());
+    String query = "SELECT count(*) FROM " + getTableName();
 
     ResultSetGroup resultBeforeOffline = getPinotConnection().execute(query);
     Assert.assertTrue(resultBeforeOffline.getResultSet(0).getLong(0) > 0);

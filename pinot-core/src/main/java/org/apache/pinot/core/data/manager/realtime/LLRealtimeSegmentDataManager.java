@@ -25,7 +25,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -48,18 +47,16 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
-import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
-import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
-import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
-import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
+import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
@@ -71,6 +68,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
@@ -256,8 +254,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final PartitionGroupConsumptionStatus _partitionGroupConsumptionStatus;
   final String _clientId;
   private final LLCSegmentName _llcSegmentName;
-  private final RecordTransformer _recordTransformer;
-  private final ComplexTypeTransformer _complexTypeTransformer;
+  private final TransformPipeline _transformPipeline;
   private PartitionGroupConsumer _partitionGroupConsumer = null;
   private StreamMetadataProvider _streamMetadataProvider = null;
   private final File _resourceTmpDir;
@@ -423,10 +420,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         consecutiveIdleCount = 0;
         // We consumed something. Update the highest stream offset as well as partition-consuming metric.
         // TODO Issue 5359 Need to find a way to bump metrics without getting actual offset value.
-        //_serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_KAFKA_OFFSET_CONSUMED,
-        //_currentOffset.getOffset());
-        //_serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED,
-        //_currentOffset.getOffset());
+        if (_currentOffset instanceof LongMsgOffset) {
+          // TODO: only LongMsgOffset supplies long offset value.
+          _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED,
+              ((LongMsgOffset) _currentOffset).getOffset());
+        }
         _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 1);
         lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(_currentOffset);
       } else if (messageBatch.getUnfilteredMessageCount() > 0) {
@@ -471,6 +469,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     boolean canTakeMore = true;
 
     GenericRow reuse = new GenericRow();
+    TransformPipeline.Result reusedResult = new TransformPipeline.Result();
     for (int index = 0; index < messageCount; index++) {
       if (_shouldStop || endCriteriaReached()) {
         if (_segmentLogger.isDebugEnabled()) {
@@ -510,42 +509,23 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           .decode(messagesAndOffsets.getMessageAtIndex(index), messagesAndOffsets.getMessageOffsetAtIndex(index),
               messagesAndOffsets.getMessageLengthAtIndex(index), reuse);
       if (decodedRow != null) {
-        List<GenericRow> transformedRows = new ArrayList<>();
         try {
-          if (_complexTypeTransformer != null) {
-            // TODO: consolidate complex type transformer into composite type transformer
-            decodedRow = _complexTypeTransformer.transform(decodedRow);
-          }
-          Collection<GenericRow> rows = (Collection<GenericRow>) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
-          if (rows != null) {
-            for (GenericRow row : rows) {
-              GenericRow transformedRow = _recordTransformer.transform(row);
-              if (transformedRow != null && IngestionUtils.shouldIngestRow(row)) {
-                transformedRows.add(transformedRow);
-              } else {
-                realtimeRowsDroppedMeter =
-                    _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
-                        realtimeRowsDroppedMeter);
-              }
-            }
-          } else {
-            GenericRow transformedRow = _recordTransformer.transform(decodedRow);
-            if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-              transformedRows.add(transformedRow);
-            } else {
-              realtimeRowsDroppedMeter =
-                  _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
-                      realtimeRowsDroppedMeter);
-            }
-          }
+          _transformPipeline.processRow(decodedRow, reusedResult);
         } catch (Exception e) {
           _numRowsErrored++;
+          // when exception happens we prefer abandoning the whole batch and not partially indexing some rows
+          reusedResult.getTransformedRows().clear();
           String errorMessage = String.format("Caught exception while transforming the record: %s", decodedRow);
           _segmentLogger.error(errorMessage, e);
           _realtimeTableDataManager.addSegmentError(_segmentNameStr,
               new SegmentErrorInfo(System.currentTimeMillis(), errorMessage, e));
         }
-        for (GenericRow transformedRow : transformedRows) {
+        if (reusedResult.getSkippedRowCount() > 0) {
+          realtimeRowsDroppedMeter =
+              _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED,
+                  reusedResult.getSkippedRowCount(), realtimeRowsDroppedMeter);
+        }
+        for (GenericRow transformedRow : reusedResult.getTransformedRows()) {
           try {
             canTakeMore = _realtimeSegment.index(transformedRow, msgMetadata);
             indexedMessageCount++;
@@ -1336,12 +1316,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _messageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, fieldsToRead);
     _clientId = streamTopic + "-" + _partitionGroupId;
 
-    // Create record transformer
-    _recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
-
-    // Create complex type transformer
-    _complexTypeTransformer = ComplexTypeTransformer.getComplexTypeTransformer(tableConfig);
-
+    _transformPipeline = new TransformPipeline(tableConfig, schema);
     // Acquire semaphore to create stream consumers
     try {
       _partitionGroupConsumerSemaphore.acquire();

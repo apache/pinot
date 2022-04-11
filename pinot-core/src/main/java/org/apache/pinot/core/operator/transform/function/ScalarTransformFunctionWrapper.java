@@ -29,7 +29,6 @@ import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -125,11 +124,12 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.INT) {
       return super.transformToIntValuesSV(projectionBlock);
     }
-    if (_intResults == null) {
-      _intResults = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int length = projectionBlock.getNumDocs();
+
+    if (_intResults == null || _intResults.length < length) {
+      _intResults = new int[length];
     }
     getNonLiteralValues(projectionBlock);
-    int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
@@ -144,11 +144,12 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.LONG) {
       return super.transformToLongValuesSV(projectionBlock);
     }
-    if (_longResults == null) {
-      _longResults = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int length = projectionBlock.getNumDocs();
+
+    if (_longResults == null || _longResults.length < length) {
+      _longResults = new long[length];
     }
     getNonLiteralValues(projectionBlock);
-    int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
@@ -163,11 +164,12 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.FLOAT) {
       return super.transformToFloatValuesSV(projectionBlock);
     }
-    if (_floatResults == null) {
-      _floatResults = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int length = projectionBlock.getNumDocs();
+
+    if (_floatResults == null || _floatResults.length < length) {
+      _floatResults = new float[length];
     }
     getNonLiteralValues(projectionBlock);
-    int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
@@ -182,11 +184,12 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.DOUBLE) {
       return super.transformToDoubleValuesSV(projectionBlock);
     }
-    if (_doubleResults == null) {
-      _doubleResults = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int length = projectionBlock.getNumDocs();
+
+    if (_doubleResults == null || _doubleResults.length < length) {
+      _doubleResults = new double[length];
     }
     getNonLiteralValues(projectionBlock);
-    int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
@@ -201,11 +204,12 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.STRING) {
       return super.transformToStringValuesSV(projectionBlock);
     }
-    if (_stringResults == null) {
-      _stringResults = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int length = projectionBlock.getNumDocs();
+
+    if (_stringResults == null || _stringResults.length < length) {
+      _stringResults = new String[length];
     }
     getNonLiteralValues(projectionBlock);
-    int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
@@ -222,11 +226,12 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.BYTES) {
       return super.transformToBytesValuesSV(projectionBlock);
     }
-    if (_bytesResults == null) {
-      _bytesResults = new byte[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    int length = projectionBlock.getNumDocs();
+
+    if (_bytesResults == null || _bytesResults.length < length) {
+      _bytesResults = new byte[length][];
     }
     getNonLiteralValues(projectionBlock);
-    int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
@@ -241,11 +246,12 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.INT) {
       return super.transformToIntValuesMV(projectionBlock);
     }
+    int length = projectionBlock.getNumDocs();
+
     if (_intMVResults == null) {
-      _intMVResults = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+      _intMVResults = new int[length][];
     }
     getNonLiteralValues(projectionBlock);
-    int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
@@ -260,11 +266,12 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.LONG) {
       return super.transformToLongValuesMV(projectionBlock);
     }
-    if (_longMVResults == null) {
-      _longMVResults = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    int length = projectionBlock.getNumDocs();
+
+    if (_longMVResults == null || _longMVResults.length < length) {
+      _longMVResults = new long[length][];
     }
     getNonLiteralValues(projectionBlock);
-    int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
@@ -279,11 +286,12 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.FLOAT) {
       return super.transformToFloatValuesMV(projectionBlock);
     }
-    if (_floatMVResults == null) {
-      _floatMVResults = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    int length = projectionBlock.getNumDocs();
+
+    if (_floatMVResults == null || _floatMVResults.length < length) {
+      _floatMVResults = new float[length][];
     }
     getNonLiteralValues(projectionBlock);
-    int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
@@ -298,11 +306,12 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.DOUBLE) {
       return super.transformToDoubleValuesMV(projectionBlock);
     }
-    if (_doubleMVResults == null) {
-      _doubleMVResults = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    int length = projectionBlock.getNumDocs();
+
+    if (_doubleMVResults == null || _doubleMVResults.length < length) {
+      _doubleMVResults = new double[length][];
     }
     getNonLiteralValues(projectionBlock);
-    int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
@@ -317,11 +326,12 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     if (_resultMetadata.getDataType().getStoredType() != DataType.STRING) {
       return super.transformToStringValuesMV(projectionBlock);
     }
-    if (_stringMVResults == null) {
-      _stringMVResults = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    int length = projectionBlock.getNumDocs();
+
+    if (_stringMVResults == null || _stringMVResults.length < length) {
+      _stringMVResults = new String[length][];
     }
     getNonLiteralValues(projectionBlock);
-    int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _arguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];

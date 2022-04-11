@@ -81,9 +81,8 @@ public class DateTimeFunctionsTest {
     // toEpochSeconds w/ bucketing (with underscore in function name)
     GenericRow row12 = new GenericRow();
     row12.putValue("timestamp", 1578685189000L);
-    inputs.add(new Object[]{
-        "to_epoch_seconds_bucket(\"timestamp\", 10)", Lists.newArrayList("timestamp"), row12, 157868518L
-    });
+    inputs.add(
+        new Object[]{"to_epoch_seconds_bucket(\"timestamp\", 10)", Lists.newArrayList("timestamp"), row12, 157868518L});
 
     // toEpochMinutes
     GenericRow row20 = new GenericRow();
@@ -99,8 +98,8 @@ public class DateTimeFunctionsTest {
     // toEpochMinutes w/ bucketing
     GenericRow row22 = new GenericRow();
     row22.putValue("timestamp", 1578685189000L);
-    inputs
-        .add(new Object[]{"toEpochMinutesBucket(\"timestamp\", 15)", Lists.newArrayList("timestamp"), row22, 1754094L});
+    inputs.add(
+        new Object[]{"toEpochMinutesBucket(\"timestamp\", 15)", Lists.newArrayList("timestamp"), row22, 1754094L});
 
     // toEpochHours
     GenericRow row30 = new GenericRow();
@@ -141,9 +140,8 @@ public class DateTimeFunctionsTest {
     // fromEpochDays w/ bucketing
     GenericRow row51 = new GenericRow();
     row51.putValue("sevenDaysSinceEpoch", 2000);
-    inputs.add(new Object[]{
-        "fromEpochDaysBucket(sevenDaysSinceEpoch, 7)", Lists.newArrayList("sevenDaysSinceEpoch"), row51, 1209600000000L
-    });
+    inputs.add(new Object[]{"fromEpochDaysBucket(sevenDaysSinceEpoch, 7)", Lists.newArrayList(
+        "sevenDaysSinceEpoch"), row51, 1209600000000L});
 
     // fromEpochHours
     GenericRow row60 = new GenericRow();
@@ -154,53 +152,44 @@ public class DateTimeFunctionsTest {
     // fromEpochHours w/ bucketing
     GenericRow row61 = new GenericRow();
     row61.putValue("twoHoursSinceEpoch", 168000);
-    inputs.add(new Object[]{
-        "fromEpochHoursBucket(twoHoursSinceEpoch, 2)", Lists.newArrayList("twoHoursSinceEpoch"), row61, 1209600000000L
-    });
+    inputs.add(new Object[]{"fromEpochHoursBucket(twoHoursSinceEpoch, 2)", Lists.newArrayList(
+        "twoHoursSinceEpoch"), row61, 1209600000000L});
 
     // fromEpochMinutes
     GenericRow row70 = new GenericRow();
     row70.putValue("minutesSinceEpoch", 20160000);
-    inputs.add(new Object[]{
-        "fromEpochMinutes(minutesSinceEpoch)", Lists.newArrayList("minutesSinceEpoch"), row70, 1209600000000L
-    });
+    inputs.add(new Object[]{"fromEpochMinutes(minutesSinceEpoch)", Lists.newArrayList(
+        "minutesSinceEpoch"), row70, 1209600000000L});
 
     // fromEpochMinutes w/ bucketing
     GenericRow row71 = new GenericRow();
     row71.putValue("fifteenMinutesSinceEpoch", 1344000);
-    inputs.add(new Object[]{
-        "fromEpochMinutesBucket(fifteenMinutesSinceEpoch, 15)", Lists.newArrayList("fifteenMinutesSinceEpoch"), row71,
-        1209600000000L
-    });
+    inputs.add(new Object[]{"fromEpochMinutesBucket(fifteenMinutesSinceEpoch, 15)", Lists.newArrayList(
+        "fifteenMinutesSinceEpoch"), row71, 1209600000000L});
 
     // fromEpochSeconds
     GenericRow row80 = new GenericRow();
     row80.putValue("secondsSinceEpoch", 1209600000L);
-    inputs.add(new Object[]{
-        "fromEpochSeconds(secondsSinceEpoch)", Lists.newArrayList("secondsSinceEpoch"), row80, 1209600000000L
-    });
+    inputs.add(new Object[]{"fromEpochSeconds(secondsSinceEpoch)", Lists.newArrayList(
+        "secondsSinceEpoch"), row80, 1209600000000L});
 
     // fromEpochSeconds w/ bucketing
     GenericRow row81 = new GenericRow();
     row81.putValue("tenSecondsSinceEpoch", 120960000L);
-    inputs.add(new Object[]{
-        "fromEpochSecondsBucket(tenSecondsSinceEpoch, 10)", Lists.newArrayList("tenSecondsSinceEpoch"), row81,
-        1209600000000L
-    });
+    inputs.add(new Object[]{"fromEpochSecondsBucket(tenSecondsSinceEpoch, 10)", Lists.newArrayList(
+        "tenSecondsSinceEpoch"), row81, 1209600000000L});
 
     // nested
     GenericRow row90 = new GenericRow();
     row90.putValue("hoursSinceEpoch", 336000);
-    inputs.add(new Object[]{
-        "toEpochDays(fromEpochHours(hoursSinceEpoch))", Lists.newArrayList("hoursSinceEpoch"), row90, 14000L
-    });
+    inputs.add(new Object[]{"toEpochDays(fromEpochHours(hoursSinceEpoch))", Lists.newArrayList(
+        "hoursSinceEpoch"), row90, 14000L});
 
     GenericRow row91 = new GenericRow();
     row91.putValue("fifteenSecondsSinceEpoch", 80640000L);
-    inputs.add(new Object[]{
-        "toEpochMinutesBucket(fromEpochSecondsBucket(fifteenSecondsSinceEpoch, 15), 10)",
-        Lists.newArrayList("fifteenSecondsSinceEpoch"), row91, 2016000L
-    });
+    inputs.add(
+        new Object[]{"toEpochMinutesBucket(fromEpochSecondsBucket(fifteenSecondsSinceEpoch, 15), 10)",
+            Lists.newArrayList("fifteenSecondsSinceEpoch"), row91, 2016000L});
 
     // toDateTime simple
     GenericRow row100 = new GenericRow();
@@ -210,43 +199,45 @@ public class DateTimeFunctionsTest {
     // toDateTime complex
     GenericRow row101 = new GenericRow();
     row101.putValue("dateTime", 1234567890000L);
-    inputs.add(new Object[]{
-        "toDateTime(dateTime, 'MM/yyyy/dd HH:mm:ss')", Lists.newArrayList("dateTime"), row101, "02/2009/13 23:31:30"
-    });
+    inputs.add(new Object[]{"toDateTime(dateTime, 'MM/yyyy/dd HH:mm:ss')", Lists.newArrayList(
+        "dateTime"), row101, "02/2009/13 23:31:30"});
 
     // toDateTime with timezone
     GenericRow row102 = new GenericRow();
     row102.putValue("dateTime", 7897897890000L);
-    inputs.add(new Object[]{
-        "toDateTime(dateTime, 'EEE MMM dd HH:mm:ss ZZZ yyyy')", Lists.newArrayList("dateTime"), row102,
-        "Mon Apr 10 20:31:30 UTC 2220"
-    });
+    inputs.add(new Object[]{"toDateTime(dateTime, 'EEE MMM dd HH:mm:ss ZZZ yyyy')", Lists.newArrayList(
+        "dateTime"), row102, "Mon Apr 10 20:31:30 UTC 2220"});
 
     // toDateTime with timezone conversion
     GenericRow row103 = new GenericRow();
     row103.putValue("dateTime", 1633740369000L);
     row103.putValue("tz", "America/Los_Angeles");
-    inputs.add(new Object[]{"toDateTime(dateTime, 'yyyy-MM-dd ZZZ', tz)",
-            Lists.newArrayList("dateTime", "tz"), row103, "2021-10-08 America/Los_Angeles"});
+    inputs.add(new Object[]{"toDateTime(dateTime, 'yyyy-MM-dd ZZZ', tz)", Lists.newArrayList("dateTime",
+        "tz"), row103, "2021-10-08 America/Los_Angeles"});
 
     // fromDateTime simple
     GenericRow row110 = new GenericRow();
     row110.putValue("dateTime", "19730216");
-    inputs
-        .add(new Object[]{"fromDateTime(dateTime, 'yyyyMMdd')", Lists.newArrayList("dateTime"), row110, 98668800000L});
+    inputs.add(
+        new Object[]{"fromDateTime(dateTime, 'yyyyMMdd')", Lists.newArrayList("dateTime"), row110, 98668800000L});
 
     // fromDateTime complex
     GenericRow row111 = new GenericRow();
     row111.putValue("dateTime", "02/2009/13 15:31:30");
-    inputs.add(new Object[]{
-        "fromDateTime(dateTime, 'MM/yyyy/dd HH:mm:ss')", Lists.newArrayList("dateTime"), row111, 1234539090000L
-    });
+    inputs.add(new Object[]{"fromDateTime(dateTime, 'MM/yyyy/dd HH:mm:ss')", Lists.newArrayList(
+        "dateTime"), row111, 1234539090000L});
 
     // fromDateTime with timezone
     GenericRow row112 = new GenericRow();
     row112.putValue("dateTime", "Mon Aug 24 12:36:46 America/Los_Angeles 2009");
+    inputs.add(new Object[]{"fromDateTime(dateTime, 'EEE MMM dd HH:mm:ss ZZZ yyyy')", Lists.newArrayList(
+        "dateTime"), row112, 1251142606000L});
+
+    // fromDateTime with null
+    GenericRow row113 = new GenericRow();
+    row113.putValue("dateTime", null);
     inputs.add(new Object[]{
-        "fromDateTime(dateTime, 'EEE MMM dd HH:mm:ss ZZZ yyyy')", Lists.newArrayList("dateTime"), row112, 1251142606000L
+        "fromDateTime(dateTime, 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z''')", Lists.newArrayList("dateTime"), row113, null
     });
 
     // timezone_hour and timezone_minute
@@ -323,6 +314,14 @@ public class DateTimeFunctionsTest {
     inputs.add(new Object[]{"minute(millis, tz)", expectedArguments, row131, 23});
     inputs.add(new Object[]{"second(millis, tz)", expectedArguments, row131, 13});
     inputs.add(new Object[]{"millisecond(millis, tz)", expectedArguments, row131, 123});
+
+    GenericRow row140 = new GenericRow();
+    row140.putValue("duration", null);
+    inputs.add(new Object[]{"ago(duration)", Lists.newArrayList("duration"), row140, null});
+
+    GenericRow row141 = new GenericRow();
+    row141.putValue("timezoneId", null);
+    inputs.add(new Object[]{"timezoneHour(timezoneId)", Lists.newArrayList("timezoneId"), row141, null});
 
     return inputs.toArray(new Object[0][]);
   }
@@ -403,5 +402,169 @@ public class DateTimeFunctionsTest {
   private static long iso8601ToUtcEpochMillis(String iso8601) {
     DateTimeFormatter formatter = ISODateTimeFormat.dateTimeParser().withOffsetParsed();
     return formatter.parseDateTime(iso8601).getMillis();
+  }
+
+  @Test
+  public void testDateTimeConvert() {
+    // EPOCH to EPOCH
+    // Test bucketing to 15 minutes
+    testDateTimeConvert(1505898960000L/* 20170920T02:16:00 */, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH",
+        "15:MINUTES", 1505898900000L/* 20170920T02:15:00 */);
+    // Test input which should create no change
+    testDateTimeConvert(1505898960000L/* 20170920T02:16:00 */, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH",
+        "1:MILLISECONDS", 1505898960000L/* 20170920T02:16:00 */);
+    // Test conversion from millis to hours
+    testDateTimeConvert(1505902560000L/* 20170920T03:16:00 */, "1:MILLISECONDS:EPOCH", "1:HOURS:EPOCH", "1:HOURS",
+        418306L/* 20170920T03:00:00 */);
+    // Test conversion from 5 minutes to hours
+    testDateTimeConvert(5019675L/* 20170920T03:15:00 */, "5:MINUTES:EPOCH", "1:HOURS:EPOCH", "1:HOURS",
+        418306L/* 20170920T03:00:00 */);
+    // Test conversion from 5 minutes to millis and bucketing to hours
+    testDateTimeConvert(5019675L/* 20170920T03:15:00 */, "5:MINUTES:EPOCH", "1:MILLISECONDS:EPOCH", "1:HOURS",
+        1505901600000L/* 20170920T03:00:00 */);
+
+    testDateTimeConvert(null, "5:MINUTES:EPOCH", "1:MILLISECONDS:EPOCH", "1:HOURS", null);
+
+    // EPOCH to SDF
+    // Test conversion from millis since epoch to simple date format (UTC)
+    testDateTimeConvert(1505985360000L/* 20170921T02:16:00 */, "1:MILLISECONDS:EPOCH",
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS", "20170921");
+    // Test conversion from millis since epoch to simple date format (Pacific timezone)
+    testDateTimeConvert(1505962800000L/* 20170920T20:00:00 */, "1:MILLISECONDS:EPOCH",
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/Los_Angeles)", "1:DAYS", "20170920");
+    // Test conversion from millis since epoch to simple date format (IST)
+    testDateTimeConvert(1505962800000L/* 20170920T20:00:00 */, "1:MILLISECONDS:EPOCH",
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(IST)", "1:DAYS", "20170921");
+    // Test conversion from millis since epoch to simple date format (Pacific timezone)
+    testDateTimeConvert(1505962800000L/* 20170920T20:00:00 */, "1:MILLISECONDS:EPOCH",
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMddHH tz(America/Los_Angeles)", "1:HOURS", "2017092020");
+    // Test conversion from millis since epoch to simple date format (East Coast timezone)
+    testDateTimeConvert(1505970000000L/* 20170920T22:00:00 */, "1:MILLISECONDS:EPOCH",
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMddHH tz(America/New_York)", "1:HOURS", "2017092101");
+    // Test conversion from millis since epoch to simple date format (America/Denver timezone with 15 second
+    // granularity)
+    testDateTimeConvert(1523560632000L/* 20180412T19:17:12 */, "1:MILLISECONDS:EPOCH",
+        "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "15:SECONDS",
+        "2018-04-12 13:17:00.000");
+    // Test conversion from millis since epoch to simple date format (America/Denver timezone with 3 minute granularity)
+    testDateTimeConvert(1523561708000L/* 20180412T19:35:08 */, "1:MILLISECONDS:EPOCH",
+        "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "3:MINUTES",
+        "2018-04-12 13:33:00.000");
+    // Test conversion from millis since epoch to simple date format (America/Denver timezone with 12 hour granularity)
+    testDateTimeConvert(1523430205000L/* 20180411T07:03:25 */, "1:MILLISECONDS:EPOCH",
+        "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "12:HOURS",
+        "2018-04-11 00:00:00.000");
+    // Test conversion from millis since epoch to simple date format (America/Denver timezone with 5 day granularity)
+    testDateTimeConvert(1519926205000L/* 20180301T09:43:25 */, "1:MILLISECONDS:EPOCH",
+        "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "5:DAYS",
+        "2018-03-01 00:00:00.000");
+    testDateTimeConvert(1522230205000L/* 20180328T09:43:25 */, "1:MILLISECONDS:EPOCH",
+        "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "5:DAYS",
+        "2018-03-26 00:00:00.000");
+    // Test conversion from millis since epoch to simple date format (America/Los_Angeles timezone with 1 day
+    // granularity)
+    testDateTimeConvert(1524013200000L/* 20180418T01:00:00 */, "1:MILLISECONDS:EPOCH",
+        "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Los_Angeles)", "1:DAYS",
+        "2018-04-17 00:00:00.000");
+
+    // SDF to EPOCH
+    // Test conversion from simple date format to millis since epoch
+    testDateTimeConvert("20170921", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:MILLISECONDS:EPOCH", "1:DAYS",
+        1505952000000L/* 20170921T00:00:00 */);
+    // Test conversion from simple date format (East Coast timezone) to millis since epoch
+    testDateTimeConvert("20170921", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/New_York)", "1:MILLISECONDS:EPOCH",
+        "1:DAYS", 1505952000000L/* 20170921T00:00:00 */);
+    // Test conversion from simple date format (East Coast timezone) to millis since epoch
+    testDateTimeConvert("2017092000", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMddHH tz(America/New_York)",
+        "1:MILLISECONDS:EPOCH", "1:HOURS", 1505880000000L/* 20170920T00:00:00 Eastern */);
+    // Test conversion from simple date format with special characters to millis since epoch
+    testDateTimeConvert("2017092000 America/Los_Angeles", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMddHH ZZZ",
+        "1:MILLISECONDS:EPOCH", "1:HOURS", 1505890800000L/* 20170920T00:00:00 UTC */);
+    // Test conversion from simple date format with special characters to millis since epoch
+    testDateTimeConvert("8/7/2017 12 PM", "1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h a", "1:MILLISECONDS:EPOCH", "1:HOURS",
+        1502107200000L/* 20170807T12:00:00 UTC */);
+    // Test conversion from simple date format with special characters to millis since epoch, with bucketing
+    testDateTimeConvert("8/7/2017 12:00:01 PM", "1:SECONDS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a",
+        "1:MILLISECONDS:EPOCH", "1:HOURS", 1502107200000L/* 20170807T12:00:00 UTC */);
+    // Test conversion from simple date format with special characters to millis since epoch, without bucketing
+    testDateTimeConvert("8/7/2017 12:00:01 PM", "1:DAYS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", "1:MILLISECONDS:EPOCH",
+        "1:MILLISECONDS", 1502107201000L/* 20170807T12:00:01 UTC */);
+
+    // SDF to SDF
+    // Test conversion from simple date format to another simple date format
+    testDateTimeConvert("8/7/2017 12:45:50 AM", "1:DAYS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a",
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:MILLISECONDS", "20170807");
+    // Test conversion from simple date format with timezone to another simple date format
+    testDateTimeConvert("20170921 Asia/Kolkata", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd ZZZ",
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:MILLISECONDS", "20170920");
+    // Test conversion from simple date format with timezone to another simple date format with timezone
+    testDateTimeConvert("20170921 Asia/Kolkata", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd ZZZ",
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/Chicago)", "1:MILLISECONDS", "20170920");
+    // Test conversion from simple date format to another simple date format (America/Denver timezone with 15 second
+    // granularity)
+    testDateTimeConvert("20180412T19:17:12", "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd''T''HH:mm:ss",
+        "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "15:SECONDS",
+        "2018-04-12 13:17:00.000");
+    // Test conversion from simple date format to another simple date format (America/Denver timezone with 5 day
+    // granularity)
+    testDateTimeConvert("20180328T09:43:25", "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd''T''HH:mm:ss",
+        "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss" + ".SSS tz(America/Denver)", "5:DAYS",
+        "2018-03-26 00:00:00.000");
+    // Test conversion from simple date format to another simple date format (America/Los_Angeles timezone with 1 day
+    // granularity)
+    testDateTimeConvert("20180418T01:00:00", "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd''T''HH:mm:ss",
+        "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Los_Angeles)", "1:DAYS",
+        "2018-04-17 00:00:00.000");
+  }
+
+  @Test
+  private void testTimestampAdd() {
+    long currentTimestamp = System.currentTimeMillis();
+    long timestampHalfHourBack = currentTimestamp - (30 * 60 * 1000);
+    long timestamp10DaysAgo = currentTimestamp - (10 * 86400 * 1000);
+
+    GenericRow row = new GenericRow();
+    row.putValue("timeCol", timestamp10DaysAgo);
+
+    List<String> arguments = Collections.singletonList("timeCol");
+
+    testFunction("timestampAdd(DAY, 10, timeCol)", arguments, row, currentTimestamp);
+
+    row.putValue("timeCol", timestampHalfHourBack);
+    testFunction("timestampAdd(MINUTE, 30, timeCol)", arguments, row, currentTimestamp);
+
+    row.putValue("timeCol", timestamp10DaysAgo);
+    testFunction("timestampAdd(MINUTE, 14370, timeCol)", arguments, row, timestampHalfHourBack);
+  }
+
+  @Test
+  private void testTimestampDiff() {
+    long currentTimestamp = System.currentTimeMillis();
+    long timestampHalfHourBack = currentTimestamp - (30 * 60 * 1000);
+    long timestamp10DaysAgo = currentTimestamp - (10 * 86400 * 1000);
+
+    GenericRow row = new GenericRow();
+    row.putValue("timeCol", currentTimestamp);
+
+    row.putValue("timeCol2", timestamp10DaysAgo);
+    List<String> arguments = new ArrayList<>();
+    arguments.add("timeCol2");
+    arguments.add("timeCol");
+    testFunction("timestampDiff(DAY, timeCol2, timeCol)", arguments, row, 10L);
+
+    row.putValue("timeCol2", timestampHalfHourBack);
+    testFunction("timestampDiff(MINUTE, timeCol2, timeCol)", arguments, row, 30L);
+
+    row.putValue("timeCol2", timestampHalfHourBack);
+    testFunction("timestampDiff(SECOND, timeCol2, timeCol)", arguments, row, 1800L);
+  }
+
+  private void testDateTimeConvert(Object timeValue, String inputFormatStr, String outputFormatStr,
+      String outputGranularityStr, Object expectedResult) {
+    GenericRow row = new GenericRow();
+    row.putValue("timeCol", timeValue);
+    List<String> arguments = Collections.singletonList("timeCol");
+    testFunction(String.format("dateTimeConvert(timeCol, '%s', '%s', '%s')", inputFormatStr, outputFormatStr,
+        outputGranularityStr), arguments, row, expectedResult == null ? null : expectedResult.toString());
   }
 }

@@ -26,7 +26,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.10.0-SNAPSHOT</version>
+    <version>0.11.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-connectors</artifactId>
@@ -39,10 +39,18 @@
 
   <modules>
     <module>pinot-spark-connector</module>
-    <module>presto-pinot-driver</module>
+    <module>pinot-flink-connector</module>
   </modules>
 
-  <dependencies>
-  </dependencies>
-
+  <profiles>
+    <profile>
+      <id>presto-driver</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <modules>
+        <module>prestodb-pinot-dependencies</module>
+      </modules>
+    </profile>
+  </profiles>
 </project>

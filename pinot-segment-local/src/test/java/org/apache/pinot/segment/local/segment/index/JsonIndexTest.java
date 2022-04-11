@@ -21,7 +21,7 @@ package org.apache.pinot.segment.local.segment.index;
 import java.io.File;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.realtime.impl.json.MutableJsonIndex;
+import org.apache.pinot.segment.local.realtime.impl.json.MutableJsonIndexImpl;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OffHeapJsonIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OnHeapJsonIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.json.ImmutableJsonIndexReader;
@@ -101,7 +101,7 @@ public class JsonIndexTest {
         PinotDataBuffer offHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
         JsonIndexReader onHeapIndexReader = new ImmutableJsonIndexReader(onHeapDataBuffer, records.length);
         JsonIndexReader offHeapIndexReader = new ImmutableJsonIndexReader(offHeapDataBuffer, records.length);
-        MutableJsonIndex mutableJsonIndex = new MutableJsonIndex()) {
+        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl()) {
       for (String record : records) {
         mutableJsonIndex.add(record);
       }
@@ -186,7 +186,7 @@ public class JsonIndexTest {
         PinotDataBuffer offHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
         JsonIndexReader onHeapIndexReader = new ImmutableJsonIndexReader(onHeapDataBuffer, records.length);
         JsonIndexReader offHeapIndexReader = new ImmutableJsonIndexReader(offHeapDataBuffer, records.length);
-        MutableJsonIndex mutableJsonIndex = new MutableJsonIndex()) {
+        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl()) {
       for (String record : records) {
         mutableJsonIndex.add(record);
       }

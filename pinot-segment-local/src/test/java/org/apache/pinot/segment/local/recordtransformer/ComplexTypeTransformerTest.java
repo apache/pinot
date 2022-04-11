@@ -31,6 +31,8 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer.DEFAULT_COLLECTION_TO_JSON_MODE;
+
 
 public class ComplexTypeTransformerTest {
   @Test
@@ -296,7 +298,8 @@ public class ComplexTypeTransformerTest {
     // {
     //   "array":"[1,2]"
     // }
-    transformer = new ComplexTypeTransformer(Arrays.asList(), ".", ComplexTypeConfig.CollectionNotUnnestedToJson.ALL);
+    transformer = new ComplexTypeTransformer(Arrays.asList(), ".",
+            ComplexTypeConfig.CollectionNotUnnestedToJson.ALL, new HashMap<>());
     genericRow = new GenericRow();
     array = new Object[]{1, 2};
     genericRow.putValue("array", array);
@@ -341,8 +344,98 @@ public class ComplexTypeTransformerTest {
     array1[0] = ImmutableMap.of("b", "v1");
     map.put("array1", array1);
     genericRow.putValue("t", map);
-    transformer = new ComplexTypeTransformer(Arrays.asList(), ".", ComplexTypeConfig.CollectionNotUnnestedToJson.NONE);
+    transformer = new ComplexTypeTransformer(Arrays.asList(), ".",
+            ComplexTypeConfig.CollectionNotUnnestedToJson.NONE, new HashMap<>());
     transformer.transform(genericRow);
     Assert.assertTrue(ComplexTypeTransformer.isArray(genericRow.getValue("t.array1")));
+  }
+
+  @Test
+  public void testRenamePrefixes() {
+    HashMap<String, String> prefixesToRename = new HashMap<>();
+    prefixesToRename.put("map1.", "");
+    prefixesToRename.put("map2", "test");
+    ComplexTypeTransformer transformer = new ComplexTypeTransformer(new ArrayList<>(), ".",
+            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
+
+    GenericRow genericRow = new GenericRow();
+    genericRow.putValue("a", 1L);
+    genericRow.putValue("map1.b", 2L);
+    genericRow.putValue("map2.c", "u");
+    transformer.renamePrefixes(genericRow);
+    Assert.assertEquals(genericRow.getValue("a"), 1L);
+    Assert.assertEquals(genericRow.getValue("b"), 2L);
+    Assert.assertEquals(genericRow.getValue("test.c"), "u");
+
+    // name conflict where there becomes duplicate field names after renaming
+    prefixesToRename = new HashMap<>();
+    prefixesToRename.put("test.", "");
+    transformer = new ComplexTypeTransformer(new ArrayList<>(), ".",
+            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
+    genericRow = new GenericRow();
+    genericRow.putValue("a", 1L);
+    genericRow.putValue("test.a", 2L);
+    try {
+      transformer.renamePrefixes(genericRow);
+      Assert.fail("Should fail due to name conflict after renaming");
+    } catch (RuntimeException e) {
+      // expected
+    }
+
+    // name conflict where there becomes an empty field name after renaming
+    prefixesToRename = new HashMap<>();
+    prefixesToRename.put("test", "");
+    transformer = new ComplexTypeTransformer(new ArrayList<>(), ".",
+            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
+    genericRow = new GenericRow();
+    genericRow.putValue("a", 1L);
+    genericRow.putValue("test", 2L);
+    try {
+      transformer.renamePrefixes(genericRow);
+      Assert.fail("Should fail due to empty name after renaming");
+    } catch (RuntimeException e) {
+      // expected
+    }
+
+    // case where nothing gets renamed
+    prefixesToRename = new HashMap<>();
+    transformer = new ComplexTypeTransformer(new ArrayList<>(), ".",
+            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
+    genericRow = new GenericRow();
+    genericRow.putValue("a", 1L);
+    genericRow.putValue("test", 2L);
+    transformer.renamePrefixes(genericRow);
+    Assert.assertEquals(genericRow.getValue("a"), 1L);
+    Assert.assertEquals(genericRow.getValue("test"), 2L);
+  }
+
+  @Test
+  public void testPrefixesToRename() {
+    HashMap<String, String> prefixesToRename = new HashMap<>();
+    prefixesToRename.put("map1.", "");
+    prefixesToRename.put("map2", "test");
+    ComplexTypeTransformer transformer = new ComplexTypeTransformer(new ArrayList<>(), ".",
+            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
+
+    // test flatten root-level tuples
+    GenericRow genericRow = new GenericRow();
+    genericRow.putValue("a", 1L);
+    Map<String, Object> map1 = new HashMap<>();
+    genericRow.putValue("map1", map1);
+    map1.put("b", "v");
+    Map<String, Object> innerMap1 = new HashMap<>();
+    innerMap1.put("aa", 2);
+    innerMap1.put("bb", "u");
+    map1.put("im1", innerMap1);
+    Map<String, Object> map2 = new HashMap<>();
+    map2.put("c", 3);
+    genericRow.putValue("map2", map2);
+
+    transformer.transform(genericRow);
+    Assert.assertEquals(genericRow.getValue("a"), 1L);
+    Assert.assertEquals(genericRow.getValue("b"), "v");
+    Assert.assertEquals(genericRow.getValue("im1.aa"), 2);
+    Assert.assertEquals(genericRow.getValue("im1.bb"), "u");
+    Assert.assertEquals(genericRow.getValue("test.c"), 3);
   }
 }

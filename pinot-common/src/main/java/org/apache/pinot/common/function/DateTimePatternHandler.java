@@ -39,6 +39,14 @@ public class DateTimePatternHandler {
   }
 
   /**
+   * Converts the dateTimeString of passed pattern into a long of the millis since epoch
+   */
+  public static long parseDateTimeStringToEpochMillis(String dateTimeString, String pattern, String timezoneId) {
+    DateTimeFormatter dateTimeFormatter = getDateTimeFormatter(pattern, timezoneId);
+    return dateTimeFormatter.parseMillis(dateTimeString);
+  }
+
+  /**
    * Converts the millis representing seconds since epoch into a string of passed pattern
    */
   public static String parseEpochMillisToDateTimeString(long millis, String pattern) {

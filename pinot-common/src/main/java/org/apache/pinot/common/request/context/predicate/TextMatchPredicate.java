@@ -25,23 +25,17 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 /**
  * Predicate for TEXT_MATCH.
  */
-public class TextMatchPredicate implements Predicate {
-  private final ExpressionContext _lhs;
+public class TextMatchPredicate extends BasePredicate {
   private final String _value;
 
   public TextMatchPredicate(ExpressionContext lhs, String value) {
-    _lhs = lhs;
+    super(lhs);
     _value = value;
   }
 
   @Override
   public Type getType() {
     return Type.TEXT_MATCH;
-  }
-
-  @Override
-  public ExpressionContext getLhs() {
-    return _lhs;
   }
 
   public String getValue() {

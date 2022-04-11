@@ -20,6 +20,7 @@ namespace java org.apache.pinot.common.request
 
 struct DataSource {
   1: optional string tableName;
+  2: optional PinotQuery subquery;
 }
 
 struct PinotQuery {
@@ -35,6 +36,7 @@ struct PinotQuery {
   10: optional map<string, string> debugOptions;
   11: optional map<string, string> queryOptions;
   12: optional bool explain;
+  13: optional map<Expression, Expression> expressionOverrideHints;
 }
 
 enum ExpressionType {

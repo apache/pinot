@@ -168,7 +168,7 @@ public class MergeEqInFilterOptimizer implements FilterOptimizer {
         Function childFunction = child.getFunctionCall();
         String childOperator = childFunction.getOperator();
         assert !childOperator.equals(FilterKind.OR.name());
-        if (childOperator.equals(FilterKind.AND.name())) {
+        if (childOperator.equals(FilterKind.AND.name()) || childOperator.equals(FilterKind.NOT.name())) {
           childFunction.getOperands().replaceAll(this::optimize);
           newChildren.add(child);
         } else if (childOperator.equals(FilterKind.EQUALS.name())) {

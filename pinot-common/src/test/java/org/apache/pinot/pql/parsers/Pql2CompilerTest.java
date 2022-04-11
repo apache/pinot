@@ -246,8 +246,8 @@ public class Pql2CompilerTest {
     } catch (Pql2CompilationException e) {
       // Expected
       Assert.assertTrue(e.getMessage().startsWith("1:30: "),
-          "Compilation exception should contain line and character for error message. Error message is " + e
-              .getMessage());
+          "Compilation exception should contain line and character for error message. Error message is "
+              + e.getMessage());
       return;
     }
 
@@ -271,8 +271,8 @@ public class Pql2CompilerTest {
     Assert.assertEquals(brokerRequest.getPinotQuery().getQueryOptionsSize(), 0);
     Assert.assertNull(brokerRequest.getPinotQuery().getQueryOptions());
 
-    brokerRequest = COMPILER
-        .compileToBrokerRequest("select * from vegetables where name != 'Brussels sprouts' OPTION (delicious=yes)");
+    brokerRequest = COMPILER.compileToBrokerRequest(
+        "select * from vegetables where name != 'Brussels sprouts' OPTION (delicious=yes)");
     Assert.assertEquals(brokerRequest.getQueryOptionsSize(), 1);
     Assert.assertTrue(brokerRequest.getQueryOptions().containsKey("delicious"));
     Assert.assertEquals(brokerRequest.getQueryOptions().get("delicious"), "yes");
@@ -374,12 +374,11 @@ public class Pql2CompilerTest {
     // Test PinotQuery
     selectFunctionList = brokerRequest.getPinotQuery().getSelectList();
     Assert.assertEquals(selectFunctionList.size(), 1);
-    Assert.assertEquals(selectFunctionList.get(0).getFunctionCall().getOperator(), "SUM");
+    Assert.assertEquals(selectFunctionList.get(0).getFunctionCall().getOperator(), "sum");
     Assert.assertEquals(selectFunctionList.get(0).getFunctionCall().getOperands().size(), 1);
 
-    Assert
-        .assertEquals(selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
-            "ADD");
+    Assert.assertEquals(
+        selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "add");
     Assert.assertEquals(
         selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().size(), 2);
     Assert.assertEquals(
@@ -390,7 +389,7 @@ public class Pql2CompilerTest {
             .getLiteral().getStringValue(), "bar");
     groupbyList = brokerRequest.getPinotQuery().getGroupByList();
     Assert.assertEquals(groupbyList.size(), 1);
-    Assert.assertEquals(groupbyList.get(0).getFunctionCall().getOperator(), "SUB");
+    Assert.assertEquals(groupbyList.get(0).getFunctionCall().getOperator(), "sub");
     Assert.assertEquals(groupbyList.get(0).getFunctionCall().getOperands().size(), 2);
     Assert.assertEquals(groupbyList.get(0).getFunctionCall().getOperands().get(0).getLiteral().getStringValue(), "foo");
     Assert.assertEquals(groupbyList.get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "bar");

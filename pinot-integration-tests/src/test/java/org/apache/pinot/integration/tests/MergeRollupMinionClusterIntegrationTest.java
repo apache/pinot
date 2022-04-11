@@ -260,7 +260,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     //      -> {merged_100days_T5_0_myTable1_16400_16435_0}
 
     String sqlQuery = "SELECT count(*) FROM myTable1"; // 115545 rows for the test table
-    JsonNode expectedJson = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode expectedJson = postQuery(sqlQuery, _brokerBaseApiUrl);
     int[] expectedNumSubTasks = {1, 2, 2, 2, 1};
     int[] expectedNumSegmentsQueried = {13, 12, 13, 13, 12};
     long expectedWatermark = 16000 * 86_400_000L;
@@ -298,7 +298,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
       }
 
       // Check num total doc of merged segments are the same as the original segments
-      JsonNode actualJson = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
+      JsonNode actualJson = postQuery(sqlQuery, _brokerBaseApiUrl);
       SqlResultComparator.areEqual(actualJson, expectedJson, sqlQuery);
       // Check query routing
       int numSegmentsQueried = actualJson.get("numSegmentsQueried").asInt();
@@ -357,7 +357,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     //      -> {merged_150days_1628644105127_0_myTable2_16352_16429_0}
 
     String sqlQuery = "SELECT count(*) FROM myTable2"; // 115545 rows for the test table
-    JsonNode expectedJson = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode expectedJson = postQuery(sqlQuery, _brokerBaseApiUrl);
     int[] expectedNumSegmentsQueried = {16, 7, 3};
     long expectedWatermark = 16050 * 86_400_000L;
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(SINGLE_LEVEL_ROLLUP_TEST_TABLE);
@@ -394,7 +394,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
       }
 
       // Check total doc of merged segments are less than the original segments
-      JsonNode actualJson = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
+      JsonNode actualJson = postQuery(sqlQuery, _brokerBaseApiUrl);
       assertTrue(
           actualJson.get("resultTable").get("rows").get(0).get(0).asInt() < expectedJson.get("resultTable").get("rows")
               .get(0).get(0).asInt());
@@ -404,12 +404,12 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     }
 
     // Check total doc is half of the original after all merge tasks are finished
-    JsonNode actualJson = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode actualJson = postQuery(sqlQuery, _brokerBaseApiUrl);
     assertEquals(actualJson.get("resultTable").get("rows").get(0).get(0).asInt(),
         expectedJson.get("resultTable").get("rows").get(0).get(0).asInt() / 2);
     // Check time column is rounded
     JsonNode responseJson =
-        postSqlQuery("SELECT count(*), DaysSinceEpoch FROM myTable2 GROUP BY DaysSinceEpoch ORDER BY DaysSinceEpoch");
+        postQuery("SELECT count(*), DaysSinceEpoch FROM myTable2 GROUP BY DaysSinceEpoch ORDER BY DaysSinceEpoch");
     for (int i = 0; i < responseJson.get("resultTable").get("rows").size(); i++) {
       int daysSinceEpoch = responseJson.get("resultTable").get("rows").get(i).get(1).asInt();
       assertTrue(daysSinceEpoch % 7 == 0);
@@ -488,7 +488,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     //    90days: [16380, 16470) is not a valid merge window because windowEndTime > 45days watermark, not scheduling
 
     String sqlQuery = "SELECT count(*) FROM myTable3"; // 115545 rows for the test table
-    JsonNode expectedJson = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode expectedJson = postQuery(sqlQuery, _brokerBaseApiUrl);
     int[] expectedNumSubTasks = {1, 2, 1, 2, 1, 2, 1, 2, 1};
     int[] expectedNumSegmentsQueried = {12, 12, 11, 10, 9, 8, 7, 6, 5};
     Long[] expectedWatermarks45Days = {16065L, 16110L, 16155L, 16200L, 16245L, 16290L, 16335L, 16380L};
@@ -540,7 +540,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
       }
 
       // Check total doc of merged segments are the same as the original segments
-      JsonNode actualJson = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
+      JsonNode actualJson = postQuery(sqlQuery, _brokerBaseApiUrl);
       SqlResultComparator.areEqual(actualJson, expectedJson, sqlQuery);
       // Check query routing
       int numSegmentsQueried = actualJson.get("numSegmentsQueried").asInt();

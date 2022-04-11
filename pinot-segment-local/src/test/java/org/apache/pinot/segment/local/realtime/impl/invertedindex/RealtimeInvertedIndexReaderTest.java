@@ -30,7 +30,7 @@ public class RealtimeInvertedIndexReaderTest {
 
   @Test
   public void testRealtimeInvertedIndexReader() {
-    RealtimeInvertedIndexReader realtimeInvertedIndexReader = new RealtimeInvertedIndexReader();
+    RealtimeInvertedIndex realtimeInvertedIndexReader = new RealtimeInvertedIndex();
 
     // Add dictionary id 0, document id 0 to the inverted index (single-value dictionary id not added yet)
     // Before adding

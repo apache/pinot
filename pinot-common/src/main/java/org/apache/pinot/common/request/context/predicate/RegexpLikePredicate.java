@@ -19,18 +19,19 @@
 package org.apache.pinot.common.request.context.predicate;
 
 import java.util.Objects;
+import java.util.regex.Pattern;
 import org.apache.pinot.common.request.context.ExpressionContext;
 
 
 /**
  * Predicate for REGEXP_LIKE.
  */
-public class RegexpLikePredicate implements Predicate {
-  private final ExpressionContext _lhs;
+public class RegexpLikePredicate extends BasePredicate {
   private final String _value;
+  private Pattern _pattern = null;
 
   public RegexpLikePredicate(ExpressionContext lhs, String value) {
-    _lhs = lhs;
+    super(lhs);
     _value = value;
   }
 
@@ -39,13 +40,15 @@ public class RegexpLikePredicate implements Predicate {
     return Type.REGEXP_LIKE;
   }
 
-  @Override
-  public ExpressionContext getLhs() {
-    return _lhs;
-  }
-
   public String getValue() {
     return _value;
+  }
+
+  public Pattern getPattern() {
+    if (_pattern == null) {
+      _pattern = Pattern.compile(_value, Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE);
+    }
+    return _pattern;
   }
 
   @Override

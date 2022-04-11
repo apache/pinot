@@ -22,9 +22,12 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
@@ -201,5 +204,27 @@ public class IngestionUtilsTest {
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 6);
     Assert.assertTrue(extract.containsAll(Lists.newArrayList("d1", "d2", "m1", "dateColumn", "xy", "timestampColumn")));
+
+    // filter + transform configs + schema fields  + schema transform + complex type configs
+    schema = new Schema.SchemaBuilder().addSingleValueDimension("d1", FieldSpec.DataType.STRING)
+            .addSingleValueDimension("d2", FieldSpec.DataType.STRING)
+            .addMetric("m1", FieldSpec.DataType.INT)
+            .addDateTime("dateColumn", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS")
+            .build();
+    schema.getFieldSpecFor("d2").setTransformFunction("reverse(xy)");
+    TransformConfig transformConfig = new TransformConfig("dateColumn", "toDateTime(timestampColumn, 'yyyy-MM-dd')");
+    transformConfigs = Lists.newArrayList(transformConfig);
+    List<String> fieldsToUnnest = Arrays.asList("before.test", "after.test");
+    Map<String, String> prefixesToRename = new HashMap<>();
+    prefixesToRename.put("before", "after");
+    ComplexTypeConfig complexTypeConfigs = new ComplexTypeConfig(fieldsToUnnest, ".",
+            ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE, prefixesToRename);
+    FilterConfig filterConfig = new FilterConfig("Groovy({d1 == \"10\"}, d1)");
+    ingestionConfig = new IngestionConfig(null, null, filterConfig, transformConfigs, complexTypeConfigs);
+    extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
+    Assert.assertEquals(extract.size(), 8);
+    List<String> expectedColumns =
+            Lists.newArrayList("d1", "d2", "m1", "dateColumn", "xy", "timestampColumn", "before", "after");
+    Assert.assertTrue(extract.containsAll(expectedColumns));
   }
 }

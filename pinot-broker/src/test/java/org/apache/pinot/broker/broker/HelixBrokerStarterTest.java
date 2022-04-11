@@ -24,8 +24,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
-import org.apache.pinot.broker.routing.RoutingManager;
-import org.apache.pinot.broker.routing.RoutingTable;
+import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -33,6 +32,7 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
+import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -154,7 +154,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
     assertEquals(brokerResourceExternalView.getStateMap(OFFLINE_TABLE_NAME).size(), NUM_BROKERS);
     assertEquals(brokerResourceExternalView.getStateMap(REALTIME_TABLE_NAME).size(), NUM_BROKERS);
 
-    RoutingManager routingManager = _brokerStarter.getRoutingManager();
+    BrokerRoutingManager routingManager = _brokerStarter.getRoutingManager();
     assertTrue(routingManager.routingExists(OFFLINE_TABLE_NAME));
     assertTrue(routingManager.routingExists(REALTIME_TABLE_NAME));
 
@@ -213,7 +213,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
    */
   @Test
   public void testTimeBoundaryUpdate() {
-    RoutingManager routingManager = _brokerStarter.getRoutingManager();
+    BrokerRoutingManager routingManager = _brokerStarter.getRoutingManager();
 
     // Time boundary should be 1 day smaller than the end time
     int currentEndTime = 10;
@@ -228,7 +228,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
         _helixResourceManager.getSegmentZKMetadata(OFFLINE_TABLE_NAME, segmentToRefresh);
     _helixResourceManager.refreshSegment(OFFLINE_TABLE_NAME,
         SegmentMetadataMockUtils.mockSegmentMetadataWithEndTimeInfo(RAW_TABLE_NAME, segmentToRefresh, newEndTime),
-        segmentZKMetadata, EXPECTED_VERSION, "downloadUrl", null);
+        segmentZKMetadata, EXPECTED_VERSION, "downloadUrl", null, -1);
 
     TestUtils.waitForCondition(aVoid -> routingManager.getTimeBoundaryInfo(OFFLINE_TABLE_NAME).getTimeValue()
         .equals(Integer.toString(newEndTime - 1)), 30_000L, "Failed to update the time boundary for refreshed segment");

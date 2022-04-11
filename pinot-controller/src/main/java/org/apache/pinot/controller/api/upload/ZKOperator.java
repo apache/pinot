@@ -61,7 +61,7 @@ public class ZKOperator {
   public void completeSegmentOperations(String tableNameWithType, SegmentMetadata segmentMetadata,
       URI finalSegmentLocationURI, File currentSegmentLocation, boolean enableParallelPushProtection,
       HttpHeaders headers, String zkDownloadURI, boolean moveSegmentToFinalLocation, String crypter,
-      boolean allowRefresh)
+      boolean allowRefresh, long segmentSizeInBytes)
       throws Exception {
     String segmentName = segmentMetadata.getName();
     ZNRecord segmentMetadataZNRecord =
@@ -76,7 +76,8 @@ public class ZKOperator {
       }
       LOGGER.info("Adding new segment {} from table {}", segmentName, tableNameWithType);
       processNewSegment(segmentMetadata, finalSegmentLocationURI, currentSegmentLocation, zkDownloadURI, headers,
-          crypter, tableNameWithType, segmentName, moveSegmentToFinalLocation, enableParallelPushProtection);
+          crypter, tableNameWithType, segmentName, moveSegmentToFinalLocation, enableParallelPushProtection,
+          segmentSizeInBytes);
       return;
     }
 
@@ -101,13 +102,13 @@ public class ZKOperator {
     LOGGER.info("Segment {} from table {} already exists, refreshing if necessary", segmentName, tableNameWithType);
     processExistingSegment(segmentMetadata, finalSegmentLocationURI, currentSegmentLocation,
         enableParallelPushProtection, headers, zkDownloadURI, crypter, tableNameWithType, segmentName,
-        segmentMetadataZNRecord, moveSegmentToFinalLocation);
+        segmentMetadataZNRecord, moveSegmentToFinalLocation, segmentSizeInBytes);
   }
 
   private void processExistingSegment(SegmentMetadata segmentMetadata, URI finalSegmentLocationURI,
       File currentSegmentLocation, boolean enableParallelPushProtection, HttpHeaders headers, String zkDownloadURI,
       String crypter, String tableNameWithType, String segmentName, ZNRecord znRecord,
-      boolean moveSegmentToFinalLocation)
+      boolean moveSegmentToFinalLocation, long segmentSizeInBytes)
       throws Exception {
 
     SegmentZKMetadata existingSegmentZKMetadata = new SegmentZKMetadata(znRecord);
@@ -202,7 +203,7 @@ public class ZKOperator {
 
         _pinotHelixResourceManager
             .refreshSegment(tableNameWithType, segmentMetadata, existingSegmentZKMetadata, expectedVersion,
-                zkDownloadURI, crypter);
+                zkDownloadURI, crypter, segmentSizeInBytes);
       }
     } catch (Exception e) {
       if (!_pinotHelixResourceManager
@@ -234,10 +235,12 @@ public class ZKOperator {
 
   private void processNewSegment(SegmentMetadata segmentMetadata, URI finalSegmentLocationURI,
       File currentSegmentLocation, String zkDownloadURI, HttpHeaders headers, String crypter, String tableNameWithType,
-      String segmentName, boolean moveSegmentToFinalLocation, boolean enableParallelPushProtection)
+      String segmentName, boolean moveSegmentToFinalLocation, boolean enableParallelPushProtection,
+      long segmentSizeInBytes)
       throws Exception {
-    SegmentZKMetadata newSegmentZKMetadata = _pinotHelixResourceManager
-        .constructZkMetadataForNewSegment(tableNameWithType, segmentMetadata, zkDownloadURI, crypter);
+    SegmentZKMetadata newSegmentZKMetadata =
+        _pinotHelixResourceManager.constructZkMetadataForNewSegment(tableNameWithType, segmentMetadata, zkDownloadURI,
+            crypter, segmentSizeInBytes);
 
     // Lock if enableParallelPushProtection is true.
     if (enableParallelPushProtection) {
@@ -253,7 +256,6 @@ public class ZKOperator {
       newSegmentZKMetadata
           .setCustomMap(segmentZKMetadataCustomMapModifier.modifyMap(newSegmentZKMetadata.getCustomMap()));
     }
-
     if (!_pinotHelixResourceManager.createSegmentZkMetadata(tableNameWithType, newSegmentZKMetadata)) {
       throw new RuntimeException(
           "Failed to create ZK metadata for segment: " + segmentName + " of table: " + tableNameWithType);

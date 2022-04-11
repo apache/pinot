@@ -19,9 +19,9 @@
 package org.apache.pinot.segment.local.realtime.impl.dictionary;
 
 import java.util.Random;
-import org.apache.pinot.segment.local.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
+import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;

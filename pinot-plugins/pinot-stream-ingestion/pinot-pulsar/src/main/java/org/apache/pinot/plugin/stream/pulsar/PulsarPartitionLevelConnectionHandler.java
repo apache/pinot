@@ -66,7 +66,7 @@ public class PulsarPartitionLevelConnectionHandler {
       _pulsarClient = pulsarClientBuilder.build();
 
       _reader = _pulsarClient.newReader().topic(getPartitionedTopicName(partition))
-          .startMessageId(_config.getInitialMessageId()).create();
+          .startMessageId(_config.getInitialMessageId()).startMessageIdInclusive().create();
 
       LOGGER.info("Created consumer with id {} for topic {}", _reader, _config.getPulsarTopicName());
     } catch (Exception e) {

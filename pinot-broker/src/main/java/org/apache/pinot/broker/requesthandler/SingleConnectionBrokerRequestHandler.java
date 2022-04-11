@@ -28,7 +28,8 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
-import org.apache.pinot.broker.routing.RoutingManager;
+import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.exception.QueryException;
@@ -59,13 +60,13 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
   private final BrokerReduceService _brokerReduceService;
   private final QueryRouter _queryRouter;
 
-  public SingleConnectionBrokerRequestHandler(PinotConfiguration config, RoutingManager routingManager,
+  public SingleConnectionBrokerRequestHandler(PinotConfiguration config, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      BrokerMetrics brokerMetrics, TlsConfig tlsConfig) {
+      BrokerMetrics brokerMetrics, NettyConfig nettyConfig, TlsConfig tlsConfig) {
     super(config, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
 
     _brokerReduceService = new BrokerReduceService(_config);
-    _queryRouter = new QueryRouter(_brokerId, brokerMetrics, tlsConfig);
+    _queryRouter = new QueryRouter(_brokerId, brokerMetrics, nettyConfig, tlsConfig);
   }
 
   @Override
@@ -80,9 +81,9 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
 
   @Override
   protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-      @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
-      @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
-      long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
+      BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance,
+      List<String>> offlineRoutingTable, @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance,
+      List<String>> realtimeRoutingTable, long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
       throws Exception {
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
 
@@ -115,8 +116,8 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
 
     long reduceStartTimeNs = System.nanoTime();
     long reduceTimeOutMs = timeoutMs - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - scatterGatherStartTimeNs);
-    BrokerResponseNative brokerResponse =
-        _brokerReduceService.reduceOnDataTable(originalBrokerRequest, dataTableMap, reduceTimeOutMs, _brokerMetrics);
+    BrokerResponseNative brokerResponse = _brokerReduceService.reduceOnDataTable(
+        originalBrokerRequest, serverBrokerRequest, dataTableMap, reduceTimeOutMs, _brokerMetrics);
     final long reduceTimeNanos = System.nanoTime() - reduceStartTimeNs;
     requestStatistics.setReduceTimeNanos(reduceTimeNanos);
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REDUCE, reduceTimeNanos);

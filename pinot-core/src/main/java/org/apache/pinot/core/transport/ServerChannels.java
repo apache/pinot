@@ -24,6 +24,10 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.epoll.EpollEventLoopGroup;
+import io.netty.channel.epoll.EpollSocketChannel;
+import io.netty.channel.kqueue.KQueueEventLoopGroup;
+import io.netty.channel.kqueue.KQueueSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -35,7 +39,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.ReentrantLock;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -43,6 +49,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.utils.TlsUtils;
+import org.apache.pinot.core.util.OsCheck;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.apache.thrift.transport.TTransportException;
@@ -61,18 +68,9 @@ public class ServerChannels {
   // TSerializer currently is not thread safe, must be put into a ThreadLocal.
   private final ThreadLocal<TSerializer> _threadLocalTSerializer;
   private final ConcurrentHashMap<ServerRoutingInstance, ServerChannel> _serverToChannelMap = new ConcurrentHashMap<>();
-  private final EventLoopGroup _eventLoopGroup = new NioEventLoopGroup();
   private final TlsConfig _tlsConfig;
-
-  /**
-   * Create an unsecured server channel
-   *
-   * @param queryRouter query router
-   * @param brokerMetrics broker metrics
-   */
-  public ServerChannels(QueryRouter queryRouter, BrokerMetrics brokerMetrics) {
-    this(queryRouter, brokerMetrics, null);
-  }
+  private final EventLoopGroup _eventLoopGroup;
+  private final Class<? extends SocketChannel> _channelClass;
 
   /**
    * Create a server channel with TLS config
@@ -81,7 +79,21 @@ public class ServerChannels {
    * @param brokerMetrics broker metrics
    * @param tlsConfig TLS/SSL config
    */
-  public ServerChannels(QueryRouter queryRouter, BrokerMetrics brokerMetrics, TlsConfig tlsConfig) {
+  public ServerChannels(QueryRouter queryRouter, BrokerMetrics brokerMetrics, @Nullable NettyConfig nettyConfig,
+      @Nullable TlsConfig tlsConfig) {
+    if (nettyConfig != null && nettyConfig.isNativeTransportsEnabled()
+        && OsCheck.getOperatingSystemType() == OsCheck.OSType.Linux) {
+      _eventLoopGroup = new EpollEventLoopGroup();
+      _channelClass = EpollSocketChannel.class;
+    } else if (nettyConfig != null && nettyConfig.isNativeTransportsEnabled()
+        && OsCheck.getOperatingSystemType() == OsCheck.OSType.MacOS) {
+      _eventLoopGroup = new KQueueEventLoopGroup();
+      _channelClass = KQueueSocketChannel.class;
+    } else {
+      _eventLoopGroup = new NioEventLoopGroup();
+      _channelClass = NioSocketChannel.class;
+    }
+
     _queryRouter = queryRouter;
     _brokerMetrics = brokerMetrics;
     _tlsConfig = tlsConfig;
@@ -118,7 +130,7 @@ public class ServerChannels {
     ServerChannel(ServerRoutingInstance serverRoutingInstance) {
       _serverRoutingInstance = serverRoutingInstance;
       _bootstrap = new Bootstrap().remoteAddress(serverRoutingInstance.getHostname(), serverRoutingInstance.getPort())
-          .group(_eventLoopGroup).channel(NioSocketChannel.class).option(ChannelOption.SO_KEEPALIVE, true)
+          .group(_eventLoopGroup).channel(_channelClass).option(ChannelOption.SO_KEEPALIVE, true)
           .handler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel ch) {

@@ -40,6 +40,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -161,7 +162,7 @@ public abstract class BaseQueriesTest {
       }
     }
     QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
-    return getBrokerResponse(queryContext, planMaker);
+    return getBrokerResponse(queryContext, queryContext, planMaker);
   }
 
   /**
@@ -197,8 +198,15 @@ public abstract class BaseQueriesTest {
     }
     queryOptions.put(Request.QueryOptionKey.GROUP_BY_MODE, Request.SQL);
     queryOptions.put(Request.QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
+    BrokerRequest serverBrokerRequest = GapfillUtils.stripGapfill(brokerRequest);
     QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
-    return getBrokerResponse(queryContext, planMaker);
+    QueryContext serverQueryContext;
+    if (brokerRequest == serverBrokerRequest) {
+      serverQueryContext = queryContext;
+    } else {
+      serverQueryContext = BrokerRequestToQueryContextConverter.convert(serverBrokerRequest);
+    }
+    return getBrokerResponse(queryContext, serverQueryContext, planMaker);
   }
 
   /**
@@ -206,12 +214,13 @@ public abstract class BaseQueriesTest {
    * <p>Use this to test the whole flow from server to broker.
    * <p>The result should be equivalent to querying 4 identical index segments.
    */
-  private BrokerResponseNative getBrokerResponse(QueryContext queryContext, PlanMaker planMaker) {
+  private BrokerResponseNative getBrokerResponse(
+      QueryContext queryContext, QueryContext serverQueryContext, PlanMaker planMaker) {
     // Server side.
-    queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
-    Plan plan = planMaker.makeInstancePlan(getIndexSegments(), queryContext, EXECUTOR_SERVICE);
+    serverQueryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    Plan plan = planMaker.makeInstancePlan(getIndexSegments(), serverQueryContext, EXECUTOR_SERVICE);
 
-    BrokerRequest brokerRequest = queryContext.getBrokerRequest();
+    BrokerRequest brokerRequest = serverQueryContext.getBrokerRequest();
     DataTable instanceResponse =
         brokerRequest != null && brokerRequest.getPinotQuery() != null && brokerRequest.getPinotQuery().isExplain()
             ? ServerQueryExecutorV1Impl.processExplainPlanQueries(plan) : plan.execute();
@@ -235,19 +244,10 @@ public abstract class BaseQueriesTest {
     }
 
     BrokerResponseNative brokerResponse =
-        brokerReduceService.reduceOnDataTable(queryContext.getBrokerRequest(), dataTableMap,
-            CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS, null);
+        brokerReduceService.reduceOnDataTable(queryContext.getBrokerRequest(), serverQueryContext.getBrokerRequest(),
+            dataTableMap, CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS, null);
     brokerReduceService.shutDown();
     return brokerResponse;
-  }
-
-  /**
-   * Run optimized SQL query on multiple index segments.
-   * <p>Use this to test the whole flow from server to broker.
-   * <p>The result should be equivalent to querying 4 identical index segments.
-   */
-  protected BrokerResponseNative getBrokerResponseForOptimizedSqlQuery(String sqlQuery, @Nullable Schema schema) {
-    return getBrokerResponseForOptimizedSqlQuery(sqlQuery, null, schema, PLAN_MAKER);
   }
 
   protected BrokerResponseNative getBrokerResponseForOptimizedSqlQuery(String sqlQuery, @Nullable TableConfig config,
@@ -271,7 +271,9 @@ public abstract class BaseQueriesTest {
     }
     queryOptions.put(Request.QueryOptionKey.GROUP_BY_MODE, Request.SQL);
     queryOptions.put(Request.QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
+    BrokerRequest serverBrokerRequest = GapfillUtils.stripGapfill(brokerRequest);
     QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
-    return getBrokerResponse(queryContext, planMaker);
+    QueryContext serverQueryContext = BrokerRequestToQueryContextConverter.convert(serverBrokerRequest);
+    return getBrokerResponse(queryContext, serverQueryContext, planMaker);
   }
 }

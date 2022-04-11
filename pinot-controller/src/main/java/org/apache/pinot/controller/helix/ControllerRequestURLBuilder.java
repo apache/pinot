@@ -44,6 +44,10 @@ public class ControllerRequestURLBuilder {
     return new ControllerRequestURLBuilder(baseUrl);
   }
 
+  public String getBaseUrl() {
+    return _baseUrl;
+  }
+
   public String forDataFileUpload() {
     return StringUtil.join("/", _baseUrl, "segments");
   }
@@ -61,7 +65,12 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forInstanceUpdateTags(String instanceName, List<String> tags) {
-    return StringUtil.join("/", _baseUrl, "instances", instanceName, "updateTags?tags=" + StringUtils.join(tags, ","));
+    return forInstanceUpdateTags(instanceName, tags, false);
+  }
+
+  public String forInstanceUpdateTags(String instanceName, List<String> tags, boolean updateBrokerResource) {
+    return StringUtil.join("/", _baseUrl, "instances", instanceName,
+        "updateTags?tags=" + StringUtils.join(tags, ",") + "&updateBrokerResource=" + updateBrokerResource);
   }
 
   public String forInstanceList() {
@@ -292,8 +301,16 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "segments");
   }
 
-  public String forSegmentMetadata(String tableName) {
-    return StringUtil.join("/", _baseUrl, "segments", tableName, "metadata");
+  public String forSegmentsMetadataFromServer(String tableName) {
+    return forSegmentsMetadataFromServer(tableName, null);
+  }
+
+  public String forSegmentsMetadataFromServer(String tableName, @Nullable String columns) {
+    String url = StringUtil.join("/", _baseUrl, "segments", tableName, "metadata");
+    if (columns != null) {
+      url += "?columns=" + columns;
+    }
+    return url;
   }
 
   public String forSegmentMetadata(String tableName, String segmentName) {
@@ -353,9 +370,9 @@ public class ControllerRequestURLBuilder {
 
   public String forIngestFromFile(String tableNameWithType, String batchConfigMapStr)
       throws UnsupportedEncodingException {
-    return String
-        .format("%s?tableNameWithType=%s&batchConfigMapStr=%s", StringUtil.join("/", _baseUrl, "ingestFromFile"),
-            tableNameWithType, URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8.toString()));
+    return String.format("%s?tableNameWithType=%s&batchConfigMapStr=%s",
+        StringUtil.join("/", _baseUrl, "ingestFromFile"), tableNameWithType,
+        URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8.toString()));
   }
 
   public String forIngestFromFile(String tableNameWithType, Map<String, String> batchConfigMap)
@@ -392,5 +409,13 @@ public class ControllerRequestURLBuilder {
 
   public String forZkPut() {
     return StringUtil.join("/", _baseUrl, "zk/put");
+  }
+
+  public String forZkGet(String path) {
+    return StringUtil.join("/", _baseUrl, "zk/get", "?path=" + path);
+  }
+
+  public String forZkGetChildren(String path) {
+    return StringUtil.join("/", _baseUrl, "zk/getChildren", "?path=" + path);
   }
 }

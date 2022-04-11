@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.reduce;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -127,11 +128,11 @@ public class GroupByDataTableReducer implements DataTableReducer {
         try {
           setSQLGroupByInResultTable(brokerResponseNative, dataSchema, dataTables, reducerContext, tableName,
               brokerMetrics);
+          resultSize = brokerResponseNative.getResultTable().getRows().size();
         } catch (TimeoutException e) {
           brokerResponseNative.getProcessingExceptions()
               .add(new QueryProcessingException(QueryException.BROKER_TIMEOUT_ERROR_CODE, e.getMessage()));
         }
-        resultSize = brokerResponseNative.getResultTable().getRows().size();
       } else {
         // 2. groupByMode = sql, responseFormat = pql
         // This mode will invoke SQL style group by execution, but present results in PQL way
@@ -192,12 +193,18 @@ public class GroupByDataTableReducer implements DataTableReducer {
       Collection<DataTable> dataTables, DataTableReducerContext reducerContext, String rawTableName,
       BrokerMetrics brokerMetrics)
       throws TimeoutException {
-    IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables, reducerContext);
-    if (brokerMetrics != null) {
-      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NUM_RESIZES, indexedTable.getNumResizes());
-      brokerMetrics.addValueToTableGauge(rawTableName, BrokerGauge.RESIZE_TIME_MS, indexedTable.getResizeTimeMs());
+    Iterator<Record> sortedIterator;
+    if (!dataTables.isEmpty()) {
+      IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables, reducerContext);
+      if (brokerMetrics != null) {
+        brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NUM_RESIZES, indexedTable.getNumResizes());
+        brokerMetrics.addValueToTableGauge(rawTableName, BrokerGauge.RESIZE_TIME_MS, indexedTable.getResizeTimeMs());
+      }
+      sortedIterator = indexedTable.iterator();
+    } else {
+      sortedIterator = Collections.emptyIterator();
     }
-    Iterator<Record> sortedIterator = indexedTable.iterator();
+
     DataSchema prePostAggregationDataSchema = getPrePostAggregationDataSchema(dataSchema);
     ColumnDataType[] columnDataTypes = prePostAggregationDataSchema.getColumnDataTypes();
     int numColumns = columnDataTypes.length;
@@ -302,7 +309,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     int resultSize = _queryContext.getHavingFilter() != null ? trimSize : limit;
     int trimThreshold = reducerContext.getGroupByTrimThreshold();
     IndexedTable indexedTable;
-    if (numReduceThreadsToUse <= 1) {
+    if (numReduceThreadsToUse == 1) {
       indexedTable = new SimpleIndexedTable(dataSchema, _queryContext, resultSize, trimSize, trimThreshold);
     } else {
       if (trimThreshold >= GroupByOrderByCombineOperator.MAX_TRIM_THRESHOLD) {
@@ -316,9 +323,6 @@ public class GroupByDataTableReducer implements DataTableReducer {
       }
     }
 
-    Future[] futures = new Future[numDataTables];
-    CountDownLatch countDownLatch = new CountDownLatch(numDataTables);
-
     // Create groups of data tables that each thread can process concurrently.
     // Given that numReduceThreads is <= numDataTables, each group will have at least one data table.
     ArrayList<DataTable> dataTables = new ArrayList<>(dataTablesToReduce);
@@ -331,16 +335,21 @@ public class GroupByDataTableReducer implements DataTableReducer {
       reduceGroups.get(i % numReduceThreadsToUse).add(dataTables.get(i));
     }
 
-    int cnt = 0;
+    Future[] futures = new Future[numReduceThreadsToUse];
+    CountDownLatch countDownLatch = new CountDownLatch(numDataTables);
     ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
-    for (List<DataTable> reduceGroup : reduceGroups) {
-      futures[cnt++] = reducerContext.getExecutorService().submit(new TraceRunnable() {
+    for (int i = 0; i < numReduceThreadsToUse; i++) {
+      List<DataTable> reduceGroup = reduceGroups.get(i);
+      futures[i] = reducerContext.getExecutorService().submit(new TraceRunnable() {
         @Override
         public void runJob() {
           for (DataTable dataTable : reduceGroup) {
-            int numRows = dataTable.getNumberOfRows();
-
+            // Terminate when thread is interrupted. This is expected when the query already fails in the main thread.
+            if (Thread.interrupted()) {
+              return;
+            }
             try {
+              int numRows = dataTable.getNumberOfRows();
               for (int rowId = 0; rowId < numRows; rowId++) {
                 Object[] values = new Object[_numColumns];
                 for (int colId = 0; colId < _numColumns; colId++) {
@@ -383,14 +392,17 @@ public class GroupByDataTableReducer implements DataTableReducer {
 
     try {
       long timeOutMs = reducerContext.getReduceTimeOutMs() - (System.currentTimeMillis() - start);
-      countDownLatch.await(timeOutMs, TimeUnit.MILLISECONDS);
+      if (!countDownLatch.await(timeOutMs, TimeUnit.MILLISECONDS)) {
+        throw new TimeoutException("Timed out in broker reduce phase");
+      }
     } catch (InterruptedException e) {
+      throw new RuntimeException("Interrupted in broker reduce phase", e);
+    } finally {
       for (Future future : futures) {
         if (!future.isDone()) {
           future.cancel(true);
         }
       }
-      throw new TimeoutException("Timed out in broker reduce phase.");
     }
 
     indexedTable.finish(true);
@@ -412,10 +424,10 @@ public class GroupByDataTableReducer implements DataTableReducer {
   private int getNumReduceThreadsToUse(int numDataTables, int maxReduceThreadsPerQuery) {
     // Use single thread if number of data tables < MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE.
     if (numDataTables < MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE) {
-      return Math.min(1, numDataTables); // Number of data tables can be zero.
+      return 1;
+    } else {
+      return Math.min(numDataTables, maxReduceThreadsPerQuery);
     }
-
-    return Math.min(maxReduceThreadsPerQuery, numDataTables);
   }
 
   /**

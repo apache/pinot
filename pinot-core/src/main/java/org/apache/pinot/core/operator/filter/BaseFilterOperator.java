@@ -40,4 +40,32 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
   public boolean isResultMatchingAll() {
     return false;
   }
+
+  /**
+   * Returns {@code true} if the filter has an optimized count implementation.
+   */
+  public boolean canOptimizeCount() {
+    return false;
+  }
+
+  /**
+   * @return the number of matching docs, or throws if it cannot produce this count.
+   */
+  public int getNumMatchingDocs() {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * @return true if the filter operator can produce a bitmap of docIds
+   */
+  public boolean canProduceBitmaps() {
+    return false;
+  }
+
+  /**
+   * @return bitmaps of matching docIds
+   */
+  public BitmapCollection getBitmaps() {
+    throw new UnsupportedOperationException();
+  }
 }

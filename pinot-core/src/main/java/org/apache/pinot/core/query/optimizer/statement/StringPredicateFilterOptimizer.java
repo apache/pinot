@@ -20,6 +20,8 @@ package org.apache.pinot.core.query.optimizer.statement;
 
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.function.FunctionInfo;
+import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
@@ -42,8 +44,8 @@ import org.apache.pinot.spi.data.Schema;
  * rewrite phase with optimizer phase to avoid such issues altogether.
  */
 public class StringPredicateFilterOptimizer implements StatementOptimizer {
-  private static final String MINUS_OPERATOR_NAME = "MINUS";
-  private static final String STRCMP_OPERATOR_NAME = "STRCMP";
+  private static final String MINUS_OPERATOR_NAME = "minus";
+  private static final String STRCMP_OPERATOR_NAME = "strcmp";
 
   @Override
   public void optimize(PinotQuery query, @Nullable TableConfig tableConfig, @Nullable Schema schema) {
@@ -73,19 +75,13 @@ public class StringPredicateFilterOptimizer implements StatementOptimizer {
     Function function = expression.getFunctionCall();
     String operator = function.getOperator();
     List<Expression> operands = function.getOperands();
-    FilterKind kind = FilterKind.valueOf(operator);
-    switch (kind) {
-      case AND:
-      case OR: {
-        for (Expression operand : operands) {
-          optimizeExpression(operand, schema);
-        }
-        break;
+    if (operator.equals(FilterKind.AND.name()) || operator.equals(FilterKind.OR.name()) || operator.equals(
+        FilterKind.NOT.name())) {
+      for (Expression operand : operands) {
+        optimizeExpression(operand, schema);
       }
-      default: {
-        replaceMinusWithCompareForStrings(operands.get(0), schema);
-        break;
-      }
+    } else {
+      replaceMinusWithCompareForStrings(operands.get(0), schema);
     }
   }
 
@@ -99,21 +95,31 @@ public class StringPredicateFilterOptimizer implements StatementOptimizer {
     Function function = expression.getFunctionCall();
     String operator = function.getOperator();
     List<Expression> operands = function.getOperands();
-    if (operator.equals(MINUS_OPERATOR_NAME) && operands.size() == 2 && isStringColumn(operands.get(0), schema)
-        && isStringColumn(operands.get(1), schema)) {
+    if (operator.equals(MINUS_OPERATOR_NAME) && operands.size() == 2 && isString(operands.get(0), schema) && isString(
+        operands.get(1), schema)) {
       function.setOperator(STRCMP_OPERATOR_NAME);
     }
   }
 
-  /** @return true if expression is a column of string type. */
-  private static boolean isStringColumn(Expression expression, Schema schema) {
-    if (expression.getType() != ExpressionType.IDENTIFIER) {
-      // Expression is not a column.
-      return false;
+  /** @return true if expression is STRING column or a function that outputs STRING. */
+  private static boolean isString(Expression expression, Schema schema) {
+    ExpressionType expressionType = expression.getType();
+
+    if (expressionType == ExpressionType.IDENTIFIER) {
+      // Check if this is a STRING column.
+      String column = expression.getIdentifier().getName();
+      FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+      return fieldSpec != null && fieldSpec.getDataType() == FieldSpec.DataType.STRING;
     }
 
-    String column = expression.getIdentifier().getName();
-    FieldSpec fieldSpec = schema.getFieldSpecFor(column);
-    return fieldSpec != null && fieldSpec.getDataType() == FieldSpec.DataType.STRING;
+    if (expressionType == ExpressionType.FUNCTION) {
+      // Check if the function returns STRING as output.
+      Function function = expression.getFunctionCall();
+      FunctionInfo functionInfo =
+          FunctionRegistry.getFunctionInfo(function.getOperator(), function.getOperands().size());
+      return functionInfo != null && functionInfo.getMethod().getReturnType() == String.class;
+    }
+
+    return false;
   }
 }

@@ -31,7 +31,7 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
-import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexReader;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
@@ -41,7 +41,7 @@ import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 /**
  * This is used to create Lucene based text index.
  * Used for both offline from {@link SegmentColumnarIndexCreator}
- * and realtime from {@link RealtimeLuceneTextIndexReader}
+ * and realtime from {@link RealtimeLuceneTextIndex}
  */
 public class LuceneTextIndexCreator implements TextIndexCreator {
   // TODO: make buffer size configurable choosing a default value based on the heap usage results in design doc

@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.common.function;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -27,22 +30,23 @@ import org.apache.commons.lang.StringUtils;
 
 public enum TransformFunctionType {
   // Aggregation functions for single-valued columns
-  ADD("add"),
-  SUB("sub"),
-  MULT("mult"),
-  DIV("div"),
+  ADD("add", "plus"),
+  SUB("sub", "minus"),
+  MULT("mult", "times"),
+  DIV("div", "divide"),
   MOD("mod"),
 
-  PLUS("plus"),
-  MINUS("minus"),
-  TIMES("times"),
-  DIVIDE("divide"),
-
   ABS("abs"),
-  CEIL("ceil"),
+  CEIL("ceil", "ceiling"),
   EXP("exp"),
   FLOOR("floor"),
-  LN("ln"),
+  LOG("log", "ln"),
+  LOG2("log2"),
+  LOG10("log10"),
+  SIGN("sign"),
+  ROUND_DECIMAL("roundDecimal"),
+  TRUNCATE("truncate"),
+  POWER("power", "pow"),
   SQRT("sqrt"),
 
   LEAST("least"),
@@ -56,6 +60,9 @@ public enum TransformFunctionType {
   LESS_THAN_OR_EQUAL("less_than_or_equal"),
   IN("in"),
 
+  IS_NULL("is_null"),
+  IS_NOT_NULL("is_not_null"),
+
   AND("and"),
   OR("or"),
 
@@ -66,6 +73,18 @@ public enum TransformFunctionType {
   TIMECONVERT("timeConvert"),
   DATETIMECONVERT("dateTimeConvert"),
   DATETRUNC("dateTrunc"),
+  YEAR("year"),
+  YEAR_OF_WEEK("yearOfWeek", "yow"),
+  QUARTER("quarter"),
+  MONTH_OF_YEAR("monthOfYear", "month"),
+  WEEK_OF_YEAR("weekOfYear", "week"),
+  DAY_OF_YEAR("dayOfYear", "doy"),
+  DAY_OF_MONTH("dayOfMonth", "day"),
+  DAY_OF_WEEK("dayOfWeek", "dow"),
+  HOUR("hour"),
+  MINUTE("minute"),
+  SECOND("second"),
+  MILLISECOND("millisecond"),
   ARRAYLENGTH("arrayLength"),
   ARRAYAVERAGE("arrayAverage"),
   ARRAYMIN("arrayMin"),
@@ -106,17 +125,42 @@ public enum TransformFunctionType {
   ST_WITHIN("ST_Within"),
 
   // Geo indexing
-  GEOTOH3("geoToH3");
+  GEOTOH3("geoToH3"),
 
-  private static final Set<String> NAMES = Arrays.stream(values())
-      .flatMap(func -> Stream.of(func.getName(), StringUtils.remove(func.getName(), '_').toUpperCase(),
-          func.getName().toUpperCase(), func.getName().toLowerCase(), func.name(), func.name().toLowerCase()))
-      .collect(Collectors.toSet());
+  //Trigonometry
+  SIN("sin"),
+  COS("cos"),
+  TAN("tan"),
+  COT("cot"),
+  ASIN("asin"),
+  ACOS("acos"),
+  ATAN("atan"),
+  ATAN2("atan2"),
+  SINH("sinh"),
+  COSH("cosh"),
+  TANH("tanh"),
+  DEGREES("degrees"),
+  RADIANS("radians");
+
+  private static final Set<String> NAMES = Arrays.stream(values()).flatMap(
+      func -> func.getAliases().stream().flatMap(name -> Stream.of(name, StringUtils.remove(name, '_').toUpperCase(),
+          StringUtils.remove(name, '_').toLowerCase(), name.toUpperCase(),
+          name.toLowerCase()))).collect(Collectors.toSet());
 
   private final String _name;
+  private final List<String> _aliases;
 
-  TransformFunctionType(String name) {
+  TransformFunctionType(String name, String... aliases) {
     _name = name;
+    List<String> all = new ArrayList<>(aliases.length + 2);
+    all.add(name);
+    all.add(name());
+    all.addAll(Arrays.asList(aliases));
+    _aliases = Collections.unmodifiableList(all);
+  }
+
+  public List<String> getAliases() {
+    return _aliases;
   }
 
   public static boolean isTransformFunction(String functionName) {

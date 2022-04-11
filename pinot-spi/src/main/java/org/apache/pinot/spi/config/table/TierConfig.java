@@ -21,6 +21,7 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.common.base.Preconditions;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
@@ -38,6 +39,9 @@ public class TierConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("For 'TIME' segment selector, the period after which to select segments for this tier")
   private final String _segmentAge;
+
+  @JsonPropertyDescription("For 'FIXED' segment selector, the list of segments to select for this tier")
+  private final List<String> _segmentList;
 
   @JsonPropertyDescription("The type of storage")
   private final String _storageType;
@@ -58,6 +62,7 @@ public class TierConfig extends BaseJsonConfig {
   public TierConfig(@JsonProperty(value = "name", required = true) String name,
       @JsonProperty(value = "segmentSelectorType", required = true) String segmentSelectorType,
       @JsonProperty("segmentAge") @Nullable String segmentAge,
+      @JsonProperty("segmentList") @Nullable List<String> segmentList,
       @JsonProperty(value = "storageType", required = true) String storageType,
       @JsonProperty("serverTag") @Nullable String serverTag,
       @JsonProperty("tierBackend") @Nullable String tierBackend,
@@ -69,6 +74,7 @@ public class TierConfig extends BaseJsonConfig {
     _name = name;
     _segmentSelectorType = segmentSelectorType;
     _segmentAge = segmentAge;
+    _segmentList = segmentList;
     _storageType = storageType;
     _serverTag = serverTag;
     _tierBackend = tierBackend;
@@ -83,8 +89,14 @@ public class TierConfig extends BaseJsonConfig {
     return _segmentSelectorType;
   }
 
+  @Nullable
   public String getSegmentAge() {
     return _segmentAge;
+  }
+
+  @Nullable
+  public List<String> getSegmentList() {
+    return _segmentList;
   }
 
   public String getStorageType() {

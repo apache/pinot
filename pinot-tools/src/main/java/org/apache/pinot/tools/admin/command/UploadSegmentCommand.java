@@ -26,6 +26,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.Command;
@@ -169,7 +170,7 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
         fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile,
             makeAuthHeader(makeAuthToken(_authToken, _user, _password)), Collections
                 .singletonList(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, _tableName)),
-            FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+            HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
       }
     } finally {
       // Delete the temporary working directory.

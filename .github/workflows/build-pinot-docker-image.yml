@@ -1,0 +1,67 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+name: Pinot Docker Image Build and Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      gitUrl:
+        description: "The Pinot git repo to check out to build, use https."
+        default: "https://github.com/apache/pinot.git"
+        required: true
+      commit:
+        description: "The branch/commit to check out to build Pinot image."
+        default: "master"
+        required: true
+      platform:
+        description: "The platform of the image to build, e.g. linux/amd64,linux/arm64"
+        default: "linux/amd64"
+        required: true
+      dockerImageName:
+        description: "The docker image name, default to 'apachepinot/pinot'."
+        default: "apachepinot/pinot"
+        required: true
+      tags:
+        description: "Tags to push of the image, comma separated, e.g. tag1,tag2,tag3"
+        default: ""
+
+jobs:
+  build-pinot-docker-image:
+    name: Build Pinot Docker Image
+    runs-on: ubuntu-latest
+    steps:
+    - name: Login to DockerHub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - uses: docker/setup-qemu-action@v1
+      name: Set up QEMU
+    - uses: docker/setup-buildx-action@v1
+      name: Set up Docker Buildx
+    - uses: actions/checkout@v3
+    - name: Build and push the Docker image
+      env:
+        DOCKER_FILE_BASE_DIR: "docker/images/pinot"
+        DOCKER_IMAGE_NAME: ${{ github.event.inputs.dockerImageName }}
+        BUILD_PLATFORM: ${{ github.event.inputs.platform }}
+        PINOT_GIT_URL: ${{ github.event.inputs.gitUrl }}
+        PINOT_BRANCH: ${{ github.event.inputs.commit }}
+        TAGS: ${{ github.event.inputs.tags }}
+      run: .github/workflows/scripts/docker/.pinot_docker_image_build_and_push.sh

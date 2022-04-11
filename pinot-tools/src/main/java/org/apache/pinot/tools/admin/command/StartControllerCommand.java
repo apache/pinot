@@ -184,15 +184,16 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
       StartServiceManagerCommand startServiceManagerCommand =
           new StartServiceManagerCommand().setZkAddress(_zkAddress).setClusterName(_clusterName).setPort(-1)
               .setBootstrapServices(new String[0]).addBootstrapService(ServiceRole.CONTROLLER, controllerConf);
-      startServiceManagerCommand.execute();
-      String pidFile = ".pinotAdminController-" + System.currentTimeMillis() + ".pid";
-      savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
-      return true;
+      if (startServiceManagerCommand.execute()) {
+        String pidFile = ".pinotAdminController-" + System.currentTimeMillis() + ".pid";
+        savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
+        return true;
+      }
     } catch (Exception e) {
       LOGGER.error("Caught exception while starting controller, exiting.", e);
-      System.exit(-1);
-      return false;
     }
+    System.exit(-1);
+    return false;
   }
 
   protected Map<String, Object> getControllerConf()

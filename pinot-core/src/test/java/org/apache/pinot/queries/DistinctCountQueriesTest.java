@@ -38,7 +38,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
-import org.apache.pinot.core.operator.query.DictionaryBasedAggregationOperator;
+import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -193,8 +193,8 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
 
     // Inner segment
     for (Object operator : Arrays.asList(getOperatorForSqlQuery(query), getOperatorForSqlQueryWithFilter(query))) {
-      assertTrue(operator instanceof DictionaryBasedAggregationOperator);
-      IntermediateResultsBlock resultsBlock = ((DictionaryBasedAggregationOperator) operator).nextBlock();
+      assertTrue(operator instanceof NonScanBasedAggregationOperator);
+      IntermediateResultsBlock resultsBlock = ((NonScanBasedAggregationOperator) operator).nextBlock();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS,
           0, 0, NUM_RECORDS);
       List<Object> aggregationResult = resultsBlock.getAggregationResult();
@@ -299,6 +299,96 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
   }
 
   @Test
+  public void testHLL() {
+    // Dictionary based
+    String query = "SELECT DISTINCTCOUNTHLL(intColumn), DISTINCTCOUNTHLL(longColumn), DISTINCTCOUNTHLL(floatColumn), "
+        + "DISTINCTCOUNTHLL(doubleColumn), DISTINCTCOUNTHLL(stringColumn) FROM testTable";
+
+    // Inner segment
+    String[] interSegmentsExpectedResults = new String[5];
+    for (Object operator : Arrays.asList(getOperatorForSqlQuery(query), getOperatorForSqlQueryWithFilter(query))) {
+      assertTrue(operator instanceof NonScanBasedAggregationOperator);
+      IntermediateResultsBlock resultsBlock = ((NonScanBasedAggregationOperator) operator).nextBlock();
+      QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS,
+          0, 0, NUM_RECORDS);
+      List<Object> aggregationResult = resultsBlock.getAggregationResult();
+      assertNotNull(aggregationResult);
+      assertEquals(aggregationResult.size(), 5);
+      for (int i = 0; i < 5; i++) {
+        assertTrue(aggregationResult.get(i) instanceof HyperLogLog);
+        HyperLogLog hll = (HyperLogLog) aggregationResult.get(i);
+
+        // Check log2m is 8
+        assertEquals(hll.sizeof(), 172);
+
+        int actualResult = (int) hll.cardinality();
+        int expectedResult = _values.size();
+        // The standard deviation of the error for log2m 8 is 6.5%, allow 20% error
+        assertEquals(actualResult, expectedResult, expectedResult * 0.2);
+
+        interSegmentsExpectedResults[i] = Integer.toString(actualResult);
+      }
+    }
+
+    // Inter segments
+    for (BrokerResponseNative brokerResponse : Arrays.asList(getBrokerResponseForPqlQuery(query),
+        getBrokerResponseForPqlQueryWithFilter(query))) {
+      QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 0, 4 * NUM_RECORDS,
+          interSegmentsExpectedResults);
+    }
+
+    // Regular aggregation
+    query = query + " WHERE intColumn >= 500";
+
+    // Inner segment
+    int expectedResult = 0;
+    for (Integer value : _values) {
+      if (value >= 500) {
+        expectedResult++;
+      }
+    }
+    Operator operator = getOperatorForSqlQuery(query);
+    assertTrue(operator instanceof AggregationOperator);
+    List<Object> aggregationResult = ((AggregationOperator) operator).nextBlock().getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 5);
+    for (int i = 0; i < 5; i++) {
+      assertTrue(aggregationResult.get(i) instanceof HyperLogLog);
+      HyperLogLog hll = (HyperLogLog) aggregationResult.get(i);
+
+      // Check log2m is 8
+      assertEquals(hll.sizeof(), 172);
+
+      int actualResult = (int) hll.cardinality();
+      // The standard deviation of the error for log2m 8 is 6.5%, allow 20% error
+      assertEquals(actualResult, expectedResult, expectedResult * 0.2);
+
+      interSegmentsExpectedResults[i] = Integer.toString(actualResult);
+    }
+
+    // Inter segment
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
+    List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
+    assertNotNull(aggregationResults);
+    assertEquals(aggregationResults.size(), 5);
+    for (int i = 0; i < 5; i++) {
+      assertEquals((String) aggregationResults.get(i).getValue(), interSegmentsExpectedResults[i]);
+    }
+
+    // Change log2m
+    query = "SELECT DISTINCTCOUNTHLL(intColumn, 12) FROM testTable";
+    operator = getOperatorForSqlQuery(query);
+    assertTrue(operator instanceof NonScanBasedAggregationOperator);
+    aggregationResult = ((NonScanBasedAggregationOperator) operator).nextBlock().getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 1);
+    assertTrue(aggregationResult.get(0) instanceof HyperLogLog);
+    HyperLogLog hll = (HyperLogLog) aggregationResult.get(0);
+    // Check log2m is 12
+    assertEquals(hll.sizeof(), 2732);
+  }
+
+  @Test
   public void testSmartHLL() {
     // Dictionary based
     String query = "SELECT DISTINCTCOUNTSMARTHLL(intColumn, 'hllConversionThreshold=10'), "
@@ -311,8 +401,8 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
     // Inner segment
     String[] interSegmentsExpectedResults = new String[6];
     for (Object operator : Arrays.asList(getOperatorForSqlQuery(query), getOperatorForSqlQueryWithFilter(query))) {
-      assertTrue(operator instanceof DictionaryBasedAggregationOperator);
-      IntermediateResultsBlock resultsBlock = ((DictionaryBasedAggregationOperator) operator).nextBlock();
+      assertTrue(operator instanceof NonScanBasedAggregationOperator);
+      IntermediateResultsBlock resultsBlock = ((NonScanBasedAggregationOperator) operator).nextBlock();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS,
           0, 0, NUM_RECORDS);
       List<Object> aggregationResult = resultsBlock.getAggregationResult();
@@ -327,7 +417,7 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
 
         int actualResult = (int) hll.cardinality();
         int expectedResult = _values.size();
-        // Allow 5% error for HLL
+        // The standard deviation of the error for log2m 12 is 1.625%, allow 5% error
         assertEquals(actualResult, expectedResult, expectedResult * 0.05);
 
         interSegmentsExpectedResults[i] = Integer.toString(actualResult);
@@ -364,7 +454,7 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
       assertEquals(hll.sizeof(), 2732);
 
       int actualResult = (int) hll.cardinality();
-      // Allow 5% error for HLL
+      // The standard deviation of the error for log2m 12 is 1.625%, allow 5% error
       assertEquals(actualResult, expectedResult, expectedResult * 0.05);
     }
 
@@ -381,8 +471,8 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
     // Change log2m
     query = "SELECT DISTINCTCOUNTSMARTHLL(intColumn, 'hllLog2m=8;hllConversionThreshold=10') FROM testTable";
     operator = getOperatorForSqlQuery(query);
-    assertTrue(operator instanceof DictionaryBasedAggregationOperator);
-    aggregationResult = ((DictionaryBasedAggregationOperator) operator).nextBlock().getAggregationResult();
+    assertTrue(operator instanceof NonScanBasedAggregationOperator);
+    aggregationResult = ((NonScanBasedAggregationOperator) operator).nextBlock().getAggregationResult();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 1);
     assertTrue(aggregationResult.get(0) instanceof HyperLogLog);

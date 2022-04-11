@@ -39,18 +39,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
-import org.apache.pinot.broker.routing.RoutingManager;
-import org.apache.pinot.broker.routing.RoutingTable;
+import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -76,11 +73,12 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
+import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -104,13 +102,14 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRequestHandler.class);
-  private static final String IN_SUBQUERY = "inSubquery";
+  private static final String IN_SUBQUERY = "insubquery";
+  private static final String IN_ID_SET = "inidset";
   private static final Expression FALSE = RequestUtils.getLiteralExpression(false);
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
   private static final Expression STAR = RequestUtils.getIdentifierExpression("*");
 
   protected final PinotConfiguration _config;
-  protected final RoutingManager _routingManager;
+  protected final BrokerRoutingManager _routingManager;
   protected final AccessControlFactory _accessControlFactory;
   protected final QueryQuotaManager _queryQuotaManager;
   protected final TableCache _tableCache;
@@ -134,7 +133,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private final boolean _enableQueryLimitOverride;
   private final boolean _enableDistinctCountBitmapOverride;
 
-  public BaseBrokerRequestHandler(PinotConfiguration config, RoutingManager routingManager,
+  public BaseBrokerRequestHandler(PinotConfiguration config, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       BrokerMetrics brokerMetrics) {
     _config = config;
@@ -219,7 +218,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       requestStatistics.setErrorCode(QueryException.PQL_PARSING_ERROR_CODE);
       return new BrokerResponseNative(QueryException.getException(QueryException.PQL_PARSING_ERROR, e));
     }
-    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
+
+    setOptions(brokerRequest.getPinotQuery(), requestId, query, request);
+    BrokerRequest serverBrokerRequest = GapfillUtils.stripGapfill(brokerRequest);
+    PinotQuery pinotQuery = serverBrokerRequest.getPinotQuery();
     setOptions(pinotQuery, requestId, query, request);
 
     if (isLiteralOnlyQuery(pinotQuery)) {
@@ -250,7 +252,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     String tableName = getActualTableName(pinotQuery.getDataSource().getTableName());
-    setTableName(brokerRequest, tableName);
+    setTableName(serverBrokerRequest, tableName);
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     requestStatistics.setTableName(rawTableName);
 
@@ -288,7 +290,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         compilationEndTimeNs - compilationStartTimeNs);
 
     // Second-stage table-level access control
-    boolean hasTableAccess = _accessControlFactory.create().hasAccess(requesterIdentity, brokerRequest);
+    boolean hasTableAccess = _accessControlFactory.create().hasAccess(requesterIdentity, serverBrokerRequest);
     if (!hasTableAccess) {
       _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
       LOGGER.info("Access denied for request {}: {}, table: {}", requestId, query, tableName);
@@ -376,27 +378,31 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     Schema schema = _tableCache.getSchema(rawTableName);
     if (offlineTableName != null && realtimeTableName != null) {
       // Hybrid
-      offlineBrokerRequest = getOfflineBrokerRequest(brokerRequest);
-      _queryOptimizer.optimize(offlineBrokerRequest.getPinotQuery(), _tableCache.getTableConfig(offlineTableName),
-          schema);
-      realtimeBrokerRequest = getRealtimeBrokerRequest(brokerRequest);
-      _queryOptimizer.optimize(realtimeBrokerRequest.getPinotQuery(), _tableCache.getTableConfig(realtimeTableName),
-          schema);
+      offlineBrokerRequest = getOfflineBrokerRequest(serverBrokerRequest);
+      PinotQuery offlinePinotQuery = offlineBrokerRequest.getPinotQuery();
+      handleExpressionOverride(offlinePinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
+      _queryOptimizer.optimize(offlinePinotQuery, offlineTableConfig, schema);
+      realtimeBrokerRequest = getRealtimeBrokerRequest(serverBrokerRequest);
+      PinotQuery realtimePinotQuery = realtimeBrokerRequest.getPinotQuery();
+      handleExpressionOverride(realtimePinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
+      _queryOptimizer.optimize(realtimePinotQuery, realtimeTableConfig, schema);
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.HYBRID);
       requestStatistics.setOfflineServerTenant(getServerTenant(offlineTableName));
       requestStatistics.setRealtimeServerTenant(getServerTenant(realtimeTableName));
     } else if (offlineTableName != null) {
       // OFFLINE only
-      setTableName(brokerRequest, offlineTableName);
-      _queryOptimizer.optimize(pinotQuery, _tableCache.getTableConfig(offlineTableName), schema);
-      offlineBrokerRequest = brokerRequest;
+      setTableName(serverBrokerRequest, offlineTableName);
+      handleExpressionOverride(pinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
+      _queryOptimizer.optimize(pinotQuery, offlineTableConfig, schema);
+      offlineBrokerRequest = serverBrokerRequest;
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.OFFLINE);
       requestStatistics.setOfflineServerTenant(getServerTenant(offlineTableName));
     } else {
       // REALTIME only
-      setTableName(brokerRequest, realtimeTableName);
-      _queryOptimizer.optimize(pinotQuery, _tableCache.getTableConfig(realtimeTableName), schema);
-      realtimeBrokerRequest = brokerRequest;
+      setTableName(serverBrokerRequest, realtimeTableName);
+      handleExpressionOverride(pinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
+      _queryOptimizer.optimize(pinotQuery, realtimeTableConfig, schema);
+      realtimeBrokerRequest = serverBrokerRequest;
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.REALTIME);
       requestStatistics.setRealtimeServerTenant(getServerTenant(realtimeTableName));
     }
@@ -534,8 +540,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
     }
     BrokerResponseNative brokerResponse =
-        processBrokerRequest(requestId, brokerRequest, offlineBrokerRequest, offlineRoutingTable, realtimeBrokerRequest,
-            realtimeRoutingTable, remainingTimeMs, serverStats, requestStatistics);
+        processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest, offlineRoutingTable,
+            realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats, requestStatistics);
     brokerResponse.setExceptions(exceptions);
     long executionEndTimeNs = System.nanoTime();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION,
@@ -857,8 +863,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // Execute the query
     ServerStats serverStats = new ServerStats();
     BrokerResponseNative brokerResponse =
-        processBrokerRequest(requestId, brokerRequest, offlineBrokerRequest, offlineRoutingTable, realtimeBrokerRequest,
-            realtimeRoutingTable, remainingTimeMs, serverStats, requestStatistics);
+        processBrokerRequest(requestId, brokerRequest, brokerRequest, offlineBrokerRequest, offlineRoutingTable,
+            realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats, requestStatistics);
     long executionEndTimeNs = System.nanoTime();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION,
         executionEndTimeNs - routingEndTimeNs);
@@ -971,7 +977,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
 
       String serializedIdSet = (String) response.getAggregationResults().get(0).getValue();
-      expression.setValue(TransformFunctionType.INIDSET.name());
+      expression.setValue(IN_ID_SET);
       children.set(1,
           new TransformExpressionTree(TransformExpressionTree.ExpressionType.LITERAL, serializedIdSet, null));
     } else {
@@ -1009,7 +1015,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return;
     }
     List<Expression> operands = function.getOperands();
-    if (StringUtils.remove(function.getOperator(), '_').equalsIgnoreCase(IN_SUBQUERY)) {
+    if (function.getOperator().equals(IN_SUBQUERY)) {
       Preconditions.checkState(operands.size() == 2, "IN_SUBQUERY requires 2 arguments: expression, subquery");
       Literal subqueryLiteral = operands.get(1).getLiteral();
       Preconditions.checkState(subqueryLiteral != null, "Second argument of IN_SUBQUERY must be a literal (subquery)");
@@ -1020,7 +1026,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         throw new RuntimeException("Caught exception while executing subquery: " + subquery);
       }
       String serializedIdSet = (String) response.getResultTable().getRows().get(0)[0];
-      function.setOperator(TransformFunctionType.INIDSET.name());
+      function.setOperator(IN_ID_SET);
       operands.set(1, RequestUtils.getLiteralExpression(serializedIdSet));
     } else {
       for (Expression operand : operands) {
@@ -1232,21 +1238,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   private static void rejectGroovyQuery(Expression expression) {
-    Function functionCall = expression.getFunctionCall();
-    if (functionCall == null) {
+    Function function = expression.getFunctionCall();
+    if (function == null) {
       return;
     }
-
-    if (TransformFunctionFactory.canonicalize(functionCall.getOperator())
-        .equals(TransformFunctionType.GROOVY.getName())) {
+    if (function.getOperator().equals("groovy")) {
       throw new BadQueryRequestException("Groovy transform functions are disabled for queries");
     }
-
-    List<Expression> operands = functionCall.getOperands();
-    if (operands != null) {
-      for (Expression operandExpression : operands) {
-        rejectGroovyQuery(operandExpression);
-      }
+    for (Expression operandExpression : function.getOperands()) {
+      rejectGroovyQuery(operandExpression);
     }
   }
 
@@ -1254,26 +1254,24 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Sets HyperLogLog log2m for DistinctCountHLL functions if not explicitly set for the given SQL expression.
    */
   private static void handleHLLLog2mOverride(Expression expression, int hllLog2mOverride) {
-    Function functionCall = expression.getFunctionCall();
-    if (functionCall == null) {
+    Function function = expression.getFunctionCall();
+    if (function == null) {
       return;
     }
-    switch (functionCall.getOperator().toUpperCase()) {
-      case "DISTINCTCOUNTHLL":
-      case "DISTINCTCOUNTHLLMV":
-      case "DISTINCTCOUNTRAWHLL":
-      case "DISTINCTCOUNTRAWHLLMV":
-        if (functionCall.getOperandsSize() == 1) {
-          functionCall.addToOperands(RequestUtils.getLiteralExpression(hllLog2mOverride));
+    switch (function.getOperator()) {
+      case "distinctcounthll":
+      case "distinctcounthllmv":
+      case "distinctcountrawhll":
+      case "distinctcountrawhllmv":
+        if (function.getOperandsSize() == 1) {
+          function.addToOperands(RequestUtils.getLiteralExpression(hllLog2mOverride));
         }
         return;
       default:
         break;
     }
-    if (functionCall.getOperandsSize() > 0) {
-      for (Expression operand : functionCall.getOperands()) {
-        handleHLLLog2mOverride(operand, hllLog2mOverride);
-      }
+    for (Expression operand : function.getOperands()) {
+      handleHLLLog2mOverride(operand, hllLog2mOverride);
     }
   }
 
@@ -1383,12 +1381,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (function == null) {
       return;
     }
-    if (StringUtils.remove(function.getOperator(), '_')
-        .equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())) {
+    if (function.getOperator().equals("distinctcount")) {
       List<Expression> operands = function.getOperands();
       if (operands.size() == 1 && operands.get(0).isSetIdentifier() && segmentPartitionedColumns.contains(
           operands.get(0).getIdentifier().getName())) {
-        function.setOperator(AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT.name());
+        function.setOperator("segmentpartitioneddistinctcount");
       }
     } else {
       for (Expression operand : function.getOperands()) {
@@ -1425,14 +1422,53 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (function == null) {
       return;
     }
-    if (StringUtils.remove(function.getOperator(), '_')
-        .equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())) {
-      function.setOperator(AggregationFunctionType.DISTINCTCOUNTBITMAP.name());
+    if (function.getOperator().equals("distinctcount")) {
+      function.setOperator("distinctcountbitmap");
     } else {
       for (Expression operand : function.getOperands()) {
         handleDistinctCountBitmapOverride(operand);
       }
     }
+  }
+
+  private static void handleExpressionOverride(PinotQuery pinotQuery,
+      @Nullable Map<Expression, Expression> expressionOverrideMap) {
+    if (expressionOverrideMap == null) {
+      return;
+    }
+    pinotQuery.getSelectList().replaceAll(o -> handleExpressionOverride(o, expressionOverrideMap));
+    Expression filterExpression = pinotQuery.getFilterExpression();
+    if (filterExpression != null) {
+      pinotQuery.setFilterExpression(handleExpressionOverride(filterExpression, expressionOverrideMap));
+    }
+    List<Expression> groupByList = pinotQuery.getGroupByList();
+    if (groupByList != null) {
+      groupByList.replaceAll(o -> handleExpressionOverride(o, expressionOverrideMap));
+    }
+    List<Expression> orderByList = pinotQuery.getOrderByList();
+    if (orderByList != null) {
+      for (Expression expression : orderByList) {
+        // NOTE: Order-by is always a Function with the ordering of the Expression
+        expression.getFunctionCall().getOperands().replaceAll(o -> handleExpressionOverride(o, expressionOverrideMap));
+      }
+    }
+    Expression havingExpression = pinotQuery.getHavingExpression();
+    if (havingExpression != null) {
+      pinotQuery.setHavingExpression(handleExpressionOverride(havingExpression, expressionOverrideMap));
+    }
+  }
+
+  private static Expression handleExpressionOverride(Expression expression,
+      Map<Expression, Expression> expressionOverrideMap) {
+    Expression override = expressionOverrideMap.get(expression);
+    if (override != null) {
+      return new Expression(override);
+    }
+    Function function = expression.getFunctionCall();
+    if (function != null) {
+      function.getOperands().replaceAll(o -> handleExpressionOverride(o, expressionOverrideMap));
+    }
+    return expression;
   }
 
   /**
@@ -1481,7 +1517,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       computeResultsForLiteral(e.getLiteral(), columnNames, columnTypes, row);
     }
     if (e.getType() == ExpressionType.FUNCTION) {
-      if (e.getFunctionCall().getOperator().equalsIgnoreCase(SqlKind.AS.toString())) {
+      if (e.getFunctionCall().getOperator().equals("as")) {
         String columnName = e.getFunctionCall().getOperands().get(1).getIdentifier().getName();
         computeResultsForExpression(e.getFunctionCall().getOperands().get(0), columnNames, columnTypes, row);
         columnNames.set(columnNames.size() - 1, columnName);
@@ -1697,7 +1733,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     } else if (expressionType == ExpressionType.FUNCTION) {
       final Function functionCall = expression.getFunctionCall();
       switch (functionCall.getOperator()) {
-        case "AS":
+        case "as":
           fixColumnName(rawTableName, functionCall.getOperands().get(0), columnNameMap, aliasMap, isCaseInsensitive);
           final Expression rightAsExpr = functionCall.getOperands().get(1);
           if (rightAsExpr.isSetIdentifier()) {
@@ -1709,7 +1745,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
             }
           }
           break;
-        case "LOOKUP":
+        case "lookup":
           // LOOKUP function looks up another table's schema, skip the check for now.
           break;
         default:
@@ -2048,6 +2084,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         || !QueryOptionsUtils.isResponseFormatSQL(queryOptions)) {
       throw new IllegalStateException("SQL query should always have response format and group-by mode set to SQL");
     }
+
+    if (pinotQuery.getDataSource().getSubquery() != null) {
+      validateRequest(pinotQuery.getDataSource().getSubquery(), queryResponseLimit);
+    }
   }
 
   /**
@@ -2151,9 +2191,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Processes the optimized broker requests for both OFFLINE and REALTIME table.
    */
   protected abstract BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-      @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
-      @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
-      long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
+      BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance,
+      List<String>> offlineRoutingTable, @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance,
+      List<String>> realtimeRoutingTable, long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
       throws Exception;
 
   /**

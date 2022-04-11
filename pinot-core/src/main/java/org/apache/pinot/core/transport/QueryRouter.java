@@ -21,11 +21,11 @@ package org.apache.pinot.core.transport;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -56,31 +56,29 @@ public class QueryRouter {
   private final ConcurrentHashMap<Long, AsyncQueryResponse> _asyncQueryResponseMap = new ConcurrentHashMap<>();
 
   /**
-   * Create an unsecured query router
+   * Creates an unsecured query router.
    *
    * @param brokerId broker id
    * @param brokerMetrics broker metrics
    */
   public QueryRouter(String brokerId, BrokerMetrics brokerMetrics) {
-    _brokerId = brokerId;
-    _brokerMetrics = brokerMetrics;
-    _serverChannels = new ServerChannels(this, brokerMetrics);
-    _serverChannelsTls = null;
+    this(brokerId, brokerMetrics, null, null);
   }
 
   /**
-   * Create a query router with TLS config
+   * Creates a query router with TLS config.
    *
    * @param brokerId broker id
    * @param brokerMetrics broker metrics
+   * @param nettyConfig configurations for netty library
    * @param tlsConfig TLS config
    */
-  public QueryRouter(String brokerId, BrokerMetrics brokerMetrics, TlsConfig tlsConfig) {
+  public QueryRouter(String brokerId, BrokerMetrics brokerMetrics, @Nullable NettyConfig nettyConfig,
+      @Nullable TlsConfig tlsConfig) {
     _brokerId = brokerId;
     _brokerMetrics = brokerMetrics;
-    _serverChannels = new ServerChannels(this, brokerMetrics);
-    _serverChannelsTls =
-        Optional.ofNullable(tlsConfig).map(conf -> new ServerChannels(this, brokerMetrics, conf)).orElse(null);
+    _serverChannels = new ServerChannels(this, brokerMetrics, nettyConfig, null);
+    _serverChannelsTls = tlsConfig != null ? new ServerChannels(this, brokerMetrics, nettyConfig, tlsConfig) : null;
   }
 
   public AsyncQueryResponse submitQuery(long requestId, String rawTableName,
@@ -121,8 +119,8 @@ public class QueryRouter {
       ServerRoutingInstance serverRoutingInstance = entry.getKey();
       ServerChannels serverChannels = serverRoutingInstance.isTlsEnabled() ? _serverChannelsTls : _serverChannels;
       try {
-        serverChannels
-            .sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, entry.getValue(), timeoutMs);
+        serverChannels.sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, entry.getValue(),
+            timeoutMs);
         asyncQueryResponse.markRequestSubmitted(serverRoutingInstance);
       } catch (TimeoutException e) {
         if (ServerChannels.CHANNEL_LOCK_TIMEOUT_MSG.equals(e.getMessage())) {

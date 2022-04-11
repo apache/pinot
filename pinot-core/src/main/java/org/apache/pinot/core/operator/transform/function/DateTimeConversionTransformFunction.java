@@ -28,7 +28,6 @@ import org.apache.pinot.core.operator.transform.transformer.datetime.EpochToEpoc
 import org.apache.pinot.core.operator.transform.transformer.datetime.EpochToSDFTransformer;
 import org.apache.pinot.core.operator.transform.transformer.datetime.SDFToEpochTransformer;
 import org.apache.pinot.core.operator.transform.transformer.datetime.SDFToSDFTransformer;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 
@@ -127,11 +126,12 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
   @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
     if (_resultMetadata == LONG_SV_NO_DICTIONARY_METADATA) {
-      if (_longOutputTimes == null) {
-        _longOutputTimes = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      int length = projectionBlock.getNumDocs();
+
+      if (_longOutputTimes == null || _longOutputTimes.length < length) {
+        _longOutputTimes = new long[length];
       }
 
-      int length = projectionBlock.getNumDocs();
       if (_dateTimeTransformer instanceof EpochToEpochTransformer) {
         EpochToEpochTransformer dateTimeTransformer = (EpochToEpochTransformer) _dateTimeTransformer;
         dateTimeTransformer
@@ -150,11 +150,12 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
   @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
     if (_resultMetadata == STRING_SV_NO_DICTIONARY_METADATA) {
-      if (_stringOutputTimes == null) {
-        _stringOutputTimes = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      int length = projectionBlock.getNumDocs();
+
+      if (_stringOutputTimes == null || _stringOutputTimes.length < length) {
+        _stringOutputTimes = new String[length];
       }
 
-      int length = projectionBlock.getNumDocs();
       if (_dateTimeTransformer instanceof EpochToSDFTransformer) {
         EpochToSDFTransformer dateTimeTransformer = (EpochToSDFTransformer) _dateTimeTransformer;
         dateTimeTransformer

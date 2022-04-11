@@ -18,16 +18,15 @@
  */
 package org.apache.pinot.common.utils.config;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.tier.FixedTierSegmentSelector;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.tier.TierSegmentSelector;
-import org.apache.pinot.common.tier.TierStorage;
 import org.apache.pinot.common.tier.TimeBasedTierSegmentSelector;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
@@ -76,20 +75,24 @@ public final class TierConfigUtils {
   }
 
   /**
-   * Comparator for sorting the {@link Tier}.
-   * As of now, we have only 1 type of {@link TierSegmentSelector} and 1 type of {@link TierStorage}.
-   * Tier with an older age bucket in {@link TimeBasedTierSegmentSelector} should appear before a younger age bucket,
-   * in sort order
-   * TODO: As we add more types, this logic needs to be upgraded
+   * Comparator for sorting the {@link Tier}. In the sort order
+   * 1) {@link FixedTierSegmentSelector} are always before others
+   * 2) For {@link TimeBasedTierSegmentSelector}, tiers with an older age bucket appear before a younger age bucket,
    */
   public static Comparator<Tier> getTierComparator() {
     return (o1, o2) -> {
       TierSegmentSelector s1 = o1.getSegmentSelector();
       TierSegmentSelector s2 = o2.getSegmentSelector();
-      Preconditions.checkState(TierFactory.TIME_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s1.getType()),
-          "Unsupported segmentSelectorType class %s", s1.getClass());
-      Preconditions.checkState(TierFactory.TIME_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s2.getType()),
-          "Unsupported segmentSelectorType class %s", s2.getClass());
+      if (TierFactory.FIXED_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s1.getType())
+          && TierFactory.FIXED_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s2.getType())) {
+        return 0;
+      }
+      if (TierFactory.FIXED_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s1.getType())) {
+        return -1;
+      }
+      if (TierFactory.FIXED_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s2.getType())) {
+        return 1;
+      }
       Long period1 = ((TimeBasedTierSegmentSelector) s1).getSegmentAgeMillis();
       Long period2 = ((TimeBasedTierSegmentSelector) s2).getSegmentAgeMillis();
       return period2.compareTo(period1);

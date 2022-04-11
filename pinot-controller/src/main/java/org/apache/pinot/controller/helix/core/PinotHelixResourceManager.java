@@ -46,6 +46,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import javax.ws.rs.BadRequestException;
+import javax.ws.rs.ClientErrorException;
+import javax.ws.rs.NotFoundException;
+import javax.ws.rs.core.Response;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.StringUtils;
@@ -87,6 +91,7 @@ import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
+import org.apache.pinot.common.messages.TableDeletionMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -112,6 +117,7 @@ import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.segment.local.utils.ReplicationUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.ConfigUtils;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -400,50 +406,152 @@ public class PinotHelixResourceManager {
    * Add an instance into the Helix cluster.
    *
    * @param instance Instance to be added
+   * @param updateBrokerResource Whether to update broker resource for broker instance
    * @return Request response
    */
-  public synchronized PinotResourceManagerResponse addInstance(Instance instance) {
-    List<String> instances = getAllInstances();
-    String instanceIdToAdd = InstanceUtils.getHelixInstanceId(instance);
-    if (instances.contains(instanceIdToAdd)) {
-      return PinotResourceManagerResponse.failure("Instance " + instanceIdToAdd + " already exists");
+  public synchronized PinotResourceManagerResponse addInstance(Instance instance, boolean updateBrokerResource) {
+    String instanceId = InstanceUtils.getHelixInstanceId(instance);
+    InstanceConfig instanceConfig = getHelixInstanceConfig(instanceId);
+    if (instanceConfig != null) {
+      throw new ClientErrorException(String.format("Instance: %s already exists", instanceId),
+          Response.Status.CONFLICT);
+    }
+
+    instanceConfig = InstanceUtils.toHelixInstanceConfig(instance);
+    _helixAdmin.addInstance(_helixClusterName, instanceConfig);
+
+    // Update broker resource if necessary
+    boolean shouldUpdateBrokerResource = false;
+    List<String> newBrokerTags = null;
+    if (instanceId.startsWith(Helix.PREFIX_OF_BROKER_INSTANCE) && updateBrokerResource) {
+      List<String> newTags = instance.getTags();
+      if (CollectionUtils.isNotEmpty(newTags)) {
+        newBrokerTags = newTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
+        shouldUpdateBrokerResource = !newBrokerTags.isEmpty();
+      }
+    }
+    if (shouldUpdateBrokerResource) {
+      long startTimeMs = System.currentTimeMillis();
+      List<String> tablesAdded = new ArrayList<>();
+      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, null);
+      LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}", instanceId,
+          newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded);
+      return PinotResourceManagerResponse.success(
+          String.format("Added instance: %s, and updated broker resource - tables added: %s", instanceId, tablesAdded));
     } else {
-      _helixAdmin.addInstance(_helixClusterName, InstanceUtils.toHelixInstanceConfig(instance));
-      return PinotResourceManagerResponse.SUCCESS;
+      return PinotResourceManagerResponse.success("Added instance: " + instanceId);
     }
   }
 
   /**
    * Update a given instance for the specified Instance ID
    */
-  public synchronized PinotResourceManagerResponse updateInstance(String instanceIdToUpdate, Instance newInstance) {
-    InstanceConfig instanceConfig = getHelixInstanceConfig(instanceIdToUpdate);
+  public synchronized PinotResourceManagerResponse updateInstance(String instanceId, Instance newInstance,
+      boolean updateBrokerResource) {
+    InstanceConfig instanceConfig = getHelixInstanceConfig(instanceId);
     if (instanceConfig == null) {
-      return PinotResourceManagerResponse.failure("Instance " + instanceIdToUpdate + " does not exists");
+      throw new NotFoundException("Failed to find instance config for instance: " + instanceId);
+    }
+
+    List<String> newTags = newInstance.getTags();
+    List<String> oldTags = instanceConfig.getTags();
+    InstanceUtils.updateHelixInstanceConfig(instanceConfig, newInstance);
+    if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceId), instanceConfig)) {
+      throw new RuntimeException("Failed to set instance config for instance: " + instanceId);
+    }
+
+    // Update broker resource if necessary
+    boolean shouldUpdateBrokerResource = false;
+    List<String> newBrokerTags = null;
+    if (instanceId.startsWith(Helix.PREFIX_OF_BROKER_INSTANCE) && updateBrokerResource) {
+      newBrokerTags =
+          newTags != null ? newTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList())
+              : Collections.emptyList();
+      List<String> oldBrokerTags =
+          oldTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
+      shouldUpdateBrokerResource = !newBrokerTags.equals(oldBrokerTags);
+    }
+    if (shouldUpdateBrokerResource) {
+      long startTimeMs = System.currentTimeMillis();
+      List<String> tablesAdded = new ArrayList<>();
+      List<String> tablesRemoved = new ArrayList<>();
+      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, tablesRemoved);
+      LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
+          instanceId, newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
+      return PinotResourceManagerResponse.success(
+          String.format("Updated instance: %s, and updated broker resource - tables added: %s, tables removed: %s",
+              instanceId, tablesAdded, tablesRemoved));
     } else {
-      InstanceUtils.updateHelixInstanceConfig(instanceConfig, newInstance);
-      if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceIdToUpdate), instanceConfig)) {
-        return PinotResourceManagerResponse.failure("Unable to update instance: " + instanceIdToUpdate);
-      }
-      return PinotResourceManagerResponse.SUCCESS;
+      return PinotResourceManagerResponse.success("Updated instance: " + instanceId);
     }
   }
 
   /**
    * Updates the tags of the specified instance ID
    */
-  public synchronized PinotResourceManagerResponse updateInstanceTags(String instanceIdToUpdate, String tags) {
-    InstanceConfig instanceConfig = getHelixInstanceConfig(instanceIdToUpdate);
+  public synchronized PinotResourceManagerResponse updateInstanceTags(String instanceId, String tagsString,
+      boolean updateBrokerResource) {
+    InstanceConfig instanceConfig = getHelixInstanceConfig(instanceId);
     if (instanceConfig == null) {
-      return PinotResourceManagerResponse.failure("Instance " + instanceIdToUpdate + " does not exists");
+      throw new NotFoundException("Failed to find instance config for instance: " + instanceId);
     }
-    List<String> tagList = Arrays.asList(StringUtils.split(tags, ','));
-    instanceConfig.getRecord().setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), tagList);
-    if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceIdToUpdate), instanceConfig)) {
-      return PinotResourceManagerResponse
-          .failure("Unable to update instance: " + instanceIdToUpdate + " to tags: " + tags);
+
+    List<String> newTags = Arrays.asList(StringUtils.split(tagsString, ','));
+    List<String> oldTags = instanceConfig.getTags();
+    instanceConfig.getRecord().setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), newTags);
+    if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceId), instanceConfig)) {
+      throw new RuntimeException("Failed to set instance config for instance: " + instanceId);
     }
-    return PinotResourceManagerResponse.SUCCESS;
+
+    // Update broker resource if necessary
+    boolean shouldUpdateBrokerResource = false;
+    List<String> newBrokerTags = null;
+    if (instanceId.startsWith(Helix.PREFIX_OF_BROKER_INSTANCE) && updateBrokerResource) {
+      newBrokerTags = newTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
+      List<String> oldBrokerTags =
+          oldTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
+      shouldUpdateBrokerResource = !newBrokerTags.equals(oldBrokerTags);
+    }
+    if (shouldUpdateBrokerResource) {
+      long startTimeMs = System.currentTimeMillis();
+      List<String> tablesAdded = new ArrayList<>();
+      List<String> tablesRemoved = new ArrayList<>();
+      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, tablesRemoved);
+      LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
+          instanceId, newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
+      return PinotResourceManagerResponse.success(String.format(
+          "Updated tags: %s for instance: %s, and updated broker resource - tables added: %s, tables removed: %s",
+          newTags, instanceId, tablesAdded, tablesRemoved));
+    } else {
+      return PinotResourceManagerResponse.success(
+          String.format("Updated tags: %s for instance: %s", newTags, instanceId));
+    }
+  }
+
+  /**
+   * Updates the tables served by the specified broker instance in the broker resource.
+   * NOTE: This method will read all the table configs, so can be costly.
+   */
+  public PinotResourceManagerResponse updateBrokerResource(String instanceId) {
+    if (!instanceId.startsWith(Helix.PREFIX_OF_BROKER_INSTANCE)) {
+      throw new BadRequestException("Cannot update broker resource for non-broker instance: " + instanceId);
+    }
+    InstanceConfig instanceConfig = getHelixInstanceConfig(instanceId);
+    if (instanceConfig == null) {
+      throw new NotFoundException("Failed to find instance config for instance: " + instanceId);
+    }
+
+    long startTimeMs = System.currentTimeMillis();
+    List<String> brokerTags =
+        instanceConfig.getTags().stream().filter(TagNameUtils::isBrokerTag).collect(Collectors.toList());
+    List<String> tablesAdded = new ArrayList<>();
+    List<String> tablesRemoved = new ArrayList<>();
+    HelixHelper.updateBrokerResource(_helixZkManager, instanceId, brokerTags, tablesAdded, tablesRemoved);
+    LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
+        instanceId, brokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
+    return PinotResourceManagerResponse.success(
+        String.format("Updated broker resource for broker: %s - tables added: %s, tables removed: %s", instanceId,
+            tablesAdded, tablesRemoved));
   }
 
   /**
@@ -1433,7 +1541,12 @@ public class PinotHelixResourceManager {
     return _helixDataAccessor.getBaseDataAccessor().get(path, null, -1);
   }
 
-  public List<String> getZKChildren(String path) {
+  public List<ZNRecord> getZKChildren(String path) {
+    return _helixDataAccessor.getBaseDataAccessor().getChildren(path, null, -1,
+        CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
+  }
+
+  public List<String> getZKChildNames(String path) {
     return _helixDataAccessor.getBaseDataAccessor().getChildNames(path, -1);
   }
 
@@ -1645,6 +1758,17 @@ public class PinotHelixResourceManager {
     HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, offlineTableName);
     LOGGER.info("Deleting table {}: Removed from broker resource", offlineTableName);
 
+    // Drop the table on servers
+    // TODO: Make this api idempotent and blocking by waiting for externalview to converge on controllers
+    //      instead of servers. This is because if externalview gets updated with significant delay,
+    //      we may have the race condition for table recreation that the new table will use the old states
+    //      (old table data manager) on the servers.
+    //      Steps needed:
+    //      1. Drop the helix resource first (set idealstate as null)
+    //      2. Wait for the externalview to converge
+    //      3. Get servers for the tenant, and send delete table message to these servers
+    deleteTableOnServer(offlineTableName);
+
     // Drop the table
     if (_helixAdmin.getResourcesInCluster(_helixClusterName).contains(offlineTableName)) {
       _helixAdmin.dropResource(_helixClusterName, offlineTableName);
@@ -1687,6 +1811,11 @@ public class PinotHelixResourceManager {
     // Remove the table from brokerResource
     HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, realtimeTableName);
     LOGGER.info("Deleting table {}: Removed from broker resource", realtimeTableName);
+
+    // Drop the table on servers
+    // TODO: Make this api idempotent and blocking by waiting for externalview to converge on controllers
+    //      instead of servers. Follow the same steps for offline tables.
+    deleteTableOnServer(realtimeTableName);
 
     // Cache the state and drop the table
     Set<String> instancesForTable = null;
@@ -1799,7 +1928,7 @@ public class PinotHelixResourceManager {
     // NOTE: must first set the segment ZK metadata before assigning segment to instances because segment assignment
     // might need them to determine the partition of the segment, and server will need them to download the segment
     SegmentZKMetadata segmentZkmetadata =
-        constructZkMetadataForNewSegment(tableNameWithType, segmentMetadata, downloadUrl, crypter);
+        constructZkMetadataForNewSegment(tableNameWithType, segmentMetadata, downloadUrl, crypter, -1);
     ZNRecord znRecord = segmentZkmetadata.toZNRecord();
 
     String segmentName = segmentMetadata.getName();
@@ -1819,16 +1948,18 @@ public class PinotHelixResourceManager {
    * @param segmentMetadata Segment metadata
    * @param downloadUrl Download URL
    * @param crypter Crypter
+   * @param segmentSizeInBytes Size of segment in bytes.
    * @return SegmentZkMetadata of the input segment
    */
   public SegmentZKMetadata constructZkMetadataForNewSegment(String tableNameWithType, SegmentMetadata segmentMetadata,
-      String downloadUrl, @Nullable String crypter) {
+      String downloadUrl, @Nullable String crypter, long segmentSizeInBytes) {
     // Construct segment zk metadata with common fields for offline and realtime.
     String segmentName = segmentMetadata.getName();
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
     ZKMetadataUtils.updateSegmentMetadata(segmentZKMetadata, segmentMetadata);
     segmentZKMetadata.setDownloadUrl(downloadUrl);
     segmentZKMetadata.setCrypterName(crypter);
+    segmentZKMetadata.setSizeInBytes(segmentSizeInBytes);
 
     if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
       Preconditions.checkState(isUpsertTable(tableNameWithType),
@@ -1939,8 +2070,39 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);
   }
 
+  /**
+   * Delete the table on servers by sending table deletion message
+   */
+  private void deleteTableOnServer(String tableNameWithType) {
+    LOGGER.info("Sending delete table message for table: {}", tableNameWithType);
+    Criteria recipientCriteria = new Criteria();
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setResource(tableNameWithType);
+    recipientCriteria.setSessionSpecific(true);
+    TableDeletionMessage tableDeletionMessage = new TableDeletionMessage(tableNameWithType);
+    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
+
+    // Externalview can be null for newly created table, skip sending the message
+    if (_helixZkManager.getHelixDataAccessor()
+        .getProperty(_helixZkManager.getHelixDataAccessor().keyBuilder().externalView(tableNameWithType)) == null) {
+      LOGGER.warn("No delete table message sent for newly created table: {} as the externalview is null.",
+          tableNameWithType);
+      return;
+    }
+    // Infinite timeout on the recipient
+    int timeoutMs = -1;
+    int numMessagesSent = messagingService.send(recipientCriteria, tableDeletionMessage, null, timeoutMs);
+    if (numMessagesSent > 0) {
+      LOGGER.info("Sent {} delete table messages for table: {}", numMessagesSent, tableNameWithType);
+    } else {
+      LOGGER.warn("No delete table message sent for table: {}", tableNameWithType);
+    }
+  }
+
   public void refreshSegment(String tableNameWithType, SegmentMetadata segmentMetadata,
-      SegmentZKMetadata segmentZKMetadata, int expectedVersion, String downloadUrl, @Nullable String crypter) {
+      SegmentZKMetadata segmentZKMetadata, int expectedVersion, String downloadUrl, @Nullable String crypter,
+      long segmentSizeInBytes) {
     String segmentName = segmentMetadata.getName();
 
     // NOTE: Must first set the segment ZK metadata before trying to refresh because servers and brokers rely on segment
@@ -1951,6 +2113,7 @@ public class PinotHelixResourceManager {
     segmentZKMetadata.setRefreshTime(System.currentTimeMillis());
     segmentZKMetadata.setDownloadUrl(downloadUrl);
     segmentZKMetadata.setCrypterName(crypter);
+    segmentZKMetadata.setSizeInBytes(segmentSizeInBytes);
     if (!ZKMetadataProvider
         .setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata, expectedVersion)) {
       throw new RuntimeException(
@@ -3169,10 +3332,11 @@ public class PinotHelixResourceManager {
             tableNameWithType, segmentsToCheck));
   }
 
-  private Set<String> getOnlineSegmentsFromExternalView(String tableNameWithType) {
+  public Set<String> getOnlineSegmentsFromExternalView(String tableNameWithType) {
     ExternalView externalView = getTableExternalView(tableNameWithType);
-    Preconditions
-        .checkState(externalView != null, String.format("External view is null for table (%s)", tableNameWithType));
+    if (externalView == null) {
+      return Collections.emptySet();
+    }
     Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
     Set<String> onlineSegments = new HashSet<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
     for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
@@ -3250,6 +3414,25 @@ public class PinotHelixResourceManager {
       }
     }
     return hosts;
+  }
+
+  /**
+   * Returns the number of replicas for a given table config
+   */
+  public int getNumReplicas(TableConfig tableConfig) {
+    if (tableConfig.isDimTable()) {
+      // If the table is a dimension table then fetch the tenant config and get the number of server belonging
+      // to the tenant
+      TenantConfig tenantConfig = tableConfig.getTenantConfig();
+      Set<String> serverInstances = getAllInstancesForServerTenant(tenantConfig.getServer());
+      return serverInstances.size();
+    }
+
+    if (ReplicationUtils.useReplicasPerPartition(tableConfig)) {
+      return Integer.parseInt(tableConfig.getValidationConfig().getReplicasPerPartition());
+    }
+
+    return tableConfig.getValidationConfig().getReplicationNumber();
   }
 
   /*

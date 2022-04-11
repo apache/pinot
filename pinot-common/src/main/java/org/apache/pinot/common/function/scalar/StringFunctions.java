@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.regex.Matcher;
@@ -42,7 +45,7 @@ public class StringFunctions {
   private final static Pattern RTRIM = Pattern.compile("\\s+$");
 
   /**
-   * @see StringBuilder#reverse()
+   * @see StringUtils#reverse(String)
    * @param input
    * @return reversed input in from end to start
    */
@@ -79,7 +82,7 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String substr(String input, int beginIndex) {
-    return input.substring(beginIndex);
+    return StringUtils.substring(input, beginIndex);
   }
 
   /**
@@ -97,7 +100,7 @@ public class StringFunctions {
     if (endIndex == -1) {
       return substr(input, beginIndex);
     }
-    return input.substring(beginIndex, endIndex);
+    return StringUtils.substring(input, beginIndex, endIndex);
   }
 
   /**
@@ -178,6 +181,26 @@ public class StringFunctions {
   @ScalarFunction
   public static String rtrim(String input) {
     return RTRIM.matcher(input).replaceAll("");
+  }
+
+  /**
+   * @see StringUtils#left(String, int)
+   * @param input
+   * @return get substring starting from the first index and extending upto specified length.
+   */
+  @ScalarFunction
+  public static String leftSubStr(String input, int length) {
+    return StringUtils.left(input, length);
+  }
+
+  /**
+   * @see StringUtils#right(String, int)
+   * @param input
+   * @return get substring ending at the last index with specified length
+   */
+  @ScalarFunction
+  public static String rightSubStr(String input, int length) {
+    return StringUtils.right(input, length);
   }
 
   /**
@@ -283,14 +306,25 @@ public class StringFunctions {
   }
 
   /**
-   * @see String#startsWith(String)
+   * @see StringUtils#startsWith(CharSequence, CharSequence)
    * @param input
    * @param prefix substring to check if it is the prefix
    * @return true if string starts with prefix, false o.w.
    */
   @ScalarFunction
   public static boolean startsWith(String input, String prefix) {
-    return input.startsWith(prefix);
+    return StringUtils.startsWith(input, prefix);
+  }
+
+  /**
+   * @see StringUtils#endsWith(CharSequence, CharSequence)
+   * @param input
+   * @param suffix substring to check if it is the prefix
+   * @return true if string ends with prefix, false o.w.
+   */
+  @ScalarFunction
+  public static boolean endsWith(String input, String suffix) {
+    return StringUtils.endsWith(input, suffix);
   }
 
   /**
@@ -360,7 +394,17 @@ public class StringFunctions {
   }
 
   /**
-   * see Normalizer#normalize(String, Form)
+   * @see StandardCharsets#US_ASCII#encode(String)
+   * @param input
+   * @return bytes
+   */
+  @ScalarFunction
+  public static byte[] toAscii(String input) {
+    return input.getBytes(StandardCharsets.US_ASCII);
+  }
+
+  /**
+   * @see Normalizer#normalize(CharSequence, Normalizer.Form)
    * @param input
    * @return transforms string with NFC normalization form.
    */
@@ -370,7 +414,7 @@ public class StringFunctions {
   }
 
   /**
-   * see Normalizer#normalize(String, Form)
+   * @see Normalizer#normalize(CharSequence, Normalizer.Form)
    * @param input
    * @param form
    * @return transforms string with the specified normalization form
@@ -382,7 +426,7 @@ public class StringFunctions {
   }
 
   /**
-   * see String#split(String)
+   * @see StringUtils#split(String, String)
    * @param input
    * @param delimiter
    * @return splits string on specified delimiter and returns an array.
@@ -393,7 +437,56 @@ public class StringFunctions {
   }
 
   /**
-   * see String#replaceAll(String, String)
+   * @param input
+   * @param delimiter
+   * @param limit
+   * @return splits string on specified delimiter limiting the number of results till the specified limit
+   */
+  @ScalarFunction
+  public static String[] split(String input, String delimiter, int limit) {
+    return StringUtils.split(input, delimiter, limit);
+  }
+
+  /**
+   * @param input
+   * @param delimiter
+   * @param index
+   * @return splits string on specified delimiter and returns String at specified index from the split.
+   */
+  @ScalarFunction
+  public static String splitPart(String input, String delimiter, int index) {
+    String[] splitString = StringUtils.split(input, delimiter);
+    if (index < splitString.length) {
+      return splitString[index];
+    } else {
+      return "null";
+    }
+  }
+
+  /**
+   * @see StringUtils#repeat(char, int)
+   * @param input
+   * @param times
+   * @return concatenate the string to itself specified number of times
+   */
+  @ScalarFunction
+  public static String repeat(String input, int times) {
+    return StringUtils.repeat(input, times);
+  }
+
+  /**
+   * @see StringUtils#repeat(String, String, int)
+   * @param input
+   * @param times
+   * @return concatenate the string to itself specified number of times with specified seperator
+   */
+  @ScalarFunction
+  public static String repeat(String input, String sep, int times) {
+    return StringUtils.repeat(input, sep, times);
+  }
+
+  /**
+   * @see StringUtils#remove(String, String)
    * @param input
    * @param search
    * @return removes all instances of search from string
@@ -423,7 +516,7 @@ public class StringFunctions {
   }
 
   /**
-   * see String#contains(String)
+   * @see String#contains(CharSequence)
    * @param input
    * @param substring
    * @return returns true if substring present in main string else false.
@@ -442,5 +535,29 @@ public class StringFunctions {
   @ScalarFunction
   public static int strcmp(String input1, String input2) {
     return input1.compareTo(input2);
+  }
+
+  /**
+   *
+   * @param input plaintext string
+   * @return url encoded string
+   * @throws UnsupportedEncodingException
+   */
+  @ScalarFunction
+  public static String encodeUrl(String input)
+      throws UnsupportedEncodingException {
+      return URLEncoder.encode(input, StandardCharsets.UTF_8.toString());
+  }
+
+  /**
+   *
+   * @param input url encoded string
+   * @return plaintext string
+   * @throws UnsupportedEncodingException
+   */
+  @ScalarFunction
+  public static String decodeUrl(String input)
+      throws UnsupportedEncodingException {
+    return URLDecoder.decode(input, StandardCharsets.UTF_8.toString());
   }
 }

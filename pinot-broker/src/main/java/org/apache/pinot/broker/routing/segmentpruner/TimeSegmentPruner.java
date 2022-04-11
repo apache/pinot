@@ -200,6 +200,10 @@ public class TimeSegmentPruner implements SegmentPruner {
    *         < 50 OR firstName = Jason')
    *         Empty list if time condition is specified but invalid (e.g. 'SELECT * from myTable where time < 50 AND
    *         time > 100')
+   *         Sorted time intervals without overlapping if time condition is valid
+   *
+   * TODO: 1. Merge adjacent intervals
+   *       2. Set interval boundary using time granularity instead of millis
    */
   @Nullable
   private List<Interval> getFilterTimeIntervals(Expression filterExpression) {
@@ -233,6 +237,14 @@ public class TimeSegmentPruner implements SegmentPruner {
           }
         }
         return getUnionSortedIntervals(orIntervals);
+      case NOT:
+        assert operands.size() == 1;
+        List<Interval> childIntervals = getFilterTimeIntervals(operands.get(0));
+        if (childIntervals == null) {
+          return null;
+        } else {
+          return getComplementSortedIntervals(childIntervals);
+        }
       case EQUALS: {
         Identifier identifier = operands.get(0).getIdentifier();
         if (identifier != null && identifier.getName().equals(_timeColumn)) {
@@ -475,6 +487,25 @@ public class TimeSegmentPruner implements SegmentPruner {
         res.set(resSize - 1, Interval.getUnion(interval, res.get(resSize - 1)));
       }
     }
+    return res;
+  }
+
+  /**
+   * Returns the complement (non-overlapping sorted intervals) of the given non-overlapping sorted intervals.
+   */
+  private List<Interval> getComplementSortedIntervals(List<Interval> intervals) {
+    List<Interval> res = new ArrayList<>();
+    long startTime = MIN_START_TIME;
+    for (Interval interval : intervals) {
+      if (interval._min > startTime) {
+        res.add(new Interval(startTime, interval._min - 1));
+      }
+      if (interval._max == MAX_END_TIME) {
+        return res;
+      }
+      startTime = interval._max + 1;
+    }
+    res.add(new Interval(startTime, MAX_END_TIME));
     return res;
   }
 

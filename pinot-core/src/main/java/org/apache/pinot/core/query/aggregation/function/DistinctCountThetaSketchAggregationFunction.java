@@ -78,9 +78,9 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class DistinctCountThetaSketchAggregationFunction
     extends BaseSingleInputAggregationFunction<List<Sketch>, Comparable> {
-  private static final String SET_UNION = "SET_UNION";
-  private static final String SET_INTERSECT = "SET_INTERSECT";
-  private static final String SET_DIFF = "SET_DIFF";
+  private static final String SET_UNION = "setunion";
+  private static final String SET_INTERSECT = "setintersect";
+  private static final String SET_DIFF = "setdiff";
   private static final String DEFAULT_SKETCH_IDENTIFIER = "$0";
   private static final Sketch EMPTY_SKETCH = new UpdateSketchBuilder().build().compact();
 
@@ -142,8 +142,8 @@ public class DistinctCountThetaSketchAggregationFunction
       Preconditions.checkArgument(postAggregationExpression.getType() == ExpressionContext.Type.LITERAL,
           "Last argument of DISTINCT_COUNT_THETA_SKETCH aggregation function must be literal (post-aggregation "
               + "expression)");
-      _postAggregationExpression = RequestContextUtils
-          .getExpression(CalciteSqlParser.compileToExpression(postAggregationExpression.getLiteral()));
+      _postAggregationExpression = RequestContextUtils.getExpression(
+          CalciteSqlParser.compileToExpression(postAggregationExpression.getLiteral()));
 
       // Validate the post-aggregation expression
       _includeDefaultSketch = validatePostAggregationExpression(_postAggregationExpression, _filterEvaluators.size());
@@ -1014,23 +1014,30 @@ public class DistinctCountThetaSketchAggregationFunction
    */
   private static FilterEvaluator getFilterEvaluator(FilterContext filter,
       Map<ExpressionContext, Integer> expressionIndexMap) {
-    List<FilterContext> children = filter.getChildren();
-    if (children != null) {
-      // AND/OR
-      List<FilterEvaluator> childEvaluators = new ArrayList<>(children.size());
-      for (FilterContext child : children) {
-        childEvaluators.add(getFilterEvaluator(child, expressionIndexMap));
-      }
-      if (filter.getType() == FilterContext.Type.AND) {
+    switch (filter.getType()) {
+      case AND:
+        List<FilterContext> children = filter.getChildren();
+        List<FilterEvaluator> childEvaluators = new ArrayList<>(children.size());
+        for (FilterContext child : children) {
+          childEvaluators.add(getFilterEvaluator(child, expressionIndexMap));
+        }
         return new AndFilterEvaluator(childEvaluators);
-      } else {
+      case OR:
+        children = filter.getChildren();
+        childEvaluators = new ArrayList<>(children.size());
+        for (FilterContext child : children) {
+          childEvaluators.add(getFilterEvaluator(child, expressionIndexMap));
+        }
         return new OrFilterEvaluator(childEvaluators);
-      }
-    } else {
-      // Predicate
-      Predicate predicate = filter.getPredicate();
-      int expressionIndex = expressionIndexMap.get(predicate.getLhs());
-      return new PredicateFilterEvaluator(predicate, expressionIndex);
+      case NOT:
+        assert filter.getChildren().size() == 1;
+        return new NotFilterEvaluator(getFilterEvaluator(filter.getChildren().get(0), expressionIndexMap));
+      case PREDICATE:
+        Predicate predicate = filter.getPredicate();
+        int expressionIndex = expressionIndexMap.get(predicate.getLhs());
+        return new PredicateFilterEvaluator(predicate, expressionIndex);
+      default:
+        throw new IllegalStateException();
     }
   }
 
@@ -1048,8 +1055,8 @@ public class DistinctCountThetaSketchAggregationFunction
 
     if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
       int sketchId = extractSketchId(expression.getIdentifier());
-      Preconditions
-          .checkArgument(sketchId <= numFilters, "Sketch id: %s exceeds number of filters: %s", sketchId, numFilters);
+      Preconditions.checkArgument(sketchId <= numFilters, "Sketch id: %s exceeds number of filters: %s", sketchId,
+          numFilters);
       return sketchId == 0;
     }
 
@@ -1058,12 +1065,11 @@ public class DistinctCountThetaSketchAggregationFunction
     List<ExpressionContext> arguments = function.getArguments();
     int numArguments = arguments.size();
     boolean includeDefaultSketch = false;
-    switch (functionName.toUpperCase()) {
+    switch (functionName) {
       case SET_UNION:
       case SET_INTERSECT:
-        Preconditions
-            .checkArgument(numArguments >= 2, "SET_UNION and SET_INTERSECT should have at least 2 arguments, got: %s",
-                numArguments);
+        Preconditions.checkArgument(numArguments >= 2,
+            "SET_UNION and SET_INTERSECT should have at least 2 arguments, got: %s", numArguments);
         for (ExpressionContext argument : arguments) {
           includeDefaultSketch |= validatePostAggregationExpression(argument, numFilters);
         }
@@ -1084,8 +1090,8 @@ public class DistinctCountThetaSketchAggregationFunction
    * Extracts the sketch id from the identifier (e.g. $0 -> 0, $1 -> 1).
    */
   private static int extractSketchId(String identifier) {
-    Preconditions
-        .checkArgument(identifier.charAt(0) == '$', "Invalid identifier: %s, expecting $0, $1, etc.", identifier);
+    Preconditions.checkArgument(identifier.charAt(0) == '$', "Invalid identifier: %s, expecting $0, $1, etc.",
+        identifier);
     int sketchId = Integer.parseInt(identifier.substring(1));
     Preconditions.checkArgument(sketchId >= 0, "Invalid identifier: %s, expecting $0, $1, etc.", identifier);
     return sketchId;
@@ -1267,7 +1273,7 @@ public class DistinctCountThetaSketchAggregationFunction
     FunctionContext function = expression.getFunction();
     String functionName = function.getFunctionName();
     List<ExpressionContext> arguments = function.getArguments();
-    switch (functionName.toUpperCase()) {
+    switch (functionName) {
       case SET_UNION:
         Union union = _setOperationBuilder.buildUnion();
         for (ExpressionContext argument : arguments) {
@@ -1366,6 +1372,19 @@ public class DistinctCountThetaSketchAggregationFunction
         }
       }
       return false;
+    }
+  }
+
+  private static class NotFilterEvaluator implements FilterEvaluator {
+    final FilterEvaluator _child;
+
+    private NotFilterEvaluator(FilterEvaluator child) {
+      _child = child;
+    }
+
+    @Override
+    public boolean evaluate(boolean[] singleValues, DataType[] valueTypes, Object[] valueArrays, int index) {
+      return !_child.evaluate(singleValues, valueTypes, valueArrays, index);
     }
   }
 

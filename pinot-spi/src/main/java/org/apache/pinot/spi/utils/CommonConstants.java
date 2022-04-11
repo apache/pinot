@@ -137,7 +137,7 @@ public class CommonConstants {
       public static final String ADMIN_PORT_KEY = "adminPort";
       public static final String ADMIN_HTTPS_PORT_KEY = "adminHttpsPort";
       public static final String GRPC_PORT_KEY = "grpcPort";
-      public static final String NETTYTLS_PORT_KEY = "nettyTlsPort";
+      public static final String NETTY_TLS_PORT_KEY = "nettyTlsPort";
       public static final String SYSTEM_RESOURCE_INFO_KEY = "SYSTEM_RESOURCE_INFO";
     }
 
@@ -224,6 +224,7 @@ public class CommonConstants {
     public static final String DEFAULT_BROKER_REQUEST_HANDLER_TYPE = NETTY_BROKER_REQUEST_HANDLER_TYPE;
 
     public static final String BROKER_TLS_PREFIX = "pinot.broker.tls";
+    public static final String BROKER_NETTY_PREFIX = "pinot.broker.netty";
     public static final String BROKER_NETTYTLS_ENABLED = "pinot.broker.nettytls.enabled";
     //Set to true to load all services tagged and compiled with hk2-metadata-generator. Default to False
     public static final String BROKER_SERVICE_AUTO_DISCOVERY = "pinot.broker.service.auto.discovery";
@@ -365,6 +366,7 @@ public class CommonConstants {
     public static final String SERVER_TLS_PREFIX = "pinot.server.tls";
     public static final String SERVER_NETTYTLS_PREFIX = "pinot.server.nettytls";
     public static final String SERVER_GRPCTLS_PREFIX = "pinot.server.grpctls";
+    public static final String SERVER_NETTY_PREFIX = "pinot.server.netty";
 
     // The complete config key is pinot.server.instance.segment.store.uri
     public static final String CONFIG_OF_SEGMENT_STORE_URI = "segment.store.uri";
@@ -548,6 +550,7 @@ public class CommonConstants {
     public static final String CRYPTER_NAME = "segment.crypter";
     public static final String PARTITION_METADATA = "segment.partition.metadata";
     public static final String CUSTOM_MAP = "custom.map";
+    public static final String SIZE_IN_BYTES = "segment.size.in.bytes";
 
     /**
      * This field is used for parallel push protection to lock the segment globally.

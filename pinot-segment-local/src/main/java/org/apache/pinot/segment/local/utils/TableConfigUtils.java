@@ -51,6 +51,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
@@ -227,11 +228,6 @@ public final class TableConfigUtils {
       }
     }
 
-    if (validationConfig.isAllowNullTimeValue()) {
-      Preconditions.checkState(timeColumnName != null && !timeColumnName.isEmpty(),
-          "'timeColumnName' should exist if null time value is allowed");
-    }
-
     validateRetentionConfig(tableConfig);
   }
 
@@ -345,6 +341,22 @@ public final class TableConfigUtils {
             throw new IllegalStateException(
                 "Arguments of a transform function '" + arguments + "' cannot contain the destination column '"
                     + columnName + "'");
+          }
+        }
+      }
+
+      // Complex configs
+      ComplexTypeConfig complexTypeConfig = ingestionConfig.getComplexTypeConfig();
+      if (complexTypeConfig != null && schema != null) {
+        Map<String, String> prefixesToRename = complexTypeConfig.getPrefixesToRename();
+        Set<String> fieldNames = schema.getFieldSpecMap().keySet();
+        if (MapUtils.isNotEmpty(prefixesToRename)) {
+          for (String prefix : prefixesToRename.keySet()) {
+            for (String field : fieldNames) {
+              Preconditions.checkState(!field.startsWith(prefix),
+                      "Fields in the schema may not begin with any prefix specified in the prefixesToRename"
+                              + " config. Name conflict with field: " + field + " and prefix: " + prefix);
+            }
           }
         }
       }
@@ -509,7 +521,7 @@ public final class TableConfigUtils {
                 segmentSelectorType, tierName);
         Preconditions.checkState(TimeUtils.isPeriodValid(segmentAge),
             "segmentAge: %s must be a valid period string (eg. 30d, 24h) in tier: %s", segmentAge, tierName);
-      } else {
+      } else if (!segmentSelectorType.equalsIgnoreCase(TierFactory.FIXED_SEGMENT_SELECTOR_TYPE)) {
         throw new IllegalStateException(
             "Unsupported segmentSelectorType: " + segmentSelectorType + " in tier: " + tierName);
       }

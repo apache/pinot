@@ -35,6 +35,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifi
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.exception.TaskCancelledException;
@@ -149,7 +150,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       httpHeaders.add(ifMatchHeader);
       httpHeaders.add(refreshOnlyHeader);
       httpHeaders.add(segmentZKMetadataCustomMapModifierHeader);
-      httpHeaders.addAll(FileUploadDownloadClient.makeAuthHeader(authToken));
+      httpHeaders.addAll(HttpClient.makeAuthHeader(authToken));
 
       // Set parameters for upload request.
       NameValuePair enableParallelPushProtectionParameter =

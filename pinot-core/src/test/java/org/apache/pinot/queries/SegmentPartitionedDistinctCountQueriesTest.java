@@ -37,7 +37,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
-import org.apache.pinot.core.operator.query.DictionaryBasedAggregationOperator;
+import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -159,8 +159,8 @@ public class SegmentPartitionedDistinctCountQueriesTest extends BaseQueriesTest 
 
     // Inner segment
     for (Object operator : Arrays.asList(getOperatorForSqlQuery(query), getOperatorForSqlQueryWithFilter(query))) {
-      assertTrue(operator instanceof DictionaryBasedAggregationOperator);
-      IntermediateResultsBlock resultsBlock = ((DictionaryBasedAggregationOperator) operator).nextBlock();
+      assertTrue(operator instanceof NonScanBasedAggregationOperator);
+      IntermediateResultsBlock resultsBlock = ((NonScanBasedAggregationOperator) operator).nextBlock();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS,
           0, 0, NUM_RECORDS);
       List<Object> aggregationResult = resultsBlock.getAggregationResult();

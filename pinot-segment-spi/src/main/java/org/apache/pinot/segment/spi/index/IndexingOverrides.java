@@ -36,6 +36,13 @@ import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.GeoSpatialIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
+import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
+import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
+import org.apache.pinot.segment.spi.index.mutable.MutableInvertedIndex;
+import org.apache.pinot.segment.spi.index.mutable.MutableJsonIndex;
+import org.apache.pinot.segment.spi.index.mutable.MutableTextIndex;
+import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
+import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexProvider;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
@@ -52,15 +59,16 @@ import org.slf4j.LoggerFactory;
 
 public class IndexingOverrides {
 
-  public interface IndexingOverride extends IndexCreatorProvider, IndexReaderProvider {
+  public interface IndexingOverride extends IndexCreatorProvider, IndexReaderProvider, MutableIndexProvider {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(IndexingOverrides.class);
 
   private static final IndexCreatorProvider CREATOR_DEFAULTS = createDefaultCreatorProvider();
   private static final IndexReaderProvider READER_DEFAULTS = createDefaultReaderProvider();
-  private static final AtomicReference<IndexingOverride> REGISTRATION = new AtomicReference<>(null);
+  private static final MutableIndexProvider MUTABLE_INDEX_DEFAULTS = createDefaultMutableIndexProvider();
 
+  private static final AtomicReference<IndexingOverride> REGISTRATION = new AtomicReference<>(null);
 
   private IndexingOverrides() {
   }
@@ -77,9 +85,17 @@ public class IndexingOverrides {
 
   /**
    * Gets the registered {@see IndexReaderProvider} or the default if none was registered yet.
-   * @return an index reader provier.
+   * @return an index reader provider.
    */
   public static IndexReaderProvider getIndexReaderProvider() {
+    return Holder.PROVIDER;
+  }
+
+  /**
+   * Gets the registered {@see MutableIndexProvider} or the default if none was registered yet.
+   * @return a mutable index reader provider.
+   */
+  public static MutableIndexProvider getMutableIndexProvider() {
     return Holder.PROVIDER;
   }
 
@@ -102,6 +118,11 @@ public class IndexingOverrides {
 
   private static IndexReaderProvider createDefaultReaderProvider() {
     return invokeDefaultConstructor("org.apache.pinot.segment.local.segment.index.readers.DefaultIndexReaderProvider");
+  }
+
+  private static MutableIndexProvider createDefaultMutableIndexProvider() {
+    return invokeDefaultConstructor(
+        "org.apache.pinot.segment.local.indexsegment.mutable.DefaultMutableIndexProvider");
   }
 
   @SuppressWarnings("unchecked")
@@ -233,8 +254,44 @@ public class IndexingOverrides {
       return READER_DEFAULTS.newTextIndexReader(file, columnMetadata, textIndexProperties);
     }
 
+    @Override
+    public MutableForwardIndex newForwardIndex(MutableIndexContext.Forward context) {
+      ensureMutableReaderPresent();
+      return MUTABLE_INDEX_DEFAULTS.newForwardIndex(context);
+    }
+
+    @Override
+    public MutableInvertedIndex newInvertedIndex(MutableIndexContext.Inverted context) {
+      ensureMutableReaderPresent();
+      return MUTABLE_INDEX_DEFAULTS.newInvertedIndex(context);
+    }
+
+    @Override
+    public MutableTextIndex newTextIndex(MutableIndexContext.Text context) {
+      ensureMutableReaderPresent();
+      return MUTABLE_INDEX_DEFAULTS.newTextIndex(context);
+    }
+
+    @Override
+    public MutableJsonIndex newJsonIndex(MutableIndexContext.Json context) {
+      ensureMutableReaderPresent();
+      return MUTABLE_INDEX_DEFAULTS.newJsonIndex(context);
+    }
+
+    @Override
+    public MutableDictionary newDictionary(MutableIndexContext.Dictionary context) {
+      ensureMutableReaderPresent();
+      return MUTABLE_INDEX_DEFAULTS.newDictionary(context);
+    }
+
     private void ensureReaderPresent() {
       if (READER_DEFAULTS == null) {
+        throw new UnsupportedOperationException("default implementation not present on classpath");
+      }
+    }
+
+    private void ensureMutableReaderPresent() {
+      if (MUTABLE_INDEX_DEFAULTS == null) {
         throw new UnsupportedOperationException("default implementation not present on classpath");
       }
     }

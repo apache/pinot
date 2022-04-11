@@ -130,7 +130,6 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
       // NOTE: the endpoint is protected implicitly (without annotation) by BasicAuthAccessControlFactory
       sendGetRequest("http://localhost:" + getControllerPort() + "/tables");
     } catch (IOException e) {
-      Assert.assertTrue(e.getMessage().contains("HTTP"));
       Assert.assertTrue(e.getMessage().contains("403"));
     }
   }

@@ -238,7 +238,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     FileUtils.forceMkdir(localOutputTempDir);
 
     //copy input path to local
-    File localInputDataFile = new File(localInputTempDir, new File(inputFileURI.getPath()).getName());
+    File localInputDataFile = createLocalInputDateFile(inputFileURI, localInputTempDir);
     _inputDirFS.copyToLocalFile(inputFileURI, localInputDataFile);
 
     //create task spec
@@ -289,5 +289,11 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
         FileUtils.deleteQuietly(localInputDataFile);
       }
     });
+  }
+
+  private File createLocalInputDateFile(URI inputFileURI, File localInputTempDir) {
+    String inputFileURIPath = inputFileURI.getPath();
+    File localInputFileDir = new File(localInputTempDir, UUID.randomUUID().toString());
+    return new File(localInputFileDir, new File(inputFileURIPath).getName());
   }
 }

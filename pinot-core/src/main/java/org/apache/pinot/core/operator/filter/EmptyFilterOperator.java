@@ -47,6 +47,16 @@ public final class EmptyFilterOperator extends BaseFilterOperator {
   }
 
   @Override
+  public boolean canOptimizeCount() {
+    return true;
+  }
+
+  @Override
+  public int getNumMatchingDocs() {
+    return 0;
+  }
+
+  @Override
   protected FilterBlock getNextBlock() {
     return EmptyFilterBlock.getInstance();
   }

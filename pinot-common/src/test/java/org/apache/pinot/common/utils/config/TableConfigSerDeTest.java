@@ -189,7 +189,7 @@ public class TableConfigSerDeTest {
     }
     {
       // With query config
-      QueryConfig queryConfig = new QueryConfig(1000L, null);
+      QueryConfig queryConfig = new QueryConfig(1000L, true, Collections.singletonMap("func(a)", "b"));
       TableConfig tableConfig = tableConfigBuilder.setQueryConfig(queryConfig).build();
 
       checkQueryConfig(tableConfig);
@@ -249,8 +249,7 @@ public class TableConfigSerDeTest {
     {
       // with upsert config
       UpsertConfig upsertConfig =
-          new UpsertConfig(UpsertConfig.Mode.FULL, null, null, "comparison",
-              UpsertConfig.HashFunction.NONE);
+          new UpsertConfig(UpsertConfig.Mode.FULL, null, null, "comparison", UpsertConfig.HashFunction.NONE);
 
       TableConfig tableConfig = tableConfigBuilder.setUpsertConfig(upsertConfig).build();
 
@@ -279,10 +278,12 @@ public class TableConfigSerDeTest {
       List<Map<String, String>> batchConfigMaps = new ArrayList<>();
       batchConfigMaps.add(batchConfigMap);
       List<String> fieldsToUnnest = Arrays.asList("c1, c2");
+      Map<String, String> prefixesToRename = new HashMap<>();
       IngestionConfig ingestionConfig =
           new IngestionConfig(new BatchIngestionConfig(batchConfigMaps, "APPEND", "HOURLY"),
               new StreamIngestionConfig(streamConfigMaps), new FilterConfig("filterFunc(foo)"), transformConfigs,
-              new ComplexTypeConfig(fieldsToUnnest, ".", ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE));
+              new ComplexTypeConfig(fieldsToUnnest, ".",
+                      ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE, prefixesToRename));
       TableConfig tableConfig = tableConfigBuilder.setIngestionConfig(ingestionConfig).build();
 
       checkIngestionConfig(tableConfig);
@@ -299,10 +300,12 @@ public class TableConfigSerDeTest {
     {
       // With tier config
       List<TierConfig> tierConfigList = Lists.newArrayList(
-          new TierConfig("tierA", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", TierFactory.PINOT_SERVER_STORAGE_TYPE,
-              "tierA_tag_OFFLINE", null, null),
-          new TierConfig("tierB", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", TierFactory.PINOT_SERVER_STORAGE_TYPE,
-              "tierB_tag_OFFLINE", null, null));
+          new TierConfig("tierA", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
+              TierFactory.PINOT_SERVER_STORAGE_TYPE, "tierA_tag_OFFLINE", null, null),
+          new TierConfig("tierB", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null,
+              TierFactory.PINOT_SERVER_STORAGE_TYPE, "tierB_tag_OFFLINE", null, null),
+          new TierConfig("tier0", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, Lists.newArrayList("seg0"),
+              TierFactory.PINOT_SERVER_STORAGE_TYPE, "tierB_tag_OFFLINE", null, null));
       TableConfig tableConfig = tableConfigBuilder.setTierConfigList(tierConfigList).build();
 
       checkTierConfigList(tableConfig);
@@ -338,26 +341,11 @@ public class TableConfigSerDeTest {
       assertEquals(tunerConfigToCompare.getName(), name);
       assertEquals(tunerConfigToCompare.getTunerProperties(), props);
     }
-    {
-      // disable handling null value in time column
-      TableConfig tableConfig = tableConfigBuilder.setTimeColumnName("timeColumn").build();
-      checkNullTimeValueHandling(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class), false);
-      checkNullTimeValueHandling(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)), false);
-
-      // enable handling null value in time column
-      tableConfig = tableConfigBuilder.setAllowNullTimeValue(true).setTimeColumnName("timeColumn").build();
-      checkNullTimeValueHandling(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class), true);
-      checkNullTimeValueHandling(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)), true);
-    }
   }
 
   private void checkSegmentsValidationAndRetentionConfig(TableConfig tableConfig) {
     // TODO validate other fields of SegmentsValidationAndRetentionConfig.
     assertEquals(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme(), CommonConstants.HTTP_PROTOCOL);
-  }
-
-  private void checkNullTimeValueHandling(TableConfig tableConfig, boolean expected) {
-    assertEquals(tableConfig.getValidationConfig().isAllowNullTimeValue(), expected);
   }
 
   private void checkDefaultTableConfig(TableConfig tableConfig) {
@@ -444,6 +432,8 @@ public class TableConfigSerDeTest {
     QueryConfig queryConfig = tableConfig.getQueryConfig();
     assertNotNull(queryConfig);
     assertEquals(queryConfig.getTimeoutMs(), Long.valueOf(1000L));
+    assertEquals(queryConfig.getDisableGroovy(), Boolean.TRUE);
+    assertEquals(queryConfig.getExpressionOverrideMap(), Collections.singletonMap("func(a)", "b"));
   }
 
   private void checkIngestionConfig(TableConfig tableConfig) {
@@ -473,7 +463,7 @@ public class TableConfigSerDeTest {
   private void checkTierConfigList(TableConfig tableConfig) {
     List<TierConfig> tierConfigsList = tableConfig.getTierConfigsList();
     assertNotNull(tierConfigsList);
-    assertEquals(tierConfigsList.size(), 2);
+    assertEquals(tierConfigsList.size(), 3);
     assertEquals(tierConfigsList.get(0).getName(), "tierA");
     assertEquals(tierConfigsList.get(0).getSegmentSelectorType(), TierFactory.TIME_SEGMENT_SELECTOR_TYPE);
     assertEquals(tierConfigsList.get(0).getSegmentAge(), "10d");
@@ -484,6 +474,12 @@ public class TableConfigSerDeTest {
     assertEquals(tierConfigsList.get(1).getSegmentAge(), "30d");
     assertEquals(tierConfigsList.get(1).getStorageType(), TierFactory.PINOT_SERVER_STORAGE_TYPE);
     assertEquals(tierConfigsList.get(1).getServerTag(), "tierB_tag_OFFLINE");
+    assertEquals(tierConfigsList.get(2).getName(), "tier0");
+    assertEquals(tierConfigsList.get(2).getSegmentSelectorType(), TierFactory.FIXED_SEGMENT_SELECTOR_TYPE);
+    assertNull(tierConfigsList.get(2).getSegmentAge());
+    assertEquals(tierConfigsList.get(2).getSegmentList(), Lists.newArrayList("seg0"));
+    assertEquals(tierConfigsList.get(2).getStorageType(), TierFactory.PINOT_SERVER_STORAGE_TYPE);
+    assertEquals(tierConfigsList.get(2).getServerTag(), "tierB_tag_OFFLINE");
   }
 
   private void checkInstanceAssignmentConfig(TableConfig tableConfig) {

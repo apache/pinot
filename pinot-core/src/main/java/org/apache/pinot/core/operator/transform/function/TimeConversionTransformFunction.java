@@ -25,7 +25,6 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.transformer.timeunit.TimeUnitTransformer;
 import org.apache.pinot.core.operator.transform.transformer.timeunit.TimeUnitTransformerFactory;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
@@ -68,12 +67,14 @@ public class TimeConversionTransformFunction extends BaseTransformFunction {
 
   @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    if (_outputTimes == null) {
-      _outputTimes = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int length = projectionBlock.getNumDocs();
+
+    if (_outputTimes == null || _outputTimes.length < length) {
+      _outputTimes = new long[length];
     }
 
     _timeUnitTransformer.transform(_mainTransformFunction.transformToLongValuesSV(projectionBlock), _outputTimes,
-        projectionBlock.getNumDocs());
+        length);
     return _outputTimes;
   }
 }

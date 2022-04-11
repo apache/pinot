@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.recordtransformer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -257,5 +258,75 @@ public class ExpressionTransformerTest {
     Assert.assertEquals(transform.getValue("d"), 110.0);
     Assert.assertEquals(transform.getValue("e"), 200);
     Assert.assertEquals(transform.getValue("f"), 210.0);
+  }
+
+  /** Check if there is more than one transform function definition for the same column. */
+  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Cannot set more than one"
+      + " ingestion transform function on column: a.")
+  public void testMultipleTransformFunctionSortOrder() {
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("a", FieldSpec.DataType.INT)
+        .addSingleValueDimension("b", FieldSpec.DataType.INT).addSingleValueDimension("c", FieldSpec.DataType.INT)
+        .build();
+
+    List<TransformConfig> transformConfigs = new ArrayList<>();
+    transformConfigs.add(new TransformConfig("a", "plus(b,10)"));
+    transformConfigs.add(new TransformConfig("a", "plus(c,10)"));
+
+    IngestionConfig ingestionConfig = new IngestionConfig(null, null, null, transformConfigs, null);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testMultipleTransformFunctionSortOrder")
+            .setIngestionConfig(ingestionConfig).build();
+
+    // should throw runtime exception indicating that there are multiple transform config on column a
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+  }
+
+  /* Check if Ingestion Transform Functions are parsed successfully when there is no cycle. */
+  @Test
+  public void testNonCyclicTransformFunctionSortOrder() {
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("a", FieldSpec.DataType.INT)
+        .addSingleValueDimension("b", FieldSpec.DataType.INT).addSingleValueDimension("c", FieldSpec.DataType.INT)
+        .build();
+
+    // Define transform function dependencies: a -> (b,c), b -> d, d -> e, c -> (d,e)
+    List<TransformConfig> transformConfigs = new ArrayList<>();
+    transformConfigs.add(new TransformConfig("a", "plus(b,c)"));
+    transformConfigs.add(new TransformConfig("b", "plus(d,10)"));
+    transformConfigs.add(new TransformConfig("d", "plus(e,10)"));
+    transformConfigs.add(new TransformConfig("c", "plus(d,e)"));
+
+    IngestionConfig ingestionConfig = new IngestionConfig(null, null, null, transformConfigs, null);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testNonCyclicTransformFunctionSortOrder")
+            .setIngestionConfig(ingestionConfig).build();
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+
+    // Check topological sort order
+    Iterator<String> sortedColumns = expressionTransformer._expressionEvaluators.keySet().iterator();
+    Assert.assertEquals(sortedColumns.next(), "d");
+    Assert.assertEquals(sortedColumns.next(), "b");
+    Assert.assertEquals(sortedColumns.next(), "c");
+    Assert.assertEquals(sortedColumns.next(), "a");
+  }
+
+  /* Check if we throw exception when Ingestion Transform Functions have a cycle. */
+  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Expression "
+      + "cycle found for column 'a' in Ingestion Transform Function definitions.")
+  public void testCyclicTransformFunctionSortOrder() {
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("a", FieldSpec.DataType.INT)
+        .addSingleValueDimension("b", FieldSpec.DataType.INT).addSingleValueDimension("c", FieldSpec.DataType.INT)
+        .build();
+
+    // Define transform function dependencies: a -> b, b -> c, c -> a
+    List<TransformConfig> transformConfigs = new ArrayList<>();
+    transformConfigs.add(new TransformConfig("a", "plus(b,10)"));
+    transformConfigs.add(new TransformConfig("b", "plus(c,10)"));
+    transformConfigs.add(new TransformConfig("c", "plus(a,10)"));
+
+    IngestionConfig ingestionConfig = new IngestionConfig(null, null, null, transformConfigs, null);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testRecrusiveTransformFunctionSortOrder")
+            .setIngestionConfig(ingestionConfig).build();
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
   }
 }

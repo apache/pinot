@@ -121,7 +121,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
 
       expectedWatermark += 86400000;
     }
-    testHardcodedSqlQueries();
+    this.testHardcodedQueries();
 
     // Delete the table
     dropRealtimeTable(_realtimeTableName);
@@ -133,9 +133,8 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
   protected void verifyTableDelete(String tableNameWithType) {
     TestUtils.waitForCondition(input -> {
       // Check if the task metadata is cleaned up
-      if (MinionTaskMetadataUtils
-          .fetchTaskMetadata(_propertyStore, MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, tableNameWithType)
-          != null) {
+      if (MinionTaskMetadataUtils.fetchTaskMetadata(_propertyStore,
+          MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, tableNameWithType) != null) {
         return false;
       }
       return true;
@@ -145,8 +144,8 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
   private void waitForTaskToComplete(long expectedWatermark) {
     TestUtils.waitForCondition(input -> {
       // Check task state
-      for (TaskState taskState : _helixTaskResourceManager
-          .getTaskStates(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE).values()) {
+      for (TaskState taskState : _helixTaskResourceManager.getTaskStates(
+          MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE).values()) {
         if (taskState != TaskState.COMPLETED) {
           return false;
         }
@@ -164,63 +163,33 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
   }
 
   @Test(enabled = false)
-  public void testSegmentListApi() {
-  }
-
-  @Test(enabled = false)
-  public void testBrokerDebugOutput() {
-  }
-
-  @Test(enabled = false)
-  public void testBrokerDebugRoutingTableSQL() {
-  }
-
-  @Test(enabled = false)
-  public void testBrokerResponseMetadata() {
-  }
-
-  @Test(enabled = false)
+  @Override
   public void testDictionaryBasedQueries() {
   }
 
   @Test(enabled = false)
-  public void testGeneratedQueriesWithMultiValues() {
-  }
-
-  @Test(enabled = false)
-  public void testGeneratedQueriesWithoutMultiValues() {
-  }
-
-  @Test(enabled = false)
+  @Override
   public void testHardcodedQueries() {
   }
 
   @Test(enabled = false)
-  public void testHardcodedSqlQueries() {
-  }
-
-  @Test(enabled = false)
-  public void testInstanceShutdown() {
-  }
-
-  @Test(enabled = false)
+  @Override
   public void testQueriesFromQueryFile() {
   }
 
   @Test(enabled = false)
+  @Override
+  public void testGeneratedQueriesWithMultiValues() {
+  }
+
+  @Test(enabled = false)
+  @Override
   public void testQueryExceptions() {
   }
 
   @Test(enabled = false)
-  public void testReload(boolean includeOfflineTable) {
-  }
-
-  @Test(enabled = false)
-  public void testSqlQueriesFromQueryFile() {
-  }
-
-  @Test(enabled = false)
-  public void testVirtualColumnQueries() {
+  @Override
+  public void testInstanceShutdown() {
   }
 
   @AfterClass

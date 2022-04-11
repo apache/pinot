@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -37,6 +38,7 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.QueryParam;
+import org.apache.helix.task.TaskPartitionState;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
@@ -206,6 +208,14 @@ public class PinotTaskRestletResource {
   }
 
   @GET
+  @Path("/tasks/subtask/{taskName}/state")
+  @ApiOperation("Get the states of all the sub tasks for the given task")
+  public Map<String, TaskPartitionState> getSubtaskStates(
+      @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName) {
+    return _pinotHelixTaskResourceManager.getSubtaskStates(taskName);
+  }
+
+  @GET
   @Path("/tasks/task/{taskName}/config")
   @ApiOperation("Get the task config (a list of child task configs) for the given task")
   public List<PinotTaskConfig> getTaskConfigs(
@@ -220,6 +230,16 @@ public class PinotTaskRestletResource {
   public List<PinotTaskConfig> getTaskConfigsDeprecated(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName) {
     return _pinotHelixTaskResourceManager.getTaskConfigs(taskName);
+  }
+
+  @GET
+  @Path("/tasks/subtask/{taskName}/config")
+  @ApiOperation("Get the configs of specified sub tasks for the given task")
+  public Map<String, PinotTaskConfig> getSubtaskConfigs(
+      @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
+      @ApiParam(value = "Sub task names separated by comma") @QueryParam("subtaskNames") @Nullable
+          String subtaskNames) {
+    return _pinotHelixTaskResourceManager.getSubtaskConfigs(taskName, subtaskNames);
   }
 
   @GET
@@ -426,6 +446,18 @@ public class PinotTaskRestletResource {
       @DefaultValue("false") @QueryParam("forceDelete") boolean forceDelete) {
     _pinotHelixTaskResourceManager.deleteTaskQueue(taskType, forceDelete);
     return new SuccessResponse("Successfully deleted tasks for task type: " + taskType);
+  }
+
+  @DELETE
+  @Path("/tasks/task/{taskName}")
+  @Authenticate(AccessType.DELETE)
+  @ApiOperation("Delete a single task given its task name")
+  public SuccessResponse deleteTask(
+      @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
+      @ApiParam(value = "Whether to force deleting the task (expert only option, enable with cautious")
+      @DefaultValue("false") @QueryParam("forceDelete") boolean forceDelete) {
+    _pinotHelixTaskResourceManager.deleteTask(taskName, forceDelete);
+    return new SuccessResponse("Successfully deleted task: " + taskName);
   }
 
   @Deprecated
