@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import com.google.common.collect.ImmutableMap;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -39,11 +38,17 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.helix.task.TaskPartitionState;
 import org.apache.helix.task.TaskState;
+import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
+import org.apache.pinot.controller.api.exception.NoTaskScheduledException;
+import org.apache.pinot.controller.api.exception.TaskAlreadyExistsException;
+import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -58,6 +63,8 @@ import org.quartz.SchedulerMetaData;
 import org.quartz.SimpleTrigger;
 import org.quartz.Trigger;
 import org.quartz.impl.matchers.GroupMatcher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -82,6 +89,8 @@ import org.quartz.impl.matchers.GroupMatcher;
 @Api(tags = Constants.TASK_TAG)
 @Path("/")
 public class PinotTaskRestletResource {
+  public static final Logger LOGGER = LoggerFactory.getLogger(PinotTaskRestletResource.class);
+
   private static final String TASK_QUEUE_STATE_STOP = "STOP";
   private static final String TASK_QUEUE_STATE_RESUME = "RESUME";
 
@@ -373,13 +382,27 @@ public class PinotTaskRestletResource {
   @POST
   @Path("/tasks/execute")
   @Authenticate(AccessType.CREATE)
-  @ApiOperation("Create an adhoc task to be running on minion")
+  @ApiOperation("Execute a task on minion")
   public Map<String, String> executeAdhocTask(AdhocTaskConfig adhocTaskConfig) {
     try {
       return _pinotTaskManager.createTask(adhocTaskConfig.getTaskType(), adhocTaskConfig.getTableName(),
           adhocTaskConfig.getTaskName(), adhocTaskConfig.getTaskConfigs());
+    } catch (TableNotFoundException e) {
+      throw new ControllerApplicationException(LOGGER, "Failed to find table: " + adhocTaskConfig.getTableName(),
+          Response.Status.NOT_FOUND, e);
+    } catch (TaskAlreadyExistsException e) {
+      throw new ControllerApplicationException(LOGGER, "Task already exists: " + adhocTaskConfig.getTaskName(),
+          Response.Status.CONFLICT, e);
+    } catch (UnknownTaskTypeException e) {
+      throw new ControllerApplicationException(LOGGER, "Unknown task type: " + adhocTaskConfig.getTaskType(),
+          Response.Status.NOT_FOUND, e);
+    } catch (NoTaskScheduledException e) {
+      throw new ControllerApplicationException(LOGGER,
+          "No task is generated for table: " + adhocTaskConfig.getTableName() + ", with task type: "
+              + adhocTaskConfig.getTaskType(), Response.Status.BAD_REQUEST);
     } catch (Exception e) {
-      return ImmutableMap.of("exception", "Failed to create task: " + ExceptionUtils.getStackTrace(e));
+      throw new ControllerApplicationException(LOGGER,
+          "Failed to create adhoc task: " + ExceptionUtils.getStackTrace(e), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 

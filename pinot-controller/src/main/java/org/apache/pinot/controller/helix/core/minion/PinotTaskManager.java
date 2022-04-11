@@ -30,16 +30,19 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
-import javax.ws.rs.NotFoundException;
 import org.I0Itec.zkclient.IZkChildListener;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.task.TaskState;
+import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
+import org.apache.pinot.controller.api.exception.NoTaskScheduledException;
+import org.apache.pinot.controller.api.exception.TaskAlreadyExistsException;
+import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorRegistry;
@@ -144,7 +147,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     String parentTaskName = _helixTaskResourceManager.getParentTaskName(taskType, taskName);
     TaskState taskState = _helixTaskResourceManager.getTaskState(parentTaskName);
     if (taskState != null) {
-      throw new RuntimeException(
+      throw new TaskAlreadyExistsException(
           "Task [" + taskName + "] of type [" + taskType + "] is already created. Current state is " + taskState);
     }
     List<String> tableNameWithTypes = new ArrayList<>();
@@ -163,13 +166,13 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       }
     }
     if (tableNameWithTypes.isEmpty()) {
-      throw new NotFoundException("'tableName' " + tableName + " is not found");
+      throw new TableNotFoundException("'tableName' " + tableName + " is not found");
     }
 
     PinotTaskGenerator taskGenerator = _taskGeneratorRegistry.getTaskGenerator(taskType);
     // Generate each type of tasks
     if (taskGenerator == null) {
-      throw new UnsupportedOperationException(
+      throw new UnknownTaskTypeException(
           "Task type: " + taskType + " is not registered, cannot enable it for table: " + tableName);
     }
     _helixTaskResourceManager.ensureTaskQueueExists(taskType);
@@ -180,7 +183,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     for (String tableNameWithType : tableNameWithTypes) {
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
       LOGGER.info("Trying to create tasks of type: {}, table: {}", taskType, tableNameWithType);
-      List<PinotTaskConfig> pinotTaskConfigs = taskGenerator.generateAdhocTasks(tableConfig, taskConfigs);
+      List<PinotTaskConfig> pinotTaskConfigs = taskGenerator.generateTasks(tableConfig, taskConfigs);
       if (pinotTaskConfigs.isEmpty()) {
         LOGGER.warn("No ad-hoc task generated for task type: {}", taskType);
         continue;
@@ -190,6 +193,9 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       responseMap.put(tableNameWithType,
           _helixTaskResourceManager.submitTask(parentTaskName, pinotTaskConfigs, minionInstanceTag,
               taskGenerator.getTaskTimeoutMs(), taskGenerator.getNumConcurrentTasksPerInstance()));
+    }
+    if (responseMap.isEmpty()) {
+      throw new NoTaskScheduledException("No task scheduled for 'tableName': " + tableName);
     }
     return responseMap;
   }

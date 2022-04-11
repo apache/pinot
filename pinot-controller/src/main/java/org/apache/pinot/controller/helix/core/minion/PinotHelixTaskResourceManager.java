@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
@@ -44,6 +45,7 @@ import org.apache.helix.task.TaskState;
 import org.apache.helix.task.WorkflowConfig;
 import org.apache.helix.task.WorkflowContext;
 import org.apache.pinot.common.utils.DateTimeUtils;
+import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.slf4j.Logger;
@@ -232,7 +234,8 @@ public class PinotHelixTaskResourceManager {
     Preconditions.checkState(numConcurrentTasksPerInstance > 0);
 
     String taskType = pinotTaskConfigs.get(0).getTaskType();
-    String parentTaskName = getParentTaskName(taskType, String.valueOf(System.currentTimeMillis()));
+    String parentTaskName =
+        getParentTaskName(taskType, UUID.randomUUID() + "_" + System.currentTimeMillis());
     return submitTask(parentTaskName, pinotTaskConfigs, minionInstanceTag, taskTimeoutMs,
         numConcurrentTasksPerInstance);
   }
@@ -370,7 +373,7 @@ public class PinotHelixTaskResourceManager {
     String taskType = getTaskType(taskName);
     WorkflowContext workflowContext = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType));
     if (workflowContext == null) {
-      return null;
+      throw new UnknownTaskTypeException("Workflow context for task type doesn't exist: " + taskType);
     }
     return workflowContext.getJobState(getHelixJobName(taskName));
   }

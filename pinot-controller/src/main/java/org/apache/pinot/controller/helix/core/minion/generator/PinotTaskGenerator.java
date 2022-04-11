@@ -49,7 +49,7 @@ public interface PinotTaskGenerator {
   /**
    * Generates a list of adhoc tasks to schedule based on the given table configs and task configs.
    */
-  List<PinotTaskConfig> generateAdhocTasks(TableConfig tableConfig, Map<String, String> taskConfigs)
+  List<PinotTaskConfig> generateTasks(TableConfig tableConfig, Map<String, String> taskConfigs)
       throws Exception;
 
   /**

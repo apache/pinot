@@ -158,7 +158,11 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
                   + "and input files from running tasks: {}", inputDirURI, existingSegmentInputFiles,
               inputFilesFromRunningTasks);
           List<URI> inputFileURIs = getInputFilesFromDirectory(batchConfigMap, inputDirURI, existingSegmentInputFiles);
-          LOGGER.info("Final input files for task config generation: {}", inputFileURIs);
+          if (inputFileURIs.size() < 10) {
+            LOGGER.info("Final input files for task config generation: {}", inputFileURIs);
+          } else {
+            LOGGER.info("Final input files for task config generation: {}...", inputFileURIs.subList(0, 10));
+          }
           for (URI inputFileURI : inputFileURIs) {
             Map<String, String> singleFileGenerationTaskConfig =
                 getSingleFileGenerationTaskConfig(offlineTableName, tableNumTasks, batchConfigMap, inputFileURI, null);
@@ -181,7 +185,7 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
   }
 
   @Override
-  public List<PinotTaskConfig> generateAdhocTasks(TableConfig tableConfig, Map<String, String> taskConfigs)
+  public List<PinotTaskConfig> generateTasks(TableConfig tableConfig, Map<String, String> taskConfigs)
       throws Exception {
     String taskUUID = UUID.randomUUID().toString();
     // Only generate tasks for OFFLINE tables
