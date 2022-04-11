@@ -51,6 +51,10 @@ class DimensionTable {
     return _lookupTable.get(pk);
   }
 
+  boolean isEmpty() {
+    return _lookupTable.isEmpty();
+  }
+
   FieldSpec getFieldSpecFor(String columnName) {
     return _tableSchema.getFieldSpecFor(columnName);
   }

@@ -154,6 +154,10 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     }
   }
 
+  public boolean isPopulated() {
+    return !_dimensionTable.isEmpty();
+  }
+
   public GenericRow lookupRowByPrimaryKey(PrimaryKey pk) {
     return _dimensionTable.get(pk);
   }
