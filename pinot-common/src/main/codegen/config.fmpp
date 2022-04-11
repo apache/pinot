@@ -60,6 +60,9 @@ data: {
       #
       # "inner" could be a table alias for "emp".
       #
+      # TODO: remove unused/untested BABEL non-reserved keywords since
+      #       we are only testing a small subset.
+      #       @see: CalciteSqlCompilerTest:testReservedKeywords
       "ABS"
       "ABSOLUTE"
       "ACTION"

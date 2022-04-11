@@ -84,6 +84,7 @@ public class CalciteSqlParser {
   //   `OPTION (<k1> = <v1>, <k2> = <v2>, <k3> = <v3>)`
   // or
   //   `OPTION (<k1> = <v1>) OPTION (<k2> = <v2>) OPTION (<k3> = <v3>)`
+  // TODO: move to use parser syntax extension: `OPTION` `(` `<key>` = `<value>` [, `<key>` = `<value>`]* `)`
   private static final Pattern OPTIONS_REGEX_PATTEN =
       Pattern.compile("option\\s*\\(([^\\)]+)\\)", Pattern.CASE_INSENSITIVE);
 
@@ -314,6 +315,7 @@ public class CalciteSqlParser {
   static SqlParserImpl newSqlParser(StringReader inStream) {
     SqlParserImpl sqlParser = new SqlParserImpl(inStream);
     sqlParser.switchTo(SqlAbstractParserImpl.LexicalState.DQID);
+    // TODO: convert to MySQL conformance once we retired most of the un-tested BABEL tokens
     sqlParser.setConformance(SqlConformanceEnum.BABEL);
     sqlParser.setTabSize(1);
     sqlParser.setQuotedCasing(Casing.UNCHANGED);
