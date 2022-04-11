@@ -78,7 +78,8 @@ public class JsonToPinotSchema extends AbstractBaseAdminCommand implements Comma
       + "JSON string, can be NONE/NON_PRIMITIVE/ALL")
   String _collectionNotUnnestedToJson;
 
-  @CommandLine.Option(names = {"-parseExactBigDecimal"}, description = "Whether to parse exact BigDecimal or parse BigDecimal as doubles, default to false")
+  @CommandLine.Option(names = {"-parseExactBigDecimal"}, description = "Whether to parse exact BigDecimal or parse "
+      + "BigDecimal as doubles, default to false")
   Boolean _parseExactBigDecimal = false;
 
   @SuppressWarnings("FieldCanBeLocal")

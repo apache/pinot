@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -169,7 +168,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
           case BYTES:
             if (dataTypes[i] == DataType.BIG_DECIMAL) {
               // Note: The result of comparing two BigDecimals may differ from comparing the corresponding ByteArray(s).
-              // Example: 
+              // Example:
               // v1 (BigDecimal) = 1.02122425491413449 > v2 (BigDecimal) = 0.02122425491413449.
               // v1 (ByteArrary) = 0011016acfce0f0459c9 < v2 (ByteArray) = 0011078a55b17a59c9.
               result = (BigDecimalUtils.deserialize((ByteArray) v1))

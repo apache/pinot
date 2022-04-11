@@ -24,7 +24,6 @@ import it.unimi.dsi.fastutil.objects.ObjectHeapPriorityQueue;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -100,7 +99,8 @@ public class DistinctTable {
         Object[] values2 = r2.getValues();
         for (int i = 0; i < numOrderByExpressions; i++) {
           int index = orderByExpressionIndices[i];
-          Comparable value1, value2;
+          Comparable value1;
+          Comparable value2;
           if (columnDataTypes[i] == ColumnDataType.BIG_DECIMAL) {
             // Comparing BigDecimals is not equivalent to comparing corresponding byte arrays.
             // todo: initial implementation converted byte[] to BigDecimal when reading from storage layer to avoid
