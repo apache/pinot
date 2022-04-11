@@ -37,6 +37,8 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.AssertJUnit.assertEquals;
+import static org.testng.AssertJUnit.fail;
 
 
 public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
@@ -65,6 +67,7 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     // , ...
     //
     when(_tableManager.getPrimaryKeyColumns()).thenReturn(Arrays.asList("teamID"));
+    when(_tableManager.isPopulated()).thenReturn(true);
     when(_tableManager.getColumnFieldSpec("teamID"))
         .thenReturn(new DimensionFieldSpec("teamID", FieldSpec.DataType.STRING, true));
     when(_tableManager.getColumnFieldSpec("teamName"))
@@ -172,6 +175,46 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
           String.format("Expecting %s data type for lookup column: '%s'", testCase.getKey(), testCase.getValue()));
     }
   }
+
+  @Test
+  public void dimensionTableNotPopulated() throws Exception {
+    DimensionTableDataManager tableManager = mock(DimensionTableDataManager.class);
+    when(tableManager.isPopulated()).thenReturn(false);
+    when(tableManager.getPrimaryKeyColumns()).thenReturn(Arrays.asList("leagueID"));
+    when(tableManager.getColumnFieldSpec("leagueID"))
+        .thenReturn(new DimensionFieldSpec("leagueID", FieldSpec.DataType.STRING, true));
+    when(tableManager.getColumnFieldSpec("leagueName"))
+        .thenReturn(new DimensionFieldSpec("leagueName", FieldSpec.DataType.STRING, true));
+
+    DimensionTableDataManager.registerDimensionTable("baseballLeagues_OFFLINE", tableManager);
+
+    try {
+      ExpressionContext expression = RequestContextUtils
+          .getExpressionFromSQL(String.format("lookup('baseballLeagues','leagueName','leagueID',%s)", STRING_SV_COLUMN));
+      TransformFunctionFactory.get(expression, _dataSourceMap);
+      fail("Should have thrown BadQueryRequestException");
+    } catch (Exception ex) {
+      Assert.assertEquals(ex.getCause().getMessage(), "Dimension table is not populated: baseballLeagues_OFFLINE");
+    }
+  }
+
+  @Test
+  public void dimensionTableIsPopulated() throws Exception {
+    DimensionTableDataManager tableManager = mock(DimensionTableDataManager.class);
+    when(tableManager.isPopulated()).thenReturn(true);
+    when(tableManager.getPrimaryKeyColumns()).thenReturn(Arrays.asList("playerID"));
+    when(tableManager.getColumnFieldSpec("playerID"))
+        .thenReturn(new DimensionFieldSpec("playerID", FieldSpec.DataType.STRING, true));
+    when(tableManager.getColumnFieldSpec("playerName"))
+        .thenReturn(new DimensionFieldSpec("playerName", FieldSpec.DataType.STRING, true));
+
+    DimensionTableDataManager.registerDimensionTable("baseballPlayers_OFFLINE", tableManager);
+
+      ExpressionContext expression = RequestContextUtils
+          .getExpressionFromSQL(String.format("lookup('baseballPlayers','playerName','playerID',%s)", STRING_SV_COLUMN));
+      TransformFunctionFactory.get(expression, _dataSourceMap);
+  }
+
 
   @Test
   public void basicLookupTests()
@@ -310,6 +353,7 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     for (Map.Entry<String, FieldSpec.DataType> table : testTables.entrySet()) {
       DimensionTableDataManager mgr = mock(DimensionTableDataManager.class);
       DimensionTableDataManager.registerDimensionTable(table.getKey(), mgr);
+      when(mgr.isPopulated()).thenReturn(true);
       when(mgr.getPrimaryKeyColumns()).thenReturn(Arrays.asList("primaryColumn"));
       when(mgr.getColumnFieldSpec("primaryColumn"))
           .thenReturn(new DimensionFieldSpec("primaryColumn", table.getValue(), true));
