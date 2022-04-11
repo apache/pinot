@@ -16,30 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator;
-
-import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.trace.InvocationScope;
-import org.apache.pinot.spi.trace.Tracing;
-
+package org.apache.pinot.spi.trace;
 
 /**
- * Any other Pinot Operators should extend BaseOperator
+ * Models the lifecycle of a span of synchronous work, analogous to the Scope concept in tracing libraries.
+ * Must be created and closed on the same thread.
  */
-public abstract class BaseOperator<T extends Block> implements Operator<T> {
+public interface Scope extends AutoCloseable {
 
   @Override
-  public final T nextBlock() {
-    if (Thread.interrupted()) {
-      throw new EarlyTerminationException();
-    }
-    try (InvocationScope execution = Tracing.getTracer().createScope(getClass())) {
-      return getNextBlock();
-    }
-  }
-
-  // Make it protected because we should always call nextBlock()
-  protected abstract T getNextBlock();
+  void close();
 }

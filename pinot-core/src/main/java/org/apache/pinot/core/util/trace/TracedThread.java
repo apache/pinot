@@ -16,30 +16,46 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator;
+package org.apache.pinot.core.util.trace;
 
-import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.trace.InvocationScope;
-import org.apache.pinot.spi.trace.Tracing;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import org.apache.pinot.spi.trace.InvocationRecording;
+import org.apache.pinot.spi.trace.TraceState;
 
 
-/**
- * Any other Pinot Operators should extend BaseOperator
- */
-public abstract class BaseOperator<T extends Block> implements Operator<T> {
+final class TracedThread extends Thread implements TraceState {
 
-  @Override
-  public final T nextBlock() {
-    if (Thread.interrupted()) {
-      throw new EarlyTerminationException();
-    }
-    try (InvocationScope execution = Tracing.getTracer().createScope(getClass())) {
-      return getNextBlock();
-    }
+  private long _traceId = Long.MIN_VALUE;
+  private int _counter;
+  private final Deque<InvocationRecording> _stack = new ArrayDeque<>();
+
+  public TracedThread(Runnable target) {
+    super(target);
   }
 
-  // Make it protected because we should always call nextBlock()
-  protected abstract T getNextBlock();
+  @Override
+  public void setTraceId(long traceId) {
+    _traceId = traceId;
+  }
+
+  @Override
+  public int getAndIncrementCounter() {
+    return _counter++;
+  }
+
+  @Override
+  public void resetCounter() {
+    _counter = 0;
+  }
+
+  @Override
+  public Deque<InvocationRecording> getRecordings() {
+    return _stack;
+  }
+
+  @Override
+  public long getTraceId() {
+    return _traceId;
+  }
 }

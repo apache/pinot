@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.evaluator.TransformEvaluator;
 import org.apache.pinot.spi.data.FieldSpec;
 
@@ -63,6 +62,11 @@ public class DataBlockCache {
    */
   public void initNewBlock(int[] docIds, int length) {
     _docIds = docIds;
+    if (length > _length) {
+      _dictIdsMap.clear();
+      _valuesMap.clear();
+      _numValuesMap.clear();
+    }
     _length = length;
     _columnDictIdLoaded.clear();
     for (Set<String> columns : _columnValueLoaded.values()) {
@@ -103,7 +107,7 @@ public class DataBlockCache {
     int[] dictIds = (int[]) _dictIdsMap.get(column);
     if (_columnDictIdLoaded.add(column)) {
       if (dictIds == null) {
-        dictIds = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+        dictIds = new int[_length];
         _dictIdsMap.put(column, dictIds);
       }
       _dataFetcher.fetchDictIds(column, _docIds, _length, dictIds);
@@ -121,7 +125,7 @@ public class DataBlockCache {
     int[] intValues = getValues(FieldSpec.DataType.INT, column);
     if (markLoaded(FieldSpec.DataType.INT, column)) {
       if (intValues == null) {
-        intValues = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+        intValues = new int[_length];
         putValues(FieldSpec.DataType.INT, column, intValues);
       }
       _dataFetcher.fetchIntValues(column, _docIds, _length, intValues);
@@ -150,7 +154,7 @@ public class DataBlockCache {
     long[] longValues = getValues(FieldSpec.DataType.LONG, column);
     if (markLoaded(FieldSpec.DataType.LONG, column)) {
       if (longValues == null) {
-        longValues = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+        longValues = new long[_length];
         putValues(FieldSpec.DataType.LONG, column, longValues);
       }
       _dataFetcher.fetchLongValues(column, _docIds, _length, longValues);
@@ -179,7 +183,7 @@ public class DataBlockCache {
     float[] floatValues = getValues(FieldSpec.DataType.FLOAT, column);
     if (markLoaded(FieldSpec.DataType.FLOAT, column)) {
       if (floatValues == null) {
-        floatValues = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+        floatValues = new float[_length];
         putValues(FieldSpec.DataType.FLOAT, column, floatValues);
       }
       _dataFetcher.fetchFloatValues(column, _docIds, _length, floatValues);
@@ -208,7 +212,7 @@ public class DataBlockCache {
     double[] doubleValues = getValues(FieldSpec.DataType.DOUBLE, column);
     if (markLoaded(FieldSpec.DataType.DOUBLE, column)) {
       if (doubleValues == null) {
-        doubleValues = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+        doubleValues = new double[_length];
         putValues(FieldSpec.DataType.DOUBLE, column, doubleValues);
       }
       _dataFetcher.fetchDoubleValues(column, _docIds, _length, doubleValues);
@@ -237,7 +241,7 @@ public class DataBlockCache {
     String[] stringValues = getValues(FieldSpec.DataType.STRING, column);
     if (markLoaded(FieldSpec.DataType.STRING, column)) {
       if (stringValues == null) {
-        stringValues = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+        stringValues = new String[_length];
         putValues(FieldSpec.DataType.STRING, column, stringValues);
       }
       _dataFetcher.fetchStringValues(column, _docIds, _length, stringValues);
@@ -267,7 +271,7 @@ public class DataBlockCache {
     byte[][] bytesValues = getValues(FieldSpec.DataType.BYTES, column);
     if (markLoaded(FieldSpec.DataType.BYTES, column)) {
       if (bytesValues == null) {
-        bytesValues = new byte[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+        bytesValues = new byte[_length][];
         putValues(FieldSpec.DataType.BYTES, column, bytesValues);
       }
       _dataFetcher.fetchBytesValues(column, _docIds, _length, bytesValues);
@@ -289,7 +293,7 @@ public class DataBlockCache {
     int[][] dictIds = (int[][]) _dictIdsMap.get(column);
     if (_columnDictIdLoaded.add(column)) {
       if (dictIds == null) {
-        dictIds = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+        dictIds = new int[_length][];
         _dictIdsMap.put(column, dictIds);
       }
       _dataFetcher.fetchDictIds(column, _docIds, _length, dictIds);
@@ -307,7 +311,7 @@ public class DataBlockCache {
     int[][] intValues = getValues(FieldSpec.DataType.INT, column);
     if (markLoaded(FieldSpec.DataType.INT, column)) {
       if (intValues == null) {
-        intValues = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+        intValues = new int[_length][];
         putValues(FieldSpec.DataType.INT, column, intValues);
       }
       _dataFetcher.fetchIntValues(column, _docIds, _length, intValues);
@@ -336,7 +340,7 @@ public class DataBlockCache {
     long[][] longValues = getValues(FieldSpec.DataType.LONG, column);
     if (markLoaded(FieldSpec.DataType.LONG, column)) {
       if (longValues == null) {
-        longValues = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+        longValues = new long[_length][];
         putValues(FieldSpec.DataType.LONG, column, longValues);
       }
       _dataFetcher.fetchLongValues(column, _docIds, _length, longValues);
@@ -365,7 +369,7 @@ public class DataBlockCache {
     float[][] floatValues = getValues(FieldSpec.DataType.FLOAT, column);
     if (markLoaded(FieldSpec.DataType.FLOAT, column)) {
       if (floatValues == null) {
-        floatValues = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+        floatValues = new float[_length][];
         putValues(FieldSpec.DataType.FLOAT, column, floatValues);
       }
       _dataFetcher.fetchFloatValues(column, _docIds, _length, floatValues);
@@ -394,7 +398,7 @@ public class DataBlockCache {
     double[][] doubleValues = getValues(FieldSpec.DataType.DOUBLE, column);
     if (markLoaded(FieldSpec.DataType.DOUBLE, column)) {
       if (doubleValues == null) {
-        doubleValues = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+        doubleValues = new double[_length][];
         putValues(FieldSpec.DataType.DOUBLE, column, doubleValues);
       }
       _dataFetcher.fetchDoubleValues(column, _docIds, _length, doubleValues);
@@ -423,7 +427,7 @@ public class DataBlockCache {
     String[][] stringValues = getValues(FieldSpec.DataType.STRING, column);
     if (markLoaded(FieldSpec.DataType.STRING, column)) {
       if (stringValues == null) {
-        stringValues = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+        stringValues = new String[_length][];
         putValues(FieldSpec.DataType.STRING, column, stringValues);
       }
       _dataFetcher.fetchStringValues(column, _docIds, _length, stringValues);
@@ -452,7 +456,7 @@ public class DataBlockCache {
     int[] numValues = _numValuesMap.get(column);
     if (_columnNumValuesLoaded.add(column)) {
       if (numValues == null) {
-        numValues = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+        numValues = new int[_length];
         _numValuesMap.put(column, numValues);
       }
       _dataFetcher.fetchNumValues(column, _docIds, _length, numValues);

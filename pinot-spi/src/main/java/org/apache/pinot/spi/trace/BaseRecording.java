@@ -16,30 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator;
-
-import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.trace.InvocationScope;
-import org.apache.pinot.spi.trace.Tracing;
-
+package org.apache.pinot.spi.trace;
 
 /**
- * Any other Pinot Operators should extend BaseOperator
+ * A base recording class. SPI users should extend this class to ensure that {@see isEnabled} checks are cheap.
  */
-public abstract class BaseOperator<T extends Block> implements Operator<T> {
+public class BaseRecording implements InvocationRecording {
 
-  @Override
-  public final T nextBlock() {
-    if (Thread.interrupted()) {
-      throw new EarlyTerminationException();
-    }
-    try (InvocationScope execution = Tracing.getTracer().createScope(getClass())) {
-      return getNextBlock();
-    }
+  private final boolean _enabled;
+
+  public BaseRecording(boolean enabled) {
+    _enabled = enabled;
   }
 
-  // Make it protected because we should always call nextBlock()
-  protected abstract T getNextBlock();
+  /**
+   * This should not be overridden to keep the isEnabled checks as cheap as possible.
+   */
+  @Override
+  public final boolean isEnabled() {
+    return _enabled;
+  }
 }
