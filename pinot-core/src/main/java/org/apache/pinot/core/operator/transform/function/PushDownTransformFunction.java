@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.segment.spi.evaluator.TransformEvaluator;
 
@@ -63,6 +64,16 @@ public interface PushDownTransformFunction {
    * @param buffer values to fill
    */
   void transformToDoubleValuesSV(ProjectionBlock projectionBlock, TransformEvaluator evaluator, double[] buffer);
+
+  /**
+   * Transforms the data from the given projection block to single-valued BigDecimal values.
+   *
+   * @param projectionBlock Projection result
+   * @param evaluator transform evaluator
+   * @param buffer values to fill
+   */
+  void transformToBigDecimalValuesSV(ProjectionBlock projectionBlock, TransformEvaluator evaluator,
+      BigDecimal[] buffer);
 
   /**
    * Transforms the data from the given projection block to single-valued string values.

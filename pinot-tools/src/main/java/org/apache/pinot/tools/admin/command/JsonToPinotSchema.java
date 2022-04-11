@@ -78,6 +78,9 @@ public class JsonToPinotSchema extends AbstractBaseAdminCommand implements Comma
       + "JSON string, can be NONE/NON_PRIMITIVE/ALL")
   String _collectionNotUnnestedToJson;
 
+  @CommandLine.Option(names = {"-parseExactBigDecimal"}, description = "Whether to parse exact BigDecimal or parse BigDecimal as doubles, default to false")
+  Boolean _parseExactBigDecimal = false;
+
   @SuppressWarnings("FieldCanBeLocal")
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message.")
   private boolean _help = false;
@@ -93,7 +96,7 @@ public class JsonToPinotSchema extends AbstractBaseAdminCommand implements Comma
 
     Schema schema;
     schema = JsonUtils.getPinotSchemaFromJsonFile(new File(_jsonFile), buildFieldTypesMap(), _timeUnit,
-        buildFieldsToUnnest(), getDelimiter(), getCollectionNotUnnestedToJson());
+        buildFieldsToUnnest(), getDelimiter(), getCollectionNotUnnestedToJson(), _parseExactBigDecimal);
     schema.setSchemaName(_pinotSchemaName);
 
     File outputDir = new File(_outputDir);

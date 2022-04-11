@@ -58,6 +58,7 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
 /**
@@ -337,7 +338,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
 
     Future[] futures = new Future[numReduceThreadsToUse];
     CountDownLatch countDownLatch = new CountDownLatch(numDataTables);
-    ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
+    ColumnDataType[] columnDataTypes = dataSchema.getStoredColumnDataTypes();
     for (int i = 0; i < numReduceThreadsToUse; i++) {
       List<DataTable> reduceGroup = reduceGroups.get(i);
       futures[i] = reducerContext.getExecutorService().submit(new TraceRunnable() {
@@ -353,7 +354,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
               for (int rowId = 0; rowId < numRows; rowId++) {
                 Object[] values = new Object[_numColumns];
                 for (int colId = 0; colId < _numColumns; colId++) {
-                  switch (storedColumnDataTypes[colId]) {
+                  switch (columnDataTypes[colId].getStoredType()) {
                     case INT:
                       values[colId] = dataTable.getInt(rowId, colId);
                       break;
@@ -370,7 +371,11 @@ public class GroupByDataTableReducer implements DataTableReducer {
                       values[colId] = dataTable.getString(rowId, colId);
                       break;
                     case BYTES:
-                      values[colId] = dataTable.getBytes(rowId, colId);
+                      if (columnDataTypes[colId] == ColumnDataType.BIG_DECIMAL) {
+                        values[colId] = BigDecimalUtils.deserialize(dataTable.getBytes(rowId, colId));
+                      } else {
+                        values[colId] = dataTable.getBytes(rowId, colId);
+                      }
                       break;
                     case OBJECT:
                       values[colId] = dataTable.getObject(rowId, colId);

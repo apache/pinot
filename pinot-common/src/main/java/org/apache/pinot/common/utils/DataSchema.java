@@ -28,10 +28,12 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.EnumSet;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
@@ -249,6 +251,7 @@ public class DataSchema {
     LONG,
     FLOAT,
     DOUBLE,
+    BIG_DECIMAL /* Stored as BYTES */,
     BOOLEAN /* Stored as INT */,
     TIMESTAMP /* Stored as LONG */,
     STRING,
@@ -264,7 +267,7 @@ public class DataSchema {
     BYTES_ARRAY,
     STRING_ARRAY;
 
-    private static final EnumSet<ColumnDataType> NUMERIC_TYPES = EnumSet.of(INT, LONG, FLOAT, DOUBLE);
+    private static final EnumSet<ColumnDataType> NUMERIC_TYPES = EnumSet.of(INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL);
     private static final EnumSet<ColumnDataType> INTEGRAL_TYPES = EnumSet.of(INT, LONG);
     private static final EnumSet<ColumnDataType> ARRAY_TYPES = EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY,
         DOUBLE_ARRAY, STRING_ARRAY, BOOLEAN_ARRAY, TIMESTAMP_ARRAY, BYTES_ARRAY);
@@ -278,6 +281,8 @@ public class DataSchema {
       switch (this) {
         case BOOLEAN:
           return INT;
+        case BIG_DECIMAL:
+          return BYTES;
         case TIMESTAMP:
           return LONG;
         case JSON:
@@ -323,6 +328,8 @@ public class DataSchema {
           return DataType.FLOAT;
         case DOUBLE:
           return DataType.DOUBLE;
+        case BIG_DECIMAL:
+          return DataType.BIG_DECIMAL;
         case BOOLEAN:
           return DataType.BOOLEAN;
         case TIMESTAMP:
@@ -360,6 +367,7 @@ public class DataSchema {
         case JSON:
           return value.toString();
         case BYTES:
+        case BIG_DECIMAL:
           return ((ByteArray) value).getBytes();
         case INT_ARRAY:
           return (int[]) value;
@@ -387,6 +395,8 @@ public class DataSchema {
      */
     public Serializable format(Object value) {
       switch (this) {
+        case BIG_DECIMAL:
+          return BigDecimalUtils.deserialize((byte[]) value).toPlainString();
         case TIMESTAMP:
           assert value instanceof Timestamp;
           return value.toString();
@@ -410,6 +420,8 @@ public class DataSchema {
           return ((Number) value).floatValue();
         case DOUBLE:
           return ((Number) value).doubleValue();
+        case BIG_DECIMAL:
+          return BigDecimalUtils.deserialize((ByteArray) value);
         case BOOLEAN:
           return (Integer) value == 1;
         case TIMESTAMP:
@@ -521,6 +533,8 @@ public class DataSchema {
           return FLOAT;
         case DOUBLE:
           return DOUBLE;
+        case BIG_DECIMAL:
+          return BIG_DECIMAL;
         case BOOLEAN:
           return BOOLEAN;
         case TIMESTAMP:

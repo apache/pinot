@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -38,6 +39,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
       new TransformResultMetadata(DataType.FLOAT, true, false);
   protected static final TransformResultMetadata DOUBLE_SV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.DOUBLE, true, false);
+  protected static final TransformResultMetadata BIG_DECIMAL_SV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.BIG_DECIMAL, true, false);
   protected static final TransformResultMetadata BOOLEAN_SV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.BOOLEAN, true, false);
   protected static final TransformResultMetadata TIMESTAMP_SV_NO_DICTIONARY_METADATA =
@@ -55,6 +58,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
   protected long[] _longValuesSV;
   protected float[] _floatValuesSV;
   protected double[] _doubleValuesSV;
+  protected BigDecimal[] _bigDecimalValuesSV;
   protected String[] _stringValuesSV;
   protected byte[][] _byteValuesSV;
   protected int[][] _intValuesMV;
@@ -108,6 +112,19 @@ public abstract class BaseTransformFunction implements TransformFunction {
           String[] stringValues = transformToStringValuesSV(projectionBlock);
           ArrayCopyUtils.copy(stringValues, _intValuesSV, length);
           break;
+        case BYTES:
+          if (getResultMetadata().getDataType().equals(DataType.BIG_DECIMAL)) {
+            // Why need to explicitly handle the case of converting INT to BIG_DECIMAL data type, while this is
+            // not needed between INT and TIMESTAMP data type?
+            // This is because TIMESTAMP's underlying stored type is LONG which is a numeric data type that is already
+            // handled here (see: case LONG). On the other side, BIG_DECIMAL's underlying stored type is byte[] and it
+            // is not handled (throw IllegalStateException).
+            // The same applied to other numeric types: LONG, FLOAT, and DOUBLE.
+            BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(projectionBlock);
+            ArrayCopyUtils.copy(bigDecimalValues, _intValuesSV, length);
+            break;
+          }
+          throw new IllegalStateException();
         default:
           throw new IllegalStateException();
       }
@@ -145,6 +162,13 @@ public abstract class BaseTransformFunction implements TransformFunction {
           String[] stringValues = transformToStringValuesSV(projectionBlock);
           ArrayCopyUtils.copy(stringValues, _longValuesSV, length);
           break;
+        case BYTES:
+          if (getResultMetadata().getDataType().equals(DataType.BIG_DECIMAL)) {
+            BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(projectionBlock);
+            ArrayCopyUtils.copy(bigDecimalValues, _longValuesSV, length);
+            break;
+          }
+          throw new IllegalStateException();
         default:
           throw new IllegalStateException();
       }
@@ -182,6 +206,13 @@ public abstract class BaseTransformFunction implements TransformFunction {
           String[] stringValues = transformToStringValuesSV(projectionBlock);
           ArrayCopyUtils.copy(stringValues, _floatValuesSV, length);
           break;
+        case BYTES:
+          if (getResultMetadata().getDataType().equals(DataType.BIG_DECIMAL)) {
+            BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(projectionBlock);
+            ArrayCopyUtils.copy(bigDecimalValues, _floatValuesSV, length);
+            break;
+          }
+          throw new IllegalStateException();
         default:
           throw new IllegalStateException();
       }
@@ -219,11 +250,72 @@ public abstract class BaseTransformFunction implements TransformFunction {
           String[] stringValues = transformToStringValuesSV(projectionBlock);
           ArrayCopyUtils.copy(stringValues, _doubleValuesSV, length);
           break;
+        case BYTES:
+          if (getResultMetadata().getDataType().equals(DataType.BIG_DECIMAL)) {
+            BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(projectionBlock);
+            ArrayCopyUtils.copy(bigDecimalValues, _doubleValuesSV, length);
+            break;
+          }
+          throw new IllegalStateException();
         default:
           throw new IllegalStateException();
       }
     }
     return _doubleValuesSV;
+  }
+
+  // Note 1: Why need transformToBigDecimalValuesSV(projectionBlock) while there is no one for TIMESTAMP data type?
+  // This is because TIMESTAMP's underlying stored type is LONG and we already have a method for LONG that can convert
+  // to other numeric data types (check: transformToLongValuesSV(projectionBlock) method).
+  // However, BIG_DECIMAL's underlying stored type is BYTES and transformToBytesValuesSV(projectionBlock) handles only
+  // the conversion from STRING (check: transformToBytesValuesSV(projectionBlock) method).
+  //
+  // Note 2: An alternative way of transforming projectionBlock into BigDecimal[] values is to call
+  // transformToBytesValuesSV(projectionBlock) method that return byte[] values and then transform byte[] to
+  // BigDecimal[]. However, this requires three operations (vs. two in this method):
+  // 1- transformTo[Type]ValuesSV(projectionBlock) based on the underlying stored type.
+  // 2- ArrayCopyUtils.copy([Type]Values, bytesValues, length).
+  // 3- ArrayCopyUtils.copy(bytesValues, bigDecimals, length).
+  @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+    if (_bigDecimalValuesSV == null || _bigDecimalValuesSV.length < length) {
+      _bigDecimalValuesSV = new BigDecimal[length];
+    }
+
+    Dictionary dictionary = getDictionary();
+    if (dictionary != null) {
+      int[] dictIds = transformToDictIdsSV(projectionBlock);
+      byte[][] bytesValues = new byte[length][];
+      dictionary.readBytesValues(dictIds, length, bytesValues);
+      ArrayCopyUtils.copy(bytesValues, _bigDecimalValuesSV, length);
+    } else {
+      switch (getResultMetadata().getDataType().getStoredType()) {
+        case INT:
+          int[] intValues = transformToIntValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(intValues, _bigDecimalValuesSV, length);
+          break;
+        case LONG:
+          long[] longValues = transformToLongValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(longValues, _bigDecimalValuesSV, length);
+          break;
+        case FLOAT:
+          float[] floatValues = transformToFloatValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(floatValues, _bigDecimalValuesSV, length);
+          break;
+        case DOUBLE:
+          double[] doubleValues = transformToDoubleValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(doubleValues, _bigDecimalValuesSV, length);
+          break;
+        case STRING:
+          String[] stringValues = transformToStringValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(stringValues, _bigDecimalValuesSV, length);
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+    }
+    return _bigDecimalValuesSV;
   }
 
   @Override
@@ -257,6 +349,11 @@ public abstract class BaseTransformFunction implements TransformFunction {
           ArrayCopyUtils.copy(doubleValues, _stringValuesSV, length);
           break;
         case BYTES:
+          if (getResultMetadata().getDataType() == DataType.BIG_DECIMAL) {
+            BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(projectionBlock);
+            ArrayCopyUtils.copy(bigDecimalValues, _stringValuesSV, length);
+            break;
+          }
           byte[][] bytesValues = transformToBytesValuesSV(projectionBlock);
           ArrayCopyUtils.copy(bytesValues, _stringValuesSV, length);
           break;
@@ -278,6 +375,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
+      // todo: In the line below, _intValuesSV is populated but not returned! This is most likely a bug.
       dictionary.readIntValues(dictIds, length, _intValuesSV);
     } else {
       Preconditions.checkState(getResultMetadata().getDataType().getStoredType() == DataType.STRING);

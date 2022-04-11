@@ -24,6 +24,7 @@ import it.unimi.dsi.fastutil.objects.ObjectHeapPriorityQueue;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,6 +39,7 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -86,9 +88,11 @@ public class DistinctTable {
       int numOrderByExpressions = orderByExpressions.size();
       int[] orderByExpressionIndices = new int[numOrderByExpressions];
       int[] comparisonFactors = new int[numOrderByExpressions];
+      ColumnDataType[] columnDataTypes = new ColumnDataType[columnNames.size()];
       for (int i = 0; i < numOrderByExpressions; i++) {
         OrderByExpressionContext orderByExpression = orderByExpressions.get(i);
         orderByExpressionIndices[i] = columnNames.indexOf(orderByExpression.getExpression().toString());
+        columnDataTypes[i] = dataSchema.getColumnDataType(orderByExpressionIndices[i]);
         comparisonFactors[i] = orderByExpression.isAsc() ? -1 : 1;
       }
       _priorityQueue = new ObjectHeapPriorityQueue<>(initialCapacity, (r1, r2) -> {
@@ -96,8 +100,18 @@ public class DistinctTable {
         Object[] values2 = r2.getValues();
         for (int i = 0; i < numOrderByExpressions; i++) {
           int index = orderByExpressionIndices[i];
-          Comparable value1 = (Comparable) values1[index];
-          Comparable value2 = (Comparable) values2[index];
+          Comparable value1, value2;
+          if (columnDataTypes[i] == ColumnDataType.BIG_DECIMAL) {
+            // Comparing BigDecimals is not equivalent to comparing corresponding byte arrays.
+            // todo: initial implementation converted byte[] to BigDecimal when reading from storage layer to avoid
+            //  paying the cost of converting byte[] to BigDecimal at many operators/transforms multiple times.
+            //  Consider bringing that implementation back.
+            value1 = BigDecimalUtils.deserialize((ByteArray) values1[index]);
+            value2 = BigDecimalUtils.deserialize((ByteArray) values2[index]);
+          } else {
+            value1 = (Comparable) values1[index];
+            value2 = (Comparable) values2[index];
+          }
           int result = value1.compareTo(value2) * comparisonFactors[i];
           if (result != 0) {
             return result;
@@ -239,13 +253,13 @@ public class DistinctTable {
       throws IOException {
     // NOTE: Serialize the DistinctTable as a DataTable
     DataTableBuilder dataTableBuilder = new DataTableBuilder(_dataSchema);
-    ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
-    int numColumns = storedColumnDataTypes.length;
+    ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
+    int numColumns = columnDataTypes.length;
     for (Record record : _records) {
       dataTableBuilder.startRow();
       Object[] values = record.getValues();
       for (int i = 0; i < numColumns; i++) {
-        switch (storedColumnDataTypes[i]) {
+        switch (columnDataTypes[i].getStoredType()) {
           case INT:
             dataTableBuilder.setColumn(i, (int) values[i]);
             break;
@@ -283,13 +297,13 @@ public class DistinctTable {
     DataTable dataTable = DataTableFactory.getDataTable(byteBuffer);
     DataSchema dataSchema = dataTable.getDataSchema();
     int numRecords = dataTable.getNumberOfRows();
-    ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
-    int numColumns = storedColumnDataTypes.length;
+    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+    int numColumns = columnDataTypes.length;
     List<Record> records = new ArrayList<>(numRecords);
     for (int i = 0; i < numRecords; i++) {
       Object[] values = new Object[numColumns];
       for (int j = 0; j < numColumns; j++) {
-        switch (storedColumnDataTypes[j]) {
+        switch (columnDataTypes[j].getStoredType()) {
           case INT:
             values[j] = dataTable.getInt(i, j);
             break;

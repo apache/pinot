@@ -447,6 +447,7 @@ public final class Schema implements Serializable {
             case LONG:
             case FLOAT:
             case DOUBLE:
+            case BIG_DECIMAL:
             case BOOLEAN:
             case TIMESTAMP:
             case STRING:
@@ -464,6 +465,7 @@ public final class Schema implements Serializable {
             case LONG:
             case FLOAT:
             case DOUBLE:
+            case BIG_DECIMAL:
             case BYTES:
               break;
             default:

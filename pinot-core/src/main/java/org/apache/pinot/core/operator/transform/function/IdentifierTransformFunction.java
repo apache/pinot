@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
@@ -26,6 +27,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.evaluator.TransformEvaluator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.spi.utils.ArrayCopyUtils;
 
 
 /**
@@ -100,6 +102,46 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
   }
 
   @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getBlockValueSet(_columnName).getNumSVEntries();
+    BigDecimal[] bigDecimalValues = new BigDecimal[length];
+    switch (_resultMetadata.getDataType()) {
+      case BOOLEAN:
+      case INT:
+        int[] intValues = projectionBlock.getBlockValueSet(_columnName).getIntValuesSV();
+        ArrayCopyUtils.copy(intValues, bigDecimalValues, length);
+        break;
+      case LONG:
+      case TIMESTAMP:
+        long[] longValues = projectionBlock.getBlockValueSet(_columnName).getLongValuesSV();
+        ArrayCopyUtils.copy(longValues, bigDecimalValues, length);
+        break;
+      case FLOAT:
+        float[] floatValues = projectionBlock.getBlockValueSet(_columnName).getFloatValuesSV();
+        ArrayCopyUtils.copy(floatValues, bigDecimalValues, length);
+        break;
+      case DOUBLE:
+        double[] doubleValues = projectionBlock.getBlockValueSet(_columnName).getDoubleValuesSV();
+        ArrayCopyUtils.copy(doubleValues, bigDecimalValues, length);
+        break;
+      case BIG_DECIMAL:
+      case BYTES:
+        byte[][] byteValues = projectionBlock.getBlockValueSet(_columnName).getBytesValuesSV();
+        ArrayCopyUtils.copy(byteValues, bigDecimalValues, length);
+        break;
+      case STRING:
+      case JSON:
+        String[] stringValues = projectionBlock.getBlockValueSet(_columnName).getStringValuesSV();
+        ArrayCopyUtils.copy(stringValues, bigDecimalValues, length);
+        break;
+      default:
+        throw new UnsupportedOperationException();
+    }
+
+    return bigDecimalValues;
+  }
+
+  @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getStringValuesSV();
   }
@@ -156,9 +198,47 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
   }
 
   @Override
+  public void transformToBigDecimalValuesSV(ProjectionBlock projectionBlock, TransformEvaluator evaluator,
+      BigDecimal[] buffer) {
+    int length = buffer.length;
+    switch (_resultMetadata.getDataType()) {
+      case BOOLEAN:
+      case INT:
+        int[] intBuffer = new int[length];
+        projectionBlock.fillValues(_columnName, evaluator, intBuffer);
+        ArrayCopyUtils.copy(intBuffer, buffer, length);
+        break;
+      case LONG:
+      case TIMESTAMP:
+        long[] longBuffer = new long[length];
+        projectionBlock.fillValues(_columnName, evaluator, longBuffer);
+        ArrayCopyUtils.copy(longBuffer, buffer, length);
+        break;
+      case FLOAT:
+        float[] floatBuffer = new float[length];
+        projectionBlock.fillValues(_columnName, evaluator, floatBuffer);
+        ArrayCopyUtils.copy(floatBuffer, buffer, length);
+        break;
+      case DOUBLE:
+        double[] doubleBuffer = new double[length];
+        projectionBlock.fillValues(_columnName, evaluator, doubleBuffer);
+        ArrayCopyUtils.copy(doubleBuffer, buffer, length);
+        break;
+      case STRING:
+      case JSON:
+        String[] stringBuffer = new String[length];
+        projectionBlock.fillValues(_columnName, evaluator, stringBuffer, true);
+        ArrayCopyUtils.copy(stringBuffer, buffer, length);
+        break;
+      default:
+        throw new UnsupportedOperationException();
+    }
+  }
+
+  @Override
   public void transformToStringValuesSV(ProjectionBlock projectionBlock, TransformEvaluator evaluator,
       String[] buffer) {
-    projectionBlock.fillValues(_columnName, evaluator, buffer);
+    projectionBlock.fillValues(_columnName, evaluator, buffer, false);
   }
 
   @Override

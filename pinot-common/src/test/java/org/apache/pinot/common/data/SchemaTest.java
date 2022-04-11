@@ -19,6 +19,7 @@
 package org.apache.pinot.common.data;
 
 import java.io.File;
+import java.math.BigDecimal;
 import java.net.URL;
 import java.sql.Timestamp;
 import java.util.concurrent.TimeUnit;
@@ -83,13 +84,21 @@ public class SchemaTest {
     schemaToValidate.validate();
 
     schemaToValidate = new Schema();
-    schemaToValidate.addField(new MetricFieldSpec("m", FieldSpec.DataType.BOOLEAN, new Timestamp(0)));
+    schemaToValidate.addField(new MetricFieldSpec("m", FieldSpec.DataType.TIMESTAMP, new Timestamp(0)));
     try {
       schemaToValidate.validate();
       Assert.fail("Should have failed validation for invalid schema.");
     } catch (IllegalStateException e) {
       // expected
     }
+
+    schemaToValidate = new Schema();
+    schemaToValidate.addField(new DimensionFieldSpec("d", FieldSpec.DataType.BIG_DECIMAL, true));
+    schemaToValidate.validate();
+
+    schemaToValidate = new Schema();
+    schemaToValidate.addField(new MetricFieldSpec("m", FieldSpec.DataType.BIG_DECIMAL, BigDecimal.ZERO));
+    schemaToValidate.validate();
   }
 
   @Test
@@ -97,6 +106,7 @@ public class SchemaTest {
     String defaultString = "default";
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
         .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.INT, 10)
+        .addSingleValueDimension("svBigDecimalDimensionWithDefault", FieldSpec.DataType.BIG_DECIMAL, BigDecimal.TEN)
         .addSingleValueDimension("svDimensionWithMaxLength", FieldSpec.DataType.STRING, 20000, null)
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
         .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, defaultString)
@@ -121,6 +131,14 @@ public class SchemaTest {
     Assert.assertEquals(dimensionFieldSpec.getDataType(), FieldSpec.DataType.INT);
     Assert.assertTrue(dimensionFieldSpec.isSingleValueField());
     Assert.assertEquals(dimensionFieldSpec.getDefaultNullValue(), 10);
+
+    dimensionFieldSpec = schema.getDimensionSpec("svBigDecimalDimensionWithDefault");
+    Assert.assertNotNull(dimensionFieldSpec);
+    Assert.assertEquals(dimensionFieldSpec.getFieldType(), FieldSpec.FieldType.DIMENSION);
+    Assert.assertEquals(dimensionFieldSpec.getName(), "svBigDecimalDimensionWithDefault");
+    Assert.assertEquals(dimensionFieldSpec.getDataType(), FieldSpec.DataType.BIG_DECIMAL);
+    Assert.assertTrue(dimensionFieldSpec.isSingleValueField());
+    Assert.assertEquals(dimensionFieldSpec.getDefaultNullValue(), BigDecimal.TEN);
 
     dimensionFieldSpec = schema.getDimensionSpec("svDimensionWithMaxLength");
     Assert.assertNotNull(dimensionFieldSpec);

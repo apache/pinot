@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -72,6 +73,12 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
             Assert.assertEquals(doubleValues[i], _doubleSVValues[i]);
           }
           break;
+        case BIG_DECIMAL:
+          BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+          for (int i = 0; i < NUM_ROWS; i++) {
+            Assert.assertEquals(bigDecimalValues[i].compareTo(_bigDecimalSVValues[i]), 0);
+          }
+          break;
         case STRING:
           String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
           for (int i = 0; i < NUM_ROWS; i++) {
@@ -107,13 +114,20 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
         new Object[]{"jsonExtractScalar(json,'$.longSV','LONG')", FieldSpec.DataType.LONG, true},
         new Object[]{"jsonExtractScalar(json,'$.floatSV','FLOAT')", FieldSpec.DataType.FLOAT, true},
         new Object[]{"jsonExtractScalar(json,'$.doubleSV','DOUBLE')", FieldSpec.DataType.DOUBLE, true},
+        new Object[]{"jsonExtractScalar(json,'$.bigDecimalSV','BIG_DECIMAL')", FieldSpec.DataType.BIG_DECIMAL, true},
+        // Test operating on the output of another transform (trim) to avoid passing the evaluation down to the
+        // storage in order to test transformTransformedValuesToXXXValuesSV() methods.
+        new Object[]{"jsonExtractScalar(trim(json),'$.bigDecimalSV','BIG_DECIMAL')",
+            FieldSpec.DataType.BIG_DECIMAL, true},
         new Object[]{"jsonExtractScalar(json,'$.stringSV','STRING')", FieldSpec.DataType.STRING, true},
         new Object[]{"json_extract_scalar(json,'$.intSV','INT', '0')", FieldSpec.DataType.INT, true},
         new Object[]{"json_extract_scalar(json,'$.intMV','INT_ARRAY', '0')", FieldSpec.DataType.INT, false},
         new Object[]{"json_extract_scalar(json,'$.longSV','LONG', '0')", FieldSpec.DataType.LONG, true},
         new Object[]{"json_extract_scalar(json,'$.floatSV','FLOAT', '0.0')", FieldSpec.DataType.FLOAT, true},
         new Object[]{"json_extract_scalar(json,'$.doubleSV','DOUBLE', '0.0')", FieldSpec.DataType.DOUBLE, true},
-        new Object[]{"json_extract_scalar(json,'$.stringSV','STRING', 'null')", FieldSpec.DataType.STRING, true}
+        new Object[]{"json_extract_scalar(json,'$.stringSV','STRING', 'null')", FieldSpec.DataType.STRING, true},
+        new Object[]{"jsonExtractScalar(json,'$.bigDecimalSV','BIG_DECIMAL', '0.0')",
+            FieldSpec.DataType.BIG_DECIMAL, true},
     };
     //@formatter:on
   }
@@ -138,7 +152,9 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
           Assert.assertEquals(_longSVValues[i], resultMap.get(0).get("longSV"));
           Assert.assertEquals(Float.compare(_floatSVValues[i], ((Double) resultMap.get(0).get("floatSV")).floatValue()),
               0);
+          // Note: some doubles are now being parsed as BigDecimals. This is backward-incompatible change.
           Assert.assertEquals(_doubleSVValues[i], resultMap.get(0).get("doubleSV"));
+          Assert.assertEquals(_bigDecimalSVValues[i].doubleValue(), resultMap.get(0).get("bigDecimalSV"));
           Assert.assertEquals(_stringSVValues[i], resultMap.get(0).get("stringSV"));
         } catch (IOException e) {
           throw new RuntimeException();
@@ -205,6 +221,19 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
   }
 
   @Test
+  public void testJsonPathTransformFunctionForBigDecimal() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpressionFromSQL("jsonExtractScalar(json,'$.bigDecimalSV','BIG_DECIMAL')");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
+    BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(bigDecimalValues[i].compareTo(_bigDecimalSVValues[i]), 0);
+    }
+  }
+
+  @Test
   public void testJsonPathTransformFunctionForString() {
     ExpressionContext expression =
         RequestContextUtils.getExpressionFromSQL("jsonExtractScalar(json,'$.stringSV','STRING')");
@@ -232,6 +261,7 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
       Assert.assertTrue(keys.contains(String.format("$['%s']", LONG_SV_COLUMN)));
       Assert.assertTrue(keys.contains(String.format("$['%s']", FLOAT_SV_COLUMN)));
       Assert.assertTrue(keys.contains(String.format("$['%s']", DOUBLE_SV_COLUMN)));
+      Assert.assertTrue(keys.contains(String.format("$['%s']", BIG_DECIMAL_SV_COLUMN)));
       Assert.assertTrue(keys.contains(String.format("$['%s']", STRING_SV_COLUMN)));
       Assert.assertTrue(keys.contains(String.format("$['%s']", INT_MV_COLUMN)));
       Assert.assertTrue(keys.contains(String.format("$['%s']", TIME_COLUMN)));

@@ -27,6 +27,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.ByteOrder;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
@@ -35,6 +36,7 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +49,7 @@ public class SegmentDictionaryCreator implements Closeable {
 
   private final Object _sortedValues;
   private final String _columnName;
+  private final DataType _dataType;
   private final DataType _storedType;
   private final File _dictionaryFile;
   private final boolean _useVarLengthDictionary;
@@ -64,6 +67,7 @@ public class SegmentDictionaryCreator implements Closeable {
       throws IOException {
     _sortedValues = sortedValues;
     _columnName = fieldSpec.getName();
+    _dataType = fieldSpec.getDataType();
     _storedType = fieldSpec.getDataType().getStoredType();
     _dictionaryFile = new File(indexDir, _columnName + V1Constants.Dict.FILE_EXTENSION);
     FileUtils.touch(_dictionaryFile);
@@ -186,13 +190,37 @@ public class SegmentDictionaryCreator implements Closeable {
         return;
 
       case BYTES:
+        byte[][] sortedByteArrays;
+        if (_dataType == DataType.BIG_DECIMAL) {
+          BigDecimal[] sortedBytes = (BigDecimal[]) _sortedValues;
+          numValues = sortedBytes.length;
+
+          Preconditions.checkState(numValues > 0);
+          _bytesValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
+
+          sortedByteArrays = new byte[sortedBytes.length][];
+          for (int i = 0; i < numValues; i++) {
+            BigDecimal value = sortedBytes[i];
+            byte[] bytesValue = BigDecimalUtils.serialize(value);
+            sortedByteArrays[i] = bytesValue;
+            _bytesValueToIndexMap.put(new ByteArray(bytesValue), i);
+            _numBytesPerEntry = Math.max(_numBytesPerEntry, bytesValue.length);
+          }
+
+          writeBytesValueDictionary(sortedByteArrays);
+          LOGGER.info(
+              "Created dictionary for BYTES column: {} with cardinality: {}, max length in bytes: {}, range: {} to {}",
+              _columnName, numValues, _numBytesPerEntry, sortedBytes[0], sortedBytes[numValues - 1]);
+          return;
+        }
+
         ByteArray[] sortedBytes = (ByteArray[]) _sortedValues;
         numValues = sortedBytes.length;
 
         Preconditions.checkState(numValues > 0);
         _bytesValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
 
-        byte[][] sortedByteArrays = new byte[sortedBytes.length][];
+        sortedByteArrays = new byte[sortedBytes.length][];
         for (int i = 0; i < numValues; i++) {
           ByteArray value = sortedBytes[i];
           sortedByteArrays[i] = value.getBytes();

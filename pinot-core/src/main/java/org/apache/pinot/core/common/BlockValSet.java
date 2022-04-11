@@ -30,6 +30,13 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public interface BlockValSet {
 
   /**
+   * Returns the number of entries for a single-valued column.
+   *
+   * @return number of single-valued entries
+   */
+  int getNumSVEntries();
+
+  /**
    * Returns the data type of the values in the value set.
    */
   DataType getValueType();
@@ -94,7 +101,7 @@ public interface BlockValSet {
   /**
    * Returns the byte[] values for a single-valued column.
    *
-   * @return Array of string values
+   * @return Array of byte[] values
    */
   byte[][] getBytesValuesSV();
 

@@ -21,8 +21,10 @@ package org.apache.pinot.spi.data;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
@@ -49,6 +51,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
   public static final Float DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT = Float.NEGATIVE_INFINITY;
   public static final Double DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE = Double.NEGATIVE_INFINITY;
+  public static final byte[] DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL = BigDecimalUtils.serialize(BigDecimal.ZERO);
   public static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN = 0;
   public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP = 0L;
   public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_STRING = "null";
@@ -59,6 +62,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final Long DEFAULT_METRIC_NULL_VALUE_OF_LONG = 0L;
   public static final Float DEFAULT_METRIC_NULL_VALUE_OF_FLOAT = 0.0F;
   public static final Double DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE = 0.0D;
+  public static final byte[] DEFAULT_METRIC_NULL_VALUE_OF_BIG_DECIMAL = BigDecimalUtils.serialize(BigDecimal.ZERO);
   public static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
   public static final byte[] DEFAULT_METRIC_NULL_VALUE_OF_BYTES = new byte[0];
 
@@ -205,6 +209,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
               return DEFAULT_METRIC_NULL_VALUE_OF_FLOAT;
             case DOUBLE:
               return DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE;
+            case BIG_DECIMAL:
+              // todo(nhejazi): update documentation w/ default null values.
+              return DEFAULT_METRIC_NULL_VALUE_OF_BIG_DECIMAL;
             case STRING:
               return DEFAULT_METRIC_NULL_VALUE_OF_STRING;
             case BYTES:
@@ -224,6 +231,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
               return DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT;
             case DOUBLE:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE;
+            case BIG_DECIMAL:
+              // todo(nhejazi): update documentation w/ default null values.
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL;
             case BOOLEAN:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN;
             case TIMESTAMP:
@@ -298,6 +308,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           break;
         case DOUBLE:
           jsonNode.put(key, (Double) _defaultNullValue);
+          break;
+        case BIG_DECIMAL:
+          jsonNode.put(key, BigDecimalUtils.deserialize((byte[]) _defaultNullValue));
           break;
         case BOOLEAN:
           jsonNode.put(key, (Integer) _defaultNullValue == 1);
@@ -384,6 +397,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     STRING(false, true),
     JSON(STRING, false, false),
     BYTES(false, false),
+    BIG_DECIMAL(BYTES, true, true),
     STRUCT(false, false),
     MAP(false, false),
     LIST(false, false);
@@ -463,6 +477,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return Float.valueOf(value);
           case DOUBLE:
             return Double.valueOf(value);
+          case BIG_DECIMAL:
+            return new BigDecimal(value);
           case BOOLEAN:
             return BooleanUtils.toInt(value);
           case TIMESTAMP:
@@ -494,6 +510,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return Float.valueOf(value);
           case DOUBLE:
             return Double.valueOf(value);
+          case BIG_DECIMAL:
+            return new BigDecimal(value);
           case BOOLEAN:
             return BooleanUtils.toInt(value);
           case TIMESTAMP:

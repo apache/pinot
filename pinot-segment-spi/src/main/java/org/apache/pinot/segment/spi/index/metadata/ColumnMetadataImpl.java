@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.index.metadata;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -266,8 +267,13 @@ public class ColumnMetadataImpl implements ColumnMetadata {
           builder.setMaxValue(maxString);
           break;
         case BYTES:
-          builder.setMinValue(BytesUtils.toByteArray(minString));
-          builder.setMaxValue(BytesUtils.toByteArray(maxString));
+          if (dataType == DataType.BIG_DECIMAL) {
+            builder.setMinValue(new BigDecimal(minString));
+            builder.setMaxValue(new BigDecimal(maxString));
+          } else {
+            builder.setMinValue(BytesUtils.toByteArray(minString));
+            builder.setMaxValue(BytesUtils.toByteArray(maxString));
+          }
           break;
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + column);

@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +32,7 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ArrayCopyUtils;
 
 
 /**
@@ -361,6 +363,12 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
           break;
         case DOUBLE:
           _nonLiteralValues[i] = ArrayUtils.toObject(transformFunction.transformToDoubleValuesSV(projectionBlock));
+          break;
+        case BIG_DECIMAL:
+          byte[][] byteValues = transformFunction.transformToBytesValuesSV(projectionBlock);
+          BigDecimal[] bigDecimalValues = new BigDecimal[byteValues.length];
+          ArrayCopyUtils.copy(byteValues, bigDecimalValues, byteValues.length);
+          _nonLiteralValues[i] = bigDecimalValues;
           break;
         case BOOLEAN: {
           int[] intValues = transformFunction.transformToIntValuesSV(projectionBlock);

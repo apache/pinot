@@ -22,6 +22,7 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
@@ -72,6 +73,13 @@ public class JsonUtils {
   public static final ObjectWriter DEFAULT_WRITER = DEFAULT_MAPPER.writer();
   public static final ObjectWriter DEFAULT_PRETTY_WRITER = DEFAULT_MAPPER.writerWithDefaultPrettyPrinter();
 
+  // Note: updating DEFAULT_MAPPER to use exact BigDecimals is a backward-incompatible change. This is why a separate
+  // mapper is introduced where withExactBigDecimals is set to true.
+  private static final ObjectMapper DEFAULT_MAPPER_WITH_EXACT_BIG_DECIMAL = (new ObjectMapper())
+      .setNodeFactory(JsonNodeFactory.withExactBigDecimals(true))
+      .configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true);
+
+
   public static <T> T stringToObject(String jsonString, Class<T> valueType)
       throws IOException {
     return DEFAULT_READER.forType(valueType).readValue(jsonString);
@@ -108,15 +116,17 @@ public class JsonUtils {
   /**
    * Reads the first json object from the file that can contain multiple objects
    */
-  public static JsonNode fileToFirstJsonNode(File jsonFile)
+  public static JsonNode fileToFirstJsonNode(File jsonFile, boolean parseExactBigDecimal)
       throws IOException {
+    ObjectMapper objectMapper = parseExactBigDecimal ? DEFAULT_MAPPER_WITH_EXACT_BIG_DECIMAL : DEFAULT_MAPPER;
+
     try (InputStream inputStream = new FileInputStream(jsonFile)) {
       JsonFactory jf = new JsonFactory();
       JsonParser jp = jf.createParser(inputStream);
-      jp.setCodec(DEFAULT_MAPPER);
+      jp.setCodec(objectMapper);
       jp.nextToken();
       if (jp.hasCurrentToken()) {
-        return DEFAULT_MAPPER.readTree(jp);
+        return objectMapper.readTree(jp);
       }
       return null;
     }
@@ -411,9 +421,10 @@ public class JsonUtils {
   public static Schema getPinotSchemaFromJsonFile(File jsonFile,
       @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit,
       @Nullable List<String> fieldsToUnnest, String delimiter,
-      ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson)
+      ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson,
+      boolean parseExactBigDecimal)
       throws IOException {
-    JsonNode jsonNode = fileToFirstJsonNode(jsonFile);
+    JsonNode jsonNode = fileToFirstJsonNode(jsonFile, parseExactBigDecimal);
     if (fieldsToUnnest == null) {
       fieldsToUnnest = new ArrayList<>();
     }
@@ -507,6 +518,8 @@ public class JsonUtils {
       return DataType.BOOLEAN;
     } else if (jsonNode.isBinary()) {
       return DataType.BYTES;
+    } else if (jsonNode.isBigDecimal()) {
+      return DataType.BIG_DECIMAL;
     } else {
       return DataType.STRING;
     }

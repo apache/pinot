@@ -24,12 +24,14 @@ import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import javax.xml.crypto.Data;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 
@@ -45,30 +47,32 @@ public class LiteralTransformFunction implements TransformFunction {
   private final long _longLiteral;
   private final float _floatLiteral;
   private final double _doubleLiteral;
+  private final BigDecimal _bigDecimalLiteral;
 
   // literals may be shared but values are intentionally not volatile as assignment races are benign
   private int[] _intResult;
   private long[] _longResult;
   private float[] _floatResult;
   private double[] _doubleResult;
+  private BigDecimal[] _bigDecimalResult;
   private String[] _stringResult;
   private byte[][] _bytesResult;
 
   public LiteralTransformFunction(String literal) {
     _literal = literal;
     _dataType = inferLiteralDataType(literal);
-    if (_dataType.isNumeric()) {
-      BigDecimal bigDecimal = new BigDecimal(_literal);
-      _intLiteral = bigDecimal.intValue();
-      _longLiteral = bigDecimal.longValue();
-      _floatLiteral = bigDecimal.floatValue();
-      _doubleLiteral = bigDecimal.doubleValue();
+    if (_dataType == DataType.TIMESTAMP) {
+      _bigDecimalLiteral = BigDecimal.valueOf(Timestamp.valueOf(literal).getTime());
+    } else if (_dataType.isNumeric()) {
+      _bigDecimalLiteral = new BigDecimal(_literal);
     } else {
-      _intLiteral = 0;
-      _longLiteral = 0L;
-      _floatLiteral = 0F;
-      _doubleLiteral = 0D;
+      _bigDecimalLiteral = BigDecimal.ZERO;
     }
+
+    _intLiteral = _bigDecimalLiteral.intValue();
+    _longLiteral = _bigDecimalLiteral.longValue();
+    _floatLiteral = _bigDecimalLiteral.floatValue();
+    _doubleLiteral = _bigDecimalLiteral.doubleValue();
   }
 
   @VisibleForTesting
@@ -84,6 +88,8 @@ public class LiteralTransformFunction implements TransformFunction {
         return DataType.FLOAT;
       } else if (number instanceof Double) {
         return DataType.DOUBLE;
+      } else if (number instanceof BigDecimal) {
+        return DataType.BIG_DECIMAL;
       } else {
         return DataType.STRING;
       }
@@ -207,6 +213,18 @@ public class LiteralTransformFunction implements TransformFunction {
   }
 
   @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    int numDocs = projectionBlock.getNumDocs();
+    BigDecimal[] bigDecimalResult = _bigDecimalResult;
+    if (bigDecimalResult == null || bigDecimalResult.length < numDocs) {
+      bigDecimalResult = new BigDecimal[numDocs];
+      Arrays.fill(bigDecimalResult, _bigDecimalLiteral);
+      _bigDecimalResult = bigDecimalResult;
+    }
+    return bigDecimalResult;
+  }
+
+  @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
     String[] stringResult = _stringResult;
@@ -225,6 +243,11 @@ public class LiteralTransformFunction implements TransformFunction {
     if (bytesResult == null || bytesResult.length < numDocs) {
       bytesResult = new byte[numDocs][];
       Arrays.fill(bytesResult, BytesUtils.toBytes(_literal));
+      if (_dataType == DataType.BIG_DECIMAL) {
+        Arrays.fill(bytesResult, BigDecimalUtils.serialize(_bigDecimalLiteral));
+      } else {
+        Arrays.fill(bytesResult, BytesUtils.toBytes(_literal));
+      }
       _bytesResult = bytesResult;
     }
     return bytesResult;

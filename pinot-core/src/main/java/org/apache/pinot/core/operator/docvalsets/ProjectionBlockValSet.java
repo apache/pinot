@@ -49,6 +49,11 @@ public class ProjectionBlockValSet implements BlockValSet {
   }
 
   @Override
+  public int getNumSVEntries() {
+    return _dataBlockCache.getNumDocs();
+  }
+
+  @Override
   public DataType getValueType() {
     return _dataSource.getDataSourceMetadata().getDataType();
   }
