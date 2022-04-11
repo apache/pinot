@@ -80,7 +80,7 @@ public class V1Constants {
       /**
        * ZK properties
        */
-      public static final String SEGMENT_START_OFFSET = "segment.start,offset";
+      public static final String SEGMENT_START_OFFSET = "segment.start.offset";
       public static final String SEGMENT_END_OFFSET = "segment.end.offset";
     }
 
