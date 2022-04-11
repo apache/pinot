@@ -60,6 +60,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
@@ -622,8 +623,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     SegmentZKMetadataConfig segmentZKMetadataConfig = _config.getSegmentZKMetadataConfig();
     if (segmentZKMetadataConfig != null) {
-      properties.setProperty(SEGMENT_START_OFFSET, segmentZKMetadataConfig.getStartOffset());
-      properties.setProperty(SEGMENT_END_OFFSET, segmentZKMetadataConfig.getEndOffset());
+      properties.setProperty(CommonConstants.Segment.Realtime.START_OFFSET, segmentZKMetadataConfig.getStartOffset());
+      properties.setProperty(CommonConstants.Segment.Realtime.END_OFFSET, segmentZKMetadataConfig.getEndOffset());
     }
 
     properties.save();

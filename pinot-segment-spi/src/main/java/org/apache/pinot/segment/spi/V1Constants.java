@@ -76,12 +76,6 @@ public class V1Constants {
       public static final String SEGMENT_PADDING_CHARACTER = "segment.padding.character";
 
       public static final String CUSTOM_SUBSET = "custom";
-
-      /**
-       * ZK properties
-       */
-      public static final String SEGMENT_START_OFFSET = "segment.start.offset";
-      public static final String SEGMENT_END_OFFSET = "segment.end.offset";
     }
 
     public static class Column {
