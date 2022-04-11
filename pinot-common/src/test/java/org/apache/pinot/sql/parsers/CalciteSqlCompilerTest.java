@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.sql.parsers;
 
+import java.io.StringReader;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -39,6 +41,8 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.PinotQuery2BrokerRequestConverter;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
+import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
 import org.apache.pinot.sql.parsers.rewriter.CompileTimeFunctionsInvoker;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -2619,5 +2623,35 @@ public class CalciteSqlCompilerTest {
 
     Assert.expectThrows(SqlCompilationException.class,
         () -> CalciteSqlParser.compileToPinotQuery("SELECT UPPER(col1), avg(col2) from foo"));
+  }
+
+  /**
+   * Test for customized components in src/main/codegen/parserImpls.ftl file.
+   */
+  @Test
+  public void testParserExtensionImpl() {
+    SqlNode sqlNode = testSqlWithCustomSqlParser("INSERT INTO db.tbl "
+        + "FROM FILE 'file:///tmp/file1', FILE 'file:///tmp/file2'");
+    Assert.assertTrue(sqlNode instanceof SqlInsertFromFile);
+  }
+
+  private static SqlNode testSqlWithCustomSqlParser(String sqlString) {
+    try (StringReader inStream = new StringReader(sqlString)) {
+      SqlParserImpl sqlParser = CalciteSqlParser.newSqlParser(inStream);
+      return sqlParser.parseSqlStmtEof();
+    } catch (Exception e) {
+      Assert.fail("test custom sql parser failed", e);
+    }
+    return null;
+  }
+
+  private static SqlNode testExpressionWithCustomSqlParser(String sqlString) {
+    try (StringReader inStream = new StringReader(sqlString)) {
+      SqlParserImpl sqlParser = CalciteSqlParser.newSqlParser(inStream);
+      return sqlParser.parseSqlExpressionEof();
+    } catch (Exception e) {
+      Assert.fail("test custom expression parser failed", e);
+    }
+    return null;
   }
 }

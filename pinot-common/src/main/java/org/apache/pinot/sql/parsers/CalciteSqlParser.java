@@ -310,7 +310,8 @@ public class CalciteSqlParser {
     return toExpression(sqlNode);
   }
 
-  private static SqlParserImpl newSqlParser(StringReader inStream) {
+  @VisibleForTesting
+  static SqlParserImpl newSqlParser(StringReader inStream) {
     SqlParserImpl sqlParser = new SqlParserImpl(inStream);
     sqlParser.switchTo(SqlAbstractParserImpl.LexicalState.DQID);
     sqlParser.setConformance(SqlConformanceEnum.BABEL);
