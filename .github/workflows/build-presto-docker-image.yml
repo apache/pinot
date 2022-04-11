@@ -19,9 +19,6 @@
 name: Presto Pinot Docker Image Build and Publish
 
 on:
-  schedule:
-  - cron: '0 0 * * *' # run at 0 AM UTC
-
   workflow_dispatch:
     inputs:
       gitUrl:
