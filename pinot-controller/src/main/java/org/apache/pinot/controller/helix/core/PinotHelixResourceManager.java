@@ -1384,8 +1384,9 @@ public class PinotHelixResourceManager {
   public void addTable(TableConfig tableConfig)
       throws IOException {
     String tableNameWithType = tableConfig.getTableName();
-    if (hasTable(tableNameWithType)) {
-      throw new TableAlreadyExistsException("Table " + tableNameWithType + " already exists");
+    if (getTableConfig(tableNameWithType) != null) {
+      throw new TableAlreadyExistsException("Table config for " + tableNameWithType
+          + " already exists. Try deleting the table to remove all metadata associated with it.");
     }
 
     validateTableTenantConfig(tableConfig);
@@ -1448,7 +1449,14 @@ public class PinotHelixResourceManager {
          * We also need to support the case when a high-level consumer already exists for a table and we are adding
          * the low-level consumers.
          */
-        ensureRealtimeClusterIsSetUp(tableConfig);
+        try {
+          ensureRealtimeClusterIsSetUp(tableConfig);
+        } catch (Exception e) {
+          LOGGER.error(
+              "Caught exception during realtime cluster setup. Cleaning up table {}", tableNameWithType, e);
+          deleteRealtimeTable(tableNameWithType);
+          throw e;
+        }
 
         LOGGER.info("Successfully added or updated the table {} ", tableNameWithType);
         break;
