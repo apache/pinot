@@ -35,9 +35,6 @@ import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
-import org.apache.pinot.spi.trace.FilterType;
-import org.apache.pinot.spi.trace.InvocationRecording;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.roaringbitmap.IntConsumer;
@@ -95,13 +92,11 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
       matchingFlattenedDocIds.forEach((IntConsumer) flattenedDocId -> matchingDocIds.add(getDocId(flattenedDocId)));
       matchingDocIds.flip(0, _numDocs);
-      record(matchingDocIds, filter);
       return matchingDocIds;
     } else {
       MutableRoaringBitmap matchingFlattenedDocIds = getMatchingFlattenedDocIds(filter);
       MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
       matchingFlattenedDocIds.forEach((IntConsumer) flattenedDocId -> matchingDocIds.add(getDocId(flattenedDocId)));
-      record(matchingDocIds, filter);
       return matchingDocIds;
     }
   }
@@ -305,18 +300,6 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     return _docIdMapping.getInt((long) flattenedDocId << 2);
   }
 
-  private void record(ImmutableRoaringBitmap bitmap, FilterContext filter) {
-    InvocationRecording recording = Tracing.activeRecording();
-    if (recording.isEnabled()) {
-      recording.setColumnCardinality(_dictionary.length());
-      recording.setFilter(FilterType.INDEX, describeJsonPredicate(filter.getPredicate()));
-      recording.setNumDocsMatchingAfterFilter(bitmap.getCardinality());
-    }
-  }
-
-  private static String describeJsonPredicate(Predicate predicate) {
-    return predicate == null ? "?" : predicate.getLhs().getIdentifier() + ":" + predicate.getType() + "?";
-  }
 
   @Override
   public void close() {
