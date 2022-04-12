@@ -23,7 +23,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.I0Itec.zkclient.ZkClient;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.testng.annotations.BeforeMethod;
@@ -43,7 +43,7 @@ public class DynamicBrokerSelectorTest {
   private ExternalViewReader _mockExternalViewReader;
 
   @Mock
-  private ZkClient _mockZkClient;
+  private CommonConstants.Helix.ZkClient _mockZkClient;
 
   private DynamicBrokerSelector _dynamicBrokerSelectorUnderTest;
 
@@ -67,7 +67,7 @@ public class DynamicBrokerSelectorTest {
       }
 
       @Override
-      protected ZkClient getZkClient(String zkServers) {
+      protected CommonConstants.Helix.ZkClient getZkClient(String zkServers) {
         return _mockZkClient;
       }
     });

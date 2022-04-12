@@ -29,10 +29,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
-import org.I0Itec.zkclient.IZkDataListener;
-import org.I0Itec.zkclient.ZkClient;
-import org.I0Itec.zkclient.serialize.BytesPushThroughSerializer;
-
+import org.apache.pinot.spi.utils.CommonConstants;
 
 /**
  * Maintains a mapping between table name and list of brokers
@@ -42,7 +39,7 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
 
   private final AtomicReference<Map<String, List<String>>> _tableToBrokerListMapRef = new AtomicReference<>();
   private final AtomicReference<List<String>> _allBrokerListRef = new AtomicReference<>();
-  private final ZkClient _zkClient;
+  private final CommonConstants.Helix.ZkClient _zkClient;
   private final ExternalViewReader _evReader;
   private final List<String> _brokerList;
   //The preferTlsPort will be mapped to client config in the future, when we support full TLS

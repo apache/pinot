@@ -216,8 +216,8 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>com.101tec</groupId>
-      <artifactId>zkclient</artifactId>
+      <groupId>org.apache.helix</groupId>
+      <artifactId>helix-core</artifactId>
       <exclusions>
         <exclusion>
           <groupId>io.netty</groupId>
