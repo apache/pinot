@@ -39,7 +39,8 @@ public class HelixZNodeSizeLimitTest extends BaseClusterIntegrationTest {
       throws Exception {
     // This line of code has to be executed before the org.apache.helix.manager.zk.zookeeper.ZkClient.WRITE_SIZE_LIMIT
     // is initialized. The code is in
-    // https://github.com/apache/helix/blob/helix-0.9.9/helix-core/src/main/java/org/apache/helix/manager/zk/zookeeper/ZkClient.java#L89
+    // https://github.com/apache/helix/blob/helix-0.9.9/helix-core/src/main/java/org/
+    // apache/helix/manager/zk/zookeeper/ZkClient.java#L89
     // Not sure how this works but this below line executes before ZkClient.WRITE_SIZE_LIMIT is created
     System.setProperty(SystemPropertyKeys.JUTE_MAXBUFFER, "4000000");
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
@@ -65,10 +66,13 @@ public class HelixZNodeSizeLimitTest extends BaseClusterIntegrationTest {
   @Test
   public void testUpdateIdealState() {
     // In Helix 0.9.8, we get error logs like below:
-    // 13:03:51.576 ERROR [ZkBaseDataAccessor] [main] Exception while setting path: /HelixZNodeSizeLimitTest/IDEALSTATES/mytable_OFFLINE
+    // 13:03:51.576 ERROR [ZkBaseDataAccessor] [main] Exception while setting path:
+    // /HelixZNodeSizeLimitTest/IDEALSTATES/mytable_OFFLINE
     //  org.apache.helix.HelixException: Data size larger than 1M
-    //	at org.apache.helix.manager.zk.zookeeper.ZkClient.checkDataSizeLimit(ZkClient.java:1513) ~[helix-core-0.9.8.jar:0.9.8]
-    //	at org.apache.helix.manager.zk.zookeeper.ZkClient.writeDataReturnStat(ZkClient.java:1406) ~[helix-core-0.9.8.jar:0.9.8]
+    //	at org.apache.helix.manager.zk.zookeeper.ZkClient.checkDataSizeLimit(ZkClient.java:1513) ~[helix-core-0.9.8
+    //	.jar:0.9.8]
+    //	at org.apache.helix.manager.zk.zookeeper.ZkClient.writeDataReturnStat(ZkClient.java:1406) ~[helix-core-0.9.8
+    //	.jar:0.9.8]
     String tableNameWithType = getTableName() + "_OFFLINE";
     System.setProperty(SystemPropertyKeys.ZK_SERIALIZER_ZNRECORD_WRITE_SIZE_LIMIT_BYTES, "4000000");
     // The updated IdealState after compression is roughly 2MB
