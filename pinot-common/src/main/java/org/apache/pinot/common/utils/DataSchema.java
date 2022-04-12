@@ -22,9 +22,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
@@ -177,38 +175,9 @@ public class DataSchema {
     return byteArrayOutputStream.toByteArray();
   }
 
-  public static DataSchema fromBytes(byte[] buffer)
-      throws IOException {
-    ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buffer);
-    DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream);
-
-    // Read the number of columns.
-    int numColumns = dataInputStream.readInt();
-    String[] columnNames = new String[numColumns];
-    ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
-
-    // Read the column names.
-    int readLength;
-    for (int i = 0; i < numColumns; i++) {
-      int length = dataInputStream.readInt();
-      byte[] bytes = new byte[length];
-      readLength = dataInputStream.read(bytes);
-      assert readLength == length;
-      columnNames[i] = new String(bytes, UTF_8);
-    }
-
-    // Read the column types.
-    for (int i = 0; i < numColumns; i++) {
-      int length = dataInputStream.readInt();
-      byte[] bytes = new byte[length];
-      readLength = dataInputStream.read(bytes);
-      assert readLength == length;
-      columnDataTypes[i] = ColumnDataType.valueOf(new String(bytes, UTF_8));
-    }
-
-    return new DataSchema(columnNames, columnDataTypes);
-  }
-
+  /**
+   * This method use relative operations on the ByteBuffer and expects the buffer's position to be set correctly.
+   */
   public static DataSchema fromBytes(ByteBuffer buffer)
       throws IOException {
     // Read the number of columns.

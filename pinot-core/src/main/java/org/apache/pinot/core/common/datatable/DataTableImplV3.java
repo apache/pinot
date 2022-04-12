@@ -339,6 +339,8 @@ public class DataTableImplV3 extends BaseDataTable {
    * DataTable from each server and aggregates the values).
    * This is to make V3 implementation keep the consumers of Map<String, String> getMetadata() API in the code happy
    * by internally converting it.
+   *
+   * This method use relative operations on the ByteBuffer and expects the buffer's position to be set correctly.
    */
   private Map<String, String> deserializeMetadata(ByteBuffer buffer)
       throws IOException {
