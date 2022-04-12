@@ -25,6 +25,10 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.spi.trace.FilterType;
+import org.apache.pinot.spi.trace.InvocationRecording;
+import org.apache.pinot.spi.trace.Tracing;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /**
@@ -67,7 +71,9 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   public BitmapCollection getBitmaps() {
-    return new BitmapCollection(_numDocs, false, _textIndexReader.getDocIds(_predicate.getValue()));
+    ImmutableRoaringBitmap bitmap = _textIndexReader.getDocIds(_predicate.getValue());
+    record(bitmap);
+    return new BitmapCollection(_numDocs, false, bitmap);
   }
 
   @Override
@@ -86,5 +92,14 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
     stringBuilder.append(",operator:").append(_predicate.getType());
     stringBuilder.append(",predicate:").append(_predicate.toString());
     return stringBuilder.append(')').toString();
+  }
+
+  private void record(ImmutableRoaringBitmap matches) {
+    InvocationRecording recording = Tracing.activeRecording();
+    if (recording.isEnabled()) {
+      recording.setNumDocsMatchingAfterFilter(matches.getCardinality());
+      recording.setColumnName(_predicate.getLhs().getIdentifier());
+      recording.setFilter(FilterType.INDEX, "LUCENE_TEXT");
+    }
   }
 }

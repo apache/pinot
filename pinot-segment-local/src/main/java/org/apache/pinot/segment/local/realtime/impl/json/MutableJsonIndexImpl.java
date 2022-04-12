@@ -291,7 +291,6 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     }
   }
 
-
   @Override
   public void close() {
   }

@@ -41,7 +41,6 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
   private final JsonIndexReader _jsonIndex;
   private final int _numDocs;
   private final JsonMatchPredicate _predicate;
-  private String _description;
 
   public JsonMatchFilterOperator(JsonIndexReader jsonIndex, JsonMatchPredicate predicate,
       int numDocs) {
@@ -99,15 +98,8 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
     InvocationRecording recording = Tracing.activeRecording();
     if (recording.isEnabled()) {
       recording.setColumnName(_predicate.getLhs().getIdentifier());
-      recording.setFilter(FilterType.INDEX, describeJsonPredicate());
+      recording.setFilter(FilterType.INDEX, _predicate.getType().name());
       recording.setNumDocsMatchingAfterFilter(bitmap.getCardinality());
     }
-  }
-
-  private String describeJsonPredicate() {
-    if (_description == null) {
-      _description = _predicate.getLhs().getIdentifier() + ":" + _predicate.getType() + "?";
-    }
-    return _description;
   }
 }

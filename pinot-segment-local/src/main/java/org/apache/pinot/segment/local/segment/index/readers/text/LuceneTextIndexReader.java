@@ -42,10 +42,6 @@ import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.trace.FilterType;
-import org.apache.pinot.spi.trace.InvocationRecording;
-import org.apache.pinot.spi.trace.InvocationScope;
-import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.LoggerFactory;
@@ -136,7 +132,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
   public MutableRoaringBitmap getDocIds(String searchQuery) {
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
-    try (InvocationScope scope = Tracing.getTracer().createScope(LuceneTextIndexReader.class)) {
+    try {
       // Lucene Query Parser is JavaCC based. It is stateful and should
       // be instantiated per query. Analyzer on the other hand is stateless
       // and can be created upfront.
@@ -146,20 +142,11 @@ public class LuceneTextIndexReader implements TextIndexReader {
       }
       Query query = parser.parse(searchQuery);
       _indexSearcher.search(query, docIDCollector);
-      record(scope, docIds);
       return docIds;
     } catch (Exception e) {
       String msg =
           "Caught excepttion while searching the text index for column:" + _column + " search query:" + searchQuery;
       throw new RuntimeException(msg, e);
-    }
-  }
-
-  private void record(InvocationRecording recording, ImmutableRoaringBitmap matches) {
-    if (recording.isEnabled()) {
-      recording.setNumDocsMatchingAfterFilter(matches.getCardinality());
-      recording.setColumnName(_column);
-      recording.setFilter(FilterType.INDEX, "LUCENE_TEXT");
     }
   }
 

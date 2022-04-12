@@ -300,7 +300,6 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     return _docIdMapping.getInt((long) flattenedDocId << 2);
   }
 
-
   @Override
   public void close() {
     // NOTE: DO NOT close the PinotDataBuffer here because it is tracked by the caller and might be reused later. The
