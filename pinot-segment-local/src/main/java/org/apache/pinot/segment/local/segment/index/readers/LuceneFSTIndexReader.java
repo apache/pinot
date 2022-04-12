@@ -71,18 +71,10 @@ public class LuceneFSTIndexReader implements TextIndexReader {
       for (Long matchingId : matchingIds) {
         dictIds.add(matchingId.intValue());
       }
-      record(span, matchingIds.size());
       return dictIds.toImmutableRoaringBitmap();
     } catch (Exception ex) {
       LOGGER.error("Error getting matching Ids from FST", ex);
       throw new RuntimeException(ex);
-    }
-  }
-
-  private void record(InvocationRecording recording, int matches) {
-    if (recording.isEnabled()) {
-      recording.setFilter(FilterType.INDEX, "LUCENE_FST");
-      recording.setNumDocsMatchingAfterFilter(matches);
     }
   }
 

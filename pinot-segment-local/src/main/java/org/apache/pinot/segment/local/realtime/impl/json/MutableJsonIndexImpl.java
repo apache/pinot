@@ -300,9 +300,14 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
   private void record(ImmutableRoaringBitmap bitmap, FilterContext filter) {
     InvocationRecording recording = Tracing.activeRecording();
     if (recording.isEnabled()) {
-      recording.setFilter(FilterType.INDEX, filter.getPredicate().toString());
+      recording.setColumnCardinality(_postingListMap.size());
+      recording.setFilter(FilterType.INDEX, describeJsonPredicate(filter.getPredicate()));
       recording.setNumDocsMatchingAfterFilter(bitmap.getCardinality());
     }
+  }
+
+  private static String describeJsonPredicate(Predicate predicate) {
+    return predicate == null ? "?" : predicate.getLhs().getIdentifier() + ":" + predicate.getType() + "?";
   }
 
   @Override

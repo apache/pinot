@@ -25,6 +25,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
+import org.apache.pinot.spi.trace.Tracing;
 
 
 /**
@@ -47,6 +48,7 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   protected FilterBlock getNextBlock() {
+    Tracing.activeRecording().setColumnName(_predicate.getLhs().getIdentifier());
     return new FilterBlock(new BitmapDocIdSet(_jsonIndex.getMatchingDocIds(_predicate.getValue()), _numDocs));
   }
 
