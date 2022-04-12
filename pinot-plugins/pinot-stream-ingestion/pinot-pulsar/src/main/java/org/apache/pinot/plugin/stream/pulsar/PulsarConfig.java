@@ -34,12 +34,16 @@ import org.apache.pulsar.client.api.SubscriptionInitialPosition;
 public class PulsarConfig {
   public static final String STREAM_TYPE = "pulsar";
   public static final String BOOTSTRAP_SERVERS = "bootstrap.servers";
+  public static final String AUTHENTICATION_TOKEN = "authenticationToken";
+  public static final String TLS_TRUST_CERTS_FILE_PATH = "tlsTrustCertsFilePath";
 
   private String _pulsarTopicName;
   private String _subscriberId;
   private String _bootstrapServers;
   private MessageId _initialMessageId;
   private SubscriptionInitialPosition _subscriptionInitialPosition;
+  private String _authenticationToken;
+  private String _tlsTrustCertsFilePath;
 
   public PulsarConfig(StreamConfig streamConfig, String subscriberId) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
@@ -47,6 +51,13 @@ public class PulsarConfig {
     _bootstrapServers =
         streamConfigMap.get(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, BOOTSTRAP_SERVERS));
     _subscriberId = subscriberId;
+
+    String authenticationTokenKey = StreamConfigProperties.constructStreamProperty(STREAM_TYPE, AUTHENTICATION_TOKEN);
+    _authenticationToken = streamConfigMap.get(authenticationTokenKey);
+
+    String tlsTrustCertsFilePathKey = StreamConfigProperties.
+            constructStreamProperty(STREAM_TYPE, TLS_TRUST_CERTS_FILE_PATH);
+    _tlsTrustCertsFilePath = streamConfigMap.get(tlsTrustCertsFilePathKey);
 
     Preconditions.checkNotNull(_bootstrapServers, "No brokers provided in the config");
 
@@ -74,5 +85,13 @@ public class PulsarConfig {
 
   public SubscriptionInitialPosition getInitialSubscriberPosition() {
    return _subscriptionInitialPosition;
+  }
+
+  public String getAuthenticationToken() {
+    return _authenticationToken;
+  }
+
+  public String getTlsTrustCertsFilePath() {
+    return _tlsTrustCertsFilePath;
   }
 }
