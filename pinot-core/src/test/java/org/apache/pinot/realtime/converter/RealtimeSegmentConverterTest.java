@@ -40,6 +40,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -118,8 +119,11 @@ public class RealtimeSegmentConverterTest {
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
 
     File outputDir = new File(tmpDir, "outputDir");
+    SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
+    segmentZKPropsConfig.setStartOffset("1");
+    segmentZKPropsConfig.setEndOffset("100");
     RealtimeSegmentConverter converter =
-        new RealtimeSegmentConverter(mutableSegmentImpl, new SegmentZKPropsConfig(), outputDir.getAbsolutePath(),
+        new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(),
             schema, tableNameWithType, tableConfig, segmentName, indexingConfig.getSortedColumn().get(0),
             indexingConfig.getInvertedIndexColumns(), null, null, indexingConfig.getNoDictionaryColumns(),
             indexingConfig.getVarLengthDictionaryColumns(), false);
@@ -131,6 +135,8 @@ public class RealtimeSegmentConverterTest {
     Assert.assertEquals(metadata.getTimeUnit(), TimeUnit.MILLISECONDS);
     Assert.assertEquals(metadata.getStartTime(), metadata.getEndTime());
     Assert.assertTrue(metadata.getAllColumns().containsAll(schema.getColumnNames()));
+    Assert.assertEquals(metadata.getPropertiesConfiguration().getProperty(CommonConstants.Segment.Realtime.START_OFFSET), "1");
+    Assert.assertEquals(metadata.getPropertiesConfiguration().getProperty(CommonConstants.Segment.Realtime.END_OFFSET), "100");
   }
 
   private SegmentZKMetadata getSegmentZKMetadata(String segmentName) {
