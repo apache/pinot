@@ -85,7 +85,7 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
       partialMatchDocIds[i++] = _h3IndexReader.getDocIds(h3IndexId);
     }
     MutableRoaringBitmap mutableRoaringBitmap = BufferFastAggregation.or(partialMatchDocIds);
-    if (mutableRoaringBitmap.getCardinality() == 0) {
+    if (mutableRoaringBitmap.isEmpty()) {
       // No doc is coverd by the geometry.
       mutableRoaringBitmap.flip(0L, _numDocs);
     }
