@@ -80,8 +80,10 @@ public class HelixZNodeSizeLimitTest extends BaseClusterIntegrationTest {
     HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
       Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
       for (int i = 0; i < 500_000; i++) {
-        currentAssignment.put("segment_" + i, ImmutableMap.of("Server_with_some_reasonable_long_prefix_" + (i % 10), "ONLINE"));
-        currentAssignment.put("segment_" + i, ImmutableMap.of("Server_with_some_reasonable_long_prefix_" + (i % 9), "ONLINE"));
+        currentAssignment.put("segment_" + i,
+            ImmutableMap.of("Server_with_some_reasonable_long_prefix_" + (i % 10), "ONLINE"));
+        currentAssignment.put("segment_" + i,
+            ImmutableMap.of("Server_with_some_reasonable_long_prefix_" + (i % 9), "ONLINE"));
       }
       return idealState;
     });
