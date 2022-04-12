@@ -128,7 +128,7 @@
     <grizzly.version>2.4.4</grizzly.version>
     <hk2.version>2.5.0</hk2.version>
     <swagger.version>1.5.16</swagger.version>
-    <hadoop.version>2.7.0</hadoop.version>
+    <hadoop.version>2.10.1</hadoop.version>
     <antlr.version>4.6</antlr.version>
     <jsonpath.version>2.7.0</jsonpath.version>
     <quartz.version>2.3.2</quartz.version>
@@ -425,7 +425,7 @@
       <dependency>
         <groupId>xml-apis</groupId>
         <artifactId>xml-apis</artifactId>
-        <version>1.0.b2</version>
+        <version>1.4.01</version>
       </dependency>
       <dependency>
         <groupId>org.testng</groupId>
