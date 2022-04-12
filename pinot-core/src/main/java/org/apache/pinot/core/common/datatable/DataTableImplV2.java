@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.core.common.datatable;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -79,26 +77,20 @@ public class DataTableImplV2 extends BaseDataTable {
 
     // Read dictionary.
     if (dictionaryMapLength != 0) {
-      byte[] dictionaryMapBytes = new byte[dictionaryMapLength];
       byteBuffer.position(dictionaryMapStart);
-      byteBuffer.get(dictionaryMapBytes);
-      _dictionaryMap = deserializeDictionaryMap(dictionaryMapBytes);
+      _dictionaryMap = deserializeDictionaryMap(byteBuffer);
     } else {
       _dictionaryMap = null;
     }
 
     // Read metadata.
-    byte[] metadataBytes = new byte[metadataLength];
     byteBuffer.position(metadataStart);
-    byteBuffer.get(metadataBytes);
-    _metadata = deserializeMetadata(metadataBytes);
+    _metadata = deserializeMetadata(byteBuffer);
 
     // Read data schema.
     if (dataSchemaLength != 0) {
-      byte[] schemaBytes = new byte[dataSchemaLength];
       byteBuffer.position(dataSchemaStart);
-      byteBuffer.get(schemaBytes);
-      _dataSchema = DataSchema.fromBytes(schemaBytes);
+      _dataSchema = DataSchema.fromBytes(byteBuffer);
       _columnOffsets = new int[_dataSchema.size()];
       _rowSizeInBytes = DataTableUtils.computeColumnOffsets(_dataSchema, _columnOffsets);
     } else {
@@ -130,21 +122,18 @@ public class DataTableImplV2 extends BaseDataTable {
     }
   }
 
-  private Map<String, String> deserializeMetadata(byte[] bytes)
+  private Map<String, String> deserializeMetadata(ByteBuffer buffer)
       throws IOException {
-    try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
-        DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream)) {
-      int numEntries = dataInputStream.readInt();
+      int numEntries = buffer.getInt();
       Map<String, String> metadata = new HashMap<>(numEntries);
 
       for (int i = 0; i < numEntries; i++) {
-        String key = DataTableUtils.decodeString(dataInputStream);
-        String value = DataTableUtils.decodeString(dataInputStream);
+        String key = DataTableUtils.decodeString(buffer);
+        String value = DataTableUtils.decodeString(buffer);
         metadata.put(key, value);
       }
 
       return metadata;
-    }
   }
 
   @Override
