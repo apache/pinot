@@ -64,7 +64,10 @@ public class SegmentPrunerService {
     try (InvocationScope scope = Tracing.getTracer().createScope(SegmentPrunerService.class)) {
       scope.setNumChildren(_segmentPruners.size());
       for (SegmentPruner segmentPruner : _segmentPruners) {
-        segments = segmentPruner.prune(segments, query);
+        try (InvocationScope prunerScope = Tracing.getTracer().createScope(segmentPruner.getClass())) {
+          prunerScope.setNumSegments(segments.size());
+          segments = segmentPruner.prune(segments, query);
+        }
       }
     }
     return segments;

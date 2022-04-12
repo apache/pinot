@@ -23,8 +23,6 @@ import java.util.List;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.trace.InvocationScope;
-import org.apache.pinot.spi.trace.Tracing;
 
 
 public interface SegmentPruner {
@@ -43,12 +41,9 @@ public interface SegmentPruner {
       return segments;
     }
     List<IndexSegment> selectedSegments = new ArrayList<>(segments.size());
-    try (InvocationScope scope = Tracing.getTracer().createScope(getClass())) {
-      scope.setNumSegments(segments.size());
-      for (IndexSegment segment : segments) {
-        if (!prune(segment, query)) {
-          selectedSegments.add(segment);
-        }
+    for (IndexSegment segment : segments) {
+      if (!prune(segment, query)) {
+        selectedSegments.add(segment);
       }
     }
     return selectedSegments;
