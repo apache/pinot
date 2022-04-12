@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.common.minion;
 
-import org.apache.helix.ZNRecord;
 
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
 /**
  * Metadata for the minion task of type <code>RealtimeToOfflineSegmentsTask</code>.

@@ -20,7 +20,7 @@ package org.apache.pinot.common.metadata.instance;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.helix.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadata;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;

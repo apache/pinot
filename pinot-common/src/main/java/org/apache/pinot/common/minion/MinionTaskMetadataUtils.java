@@ -19,10 +19,10 @@
 package org.apache.pinot.common.minion;
 
 import javax.annotation.Nullable;
-import org.I0Itec.zkclient.exception.ZkException;
 import org.apache.helix.AccessOption;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.store.HelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.zkclient.exception.ZkException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.zookeeper.data.Stat;
 
@@ -40,7 +40,7 @@ public final class MinionTaskMetadataUtils {
    */
   @Nullable
   public static ZNRecord fetchTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore, String taskType,
-      String tableNameWithType) {
+                                           String tableNameWithType) {
     String path = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(taskType, tableNameWithType);
     Stat stat = new Stat();
     ZNRecord znRecord = propertyStore.get(path, stat, AccessOption.PERSISTENT);

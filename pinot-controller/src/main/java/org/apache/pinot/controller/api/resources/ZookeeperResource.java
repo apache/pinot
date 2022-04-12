@@ -19,6 +19,10 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.annotations.VisibleForTesting;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -49,9 +53,6 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.zookeeper.data.Stat;
-import org.codehaus.jackson.map.DeserializationConfig;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.map.SerializationConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,12 +68,11 @@ public class ZookeeperResource {
 
   static {
     // Configuration should be identical to org.apache.helix.manager.zk.ZNRecordSerializer.
-    MAPPER.configure(SerializationConfig.Feature.INDENT_OUTPUT, true);
-    MAPPER.configure(SerializationConfig.Feature.AUTO_DETECT_FIELDS, true);
-    MAPPER.configure(SerializationConfig.Feature.CAN_OVERRIDE_ACCESS_MODIFIERS, true);
-    MAPPER.configure(DeserializationConfig.Feature.AUTO_DETECT_FIELDS, true);
-    MAPPER.configure(DeserializationConfig.Feature.AUTO_DETECT_SETTERS, true);
-    MAPPER.configure(DeserializationConfig.Feature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+    MAPPER.configure(SerializationFeature.INDENT_OUTPUT.INDENT_OUTPUT, true);
+    MAPPER.configure(MapperFeature.AUTO_DETECT_FIELDS, true);
+    MAPPER.configure(MapperFeature.CAN_OVERRIDE_ACCESS_MODIFIERS, true);
+    MAPPER.configure(MapperFeature.AUTO_DETECT_SETTERS, true);
+    MAPPER.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
   }
 
   @Inject
