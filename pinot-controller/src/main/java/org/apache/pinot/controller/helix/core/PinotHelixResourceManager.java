@@ -1386,7 +1386,8 @@ public class PinotHelixResourceManager {
     String tableNameWithType = tableConfig.getTableName();
     if (getTableConfig(tableNameWithType) != null) {
       throw new TableAlreadyExistsException("Table config for " + tableNameWithType
-          + " already exists. Try deleting the table to remove all metadata associated with it.");
+          + " already exists. If this is unexpected, try deleting the table to remove all metadata associated"
+          + " with it.");
     }
 
     validateTableTenantConfig(tableConfig);
@@ -1401,14 +1402,22 @@ public class PinotHelixResourceManager {
             .buildEmptyIdealStateFor(tableNameWithType, Integer.parseInt(segmentsConfig.getReplication()),
                 _enableBatchMessageMode);
         LOGGER.info("adding table via the admin");
-        _helixAdmin.addResource(_helixClusterName, tableNameWithType, offlineIdealState);
 
-        // lets add table configs
-        ZKMetadataProvider
-            .setOfflineTableConfig(_propertyStore, tableNameWithType, TableConfigUtils.toZNRecord(tableConfig));
+        try {
+          _helixAdmin.addResource(_helixClusterName, tableNameWithType, offlineIdealState);
 
-        // Assign instances
-        assignInstances(tableConfig, true);
+          // lets add table configs
+          ZKMetadataProvider.setOfflineTableConfig(_propertyStore, tableNameWithType,
+              TableConfigUtils.toZNRecord(tableConfig));
+
+          // Assign instances
+          assignInstances(tableConfig, true);
+        } catch (Exception e) {
+          LOGGER.error(
+              "Caught exception during offline table setup. Cleaning up table {}", tableNameWithType, e);
+          deleteOfflineTable(tableNameWithType);
+          throw e;
+        }
 
         LOGGER.info("Successfully added table: {}", tableNameWithType);
         break;
@@ -1428,32 +1437,32 @@ public class PinotHelixResourceManager {
           }
         }
 
-        // lets add table configs
-        ZKMetadataProvider
-            .setRealtimeTableConfig(_propertyStore, tableNameWithType, TableConfigUtils.toZNRecord(tableConfig));
-
-        // Assign instances before setting up the real-time cluster so that new LLC CONSUMING segment can be assigned
-        // based on the instance partitions
-        assignInstances(tableConfig, true);
-
-        /*
-         * PinotRealtimeSegmentManager sets up watches on table and segment path. When a table gets created,
-         * it expects the INSTANCE path in propertystore to be set up so that it can get the group ID and
-         * create (high-level consumer) segments for that table.
-         * So, we need to set up the instance first, before adding the table resource for HLC new table creation.
-         *
-         * For low-level consumers, the order is to create the resource first, and set up the propertystore with
-         * segments
-         * and then tweak the idealstate to add those segments.
-         *
-         * We also need to support the case when a high-level consumer already exists for a table and we are adding
-         * the low-level consumers.
-         */
         try {
+          // lets add table configs
+          ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableNameWithType,
+              TableConfigUtils.toZNRecord(tableConfig));
+
+          // Assign instances before setting up the real-time cluster so that new LLC CONSUMING segment can be assigned
+          // based on the instance partitions
+          assignInstances(tableConfig, true);
+
+          /*
+           * PinotRealtimeSegmentManager sets up watches on table and segment path. When a table gets created,
+           * it expects the INSTANCE path in propertystore to be set up so that it can get the group ID and
+           * create (high-level consumer) segments for that table.
+           * So, we need to set up the instance first, before adding the table resource for HLC new table creation.
+           *
+           * For low-level consumers, the order is to create the resource first, and set up the propertystore with
+           * segments
+           * and then tweak the idealstate to add those segments.
+           *
+           * We also need to support the case when a high-level consumer already exists for a table and we are adding
+           * the low-level consumers.
+           */
           ensureRealtimeClusterIsSetUp(tableConfig);
         } catch (Exception e) {
           LOGGER.error(
-              "Caught exception during realtime cluster setup. Cleaning up table {}", tableNameWithType, e);
+              "Caught exception during realtime table setup. Cleaning up table {}", tableNameWithType, e);
           deleteRealtimeTable(tableNameWithType);
           throw e;
         }
