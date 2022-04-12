@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.utils;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -30,6 +31,8 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.MapDifference;
+import com.google.common.collect.Maps;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -37,6 +40,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -58,6 +62,16 @@ public class JsonUtils {
   private JsonUtils() {
   }
 
+  public static class JsonParsedWithUnparsableProps<T> {
+    public T _obj;
+    public MapDifference<String, Object> _difference;
+
+    public JsonParsedWithUnparsableProps(T obj, MapDifference<String, Object> difference) {
+      _obj = obj;
+      _difference = difference;
+    }
+  }
+
   // For flattening
   public static final String VALUE_KEY = "";
   public static final String KEY_SEPARATOR = ".";
@@ -71,10 +85,25 @@ public class JsonUtils {
   public static final ObjectReader DEFAULT_READER = DEFAULT_MAPPER.reader();
   public static final ObjectWriter DEFAULT_WRITER = DEFAULT_MAPPER.writer();
   public static final ObjectWriter DEFAULT_PRETTY_WRITER = DEFAULT_MAPPER.writerWithDefaultPrettyPrinter();
+  private static final TypeReference<HashMap<String, Object>> GENERIC_JSON_TYPE =
+      new TypeReference<HashMap<String, Object>>() {};
 
   public static <T> T stringToObject(String jsonString, Class<T> valueType)
       throws IOException {
     return DEFAULT_READER.forType(valueType).readValue(jsonString);
+  }
+
+  public static <T> JsonParsedWithUnparsableProps<T> stringToObjectAndUnparseableProps(String jsonString, Class<T> klass) throws IOException {
+    T instance = DEFAULT_READER.forType(klass).readValue(jsonString);
+
+    // TODO check if setSerializationInclusion is thread safe?
+    String instanceJson = DEFAULT_MAPPER.setSerializationInclusion(JsonInclude.Include.NON_NULL).writeValueAsString(instance);
+
+    Map<String, Object> inputJsonMap = DEFAULT_MAPPER.readValue(jsonString, GENERIC_JSON_TYPE);
+    Map<String, Object> instanceJsonMap = DEFAULT_MAPPER.readValue(instanceJson, GENERIC_JSON_TYPE);
+
+    MapDifference<String, Object> difference = Maps.difference(inputJsonMap, instanceJsonMap);
+    return new JsonParsedWithUnparsableProps<T>(instance, difference);
   }
 
   public static <T> T stringToObject(String jsonString, TypeReference<T> valueTypeRef)

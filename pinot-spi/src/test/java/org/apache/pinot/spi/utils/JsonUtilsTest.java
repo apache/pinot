@@ -274,6 +274,14 @@ public class JsonUtilsTest {
   }
 
   @Test
+  public void testUnparseableJson() throws Exception {
+    String inputJsonMissingProp = "{\"primitiveIntegerField\": 123, \"missingProp\": 567, \"classField\": {\"internalIntField\": 12, \"internalMissingField\": \"somedata\"}}";
+    JsonUtils.JsonParsedWithUnparsableProps<TestClass> jsonParsedWithUnparsableProps = JsonUtils.stringToObjectAndUnparseableProps(inputJsonMissingProp, TestClass.class);
+
+    Assert.assertTrue(jsonParsedWithUnparsableProps._difference.entriesOnlyOnLeft().containsKey("missingProp"));
+  }
+
+  @Test
   public void testInferSchema()
       throws Exception {
     ClassLoader classLoader = JsonUtilsTest.class.getClassLoader();
