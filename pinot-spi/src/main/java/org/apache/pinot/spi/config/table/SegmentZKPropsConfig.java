@@ -22,7 +22,7 @@ package org.apache.pinot.spi.config.table;
 /**
  * ZK properties that are to be logged into segment's metadata.properties
  */
-public class SegmentZKMetadataConfig {
+public class SegmentZKPropsConfig {
   private String _startOffset;
   private String _endOffset;
 

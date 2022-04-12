@@ -42,7 +42,7 @@ import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
-import org.apache.pinot.spi.config.table.SegmentZKMetadataConfig;
+import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -112,7 +112,7 @@ public class SegmentGeneratorConfig implements Serializable {
   // constructed from FieldConfig
   private Map<String, Map<String, String>> _columnProperties = new HashMap<>();
 
-  private SegmentZKMetadataConfig _segmentZKMetadataConfig;
+  private SegmentZKPropsConfig _segmentZKPropsConfig;
 
   @Deprecated
   public SegmentGeneratorConfig() {
@@ -717,11 +717,11 @@ public class SegmentGeneratorConfig implements Serializable {
     _failOnEmptySegment = failOnEmptySegment;
   }
 
-  public SegmentZKMetadataConfig getSegmentZKMetadataConfig() {
-    return _segmentZKMetadataConfig;
+  public SegmentZKPropsConfig getSegmentZKPropsConfig() {
+    return _segmentZKPropsConfig;
   }
 
-  public void setSegmentZKMetadataConfig(SegmentZKMetadataConfig segmentZKMetadataConfig) {
-    _segmentZKMetadataConfig = segmentZKMetadataConfig;
+  public void setSegmentZKPropsConfig(SegmentZKPropsConfig segmentZKPropsConfig) {
+    _segmentZKPropsConfig = segmentZKPropsConfig;
   }
 }

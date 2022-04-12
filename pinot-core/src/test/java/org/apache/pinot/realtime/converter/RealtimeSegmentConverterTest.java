@@ -34,7 +34,7 @@ import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvide
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.IndexingConfig;
-import org.apache.pinot.spi.config.table.SegmentZKMetadataConfig;
+import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -119,8 +119,8 @@ public class RealtimeSegmentConverterTest {
 
     File outputDir = new File(tmpDir, "outputDir");
     RealtimeSegmentConverter converter =
-        new RealtimeSegmentConverter(mutableSegmentImpl, new SegmentZKMetadataConfig(), outputDir.getAbsolutePath(), schema,
-            tableNameWithType, tableConfig, segmentName, indexingConfig.getSortedColumn().get(0),
+        new RealtimeSegmentConverter(mutableSegmentImpl, new SegmentZKPropsConfig(), outputDir.getAbsolutePath(),
+            schema, tableNameWithType, tableConfig, segmentName, indexingConfig.getSortedColumn().get(0),
             indexingConfig.getInvertedIndexColumns(), null, null, indexingConfig.getNoDictionaryColumns(),
             indexingConfig.getVarLengthDictionaryColumns(), false);
 

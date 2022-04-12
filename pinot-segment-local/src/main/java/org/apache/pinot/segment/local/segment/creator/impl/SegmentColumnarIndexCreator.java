@@ -52,7 +52,7 @@ import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.SegmentZKMetadataConfig;
+import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -621,7 +621,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           _dictionaryCreatorMap.containsKey(column), dictionaryElementSize);
     }
 
-    SegmentZKMetadataConfig segmentZKMetadataConfig = _config.getSegmentZKMetadataConfig();
+    SegmentZKPropsConfig segmentZKMetadataConfig = _config.getSegmentZKPropsConfig();
     if (segmentZKMetadataConfig != null) {
       properties.setProperty(CommonConstants.Segment.Realtime.START_OFFSET, segmentZKMetadataConfig.getStartOffset());
       properties.setProperty(CommonConstants.Segment.Realtime.END_OFFSET, segmentZKMetadataConfig.getEndOffset());

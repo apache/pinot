@@ -45,7 +45,6 @@ import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.spi.config.table.IndexingConfig;
-import org.apache.pinot.spi.config.table.SegmentZKMetadataConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -285,13 +284,9 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           updateCurrentDocumentCountMetrics();
           _segmentLogger.info("Indexed {} raw events", _realtimeSegment.getNumDocsIndexed());
           File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + System.currentTimeMillis());
-
-          SegmentZKMetadataConfig segmentZKMetadataConfig = new SegmentZKMetadataConfig();
-          segmentZKMetadataConfig.setStartOffset(segmentZKMetadata.getStartOffset());
-          // TODO what should be the endOffset for HLRealtimeSegment?
           // lets convert the segment now
           RealtimeSegmentConverter converter =
-              new RealtimeSegmentConverter(_realtimeSegment, segmentZKMetadataConfig, tempSegmentFolder.getAbsolutePath(),
+              new RealtimeSegmentConverter(_realtimeSegment, null, tempSegmentFolder.getAbsolutePath(),
                   schema, _tableNameWithType, tableConfig, segmentZKMetadata.getSegmentName(), _sortedColumn,
                   _invertedIndexColumns, Collections.emptyList(), Collections.emptyList(), _noDictionaryColumns,
                   _varLengthDictionaryColumns, indexingConfig.isNullHandlingEnabled());
