@@ -27,8 +27,6 @@ import org.apache.pinot.segment.local.utils.fst.PinotBufferIndexInput;
 import org.apache.pinot.segment.local.utils.fst.RegexpMatcher;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.spi.trace.InvocationScope;
-import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -63,7 +61,7 @@ public class LuceneFSTIndexReader implements TextIndexReader {
 
   @Override
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
-    try (InvocationScope scope = Tracing.getTracer().createScope(LuceneFSTIndexReader.class)) {
+    try {
       MutableRoaringBitmap dictIds = new MutableRoaringBitmap();
       List<Long> matchingIds = RegexpMatcher.regexMatch(searchQuery, _readFST);
       for (Long matchingId : matchingIds) {
