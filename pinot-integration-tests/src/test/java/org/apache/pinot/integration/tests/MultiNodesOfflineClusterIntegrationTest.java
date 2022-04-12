@@ -22,7 +22,7 @@ import java.util.Collections;
 import java.util.Map;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
-import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
+import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
 import org.apache.pinot.util.TestUtils;
@@ -59,7 +59,7 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
   public void testUpdateBrokerResource()
       throws Exception {
     // Add a new broker to the cluster
-    HelixBrokerStarter brokerStarter = startOneBroker(NUM_BROKERS);
+    BaseBrokerStarter brokerStarter = startOneBroker(NUM_BROKERS);
 
     // Check if broker is added to all the tables in broker resource
     String clusterName = getHelixClusterName();
