@@ -33,9 +33,13 @@ import org.apache.pinot.sql.parsers.SqlCompilationException;
 public class PredicateComparisonRewriter implements QueryRewriter {
   @Override
   public PinotQuery rewrite(PinotQuery pinotQuery) {
-    if (pinotQuery.getFilterExpression() != null) {
-      pinotQuery.setFilterExpression(updateBooleanPredicates(pinotQuery.getFilterExpression(), null));
-      pinotQuery.setFilterExpression(updateComparisonPredicate(pinotQuery.getFilterExpression()));
+    Expression filterExpression = pinotQuery.getFilterExpression();
+    if (filterExpression != null) {
+      filterExpression = updateBooleanPredicates(filterExpression, null);
+      pinotQuery.setFilterExpression(filterExpression);
+
+      filterExpression = updateComparisonPredicate(filterExpression);
+      pinotQuery.setFilterExpression(updateComparisonPredicate(filterExpression));
     }
     Expression havingExpression = pinotQuery.getHavingExpression();
     if (havingExpression != null) {
@@ -45,7 +49,7 @@ public class PredicateComparisonRewriter implements QueryRewriter {
   }
 
   /**
-   * Updates boolean predicates that are missing an EQUALS filter.
+   * Updates boolean predicates (literals and scalar functions) that are missing an EQUALS filter.
    * E.g. 1:  'WHERE a' will be updated to 'WHERE a = true'
    * E.g. 2: "WHERE startsWith(col, 'str')" will be updated to "WHERE startsWith(col, 'str') = true"
    *
@@ -57,55 +61,54 @@ public class PredicateComparisonRewriter implements QueryRewriter {
     ExpressionType type = expression.getType();
     if (type == ExpressionType.FUNCTION) {
       Function function = expression.getFunctionCall();
+      String functionOperator = function.getOperator();
 
-      // If the function is not of FilterKind, we might have to rewrite the function if parentFunction is AND, OR or
-      // NOT. Example: A query like "select col1 from table where startsWith(col1, 'myStr') AND col2 > 10;" should be
-      // rewritten to "select col1 from table where startsWith(col1, 'myStr') = true AND col2 > 10;".
-      if (!EnumUtils.isValidEnum(FilterKind.class, function.getOperator())) {
-
-        // Rewrite non FilterKind functions if one of the two conditions are satified:
-        // 1. parent function is empty. Example: "select * from table where startsWith(col, 'myStr');
-        // 2. Separator is not a predicate (non predicates are AND, OR, NOT).
-        //    Example: "select * from table where startsWith(col, 'myStr') AND col2 > 10";
-        if (parentFunction == null || (EnumUtils.isValidEnum(FilterKind.class, parentFunction.getOperator())
-            && !FilterKind.valueOf(parentFunction.getOperator()).isPredicate())) {
-          Expression currExpression = expression.deepCopy();
-          expression = RequestUtils.getFunctionExpression(FilterKind.EQUALS.name());
-          List<Expression> operands = new ArrayList<>();
-          operands.add(currExpression);
-          operands.add(RequestUtils.getLiteralExpression(true));
-          expression.getFunctionCall().setOperands(operands);
-
-          return expression;
-        }
+      // If the function is not of FilterKind, we might have to rewrite the function if parentFunction is not a
+      // predicate.
+      // Example: A query like "select col1 from table where startsWith(col1, 'myStr') AND col2 > 10;" should be
+      //          rewritten to "select col1 from table where startsWith(col1, 'myStr') = true AND col2 > 10;".
+      if (!EnumUtils.isValidEnum(FilterKind.class, functionOperator)) {
+        expression = convertPredicateToBooleanExpression(expression, parentFunction);
+        return expression;
       }
 
-      List<Expression> operands = expression.getFunctionCall().getOperands();
-
-      if (operands.size() > 0) {
-        // unset operands only within the "if" condition because 'no argument' functions expect operand list to
-        // be initialized.
-        expression.getFunctionCall().unsetOperands();
-
-        for (Expression exp : operands) {
-          expression.getFunctionCall().addToOperands(updateBooleanPredicates(exp, expression.getFunctionCall()));
-        }
+      List<Expression> operands = function.getOperands();
+      for (int i = 0; i < operands.size(); i++) {
+        Expression operand = function.getOperands().get(i);
+        operands.set(i, updateBooleanPredicates(operand, function));
       }
     } else if (type == ExpressionType.IDENTIFIER) {
+      expression = convertPredicateToBooleanExpression(expression, parentFunction);
+    }
 
-      // Rewrite identifiers  if one of the two conditions are satified:
-      // 1. parent function is empty. Example: "select * from table where col1";
-      // 2. Separator is not a predicate (non predicates are AND, OR, NOT).
-      //    Example: "select * from table where col1 AND col2 > 10";
-      if (parentFunction == null || (EnumUtils.isValidEnum(FilterKind.class, parentFunction.getOperator())
-          && !FilterKind.valueOf(parentFunction.getOperator()).isPredicate())) {
-        Expression currExpression = expression.deepCopy();
-        expression = RequestUtils.getFunctionExpression(FilterKind.EQUALS.name());
-        List<Expression> operands = new ArrayList<>();
-        operands.add(currExpression);
-        operands.add(RequestUtils.getLiteralExpression(true));
-        expression.getFunctionCall().setOperands(operands);
-      }
+    return expression;
+  }
+
+  /**
+   * Rewrite if one of the two conditions are satisfied:
+   *  1. parent function is empty.
+   *     Example1: "select * from table where col1" converts to
+   *                "select * from table where col1 = true"
+   *     Example2: "select * from table where startsWith(col1, 'str')" converts to
+   *               "select * from table where startsWith(col1, 'str') = true"
+   *  2. Separator is not a predicate (non predicates are AND, OR, NOT).
+   *     Example1: "select * from table where col1 AND startsWith(col2, 'str')" converts to
+   *               "select * from table where col1 = true AND startsWith(col2, 'str') = true"
+   * @param expression Expression
+   * @param parentFunction Parent expression
+   * @return Rewritten expression
+   */
+  private static Expression convertPredicateToBooleanExpression(Expression expression, Function parentFunction) {
+    if (parentFunction == null || (EnumUtils.isValidEnum(FilterKind.class, parentFunction.getOperator())
+        && !FilterKind.valueOf(parentFunction.getOperator()).isPredicate())) {
+      Expression newExpression;
+      newExpression = RequestUtils.getFunctionExpression(FilterKind.EQUALS.name());
+      List<Expression> operands = new ArrayList<>();
+      operands.add(expression);
+      operands.add(RequestUtils.getLiteralExpression(true));
+      newExpression.getFunctionCall().setOperands(operands);
+
+      return newExpression;
     }
 
     return expression;

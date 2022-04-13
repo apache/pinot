@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.pql.parsers.pql2.ast;
 
+import java.util.EnumSet;
+
 public enum FilterKind {
   AND,
   OR,
@@ -39,14 +41,18 @@ public enum FilterKind {
   TEXT_MATCH,
   JSON_MATCH;
 
+  private static final EnumSet<FilterKind> RANGE_FILTERS = EnumSet.of(GREATER_THAN, GREATER_THAN_OR_EQUAL, LESS_THAN,
+      LESS_THAN_OR_EQUAL, BETWEEN, RANGE);
+  private static final EnumSet<FilterKind> PREDICATE_FILTERS = EnumSet.of(EQUALS, NOT_EQUALS, GREATER_THAN,
+      GREATER_THAN_OR_EQUAL, LESS_THAN, LESS_THAN_OR_EQUAL, LIKE, BETWEEN, RANGE, IN, NOT_IN, REGEXP_LIKE, IS_NULL,
+      IS_NOT_NULL, TEXT_MATCH, JSON_MATCH);
   /**
    * Helper method that returns true if the enum maps to a Range.
    *
    * @return True if the enum is of Range type, false otherwise.
    */
   public boolean isRange() {
-    return this == GREATER_THAN || this == GREATER_THAN_OR_EQUAL || this == LESS_THAN || this == LESS_THAN_OR_EQUAL
-        || this == BETWEEN || this == RANGE;
+    return RANGE_FILTERS.contains(this);
   }
 
   /**
@@ -55,6 +61,6 @@ public enum FilterKind {
    * @return where the filter is a predicate.
    */
   public boolean isPredicate() {
-    return this != AND && this != OR && this != NOT;
+    return PREDICATE_FILTERS.contains(this);
   }
 }
