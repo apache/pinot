@@ -23,6 +23,9 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.common.function.scalar.DataTypeConversionFunctions.cast;
+import static org.testng.Assert.assertEquals;
+
 
 public class CastTransformFunctionTest extends BaseTransformFunctionTest {
 
@@ -32,22 +35,28 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
         RequestContextUtils.getExpressionFromSQL(String.format("CAST(%s AS string)", INT_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CastTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), CastTransformFunction.FUNCTION_NAME);
+    assertEquals(transformFunction.getName(), CastTransformFunction.FUNCTION_NAME);
     String[] expectedValues = new String[NUM_ROWS];
+    String[] scalarStringValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedValues[i] = Integer.toString(_intSVValues[i]);
+      scalarStringValues[i] = (String) cast(_intSVValues[i], "string");
     }
     testTransformFunction(transformFunction, expectedValues);
+    assertEquals(expectedValues, scalarStringValues);
 
     expression =
         RequestContextUtils.getExpressionFromSQL(String.format("CAST(CAST(%s as INT) as FLOAT)", FLOAT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CastTransformFunction);
     float[] expectedFloatValues = new float[NUM_ROWS];
+    float[] scalarFloatValues = new float[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedFloatValues[i] = (int) _floatSVValues[i];
+      scalarFloatValues[i] = (float) cast(cast(_floatSVValues[i], "int"), "float");
     }
     testTransformFunction(transformFunction, expectedFloatValues);
+    assertEquals(expectedFloatValues, scalarFloatValues);
 
     expression = RequestContextUtils.getExpressionFromSQL(
         String.format("CAST(ADD(CAST(%s AS LONG), %s) AS STRING)", DOUBLE_SV_COLUMN, LONG_SV_COLUMN));
@@ -55,18 +64,26 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     Assert.assertTrue(transformFunction instanceof CastTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedValues[i] = Double.toString((double) (long) _doubleSVValues[i] + (double) _longSVValues[i]);
+      scalarStringValues[i] = (String) cast(
+          (double) (long) cast(_doubleSVValues[i], "long") + (double) _longSVValues[i], "string");
     }
     testTransformFunction(transformFunction, expectedValues);
+    assertEquals(expectedValues, scalarStringValues);
 
     expression = RequestContextUtils.getExpressionFromSQL(
         String.format("caSt(cAst(casT(%s as inT) + %s aS sTring) As DouBle)", FLOAT_SV_COLUMN, INT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CastTransformFunction);
     double[] expectedDoubleValues = new double[NUM_ROWS];
+    double[] scalarDoubleValues = new double[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedDoubleValues[i] = (double) (int) _floatSVValues[i] + (double) _intSVValues[i];
+      scalarDoubleValues[i] =
+          (double) cast(cast((double) (int) cast(_floatSVValues[i], "int") + (double) _intSVValues[i], "string"),
+              "double");
     }
     testTransformFunction(transformFunction, expectedDoubleValues);
+    assertEquals(expectedDoubleValues, scalarDoubleValues);
 
     expression = RequestContextUtils.getExpressionFromSQL(String
         .format("CAST(CAST(%s AS INT) - CAST(%s AS FLOAT) / CAST(%s AS DOUBLE) AS LONG)", DOUBLE_SV_COLUMN,
@@ -74,10 +91,14 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CastTransformFunction);
     long[] expectedLongValues = new long[NUM_ROWS];
+    long[] longScalarValues = new long[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedLongValues[i] =
           (long) ((double) (int) _doubleSVValues[i] - (double) (float) _longSVValues[i] / (double) _intSVValues[i]);
+      longScalarValues[i] = (long) cast((double) (int) cast(_doubleSVValues[i], "int")
+          - (double) (float) cast(_longSVValues[i], "float") / (double) cast(_intSVValues[i], "double"), "long");
     }
     testTransformFunction(transformFunction, expectedLongValues);
+    assertEquals(expectedLongValues, longScalarValues);
   }
 }

@@ -1629,41 +1629,19 @@ public class CalciteSqlCompilerTest {
   public void testCastTransformation() {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("select CAST(25.65 AS int) from myTable");
     Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
-    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "cast");
-    Assert.assertEquals(
-        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getLiteral().getDoubleValue(), 25.65);
-    Assert.assertEquals(
-        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue(),
-        "INTEGER");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getLongValue(), 25);
 
     pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT CAST('20170825' AS LONG) from myTable");
     Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
-    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "cast");
-    Assert.assertEquals(
-        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getLiteral().getStringValue(),
-        "20170825");
-    Assert.assertEquals(
-        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue(), "LONG");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getLongValue(), 20170825);
 
     pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT CAST(20170825.0 AS Float) from myTable");
     Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
-    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "cast");
-    Assert.assertEquals(
-        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getLiteral().getDoubleValue(),
-        20170825.0);
-    Assert.assertEquals(
-        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue(),
-        "FLOAT");
+    Assert.assertEquals((float) pinotQuery.getSelectList().get(0).getLiteral().getDoubleValue(), 20170825.0F);
 
     pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT CAST(20170825.0 AS dOuble) from myTable");
     Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
-    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "cast");
-    Assert.assertEquals(
-        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getLiteral().getDoubleValue(),
-        20170825.0);
-    Assert.assertEquals(
-        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue(),
-        "DOUBLE");
+    Assert.assertEquals((float) pinotQuery.getSelectList().get(0).getLiteral().getDoubleValue(), 20170825.0F);
 
     pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT CAST(column1 AS STRING) from myTable");
     Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
