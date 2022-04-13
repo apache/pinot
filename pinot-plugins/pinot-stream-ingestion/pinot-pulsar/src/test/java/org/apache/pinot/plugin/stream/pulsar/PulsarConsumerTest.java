@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
@@ -57,6 +58,8 @@ public class PulsarConsumerTest {
   public static final int NUM_PARTITION = 1;
   public static final int NUM_RECORDS_PER_PARTITION = 1000;
   public static final int BATCH_SIZE = 10;
+  public static final int DEFAULT_TIMEOUT_MS = 10000;
+  public static final int DEFAULT_RETRY_COUNT = 3;
 
   private PulsarClient _pulsarClient;
   private PulsarStandaloneCluster _pulsarStandaloneCluster;
@@ -191,29 +194,25 @@ public class PulsarConsumerTest {
 
       final PartitionGroupConsumer consumer =
           streamConsumerFactory.createPartitionGroupConsumer(CLIENT_ID, partitionGroupConsumptionStatus);
-      final MessageBatch messageBatch1 = consumer.fetchMessages(new MessageIdStreamOffset(MessageId.earliest),
-          new MessageIdStreamOffset(getMessageIdForPartitionAndIndex(partition, 500)), 10000);
-      Assert.assertEquals(messageBatch1.getMessageCount(), 500);
+
+      final MessageBatch messageBatch1 = consumeMessageBatch(consumer, MessageId.earliest,
+          getMessageIdForPartitionAndIndex(partition, 500), 500);
       for (int i = 0; i < messageBatch1.getMessageCount(); i++) {
         final byte[] msg = (byte[]) messageBatch1.getMessageAtIndex(i);
         Assert.assertEquals(new String(msg), "sample_msg_" + i);
         totalMessagesReceived++;
       }
 
-      final MessageBatch messageBatch2 =
-          consumer.fetchMessages(new MessageIdStreamOffset(getMessageIdForPartitionAndIndex(partition, 500)), null,
-              10000);
-      Assert.assertEquals(messageBatch2.getMessageCount(), 500);
+      final MessageBatch messageBatch2 = consumeMessageBatch(consumer, getMessageIdForPartitionAndIndex(partition, 500),
+          null, 500);
       for (int i = 0; i < messageBatch2.getMessageCount(); i++) {
         final byte[] msg = (byte[]) messageBatch2.getMessageAtIndex(i);
         Assert.assertEquals(new String(msg), "sample_msg_" + (500 + i));
         totalMessagesReceived++;
       }
 
-      final MessageBatch messageBatch3 =
-          consumer.fetchMessages(new MessageIdStreamOffset(getMessageIdForPartitionAndIndex(partition, 10)),
-              new MessageIdStreamOffset(getMessageIdForPartitionAndIndex(partition, 35)), 10000);
-      Assert.assertEquals(messageBatch3.getMessageCount(), 25);
+      final MessageBatch messageBatch3 = consumeMessageBatch(consumer, getMessageIdForPartitionAndIndex(partition, 10),
+          getMessageIdForPartitionAndIndex(partition, 35), 25);
       for (int i = 0; i < messageBatch3.getMessageCount(); i++) {
         final byte[] msg = (byte[]) messageBatch3.getMessageAtIndex(i);
         Assert.assertEquals(new String(msg), "sample_msg_" + (10 + i));
@@ -241,18 +240,16 @@ public class PulsarConsumerTest {
 
       final PartitionGroupConsumer consumer =
           streamConsumerFactory.createPartitionGroupConsumer(CLIENT_ID, partitionGroupConsumptionStatus);
-      final MessageBatch messageBatch1 = consumer.fetchMessages(new MessageIdStreamOffset(MessageId.earliest),
-          new MessageIdStreamOffset(getBatchMessageIdForPartitionAndIndex(partition, 500)), 10000);
-      Assert.assertEquals(messageBatch1.getMessageCount(), 500);
+      final MessageBatch messageBatch1 = consumeMessageBatch(consumer, MessageId.earliest,
+          getBatchMessageIdForPartitionAndIndex(partition, 500), 500);
       for (int i = 0; i < messageBatch1.getMessageCount(); i++) {
         final byte[] msg = (byte[]) messageBatch1.getMessageAtIndex(i);
         Assert.assertEquals(new String(msg), "sample_msg_" + i);
         totalMessagesReceived++;
       }
 
-      final MessageBatch messageBatch2 =
-          consumer.fetchMessages(new MessageIdStreamOffset(getBatchMessageIdForPartitionAndIndex(partition, 500)), null,
-              10000);
+      final MessageBatch messageBatch2 = consumeMessageBatch(consumer,
+          getBatchMessageIdForPartitionAndIndex(partition, 500), null, 500);
       Assert.assertEquals(messageBatch2.getMessageCount(), 500);
       for (int i = 0; i < messageBatch2.getMessageCount(); i++) {
         final byte[] msg = (byte[]) messageBatch2.getMessageAtIndex(i);
@@ -260,10 +257,9 @@ public class PulsarConsumerTest {
         totalMessagesReceived++;
       }
 
-      final MessageBatch messageBatch3 =
-          consumer.fetchMessages(new MessageIdStreamOffset(getBatchMessageIdForPartitionAndIndex(partition, 10)),
-              new MessageIdStreamOffset(getBatchMessageIdForPartitionAndIndex(partition, 35)), 10000);
-      Assert.assertEquals(messageBatch3.getMessageCount(), 25);
+      final MessageBatch messageBatch3 = consumeMessageBatch(consumer,
+          getBatchMessageIdForPartitionAndIndex(partition, 10), getBatchMessageIdForPartitionAndIndex(partition, 35),
+          25);
       for (int i = 0; i < messageBatch3.getMessageCount(); i++) {
         final byte[] msg = (byte[]) messageBatch3.getMessageAtIndex(i);
         Assert.assertEquals(new String(msg), "sample_msg_" + (10 + i));
@@ -273,13 +269,31 @@ public class PulsarConsumerTest {
     }
   }
 
-  public MessageId getMessageIdForPartitionAndIndex(int partitionNum, int index) {
+  private static MessageBatch consumeMessageBatch(PartitionGroupConsumer consumer, MessageId startMsgId,
+      MessageId endMsgId, int expectedMsgCount)
+      throws TimeoutException {
+    int retryCount = 0;
+    MessageBatch messageBatch = null;
+    while (retryCount < DEFAULT_RETRY_COUNT) {
+      retryCount++;
+      messageBatch = consumer.fetchMessages(new MessageIdStreamOffset(startMsgId),
+          new MessageIdStreamOffset(endMsgId), DEFAULT_TIMEOUT_MS);
+      if (messageBatch.getMessageCount() == expectedMsgCount) {
+        return messageBatch;
+      }
+    }
+    Assert.fail("Unable to acquire message batch, expected: " + expectedMsgCount + ", actual "
+        + messageBatch.getMessageCount());
+    return null;
+  }
+
+  private MessageId getMessageIdForPartitionAndIndex(int partitionNum, int index) {
     MessageId startMessageIdRaw = _partitionToFirstMessageIdMap.get(partitionNum);
     MessageIdImpl startMessageId = MessageIdImpl.convertToMessageIdImpl(startMessageIdRaw);
     return DefaultImplementation.newMessageId(startMessageId.getLedgerId(), index, partitionNum);
   }
 
-  public MessageId getBatchMessageIdForPartitionAndIndex(int partitionNum, int index) {
+  private MessageId getBatchMessageIdForPartitionAndIndex(int partitionNum, int index) {
     MessageId startMessageIdRaw = _partitionToFirstMessageIdMapBatch.get(partitionNum);
     BatchMessageIdImpl startMessageId = (BatchMessageIdImpl) MessageIdImpl.convertToMessageIdImpl(startMessageIdRaw);
     return new BatchMessageIdImpl(startMessageId.getLedgerId(), index / BATCH_SIZE, partitionNum, index % BATCH_SIZE,
