@@ -37,7 +37,6 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 @SuppressWarnings("rawtypes")
 public class BitmapBasedFilterOperator extends BaseFilterOperator {
-  private static final String OPERATOR_NAME = "BitmapBasedFilterOperator";
   private static final String EXPLAIN_NAME = "FILTER_INVERTED_INDEX";
 
   private final PredicateEvaluator _predicateEvaluator;
@@ -171,10 +170,6 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
     }
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public List<Operator> getChildOperators() {

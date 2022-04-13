@@ -41,13 +41,6 @@ public interface Operator<T extends Block> {
    */
   T nextBlock();
 
-  /**
-   * Returns the name of the operator.
-   * NOTE: This method is called for tracing purpose. The sub-class should try to return a constant to avoid the
-   * unnecessary overhead.
-   */
-  String getOperatorName();
-
   /** @return List of {@link Operator}s that this operator depends upon. */
   List<Operator> getChildOperators();
 

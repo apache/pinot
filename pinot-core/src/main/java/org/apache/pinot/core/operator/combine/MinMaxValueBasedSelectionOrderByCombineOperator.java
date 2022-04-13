@@ -55,7 +55,7 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombineOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinMaxValueBasedSelectionOrderByCombineOperator.class);
-  private static final String OPERATOR_NAME = "MinMaxValueBasedSelectionOrderByCombineOperator";
+
   private static final String EXPLAIN_NAME = "COMBINE_SELECT_ORDERBY_MINMAX";
 
   // For min/max value based combine, when a thread detects that no more segments need to be processed, it inserts this
@@ -114,10 +114,6 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
     }
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public String toExplainString() {

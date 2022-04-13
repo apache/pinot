@@ -40,7 +40,6 @@ import org.apache.pinot.spi.exception.EarlyTerminationException;
  */
 @SuppressWarnings("unchecked")
 public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<IntermediateResultsBlock> {
-  private static final String OPERATOR_NAME = "AcquireReleaseColumnsSegmentOperator";
   private static final String EXPLAIN_NAME = "ACQUIRE_RELEASE_COLUMNS_SEGMENT";
 
   private final PlanNode _planNode;
@@ -82,10 +81,6 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<Intermedi
     _indexSegment.release(_fetchContext);
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public String toExplainString() {

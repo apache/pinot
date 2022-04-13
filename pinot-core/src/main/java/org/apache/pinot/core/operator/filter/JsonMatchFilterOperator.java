@@ -35,7 +35,6 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
  * Filter operator for JSON_MATCH. E.g. SELECT ... WHERE JSON_MATCH(column_name, filter_string)
  */
 public class JsonMatchFilterOperator extends BaseFilterOperator {
-  private static final String OPERATOR_NAME = "JsonMatchFilterOperator";
   private static final String EXPLAIN_NAME = "FILTER_JSON_INDEX";
 
   private final JsonIndexReader _jsonIndex;
@@ -74,11 +73,6 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
   @Override
   public BitmapCollection getBitmaps() {
     return new BitmapCollection(_numDocs, false, _jsonIndex.getMatchingDocIds(_predicate.getValue()));
-  }
-
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
   }
 
   @Override

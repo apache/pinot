@@ -30,7 +30,7 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 public class OrFilterOperator extends BaseFilterOperator {
-  private static final String OPERATOR_NAME = "OrFilterOperator";
+
   private static final String EXPLAIN_NAME = "FILTER_OR";
   private final List<BaseFilterOperator> _filterOperators;
   private final int _numDocs;
@@ -50,10 +50,6 @@ public class OrFilterOperator extends BaseFilterOperator {
     return new FilterBlock(new OrDocIdSet(filterBlockDocIdSets, _numDocs));
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public String toExplainString() {

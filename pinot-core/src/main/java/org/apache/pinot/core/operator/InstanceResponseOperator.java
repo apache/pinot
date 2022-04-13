@@ -32,7 +32,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 
 
 public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock> {
-  private static final String OPERATOR_NAME = "InstanceResponseOperator";
+
   private static final String EXPLAIN_NAME = "INSTANCE_RESPONSE";
 
   private final BaseCombineOperator _combineOperator;
@@ -128,10 +128,6 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
     }
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public String toExplainString() {

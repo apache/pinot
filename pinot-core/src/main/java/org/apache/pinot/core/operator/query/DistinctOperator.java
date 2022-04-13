@@ -38,7 +38,6 @@ import org.apache.pinot.segment.spi.IndexSegment;
  * Operator for distinct queries on a single segment.
  */
 public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
-  private static final String OPERATOR_NAME = "DistinctOperator";
   private static final String EXPLAIN_NAME = "DISTINCT";
 
   private final IndexSegment _indexSegment;
@@ -71,10 +70,6 @@ public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
         Collections.singletonList(distinctTable), false);
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public List<Operator> getChildOperators() {
