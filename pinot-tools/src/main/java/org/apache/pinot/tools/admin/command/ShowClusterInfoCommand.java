@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -41,7 +42,6 @@ import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.Command;
-import org.codehaus.jackson.annotate.JsonProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;

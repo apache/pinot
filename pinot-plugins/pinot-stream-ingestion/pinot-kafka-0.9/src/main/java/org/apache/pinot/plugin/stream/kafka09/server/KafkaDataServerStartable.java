@@ -25,6 +25,7 @@ import kafka.admin.TopicCommand;
 import kafka.server.KafkaConfig;
 import kafka.server.KafkaServerStartable;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
