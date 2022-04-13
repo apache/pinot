@@ -53,6 +53,7 @@ public class PerfBenchmarkDriverConf {
   //broker configuration
   int _brokerPort = CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;
   String _brokerHost = "localhost";
+  String _brokerURL;
   boolean _startBroker = true;
 
   //resource configuration
@@ -144,6 +145,14 @@ public class PerfBenchmarkDriverConf {
 
   public void setBrokerHost(String brokerHost) {
     _brokerHost = brokerHost;
+  }
+
+  public String getBrokerURL() {
+    return _brokerURL;
+  }
+
+  public void setBrokerURL(String brokerURL) {
+    _brokerURL = brokerURL;
   }
 
   public boolean shouldStartBroker() {
