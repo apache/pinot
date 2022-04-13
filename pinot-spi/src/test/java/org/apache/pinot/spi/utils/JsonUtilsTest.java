@@ -275,14 +275,16 @@ public class JsonUtilsTest {
 
   @Test
   public void testUnparseableJson() throws Exception {
-    String inputJsonMissingProp = "{\"primitiveIntegerField\": 123, \"missingProp\": 567, \"missingObjectProp\": {\"somestuff\": \"data\", \"somemorestuff\":\"moredata\"},  \"classField\": {\"internalIntField\": 12, \"internalMissingField\": \"somedata\"}}";
+    String inputJsonMissingProp = "{\"primitiveIntegerField\": 123, \"missingProp\": 567,"
+        + " \"missingObjectProp\": {\"somestuff\": \"data\", \"somemorestuff\":\"moredata\"},"
+        + "  \"classField\": {\"internalIntField\": 12, \"internalMissingField\": \"somedata\"}}";
     JsonUtils.JsonPojoWithUnparsableProps<TestClass>
-        jsonPojoWithUnparsableProps = JsonUtils.stringToObjectAndUnparseableProps(inputJsonMissingProp, TestClass.class);
+        parsedResp = JsonUtils.stringToObjectAndUnparseableProps(inputJsonMissingProp, TestClass.class);
 
-    Assert.assertTrue(jsonPojoWithUnparsableProps._unparseableProps.containsKey("/missingProp"));
-    Assert.assertTrue(jsonPojoWithUnparsableProps._unparseableProps.containsKey("/missingObjectProp/somestuff"));
-    Assert.assertTrue(jsonPojoWithUnparsableProps._unparseableProps.containsKey("/missingObjectProp/somemorestuff"));
-    Assert.assertTrue(jsonPojoWithUnparsableProps._unparseableProps.containsKey("/classField/internalMissingField"));
+    Assert.assertTrue(parsedResp._unparseableProps.containsKey("/missingProp"));
+    Assert.assertTrue(parsedResp._unparseableProps.containsKey("/missingObjectProp/somestuff"));
+    Assert.assertTrue(parsedResp._unparseableProps.containsKey("/missingObjectProp/somemorestuff"));
+    Assert.assertTrue(parsedResp._unparseableProps.containsKey("/classField/internalMissingField"));
   }
 
   @Test

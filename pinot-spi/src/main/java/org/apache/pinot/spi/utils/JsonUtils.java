@@ -89,14 +89,15 @@ public class JsonUtils {
   public static final ObjectWriter DEFAULT_WRITER = DEFAULT_MAPPER.writer();
   public static final ObjectWriter DEFAULT_PRETTY_WRITER = DEFAULT_MAPPER.writerWithDefaultPrettyPrinter();
   private static final TypeReference<HashMap<String, Object>> GENERIC_JSON_TYPE =
-      new TypeReference<HashMap<String, Object>>() {};
+      new TypeReference<HashMap<String, Object>>() { };
 
   public static <T> T stringToObject(String jsonString, Class<T> valueType)
       throws IOException {
     return DEFAULT_READER.forType(valueType).readValue(jsonString);
   }
 
-  public static <T> JsonPojoWithUnparsableProps<T> stringToObjectAndUnparseableProps(String jsonString, Class<T> klass) throws IOException {
+  public static <T> JsonPojoWithUnparsableProps<T> stringToObjectAndUnparseableProps(String jsonString, Class<T> klass)
+      throws IOException {
     T instance = DEFAULT_READER.forType(klass).readValue(jsonString);
 
     String instanceJson = DEFAULT_MAPPER.writeValueAsString(instance);

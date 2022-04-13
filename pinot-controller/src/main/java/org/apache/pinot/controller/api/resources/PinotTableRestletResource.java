@@ -503,7 +503,8 @@ public class PinotTableRestletResource {
       String msg = String.format("Invalid table config json string: %s", tableConfigStr);
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
-    String validationResponse = validateConfig(tableConfig._obj, _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig._obj), typesToSkip);
+    String validationResponse = validateConfig(tableConfig._obj,
+        _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig._obj), typesToSkip);
     return new ConfigValidationResponse(validationResponse, tableConfig._unparseableProps);
   }
 
