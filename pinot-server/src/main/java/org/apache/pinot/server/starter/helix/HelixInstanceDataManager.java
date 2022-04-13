@@ -251,6 +251,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   public void reloadAllSegments(String tableNameWithType, boolean forceDownload,
       SegmentRefreshSemaphore segmentRefreshSemaphore)
       throws Exception {
+    long startTime = System.currentTimeMillis();
     LOGGER.info("Reloading all segments in table: {}", tableNameWithType);
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkNotNull(tableConfig);
@@ -283,7 +284,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
           String.format("Failed to reload %d/%d segments: %s in table: %s", failedSegments.size(),
               segmentsMetadata.size(), failedSegments, tableNameWithType), sampleException.get());
     }
-    LOGGER.info("Reloaded all segments in table: {}", tableNameWithType);
+    LOGGER.info("Reloaded all segments in table: {}. Duration: {}ms", tableNameWithType,
+        (System.currentTimeMillis() - startTime));
   }
 
   private void reloadSegment(String tableNameWithType, SegmentMetadata segmentMetadata, TableConfig tableConfig,
