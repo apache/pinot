@@ -39,7 +39,7 @@ public class ProtoSerializationUtils {
   public static void fromObjectField(Object object, Plan.ObjectField objectField) {
     Map<String, Plan.MemberVariableField> memberVariablesMap = objectField.getMemberVariablesMap();
     try {
-      for (var e : memberVariablesMap.entrySet()) {
+      for (Map.Entry<String, Plan.MemberVariableField> e : memberVariablesMap.entrySet()) {
         Object memberVarObject = constructMemberVariable(e.getValue());
         if (memberVarObject != null) {
           Field declaredField = object.getClass().getDeclaredField(e.getKey());
@@ -60,7 +60,7 @@ public class ProtoSerializationUtils {
       builder.putMemberVariables(ENUM_VALUE_KEY, serializeMemberVariable(((Enum) object).name()));
     } else {
       try {
-        for (var field : object.getClass().getDeclaredFields()) {
+        for (Field field : object.getClass().getDeclaredFields()) {
           field.setAccessible(true);
           Object fieldObject = field.get(object);
           builder.putMemberVariables(field.getName(), serializeMemberVariable(fieldObject));
@@ -121,7 +121,7 @@ public class ProtoSerializationUtils {
   private static Plan.ListField serializeListMemberVariable(Object fieldObject) {
     Preconditions.checkState(fieldObject instanceof List);
     Plan.ListField.Builder builder = Plan.ListField.newBuilder();
-    for (var e : (List) fieldObject) {
+    for (Object e : (List) fieldObject) {
       builder.addContent(serializeMemberVariable(e));
     }
     return builder.build();
@@ -131,7 +131,7 @@ public class ProtoSerializationUtils {
     Preconditions.checkState(fieldObject instanceof Map);
     Plan.MapField.Builder builder = Plan.MapField.newBuilder();
     Set<Map.Entry<String, Object>> entrySet = ((Map) fieldObject).entrySet();
-    for (var e : entrySet) {
+    for (Map.Entry<String, Object> e : entrySet) {
       builder.putContent(e.getKey(), serializeMemberVariable(e.getValue()));
     }
     return builder.build();
@@ -177,7 +177,7 @@ public class ProtoSerializationUtils {
 
   private static List constructList(Plan.ListField listField) {
     List list = new ArrayList();
-    for (var e : listField.getContentList()) {
+    for (Plan.MemberVariableField e : listField.getContentList()) {
       list.add(constructMemberVariable(e));
     }
     return list;
@@ -185,7 +185,7 @@ public class ProtoSerializationUtils {
 
   private static Object constructMap(Plan.MapField mapField) {
     Map map = new HashMap();
-    for (var e : mapField.getContentMap().entrySet()) {
+    for (Map.Entry<String, Plan.MemberVariableField> e : mapField.getContentMap().entrySet()) {
       map.put(e.getKey(), constructMemberVariable(e.getValue()));
     }
     return map;
