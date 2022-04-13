@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
@@ -144,7 +145,8 @@ public class PerfBenchmarkDriver {
     }
 
     // Init broker.
-    _brokerBaseApiUrl = "http://" + _conf.getBrokerHost() + ":" + _conf.getBrokerPort();
+    _brokerBaseApiUrl = StringUtils.isNotBlank(_conf.getBrokerURL()) ? _conf.getBrokerURL()
+        : "http://" + _conf.getBrokerHost() + ":" + _conf.getBrokerPort();
 
     // Init server.
     String serverInstanceName = _conf.getServerInstanceName();
