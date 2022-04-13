@@ -18,18 +18,21 @@
  */
 package org.apache.pinot.core.common.evaluators;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.DoubleNode;
+import com.fasterxml.jackson.databind.node.FloatNode;
+import com.fasterxml.jackson.databind.node.IntNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.LongNode;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.InvalidPathException;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.ParseContext;
-import com.jayway.jsonpath.spi.json.JacksonJsonNodeJsonProvider;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
-import java.math.BigDecimal;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.JsonPathCache;
@@ -47,11 +50,8 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
       .setNodeFactory(JsonNodeFactory.withExactBigDecimals(true))
       .configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true);
 
-  private static final ParseContext JSON_PARSER_CONTEXT = JsonPath.using(
-      new Configuration.ConfigurationBuilder().jsonProvider(new JacksonJsonProvider())
-          .mappingProvider(new JacksonMappingProvider()).options(Option.SUPPRESS_EXCEPTIONS).build());
   private static final ParseContext JSON_PARSER_CONTEXT_WITH_EXACT_BIG_DECIMAL = JsonPath.using(
-      new Configuration.ConfigurationBuilder().jsonProvider(new JacksonJsonNodeJsonProvider(
+      new Configuration.ConfigurationBuilder().jsonProvider(new JacksonJsonProvider(
               OBJECT_MAPPER_WITH_EXACT_BIG_DECIMAL))
           .mappingProvider(new JacksonMappingProvider()).options(Option.SUPPRESS_EXCEPTIONS).build());
 
@@ -210,54 +210,29 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
   }
 
   public <T extends ForwardIndexReaderContext> void evaluateBlock(int[] docIds, int length,
-      ForwardIndexReader<T> reader, T context, Dictionary dictionary, int[] dictIdsBuffer, String[] valueBuffer,
-      boolean parseExactBigDecimal) {
+      ForwardIndexReader<T> reader, T context, Dictionary dictionary, int[] dictIdsBuffer, String[] valueBuffer) {
     if (reader.isDictionaryEncoded()) {
       reader.readDictIds(docIds, length, dictIdsBuffer, context);
       if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
-        if (parseExactBigDecimal) {
-          for (int i = 0; i < length; i++) {
-            processValue(i, extractFromBytesWithExactBigDecimal(dictionary, dictIdsBuffer[i]), valueBuffer);
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
-            processValue(i, extractFromBytes(dictionary, dictIdsBuffer[i]), valueBuffer);
-          }
+        for (int i = 0; i < length; i++) {
+          processValue(i, extractFromBytes(dictionary, dictIdsBuffer[i]), valueBuffer);
         }
       } else {
-        if (parseExactBigDecimal) {
-          for (int i = 0; i < length; i++) {
-            processValue(i, extractFromStringWithExactBigDecimal(dictionary, dictIdsBuffer[i]), valueBuffer);
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
-            processValue(i, extractFromString(dictionary, dictIdsBuffer[i]), valueBuffer);
-          }
+        for (int i = 0; i < length; i++) {
+          processValue(i, extractFromString(dictionary, dictIdsBuffer[i]), valueBuffer);
         }
       }
     } else {
       switch (reader.getValueType()) {
         case JSON:
         case STRING:
-          if (parseExactBigDecimal) {
-            for (int i = 0; i < length; i++) {
-              processValue(i, extractFromStringWithExactBigDecimal(reader, context, docIds[i]), valueBuffer);
-            }
-          } else {
-            for (int i = 0; i < length; i++) {
-              processValue(i, extractFromString(reader, context, docIds[i]), valueBuffer);
-            }
+          for (int i = 0; i < length; i++) {
+            processValue(i, extractFromString(reader, context, docIds[i]), valueBuffer);
           }
           break;
         case BYTES:
-          if (parseExactBigDecimal) {
-            for (int i = 0; i < length; i++) {
-              processValue(i, extractFromBytesWithExactBigDecimal(reader, context, docIds[i]), valueBuffer);
-            }
-          } else {
-            for (int i = 0; i < length; i++) {
-              processValue(i, extractFromBytes(reader, context, docIds[i]), valueBuffer);
-            }
+          for (int i = 0; i < length; i++) {
+            processValue(i, extractFromBytes(reader, context, docIds[i]), valueBuffer);
           }
           break;
         default:
@@ -427,38 +402,20 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
   }
 
   private <T> T extractFromBytes(Dictionary dictionary, int dictId) {
-    return JSON_PARSER_CONTEXT.parseUtf8(dictionary.getBytesValue(dictId)).read(_jsonPath);
+    return JSON_PARSER_CONTEXT_WITH_EXACT_BIG_DECIMAL.parseUtf8(dictionary.getBytesValue(dictId)).read(_jsonPath);
   }
 
   private <T, R extends ForwardIndexReaderContext> T extractFromBytes(ForwardIndexReader<R> reader, R context,
       int docId) {
-    return JSON_PARSER_CONTEXT.parseUtf8(reader.getBytes(docId, context)).read(_jsonPath);
-  }
-
-  private <T> T extractFromBytesWithExactBigDecimal(Dictionary dictionary, int dictId) {
-    return JSON_PARSER_CONTEXT_WITH_EXACT_BIG_DECIMAL.parseUtf8(dictionary.getBytesValue(dictId)).read(_jsonPath);
-  }
-
-  private <R extends ForwardIndexReaderContext> BigDecimal extractFromBytesWithExactBigDecimal(
-      ForwardIndexReader<R> reader, R context, int docId) {
     return JSON_PARSER_CONTEXT_WITH_EXACT_BIG_DECIMAL.parseUtf8(reader.getBytes(docId, context)).read(_jsonPath);
   }
 
   private <T> T extractFromString(Dictionary dictionary, int dictId) {
-    return JSON_PARSER_CONTEXT.parse(dictionary.getStringValue(dictId)).read(_jsonPath);
+    return JSON_PARSER_CONTEXT_WITH_EXACT_BIG_DECIMAL.parse(dictionary.getStringValue(dictId)).read(_jsonPath);
   }
 
   private <T, R extends ForwardIndexReaderContext> T extractFromString(ForwardIndexReader<R> reader, R context,
       int docId) {
-    return JSON_PARSER_CONTEXT.parseUtf8(reader.getBytes(docId, context)).read(_jsonPath);
-  }
-
-  private <T> T extractFromStringWithExactBigDecimal(Dictionary dictionary, int dictId) {
-    return JSON_PARSER_CONTEXT_WITH_EXACT_BIG_DECIMAL.parse(dictionary.getStringValue(dictId)).read(_jsonPath);
-  }
-
-  private <R extends ForwardIndexReaderContext> BigDecimal extractFromStringWithExactBigDecimal(
-      ForwardIndexReader<R> reader, R context, int docId) {
     return JSON_PARSER_CONTEXT_WITH_EXACT_BIG_DECIMAL.parseUtf8(reader.getBytes(docId, context)).read(_jsonPath);
   }
 

@@ -328,14 +328,14 @@ public class IntermediateResultsBlock implements Block {
   private DataTable getResultDataTable()
       throws IOException {
     DataTableBuilder dataTableBuilder = new DataTableBuilder(_dataSchema);
-    ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
+    ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     Iterator<Record> iterator = _table.iterator();
     while (iterator.hasNext()) {
       Record record = iterator.next();
       dataTableBuilder.startRow();
       int columnIndex = 0;
       for (Object value : record.getValues()) {
-        setDataTableColumn(columnDataTypes[columnIndex], dataTableBuilder, columnIndex, value);
+        setDataTableColumn(storedColumnDataTypes[columnIndex], dataTableBuilder, columnIndex, value);
         columnIndex++;
       }
       dataTableBuilder.finishRow();
@@ -348,12 +348,10 @@ public class IntermediateResultsBlock implements Block {
       Object value)
       throws IOException {
     switch (columnDataType) {
-      case BOOLEAN:
       case INT:
         dataTableBuilder.setColumn(columnIndex, (int) value);
         break;
       case LONG:
-      case TIMESTAMP:
         dataTableBuilder.setColumn(columnIndex, (long) value);
         break;
       case FLOAT:
@@ -366,7 +364,6 @@ public class IntermediateResultsBlock implements Block {
         dataTableBuilder.setColumn(columnIndex, (String) value);
         break;
       case BYTES:
-      case BIG_DECIMAL:
         dataTableBuilder.setColumn(columnIndex, (ByteArray) value);
         break;
       case OBJECT:

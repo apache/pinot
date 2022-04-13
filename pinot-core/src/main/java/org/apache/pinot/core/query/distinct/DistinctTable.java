@@ -253,13 +253,13 @@ public class DistinctTable {
       throws IOException {
     // NOTE: Serialize the DistinctTable as a DataTable
     DataTableBuilder dataTableBuilder = new DataTableBuilder(_dataSchema);
-    ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
-    int numColumns = columnDataTypes.length;
+    ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
+    int numColumns = storedColumnDataTypes.length;
     for (Record record : _records) {
       dataTableBuilder.startRow();
       Object[] values = record.getValues();
       for (int i = 0; i < numColumns; i++) {
-        switch (columnDataTypes[i].getStoredType()) {
+        switch (storedColumnDataTypes[i]) {
           case INT:
             dataTableBuilder.setColumn(i, (int) values[i]);
             break;
@@ -297,13 +297,13 @@ public class DistinctTable {
     DataTable dataTable = DataTableFactory.getDataTable(byteBuffer);
     DataSchema dataSchema = dataTable.getDataSchema();
     int numRecords = dataTable.getNumberOfRows();
-    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
-    int numColumns = columnDataTypes.length;
+    ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
+    int numColumns = storedColumnDataTypes.length;
     List<Record> records = new ArrayList<>(numRecords);
     for (int i = 0; i < numRecords; i++) {
       Object[] values = new Object[numColumns];
       for (int j = 0; j < numColumns; j++) {
-        switch (columnDataTypes[j].getStoredType()) {
+        switch (storedColumnDataTypes[j]) {
           case INT:
             values[j] = dataTable.getInt(i, j);
             break;

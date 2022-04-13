@@ -20,16 +20,13 @@ package org.apache.pinot.core.operator.transform.function;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.DecimalNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.ParseContext;
-import com.jayway.jsonpath.spi.json.JacksonJsonNodeJsonProvider;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.JsonPathCache;
@@ -64,7 +61,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       .configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true);
 
   private static final ParseContext JSON_PARSER_CONTEXT_WITH_EXACT_BIG_DECIMAL = JsonPath.using(
-      new Configuration.ConfigurationBuilder().jsonProvider(new JacksonJsonNodeJsonProvider(
+      new Configuration.ConfigurationBuilder().jsonProvider(new JacksonJsonProvider(
               OBJECT_MAPPER_WITH_EXACT_BIG_DECIMAL))
           .mappingProvider(new JacksonMappingProvider()).options(Option.SUPPRESS_EXCEPTIONS).build());
 
@@ -295,50 +292,6 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
-    if (_bigDecimalValuesSV == null || _bigDecimalValuesSV.length < numDocs) {
-      _bigDecimalValuesSV = new BigDecimal[numDocs];
-    }
-    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
-      ((PushDownTransformFunction) _jsonFieldTransformFunction)
-          .transformToBigDecimalValuesSV(projectionBlock, _jsonPathEvaluator, _bigDecimalValuesSV);
-      return _bigDecimalValuesSV;
-    }
-    return transformTransformedValuesToBigDecimalValuesSV(projectionBlock);
-  }
-
-  private BigDecimal[] transformTransformedValuesToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
-    // operating on the output of another transform so can't pass the evaluation down to the storage
-    ensureJsonPathCompiled();
-    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
-    int numDocs = projectionBlock.getNumDocs();
-    for (int i = 0; i < numDocs; i++) {
-      Object result = null;
-      try {
-        result = JSON_PARSER_CONTEXT_WITH_EXACT_BIG_DECIMAL.parse(jsonStrings[i]).read(_jsonPath);
-      } catch (Exception ignored) {
-      }
-      if (result == null) {
-        if (_defaultValue != null) {
-          _bigDecimalValuesSV[i] = (BigDecimal) _defaultValue;
-          continue;
-        }
-        throw new RuntimeException(
-            String.format("Illegal Json Path: [%s], when reading [%s]", _jsonPathString, jsonStrings[i]));
-      }
-      if (result instanceof DecimalNode) {
-        _bigDecimalValuesSV[i] = ((DecimalNode) result).decimalValue();
-      } else if (result instanceof Number) {
-        _bigDecimalValuesSV[i] = (BigDecimal) result;
-      } else {
-        _bigDecimalValuesSV[i] = new BigDecimal(result.toString());
-      }
-    }
-    return _bigDecimalValuesSV;
-  }
-
-  @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
     if (_stringValuesSV == null || _stringValuesSV.length < numDocs) {
@@ -360,7 +313,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     for (int i = 0; i < numDocs; i++) {
       Object result = null;
       try {
-        result = JSON_PARSER_CONTEXT.parse(jsonStrings[i]).read(_jsonPath);
+        result = JSON_PARSER_CONTEXT_WITH_EXACT_BIG_DECIMAL.parse(jsonStrings[i]).read(_jsonPath);
       } catch (Exception ignored) {
       }
       if (result == null) {

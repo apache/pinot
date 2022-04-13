@@ -212,18 +212,6 @@ public class LiteralTransformFunction implements TransformFunction {
   }
 
   @Override
-  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
-    BigDecimal[] bigDecimalResult = _bigDecimalResult;
-    if (bigDecimalResult == null || bigDecimalResult.length < numDocs) {
-      bigDecimalResult = new BigDecimal[numDocs];
-      Arrays.fill(bigDecimalResult, _bigDecimalLiteral);
-      _bigDecimalResult = bigDecimalResult;
-    }
-    return bigDecimalResult;
-  }
-
-  @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
     String[] stringResult = _stringResult;

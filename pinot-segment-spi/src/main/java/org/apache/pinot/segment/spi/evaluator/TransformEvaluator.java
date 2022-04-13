@@ -84,10 +84,9 @@ public interface TransformEvaluator {
    * @param context the reader context
    * @param valueBuffer the values to fill
    * @param <T> type of the reader context
-   * @param parseExactBigDecimal parse exact big decimal values
    */
   <T extends ForwardIndexReaderContext> void evaluateBlock(int[] docIds, int length, ForwardIndexReader<T> reader,
-      T context, Dictionary dictionary, int[] dictIdBuffer, String[] valueBuffer, boolean parseExactBigDecimal);
+      T context, Dictionary dictionary, int[] dictIdBuffer, String[] valueBuffer);
 
   /**
    * Evaluate the JSON path and fill the value buffer

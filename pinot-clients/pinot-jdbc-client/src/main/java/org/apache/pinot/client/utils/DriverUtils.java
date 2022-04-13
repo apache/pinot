@@ -98,6 +98,9 @@ public class DriverUtils {
       case "DOUBLE":
         columnsSQLDataType = Types.DOUBLE;
         break;
+      case "BIG_DECIMAL":
+        columnsSQLDataType = Types.DECIMAL;
+        break;
       case "BOOLEAN":
         columnsSQLDataType = Types.BOOLEAN;
         break;
@@ -136,7 +139,6 @@ public class DriverUtils {
         columnsJavaClassName = Double.class.getTypeName();
         break;
       case "BIG_DECIMAL":
-      case "BIGDECIMAL":
         columnsJavaClassName = BigDecimal.class.getTypeName();
         break;
       case "BOOLEAN":

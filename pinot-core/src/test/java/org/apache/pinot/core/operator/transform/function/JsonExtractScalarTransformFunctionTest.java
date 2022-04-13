@@ -74,9 +74,15 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
           }
           break;
         case BIG_DECIMAL:
-          BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+          // JsonExtractScalarTransformFunction, PushDownTransformFunction, and many other transforms don't override
+          // `transformToBytesValuesSV` from `BaseTransformFunction`. Also, `ProjectionBlock` and `DataBlockCache`
+          // don't implement a method that takes TransformEvaluator and fill bytes values:
+          //     `fillValues(ProjectionBlock, TransformEvaluator, byte[][])`.
+          // Also, JsonExtractScalarTransformFunction utilizes DefaultJsonPathEvaluator which uses StringDictionary.
+          // This is why we call here: transformToStringValuesSV().
+          String[] bigDecimalStrValues = transformFunction.transformToStringValuesSV(_projectionBlock);
           for (int i = 0; i < NUM_ROWS; i++) {
-            Assert.assertEquals(bigDecimalValues[i].compareTo(_bigDecimalSVValues[i]), 0);
+            Assert.assertEquals(new BigDecimal(bigDecimalStrValues[i]).compareTo(_bigDecimalSVValues[i]), 0);
           }
           break;
         case STRING:
@@ -150,7 +156,7 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
             Assert.assertEquals(_intMVValues[i][j], ((List) resultMap.get(0).get("intMV")).get(j));
           }
           Assert.assertEquals(_longSVValues[i], resultMap.get(0).get("longSV"));
-          Assert.assertEquals(Float.compare(_floatSVValues[i], ((Double) resultMap.get(0).get("floatSV")).floatValue()),
+          Assert.assertEquals(Float.compare(_floatSVValues[i], ((Number) resultMap.get(0).get("floatSV")).floatValue()),
               0);
           // Note: some doubles are now being parsed as BigDecimals. This is backward-incompatible change.
           Assert.assertEquals(_doubleSVValues[i], resultMap.get(0).get("doubleSV"));
@@ -227,9 +233,9 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
-    BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+    String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      Assert.assertEquals(bigDecimalValues[i].compareTo(_bigDecimalSVValues[i]), 0);
+      Assert.assertEquals(new BigDecimal(stringValues[i]).compareTo(_bigDecimalSVValues[i]), 0);
     }
   }
 
