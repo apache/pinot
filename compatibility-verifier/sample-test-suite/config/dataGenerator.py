@@ -21,6 +21,9 @@ import random
 import csv
 import string
 
+'''Script used for one time random generation of test data FeatureTest3-data-realtime-00.csv, 
+   do not use for adding new columns in existing dataset. Left this here for future reference. '''
+
 class DataGenerator:
 
     def __init__(self):
