@@ -56,6 +56,4 @@ operations:
     description: Run query on FeatureTest3 using SQL
     queryFileName: queries/feature-test-3-sql-realtime.queries
     expectedResultsFileName: query-results/feature-test-3-sql-realtime.results
-    shouldCompareNumEntriesScannedInFilter: true
-    shouldCompareNumConsumingSegmentsQueried: true
-    shouldRunAllGenerations: true
+
