@@ -20,6 +20,8 @@ package org.apache.pinot.integration.tests;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -84,15 +86,21 @@ public class ChaosMonkeyIntegrationTest {
   }
 
   private int getProcessPid(Process process) {
-    Class<? extends Process> clazz = process.getClass();
     try {
-      Field field = clazz.getDeclaredField("pid");
-      field.setAccessible(true);
-      return field.getInt(process);
-    } catch (NoSuchFieldException e) {
-      return -1;
-    } catch (IllegalAccessException e) {
-      return -1;
+      Class<?> processHandle =
+          Class.forName("java.lang.ProcessHandle", false, ChaosMonkeyIntegrationTest.class.getClassLoader());
+      return (int) MethodHandles.lookup().findStatic(processHandle, "pid", MethodType.methodType(long.class))
+          .invoke();
+    } catch (Throwable t) {
+      LOGGER.warn("failed to invoke java.lang.ProcessHandle#pid - running on JDK8?", t);
+      Class<? extends Process> clazz = process.getClass();
+      try {
+        Field field = clazz.getDeclaredField("pid");
+        field.setAccessible(true);
+        return field.getInt(process);
+      } catch (NoSuchFieldException | IllegalAccessException e) {
+        return -1;
+      }
     }
   }
 
