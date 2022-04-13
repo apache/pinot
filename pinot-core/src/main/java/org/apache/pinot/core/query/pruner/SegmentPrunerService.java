@@ -24,6 +24,8 @@ import org.apache.pinot.core.query.config.SegmentPrunerConfig;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.trace.InvocationScope;
+import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,8 +61,14 @@ public class SegmentPrunerService {
    * Prunes the segments based on the query request, returns the segments that are not pruned.
    */
   public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query) {
-    for (SegmentPruner segmentPruner : _segmentPruners) {
-      segments = segmentPruner.prune(segments, query);
+    try (InvocationScope scope = Tracing.getTracer().createScope(SegmentPrunerService.class)) {
+      scope.setNumChildren(_segmentPruners.size());
+      for (SegmentPruner segmentPruner : _segmentPruners) {
+        try (InvocationScope prunerScope = Tracing.getTracer().createScope(segmentPruner.getClass())) {
+          prunerScope.setNumSegments(segments.size());
+          segments = segmentPruner.prune(segments, query);
+        }
+      }
     }
     return segments;
   }
