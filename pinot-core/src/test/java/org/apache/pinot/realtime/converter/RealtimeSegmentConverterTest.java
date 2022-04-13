@@ -123,8 +123,8 @@ public class RealtimeSegmentConverterTest {
     segmentZKPropsConfig.setStartOffset("1");
     segmentZKPropsConfig.setEndOffset("100");
     RealtimeSegmentConverter converter =
-        new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(),
-            schema, tableNameWithType, tableConfig, segmentName, indexingConfig.getSortedColumn().get(0),
+        new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
+            tableNameWithType, tableConfig, segmentName, indexingConfig.getSortedColumn().get(0),
             indexingConfig.getInvertedIndexColumns(), null, null, indexingConfig.getNoDictionaryColumns(),
             indexingConfig.getVarLengthDictionaryColumns(), false);
 
@@ -135,8 +135,10 @@ public class RealtimeSegmentConverterTest {
     Assert.assertEquals(metadata.getTimeUnit(), TimeUnit.MILLISECONDS);
     Assert.assertEquals(metadata.getStartTime(), metadata.getEndTime());
     Assert.assertTrue(metadata.getAllColumns().containsAll(schema.getColumnNames()));
-    Assert.assertEquals(metadata.getPropertiesConfiguration().getProperty(CommonConstants.Segment.Realtime.START_OFFSET), "1");
-    Assert.assertEquals(metadata.getPropertiesConfiguration().getProperty(CommonConstants.Segment.Realtime.END_OFFSET), "100");
+    Assert.assertEquals(
+        metadata.getPropertiesConfiguration().getProperty(CommonConstants.Segment.Realtime.START_OFFSET), "1");
+    Assert.assertEquals(metadata.getPropertiesConfiguration().getProperty(CommonConstants.Segment.Realtime.END_OFFSET),
+        "100");
   }
 
   private SegmentZKMetadata getSegmentZKMetadata(String segmentName) {
