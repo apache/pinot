@@ -22,14 +22,14 @@
  * DO NOT EDIT UNLESS YOU ARE SURE THAT YOU KNOW WHAT YOU ARE DOING
  *  @generated
  */
-package org.apache.pinot.query.planner.nodes;
+package org.apache.pinot.query.planner.nodes.serde;
 
 import org.apache.pinot.common.proto.Plan;
 
 
 public interface ProtoSerializable {
 
-  void setFields(Plan.ObjectFields objFields);
+  void setObjectField(Plan.ObjectField objFields);
 
-  Plan.ObjectFields getFields();
+  Plan.ObjectField getObjectField();
 }

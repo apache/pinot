@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.query.planner.nodes;
 
-import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.common.proto.Plan;
 
 
 public class TableScanNode extends AbstractStageNode {
@@ -43,26 +41,5 @@ public class TableScanNode extends AbstractStageNode {
 
   public List<String> getTableScanColumns() {
     return _tableScanColumns;
-  }
-
-  @Override
-  public void setFields(Plan.ObjectFields objFields) {
-    _tableName = objFields.getLiteralFieldOrThrow("tableName").getStringField();
-    _tableScanColumns = new ArrayList<>();
-    for (Plan.LiteralField literalField : objFields.getListFieldsOrThrow("columns").getLiteralsList()) {
-      _tableScanColumns.add(literalField.getStringField());
-    }
-  }
-
-  @Override
-  public Plan.ObjectFields getFields() {
-    Plan.ListField.Builder listBuilder = Plan.ListField.newBuilder();
-    for (String column : _tableScanColumns) {
-      listBuilder.addLiterals(SerDeUtils.stringField(column));
-    }
-    return Plan.ObjectFields.newBuilder()
-        .putLiteralField("tableName", SerDeUtils.stringField(_tableName))
-        .putListFields("columns", listBuilder.build())
-        .build();
   }
 }

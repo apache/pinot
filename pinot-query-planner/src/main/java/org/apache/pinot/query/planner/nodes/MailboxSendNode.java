@@ -19,7 +19,6 @@
 package org.apache.pinot.query.planner.nodes;
 
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.pinot.common.proto.Plan;
 
 
 public class MailboxSendNode extends AbstractStageNode {
@@ -42,19 +41,5 @@ public class MailboxSendNode extends AbstractStageNode {
 
   public RelDistribution.Type getExchangeType() {
     return _exchangeType;
-  }
-
-  @Override
-  public void setFields(Plan.ObjectFields objFields) {
-    _receiverStageId = objFields.getLiteralFieldOrThrow("receivingStageId").getIntField();
-    _exchangeType = RelDistribution.Type.valueOf(objFields.getLiteralFieldOrThrow("exchangeType").getStringField());
-  }
-
-  @Override
-  public Plan.ObjectFields getFields() {
-    return Plan.ObjectFields.newBuilder()
-        .putLiteralField("receivingStageId", SerDeUtils.intField(_receiverStageId))
-        .putLiteralField("exchangeType", SerDeUtils.stringField(_exchangeType.name()))
-        .build();
   }
 }

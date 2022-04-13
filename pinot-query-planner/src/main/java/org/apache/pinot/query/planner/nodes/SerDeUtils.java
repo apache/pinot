@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.planner.nodes;
 
-import com.google.protobuf.ByteString;
 import org.apache.pinot.common.proto.Plan;
 
 
@@ -29,7 +28,7 @@ public final class SerDeUtils {
 
   public static AbstractStageNode deserializeStageNode(Plan.StageNode protoNode) {
     AbstractStageNode stageNode = newNodeInstance(protoNode.getNodeName(), protoNode.getStageId());
-    stageNode.setFields(protoNode.getFields());
+    stageNode.setObjectField(protoNode.getObjectField());
     for (Plan.StageNode protoChild : protoNode.getInputsList()) {
       stageNode.addInput(deserializeStageNode(protoChild));
     }
@@ -40,35 +39,11 @@ public final class SerDeUtils {
     Plan.StageNode.Builder builder = Plan.StageNode.newBuilder()
         .setStageId(stageNode.getStageId())
         .setNodeName(stageNode.getClass().getSimpleName())
-        .setFields(stageNode.getFields());
+        .setObjectField(stageNode.getObjectField());
     for (StageNode childNode : stageNode.getInputs()) {
       builder.addInputs(serializeStageNode((AbstractStageNode) childNode));
     }
     return builder.build();
-  }
-
-  public static Plan.LiteralField boolField(boolean val) {
-    return Plan.LiteralField.newBuilder().setBoolField(val).build();
-  }
-
-  public static Plan.LiteralField intField(int val) {
-    return Plan.LiteralField.newBuilder().setIntField(val).build();
-  }
-
-  public static Plan.LiteralField longField(long val) {
-    return Plan.LiteralField.newBuilder().setLongField(val).build();
-  }
-
-  public static Plan.LiteralField doubleField(double val) {
-    return Plan.LiteralField.newBuilder().setDoubleField(val).build();
-  }
-
-  public static Plan.LiteralField stringField(String val) {
-    return Plan.LiteralField.newBuilder().setStringField(val).build();
-  }
-
-  public static Plan.LiteralField bytesField(byte[] val) {
-    return Plan.LiteralField.newBuilder().setBytesField(ByteString.copyFrom(val)).build();
   }
 
   private static AbstractStageNode newNodeInstance(String nodeName, int stageId) {

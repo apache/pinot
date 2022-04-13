@@ -43,13 +43,24 @@ message StageNode {
   int32 stageId = 1;
   string nodeName = 2;
   repeated StageNode inputs = 3;
-  ObjectFields fields = 4;
+  ObjectField objectField = 4;
 }
 
-message ObjectFields {
-  map<string, LiteralField> literalField = 1;
-  map<string, ListField> listFields = 2;
-  map<string, MapField> mapFields = 3;
+// MemberVariableField defines the serialized format of the member variable
+message MemberVariableField {
+  oneof member_variable_field {
+    LiteralField literalField = 1;
+    ListField listField = 2;
+    MapField mapField = 3;
+    ObjectField objectField = 4;
+  }
+}
+
+message ObjectField {
+  // clazz of the object defined.
+  string objectClassName = 1;
+  // map from member variable name to the member variable field definition
+  map<string, MemberVariableField> memberVariables = 2;
 }
 
 message LiteralField {
@@ -59,16 +70,13 @@ message LiteralField {
     int64 longField = 3;
     double doubleField = 4;
     string stringField = 5;
-    bytes bytesField = 6;
   }
 }
 
 message ListField {
-  repeated ObjectFields objects = 1;
-  repeated LiteralField literals = 2;
+  repeated MemberVariableField content = 1;
 }
 
 message MapField {
-  map<string, ObjectFields> objects = 1;
-  map<string, ObjectFields> literals = 2;
+  map<string, MemberVariableField> content = 1;
 }
