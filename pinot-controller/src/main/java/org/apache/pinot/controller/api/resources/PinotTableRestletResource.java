@@ -492,18 +492,19 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Validate table config for a table",
       notes = "This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
           + " This allows us to validate table config before apply.")
-  public String checkTableConfig(
+  public ConfigValidationResponse checkTableConfig(
       String tableConfigStr,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip) {
-    TableConfig tableConfig;
+    JsonUtils.JsonPojoWithUnparsableProps<TableConfig> tableConfig;
     try {
-      tableConfig = JsonUtils.stringToObject(tableConfigStr, TableConfig.class);
+      tableConfig = JsonUtils.stringToObjectAndUnparseableProps(tableConfigStr, TableConfig.class);
     } catch (IOException e) {
       String msg = String.format("Invalid table config json string: %s", tableConfigStr);
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
-    return validateConfig(tableConfig, _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig), typesToSkip);
+    String validationResponse = validateConfig(tableConfig._obj, _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig._obj), typesToSkip);
+    return new ConfigValidationResponse(validationResponse, tableConfig._unparseableProps);
   }
 
   @Deprecated

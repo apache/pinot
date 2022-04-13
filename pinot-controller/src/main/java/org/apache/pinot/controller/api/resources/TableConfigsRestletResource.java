@@ -357,17 +357,18 @@ public class TableConfigsRestletResource {
   @Path("/tableConfigs/validate")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Validate the TableConfigs", notes = "Validate the TableConfigs")
-  public String validateConfig(String tableConfigsStr,
+  public ConfigValidationResponse validateConfig(String tableConfigsStr,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip) {
-    TableConfigs tableConfigs;
+    JsonUtils.JsonPojoWithUnparsableProps<TableConfigs> tableConfigs;
     try {
-      tableConfigs = JsonUtils.stringToObject(tableConfigsStr, TableConfigs.class);
+      tableConfigs = JsonUtils.stringToObjectAndUnparseableProps(tableConfigsStr, TableConfigs.class);
     } catch (IOException e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Invalid TableConfigs json string: %s", tableConfigsStr), Response.Status.BAD_REQUEST, e);
     }
-    return validateConfig(tableConfigs, typesToSkip);
+    String validationResponse = validateConfig(tableConfigs._obj, typesToSkip);
+    return new ConfigValidationResponse(validationResponse, tableConfigs._unparseableProps);
   }
 
   private void tuneConfig(TableConfig tableConfig, Schema schema) {
