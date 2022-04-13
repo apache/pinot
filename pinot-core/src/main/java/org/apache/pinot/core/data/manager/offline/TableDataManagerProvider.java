@@ -50,7 +50,8 @@ public class TableDataManagerProvider {
   }
 
   public static TableDataManager getTableDataManager(TableDataManagerConfig tableDataManagerConfig, String instanceId,
-                                                     ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager,
+                                                     ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics,
+                                                     HelixManager helixManager,
                                                      LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache) {
     TableDataManager tableDataManager;
     switch (TableType.valueOf(tableDataManagerConfig.getTableDataManagerType())) {
