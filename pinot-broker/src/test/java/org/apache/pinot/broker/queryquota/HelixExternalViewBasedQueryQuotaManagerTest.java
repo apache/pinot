@@ -31,6 +31,7 @@ import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.api.client.RealmAwareZkClient;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
@@ -112,7 +113,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
   public class FakeZKHelixAdmin extends ZKHelixAdmin {
     private Map<String, String> _instanceConfigMap;
 
-    public FakeZKHelixAdmin(ZkClient zkClient) {
+    public FakeZKHelixAdmin(RealmAwareZkClient zkClient) {
       super(zkClient);
       _instanceConfigMap = new HashMap<>();
     }
