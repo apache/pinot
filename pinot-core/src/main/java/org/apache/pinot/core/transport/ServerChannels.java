@@ -116,11 +116,9 @@ public class ServerChannels {
         .sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes, timeoutMs);
   }
 
-  /**
-   * Connects to the given server, returns {@code true} if the server is successfully connected.
-   */
-  public boolean connect(ServerRoutingInstance serverRoutingInstance) {
-    return _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new).connect();
+  public void connect(ServerRoutingInstance serverRoutingInstance)
+      throws InterruptedException, TimeoutException {
+    _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new).connect();
   }
 
   public void shutDown() {
@@ -214,20 +212,17 @@ public class ServerChannels {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_BYTES_SENT, requestBytes.length);
     }
 
-    boolean connect() {
-      try {
-        if (_channelLock.tryLock(TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
-          try {
-            connectWithoutLocking();
-            return true;
-          } finally {
-            _channelLock.unlock();
-          }
+    void connect()
+        throws InterruptedException, TimeoutException {
+      if (_channelLock.tryLock(TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+        try {
+          connectWithoutLocking();
+        } finally {
+          _channelLock.unlock();
         }
-      } catch (Exception e) {
-        // Ignored
+      } else {
+        throw new TimeoutException(CHANNEL_LOCK_TIMEOUT_MSG);
       }
-      return false;
     }
   }
 }

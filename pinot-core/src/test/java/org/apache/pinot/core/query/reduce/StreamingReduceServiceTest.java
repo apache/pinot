@@ -52,11 +52,14 @@ public class StreamingReduceServiceTest {
     // supposedly we can use TestNG's annotation like @Test(expectedExceptions = { IOException.class }) to verify
     // here we hope to verify deeper to make sure the thrown exception is nested inside the exception
     assertTrue(verifyException(() -> {
-      StreamingReduceService.processIterativeServerResponse(mock(StreamingReducer.class), threadPoolService,
-          ImmutableMap.of(routingInstance, mockedResponse), 1000,
-          mock(BaseReduceService.ExecutionStatsAggregator.class));
-      return null;
-    }, cause -> cause.getMessage().contains(exceptionMessage)));
+          StreamingReduceService.processIterativeServerResponse(mock(StreamingReducer.class),
+              threadPoolService,
+              ImmutableMap.of(routingInstance, mockedResponse),
+              1000,
+              mock(BaseReduceService.ExecutionStatsAggregator.class));
+          return null;
+        }, cause -> cause.getMessage().contains(exceptionMessage))
+    );
   }
 
   @Test
@@ -75,13 +78,17 @@ public class StreamingReduceServiceTest {
     });
     final ExecutorService threadPoolService = Executors.newFixedThreadPool(1);
     final ServerRoutingInstance routingInstance = new ServerRoutingInstance("localhost", 9527, TableType.OFFLINE);
-    // We cannot use TestNG's annotation like @Test(expectedExceptions = { IOException.class }) to verify
+    //We cannot use TestNG's annotation like @Test(expectedExceptions = { IOException.class }) to verify
     // because the Exception we hope to verify is nested inside the final exception.
     assertTrue(verifyException(() -> {
-      StreamingReduceService.processIterativeServerResponse(mock(StreamingReducer.class), threadPoolService,
-          ImmutableMap.of(routingInstance, mockedResponse), 10, mock(BaseReduceService.ExecutionStatsAggregator.class));
-      return null;
-    }, (cause) -> cause instanceof TimeoutException));
+          StreamingReduceService.processIterativeServerResponse(mock(StreamingReducer.class),
+              threadPoolService,
+              ImmutableMap.of(routingInstance, mockedResponse),
+              10,
+              mock(BaseReduceService.ExecutionStatsAggregator.class));
+          return null;
+        },
+        (cause) -> cause instanceof TimeoutException));
   }
 
   private static boolean verifyException(Callable<Void> verifyTarget, Predicate<Throwable> verifyCause) {
@@ -92,7 +99,8 @@ public class StreamingReduceServiceTest {
     try {
       verifyTarget.call();
     } catch (Exception ex) {
-      for (Throwable child = ex; child != null && child.getCause() != child && !exceptionVerified;
+      for (Throwable child = ex;
+          child != null && child.getCause() != child && !exceptionVerified;
           child = child.getCause()) {
         exceptionVerified = verifyCause.test(child);
       }

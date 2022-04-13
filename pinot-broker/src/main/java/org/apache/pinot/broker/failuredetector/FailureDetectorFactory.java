@@ -21,6 +21,7 @@ package org.apache.pinot.broker.failuredetector;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,8 +41,7 @@ public class FailureDetectorFactory {
     } else {
       LOGGER.info("Initializing failure detector with class: {}", className);
       try {
-        FailureDetector failureDetector =
-            (FailureDetector) Class.forName(className).getDeclaredConstructor().newInstance();
+        FailureDetector failureDetector = PluginManager.get().createInstance(className);
         failureDetector.init(config, brokerMetrics);
         LOGGER.info("Initialized failure detector with class: {}", className);
         return failureDetector;

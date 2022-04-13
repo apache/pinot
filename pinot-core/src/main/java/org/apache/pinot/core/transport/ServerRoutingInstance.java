@@ -21,7 +21,6 @@ package org.apache.pinot.core.transport;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.net.InternetDomainName;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.spi.config.table.TableType;
@@ -113,7 +112,7 @@ public class ServerRoutingInstance {
   public int hashCode() {
     // NOTE: Only check hostname, port and tableType for performance concern because they can identify a routing
     //       instance within the same query
-    return Objects.hash(_hostname, _port, _tableType);
+    return 31 * 31 * _hostname.hashCode() + 31 * Integer.hashCode(_port) + _tableType.hashCode();
   }
 
   @Override

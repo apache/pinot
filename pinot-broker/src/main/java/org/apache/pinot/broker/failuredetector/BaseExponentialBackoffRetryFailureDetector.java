@@ -20,9 +20,10 @@ package org.apache.pinot.broker.failuredetector;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.DelayQueue;
+import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.BrokerGauge;
@@ -39,10 +40,12 @@ import org.slf4j.LoggerFactory;
  */
 @ThreadSafe
 public abstract class BaseExponentialBackoffRetryFailureDetector implements FailureDetector {
-  protected final Logger _logger = LoggerFactory.getLogger(getClass());
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseExponentialBackoffRetryFailureDetector.class);
+
   protected final String _name = getClass().getSimpleName();
   protected final List<Listener> _listeners = new ArrayList<>();
   protected final ConcurrentHashMap<String, RetryInfo> _unhealthyServerRetryInfoMap = new ConcurrentHashMap<>();
+  protected final DelayQueue<RetryInfo> _retryInfoDelayQueue = new DelayQueue<>();
 
   protected BrokerMetrics _brokerMetrics;
   protected long _retryInitialDelayNs;
@@ -62,8 +65,8 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
         Broker.FailureDetector.DEFAULT_RETRY_DELAY_FACTOR);
     _maxRetries =
         config.getProperty(Broker.FailureDetector.CONFIG_OF_MAX_RETRIES, Broker.FailureDetector.DEFAULT_MAX_RETIRES);
-    _logger.info("Initialized {} with retry initial delay: {}ms, exponential backoff factor: {}, max " + "retries: {}",
-        _name, retryInitialDelayMs, _retryDelayFactor, _maxRetries);
+    LOGGER.info("Initialized {} with retry initial delay: {}ms, exponential backoff factor: {}, max retries: {}", _name,
+        retryInitialDelayMs, _retryDelayFactor, _maxRetries);
   }
 
   @Override
@@ -73,41 +76,36 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
 
   @Override
   public void start() {
-    _logger.info("Starting {}", _name);
+    LOGGER.info("Starting {}", _name);
     _running = true;
 
     _retryThread = new Thread(() -> {
       while (_running) {
         try {
-          long earliestRetryTimeNs = System.nanoTime() + _retryInitialDelayNs;
-          for (Map.Entry<String, RetryInfo> entry : _unhealthyServerRetryInfoMap.entrySet()) {
-            RetryInfo retryInfo = entry.getValue();
-            if (System.nanoTime() > retryInfo._retryTimeNs) {
-              String instanceId = entry.getKey();
-              if (retryInfo._numRetires == _maxRetries) {
-                _logger.warn(
-                    "Unhealthy server: {} already reaches the max retries: {}, do not retry again and treat it as "
-                        + "healthy so that the listeners do not lose track of the server", instanceId, _maxRetries);
-                markServerHealthy(instanceId);
-                continue;
-              }
-              _logger.info("Retry unhealthy server: {}", instanceId);
-              for (Listener listener : _listeners) {
-                listener.retryUnhealthyServer(instanceId, this);
-              }
-              // Update the retry info
-              retryInfo._retryDelayNs = (long) (retryInfo._retryDelayNs * _retryDelayFactor);
-              retryInfo._retryTimeNs = System.nanoTime() + retryInfo._retryDelayNs;
-              retryInfo._numRetires++;
-            } else {
-              earliestRetryTimeNs = Math.min(earliestRetryTimeNs, retryInfo._retryTimeNs);
-            }
+          RetryInfo retryInfo = _retryInfoDelayQueue.take();
+          String instanceId = retryInfo._instanceId;
+          if (_unhealthyServerRetryInfoMap.get(instanceId) != retryInfo) {
+            LOGGER.info("Server: {} has been marked healthy, skipping the retry", instanceId);
+            continue;
           }
-          //noinspection BusyWait
-          Thread.sleep(TimeUnit.NANOSECONDS.toMillis(earliestRetryTimeNs - System.nanoTime()));
+          if (retryInfo._numRetires == _maxRetries) {
+            LOGGER.warn("Unhealthy server: {} already reaches the max retries: {}, do not retry again and treat it "
+                + "as healthy so that the listeners do not lose track of the server", instanceId, _maxRetries);
+            markServerHealthy(instanceId);
+            continue;
+          }
+          LOGGER.info("Retry unhealthy server: {}", instanceId);
+          for (Listener listener : _listeners) {
+            listener.retryUnhealthyServer(instanceId, this);
+          }
+          // Update the retry info and add it back to the delay queue
+          retryInfo._retryDelayNs = (long) (retryInfo._retryDelayNs * _retryDelayFactor);
+          retryInfo._retryTimeNs = System.nanoTime() + retryInfo._retryDelayNs;
+          retryInfo._numRetires++;
+          _retryInfoDelayQueue.offer(retryInfo);
         } catch (Exception e) {
           if (_running) {
-            _logger.error("Caught exception in the retry thread, continuing with errors", e);
+            LOGGER.error("Caught exception in the retry thread, continuing with errors", e);
           }
         }
       }
@@ -119,24 +117,28 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
 
   @Override
   public void markServerHealthy(String instanceId) {
-    if (_unhealthyServerRetryInfoMap.remove(instanceId) != null) {
-      _logger.info("Mark server: {} as healthy", instanceId);
-      _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS, _unhealthyServerRetryInfoMap.size());
+    _unhealthyServerRetryInfoMap.computeIfPresent(instanceId, (id, retryInfo) -> {
+      LOGGER.info("Mark server: {} as healthy", instanceId);
+      _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS, _unhealthyServerRetryInfoMap.size() - 1);
       for (Listener listener : _listeners) {
         listener.notifyHealthyServer(instanceId, this);
       }
-    }
+      return null;
+    });
   }
 
   @Override
   public void markServerUnhealthy(String instanceId) {
-    if (_unhealthyServerRetryInfoMap.putIfAbsent(instanceId, new RetryInfo()) == null) {
-      _logger.warn("Mark server: {} as unhealthy", instanceId);
-      _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS, _unhealthyServerRetryInfoMap.size());
+    _unhealthyServerRetryInfoMap.computeIfAbsent(instanceId, id -> {
+      LOGGER.warn("Mark server: {} as unhealthy", instanceId);
+      _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS, _unhealthyServerRetryInfoMap.size() + 1);
       for (Listener listener : _listeners) {
         listener.notifyUnhealthyServer(instanceId, this);
       }
-    }
+      RetryInfo retryInfo = new RetryInfo(id);
+      _retryInfoDelayQueue.offer(retryInfo);
+      return retryInfo;
+    });
   }
 
   @Override
@@ -146,7 +148,7 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
 
   @Override
   public void stop() {
-    _logger.info("Stopping {}", _name);
+    LOGGER.info("Stopping {}", _name);
     _running = false;
 
     try {
@@ -160,15 +162,29 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
   /**
    * Encapsulates the retry related information.
    */
-  protected class RetryInfo {
+  protected class RetryInfo implements Delayed {
+    final String _instanceId;
+
     long _retryTimeNs;
     long _retryDelayNs;
     int _numRetires;
 
-    RetryInfo() {
+    RetryInfo(String instanceId) {
+      _instanceId = instanceId;
       _retryTimeNs = System.nanoTime() + _retryInitialDelayNs;
       _retryDelayNs = _retryInitialDelayNs;
       _numRetires = 0;
+    }
+
+    @Override
+    public long getDelay(TimeUnit unit) {
+      return unit.convert(System.nanoTime() - _retryTimeNs, TimeUnit.NANOSECONDS);
+    }
+
+    @Override
+    public int compareTo(Delayed o) {
+      RetryInfo that = (RetryInfo) o;
+      return Long.compare(that._retryTimeNs, _retryTimeNs);
     }
   }
 }

@@ -318,11 +318,11 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         instanceConfigZNRecord.getSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_ENABLED.name()))) {
       return false;
     }
-    if ("true".equalsIgnoreCase(instanceConfigZNRecord.getSimpleField(Helix.IS_SHUTDOWN_IN_PROGRESS))) {
+    if (Boolean.parseBoolean(instanceConfigZNRecord.getSimpleField(Helix.IS_SHUTDOWN_IN_PROGRESS))) {
       return false;
     }
     //noinspection RedundantIfStatement
-    if ("true".equalsIgnoreCase(instanceConfigZNRecord.getSimpleField(Helix.QUERIES_DISABLED))) {
+    if (Boolean.parseBoolean(instanceConfigZNRecord.getSimpleField(Helix.QUERIES_DISABLED))) {
       return false;
     }
     return true;

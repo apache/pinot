@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.failuredetector;
 
 import java.util.Collections;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -67,31 +68,19 @@ public class ConnectionFailureDetectorTest {
 
     // No failure detection when submitting the query
     _failureDetector.notifyQuerySubmitted(queryResponse);
-    assertTrue(_failureDetector.getUnhealthyServers().isEmpty());
-    assertEquals(_brokerMetrics.getValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS), 0);
-    assertEquals(_listener._notifyUnhealthyServerCalled.get(), 0);
-    assertEquals(_listener._notifyHealthyServerCalled.get(), 0);
+    verify(Collections.emptySet(), 0, 0);
 
     // When query finishes, the failed server should be count as unhealthy and trigger a callback
     _failureDetector.notifyQueryFinished(queryResponse);
-    assertEquals(_failureDetector.getUnhealthyServers(), Collections.singleton(INSTANCE_ID));
-    assertEquals(_brokerMetrics.getValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS), 1);
-    assertEquals(_listener._notifyUnhealthyServerCalled.get(), 1);
-    assertEquals(_listener._notifyHealthyServerCalled.get(), 0);
+    verify(Collections.singleton(INSTANCE_ID), 1, 0);
 
     // Mark server unhealthy again should have no effect
     _failureDetector.markServerUnhealthy(INSTANCE_ID);
-    assertEquals(_failureDetector.getUnhealthyServers(), Collections.singleton(INSTANCE_ID));
-    assertEquals(_brokerMetrics.getValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS), 1);
-    assertEquals(_listener._notifyUnhealthyServerCalled.get(), 1);
-    assertEquals(_listener._notifyHealthyServerCalled.get(), 0);
+    verify(Collections.singleton(INSTANCE_ID), 1, 0);
 
     // Mark server healthy should remove it from the unhealthy servers and trigger a callback
     _failureDetector.markServerHealthy(INSTANCE_ID);
-    assertTrue(_failureDetector.getUnhealthyServers().isEmpty());
-    assertEquals(_brokerMetrics.getValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS), 0);
-    assertEquals(_listener._notifyUnhealthyServerCalled.get(), 1);
-    assertEquals(_listener._notifyHealthyServerCalled.get(), 1);
+    verify(Collections.emptySet(), 1, 1);
 
     _listener.reset();
   }
@@ -99,10 +88,8 @@ public class ConnectionFailureDetectorTest {
   @Test
   public void testRetry() {
     _failureDetector.markServerUnhealthy(INSTANCE_ID);
-    assertEquals(_failureDetector.getUnhealthyServers(), Collections.singleton(INSTANCE_ID));
-    assertEquals(_brokerMetrics.getValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS), 1);
-    assertEquals(_listener._notifyUnhealthyServerCalled.get(), 1);
-    assertEquals(_listener._notifyHealthyServerCalled.get(), 0);
+    verify(Collections.singleton(INSTANCE_ID), 1, 0);
+
     // Should get 10 retries in 1s, then remove the failed server from the unhealthy servers.
     // Wait for up to 5s to avoid flakiness
     TestUtils.waitForCondition(aVoid -> {
@@ -121,6 +108,14 @@ public class ConnectionFailureDetectorTest {
     }, 5_000L, "Failed to get 10 retires");
 
     _listener.reset();
+  }
+
+  private void verify(Set<String> expectedUnhealthyServers, int expectedNotifyUnhealthyServerCalled,
+      int expectedNotifyHealthyServerCalled) {
+    assertEquals(_failureDetector.getUnhealthyServers(), expectedUnhealthyServers);
+    assertEquals(_brokerMetrics.getValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS), expectedUnhealthyServers.size());
+    assertEquals(_listener._notifyUnhealthyServerCalled.get(), expectedNotifyUnhealthyServerCalled);
+    assertEquals(_listener._notifyHealthyServerCalled.get(), expectedNotifyHealthyServerCalled);
   }
 
   @AfterClass

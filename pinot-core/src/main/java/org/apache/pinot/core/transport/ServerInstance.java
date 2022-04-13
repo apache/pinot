@@ -143,9 +143,6 @@ public class ServerInstance {
     return _instanceId.hashCode();
   }
 
-  /**
-   * Use default format {@code Server_<hostname>_<port>} for backward-compatibility.
-   */
   @Override
   public String toString() {
     return _instanceId;

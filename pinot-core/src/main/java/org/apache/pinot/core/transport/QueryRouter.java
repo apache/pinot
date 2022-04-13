@@ -149,10 +149,16 @@ public class QueryRouter {
    * Connects to the given server, returns {@code true} if the server is successfully connected.
    */
   public boolean connect(ServerInstance serverInstance) {
-    if (_serverChannelsTls != null) {
-      return _serverChannelsTls.connect(serverInstance.toServerRoutingInstance(TableType.OFFLINE, true));
-    } else {
-      return _serverChannels.connect(serverInstance.toServerRoutingInstance(TableType.OFFLINE, false));
+    try {
+      if (_serverChannelsTls != null) {
+        _serverChannelsTls.connect(serverInstance.toServerRoutingInstance(TableType.OFFLINE, true));
+      } else {
+        _serverChannels.connect(serverInstance.toServerRoutingInstance(TableType.OFFLINE, false));
+      }
+      return true;
+    } catch (Exception e) {
+      LOGGER.debug("Failed to connect to server: {}", serverInstance, e);
+      return false;
     }
   }
 
