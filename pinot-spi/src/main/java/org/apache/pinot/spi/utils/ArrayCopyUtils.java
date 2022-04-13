@@ -154,12 +154,6 @@ public class ArrayCopyUtils {
     }
   }
 
-  public static void copy(String[] src, BigDecimal[] dest, int length) {
-    for (int i = 0; i < length; i++) {
-      dest[i] = new BigDecimal(src[i]);
-    }
-  }
-
   public static void copy(String[] src, byte[][] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = BytesUtils.toBytes(src[i]);
