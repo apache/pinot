@@ -36,7 +36,7 @@
     <spark.version>2.4.0</spark.version>
     <scala.binary.version>2.11</scala.binary.version>
     <scala.version>2.11.11</scala.version>
-    <hadoop.version>2.8.3</hadoop.version>
+    <hadoop.version>2.10.1</hadoop.version>
     <phase.prop>package</phase.prop>
   </properties>
   <profiles>
@@ -303,27 +303,7 @@
       <exclusions>
         <exclusion>
           <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-common</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-yarn-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-hdfs</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-client</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-annotations</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-yarn-client</artifactId>
+          <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
           <groupId>net.minidev</groupId>
@@ -332,14 +312,6 @@
         <exclusion>
           <groupId>org.apache.spark</groupId>
           <artifactId>spark-tags_${scala.binary.version}</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-yarn-server-web-proxy</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-yarn-common</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.apache.zookeeper</groupId>

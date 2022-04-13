@@ -28,6 +28,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.trace.Tracing;
 
 
 public class ProjectionOperator extends BaseOperator<ProjectionBlock> {
@@ -62,6 +63,7 @@ public class ProjectionOperator extends BaseOperator<ProjectionBlock> {
     if (docIdSetBlock == null) {
       return null;
     } else {
+      Tracing.activeRecording().setNumChildren(_dataSourceMap.size());
       _dataBlockCache.initNewBlock(docIdSetBlock.getDocIdSet(), docIdSetBlock.getSearchableLength());
       return new ProjectionBlock(_dataSourceMap, _dataBlockCache);
     }

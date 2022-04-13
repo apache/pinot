@@ -622,7 +622,7 @@ public class DateTimeFunctions {
    * @return truncated timeValue in TimeUnit.MILLISECONDS
    */
   @ScalarFunction
-  public long dateTrunc(String unit, long timeValue) {
+  public static long dateTrunc(String unit, long timeValue) {
     return dateTrunc(unit, timeValue, TimeUnit.MILLISECONDS, ISOChronology.getInstanceUTC(), TimeUnit.MILLISECONDS);
   }
 

@@ -119,6 +119,19 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   @Override
   public DataTable processQuery(ServerQueryRequest queryRequest, ExecutorService executorService,
       @Nullable StreamObserver<Server.ServerResponse> responseObserver) {
+    if (!queryRequest.isEnableTrace()) {
+      return processQueryInternal(queryRequest, executorService, responseObserver);
+    }
+    try {
+      Tracing.getTracer().register(queryRequest.getRequestId());
+      return processQueryInternal(queryRequest, executorService, responseObserver);
+    } finally {
+      Tracing.getTracer().unregister();
+    }
+  }
+
+  private DataTable processQueryInternal(ServerQueryRequest queryRequest, ExecutorService executorService,
+      @Nullable StreamObserver<Server.ServerResponse> responseObserver) {
     TimerContext timerContext = queryRequest.getTimerContext();
     TimerContext.Timer schedulerWaitTimer = timerContext.getPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
     if (schedulerWaitTimer != null) {
@@ -194,11 +207,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       }
     }
 
-    boolean enableTrace = queryRequest.isEnableTrace();
-    if (enableTrace) {
-      Tracing.getTracer().register(requestId);
-    }
-
     DataTable dataTable = null;
     try {
       dataTable = processQuery(indexSegments, queryContext, timerContext, executorService, responseObserver,
@@ -219,11 +227,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         tableDataManager.releaseSegment(segmentDataManager);
       }
-      if (enableTrace) {
+      if (queryRequest.isEnableTrace()) {
         if (TraceContext.traceEnabled() && dataTable != null) {
           dataTable.getMetadata().put(MetadataKey.TRACE_INFO.getName(), TraceContext.getTraceInfo());
         }
-        Tracing.getTracer().unregister();
       }
     }
 

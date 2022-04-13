@@ -24,6 +24,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.MapUtils;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.core.common.MinionConstants.MergeTask;
 import org.apache.pinot.core.segment.processing.framework.MergeType;
 import org.apache.pinot.core.segment.processing.framework.SegmentConfig;
@@ -145,5 +147,15 @@ public class MergeTaskUtils {
     segmentConfigBuilder.setSegmentNamePostfix(taskConfig.get(MergeTask.SEGMENT_NAME_POSTFIX_KEY));
     segmentConfigBuilder.setFixedSegmentName(taskConfig.get(MergeTask.FIXED_SEGMENT_NAME_KEY));
     return segmentConfigBuilder.build();
+  }
+
+  /**
+   * Check if the segment can be merged. Only skip merging the segment if 'shouldNotMerge'
+   * field exists and is set to true in its segment metadata custom map.
+   */
+  public static boolean allowMerge(SegmentZKMetadata segmentZKMetadata) {
+    Map<String, String> customMap = segmentZKMetadata.getCustomMap();
+    return MapUtils.isEmpty(customMap) || !Boolean
+        .parseBoolean(customMap.get(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY));
   }
 }

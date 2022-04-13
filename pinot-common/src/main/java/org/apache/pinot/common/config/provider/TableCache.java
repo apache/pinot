@@ -44,6 +44,7 @@ import org.apache.pinot.spi.config.provider.SchemaChangeListener;
 import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -172,6 +173,15 @@ public class TableCache implements PinotConfigProvider {
   public Map<Expression, Expression> getExpressionOverrideMap(String tableNameWithType) {
     TableConfigInfo tableConfigInfo = _tableConfigInfoMap.get(tableNameWithType);
     return tableConfigInfo != null ? tableConfigInfo._expressionOverrideMap : null;
+  }
+
+  /**
+   * Returns the timestamp index columns for the given table, or {@code null} if table does not exist.
+   */
+  @Nullable
+  public Set<String> getTimestampIndexColumns(String tableNameWithType) {
+    TableConfigInfo tableConfigInfo = _tableConfigInfoMap.get(tableNameWithType);
+    return tableConfigInfo != null ? tableConfigInfo._timestampIndexColumns : null;
   }
 
   /**
@@ -485,6 +495,8 @@ public class TableCache implements PinotConfigProvider {
   private static class TableConfigInfo {
     final TableConfig _tableConfig;
     final Map<Expression, Expression> _expressionOverrideMap;
+    // All the timestamp with granularity column names
+    final Set<String> _timestampIndexColumns;
 
     private TableConfigInfo(TableConfig tableConfig) {
       _tableConfig = tableConfig;
@@ -513,6 +525,7 @@ public class TableCache implements PinotConfigProvider {
       } else {
         _expressionOverrideMap = null;
       }
+      _timestampIndexColumns = TimestampIndexGranularity.extractTimestampIndexGranularityColumnNames(tableConfig);
     }
   }
 

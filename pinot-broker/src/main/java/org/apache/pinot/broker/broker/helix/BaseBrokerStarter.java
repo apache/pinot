@@ -148,6 +148,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         _brokerConf.getProperty(Helix.CONFIG_OF_BROKER_FLAPPING_TIME_WINDOW_MS, Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
   }
 
+  public int getPort() {
+    return _port;
+  }
+
   /**
    * Adds an ideal state change handler to handle Helix ideal state change callbacks.
    * <p>NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
@@ -261,6 +265,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
                 queryQuotaManager, tableCache, _brokerMetrics, nettyDefaults, null);
       }
     }
+    _brokerRequestHandler.start();
 
     LOGGER.info("Starting broker admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _brokerAdminApplication =

@@ -55,6 +55,7 @@ import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -62,16 +63,14 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 
-import static org.apache.pinot.spi.utils.CommonConstants.Helix.*;
-import static org.apache.pinot.spi.utils.CommonConstants.Helix.Instance.ADMIN_PORT_KEY;
-import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
 import static org.testng.Assert.assertNotNull;
 
 
@@ -94,7 +93,7 @@ public abstract class ControllerTest {
   protected final List<HelixManager> _fakeInstanceHelixManagers = new ArrayList<>();
   protected String _controllerDataDir;
 
-  protected ControllerStarter _controllerStarter;
+  protected BaseControllerStarter _controllerStarter;
   protected PinotHelixResourceManager _helixResourceManager;
   protected HelixManager _helixManager;
   protected HelixAdmin _helixAdmin;
@@ -219,9 +218,9 @@ public abstract class ControllerTest {
         break;
     }
     //enable case insensitive pql for test cases.
-    configAccessor.set(scope, CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(true));
+    configAccessor.set(scope, Helix.ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(true));
     //Set hyperloglog log2m value to 12.
-    configAccessor.set(scope, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
+    configAccessor.set(scope, Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
   }
 
   protected ControllerStarter getControllerStarter() {
@@ -248,8 +247,7 @@ public abstract class ControllerTest {
   protected void addFakeBrokerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant)
       throws Exception {
     HelixManager helixManager =
-        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
-            getZkUrl());
+        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT, getZkUrl());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeBrokerResourceOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
             FakeBrokerResourceOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
@@ -258,7 +256,7 @@ public abstract class ControllerTest {
     if (isSingleTenant) {
       helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, TagNameUtils.getBrokerTagForTenant(null));
     } else {
-      helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, UNTAGGED_BROKER_INSTANCE);
+      helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, Helix.UNTAGGED_BROKER_INSTANCE);
     }
     _fakeInstanceHelixManagers.add(helixManager);
   }
@@ -315,7 +313,7 @@ public abstract class ControllerTest {
 
   protected void addFakeServerInstancesToAutoJoinHelixCluster(int numInstances, boolean isSingleTenant)
       throws Exception {
-    addFakeServerInstancesToAutoJoinHelixCluster(numInstances, isSingleTenant, DEFAULT_ADMIN_API_PORT);
+    addFakeServerInstancesToAutoJoinHelixCluster(numInstances, isSingleTenant, Server.DEFAULT_ADMIN_API_PORT);
   }
 
   protected void addFakeServerInstancesToAutoJoinHelixCluster(int numInstances, boolean isSingleTenant,
@@ -328,14 +326,13 @@ public abstract class ControllerTest {
 
   protected void addFakeServerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant)
       throws Exception {
-    addFakeServerInstanceToAutoJoinHelixCluster(instanceId, isSingleTenant, DEFAULT_ADMIN_API_PORT);
+    addFakeServerInstanceToAutoJoinHelixCluster(instanceId, isSingleTenant, Server.DEFAULT_ADMIN_API_PORT);
   }
 
   protected void addFakeServerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant, int adminPort)
       throws Exception {
     HelixManager helixManager =
-        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
-            getZkUrl());
+        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT, getZkUrl());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeSegmentOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
             FakeSegmentOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
@@ -345,11 +342,12 @@ public abstract class ControllerTest {
       helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, TagNameUtils.getOfflineTagForTenant(null));
       helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, TagNameUtils.getRealtimeTagForTenant(null));
     } else {
-      helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, UNTAGGED_SERVER_INSTANCE);
+      helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, Helix.UNTAGGED_SERVER_INSTANCE);
     }
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT,
         getHelixClusterName()).forParticipant(instanceId).build();
-    helixAdmin.setConfig(configScope, Collections.singletonMap(ADMIN_PORT_KEY, Integer.toString(adminPort)));
+    helixAdmin.setConfig(configScope,
+        Collections.singletonMap(Helix.Instance.ADMIN_PORT_KEY, Integer.toString(adminPort)));
     _fakeInstanceHelixManagers.add(helixManager);
   }
 
@@ -433,14 +431,13 @@ public abstract class ControllerTest {
   protected void addFakeMinionInstanceToAutoJoinHelixCluster(String instanceId)
       throws Exception {
     HelixManager helixManager =
-        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT,
-            getZkUrl());
+        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT, getZkUrl());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeMinionResourceOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
             FakeMinionResourceOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
     helixManager.connect();
     HelixAdmin helixAdmin = helixManager.getClusterManagmentTool();
-    helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, UNTAGGED_MINION_INSTANCE);
+    helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, Helix.UNTAGGED_MINION_INSTANCE);
     _fakeInstanceHelixManagers.add(helixManager);
   }
 
@@ -615,10 +612,10 @@ public abstract class ControllerTest {
   public void enableResourceConfigForLeadControllerResource(boolean enable) {
     ConfigAccessor configAccessor = _helixManager.getConfigAccessor();
     ResourceConfig resourceConfig =
-        configAccessor.getResourceConfig(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME);
-    if (Boolean.parseBoolean(resourceConfig.getSimpleConfig(LEAD_CONTROLLER_RESOURCE_ENABLED_KEY)) != enable) {
-      resourceConfig.putSimpleConfig(LEAD_CONTROLLER_RESOURCE_ENABLED_KEY, Boolean.toString(enable));
-      configAccessor.setResourceConfig(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME, resourceConfig);
+        configAccessor.getResourceConfig(getHelixClusterName(), Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+    if (Boolean.parseBoolean(resourceConfig.getSimpleConfig(Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY)) != enable) {
+      resourceConfig.putSimpleConfig(Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY, Boolean.toString(enable));
+      configAccessor.setResourceConfig(getHelixClusterName(), Helix.LEAD_CONTROLLER_RESOURCE_NAME, resourceConfig);
     }
   }
 
@@ -630,8 +627,8 @@ public abstract class ControllerTest {
   public static String sendGetRequest(String urlString, Map<String, String> headers)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(
-          new URL(urlString).toURI(), headers));
+      SimpleHttpResponse resp =
+          HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(urlString).toURI(), headers));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
       throw new IOException(e);
@@ -651,8 +648,8 @@ public abstract class ControllerTest {
   public static String sendPostRequest(String urlString, String payload, Map<String, String> headers)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendJsonPostRequest(
-          new URL(urlString).toURI(), payload, headers));
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(
+          getHttpClient().sendJsonPostRequest(new URL(urlString).toURI(), payload, headers));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
       throw new IOException(e);
@@ -664,8 +661,8 @@ public abstract class ControllerTest {
     try {
       EntityBuilder builder = EntityBuilder.create();
       builder.setText(payload);
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendPostRequest(
-          new URL(urlString).toURI(), builder.build(), headers));
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(
+          getHttpClient().sendPostRequest(new URL(urlString).toURI(), builder.build(), headers));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
       throw new IOException(e);
@@ -685,8 +682,8 @@ public abstract class ControllerTest {
   public static String sendPutRequest(String urlString, String payload, Map<String, String> headers)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendJsonPutRequest(
-          new URL(urlString).toURI(), payload, headers));
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(
+          getHttpClient().sendJsonPutRequest(new URL(urlString).toURI(), payload, headers));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
       throw new IOException(e);
@@ -701,8 +698,8 @@ public abstract class ControllerTest {
   public static String sendDeleteRequest(String urlString, Map<String, String> headers)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendDeleteRequest(
-          new URL(urlString).toURI(), headers));
+      SimpleHttpResponse resp =
+          HttpClient.wrapAndThrowHttpException(getHttpClient().sendDeleteRequest(new URL(urlString).toURI(), headers));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
       throw new IOException(e);
@@ -724,7 +721,7 @@ public abstract class ControllerTest {
   }
 
   public static SimpleHttpResponse sendMultipartPutRequest(String url, String body)
-    throws IOException {
+      throws IOException {
     return sendMultipartPutRequest(url, body, null);
   }
 

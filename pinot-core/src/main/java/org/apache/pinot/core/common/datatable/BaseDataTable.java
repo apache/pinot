@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.core.common.datatable;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -115,27 +113,24 @@ public abstract class BaseDataTable implements DataTable {
   /**
    * Helper method to deserialize dictionary map.
    */
-  protected Map<String, Map<Integer, String>> deserializeDictionaryMap(byte[] bytes)
+  protected Map<String, Map<Integer, String>> deserializeDictionaryMap(ByteBuffer buffer)
       throws IOException {
-    try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
-        DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream)) {
-      int numDictionaries = dataInputStream.readInt();
+      int numDictionaries = buffer.getInt();
       Map<String, Map<Integer, String>> dictionaryMap = new HashMap<>(numDictionaries);
 
       for (int i = 0; i < numDictionaries; i++) {
-        String column = DataTableUtils.decodeString(dataInputStream);
-        int dictionarySize = dataInputStream.readInt();
+        String column = DataTableUtils.decodeString(buffer);
+        int dictionarySize = buffer.getInt();
         Map<Integer, String> dictionary = new HashMap<>(dictionarySize);
         for (int j = 0; j < dictionarySize; j++) {
-          int key = dataInputStream.readInt();
-          String value = DataTableUtils.decodeString(dataInputStream);
+          int key = buffer.getInt();
+          String value = DataTableUtils.decodeString(buffer);
           dictionary.put(key, value);
         }
         dictionaryMap.put(column, dictionary);
       }
 
       return dictionaryMap;
-    }
   }
 
   @Override

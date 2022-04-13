@@ -18,18 +18,15 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
-import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
 import org.apache.pinot.common.utils.grpc.GrpcRequestBuilder;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
@@ -38,7 +35,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -47,30 +43,11 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTestSet {
-  private static final int NUM_BROKERS = 1;
-  private static final int NUM_SERVERS = 1;
-  private static final int NUM_SEGMENTS = 12;
-
-  private final List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbacks =
-      new ArrayList<>(getNumBrokers() + getNumServers());
-  private String _schemaFileName = DEFAULT_SCHEMA_FILE_NAME;
-  // Cache the table size after removing an index via reloading. Once this value
-  // is set, assert that table size always gets back to this value after removing
-  // any other kind of index.
-  private long _tableSizeAfterRemovingIndex;
-
-  protected int getNumBrokers() {
-    return NUM_BROKERS;
-  }
-
-  protected int getNumServers() {
-    return NUM_SERVERS;
-  }
+public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest {
 
   @Override
-  protected String getSchemaFileName() {
-    return _schemaFileName;
+  protected void overrideServerConf(PinotConfiguration serverConf) {
+    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_GRPC_SERVER, true);
   }
 
   @BeforeClass
@@ -81,8 +58,8 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
     // Start the Pinot cluster
     startZk();
     startController();
-    startBrokers(getNumBrokers());
-    startServers();
+    startBroker();
+    startServer();
 
     // Create and upload the schema and table config
     Schema schema = createSchema();
@@ -103,51 +80,8 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
     // Initialize the query generator
     setUpQueryGenerator(avroFiles);
 
-    // Set up service status callbacks
-    // NOTE: put this step after creating the table and uploading all segments so that brokers and servers can find the
-    // resources to monitor
-    registerCallbackHandlers();
-
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
-  }
-
-  void setExtraServerConfigs(PinotConfiguration serverConfig) {
-  }
-
-  protected void startServers() {
-    // Enable gRPC server
-    PinotConfiguration serverConfig = getDefaultServerConfiguration();
-    serverConfig.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_GRPC_SERVER, true);
-    setExtraServerConfigs(serverConfig);
-    startServer(serverConfig);
-  }
-
-  private void registerCallbackHandlers() {
-    List<String> instances = _helixAdmin.getInstancesInCluster(getHelixClusterName());
-    instances.removeIf(
-        instance -> (!instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) && !instance.startsWith(
-            CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)));
-    List<String> resourcesInCluster = _helixAdmin.getResourcesInCluster(getHelixClusterName());
-    resourcesInCluster.removeIf(resource -> (!TableNameBuilder.isTableResource(resource)
-        && !CommonConstants.Helix.BROKER_RESOURCE_INSTANCE.equals(resource)));
-    for (String instance : instances) {
-      List<String> resourcesToMonitor = new ArrayList<>();
-      for (String resourceName : resourcesInCluster) {
-        IdealState idealState = _helixAdmin.getResourceIdealState(getHelixClusterName(), resourceName);
-        for (String partitionName : idealState.getPartitionSet()) {
-          if (idealState.getInstanceSet(partitionName).contains(instance)) {
-            resourcesToMonitor.add(resourceName);
-            break;
-          }
-        }
-      }
-      _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
-          new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, getHelixClusterName(),
-              instance, resourcesToMonitor, 100.0),
-          new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, getHelixClusterName(),
-              instance, resourcesToMonitor, 100.0))));
-    }
   }
 
   public GrpcQueryClient getGrpcQueryClient() {

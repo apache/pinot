@@ -33,6 +33,9 @@ import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFa
 import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.SortedDictionaryBasedRangePredicateEvaluator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
+import org.apache.pinot.spi.trace.FilterType;
+import org.apache.pinot.spi.trace.InvocationRecording;
+import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -125,6 +128,7 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
         }
       });
     } else {
+      recordFilter(matches);
       return new FilterBlock(new BitmapDocIdSet(matches == null ? new MutableRoaringBitmap() : matches, _numDocs));
     }
   }
@@ -145,5 +149,15 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
     stringBuilder.append(",operator:").append(_rangePredicateEvaluator.getPredicateType());
     stringBuilder.append(",predicate:").append(_rangePredicateEvaluator.getPredicate().toString());
     return stringBuilder.append(')').toString();
+  }
+
+  private void recordFilter(ImmutableRoaringBitmap bitmap) {
+    InvocationRecording recording = Tracing.activeRecording();
+    if (recording.isEnabled()) {
+      recording.setNumDocsMatchingAfterFilter(bitmap == null ? 0 : bitmap.getCardinality());
+      recording.setColumnName(_dataSource.getDataSourceMetadata().getFieldSpec().getName());
+      recording.setFilter(FilterType.INDEX, _rangePredicateEvaluator.getPredicateType().name());
+      recording.setNumDocsScanned(_numDocs);
+    }
   }
 }

@@ -330,6 +330,18 @@
       "dataType": "INT",
       "format": "1:DAYS:EPOCH",
       "granularity": "1:DAYS"
+    },
+    {
+      "name": "ts",
+      "dataType": "TIMESTAMP",
+      "format": "1:MILLISECONDS:TIMESTAMP",
+      "granularity": "1:SECONDS"
+    },
+    {
+      "name": "tsRaw",
+      "dataType": "TIMESTAMP",
+      "format": "1:MILLISECONDS:TIMESTAMP",
+      "granularity": "1:SECONDS"
     }
   ],
   "schemaName": "airlineStats"

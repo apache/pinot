@@ -57,6 +57,18 @@ public interface InvocationRecording {
   }
 
   /**
+   * @param numChildren the number of children operators/transforms/projections
+   */
+  default void setNumChildren(int numChildren) {
+  }
+
+  /**
+   * @param numSegments the number of segments
+   */
+  default void setNumSegments(int numSegments) {
+  }
+
+  /**
    * If the operator is a filter, determines the filter type (scan or index) and the predicate type
    * @param filterType SCAN or INDEX
    * @param predicateType e.g. BETWEEN, REGEXP_LIKE
@@ -64,23 +76,21 @@ public interface InvocationRecording {
   default void setFilter(FilterType filterType, String predicateType) {
   }
 
+
   /**
-   * Records whether type transformation took place during the operator's invocation and what the types were
-   * @param inputDataType the input data type
-   * @param inputSV if the input data type is single-value
-   * @param outputDataType the output data type
-   * @param outputSV if the output data type is single-value
+   * Records the input datatype before a stage of query execution
+   * @param dataType the output data type
+   * @param singleValue if the output data type is single-value
    */
-  default void setDataTypes(FieldSpec.DataType inputDataType, boolean inputSV, FieldSpec.DataType outputDataType,
-      boolean outputSV) {
+  default void setInputDataType(FieldSpec.DataType dataType, boolean singleValue) {
   }
 
   /**
-   * Records whether type transformation took place during the operator's invocation and what the types were
-   * @param inputDataType the input data type
-   * @param outputDataType the output data type
+   * Records the output datatype after a stage of query execution
+   * @param dataType the output data type
+   * @param singleValue if the output data type is single-value
    */
-  default void setDataTypes(String inputDataType, String outputDataType) {
+  default void setOutputDataType(FieldSpec.DataType dataType, boolean singleValue) {
   }
 
   /**

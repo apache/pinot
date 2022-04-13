@@ -21,9 +21,7 @@ package org.apache.pinot.core.common.datatable;
 
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -111,30 +109,24 @@ public class DataTableImplV3 extends BaseDataTable {
 
     // Read exceptions.
     if (exceptionsLength != 0) {
-      byte[] exceptionsBytes = new byte[exceptionsLength];
       byteBuffer.position(exceptionsStart);
-      byteBuffer.get(exceptionsBytes);
-      _errCodeToExceptionMap = deserializeExceptions(exceptionsBytes);
+      _errCodeToExceptionMap = deserializeExceptions(byteBuffer);
     } else {
       _errCodeToExceptionMap = new HashMap<>();
     }
 
     // Read dictionary.
     if (dictionaryMapLength != 0) {
-      byte[] dictionaryMapBytes = new byte[dictionaryMapLength];
       byteBuffer.position(dictionaryMapStart);
-      byteBuffer.get(dictionaryMapBytes);
-      _dictionaryMap = deserializeDictionaryMap(dictionaryMapBytes);
+      _dictionaryMap = deserializeDictionaryMap(byteBuffer);
     } else {
       _dictionaryMap = null;
     }
 
     // Read data schema.
     if (dataSchemaLength != 0) {
-      byte[] schemaBytes = new byte[dataSchemaLength];
       byteBuffer.position(dataSchemaStart);
-      byteBuffer.get(schemaBytes);
-      _dataSchema = DataSchema.fromBytes(schemaBytes);
+      _dataSchema = DataSchema.fromBytes(byteBuffer);
       _columnOffsets = new int[_dataSchema.size()];
       _rowSizeInBytes = DataTableUtils.computeColumnOffsets(_dataSchema, _columnOffsets);
     } else {
@@ -168,9 +160,7 @@ public class DataTableImplV3 extends BaseDataTable {
     // Read metadata.
     int metadataLength = byteBuffer.getInt();
     if (metadataLength != 0) {
-      byte[] metadataBytes = new byte[metadataLength];
-      byteBuffer.get(metadataBytes);
-      _metadata = deserializeMetadata(metadataBytes);
+      _metadata = deserializeMetadata(byteBuffer);
     }
   }
 
@@ -349,33 +339,32 @@ public class DataTableImplV3 extends BaseDataTable {
    * DataTable from each server and aggregates the values).
    * This is to make V3 implementation keep the consumers of Map<String, String> getMetadata() API in the code happy
    * by internally converting it.
+   *
+   * This method use relative operations on the ByteBuffer and expects the buffer's position to be set correctly.
    */
-  private Map<String, String> deserializeMetadata(byte[] bytes)
+  private Map<String, String> deserializeMetadata(ByteBuffer buffer)
       throws IOException {
-    try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
-        DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream)) {
-      int numEntries = dataInputStream.readInt();
-      Map<String, String> metadata = new HashMap<>();
-      for (int i = 0; i < numEntries; i++) {
-        int keyId = dataInputStream.readInt();
-        MetadataKey key = MetadataKey.getByOrdinal(keyId);
-        // Ignore unknown keys.
-        if (key == null) {
-          continue;
-        }
-        if (key.getValueType() == MetadataValueType.INT) {
-          String value = String.valueOf(DataTableUtils.decodeInt(dataInputStream));
-          metadata.put(key.getName(), value);
-        } else if (key.getValueType() == MetadataValueType.LONG) {
-          String value = String.valueOf(DataTableUtils.decodeLong(dataInputStream));
-          metadata.put(key.getName(), value);
-        } else {
-          String value = String.valueOf(DataTableUtils.decodeString(dataInputStream));
-          metadata.put(key.getName(), value);
-        }
+    int numEntries = buffer.getInt();
+    Map<String, String> metadata = new HashMap<>();
+    for (int i = 0; i < numEntries; i++) {
+      int keyId = buffer.getInt();
+      MetadataKey key = MetadataKey.getByOrdinal(keyId);
+      // Ignore unknown keys.
+      if (key == null) {
+        continue;
       }
-      return metadata;
+      if (key.getValueType() == MetadataValueType.INT) {
+        String value = "" + buffer.getInt();
+        metadata.put(key.getName(), value);
+      } else if (key.getValueType() == MetadataValueType.LONG) {
+        String value = "" + buffer.getLong();
+        metadata.put(key.getName(), value);
+      } else {
+        String value = DataTableUtils.decodeString(buffer);
+        metadata.put(key.getName(), value);
+      }
     }
+    return metadata;
   }
 
   private byte[] serializeExceptions()
@@ -397,18 +386,15 @@ public class DataTableImplV3 extends BaseDataTable {
     return byteArrayOutputStream.toByteArray();
   }
 
-  private Map<Integer, String> deserializeExceptions(byte[] bytes)
+  private Map<Integer, String> deserializeExceptions(ByteBuffer buffer)
       throws IOException {
-    try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
-        DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream)) {
-      int numExceptions = dataInputStream.readInt();
-      Map<Integer, String> exceptions = new HashMap<>(numExceptions);
-      for (int i = 0; i < numExceptions; i++) {
-        int errCode = dataInputStream.readInt();
-        String errMessage = DataTableUtils.decodeString(dataInputStream);
-        exceptions.put(errCode, errMessage);
-      }
-      return exceptions;
+    int numExceptions = buffer.getInt();
+    Map<Integer, String> exceptions = new HashMap<>(numExceptions);
+    for (int i = 0; i < numExceptions; i++) {
+      int errCode = buffer.getInt();
+      String errMessage = DataTableUtils.decodeString(buffer);
+      exceptions.put(errCode, errMessage);
     }
+    return exceptions;
   }
 }

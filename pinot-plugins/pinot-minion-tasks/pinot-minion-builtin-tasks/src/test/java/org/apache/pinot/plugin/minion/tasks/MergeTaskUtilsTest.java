@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.core.common.MinionConstants.MergeTask;
 import org.apache.pinot.core.segment.processing.framework.MergeType;
 import org.apache.pinot.core.segment.processing.framework.SegmentConfig;
@@ -178,5 +179,23 @@ public class MergeTaskUtilsTest {
     assertNull(segmentConfig.getSegmentNamePrefix());
     assertNull(segmentConfig.getSegmentNamePostfix());
     assertNull(segmentConfig.getFixedSegmentName());
+  }
+
+  @Test
+  public void testAllowMerge() {
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata("seg01");
+    assertNull(segmentZKMetadata.getCustomMap());
+    assertTrue(MergeTaskUtils.allowMerge(segmentZKMetadata));
+
+    segmentZKMetadata.setCustomMap(Collections.emptyMap());
+    assertTrue(MergeTaskUtils.allowMerge(segmentZKMetadata));
+
+    segmentZKMetadata
+        .setCustomMap(Collections.singletonMap(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY, "false"));
+    assertTrue(MergeTaskUtils.allowMerge(segmentZKMetadata));
+
+    segmentZKMetadata
+        .setCustomMap(Collections.singletonMap(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY, "true"));
+    assertFalse(MergeTaskUtils.allowMerge(segmentZKMetadata));
   }
 }

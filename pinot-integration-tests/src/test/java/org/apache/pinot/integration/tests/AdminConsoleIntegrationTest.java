@@ -24,8 +24,6 @@ import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -36,7 +34,6 @@ import org.testng.annotations.Test;
  * Tests that the controller, broker and server admin consoles return the expected pages.
  */
 public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(AdminConsoleIntegrationTest.class);
 
   @BeforeClass
   public void setUp()

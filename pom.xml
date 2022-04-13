@@ -128,7 +128,7 @@
     <grizzly.version>2.4.4</grizzly.version>
     <hk2.version>2.5.0</hk2.version>
     <swagger.version>1.5.16</swagger.version>
-    <hadoop.version>2.7.0</hadoop.version>
+    <hadoop.version>2.10.1</hadoop.version>
     <antlr.version>4.6</antlr.version>
     <jsonpath.version>2.7.0</jsonpath.version>
     <quartz.version>2.3.2</quartz.version>
@@ -143,7 +143,7 @@
     <commons-net.version>3.1</commons-net.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.2</dropwizard-metrics.version>
-    <snappy-java.version>1.1.1.7</snappy-java.version>
+    <snappy-java.version>1.1.8.2</snappy-java.version>
     <zstd-jni.version>1.4.9-5</zstd-jni.version>
     <lz4-java.version>1.7.1</lz4-java.version>
     <log4j.version>2.17.1</log4j.version>
@@ -425,7 +425,7 @@
       <dependency>
         <groupId>xml-apis</groupId>
         <artifactId>xml-apis</artifactId>
-        <version>1.0.b2</version>
+        <version>1.4.01</version>
       </dependency>
       <dependency>
         <groupId>org.testng</groupId>
@@ -435,7 +435,7 @@
       <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>0.9.25</version>
+        <version>0.9.26</version>
       </dependency>
       <dependency>
         <groupId>com.101tec</groupId>
