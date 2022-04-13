@@ -89,30 +89,32 @@ public class QueryServerTest {
       throws Exception {
     QueryPlan queryPlan = _queryEnvironment.planQuery("SELECT * FROM a JOIN b ON a.col1 = b.col2");
 
-    int singleServerStageId = QueryEnvironmentTestUtils.getTestStageByServerCount(queryPlan, 1);
+    for (int stageId : queryPlan.getStageMetadataMap().keySet()) {
+      if (stageId > 0) { // we do not test reduce stage.
+        Worker.QueryRequest queryRequest = getQueryRequest(queryPlan, stageId);
 
-    Worker.QueryRequest queryRequest = getQueryRequest(queryPlan, singleServerStageId);
+        // submit the request for testing.
+        submitRequest(queryRequest);
 
-    // submit the request for testing.
-    submitRequest(queryRequest);
+        StageMetadata stageMetadata = queryPlan.getStageMetadataMap().get(stageId);
 
-    StageMetadata stageMetadata = queryPlan.getStageMetadataMap().get(singleServerStageId);
-
-    // ensure mock query runner received correctly deserialized payload.
-    // since submitRequest is async, we need to wait for the mockRunner to receive the query payload.
-    QueryRunner mockRunner = _queryRunnerMap.get(stageMetadata.getServerInstances().get(0).getPort());
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        Mockito.verify(mockRunner).processQuery(Mockito.argThat(distributedStagePlan -> {
-          StageNode stageNode = queryPlan.getQueryStageMap().get(singleServerStageId);
-          return isStageNodesEqual(stageNode, distributedStagePlan.getStageRoot()) && isMetadataMapsEqual(stageMetadata,
-              distributedStagePlan.getMetadataMap().get(singleServerStageId));
-        }), any(ExecutorService.class), any(Map.class));
-        return true;
-      } catch (Throwable t) {
-        return false;
+        // ensure mock query runner received correctly deserialized payload.
+        // since submitRequest is async, we need to wait for the mockRunner to receive the query payload.
+        QueryRunner mockRunner = _queryRunnerMap.get(stageMetadata.getServerInstances().get(0).getPort());
+        TestUtils.waitForCondition(aVoid -> {
+          try {
+            Mockito.verify(mockRunner).processQuery(Mockito.argThat(distributedStagePlan -> {
+              StageNode stageNode = queryPlan.getQueryStageMap().get(stageId);
+              return isStageNodesEqual(stageNode, distributedStagePlan.getStageRoot()) && isMetadataMapsEqual(
+                  stageMetadata, distributedStagePlan.getMetadataMap().get(stageId));
+            }), any(ExecutorService.class), any(Map.class));
+            return true;
+          } catch (Throwable t) {
+            return false;
+          }
+        }, 1000L, "Error verifying mock QueryRunner intercepted query payload!");
       }
-    }, 1000L, "Error verifying mock QueryRunner intercepted query payload!");
+    }
   }
 
   private static boolean isMetadataMapsEqual(StageMetadata left, StageMetadata right) {
