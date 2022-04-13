@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.utils;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -38,14 +37,18 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -62,13 +65,13 @@ public class JsonUtils {
   private JsonUtils() {
   }
 
-  public static class JsonParsedWithUnparsableProps<T> {
+  public static class JsonPojoWithUnparsableProps<T> {
     public T _obj;
-    public MapDifference<String, Object> _difference;
+    public Map<String, Object> _unparseableProps;
 
-    public JsonParsedWithUnparsableProps(T obj, MapDifference<String, Object> difference) {
+    public JsonPojoWithUnparsableProps(T obj, Map<String, Object> unparseableProps) {
       _obj = obj;
-      _difference = difference;
+      _unparseableProps = unparseableProps;
     }
   }
 
@@ -93,17 +96,42 @@ public class JsonUtils {
     return DEFAULT_READER.forType(valueType).readValue(jsonString);
   }
 
-  public static <T> JsonParsedWithUnparsableProps<T> stringToObjectAndUnparseableProps(String jsonString, Class<T> klass) throws IOException {
+  public static <T> JsonPojoWithUnparsableProps<T> stringToObjectAndUnparseableProps(String jsonString, Class<T> klass) throws IOException {
     T instance = DEFAULT_READER.forType(klass).readValue(jsonString);
 
-    // TODO check if setSerializationInclusion is thread safe?
-    String instanceJson = DEFAULT_MAPPER.setSerializationInclusion(JsonInclude.Include.NON_NULL).writeValueAsString(instance);
-
-    Map<String, Object> inputJsonMap = DEFAULT_MAPPER.readValue(jsonString, GENERIC_JSON_TYPE);
-    Map<String, Object> instanceJsonMap = DEFAULT_MAPPER.readValue(instanceJson, GENERIC_JSON_TYPE);
+    String instanceJson = DEFAULT_MAPPER.writeValueAsString(instance);
+    Map<String, Object> inputJsonMap = flatten(DEFAULT_MAPPER.readValue(jsonString, GENERIC_JSON_TYPE));
+    Map<String, Object> instanceJsonMap = flatten(DEFAULT_MAPPER.readValue(instanceJson, GENERIC_JSON_TYPE));
 
     MapDifference<String, Object> difference = Maps.difference(inputJsonMap, instanceJsonMap);
-    return new JsonParsedWithUnparsableProps<T>(instance, difference);
+    return new JsonPojoWithUnparsableProps<>(instance, difference.entriesOnlyOnLeft());
+  }
+
+  public static Map<String, Object> flatten(Map<String, Object> map) {
+    return map.entrySet().stream()
+        .flatMap(JsonUtils::flatten)
+        .collect(LinkedHashMap::new, (m, e) -> m.put("/" + e.getKey(), e.getValue()), LinkedHashMap::putAll);
+  }
+
+  private static Stream<Map.Entry<String, Object>> flatten(Map.Entry<String, Object> entry) {
+
+    if (entry == null) {
+      return Stream.empty();
+    }
+
+    if (entry.getValue() instanceof Map<?, ?>) {
+      return ((Map<?, ?>) entry.getValue()).entrySet().stream()
+          .flatMap(e -> flatten(new AbstractMap.SimpleEntry<>(entry.getKey() + "/" + e.getKey(), e.getValue())));
+    }
+
+    if (entry.getValue() instanceof List<?>) {
+      List<?> list = (List<?>) entry.getValue();
+      return IntStream.range(0, list.size())
+          .mapToObj(i -> new AbstractMap.SimpleEntry<String, Object>(entry.getKey() + "/" + i, list.get(i)))
+          .flatMap(JsonUtils::flatten);
+    }
+
+    return Stream.of(entry);
   }
 
   public static <T> T stringToObject(String jsonString, TypeReference<T> valueTypeRef)
