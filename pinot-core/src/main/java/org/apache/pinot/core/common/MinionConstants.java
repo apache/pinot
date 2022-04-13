@@ -101,6 +101,11 @@ public class MinionConstants {
     public static final String SEGMENT_NAME_PREFIX_KEY = "segmentNamePrefix";
     public static final String SEGMENT_NAME_POSTFIX_KEY = "segmentNamePostfix";
     public static final String FIXED_SEGMENT_NAME_KEY = "fixedSegmentName";
+
+    // This field is set in segment metadata custom map to indicate if the segment is safe to be merged.
+    // Tasks can take use of this field to coordinate with the merge task. By default, segment is safe
+    // to merge, so existing segments w/o this field can be merged just as before.
+    public static final String SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY = "shouldNotMerge";
   }
 
   public static class MergeRollupTask extends MergeTask {
