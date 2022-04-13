@@ -32,7 +32,6 @@ import org.apache.pinot.spi.trace.Tracing;
  * the AND result of the main and sub filter.
  */
 public class CombinedFilterOperator extends BaseFilterOperator {
-  private static final String OPERATOR_NAME = "CombinedFilterOperator";
   private static final String EXPLAIN_NAME = "FILTER_COMBINED";
 
   private final BaseFilterOperator _mainFilterOperator;
@@ -41,11 +40,6 @@ public class CombinedFilterOperator extends BaseFilterOperator {
   public CombinedFilterOperator(BaseFilterOperator mainFilterOperator, BaseFilterOperator subFilterOperator) {
     _mainFilterOperator = mainFilterOperator;
     _subFilterOperator = subFilterOperator;
-  }
-
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
   }
 
   @Override

@@ -38,7 +38,6 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
 public class ExpressionFilterOperator extends BaseFilterOperator {
-  private static final String OPERATOR_NAME = "ExpressionFilterOperator";
   private static final String EXPLAIN_NAME = "FILTER_EXPRESSION";
 
   private final int _numDocs;
@@ -69,10 +68,6 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
         new ExpressionFilterDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs));
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public List<Operator> getChildOperators() {

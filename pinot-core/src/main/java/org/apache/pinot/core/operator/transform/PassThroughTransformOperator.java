@@ -29,7 +29,7 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
  * Class for evaluating pass through transform expressions.
  */
 public class PassThroughTransformOperator extends TransformOperator {
-  private static final String OPERATOR_NAME = "PassThroughTransformOperator";
+
   private static final String EXPLAIN_NAME = "TRANSFORM_PASSTHROUGH";
 
   /**
@@ -53,10 +53,6 @@ public class PassThroughTransformOperator extends TransformOperator {
     }
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public String toExplainString() {

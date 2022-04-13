@@ -32,7 +32,7 @@ import org.apache.pinot.spi.trace.Tracing;
 
 
 public class ProjectionOperator extends BaseOperator<ProjectionBlock> {
-  private static final String OPERATOR_NAME = "ProjectionOperator";
+
   private static final String EXPLAIN_NAME = "PROJECT";
 
   private final Map<String, DataSource> _dataSourceMap;
@@ -69,10 +69,6 @@ public class ProjectionOperator extends BaseOperator<ProjectionBlock> {
     }
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public List<Operator> getChildOperators() {

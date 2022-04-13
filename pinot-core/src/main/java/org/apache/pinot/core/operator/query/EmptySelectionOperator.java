@@ -37,7 +37,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
  * <p>NOTE: this operator short circuit underlying operators and directly returns the data schema without any rows.
  */
 public class EmptySelectionOperator extends BaseOperator<IntermediateResultsBlock> {
-  private static final String OPERATOR_NAME = "EmptySelectionOperator";
+
   private static final String EXPLAIN_NAME = "SELECT_EMPTY";
 
   private final DataSchema _dataSchema;
@@ -67,10 +67,6 @@ public class EmptySelectionOperator extends BaseOperator<IntermediateResultsBloc
     return new IntermediateResultsBlock(_dataSchema, Collections.emptyList());
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public String toExplainString() {

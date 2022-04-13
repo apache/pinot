@@ -35,7 +35,6 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class SortedIndexBasedFilterOperator extends BaseFilterOperator {
-  private static final String OPERATOR_NAME = "SortedIndexBasedFilterOperator";
   private static final String EXPLAIN_NAME = "FILTER_SORTED_INDEX";
 
   private final PredicateEvaluator _predicateEvaluator;
@@ -219,10 +218,6 @@ public class SortedIndexBasedFilterOperator extends BaseFilterOperator {
     return new BitmapCollection(_numDocs, exclusive, bitmap);
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public List<Operator> getChildOperators() {

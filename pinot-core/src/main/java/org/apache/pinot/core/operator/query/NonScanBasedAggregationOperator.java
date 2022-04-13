@@ -61,7 +61,7 @@ import org.apache.pinot.spi.utils.ByteArray;
  */
 @SuppressWarnings("rawtypes")
 public class NonScanBasedAggregationOperator extends BaseOperator<IntermediateResultsBlock> {
-  private static final String OPERATOR_NAME = NonScanBasedAggregationOperator.class.getSimpleName();
+
   private static final String EXPLAIN_NAME = "AGGREGATE_NO_SCAN";
 
   private final AggregationFunction[] _aggregationFunctions;
@@ -239,10 +239,6 @@ public class NonScanBasedAggregationOperator extends BaseOperator<IntermediateRe
     }
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public String toExplainString() {
