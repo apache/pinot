@@ -621,10 +621,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           _dictionaryCreatorMap.containsKey(column), dictionaryElementSize);
     }
 
-    SegmentZKPropsConfig segmentZKMetadataConfig = _config.getSegmentZKPropsConfig();
-    if (segmentZKMetadataConfig != null) {
-      properties.setProperty(CommonConstants.Segment.Realtime.START_OFFSET, segmentZKMetadataConfig.getStartOffset());
-      properties.setProperty(CommonConstants.Segment.Realtime.END_OFFSET, segmentZKMetadataConfig.getEndOffset());
+    SegmentZKPropsConfig segmentZKPropsConfig = _config.getSegmentZKPropsConfig();
+    if (segmentZKPropsConfig != null) {
+      properties.setProperty(CommonConstants.Segment.Realtime.START_OFFSET, segmentZKPropsConfig.getStartOffset());
+      properties.setProperty(CommonConstants.Segment.Realtime.END_OFFSET, segmentZKPropsConfig.getEndOffset());
     }
 
     properties.save();
