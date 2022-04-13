@@ -20,7 +20,7 @@ import java.nio.file.Files;
 import java.util.Collections;
 
 public class SparkSegmentGenerationJobRunnerTest {
-    @Test
+    @Test(enabled = false)
     public void testSegmentGeneration() throws Exception {
         // TODO use common resource definitions & code shared with Hadoop unit test.
         // So probably need a pinot-batch-ingestion-common tests jar that we depend on.
@@ -116,7 +116,7 @@ public class SparkSegmentGenerationJobRunnerTest {
         // FUTURE - validate contents of file?
     }
 
-    @Test
+    @Test(enabled = false)
     public void testInputFilesWithSameNameInDifferentDirectories()
             throws Exception {
         File testDir = Files.createTempDirectory("testSegmentGeneration-").toFile();
