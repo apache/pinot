@@ -31,6 +31,11 @@ import org.apache.calcite.sql.SqlWriter;
 import org.apache.calcite.sql.parser.SqlParserPos;
 
 
+/**
+ * Calcite extension for creating an INSERT sql node from a File object.
+ *
+ * <p>Syntax: INSERT INTO [db_name.]table_name FROM [ FILE | ARCHIVE ] 'file_uri' [, [ FILE | ARCHIVE ] 'file_uri' ]
+ */
 public class SqlInsertFromFile extends SqlCall {
   private static final SqlSpecialOperator OPERATOR = new SqlSpecialOperator("UDF", SqlKind.OTHER_DDL);
   private SqlIdentifier _dbName;
