@@ -192,8 +192,11 @@ public class FilterPlanNode implements PlanNode {
             String functionName = lhs.getFunction().getFunctionName();
             if (functionName.equals("st_distance") || functionName.equals("stdistance")) {
               return new H3IndexFilterOperator(_indexSegment, predicate, numDocs);
-            } else {
+            } else if (functionName.equals("st_contains") || functionName.equals("stcontains")) {
               return new H3InclusionIndexFilterOperator(_indexSegment, predicate, numDocs);
+            } else {
+              throw new IllegalStateException(
+                  String.format("Only %s can use H3 index.", CAN_APPLY_H3_INDEX_FUNCTION_NAMES));
             }
           }
           // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (IS_NULL,
@@ -219,20 +222,20 @@ public class FilterPlanNode implements PlanNode {
               // Consuming segments: When FST is enabled, use AutomatonBasedEvaluator so that regexp matching logic is
               // similar to that of FSTBasedEvaluator, else use regular flow of getting predicate evaluator.
               if (dataSource.getFSTIndex() != null) {
-                predicateEvaluator = FSTBasedRegexpPredicateEvaluatorFactory
-                    .newFSTBasedEvaluator((RegexpLikePredicate) predicate, dataSource.getFSTIndex(),
-                        dataSource.getDictionary());
+                predicateEvaluator =
+                    FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator((RegexpLikePredicate) predicate,
+                        dataSource.getFSTIndex(), dataSource.getDictionary());
               } else {
-                predicateEvaluator = PredicateEvaluatorProvider
-                    .getPredicateEvaluator(predicate, dataSource.getDictionary(),
+                predicateEvaluator =
+                    PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
                         dataSource.getDataSourceMetadata().getDataType());
               }
               _predicateEvaluatorMap.put(predicate, predicateEvaluator);
               return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs);
             case JSON_MATCH:
               JsonIndexReader jsonIndex = dataSource.getJsonIndex();
-              Preconditions
-                  .checkState(jsonIndex != null, "Cannot apply JSON_MATCH on column: %s without json index", column);
+              Preconditions.checkState(jsonIndex != null, "Cannot apply JSON_MATCH on column: %s without json index",
+                  column);
               return new JsonMatchFilterOperator(jsonIndex, (JsonMatchPredicate) predicate, numDocs);
             case IS_NULL:
               NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
@@ -249,8 +252,8 @@ public class FilterPlanNode implements PlanNode {
                 return new MatchAllFilterOperator(numDocs);
               }
             default:
-              predicateEvaluator = PredicateEvaluatorProvider
-                  .getPredicateEvaluator(predicate, dataSource.getDictionary(),
+              predicateEvaluator =
+                  PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
                       dataSource.getDataSourceMetadata().getDataType());
               _predicateEvaluatorMap.put(predicate, predicateEvaluator);
               return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs);

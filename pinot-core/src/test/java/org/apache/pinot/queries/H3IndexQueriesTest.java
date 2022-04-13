@@ -50,7 +50,6 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.locationtech.jts.geom.Coordinate;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
@@ -76,12 +75,11 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
           .addSingleValueDimension(NON_H3_INDEX_GEOMETRY_COLUMN, DataType.BYTES).build();
   private static final Map<String, String> H3_INDEX_PROPERTIES = Collections.singletonMap("resolutions", "5");
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-      .setFieldConfigList(ImmutableList.of(
-          new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3, null,
-              H3_INDEX_PROPERTIES),
-          new FieldConfig(H3_INDEX_GEOMETRY_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3, null,
-      H3_INDEX_PROPERTIES)
-      )).build();
+      .setFieldConfigList(ImmutableList
+          .of(new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3, null,
+                  H3_INDEX_PROPERTIES),
+              new FieldConfig(H3_INDEX_GEOMETRY_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3,
+                  null, H3_INDEX_PROPERTIES))).build();
 
   private IndexSegment _indexSegment;
 
@@ -100,26 +98,9 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
     throw new UnsupportedOperationException();
   }
 
-  @BeforeClass
-  public void setUp()
+  public void setUp(List<GenericRow> records)
       throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
-
-    List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
-    for (int i = 0; i < NUM_RECORDS; i++) {
-      double longitude = -122.5 + RANDOM.nextDouble();
-      double latitude = 37 + RANDOM.nextDouble();
-      byte[] value = GeometrySerializer
-          .serialize(GeometryUtils.GEOGRAPHY_FACTORY.createPoint(new Coordinate(longitude, latitude)));
-      byte[] geometryValue = GeometrySerializer
-          .serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(longitude, latitude)));
-      GenericRow record = new GenericRow();
-      record.putValue(H3_INDEX_COLUMN, value);
-      record.putValue(NON_H3_INDEX_COLUMN, value);
-      record.putValue(H3_INDEX_GEOMETRY_COLUMN, geometryValue);
-      record.putValue(NON_H3_INDEX_GEOMETRY_COLUMN, geometryValue);
-      records.add(record);
-    }
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
@@ -131,17 +112,36 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
     driver.build();
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig
-        .setH3IndexConfigs(ImmutableMap.of(
-            H3_INDEX_COLUMN, new H3IndexConfig(H3_INDEX_PROPERTIES),
-            H3_INDEX_GEOMETRY_COLUMN, new H3IndexConfig(H3_INDEX_PROPERTIES)
-            ));
+    indexLoadingConfig.setH3IndexConfigs(ImmutableMap
+        .of(H3_INDEX_COLUMN, new H3IndexConfig(H3_INDEX_PROPERTIES), H3_INDEX_GEOMETRY_COLUMN,
+            new H3IndexConfig(H3_INDEX_PROPERTIES)));
     _indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
+  }
+
+  private void addRecord(List<GenericRow> records, double longitude, double latitude) {
+    byte[] value =
+        GeometrySerializer.serialize(GeometryUtils.GEOGRAPHY_FACTORY.createPoint(new Coordinate(longitude, latitude)));
+    byte[] geometryValue =
+        GeometrySerializer.serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(longitude, latitude)));
+    GenericRow record = new GenericRow();
+    record.putValue(H3_INDEX_COLUMN, value);
+    record.putValue(NON_H3_INDEX_COLUMN, value);
+    record.putValue(H3_INDEX_GEOMETRY_COLUMN, geometryValue);
+    record.putValue(NON_H3_INDEX_GEOMETRY_COLUMN, geometryValue);
+    records.add(record);
   }
 
   @Test
   public void testH3Index()
-      throws IOException {
+      throws Exception {
+    List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
+    for (int i = 0; i < NUM_RECORDS; i++) {
+      double longitude = -122.5 + RANDOM.nextDouble();
+      double latitude = 37 + RANDOM.nextDouble();
+      addRecord(records, longitude, latitude);
+    }
+    setUp(records);
+
     // Invalid upper bound
     {
       for (String query : Arrays
@@ -252,6 +252,48 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
       Assert.assertNotNull(aggregationResult);
       Assert.assertEquals((long) aggregationResult.get(0), 0);
     }
+  }
+
+  @Test
+  public void stContainPointVeryCloseToBorderTest()
+      throws Exception {
+    List<GenericRow> records = new ArrayList<>(1);
+    addRecord(records, -122.0008081, 37.5004231);
+    setUp(records);
+    // Test point is vertex of a polygon.
+    String query = "SELECT COUNT(*) FROM testTable WHERE ST_Contains(ST_GeomFromText('POLYGON ((\n"
+        + "             -122.0008564 37.5004316, \n"
+        + "             -121.9991291 37.5005168, \n"
+        + "             -121.9990325 37.4995294, \n"
+        + "             -122.0001268 37.4993506,  \n"
+        + "             -122.0008564 37.5004316))'), h3Column_geometry) = 1";
+    AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
+    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 1, 1, 0, 1);
+    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    Assert.assertNotNull(aggregationResult);
+    Assert.assertEquals((long) aggregationResult.get(0), 1);
+  }
+
+  @Test
+  public void stContainPointVeryCloseToBorderButOutsideTest()
+      throws Exception {
+    List<GenericRow> records = new ArrayList<>(1);
+    addRecord(records, -122.0007277, 37.5005785);
+    setUp(records);
+    // Test point is vertex of a polygon.
+    String query = "SELECT COUNT(*) FROM testTable WHERE ST_Contains(ST_GeomFromText('POLYGON ((\n"
+        + "             -122.0008564 37.5004316, \n"
+        + "             -121.9991291 37.5005168, \n"
+        + "             -121.9990325 37.4995294, \n"
+        + "             -122.0001268 37.4993506,  \n"
+        + "             -122.0008564 37.5004316))'), h3Column_geometry) = 1";
+    AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
+    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 1, 0, 1);
+    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    Assert.assertNotNull(aggregationResult);
+    Assert.assertEquals((long) aggregationResult.get(0), 0);
   }
 
   private void testQuery(String queryTemplate) {
