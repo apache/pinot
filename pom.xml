@@ -31,7 +31,7 @@
 
   <groupId>org.apache.pinot</groupId>
   <artifactId>pinot</artifactId>
-  <version>0.10.0-SNAPSHOT</version>
+  <version>0.11.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Pinot</name>
   <description>A realtime distributed OLAP datastore</description>
@@ -128,7 +128,7 @@
     <grizzly.version>2.4.4</grizzly.version>
     <hk2.version>2.5.0</hk2.version>
     <swagger.version>1.5.16</swagger.version>
-    <hadoop.version>2.7.0</hadoop.version>
+    <hadoop.version>2.10.1</hadoop.version>
     <antlr.version>4.6</antlr.version>
     <jsonpath.version>2.7.0</jsonpath.version>
     <quartz.version>2.3.2</quartz.version>
@@ -143,7 +143,7 @@
     <commons-net.version>3.1</commons-net.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.2</dropwizard-metrics.version>
-    <snappy-java.version>1.1.1.7</snappy-java.version>
+    <snappy-java.version>1.1.8.2</snappy-java.version>
     <zstd-jni.version>1.4.9-5</zstd-jni.version>
     <lz4-java.version>1.7.1</lz4-java.version>
     <log4j.version>2.17.1</log4j.version>
@@ -425,7 +425,7 @@
       <dependency>
         <groupId>xml-apis</groupId>
         <artifactId>xml-apis</artifactId>
-        <version>1.0.b2</version>
+        <version>1.4.01</version>
       </dependency>
       <dependency>
         <groupId>org.testng</groupId>
@@ -435,7 +435,7 @@
       <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>0.9.25</version>
+        <version>0.9.26</version>
       </dependency>
       <dependency>
         <groupId>com.101tec</groupId>
@@ -488,6 +488,15 @@
         <version>2.11.0</version>
       </dependency>
 
+      <!-- netty BOM -->
+      <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-bom</artifactId>
+        <version>${netty.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
       <!-- zkclient & helix-core use netty -->
       <dependency>
         <groupId>io.netty</groupId>
@@ -496,86 +505,15 @@
       </dependency>
 
       <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-all</artifactId>
-        <version>${netty.version}</version>
-      </dependency>
-
-      <!-- this part is for resolving dependency convergence error for pinot-kinesis -->
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-codec</artifactId>
-        <version>${netty.version}</version>
-      </dependency>
-
-      <dependency>
         <groupId>org.reactivestreams</groupId>
         <artifactId>reactive-streams</artifactId>
         <version>${reactivestreams.version}</version>
-      </dependency>
-
-      <!-- this part is for resolving dependency convergence error for pinot-adls -->
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-codec-http2</artifactId>
-        <version>${netty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-handler-proxy</artifactId>
-        <version>${netty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-codec-http</artifactId>
-        <version>${netty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-handler</artifactId>
-        <version>${netty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-transport-native-epoll</artifactId>
-        <version>${netty.version}</version>
-        <classifier>linux-x86_64</classifier>
-      </dependency>
-
-      <!-- this part is for resolving dependency convergence error for zookeeper -->
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-buffer</artifactId>
-        <version>${netty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-transport</artifactId>
-        <version>${netty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-common</artifactId>
-        <version>${netty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-transport-native-epoll</artifactId>
-        <version>${netty.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.yetus</groupId>
         <artifactId>audience-annotations</artifactId>
         <version>${audienceannotations.version}</version>
       </dependency>
-
-      <!-- this part is for resolving dependency convergence error for pulsar -->
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-codec-socks</artifactId>
-        <version>${netty.version}</version>
-      </dependency>
-
       <dependency>
         <groupId>it.unimi.dsi</groupId>
         <artifactId>fastutil</artifactId>

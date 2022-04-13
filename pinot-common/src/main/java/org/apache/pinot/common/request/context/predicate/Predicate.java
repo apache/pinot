@@ -54,4 +54,9 @@ public interface Predicate {
    * Returns the left-hand side expression of the predicate.
    */
   ExpressionContext getLhs();
+
+  /**
+   * Sets the left-hand side expression of the predicate.
+   */
+  void setLhs(ExpressionContext lhs);
 }

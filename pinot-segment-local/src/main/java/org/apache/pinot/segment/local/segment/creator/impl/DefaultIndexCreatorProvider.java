@@ -263,8 +263,8 @@ public final class DefaultIndexCreatorProvider implements IndexCreatorProvider {
       if (context.hasDictionary()) {
         return new BitSlicedRangeIndexCreator(context.getIndexDir(), context.getFieldSpec(), context.getCardinality());
       }
-      return new BitSlicedRangeIndexCreator(context.getIndexDir(), context.getFieldSpec(), context.getMin(),
-          context.getMax());
+      return new BitSlicedRangeIndexCreator(context.getIndexDir(), context.getFieldSpec(), context.getMinValue(),
+          context.getMaxValue());
     }
     // default to RangeIndexCreator for the time being
     return new RangeIndexCreator(context.getIndexDir(), context.getFieldSpec(),

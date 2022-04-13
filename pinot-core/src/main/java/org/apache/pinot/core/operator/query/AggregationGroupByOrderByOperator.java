@@ -45,7 +45,6 @@ import org.apache.pinot.core.util.GroupByUtils;
  */
 @SuppressWarnings("rawtypes")
 public class AggregationGroupByOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
-  private static final String OPERATOR_NAME = "AggregationGroupByOrderByOperator";
   private static final String EXPLAIN_NAME = "AGGREGATE_GROUPBY_ORDERBY";
 
   private final AggregationFunction[] _aggregationFunctions;
@@ -135,11 +134,6 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
         new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
     resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
     return resultsBlock;
-  }
-
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
   }
 
   @Override

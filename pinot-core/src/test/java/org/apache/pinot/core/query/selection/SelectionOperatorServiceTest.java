@@ -165,7 +165,7 @@ public class SelectionOperatorServiceTest {
     when(dataSchema.getColumnNames()).thenReturn(new String[]{"*"});
     selectionColumns = SelectionOperatorUtils
         .getSelectionColumns(QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable"), dataSchema);
-    assertEquals(selectionColumns, Collections.singletonList("*"));
+    assertEquals(selectionColumns, new ArrayList<>(Collections.singletonList("*")));
   }
 
   @Test

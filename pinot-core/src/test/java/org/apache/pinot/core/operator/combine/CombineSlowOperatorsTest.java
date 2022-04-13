@@ -167,11 +167,6 @@ public class CombineSlowOperatorsTest {
     }
 
     @Override
-    public String getOperatorName() {
-      return "SlowOperator";
-    }
-
-    @Override
     public String toExplainString() {
       return EXPLAIN_NAME;
     }

@@ -16,23 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.connector.flink.http;
+package org.apache.pinot.spi.trace;
 
-public class HttpException extends RuntimeException {
-  private final int _statusCode;
-  private final String _errorMessage;
-
-  public HttpException(int statusCode, String errorMessage) {
-    super();
-    _statusCode = statusCode;
-    _errorMessage = errorMessage;
-  }
-
-  public int getStatusCode() {
-    return _statusCode;
-  }
-
-  public String getErrorMessage() {
-    return _errorMessage;
-  }
+/**
+ * Convergence of {@see Span} (the lifecycle) and {@see InvocationRecording} (the data).
+ */
+public interface InvocationScope extends Scope, InvocationRecording {
 }

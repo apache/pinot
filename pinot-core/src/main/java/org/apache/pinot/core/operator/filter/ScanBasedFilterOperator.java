@@ -30,7 +30,6 @@ import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 
 
 public class ScanBasedFilterOperator extends BaseFilterOperator {
-  private static final String OPERATOR_NAME = "ScanBasedFilterOperator";
   private static final String EXPLAIN_NAME = "FILTER_FULL_SCAN";
 
   private final PredicateEvaluator _predicateEvaluator;
@@ -54,10 +53,6 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
     }
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public List<Operator> getChildOperators() {

@@ -27,7 +27,7 @@ import org.apache.pinot.core.operator.docidsets.NotDocIdSet;
 
 
 public class NotFilterOperator extends BaseFilterOperator {
-  private static final String OPERATOR_NAME = "NotFilterOperator";
+
   private static final String EXPLAIN_NAME = "FILTER_NOT";
   private final BaseFilterOperator _filterOperator;
   private final int _numDocs;
@@ -37,10 +37,6 @@ public class NotFilterOperator extends BaseFilterOperator {
     _numDocs = numDocs;
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public List<Operator> getChildOperators() {
@@ -56,6 +52,26 @@ public class NotFilterOperator extends BaseFilterOperator {
   @Override
   protected FilterBlock getNextBlock() {
     return new FilterBlock(new NotDocIdSet(_filterOperator.nextBlock().getBlockDocIdSet(), _numDocs));
+  }
+
+  @Override
+  public boolean canOptimizeCount() {
+    return _filterOperator.canOptimizeCount();
+  }
+
+  @Override
+  public int getNumMatchingDocs() {
+    return _numDocs - _filterOperator.getNumMatchingDocs();
+  }
+
+  @Override
+  public boolean canProduceBitmaps() {
+    return _filterOperator.canProduceBitmaps();
+  }
+
+  @Override
+  public BitmapCollection getBitmaps() {
+    return _filterOperator.getBitmaps().invert();
   }
 
   public BaseFilterOperator getChildFilterOperator() {

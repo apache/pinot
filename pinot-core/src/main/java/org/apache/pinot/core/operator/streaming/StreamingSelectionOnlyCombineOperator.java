@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamingSelectionOnlyCombineOperator.class);
-  private static final String OPERATOR_NAME = "StreamingSelectionOnlyCombineOperator";
+
   private static final String EXPLAIN_NAME = "SELECT_STREAMING_COMBINE";
 
   // Special IntermediateResultsBlock to indicate that this is the last results block for an operator
@@ -65,10 +65,6 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
     _limit = queryContext.getLimit();
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public String toExplainString() {

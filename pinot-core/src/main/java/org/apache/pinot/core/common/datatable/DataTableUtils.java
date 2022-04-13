@@ -22,6 +22,7 @@ import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -254,6 +255,21 @@ public class DataTableUtils {
       int numBytesRead = dataInputStream.read(buffer);
       assert numBytesRead == length;
       return new String(buffer, UTF_8);
+    }
+  }
+
+  /**
+   * Helper method to decode string.
+   */
+  public static String decodeString(ByteBuffer buffer)
+      throws IOException {
+    int length = buffer.getInt();
+    if (length == 0) {
+      return "";
+    } else {
+      byte[] bytes = new byte[length];
+      buffer.get(bytes);
+      return new String(bytes, UTF_8);
     }
   }
 

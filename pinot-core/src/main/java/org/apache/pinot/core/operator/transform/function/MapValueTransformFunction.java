@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
@@ -97,13 +96,14 @@ public class MapValueTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToDictIdsSV(ProjectionBlock projectionBlock) {
-    if (_dictIds == null) {
-      _dictIds = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int length = projectionBlock.getNumDocs();
+
+    if (_dictIds == null || _dictIds.length < length) {
+      _dictIds = new int[length];
     }
 
     int[][] keyDictIdsMV = _keyColumnFunction.transformToDictIdsMV(projectionBlock);
     int[][] valueDictIdsMV = _valueColumnFunction.transformToDictIdsMV(projectionBlock);
-    int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       int[] keyDictIds = keyDictIdsMV[i];
 

@@ -160,7 +160,7 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
 
   private int getTotalDocsFromQuery()
       throws Exception {
-    JsonNode response = postSqlQuery(String.format("select count(*) from %s", _tableNameWithType), _brokerBaseApiUrl);
+    JsonNode response = postQuery(String.format("select count(*) from %s", _tableNameWithType), _brokerBaseApiUrl);
     return response.get("resultTable").get("rows").get(0).get(0).asInt();
   }
 

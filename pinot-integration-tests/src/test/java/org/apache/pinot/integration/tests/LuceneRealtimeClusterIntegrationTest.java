@@ -211,6 +211,6 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
 
   private long getTextColumnQueryResult()
       throws Exception {
-    return postQuery(TEST_TEXT_COLUMN_QUERY).get("aggregationResults").get(0).get("value").asLong();
+    return postQuery(TEST_TEXT_COLUMN_QUERY).get("resultTable").get("rows").get(0).get(0).asLong();
   }
 }

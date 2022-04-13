@@ -26,13 +26,14 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 public class TraceContextTest {
-  private static final int NUM_CHILDREN_PER_REQUEST = 10;
+  private static final int NUM_CHILDREN_PER_REQUEST = 5000;
   private static final int NUM_REQUESTS = 10;
   private static final Random RANDOM = new Random();
 
@@ -73,7 +74,7 @@ public class TraceContextTest {
   private void testSingleRequest(ExecutorService executorService, final long requestId)
       throws Exception {
     Set<String> expectedTraces = new HashSet<>(NUM_CHILDREN_PER_REQUEST + 1);
-    TraceContext.register(requestId);
+    Tracing.getTracer().register(requestId);
     String key = Integer.toString(RANDOM.nextInt());
     int value = RANDOM.nextInt();
     expectedTraces.add(getTraceString(key, value));
@@ -102,19 +103,21 @@ public class TraceContextTest {
     for (Future future : futures) {
       future.get();
     }
-
+    // to check uniqueness of traceIds
+    Set<String> traceIds = new HashSet<>();
     Queue<TraceContext.Trace> traces = TraceContext.REQUEST_TO_TRACES_MAP.get(requestId);
     Assert.assertNotNull(traces);
     Assert.assertEquals(traces.size(), NUM_CHILDREN_PER_REQUEST + 1);
     for (TraceContext.Trace trace : traces) {
       // Trace Id is not deterministic because it relies on the order of runJob() getting called
       List<TraceContext.Trace.LogEntry> logs = trace._logs;
+      traceIds.add(trace._traceId);
       Assert.assertEquals(logs.size(), requestId + 1);
       for (TraceContext.Trace.LogEntry log : logs) {
         Assert.assertTrue(expectedTraces.contains(log.toJson().toString()));
       }
     }
-
+    Assert.assertEquals(traceIds.size(), NUM_CHILDREN_PER_REQUEST + 1);
     TraceContext.unregister();
   }
 

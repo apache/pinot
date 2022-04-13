@@ -67,6 +67,12 @@ public interface InstanceDataManager {
   void shutDown();
 
   /**
+   * Delete a table.
+   */
+  void deleteTable(String tableNameWithType)
+      throws Exception;
+
+  /**
    * Adds a segment from local disk into an OFFLINE table.
    */
   void addOfflineSegment(String offlineTableName, String segmentName, File indexDir)

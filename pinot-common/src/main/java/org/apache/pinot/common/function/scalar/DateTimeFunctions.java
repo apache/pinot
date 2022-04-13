@@ -33,7 +33,6 @@ import org.joda.time.DateTimeZone;
 import org.joda.time.chrono.ISOChronology;
 import org.joda.time.format.DateTimeFormatter;
 
-
 /**
  * Inbuilt date time related transform functions
  *
@@ -274,6 +273,14 @@ public class DateTimeFunctions {
   @ScalarFunction
   public static long fromDateTime(String dateTimeString, String pattern) {
     return DateTimePatternHandler.parseDateTimeStringToEpochMillis(dateTimeString, pattern);
+  }
+
+  /**
+   * Converts DateTime string represented by pattern to epoch millis
+   */
+  @ScalarFunction
+  public static long fromDateTime(String dateTimeString, String pattern, String timeZoneId) {
+    return DateTimePatternHandler.parseDateTimeStringToEpochMillis(dateTimeString, pattern, timeZoneId);
   }
 
   /**
@@ -615,7 +622,7 @@ public class DateTimeFunctions {
    * @return truncated timeValue in TimeUnit.MILLISECONDS
    */
   @ScalarFunction
-  public long dateTrunc(String unit, long timeValue) {
+  public static long dateTrunc(String unit, long timeValue) {
     return dateTrunc(unit, timeValue, TimeUnit.MILLISECONDS, ISOChronology.getInstanceUTC(), TimeUnit.MILLISECONDS);
   }
 
@@ -715,5 +722,34 @@ public class DateTimeFunctions {
       long roundedTimeValueMs = timeValueMs / granularityMs * granularityMs;
       return new DateTimeFormatSpec(outputFormatStr).fromMillisToFormat(roundedTimeValueMs);
     }
+  }
+
+  /**
+   * Add a time period to the provided timestamp.
+   * e.g. timestampAdd('days', 10, NOW()) will add 10 days to the current timestamp and return the value
+   * @param unit the timeunit of the period to add. e.g. milliseconds, seconds, days, year
+   * @param interval value of the period to add.
+   * @param timestamp
+   * @return
+   */
+  @ScalarFunction(names = {"timestampAdd", "dateAdd"})
+  public static long timestampAdd(String unit, long interval, long timestamp) {
+    ISOChronology chronology = ISOChronology.getInstanceUTC();
+    long millis = DateTimeUtils.getTimestampField(chronology, unit).add(timestamp, interval);
+    return millis;
+  }
+
+  /**
+   * Get difference between two timestamps and return the result in the specified timeunit.
+   * e.g. timestampDiff('days', ago('10D'), ago('2D')) will return 8 i.e. 8 days
+   * @param unit
+   * @param timestamp1
+   * @param timestamp2
+   * @return
+   */
+  @ScalarFunction(names = {"timestampDiff", "dateDiff"})
+  public static long timestampDiff(String unit, long timestamp1, long timestamp2) {
+    ISOChronology chronology = ISOChronology.getInstanceUTC();
+    return DateTimeUtils.getTimestampField(chronology, unit).getDifferenceAsLong(timestamp2, timestamp1);
   }
 }

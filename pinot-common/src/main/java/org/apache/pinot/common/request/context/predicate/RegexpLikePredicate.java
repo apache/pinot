@@ -26,24 +26,18 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 /**
  * Predicate for REGEXP_LIKE.
  */
-public class RegexpLikePredicate implements Predicate {
-  private final ExpressionContext _lhs;
+public class RegexpLikePredicate extends BasePredicate {
   private final String _value;
   private Pattern _pattern = null;
 
   public RegexpLikePredicate(ExpressionContext lhs, String value) {
-    _lhs = lhs;
+    super(lhs);
     _value = value;
   }
 
   @Override
   public Type getType() {
     return Type.REGEXP_LIKE;
-  }
-
-  @Override
-  public ExpressionContext getLhs() {
-    return _lhs;
   }
 
   public String getValue() {

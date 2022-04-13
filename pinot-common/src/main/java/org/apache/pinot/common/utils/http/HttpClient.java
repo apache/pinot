@@ -95,6 +95,14 @@ public class HttpClient implements AutoCloseable {
     _httpClient = HttpClients.custom().setSSLSocketFactory(csf).build();
   }
 
+  public static HttpClient getInstance() {
+    return HttpClientHolder.HTTP_CLIENT;
+  }
+
+  private static final class HttpClientHolder {
+    static final HttpClient HTTP_CLIENT = new HttpClient(TlsUtils.getSslContext());
+  }
+
   // --------------------------------------------------------------------------
   // Generic HTTP Request APIs
   // --------------------------------------------------------------------------
@@ -102,16 +110,26 @@ public class HttpClient implements AutoCloseable {
   /**
    * Deprecated due to lack of auth header support. May break for deployments with auth enabled
    *
-   * @see #sendGetRequest(URI, String)
+   * @see #sendGetRequest(URI, Map, String)
    */
   public SimpleHttpResponse sendGetRequest(URI uri)
       throws IOException {
-    return sendGetRequest(uri, null);
+    return sendGetRequest(uri, null, null);
   }
 
-  public SimpleHttpResponse sendGetRequest(URI uri, @Nullable String authToken)
+  public SimpleHttpResponse sendGetRequest(URI uri, @Nullable Map<String, String> headers)
+      throws IOException {
+    return sendGetRequest(uri, headers, null);
+  }
+
+  public SimpleHttpResponse sendGetRequest(URI uri, @Nullable Map<String, String> headers, @Nullable String authToken)
       throws IOException {
     RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
+    if (MapUtils.isNotEmpty(headers)) {
+      for (Map.Entry<String, String> header : headers.entrySet()) {
+        requestBuilder.addHeader(header.getKey(), header.getValue());
+      }
+    }
     if (StringUtils.isNotBlank(authToken)) {
       requestBuilder.addHeader(AUTH_HTTP_HEADER, authToken);
     }
@@ -122,18 +140,29 @@ public class HttpClient implements AutoCloseable {
   /**
    * Deprecated due to lack of auth header support. May break for deployments with auth enabled
    *
-   * @see #sendDeleteRequest(URI, String)
+   * @see #sendDeleteRequest(URI, Map, String)
    */
   public SimpleHttpResponse sendDeleteRequest(URI uri)
       throws IOException {
-    return sendDeleteRequest(uri, null);
+    return sendDeleteRequest(uri, Collections.emptyMap());
   }
 
-  public SimpleHttpResponse sendDeleteRequest(URI uri, @Nullable String authToken)
+  public SimpleHttpResponse sendDeleteRequest(URI uri, @Nullable Map<String, String> headers)
+      throws IOException {
+    return sendDeleteRequest(uri, headers, null);
+  }
+
+  public SimpleHttpResponse sendDeleteRequest(URI uri, @Nullable Map<String, String> headers,
+      @Nullable String authToken)
       throws IOException {
     RequestBuilder requestBuilder = RequestBuilder.delete(uri).setVersion(HttpVersion.HTTP_1_1);
     if (StringUtils.isNotBlank(authToken)) {
       requestBuilder.addHeader(AUTH_HTTP_HEADER, authToken);
+    }
+    if (MapUtils.isNotEmpty(headers)) {
+      for (Map.Entry<String, String> header : headers.entrySet()) {
+        requestBuilder.addHeader(header.getKey(), header.getValue());
+      }
     }
     setTimeout(requestBuilder, DELETE_REQUEST_SOCKET_TIMEOUT_MS);
     return sendRequest(requestBuilder.build());
@@ -216,10 +245,8 @@ public class HttpClient implements AutoCloseable {
   public SimpleHttpResponse sendJsonPostRequest(URI uri, @Nullable String jsonRequestBody,
       @Nullable Map<String, String> headers, @Nullable String authToken)
       throws IOException {
-    if (MapUtils.isEmpty(headers)) {
-      headers = new HashMap<>();
-    }
-    headers.put(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
+    Map<String, String> headersWrapper = MapUtils.isEmpty(headers) ? new HashMap<>() : new HashMap<>(headers);
+    headersWrapper.put(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
     HttpEntity entity =
         jsonRequestBody == null ? null : new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON);
     return sendPostRequest(uri, entity, headers, authToken);
@@ -239,13 +266,11 @@ public class HttpClient implements AutoCloseable {
   public SimpleHttpResponse sendJsonPutRequest(URI uri, @Nullable String jsonRequestBody,
       @Nullable Map<String, String> headers, @Nullable String authToken)
       throws IOException {
-    if (MapUtils.isEmpty(headers)) {
-      headers = new HashMap<>();
-    }
-    headers.put(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
+    Map<String, String> headersWrapper = MapUtils.isEmpty(headers) ? new HashMap<>() : new HashMap<>(headers);
+    headersWrapper.put(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
     HttpEntity entity =
         jsonRequestBody == null ? null : new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON);
-    return sendPutRequest(uri, entity, headers, authToken);
+    return sendPutRequest(uri, entity, headersWrapper, authToken);
   }
 
   // --------------------------------------------------------------------------
@@ -280,11 +305,21 @@ public class HttpClient implements AutoCloseable {
 
   public SimpleHttpResponse sendMultipartPostRequest(String url, String body)
       throws IOException {
+    return sendMultipartPostRequest(url, body, null);
+  }
+
+  public SimpleHttpResponse sendMultipartPostRequest(String url, String body, @Nullable Map<String, String> headers)
+      throws IOException {
     HttpPost post = new HttpPost(url);
     // our handlers ignore key...so we can put anything here
     MultipartEntityBuilder builder = MultipartEntityBuilder.create();
     builder.addTextBody("body", body);
     post.setEntity(builder.build());
+    if (MapUtils.isNotEmpty(headers)) {
+      for (String key : headers.keySet()) {
+        post.addHeader(key, headers.get(key));
+      }
+    }
     try (CloseableHttpResponse response = _httpClient.execute(post)) {
       StatusLine statusLine = response.getStatusLine();
       int statusCode = statusLine.getStatusCode();
@@ -294,14 +329,23 @@ public class HttpClient implements AutoCloseable {
       return new SimpleHttpResponse(statusCode, EntityUtils.toString(response.getEntity()));
     }
   }
-
   public SimpleHttpResponse sendMultipartPutRequest(String url, String body)
+      throws IOException {
+    return sendMultipartPutRequest(url, body, null);
+  }
+
+  public SimpleHttpResponse sendMultipartPutRequest(String url, String body, @Nullable Map<String, String> headers)
       throws IOException {
     HttpPut put = new HttpPut(url);
     // our handlers ignore key...so we can put anything here
     MultipartEntityBuilder builder = MultipartEntityBuilder.create();
     builder.addTextBody("body", body);
     put.setEntity(builder.build());
+    if (MapUtils.isNotEmpty(headers)) {
+      for (String key : headers.keySet()) {
+        put.addHeader(key, headers.get(key));
+      }
+    }
     try (CloseableHttpResponse response = _httpClient.execute(put)) {
       StatusLine statusLine = response.getStatusLine();
       int statusCode = statusLine.getStatusCode();

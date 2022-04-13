@@ -25,7 +25,8 @@ import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.core.operator.query.AggregationOperator;
+import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -136,7 +137,7 @@ public class NotOperatorQueriesTest extends BaseQueriesTest {
 
   private void testNotOperator(String filter, long expectedSegmentResult) {
     String query = "SELECT COUNT(*) FROM testTable WHERE " + filter;
-    AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
+    BaseOperator<IntermediateResultsBlock> aggregationOperator = getOperatorForSqlQuery(query);
     List<Object> segmentResults = aggregationOperator.nextBlock().getAggregationResult();
     assertNotNull(segmentResults);
     assertEquals((long) segmentResults.get(0), expectedSegmentResult);

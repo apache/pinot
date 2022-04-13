@@ -38,7 +38,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 
 
 public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock> {
-  private static final String OPERATOR_NAME = "SelectionOnlyOperator";
+
   private static final String EXPLAIN_NAME = "SELECT";
 
   private final IndexSegment _indexSegment;
@@ -109,10 +109,6 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
     return new IntermediateResultsBlock(_dataSchema, _rows);
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public List<Operator> getChildOperators() {

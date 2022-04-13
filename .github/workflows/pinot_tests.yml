@@ -24,7 +24,10 @@ on:
     branches:
       - master
     paths-ignore:
+      - "contrib/**"
       - "docs/**"
+      - "docker/**"
+      - "kubernetes/**"
       - "licenses/**"
       - "licenses-binary/**"
       - "**.md"
@@ -32,13 +35,17 @@ on:
     branches:
       - master
     paths-ignore:
+      - "contrib/**"
       - "docs/**"
+      - "docker/**"
+      - "kubernetes/**"
       - "licenses/**"
       - "licenses-binary/**"
       - "**.md"
 
 jobs:
   linter-test:
+    if: github.repository == 'apache/pinot'
     runs-on: ubuntu-latest
     name: Pinot Linter Test Set
     steps:
@@ -52,6 +59,7 @@ jobs:
           MAVEN_OPTS: -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25 -Dmaven.wagon.http.retryHandler.count=3 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
         run: .github/workflows/scripts/.pinot_linter.sh
   unit-test:
+    if: github.repository == 'apache/pinot'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -81,6 +89,7 @@ jobs:
           bash <(curl -s https://codecov.io/bash) -cF unittests${{ matrix.testset }}
 
   integration-test:
+    if: github.repository == 'apache/pinot'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -110,6 +119,7 @@ jobs:
           bash <(curl -s https://codecov.io/bash) -cF integration${{ matrix.testset }}
 
   compatibility-verifier:
+    if: github.repository == 'apache/pinot'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -138,6 +148,7 @@ jobs:
         run: .github/workflows/scripts/.pinot_compatibility_verifier.sh
 
   quickstarts:
+    if: github.repository == 'apache/pinot'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -160,6 +171,7 @@ jobs:
         run: .github/workflows/scripts/.pinot_quickstart.sh
 
   presto-driver-build:
+    if: github.repository == 'apache/pinot'
     runs-on: ubuntu-latest
     name: Build Presto Pinot Driver
     steps:

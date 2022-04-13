@@ -25,6 +25,7 @@ import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
+import org.apache.pulsar.client.impl.BatchMessageIdImpl;
 import org.apache.pulsar.client.impl.MessageIdImpl;
 import org.apache.pulsar.client.internal.DefaultImplementation;
 
@@ -75,9 +76,28 @@ public class PulsarMessageBatch implements MessageBatch<byte[]> {
   @Override
   public StreamPartitionMsgOffset getNextStreamPartitionMsgOffsetAtIndex(int index) {
     MessageIdImpl currentMessageId = MessageIdImpl.convertToMessageIdImpl(_messageList.get(index).getMessageId());
-    MessageId nextMessageId = DefaultImplementation
-        .newMessageId(currentMessageId.getLedgerId(), currentMessageId.getEntryId() + 1,
-            currentMessageId.getPartitionIndex());
+    MessageId nextMessageId;
+
+    long currentLedgerId = currentMessageId.getLedgerId();
+    long currentEntryId = currentMessageId.getEntryId();
+    int currentPartitionIndex = currentMessageId.getPartitionIndex();
+
+    if (currentMessageId instanceof BatchMessageIdImpl) {
+      int currentBatchIndex = ((BatchMessageIdImpl) currentMessageId).getBatchIndex();
+      int currentBatchSize = ((BatchMessageIdImpl) currentMessageId).getBatchSize();
+
+      if (currentBatchIndex < currentBatchSize - 1) {
+        nextMessageId =
+            new BatchMessageIdImpl(currentLedgerId, currentEntryId, currentPartitionIndex, currentBatchIndex + 1,
+                currentBatchSize, ((BatchMessageIdImpl) currentMessageId).getAcker());
+      } else {
+        nextMessageId =
+            new BatchMessageIdImpl(currentLedgerId, currentEntryId + 1, currentPartitionIndex, 0, currentBatchSize,
+                ((BatchMessageIdImpl) currentMessageId).getAcker());
+      }
+    } else {
+      nextMessageId = DefaultImplementation.newMessageId(currentLedgerId, currentEntryId + 1, currentPartitionIndex);
+    }
     return new MessageIdStreamOffset(nextMessageId);
   }
 

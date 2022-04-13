@@ -23,12 +23,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.ws.rs.core.MultivaluedHashMap;
+import org.apache.pinot.controller.helix.ControllerRequestClient;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,37 +39,28 @@ public final class PinotConnectionUtils {
   private PinotConnectionUtils() {
   }
 
-  public static Schema getSchema(PinotControllerClient client, String tableName) {
+  public static Schema getSchema(ControllerRequestClient client, String tableName) {
     try {
-      String resp = client.getSchemaStrFromController(tableName, new MultivaluedHashMap<>());
-      Schema schema = JsonUtils.stringToObject(resp, Schema.class);
-      return schema;
+      return client.getSchema(tableName);
     } catch (Exception e) {
       throw new RuntimeException(String.format("Failed to get table schema %s from Pinot controller", tableName), e);
     }
   }
 
-  public static TableConfig getTableConfig(PinotControllerClient client, String tableName, String tableType) {
-    String resp = null;
+  public static TableConfig getTableConfig(ControllerRequestClient client, String tableName, String tableType) {
     TableConfig tableConfig = null;
     try {
-      resp = client.getPinotConfigStrFromController(tableName, PinotControllerClient.TableType.valueOfByType(tableType),
-          new MultivaluedHashMap<>());
-      tableConfig = JsonUtils.stringToObject(resp, TableConfig.class);
+      tableConfig = client.getTableConfig(tableName, TableType.valueOf(tableType));
     } catch (Exception e) {
       throw new RuntimeException(String.format("Failed to get table config %s from Pinot controller", tableName), e);
     }
 
-    LOGGER.info("fetched pinot config {}", resp);
+    LOGGER.info("fetched pinot config {}", tableConfig);
 
     Map<String, String> newBatchConfigMaps = new HashMap<>();
     // append the batch config of controller URI
-    List<String> addresses = client.getControllerInstances(new MultivaluedHashMap<>());
-    // use the first address
-    if (addresses.isEmpty()) {
-      throw new IllegalStateException("Cannot find controller addresses");
-    }
-    newBatchConfigMaps.put("push.controllerUri", "http://" + addresses.get(0));
+    String controllerBaseUrl = client.getControllerRequestURLBuilder().getBaseUrl();
+    newBatchConfigMaps.put("push.controllerUri", controllerBaseUrl);
     newBatchConfigMaps.put("outputDirURI", "/tmp/pinotoutput");
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     if (ingestionConfig == null) {

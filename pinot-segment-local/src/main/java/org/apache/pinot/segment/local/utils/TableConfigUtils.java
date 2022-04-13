@@ -742,6 +742,10 @@ public final class TableConfigUtils {
               Preconditions.checkState(fieldConfigColSpec.getDataType().getStoredType() == DataType.STRING,
                   "TEXT Index is only supported for string columns");
               break;
+            case TIMESTAMP:
+              Preconditions.checkState(fieldConfigColSpec.getDataType() == DataType.TIMESTAMP,
+                  "TIMESTAMP Index is only supported for timestamp columns");
+              break;
             default:
               break;
           }

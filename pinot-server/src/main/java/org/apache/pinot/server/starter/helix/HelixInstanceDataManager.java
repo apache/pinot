@@ -32,6 +32,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
@@ -39,6 +40,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -73,6 +75,9 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class HelixInstanceDataManager implements InstanceDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
+  // TODO: Make this configurable
+  private static final long EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS = 20 * 60_000L; // 20 minutes
+  private static final long EXTERNAL_VIEW_CHECK_INTERVAL_MS = 1_000L; // 1 second
 
   private final ConcurrentHashMap<String, TableDataManager> _tableDataManagerMap = new ConcurrentHashMap<>();
 
@@ -185,17 +190,39 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
+  public void deleteTable(String tableNameWithType)
+      throws Exception {
+    // Wait externalview to converge
+    long endTimeMs = System.currentTimeMillis() + EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS;
+    do {
+      ExternalView externalView = _helixManager.getHelixDataAccessor()
+          .getProperty(_helixManager.getHelixDataAccessor().keyBuilder().externalView(tableNameWithType));
+      if (externalView == null) {
+        LOGGER.info("ExternalView converged for the table to delete: {}", tableNameWithType);
+        _tableDataManagerMap.compute(tableNameWithType, (k, v) -> {
+          if (v != null) {
+            v.shutDown();
+            LOGGER.info("Removed table: {}", tableNameWithType);
+          } else {
+            LOGGER.warn("Failed to find table data manager for table: {}, skip removing the table", tableNameWithType);
+          }
+          return null;
+        });
+        return;
+      }
+      Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
+    } while (System.currentTimeMillis() < endTimeMs);
+    throw new TimeoutException(
+        "Timeout while waiting for ExternalView to converge for the table to delete: " + tableNameWithType);
+  }
+
+  @Override
   public void removeSegment(String tableNameWithType, String segmentName) {
     LOGGER.info("Removing segment: {} from table: {}", segmentName, tableNameWithType);
     _tableDataManagerMap.computeIfPresent(tableNameWithType, (k, v) -> {
       v.removeSegment(segmentName);
       LOGGER.info("Removed segment: {} from table: {}", segmentName, k);
-      if (v.getNumSegments() == 0) {
-        v.shutDown();
-        return null;
-      } else {
-        return v;
-      }
+      return v;
     });
   }
 

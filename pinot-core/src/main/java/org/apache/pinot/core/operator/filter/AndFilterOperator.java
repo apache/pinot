@@ -24,10 +24,12 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
+import org.apache.pinot.spi.trace.Tracing;
+import org.roaringbitmap.buffer.BufferFastAggregation;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 public class AndFilterOperator extends BaseFilterOperator {
-  private static final String OPERATOR_NAME = "AndFilterOperator";
   private static final String EXPLAIN_NAME = "FILTER_AND";
 
   private final List<BaseFilterOperator> _filterOperators;
@@ -38,6 +40,7 @@ public class AndFilterOperator extends BaseFilterOperator {
 
   @Override
   protected FilterBlock getNextBlock() {
+    Tracing.activeRecording().setNumChildren(_filterOperators.size());
     List<FilterBlockDocIdSet> filterBlockDocIdSets = new ArrayList<>(_filterOperators.size());
     for (BaseFilterOperator filterOperator : _filterOperators) {
       filterBlockDocIdSets.add(filterOperator.nextBlock().getBlockDocIdSet());
@@ -46,9 +49,27 @@ public class AndFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
+  public boolean canOptimizeCount() {
+    boolean allChildrenCanProduceBitmaps = true;
+    for (BaseFilterOperator child : _filterOperators) {
+      allChildrenCanProduceBitmaps &= child.canProduceBitmaps();
+    }
+    return allChildrenCanProduceBitmaps;
   }
+
+  @Override
+  public int getNumMatchingDocs() {
+    if (_filterOperators.size() == 2) {
+      return _filterOperators.get(0).getBitmaps().andCardinality(_filterOperators.get(1).getBitmaps());
+    }
+    ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[_filterOperators.size()];
+    int i = 0;
+    for (BaseFilterOperator child : _filterOperators) {
+      bitmaps[i++] = child.getBitmaps().reduce();
+    }
+    return BufferFastAggregation.and(bitmaps).getCardinality();
+  }
+
 
   @Override
   public List<Operator> getChildOperators() {

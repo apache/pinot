@@ -70,6 +70,8 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   @Deprecated // Instead use TABLE_TOTAL_SIZE_ON_SERVER
   OFFLINE_TABLE_ESTIMATED_SIZE("OfflineTableEstimatedSize", false),
 
+  LARGEST_SEGMENT_SIZE_ON_SERVER("LargestSegmentSizeOnServer", false),
+
   // Total size of table across replicas on servers
   TABLE_TOTAL_SIZE_ON_SERVER("TableTotalSizeOnServer", false),
 

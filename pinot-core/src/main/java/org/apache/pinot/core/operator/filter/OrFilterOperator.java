@@ -24,10 +24,13 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
+import org.apache.pinot.spi.trace.Tracing;
+import org.roaringbitmap.buffer.BufferFastAggregation;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 public class OrFilterOperator extends BaseFilterOperator {
-  private static final String OPERATOR_NAME = "OrFilterOperator";
+
   private static final String EXPLAIN_NAME = "FILTER_OR";
   private final List<BaseFilterOperator> _filterOperators;
   private final int _numDocs;
@@ -39,6 +42,7 @@ public class OrFilterOperator extends BaseFilterOperator {
 
   @Override
   protected FilterBlock getNextBlock() {
+    Tracing.activeRecording().setNumChildren(_filterOperators.size());
     List<FilterBlockDocIdSet> filterBlockDocIdSets = new ArrayList<>(_filterOperators.size());
     for (BaseFilterOperator filterOperator : _filterOperators) {
       filterBlockDocIdSets.add(filterOperator.nextBlock().getBlockDocIdSet());
@@ -46,10 +50,6 @@ public class OrFilterOperator extends BaseFilterOperator {
     return new FilterBlock(new OrDocIdSet(filterBlockDocIdSets, _numDocs));
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public String toExplainString() {
@@ -59,5 +59,26 @@ public class OrFilterOperator extends BaseFilterOperator {
   @Override
   public List<Operator> getChildOperators() {
     return new ArrayList<>(_filterOperators);
+  }
+
+  @Override
+  public boolean canOptimizeCount() {
+    boolean allChildrenProduceBitmaps = true;
+    for (BaseFilterOperator child : _filterOperators) {
+      allChildrenProduceBitmaps &= child.canProduceBitmaps();
+    }
+    return allChildrenProduceBitmaps;
+  }
+
+  @Override
+  public int getNumMatchingDocs() {
+    if (_filterOperators.size() == 2) {
+      return _filterOperators.get(0).getBitmaps().orCardinality(_filterOperators.get(1).getBitmaps());
+    }
+    ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[_filterOperators.size()];
+    for (int i = 0; i < _filterOperators.size(); i++) {
+      bitmaps[i] = _filterOperators.get(i).getBitmaps().reduce();
+    }
+    return BufferFastAggregation.or(bitmaps).getCardinality();
   }
 }

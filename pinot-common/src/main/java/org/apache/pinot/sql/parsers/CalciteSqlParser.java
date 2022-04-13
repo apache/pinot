@@ -292,7 +292,8 @@ public class CalciteSqlParser {
       Function function = expression.getFunctionCall();
       if (function != null) {
         if (excludeAs && function.getOperator().equals("as")) {
-          identifiers.addAll(extractIdentifiers(Collections.singletonList(function.getOperands().get(0)), true));
+          identifiers.addAll(
+              extractIdentifiers(new ArrayList<>(Collections.singletonList(function.getOperands().get(0))), true));
         } else {
           identifiers.addAll(extractIdentifiers(function.getOperands(), excludeAs));
         }

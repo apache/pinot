@@ -19,6 +19,7 @@
 package org.apache.pinot.common.utils;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -109,6 +110,7 @@ public interface DataTable {
     SYSTEM_ACTIVITIES_CPU_TIME_NS("systemActivitiesCpuTimeNs", MetadataValueType.LONG),
     RESPONSE_SER_CPU_TIME_NS("responseSerializationCpuTimeNs", MetadataValueType.LONG);
 
+    private static final MetadataKey[] VALUES;
     private static final Map<String, MetadataKey> NAME_TO_ENUM_KEY_MAP = new HashMap<>();
     private final String _name;
     private final MetadataValueType _valueType;
@@ -121,10 +123,7 @@ public interface DataTable {
     // getByOrdinal returns an enum key for a given ordinal or null if the key does not exist.
     @Nullable
     public static MetadataKey getByOrdinal(int ordinal) {
-      if (ordinal >= MetadataKey.values().length) {
-        return null;
-      }
-      return MetadataKey.values()[ordinal];
+      return VALUES[Math.min(ordinal, VALUES.length - 1)];
     }
 
     // getByName returns an enum key for a given name or null if the key does not exist.
@@ -143,11 +142,13 @@ public interface DataTable {
     }
 
     static {
-      for (MetadataKey key : MetadataKey.values()) {
+      MetadataKey[] values = values();
+      for (MetadataKey key : values) {
         if (NAME_TO_ENUM_KEY_MAP.put(key.getName(), key) != null) {
           throw new IllegalArgumentException("Duplicate name defined in the MetadataKey definition: " + key.getName());
         }
       }
+      VALUES = Arrays.copyOf(values, values.length + 1);
     }
   }
 }

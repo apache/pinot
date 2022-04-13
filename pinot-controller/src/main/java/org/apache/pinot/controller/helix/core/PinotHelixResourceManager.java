@@ -91,6 +91,7 @@ import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
+import org.apache.pinot.common.messages.TableDeletionMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -1757,6 +1758,17 @@ public class PinotHelixResourceManager {
     HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, offlineTableName);
     LOGGER.info("Deleting table {}: Removed from broker resource", offlineTableName);
 
+    // Drop the table on servers
+    // TODO: Make this api idempotent and blocking by waiting for externalview to converge on controllers
+    //      instead of servers. This is because if externalview gets updated with significant delay,
+    //      we may have the race condition for table recreation that the new table will use the old states
+    //      (old table data manager) on the servers.
+    //      Steps needed:
+    //      1. Drop the helix resource first (set idealstate as null)
+    //      2. Wait for the externalview to converge
+    //      3. Get servers for the tenant, and send delete table message to these servers
+    deleteTableOnServer(offlineTableName);
+
     // Drop the table
     if (_helixAdmin.getResourcesInCluster(_helixClusterName).contains(offlineTableName)) {
       _helixAdmin.dropResource(_helixClusterName, offlineTableName);
@@ -1799,6 +1811,11 @@ public class PinotHelixResourceManager {
     // Remove the table from brokerResource
     HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, realtimeTableName);
     LOGGER.info("Deleting table {}: Removed from broker resource", realtimeTableName);
+
+    // Drop the table on servers
+    // TODO: Make this api idempotent and blocking by waiting for externalview to converge on controllers
+    //      instead of servers. Follow the same steps for offline tables.
+    deleteTableOnServer(realtimeTableName);
 
     // Cache the state and drop the table
     Set<String> instancesForTable = null;
@@ -2051,6 +2068,36 @@ public class PinotHelixResourceManager {
 
   public boolean updateZkMetadata(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
     return ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);
+  }
+
+  /**
+   * Delete the table on servers by sending table deletion message
+   */
+  private void deleteTableOnServer(String tableNameWithType) {
+    LOGGER.info("Sending delete table message for table: {}", tableNameWithType);
+    Criteria recipientCriteria = new Criteria();
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setResource(tableNameWithType);
+    recipientCriteria.setSessionSpecific(true);
+    TableDeletionMessage tableDeletionMessage = new TableDeletionMessage(tableNameWithType);
+    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
+
+    // Externalview can be null for newly created table, skip sending the message
+    if (_helixZkManager.getHelixDataAccessor()
+        .getProperty(_helixZkManager.getHelixDataAccessor().keyBuilder().externalView(tableNameWithType)) == null) {
+      LOGGER.warn("No delete table message sent for newly created table: {} as the externalview is null.",
+          tableNameWithType);
+      return;
+    }
+    // Infinite timeout on the recipient
+    int timeoutMs = -1;
+    int numMessagesSent = messagingService.send(recipientCriteria, tableDeletionMessage, null, timeoutMs);
+    if (numMessagesSent > 0) {
+      LOGGER.info("Sent {} delete table messages for table: {}", numMessagesSent, tableNameWithType);
+    } else {
+      LOGGER.warn("No delete table message sent for table: {}", tableNameWithType);
+    }
   }
 
   public void refreshSegment(String tableNameWithType, SegmentMetadata segmentMetadata,
@@ -3285,10 +3332,11 @@ public class PinotHelixResourceManager {
             tableNameWithType, segmentsToCheck));
   }
 
-  private Set<String> getOnlineSegmentsFromExternalView(String tableNameWithType) {
+  public Set<String> getOnlineSegmentsFromExternalView(String tableNameWithType) {
     ExternalView externalView = getTableExternalView(tableNameWithType);
-    Preconditions
-        .checkState(externalView != null, String.format("External view is null for table (%s)", tableNameWithType));
+    if (externalView == null) {
+      return Collections.emptySet();
+    }
     Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
     Set<String> onlineSegments = new HashSet<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
     for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {

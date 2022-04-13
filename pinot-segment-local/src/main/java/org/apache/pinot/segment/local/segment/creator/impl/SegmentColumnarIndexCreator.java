@@ -176,6 +176,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           .withDictionary(dictEnabledColumn)
           .withFieldSpec(fieldSpec)
           .withTotalDocs(segmentIndexCreationInfo.getTotalDocs())
+          .withMinValue((Comparable<?>) columnIndexCreationInfo.getMin())
+          .withMaxValue((Comparable<?>) columnIndexCreationInfo.getMax())
           .withTotalNumberOfEntries(columnIndexCreationInfo.getTotalNumberOfEntries())
           .withColumnIndexCreationInfo(columnIndexCreationInfo)
           .sorted(columnIndexCreationInfo.isSorted())

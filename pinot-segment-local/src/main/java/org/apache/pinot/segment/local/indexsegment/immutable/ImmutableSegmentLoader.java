@@ -37,6 +37,7 @@ import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexContainer;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.IndexingOverrides;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
@@ -105,6 +106,11 @@ public class ImmutableSegmentLoader {
     if (segmentMetadata.getTotalDocs() == 0) {
       return new EmptyIndexSegment(segmentMetadata);
     }
+    if (schema != null) {
+      schema = SegmentGeneratorConfig.updateSchemaWithTimestampIndexes(schema,
+          SegmentGeneratorConfig.extractTimestampIndexConfigsFromTableConfig(indexLoadingConfig.getTableConfig()));
+    }
+
     if (needPreprocess) {
       preprocess(indexDir, indexLoadingConfig, schema);
     }

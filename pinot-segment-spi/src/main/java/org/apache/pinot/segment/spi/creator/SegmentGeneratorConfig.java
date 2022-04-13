@@ -33,6 +33,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
@@ -44,6 +45,7 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -75,6 +77,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private final List<String> _fstIndexCreationColumns = new ArrayList<>();
   private final List<String> _jsonIndexCreationColumns = new ArrayList<>();
   private final Map<String, H3IndexConfig> _h3IndexConfigs = new HashMap<>();
+  private final Map<String, List<TimestampIndexGranularity>> _timestampIndexConfigs = new HashMap<>();
   private final List<String> _columnSortOrder = new ArrayList<>();
   private List<String> _varLengthDictionaryColumns = new ArrayList<>();
   private String _inputFilePath = null;
@@ -127,7 +130,8 @@ public class SegmentGeneratorConfig implements Serializable {
   public SegmentGeneratorConfig(TableConfig tableConfig, Schema schema) {
     Preconditions.checkNotNull(schema);
     Preconditions.checkNotNull(tableConfig);
-    setSchema(schema);
+    _timestampIndexConfigs.putAll(extractTimestampIndexConfigsFromTableConfig(tableConfig));
+    setSchema(updateSchemaWithTimestampIndexes(schema, _timestampIndexConfigs));
 
     _tableConfig = tableConfig;
     setTableName(tableConfig.getTableName());
@@ -202,6 +206,30 @@ public class SegmentGeneratorConfig implements Serializable {
     }
   }
 
+  public static Schema updateSchemaWithTimestampIndexes(Schema schema,
+      Map<String, List<TimestampIndexGranularity>> timestampIndexConfigs) {
+    if (timestampIndexConfigs.isEmpty()) {
+      return schema;
+    }
+    List<FieldSpec> timestampColumnWithGranularityFieldSpecs = new ArrayList<>();
+    for (Map.Entry<String, List<TimestampIndexGranularity>> entry : timestampIndexConfigs.entrySet()) {
+      String columnName = entry.getKey();
+      Preconditions.checkState(schema.hasColumn(columnName),
+          "Cannot create Timestamp index for column: %s because it is not in schema", columnName);
+      entry.getValue().stream().filter(granularity -> !schema.hasColumn(
+          TimestampIndexGranularity.getColumnNameWithGranularity(columnName, granularity))).forEach(
+          granularity -> timestampColumnWithGranularityFieldSpecs.add(
+              TimestampIndexGranularity.getFieldSpecForTimestampColumnWithGranularity(
+                  schema.getFieldSpecFor(columnName), granularity)));
+    }
+    if (timestampColumnWithGranularityFieldSpecs.isEmpty()) {
+      return schema;
+    }
+    Schema newSchema = schema.clone();
+    timestampColumnWithGranularityFieldSpecs.forEach(fieldSpec -> newSchema.addField(fieldSpec));
+    return newSchema;
+  }
+
   public Map<String, Map<String, String>> getColumnProperties() {
     return _columnProperties;
   }
@@ -259,6 +287,22 @@ public class SegmentGeneratorConfig implements Serializable {
         }
       }
     }
+  }
+
+  public static Map<String, List<TimestampIndexGranularity>> extractTimestampIndexConfigsFromTableConfig(
+      TableConfig tableConfig) {
+    if (tableConfig == null) {
+      return Collections.emptyMap();
+    }
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    Map<String, List<TimestampIndexGranularity>> timestampIndexConfigs = new HashMap<>();
+    if (CollectionUtils.isNotEmpty(fieldConfigList)) {
+      fieldConfigList.stream()
+          .filter(fieldConfig -> fieldConfig.getIndexTypes().contains(FieldConfig.IndexType.TIMESTAMP))
+          .forEach(fieldConfig -> timestampIndexConfigs.put(fieldConfig.getName(),
+              fieldConfig.getTimestampConfig().getGranularities()));
+    }
+    return timestampIndexConfigs;
   }
 
   private void extractCompressionCodecConfigsFromTableConfig(TableConfig tableConfig) {
@@ -335,6 +379,10 @@ public class SegmentGeneratorConfig implements Serializable {
 
   public Map<String, H3IndexConfig> getH3IndexConfigs() {
     return _h3IndexConfigs;
+  }
+
+  public Map<String, List<TimestampIndexGranularity>> getTimestampIndexConfigs() {
+    return _timestampIndexConfigs;
   }
 
   public List<String> getColumnSortOrder() {

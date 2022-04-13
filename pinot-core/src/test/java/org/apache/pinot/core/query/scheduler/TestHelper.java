@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.scheduler;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -44,7 +45,7 @@ public class TestHelper {
     qs.setTableName(table);
     br.setQuerySource(qs);
     Selection selection = new Selection();
-    selection.setSelectionColumns(Collections.singletonList("*"));
+    selection.setSelectionColumns(new ArrayList<>(Collections.singletonList("*")));
     br.setSelections(selection);
     request.setQuery(br);
     return new ServerQueryRequest(request, metrics, queryArrivalTimeMs);
