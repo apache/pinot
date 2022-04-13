@@ -103,9 +103,6 @@ public class DistinctTable {
           Comparable value2;
           if (columnDataTypes[i] == ColumnDataType.BIG_DECIMAL) {
             // Comparing BigDecimals is not equivalent to comparing corresponding byte arrays.
-            // todo: initial implementation converted byte[] to BigDecimal when reading from storage layer to avoid
-            //  paying the cost of converting byte[] to BigDecimal at many operators/transforms multiple times.
-            //  Consider bringing that implementation back.
             value1 = BigDecimalUtils.deserialize((ByteArray) values1[index]);
             value2 = BigDecimalUtils.deserialize((ByteArray) values2[index]);
           } else {

@@ -247,6 +247,21 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   }
 
   @Test
+  public void testIsNullOperator() {
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(String.format("%s IS NULL",
+        BIG_DECIMAL_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof IsNullTransformFunction);
+    assertEquals(transformFunction.getName(), "is_null");
+    int[] expectedValues = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = (_bigDecimalSVValues[i] == null) ? 1 : 0;
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+
+  @Test
   public void testStringContainsTransformFunction() {
     ExpressionContext expression =
         RequestContextUtils.getExpressionFromSQL(String.format("contains(%s, 'a')", STRING_ALPHANUM_SV_COLUMN));
