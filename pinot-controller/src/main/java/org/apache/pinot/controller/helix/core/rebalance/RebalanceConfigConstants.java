@@ -33,10 +33,6 @@ public class RebalanceConfigConstants {
   public static final String REASSIGN_INSTANCES = "reassignInstances";
   public static final boolean DEFAULT_REASSIGN_INSTANCES = false;
 
-  // Whether to retain the sequence for the existing instances
-  public static final String RETAIN_INSTANCE_SEQUENCE = "retainInstancesSequence";
-  public static final boolean DEFAULT_RETAIN_INSTANCE_SEQUENCE = false;
-
   // Whether to reassign CONSUMING segments
   public static final String INCLUDE_CONSUMING = "includeConsuming";
   public static final boolean DEFAULT_INCLUDE_CONSUMING = false;

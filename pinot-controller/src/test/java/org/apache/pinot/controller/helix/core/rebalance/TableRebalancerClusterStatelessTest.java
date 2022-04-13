@@ -198,7 +198,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     InstanceTagPoolConfig tagPoolConfig =
         new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(null), false, 0, null);
     InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
-        new InstanceReplicaGroupPartitionConfig(true, 0, NUM_REPLICAS, 0, 0, 0);
+        new InstanceReplicaGroupPartitionConfig(true, 0, NUM_REPLICAS, 0, 0, 0, false);
     tableConfig.setInstanceAssignmentConfigMap(Collections.singletonMap(InstancePartitionsType.OFFLINE,
         new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig)));
     _helixResourceManager.updateTableConfig(tableConfig);

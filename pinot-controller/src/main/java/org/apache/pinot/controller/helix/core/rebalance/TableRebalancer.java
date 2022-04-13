@@ -145,8 +145,6 @@ public class TableRebalancer {
         tableConfig.getRoutingConfig().getInstanceSelectorType());
     boolean bestEfforts = rebalanceConfig.getBoolean(RebalanceConfigConstants.BEST_EFFORTS,
         RebalanceConfigConstants.DEFAULT_BEST_EFFORTS);
-    boolean retainInstanceSequence = rebalanceConfig.getBoolean(RebalanceConfigConstants.RETAIN_INSTANCE_SEQUENCE,
-        RebalanceConfigConstants.DEFAULT_RETAIN_INSTANCE_SEQUENCE);
     LOGGER.info(
         "Start rebalancing table: {} with dryRun: {}, reassignInstances: {}, includeConsuming: {}, bootstrap: {}, "
             + "downtime: {}, minReplicasToKeepUpForNoDowntime: {}, enableStrictReplicaGroup: {}, bestEfforts: {}",
@@ -196,7 +194,7 @@ public class TableRebalancer {
     // Calculate instance partitions map
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap;
     try {
-      instancePartitionsMap = getInstancePartitionsMap(tableConfig, reassignInstances, dryRun, retainInstanceSequence);
+      instancePartitionsMap = getInstancePartitionsMap(tableConfig, reassignInstances, dryRun);
     } catch (Exception e) {
       LOGGER.warn(
           "Caught exception while fetching/calculating instance partitions for table: {}, aborting the rebalance",
@@ -325,12 +323,10 @@ public class TableRebalancer {
           currentIdealState = idealState;
           currentAssignment = currentIdealState.getRecord().getMapFields();
           // Re-calculate the instance partitions in case the instance configs changed during the rebalance
-          instancePartitionsMap =
-              getInstancePartitionsMap(tableConfig, reassignInstances, false, retainInstanceSequence);
+          instancePartitionsMap = getInstancePartitionsMap(tableConfig, reassignInstances, false);
           tierToInstancePartitionsMap = getTierToInstancePartitionsMap(tableNameWithType, sortedTiers);
-          targetAssignment = segmentAssignment
-              .rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers, tierToInstancePartitionsMap,
-                  rebalanceConfig);
+          targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
+              tierToInstancePartitionsMap, rebalanceConfig);
           expectedVersion = currentIdealState.getRecord().getVersion();
         } catch (Exception e) {
           LOGGER.warn(
@@ -385,24 +381,21 @@ public class TableRebalancer {
   }
 
   private Map<InstancePartitionsType, InstancePartitions> getInstancePartitionsMap(TableConfig tableConfig,
-      boolean reassignInstances, boolean dryRun, boolean retainInstanceSequence) {
+      boolean reassignInstances, boolean dryRun) {
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
     if (tableConfig.getTableType() == TableType.OFFLINE) {
       instancePartitionsMap.put(InstancePartitionsType.OFFLINE,
-          getInstancePartitions(tableConfig, InstancePartitionsType.OFFLINE, reassignInstances, dryRun,
-              retainInstanceSequence));
+          getInstancePartitions(tableConfig, InstancePartitionsType.OFFLINE, reassignInstances, dryRun));
     } else {
       instancePartitionsMap.put(InstancePartitionsType.CONSUMING,
-          getInstancePartitions(tableConfig, InstancePartitionsType.CONSUMING, reassignInstances, dryRun,
-              retainInstanceSequence));
+          getInstancePartitions(tableConfig, InstancePartitionsType.CONSUMING, reassignInstances, dryRun));
       String tableNameWithType = tableConfig.getTableName();
       if (InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig)) {
         LOGGER.info(
             "COMPLETED segments should be relocated, fetching/computing COMPLETED instance partitions for table: {}",
             tableNameWithType);
         instancePartitionsMap.put(InstancePartitionsType.COMPLETED,
-            getInstancePartitions(tableConfig, InstancePartitionsType.COMPLETED, reassignInstances, dryRun,
-                retainInstanceSequence));
+            getInstancePartitions(tableConfig, InstancePartitionsType.COMPLETED, reassignInstances, dryRun));
       } else {
         LOGGER.info(
             "COMPLETED segments should not be relocated, skipping fetching/computing COMPLETED instance partitions "
@@ -420,16 +413,14 @@ public class TableRebalancer {
   }
 
   private InstancePartitions getInstancePartitions(TableConfig tableConfig,
-      InstancePartitionsType instancePartitionsType, boolean reassignInstances, boolean dryRun,
-      boolean retainInstanceSequence) {
+      InstancePartitionsType instancePartitionsType, boolean reassignInstances, boolean dryRun) {
     String tableNameWithType = tableConfig.getTableName();
     if (InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, instancePartitionsType)) {
       if (reassignInstances) {
-        InstancePartitions existingInstancePartitions = null;
-        if (retainInstanceSequence) {
-          existingInstancePartitions = InstancePartitionsUtils
-              .fetchOrComputeInstancePartitions(_helixManager, tableConfig, instancePartitionsType);
-        }
+        InstancePartitions existingInstancePartitions =
+            InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
+                InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType,
+                    instancePartitionsType.toString()));
         LOGGER.info("Reassigning {} instances for table: {}", instancePartitionsType, tableNameWithType);
         InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(tableConfig);
         InstancePartitions instancePartitions = instanceAssignmentDriver.assignInstances(instancePartitionsType,

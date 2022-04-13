@@ -569,12 +569,9 @@ public class PinotTableRestletResource {
           boolean downtime, @ApiParam(
       value = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum "
           + "number of replicas allowed to be unavailable if value is negative") @DefaultValue("1")
-  @QueryParam("minAvailableReplicas") int minAvailableReplicas,
-      @ApiParam(value = "Whether to use best-efforts to rebalance (not fail the rebalance"
-          + " when the no-downtime contract cannot be achieved)") @DefaultValue("false")
-      @QueryParam("bestEfforts") boolean bestEfforts,
-      @ApiParam(value = "Whether to retain instance sequence during rebalancing in order to minimize data movement")
-      @DefaultValue("false") @QueryParam("retainInstancesSequence") boolean retainInstancesSequence) {
+  @QueryParam("minAvailableReplicas") int minAvailableReplicas, @ApiParam(
+      value = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot "
+          + "be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts) {
 
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
 
@@ -586,7 +583,6 @@ public class PinotTableRestletResource {
     rebalanceConfig.addProperty(RebalanceConfigConstants.DOWNTIME, downtime);
     rebalanceConfig.addProperty(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME, minAvailableReplicas);
     rebalanceConfig.addProperty(RebalanceConfigConstants.BEST_EFFORTS, bestEfforts);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.RETAIN_INSTANCE_SEQUENCE, retainInstancesSequence);
 
     try {
       if (dryRun || downtime) {

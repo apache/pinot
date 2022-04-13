@@ -124,9 +124,7 @@ public class PinotInstanceAssignmentRestletResource {
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED") @QueryParam("type") @Nullable
           InstancePartitionsType instancePartitionsType,
-      @ApiParam(value = "Whether to do dry-run") @DefaultValue("false") @QueryParam("dryRun") boolean dryRun,
-      @ApiParam(value = "Whether to retain current instance sequence") @DefaultValue("false")
-      @QueryParam("retainInstanceSequence") boolean retainInstanceSequence) {
+      @ApiParam(value = "Whether to do dry-run") @DefaultValue("false") @QueryParam("dryRun") boolean dryRun) {
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
     List<InstanceConfig> instanceConfigs = _resourceManager.getAllHelixInstanceConfigs();
 
@@ -139,7 +137,7 @@ public class PinotInstanceAssignmentRestletResource {
           if (InstanceAssignmentConfigUtils
               .allowInstanceAssignment(offlineTableConfig, InstancePartitionsType.OFFLINE)) {
             assignInstancesForInstancePartitionsType(instancePartitionsMap, offlineTableConfig, instanceConfigs,
-                InstancePartitionsType.OFFLINE, retainInstanceSequence);
+                InstancePartitionsType.OFFLINE);
           }
         } catch (IllegalStateException e) {
           throw new ControllerApplicationException(LOGGER, "Caught IllegalStateException", Response.Status.BAD_REQUEST,
@@ -158,14 +156,14 @@ public class PinotInstanceAssignmentRestletResource {
             if (InstanceAssignmentConfigUtils
                 .allowInstanceAssignment(realtimeTableConfig, InstancePartitionsType.CONSUMING)) {
               assignInstancesForInstancePartitionsType(instancePartitionsMap, realtimeTableConfig, instanceConfigs,
-                  InstancePartitionsType.CONSUMING, retainInstanceSequence);
+                  InstancePartitionsType.CONSUMING);
             }
           }
           if (instancePartitionsType == InstancePartitionsType.COMPLETED || instancePartitionsType == null) {
             if (InstanceAssignmentConfigUtils
                 .allowInstanceAssignment(realtimeTableConfig, InstancePartitionsType.COMPLETED)) {
               assignInstancesForInstancePartitionsType(instancePartitionsMap, realtimeTableConfig, instanceConfigs,
-                  InstancePartitionsType.COMPLETED, retainInstanceSequence);
+                  InstancePartitionsType.COMPLETED);
             }
           }
         } catch (IllegalStateException e) {
@@ -198,17 +196,14 @@ public class PinotInstanceAssignmentRestletResource {
    * @param tableConfig table config
    * @param instanceConfigs list of instance configs
    * @param instancePartitionsType type of instancePartitions
-   * @param retainInstanceSequence whether to retain instance sequence
    */
   private void assignInstancesForInstancePartitionsType(
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, TableConfig tableConfig,
-      List<InstanceConfig> instanceConfigs, InstancePartitionsType instancePartitionsType,
-      boolean retainInstanceSequence) {
-    InstancePartitions existingInstancePartitions = null;
-    if (retainInstanceSequence) {
-      existingInstancePartitions = InstancePartitionsUtils
-          .fetchOrComputeInstancePartitions(_resourceManager.getHelixZkManager(), tableConfig, instancePartitionsType);
-    }
+      List<InstanceConfig> instanceConfigs, InstancePartitionsType instancePartitionsType) {
+    String tableNameWithType = tableConfig.getTableName();
+    InstancePartitions existingInstancePartitions =
+        InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getHelixZkManager().getHelixPropertyStore(),
+            InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString()));
     instancePartitionsMap.put(instancePartitionsType, new InstanceAssignmentDriver(tableConfig)
         .assignInstances(instancePartitionsType, instanceConfigs, existingInstancePartitions));
   }

@@ -77,10 +77,6 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
           + " cannot be achieved, false by default)")
   private boolean _bestEfforts = false;
 
-  @CommandLine.Option(names = {"-retainInstancesSequence"},
-      description = "Whether to retain instance sequence during rebalancing in order to minimize data movement")
-  private boolean _retainInstancesSequence = false;
-
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message")
   private boolean _help = false;
 
@@ -98,7 +94,7 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
       throws Exception {
     PinotTableRebalancer tableRebalancer =
         new PinotTableRebalancer(_zkAddress, _clusterName, _dryRun, _reassignInstances, _includeConsuming, _bootstrap,
-            _downtime, _minAvailableReplicas, _bestEfforts, _retainInstancesSequence);
+            _downtime, _minAvailableReplicas, _bestEfforts);
     RebalanceResult rebalanceResult = tableRebalancer.rebalance(_tableNameWithType);
     LOGGER
         .info("Got rebalance result: {} for table: {}", JsonUtils.objectToString(rebalanceResult), _tableNameWithType);

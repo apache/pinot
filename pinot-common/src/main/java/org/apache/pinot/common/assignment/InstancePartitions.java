@@ -23,8 +23,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -60,39 +58,24 @@ import org.apache.pinot.spi.utils.JsonUtils;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class InstancePartitions {
   private static final char PARTITION_REPLICA_GROUP_SEPARATOR = '_';
-  private static final String POOLS_KEY = "pools";
-  private static final String REPLICA_GROUP_SEPARATOR = "/";
 
   private final String _instancePartitionsName;
-  // A map to store the partition and its associated list of instances.
-  // The partition key would be like "0_0", where the 1st number denotes the partition id,
-  // and the 2nd one denotes the replica group id.
   private final Map<String, List<String>> _partitionToInstancesMap;
-  // A map to store the selected pool numbers and their associated list of replica groups.
-  private final Map<Integer, List<Integer>> _poolToReplicaGroupsMap;
   private int _numPartitions;
   private int _numReplicaGroups;
 
   public InstancePartitions(String instancePartitionsName) {
     _instancePartitionsName = instancePartitionsName;
     _partitionToInstancesMap = new TreeMap<>();
-    _poolToReplicaGroupsMap = new TreeMap<>();
   }
 
   @JsonCreator
   private InstancePartitions(
       @JsonProperty(value = "instancePartitionsName", required = true) String instancePartitionsName,
       @JsonProperty(value = "partitionToInstancesMap", required = true)
-          Map<String, List<String>> partitionToInstancesMap,
-      @JsonProperty(value = "poolToReplicaGroupsMap") Map<String, String> poolToReplicaGroupsMap) {
+          Map<String, List<String>> partitionToInstancesMap) {
     _instancePartitionsName = instancePartitionsName;
     _partitionToInstancesMap = partitionToInstancesMap;
-    _poolToReplicaGroupsMap = new TreeMap<>();
-    if (poolToReplicaGroupsMap != null) {
-      for (Map.Entry<String, String> entry : poolToReplicaGroupsMap.entrySet()) {
-        _poolToReplicaGroupsMap.put(Integer.parseInt(entry.getKey()), extractReplicaGroups(entry.getValue()));
-      }
-    }
     for (String key : partitionToInstancesMap.keySet()) {
       int separatorIndex = key.indexOf(PARTITION_REPLICA_GROUP_SEPARATOR);
       int partitionId = Integer.parseInt(key.substring(0, separatorIndex));
@@ -122,11 +105,6 @@ public class InstancePartitions {
     return _numReplicaGroups;
   }
 
-  @JsonIgnore
-  public Map<Integer, List<Integer>> getPoolToReplicaGroupsMap() {
-    return _poolToReplicaGroupsMap;
-  }
-
   public List<String> getInstances(int partitionId, int replicaGroupId) {
     return _partitionToInstancesMap
         .get(Integer.toString(partitionId) + PARTITION_REPLICA_GROUP_SEPARATOR + replicaGroupId);
@@ -139,53 +117,13 @@ public class InstancePartitions {
     _numReplicaGroups = Integer.max(_numReplicaGroups, replicaGroupId + 1);
   }
 
-  public void setPoolToReplicaGroupsMap(Map<Integer, List<Integer>> poolToReplicaGroupsMap) {
-    _poolToReplicaGroupsMap.putAll(poolToReplicaGroupsMap);
-  }
-
   public static InstancePartitions fromZNRecord(ZNRecord znRecord) {
-    return new InstancePartitions(znRecord.getId(), znRecord.getListFields(), znRecord.getMapField(POOLS_KEY));
-  }
-
-  private static List<Integer> extractReplicaGroups(String instancesRawString) {
-    if (instancesRawString == null || instancesRawString.length() == 0) {
-      return Collections.emptyList();
-    }
-    String[] replicaGroupStringArray = instancesRawString.split(REPLICA_GROUP_SEPARATOR);
-    List<Integer> instances = new ArrayList<>(replicaGroupStringArray.length);
-    for (String replicaGroupString : replicaGroupStringArray) {
-      instances.add(Integer.parseInt(replicaGroupString));
-    }
-    return instances;
-  }
-
-  private String convertReplicaGroupsToString(List<Integer> replicaGroups) {
-    if (replicaGroups == null || replicaGroups.isEmpty()) {
-      return "";
-    }
-    StringBuilder stringBuilder = new StringBuilder();
-    for (Integer replicaGroup : replicaGroups) {
-      if (stringBuilder.length() == 0) {
-        stringBuilder.append(replicaGroup);
-      } else {
-        stringBuilder.append(REPLICA_GROUP_SEPARATOR).append(replicaGroup);
-      }
-    }
-    return stringBuilder.toString();
-  }
-
-  private Map<String, String> convertListToStringMap() {
-    Map<String, String> convertedMap = new TreeMap<>();
-    for (Map.Entry<Integer, List<Integer>> entry : _poolToReplicaGroupsMap.entrySet()) {
-      convertedMap.put(Integer.toString(entry.getKey()), convertReplicaGroupsToString(entry.getValue()));
-    }
-    return convertedMap;
+    return new InstancePartitions(znRecord.getId(), znRecord.getListFields());
   }
 
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = new ZNRecord(_instancePartitionsName);
     znRecord.setListFields(_partitionToInstancesMap);
-    znRecord.setMapField(POOLS_KEY, convertListToStringMap());
     return znRecord;
   }
 
