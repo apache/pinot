@@ -19,11 +19,14 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.RateLimiter;
+import java.io.IOException;
 import java.net.InetAddress;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -41,6 +44,8 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.helix.HelixManager;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
@@ -48,6 +53,7 @@ import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -73,7 +79,13 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.helix.LeadControllerUtils;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
@@ -87,6 +99,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
+import org.apache.pinot.spi.config.task.AdhocTaskConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -110,7 +123,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
   private static final Expression STAR = RequestUtils.getIdentifierExpression("*");
 
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final DataSchema INSERT_FROM_FILE_RESPONSE_SCHEMA =
+      new DataSchema(new String[]{"tableName", "taskJobName"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
+  private static final String TASK_NAME = "taskName";
+  private static final String TASK_TYPE = "taskType";
+
   protected final PinotConfiguration _config;
+  protected final HelixManager _helixManager;
   protected final BrokerRoutingManager _routingManager;
   protected final AccessControlFactory _accessControlFactory;
   protected final QueryQuotaManager _queryQuotaManager;
@@ -135,10 +156,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private final boolean _enableQueryLimitOverride;
   private final boolean _enableDistinctCountBitmapOverride;
 
-  public BaseBrokerRequestHandler(PinotConfiguration config, BrokerRoutingManager routingManager,
-      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      BrokerMetrics brokerMetrics) {
+  public BaseBrokerRequestHandler(PinotConfiguration config, HelixManager helixManager,
+      BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
+      QueryQuotaManager queryQuotaManager, TableCache tableCache, BrokerMetrics brokerMetrics) {
     _config = config;
+    _helixManager = helixManager;
     _routingManager = routingManager;
     _accessControlFactory = accessControlFactory;
     _queryQuotaManager = queryQuotaManager;
@@ -222,6 +244,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     setOptions(brokerRequest.getPinotQuery(), requestId, query, request);
+    if (brokerRequest.getPinotQuery().isInsertFromFile()) {
+      try {
+        return handleInsertFromFileRequest(brokerRequest.getPinotQuery());
+      } catch (Exception e) {
+        return new BrokerResponseNative(QueryException.getException(QueryException.INSERT_FROM_FILE_ERROR, e));
+      }
+    }
     BrokerRequest serverBrokerRequest = GapfillUtils.stripGapfill(brokerRequest);
     PinotQuery pinotQuery = serverBrokerRequest.getPinotQuery();
     setOptions(pinotQuery, requestId, query, request);
@@ -592,6 +621,39 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (CollectionUtils.isNotEmpty(orderByList)) {
       orderByList.forEach(
           expression -> setTimestampIndexExpressionOverrideHints(expression, timestampIndexColumns, pinotQuery));
+    }
+  }
+
+  private BrokerResponseNative handleInsertFromFileRequest(PinotQuery pinotQuery)
+      throws IOException {
+    Map<String, String> queryOptions = pinotQuery.getQueryOptions();
+    String taskName = queryOptions.get(TASK_NAME);
+    String taskType = queryOptions.getOrDefault(TASK_TYPE, MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE);
+    AdhocTaskConfig taskConf =
+        new AdhocTaskConfig(taskType, pinotQuery.getDataSource().getTableName(), taskName, queryOptions);
+    String response = executeTask(taskConf);
+    BrokerResponseNative result = new BrokerResponseNative();
+
+    Map<String, String> tableToTaskIdMap = OBJECT_MAPPER.readValue(response, Map.class);
+    List<Object[]> rows = new ArrayList<>();
+    tableToTaskIdMap.entrySet().forEach(entry -> rows.add(new Object[]{entry.getKey(), entry.getValue()}));
+    result.setResultTable(new ResultTable(INSERT_FROM_FILE_RESPONSE_SCHEMA, rows));
+    return result;
+  }
+
+  private String executeTask(AdhocTaskConfig adhocTaskConfig)
+      throws IOException {
+    try {
+      InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager,
+          CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + LeadControllerUtils.getHelixClusterLeader(
+              _helixManager));
+      String url = "http://" + StringUtil.join("/", instanceConfig.getHostName() + ":" + instanceConfig.getPort(),
+          "tasks/execute");
+      SimpleHttpResponse simpleHttpResponse = HttpClient.wrapAndThrowHttpException(
+          HttpClient.getInstance().sendJsonPostRequest(URI.create(url), adhocTaskConfig.toJsonString()));
+      return simpleHttpResponse.getResponse();
+    } catch (HttpErrorStatusException e) {
+      throw new IOException(e);
     }
   }
 

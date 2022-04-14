@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.helix.HelixManager;
 import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.failuredetector.FailureDetector;
@@ -67,10 +68,11 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
   private final QueryRouter _queryRouter;
   private final FailureDetector _failureDetector;
 
-  public SingleConnectionBrokerRequestHandler(PinotConfiguration config, BrokerRoutingManager routingManager,
-      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      BrokerMetrics brokerMetrics, NettyConfig nettyConfig, TlsConfig tlsConfig) {
-    super(config, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
+  public SingleConnectionBrokerRequestHandler(PinotConfiguration config, HelixManager helixManager,
+      BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
+      QueryQuotaManager queryQuotaManager, TableCache tableCache, BrokerMetrics brokerMetrics, NettyConfig nettyConfig,
+      TlsConfig tlsConfig) {
+    super(config, helixManager, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
 
     _brokerReduceService = new BrokerReduceService(_config);
     _queryRouter = new QueryRouter(_brokerId, brokerMetrics, nettyConfig, tlsConfig);

@@ -98,8 +98,8 @@ public class LiteralOnlyBrokerRequestTest {
         .compileToPinotQuery("SELECT encodeUrl('key1=value 1&key2=value@!$2&key3=value%3'),"
             + " decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') FROM myTable")));
     Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser
-            .compileToPinotQuery("SELECT count(*) from foo "
-                + "where bar = encodeUrl('key1=value 1&key2=value@!$2&key3=value%3')")));
+        .compileToPinotQuery("SELECT count(*) from foo "
+            + "where bar = encodeUrl('key1=value 1&key2=value@!$2&key3=value%3')")));
     Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser
         .compileToPinotQuery("SELECT count(*) from foo "
             + "where bar = decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253')")));
@@ -120,9 +120,9 @@ public class LiteralOnlyBrokerRequestTest {
   public void testBrokerRequestHandler()
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
-        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, ACCESS_CONTROL_FACTORY, null, null,
-            new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet()),
-            null, null);
+        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, null, ACCESS_CONTROL_FACTORY, null,
+            null, new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet()), null,
+            null);
     long randNum = RANDOM.nextLong();
     byte[] randBytes = new byte[12];
     RANDOM.nextBytes(randBytes);
@@ -147,9 +147,9 @@ public class LiteralOnlyBrokerRequestTest {
   public void testBrokerRequestHandlerWithAsFunction()
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
-        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, ACCESS_CONTROL_FACTORY, null, null,
-            new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet()),
-            null, null);
+        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, null, ACCESS_CONTROL_FACTORY, null,
+            null, new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet()), null,
+            null);
     long currentTsMin = System.currentTimeMillis();
     JsonNode request = new ObjectMapper().readTree(
         "{\"sql\":\"SELECT now() as currentTs, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') as firstDayOf2020\"}");
@@ -217,9 +217,9 @@ public class LiteralOnlyBrokerRequestTest {
   public void testExplainPlanLiteralOnly()
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
-        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, ACCESS_CONTROL_FACTORY, null, null,
-            new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet()),
-            null, null);
+        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, null, ACCESS_CONTROL_FACTORY, null,
+            null, new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet()), null,
+            null);
 
     ObjectMapper objectMapper = new ObjectMapper();
     // Test 1: select constant
@@ -229,8 +229,10 @@ public class LiteralOnlyBrokerRequestTest {
 
     checkExplainResultSchema(brokerResponse.getResultTable().getDataSchema(),
         new String[]{"Operator", "Operator_Id", "Parent_Id"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.INT});
+        new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
+            DataSchema.ColumnDataType.INT
+        });
 
     Assert.assertEquals(brokerResponse.getResultTable().getRows().size(), 1);
     Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0),
@@ -247,8 +249,10 @@ public class LiteralOnlyBrokerRequestTest {
 
     checkExplainResultSchema(brokerResponse.getResultTable().getDataSchema(),
         new String[]{"Operator", "Operator_Id", "Parent_Id"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.INT});
+        new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
+            DataSchema.ColumnDataType.INT
+        });
 
     Assert.assertEquals(brokerResponse.getResultTable().getRows().size(), 1);
     Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0),

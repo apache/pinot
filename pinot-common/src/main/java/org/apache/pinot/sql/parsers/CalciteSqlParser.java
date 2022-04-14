@@ -50,6 +50,7 @@ import org.apache.calcite.sql.parser.SqlAbstractParserImpl;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -60,6 +61,7 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.Pairs;
+import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
@@ -127,6 +129,32 @@ public class CalciteSqlParser {
       sqlNode = sqlParser.parseSqlStmtEof();
     } catch (Throwable e) {
       throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
+    }
+
+    // Compile Sql Insert
+    if (sqlNode instanceof SqlInsertFromFile) {
+      SqlInsertFromFile sqlInsertFromFile = (SqlInsertFromFile) sqlNode;
+      // operandList[0] : database name
+      // operandList[1] : table name
+      // operandList[2] : file list
+      List<SqlNode> operandList = sqlInsertFromFile.getOperandList();
+
+      PinotQuery pinotQuery = new PinotQuery();
+      pinotQuery.setInsertFromFile(true);
+      // Set table
+      String tableName = operandList.get(0) != null ? StringUtils.joinWith(",", operandList.get(0), operandList.get(1))
+          : operandList.get(1).toString();
+      DataSource dataSource = new DataSource();
+      dataSource.setTableName(tableName);
+      pinotQuery.setDataSource(dataSource);
+
+      // Set Option statements to PinotQuery.
+      setOptions(pinotQuery, options);
+      List<String> inputDirList = new ArrayList<>();
+      ((SqlNodeList) operandList.get(2)).getList()
+          .forEach(sqlNode1 -> inputDirList.add(sqlNode1.toString().replace("'", "")));
+      pinotQuery.getQueryOptions().put("inputDirURI", StringUtils.join(inputDirList, ","));
+      return pinotQuery;
     }
 
     // Compile Sql without OPTION statements.

@@ -53,6 +53,7 @@ public class QueryException {
   public static final int ACCESS_DENIED_ERROR_CODE = 180;
   public static final int TABLE_DOES_NOT_EXIST_ERROR_CODE = 190;
   public static final int QUERY_EXECUTION_ERROR_CODE = 200;
+  public static final int INSERT_FROM_FILE_ERROR_CODE = 210;
   // TODO: Handle these errors in broker
   public static final int SERVER_SHUTTING_DOWN_ERROR_CODE = 210;
   public static final int SERVER_OUT_OF_CAPACITY_ERROR_CODE = 211;
@@ -90,6 +91,7 @@ public class QueryException {
   public static final ProcessingException TABLE_DOES_NOT_EXIST_ERROR =
       new ProcessingException(TABLE_DOES_NOT_EXIST_ERROR_CODE);
   public static final ProcessingException QUERY_EXECUTION_ERROR = new ProcessingException(QUERY_EXECUTION_ERROR_CODE);
+  public static final ProcessingException INSERT_FROM_FILE_ERROR = new ProcessingException(INSERT_FROM_FILE_ERROR_CODE);
   public static final ProcessingException SERVER_SCHEDULER_DOWN_ERROR =
       new ProcessingException(SERVER_SHUTTING_DOWN_ERROR_CODE);
   public static final ProcessingException SERVER_OUT_OF_CAPACITY_ERROR =

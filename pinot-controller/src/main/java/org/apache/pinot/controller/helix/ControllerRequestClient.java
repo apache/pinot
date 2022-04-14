@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix;
 
 import java.io.IOException;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
@@ -26,6 +27,7 @@ import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.task.AdhocTaskConfig;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.data.Schema;
@@ -50,6 +52,7 @@ public class ControllerRequestClient {
   public ControllerRequestURLBuilder getControllerRequestURLBuilder() {
     return _controllerRequestURLBuilder;
   }
+
   /**
    * Add a schema to the controller.
    */
@@ -220,5 +223,17 @@ public class ControllerRequestClient {
       int numRealtimeServers) {
     return new Tenant(TenantRole.SERVER, tenantName, numOfflineServers + numRealtimeServers, numOfflineServers,
         numRealtimeServers).toJsonString();
+  }
+
+  public String executeTask(AdhocTaskConfig adhocTaskConfig)
+      throws IOException {
+    String url = _controllerRequestURLBuilder.forTaskExecute();
+    try {
+      SimpleHttpResponse simpleHttpResponse = HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendJsonPostRequest(URI.create(url), adhocTaskConfig.toJsonString()));
+      return simpleHttpResponse.getResponse();
+    } catch (HttpErrorStatusException e) {
+      throw new IOException(e);
+    }
   }
 }

@@ -418,4 +418,8 @@ public class ControllerRequestURLBuilder {
   public String forZkGetChildren(String path) {
     return StringUtil.join("/", _baseUrl, "zk/getChildren", "?path=" + path);
   }
+
+  public String forTaskExecute() {
+    return StringUtil.join("/", _baseUrl, "tasks/execute");
+  }
 }

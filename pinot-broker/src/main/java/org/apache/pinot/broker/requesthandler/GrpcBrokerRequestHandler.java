@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.helix.HelixManager;
 import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
@@ -55,10 +56,10 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final PinotStreamingQueryClient _streamingQueryClient;
 
   // TODO: Support TLS
-  public GrpcBrokerRequestHandler(PinotConfiguration config, BrokerRoutingManager routingManager,
-      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      BrokerMetrics brokerMetrics, TlsConfig tlsConfig) {
-    super(config, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
+  public GrpcBrokerRequestHandler(PinotConfiguration config, HelixManager helixManager,
+      BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
+      QueryQuotaManager queryQuotaManager, TableCache tableCache, BrokerMetrics brokerMetrics, TlsConfig tlsConfig) {
+    super(config, helixManager, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
     _grpcConfig = buildGrpcQueryClientConfig(config);
 
     // create streaming query client

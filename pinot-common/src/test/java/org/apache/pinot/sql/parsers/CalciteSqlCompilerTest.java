@@ -2635,4 +2635,22 @@ public class CalciteSqlCompilerTest {
     }
     return null;
   }
+
+  @Test
+  public void testInsertIntoStatement() {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
+        "INSERT INTO myTable FROM FILE '/path/pet.txt' "
+            + "OPTION(input.fs.className=org.apache.pinot.plugin.filesystem.S3PinotFS) "
+            + "OPTION(input.fs.prop.accessKey=my-access-key) "
+            + "OPTION(input.fs.prop.secretKey=my-secret-key) "
+            + "OPTION(input.fs.prop.region=us-west-2)");
+    Assert.assertEquals(pinotQuery.getDataSource().getTableName(), "myTable");
+    Assert.assertEquals(pinotQuery.getQueryOptions().size(), 5);
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("input.fs.className"),
+        "org.apache.pinot.plugin.filesystem.S3PinotFS");
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("input.fs.prop.accessKey"), "my-access-key");
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("input.fs.prop.secretKey"), "my-secret-key");
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("input.fs.prop.region"), "us-west-2");
+    Assert.assertEquals(pinotQuery.getQueryOptions().get("inputDirURI"), "/path/pet.txt");
+  }
 }
