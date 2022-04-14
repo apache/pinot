@@ -24,7 +24,6 @@ import java.util.Map;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
-import org.apache.pinot.broker.failuredetector.ConnectionFailureDetector;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -64,7 +63,7 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
 
   @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
-    brokerConf.setProperty(FailureDetector.CONFIG_OF_CLASS_NAME, ConnectionFailureDetector.class.getName());
+    brokerConf.setProperty(FailureDetector.CONFIG_OF_TYPE, FailureDetector.Type.CONNECTION.name());
   }
 
   @Test

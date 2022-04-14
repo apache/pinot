@@ -178,13 +178,13 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
 
     @Override
     public long getDelay(TimeUnit unit) {
-      return unit.convert(System.nanoTime() - _retryTimeNs, TimeUnit.NANOSECONDS);
+      return unit.convert(_retryTimeNs - System.nanoTime(), TimeUnit.NANOSECONDS);
     }
 
     @Override
     public int compareTo(Delayed o) {
       RetryInfo that = (RetryInfo) o;
-      return Long.compare(that._retryTimeNs, _retryTimeNs);
+      return Long.compare(_retryTimeNs, that._retryTimeNs);
     }
   }
 }

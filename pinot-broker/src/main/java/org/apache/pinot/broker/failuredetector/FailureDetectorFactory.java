@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.failuredetector;
 
+import com.google.common.base.Preconditions;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -32,25 +33,41 @@ public class FailureDetectorFactory {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FailureDetectorFactory.class);
+  private static final FailureDetector NO_OP_FAILURE_DETECTOR = new NoOpFailureDetector();
 
   public static FailureDetector getFailureDetector(PinotConfiguration config, BrokerMetrics brokerMetrics) {
-    String className = config.getProperty(Broker.FailureDetector.CONFIG_OF_CLASS_NAME);
-    if (StringUtils.isEmpty(className)) {
-      LOGGER.info("Class name is not configured, falling back to NoOpFailureDetector");
-      return new NoOpFailureDetector();
-    } else {
-      LOGGER.info("Initializing failure detector with class: {}", className);
-      try {
-        FailureDetector failureDetector = PluginManager.get().createInstance(className);
+    String typeStr = config.getProperty(Broker.FailureDetector.CONFIG_OF_TYPE, Broker.FailureDetector.DEFAULT_TYPE);
+    Broker.FailureDetector.Type type;
+    try {
+      type = Broker.FailureDetector.Type.valueOf(typeStr.toUpperCase());
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Illegal failure detector type: " + typeStr);
+    }
+    switch (type) {
+      case NO_OP:
+        return NO_OP_FAILURE_DETECTOR;
+      case CONNECTION: {
+        FailureDetector failureDetector = new ConnectionFailureDetector();
         failureDetector.init(config, brokerMetrics);
-        LOGGER.info("Initialized failure detector with class: {}", className);
         return failureDetector;
-      } catch (Exception e) {
-        LOGGER.error(
-            "Caught exception while initializing failure detector with class: {}, falling back to NoOpFailureDetector",
-            className);
-        return new NoOpFailureDetector();
       }
+      case CUSTOM: {
+        String className = config.getProperty(Broker.FailureDetector.CONFIG_OF_CLASS_NAME);
+        Preconditions.checkArgument(!StringUtils.isEmpty(className),
+            "Failure detector class name must be configured for CUSTOM type");
+        LOGGER.info("Initializing CUSTOM failure detector with class: {}", className);
+        try {
+          FailureDetector failureDetector = PluginManager.get().createInstance(className);
+          failureDetector.init(config, brokerMetrics);
+          LOGGER.info("Initialized CUSTOM failure detector with class: {}", className);
+          return failureDetector;
+        } catch (Exception e) {
+          throw new RuntimeException(
+              "Caught exception while initializing CUSTOM failure detector with class: " + className, e);
+        }
+      }
+      default:
+        throw new IllegalStateException("Unsupported failure detector type: " + type);
     }
   }
 }

@@ -50,7 +50,7 @@ public class ConnectionFailureDetectorTest {
   @BeforeClass
   public void setUp() {
     PinotConfiguration config = new PinotConfiguration();
-    config.setProperty(Broker.FailureDetector.CONFIG_OF_CLASS_NAME, ConnectionFailureDetector.class.getName());
+    config.setProperty(Broker.FailureDetector.CONFIG_OF_TYPE, Broker.FailureDetector.Type.CONNECTION.name());
     config.setProperty(Broker.FailureDetector.CONFIG_OF_RETRY_INITIAL_DELAY_MS, 100);
     config.setProperty(Broker.FailureDetector.CONFIG_OF_RETRY_DELAY_FACTOR, 1);
     _brokerMetrics = new BrokerMetrics(PinotMetricUtils.getPinotMetricsRegistry());

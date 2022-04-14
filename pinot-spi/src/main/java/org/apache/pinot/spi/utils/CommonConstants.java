@@ -251,6 +251,19 @@ public class CommonConstants {
     }
 
     public static class FailureDetector {
+      public enum Type {
+        // Do not detect any failure
+        NO_OP,
+
+        // Detect connection failures
+        CONNECTION,
+
+        // Use the custom failure detector of the configured class name
+        CUSTOM
+      }
+
+      public static final String CONFIG_OF_TYPE = "pinot.broker.failure.detector.type";
+      public static final String DEFAULT_TYPE = Type.NO_OP.name();
       public static final String CONFIG_OF_CLASS_NAME = "pinot.broker.failure.detector.class";
 
       // Exponential backoff delay of retrying an unhealthy server when a failure is detected
@@ -510,11 +523,9 @@ public class CommonConstants {
     public static class Realtime {
       public enum Status {
         // Means the segment is in CONSUMING state.
-        IN_PROGRESS,
-        // Means the segment is in ONLINE state (segment completed consuming and has been saved in
+        IN_PROGRESS, // Means the segment is in ONLINE state (segment completed consuming and has been saved in
         // segment store).
-        DONE,
-        // Means the segment is uploaded to a Pinot controller by an external party.
+        DONE, // Means the segment is uploaded to a Pinot controller by an external party.
         UPLOADED
       }
 
@@ -525,8 +536,7 @@ public class CommonConstants {
       public enum CompletionMode {
         // default behavior - if the in memory segment in the non-winner server is equivalent to the committed
         // segment, then build and replace, else download
-        DEFAULT,
-        // non-winner servers always download the segment, never build it
+        DEFAULT, // non-winner servers always download the segment, never build it
         DOWNLOAD
       }
 
