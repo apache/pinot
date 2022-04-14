@@ -449,6 +449,46 @@ public class CommonConstants {
         "pinot.controller.query.rewriter.class.names";
     //Set to true to load all services tagged and compiled with hk2-metadata-generator. Default to False
     public static final String CONTROLLER_SERVICE_AUTO_DISCOVERY = "pinot.controller.service.auto.discovery";
+
+    /**
+     * Constants for rebalance config properties
+     */
+    public static class RebalanceConfigConstants {
+      // Whether to rebalance table in dry-run mode
+      public static final String DRY_RUN = "dryRun";
+      public static final boolean DEFAULT_DRY_RUN = false;
+
+      // Whether to reassign instances before reassigning segments
+      public static final String REASSIGN_INSTANCES = "reassignInstances";
+      public static final boolean DEFAULT_REASSIGN_INSTANCES = false;
+
+      // Whether to reassign CONSUMING segments
+      public static final String INCLUDE_CONSUMING = "includeConsuming";
+      public static final boolean DEFAULT_INCLUDE_CONSUMING = false;
+
+      // Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign all segments
+      // in a round-robin fashion as if adding new segments to an empty table)
+      public static final String BOOTSTRAP = "bootstrap";
+      public static final boolean DEFAULT_BOOTSTRAP = false;
+
+      // Whether to allow downtime for the rebalance
+      public static final String DOWNTIME = "downtime";
+      public static final boolean DEFAULT_DOWNTIME = false;
+
+      // For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum number of
+      // replicas allowed to be unavailable if value is negative
+      public static final String MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME = "minReplicasToKeepUpForNoDowntime";
+      public static final int DEFAULT_MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME = 1;
+
+      // Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot be
+      // achieved)
+      // When using best-efforts to rebalance, the following scenarios won't fail the rebalance (will log warnings
+      // instead):
+      // - Segment falls into ERROR state in ExternalView -> count ERROR state as good state
+      // - ExternalView has not converged within the maximum wait time -> continue to the next stage
+      public static final String BEST_EFFORTS = "bestEfforts";
+      public static final boolean DEFAULT_BEST_EFFORTS = false;
+    }
   }
 
   public static class Minion {

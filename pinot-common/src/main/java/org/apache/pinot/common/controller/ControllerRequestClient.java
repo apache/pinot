@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.helix;
+package org.apache.pinot.common.controller;
 
 import java.io.IOException;
 import java.net.URISyntaxException;

@@ -50,6 +50,8 @@ import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.http.client.entity.EntityBuilder;
+import org.apache.pinot.common.controller.ControllerRequestClient;
+import org.apache.pinot.common.controller.ControllerRequestURLBuilder;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.ZkStarter;

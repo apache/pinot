@@ -30,12 +30,12 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.types.Row;
+import org.apache.pinot.common.controller.ControllerRequestClient;
+import org.apache.pinot.common.controller.ControllerRequestURLBuilder;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.connector.flink.common.FlinkRowGenericRowConverter;
 import org.apache.pinot.connector.flink.http.PinotConnectionUtils;
 import org.apache.pinot.connector.flink.sink.PinotSinkFunction;
-import org.apache.pinot.controller.helix.ControllerRequestClient;
-import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
