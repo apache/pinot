@@ -150,6 +150,28 @@ public class PinotTaskRestletResource {
   }
 
   @GET
+  @Path("/tasks/{taskType}/{tableNameWithType}/metadata")
+  @ApiOperation("Get task metadata for the given task type and table")
+  public String getTaskMetadataByTable(
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
+      @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
+          String tableNameWithType) {
+    return _pinotHelixTaskResourceManager.getTaskMetadataByTable(taskType, tableNameWithType);
+  }
+
+  @DELETE
+  @Path("/tasks/{taskType}/{tableNameWithType}/metadata")
+  @ApiOperation("Delete task metadata for the given task type and table")
+  public SuccessResponse deleteTaskMetadataByTable(
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
+      @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
+          String tableNameWithType) {
+    _pinotHelixTaskResourceManager.deleteTaskMetadataByTable(taskType, tableNameWithType);
+    return new SuccessResponse(
+        String.format("Successfully deleted metadata for task type: %s from table: %s", taskType, tableNameWithType));
+  }
+
+  @GET
   @Path("/tasks/{taskType}/taskcounts")
   @ApiOperation("Fetch count of sub-tasks for each of the tasks for the given task type")
   public Map<String, PinotHelixTaskResourceManager.TaskCount> getTaskCounts(
