@@ -19,6 +19,10 @@
 package org.apache.pinot.plugin.ingestion.batch.spark;
 
 import com.google.common.collect.Lists;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.Collections;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReader;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
@@ -27,23 +31,23 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
-import org.apache.pinot.spi.ingestion.batch.spec.*;
+import org.apache.pinot.spi.ingestion.batch.spec.ExecutionFrameworkSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.RecordReaderSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import java.io.File;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.util.Collections;
-
 public class SparkSegmentGenerationJobRunnerTest {
 
     @BeforeClass
-    public void setup(){
-        JavaSparkContext javaSparkContext = new JavaSparkContext("local", SparkSegmentGenerationJobRunnerTest.class.getName());
+    public void setup() {
+        JavaSparkContext javaSparkContext = new JavaSparkContext("local",
+                SparkSegmentGenerationJobRunnerTest.class.getName());
     }
 
     @Test
