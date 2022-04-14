@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -49,15 +50,26 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
   @Override
   Map<String, String> select(List<String> segments, int requestId,
-      Map<String, List<String>> segmentToEnabledInstancesMap) {
+      Map<String, List<String>> segmentToEnabledInstancesMap, Map<String, String> queryOptions) {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
+    // validate queryOptions to get query
+    String replicaGroup = queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.NUM_REPLICA_GROUPS);
+    int replicaGroupNum = 1;
+    int currentRequest = 0;
+    if (replicaGroup != null) {
+      replicaGroupNum = Integer.parseInt(replicaGroup);
+    }
     for (String segment : segments) {
       List<String> enabledInstances = segmentToEnabledInstancesMap.get(segment);
       // NOTE: enabledInstances can be null when there is no enabled instances for the segment, or the instance selector
       // has not been updated (we update all components for routing in sequence)
       if (enabledInstances != null) {
         int numEnabledInstances = enabledInstances.size();
-        segmentToSelectedInstanceMap.put(segment, enabledInstances.get(requestId % numEnabledInstances));
+        int instanceToSelect = (requestId + currentRequest++) % numEnabledInstances;
+        segmentToSelectedInstanceMap.put(segment, enabledInstances.get(instanceToSelect));
+        if (currentRequest % replicaGroupNum == 0) {
+          currentRequest = 0;
+        }
       }
     }
     return segmentToSelectedInstanceMap;

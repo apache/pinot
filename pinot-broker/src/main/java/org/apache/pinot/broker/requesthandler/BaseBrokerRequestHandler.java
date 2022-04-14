@@ -363,7 +363,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // Validate the request
     try {
-      validateRequest(pinotQuery, _queryResponseLimit);
+      int numReplicas = 1;
+      if (offlineTableConfig != null) {
+        numReplicas = offlineTableConfig.getValidationConfig().getReplicationNumber();
+      } else if (realtimeTableConfig != null) {
+        numReplicas = realtimeTableConfig.getValidationConfig().getReplicationNumber();
+      }
+      validateRequest(pinotQuery, _queryResponseLimit, numReplicas);
     } catch (Exception e) {
       LOGGER.info("Caught exception while validating request {}: {}, {}", requestId, query, e.getMessage());
       requestStatistics.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
@@ -2133,10 +2139,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * <ul>
    *   <li>Value for 'LIMIT' <= configured value</li>
    *   <li>Query options must be set to SQL mode</li>
+   *   <li>Check if numReplicaGroups option provided is valid</li>
    * </ul>
    */
   @VisibleForTesting
-  static void validateRequest(PinotQuery pinotQuery, int queryResponseLimit) {
+  static void validateRequest(PinotQuery pinotQuery, int queryResponseLimit, int numReplicas) {
     // Verify LIMIT
     int limit = pinotQuery.getLimit();
     if (limit > queryResponseLimit) {
@@ -2152,8 +2159,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       throw new IllegalStateException("SQL query should always have response format and group-by mode set to SQL");
     }
 
+    // throw errors if options is less than 1, rectify if larger that current replicas
+    if (queryOptions.get(Broker.Request.QueryOptionKey.NUM_REPLICA_GROUPS) != null) {
+      Integer numReplicaGroups = QueryOptionsUtils.getNumReplicaGroups(queryOptions);
+      if (numReplicaGroups > numReplicas) {
+        queryOptions.put(Broker.Request.QueryOptionKey.NUM_REPLICA_GROUPS, String.valueOf(numReplicas));
+      }
+    }
+
     if (pinotQuery.getDataSource().getSubquery() != null) {
-      validateRequest(pinotQuery.getDataSource().getSubquery(), queryResponseLimit);
+      validateRequest(pinotQuery.getDataSource().getSubquery(), queryResponseLimit, numReplicas);
     }
   }
 

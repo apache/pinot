@@ -228,7 +228,7 @@ public class QueryValidationTest {
   private void testUnsupportedSQLQuery(String query, String errorMessage) {
     try {
       PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-      BaseBrokerRequestHandler.validateRequest(pinotQuery, 1000);
+      BaseBrokerRequestHandler.validateRequest(pinotQuery, 1000, 1);
       Assert.fail("Query should have failed");
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(), errorMessage);

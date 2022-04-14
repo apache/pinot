@@ -59,6 +59,17 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.SKIP_UPSERT));
   }
 
+  public static Integer getNumReplicaGroups(Map<String, String> queryOptions) {
+    String numReplicaGroups = queryOptions.get(Request.QueryOptionKey.NUM_REPLICA_GROUPS);
+    if (numReplicaGroups != null) {
+      int replicaGroups = Integer.parseInt(numReplicaGroups);
+      Preconditions.checkState(replicaGroups > 0, "numReplicaGroups must be positive, got: %s", numReplicaGroups);
+      return replicaGroups;
+    } else {
+      return null;
+    }
+  }
+
   @Nullable
   public static Integer getMaxExecutionThreads(Map<String, String> queryOptions) {
     String maxExecutionThreadsString = queryOptions.get(Request.QueryOptionKey.MAX_EXECUTION_THREADS);
