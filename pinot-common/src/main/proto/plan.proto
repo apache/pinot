@@ -46,7 +46,12 @@ message StageNode {
   ObjectField objectField = 4;
 }
 
-// MemberVariableField defines the serialized format of the member variable
+// MemberVariableField defines the serialized format of the member variables of a class object.
+// MemberVariableField can be one of
+//   1. literal
+//   2. list
+//   3. map
+//   4. complex class object
 message MemberVariableField {
   oneof member_variable_field {
     LiteralField literalField = 1;
@@ -56,13 +61,16 @@ message MemberVariableField {
   }
 }
 
+// ObjectField defines the serialized format of a complex class object.
+// it contains:
+//   1. its fully-qualified clazz name;
+//   2. its MemberVariableField map.
 message ObjectField {
-  // clazz of the object defined.
   string objectClassName = 1;
-  // map from member variable name to the member variable field definition
   map<string, MemberVariableField> memberVariables = 2;
 }
 
+// LiteralField defines the serialized format of a literal field.
 message LiteralField {
   oneof literal_field {
     bool boolField = 1;
@@ -73,10 +81,14 @@ message LiteralField {
   }
 }
 
+// ListField defines the serialized format of a list field.
+// The content of the list is a MemberVariableField.
 message ListField {
   repeated MemberVariableField content = 1;
 }
 
+// ListField defines the serialized format of a map field.
+// The key of the map is a string and the value of the map is a MemberVariableField.
 message MapField {
   map<string, MemberVariableField> content = 1;
 }
