@@ -144,6 +144,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     }
     String minionInstanceTag =
         taskConfigs.getOrDefault("minionInstanceTag", CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
+    _helixTaskResourceManager.ensureTaskQueueExists(taskType);
+    addTaskTypeMetricsUpdaterIfNeeded(taskType);
     String parentTaskName = _helixTaskResourceManager.getParentTaskName(taskType, taskName);
     TaskState taskState = _helixTaskResourceManager.getTaskState(parentTaskName);
     if (taskState != null) {
@@ -175,9 +177,6 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       throw new UnknownTaskTypeException(
           "Task type: " + taskType + " is not registered, cannot enable it for table: " + tableName);
     }
-    _helixTaskResourceManager.ensureTaskQueueExists(taskType);
-    addTaskTypeMetricsUpdaterIfNeeded(taskType);
-
     // responseMap holds the table to task name mapping.
     Map<String, String> responseMap = new HashMap<>();
     for (String tableNameWithType : tableNameWithTypes) {
