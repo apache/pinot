@@ -978,6 +978,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   private void closePartitionGroupConsumer() {
     try {
+      _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
       _partitionGroupConsumer.close();
     } catch (Exception e) {
       _segmentLogger.warn("Could not close stream consumer", e);
@@ -1333,12 +1334,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
 
     try {
+      _startOffset = _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset());
+      _currentOffset = _streamPartitionMsgOffsetFactory.create(_startOffset);
       makeStreamConsumer("Starting");
       makeStreamMetadataProvider("Starting");
       setPartitionParameters(realtimeSegmentConfigBuilder, indexingConfig.getSegmentPartitionConfig());
       _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), serverMetrics);
-      _startOffset = _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset());
-      _currentOffset = _streamPartitionMsgOffsetFactory.create(_startOffset);
       _resourceTmpDir = new File(resourceDataDir, "_tmp");
       if (!_resourceTmpDir.exists()) {
         _resourceTmpDir.mkdirs();
@@ -1457,7 +1458,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _segmentLogger.info("Creating new stream consumer for topic partition {} , reason: {}", _clientId, reason);
     _partitionGroupConsumer =
         _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
-    _partitionGroupConsumer.start(_partitionGroupConsumptionStatus.getStartOffset());
+    _partitionGroupConsumer.start(_currentOffset);
   }
 
   /**
