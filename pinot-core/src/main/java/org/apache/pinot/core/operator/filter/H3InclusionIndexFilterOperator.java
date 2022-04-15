@@ -96,6 +96,8 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
    * Returns the filter block based on the given the partial match doc ids.
    */
   private FilterBlock getFilterBlock(MutableRoaringBitmap partialMatchDocIds) {
+    // TODO: this can be further optimized to skip the H3 cells fully contained in the polygon
+    // https://github.com/apache/pinot/issues/8547
     ExpressionFilterOperator expressionFilterOperator = new ExpressionFilterOperator(_segment, _predicate, _numDocs);
     ScanBasedDocIdIterator docIdIterator =
         (ScanBasedDocIdIterator) expressionFilterOperator.getNextBlock().getBlockDocIdSet().iterator();

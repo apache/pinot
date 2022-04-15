@@ -60,7 +60,7 @@ public class H3Utils {
     }
     for (int i = 0; i < endpointH3Cells.size() - 1; i++) {
       try {
-        coveringH3Cells.addAll(H3_CORE.h3Line(endpointH3Cells.get(i), endpointH3Cells.get(i + 1)));
+        coveringH3Cells.addAll(H3_CORE.h3Line(endpointH3Cells.getLong(i), endpointH3Cells.getLong(i + 1)));
       } catch (LineUndefinedException e) {
         throw new RuntimeException(e);
       }
