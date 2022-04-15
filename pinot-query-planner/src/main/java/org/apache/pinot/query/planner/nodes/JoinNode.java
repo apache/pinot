@@ -18,15 +18,19 @@
  */
 package org.apache.pinot.query.planner.nodes;
 
-import java.io.Serializable;
 import java.util.List;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 
 
 public class JoinNode extends AbstractStageNode {
-  private final JoinRelType _joinRelType;
-  private final List<JoinClause> _criteria;
+  private JoinRelType _joinRelType;
+  private List<JoinClause> _criteria;
+
+  public JoinNode(int stageId) {
+    super(stageId);
+  }
 
   public JoinNode(int stageId, JoinRelType joinRelType, List<JoinClause> criteria
   ) {
@@ -43,11 +47,14 @@ public class JoinNode extends AbstractStageNode {
     return _criteria;
   }
 
-  public static class JoinClause implements Serializable {
-    private final KeySelector<Object[], Object> _leftJoinKeySelector;
-    private final KeySelector<Object[], Object> _rightJoinKeySelector;
+  public static class JoinClause {
+    private KeySelector<Object[], Object> _leftJoinKeySelector;
+    private KeySelector<Object[], Object> _rightJoinKeySelector;
 
-    public JoinClause(KeySelector<Object[], Object> leftKeySelector, KeySelector<Object[], Object> rightKeySelector) {
+    public JoinClause() {
+    }
+
+    public JoinClause(FieldSelectionKeySelector leftKeySelector, FieldSelectionKeySelector rightKeySelector) {
       _leftJoinKeySelector = leftKeySelector;
       _rightJoinKeySelector = rightKeySelector;
     }

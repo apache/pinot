@@ -22,8 +22,12 @@ import java.util.List;
 
 
 public class TableScanNode extends AbstractStageNode {
-  private final String _tableName;
-  private final List<String> _tableScanColumns;
+  private String _tableName;
+  private List<String> _tableScanColumns;
+
+  public TableScanNode(int stageId) {
+    super(stageId);
+  }
 
   public TableScanNode(int stageId, String tableName, List<String> tableScanColumns) {
     super(stageId);

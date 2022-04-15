@@ -20,9 +20,12 @@ package org.apache.pinot.query.planner.nodes;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.proto.Plan;
+import org.apache.pinot.query.planner.nodes.serde.ProtoSerializable;
+import org.apache.pinot.query.planner.nodes.serde.ProtoSerializationUtils;
 
 
-public abstract class AbstractStageNode implements StageNode {
+public abstract class AbstractStageNode implements StageNode, ProtoSerializable {
 
   protected final int _stageId;
   protected final List<StageNode> _inputs;
@@ -45,5 +48,15 @@ public abstract class AbstractStageNode implements StageNode {
   @Override
   public int getStageId() {
     return _stageId;
+  }
+
+  @Override
+  public void setObjectField(Plan.ObjectField objectField) {
+    ProtoSerializationUtils.fromObjectField(this, objectField);
+  }
+
+  @Override
+  public Plan.ObjectField getObjectField() {
+    return ProtoSerializationUtils.toObjectField(this);
   }
 }
