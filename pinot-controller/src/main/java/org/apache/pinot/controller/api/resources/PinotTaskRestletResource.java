@@ -37,7 +37,12 @@ import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.container.AsyncResponse;
+import javax.ws.rs.container.Suspended;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.helix.task.TaskPartitionState;
@@ -53,6 +58,8 @@ import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManag
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
+import org.glassfish.grizzly.http.server.Request;
+import org.glassfish.jersey.server.ManagedAsync;
 import org.quartz.CronTrigger;
 import org.quartz.JobDataMap;
 import org.quartz.JobDetail;
@@ -380,13 +387,16 @@ public class PinotTaskRestletResource {
   }
 
   @POST
+  @ManagedAsync
+  @Produces(MediaType.APPLICATION_JSON)
   @Path("/tasks/execute")
   @Authenticate(AccessType.CREATE)
   @ApiOperation("Execute a task on minion")
-  public Map<String, String> executeAdhocTask(AdhocTaskConfig adhocTaskConfig) {
+  public void executeAdhocTask(AdhocTaskConfig adhocTaskConfig, @Suspended AsyncResponse asyncResponse,
+      @Context Request requestContext) {
     try {
-      return _pinotTaskManager.createTask(adhocTaskConfig.getTaskType(), adhocTaskConfig.getTableName(),
-          adhocTaskConfig.getTaskName(), adhocTaskConfig.getTaskConfigs());
+      asyncResponse.resume(_pinotTaskManager.createTask(adhocTaskConfig.getTaskType(), adhocTaskConfig.getTableName(),
+          adhocTaskConfig.getTaskName(), adhocTaskConfig.getTaskConfigs()));
     } catch (TableNotFoundException e) {
       throw new ControllerApplicationException(LOGGER, "Failed to find table: " + adhocTaskConfig.getTableName(),
           Response.Status.NOT_FOUND, e);
