@@ -22,33 +22,44 @@ import org.apache.pinot.segment.spi.Constants;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-/**
- * The {@code BitmapDocIdIterator} is the bitmap-based iterator to iterate on a bitmap of matching document ids.
- */
-public final class BitmapDocIdIterator extends BaseBitmapDocIdIterator {
+public class InvertedBitmapDocIdIterator extends BaseBitmapDocIdIterator {
 
-  public BitmapDocIdIterator(ImmutableRoaringBitmap docIds, int numDocs) {
+  private int _next;
+  private ImmutableRoaringBitmap _complement;
+
+  public InvertedBitmapDocIdIterator(ImmutableRoaringBitmap docIds, int numDocs) {
     super(docIds, numDocs);
+    nextBatch();
   }
 
   @Override
   public int next() {
-    if (_cursor == _limit && !nextBatch()) {
-      return Constants.EOF;
+    if (_next < _batch[_cursor]) {
+      return _next++;
     }
-    return _batch[_cursor++];
+    while (_next++ == _batch[_cursor++] & _next < _numDocs) {
+      if (_cursor == _limit && !nextBatch()) {
+        _cursor = 0;
+        _batch[0] = _numDocs;
+      }
+    }
+    return _next == _numDocs ? Constants.EOF : _next++;
   }
 
   @Override
   public int advance(int targetDocId) {
-    _docIdIterator.advanceIfNeeded(targetDocId);
-    // force new batch
-    _limit = _cursor;
+    _next = (int) _docIds.nextAbsentValue(targetDocId);
+    _docIdIterator.advanceIfNeeded(_next);
+    _cursor = _limit;
+    nextBatch();
     return next();
   }
 
   @Override
   public ImmutableRoaringBitmap getDocIds() {
-    return _docIds;
+    if (_complement == null) {
+      _complement = ImmutableRoaringBitmap.flip(_docIds, 0L, _numDocs);
+    }
+    return _complement;
   }
 }

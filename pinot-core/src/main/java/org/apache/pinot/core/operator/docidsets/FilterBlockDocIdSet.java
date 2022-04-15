@@ -21,7 +21,7 @@ package org.apache.pinot.core.operator.docidsets;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.AndDocIdIterator;
-import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.OrDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
@@ -66,8 +66,8 @@ public interface FilterBlockDocIdSet extends BlockDocIdSet {
     if (docIdIterator instanceof RangelessBitmapDocIdIterator) {
       return new RangelessBitmapDocIdSet((RangelessBitmapDocIdIterator) docIdIterator);
     }
-    if (docIdIterator instanceof BitmapDocIdIterator) {
-      return new BitmapDocIdSet((BitmapDocIdIterator) docIdIterator);
+    if (docIdIterator instanceof BitmapBasedDocIdIterator) {
+      return new BitmapDocIdSet((BitmapBasedDocIdIterator) docIdIterator);
     }
 
     return this;

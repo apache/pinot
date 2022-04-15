@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.dociditerators;
 
 import org.apache.pinot.segment.spi.Constants;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.Test;
 
@@ -43,5 +44,29 @@ public class BitmapDocIdIteratorTest {
     assertEquals(docIdIterator.advance(19), 20);
     assertEquals(docIdIterator.next(), 21);
     assertEquals(docIdIterator.next(), Constants.EOF);
+  }
+
+  @Test
+  public void testInvertedBitmapDocIdIterator() {
+    int[] docIds = new int[]{1, 2, 4, 5, 6, 8, 12, 15, 16, 18, 20, 21};
+    MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+    bitmap.add(docIds);
+    int numDocs = 25;
+    BitmapDocIdIterator docIdIterator =
+        new BitmapDocIdIterator(ImmutableRoaringBitmap.flip(bitmap, 0L, numDocs), numDocs);
+    InvertedBitmapDocIdIterator invertedIterator = new InvertedBitmapDocIdIterator(bitmap, numDocs);
+    assertEquals(docIdIterator.advance(2), invertedIterator.advance(2));
+    assertEquals(docIdIterator.advance(3), invertedIterator.advance(3));
+    assertEquals(docIdIterator.next(), invertedIterator.next());
+    assertEquals(docIdIterator.advance(6), invertedIterator.advance(6));
+    assertEquals(docIdIterator.next(), invertedIterator.next());
+    assertEquals(docIdIterator.advance(13), invertedIterator.advance(13));
+    assertEquals(docIdIterator.advance(19), invertedIterator.advance(19));
+    assertEquals(docIdIterator.next(), invertedIterator.next());
+    assertEquals(docIdIterator.next(), invertedIterator.next());
+    assertEquals(docIdIterator.next(), invertedIterator.next());
+    assertEquals(docIdIterator.next(), invertedIterator.next());
+    assertEquals(docIdIterator.next(), Constants.EOF);
+    assertEquals(invertedIterator.next(), Constants.EOF);
   }
 }
