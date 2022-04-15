@@ -32,13 +32,15 @@ public class ConfigUtils {
   private ConfigUtils() {
   }
 
+  private static final Map<String, String> ENVIRONMENT_VARIABLES = System.getenv();
+
   /**
    * Apply environment variables to any given BaseJsonConfig.
    *
    * @return Config with environment variable applied.
    */
   public static <T extends BaseJsonConfig> T applyConfigWithEnvVariables(T config) {
-    return applyConfigWithEnvVariables(System::getenv, config);
+    return applyConfigWithEnvVariables(ENVIRONMENT_VARIABLES, config);
   }
 
   /**
@@ -46,7 +48,7 @@ public class ConfigUtils {
    *
    * @return Config with environment variable applied.
    */
-  public static <T extends BaseJsonConfig> T applyConfigWithEnvVariables(Environment environment, T config) {
+  public static <T extends BaseJsonConfig> T applyConfigWithEnvVariables(Map<String, String> environment, T config) {
     JsonNode jsonNode;
     try {
       jsonNode = applyConfigWithEnvVariables(environment, config.toJsonNode());
@@ -63,7 +65,7 @@ public class ConfigUtils {
     }
   }
 
-  private static JsonNode applyConfigWithEnvVariables(Environment environment, JsonNode jsonNode) {
+  private static JsonNode applyConfigWithEnvVariables(Map<String, String> environment, JsonNode jsonNode) {
     final JsonNodeType nodeType = jsonNode.getNodeType();
     switch (nodeType) {
       case OBJECT:
@@ -89,7 +91,7 @@ public class ConfigUtils {
         if (field.startsWith("${") && field.endsWith("}")) {
           String[] envVarSplits = field.substring(2, field.length() - 1).split(":", 2);
           String envVarKey = envVarSplits[0];
-          String value = environment.getVariable(envVarKey);
+          String value = environment.get(envVarKey);
           if (value != null) {
             return JsonNodeFactory.instance.textNode(value);
           } else if (envVarSplits.length > 1) {
