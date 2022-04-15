@@ -22,8 +22,12 @@ import org.apache.calcite.rel.RelDistribution;
 
 
 public class MailboxSendNode extends AbstractStageNode {
-  private final int _receiverStageId;
-  private final RelDistribution.Type _exchangeType;
+  private int _receiverStageId;
+  private RelDistribution.Type _exchangeType;
+
+  public MailboxSendNode(int stageId) {
+    super(stageId);
+  }
 
   public MailboxSendNode(int stageId, int receiverStageId, RelDistribution.Type exchangeType) {
     super(stageId);
