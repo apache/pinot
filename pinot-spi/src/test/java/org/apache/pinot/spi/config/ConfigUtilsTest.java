@@ -91,7 +91,7 @@ public class ConfigUtilsTest {
         ImmutableMap.of("LOAD_MODE", "MMAP", "AWS_ACCESS_KEY", "default_aws_access_key", "AWS_SECRET_KEY",
             "default_aws_secret_key");
 
-    indexingConfig = ConfigUtils.applyConfigWithEnvVariables(environment::get, indexingConfig);
+    indexingConfig = ConfigUtils.applyConfigWithEnvVariables(environment, indexingConfig);
     assertEquals(indexingConfig.getLoadMode(), "MMAP");
     assertTrue(indexingConfig.isAggregateMetrics());
     assertEquals(indexingConfig.getInvertedIndexColumns(), invertedIndexColumns);
