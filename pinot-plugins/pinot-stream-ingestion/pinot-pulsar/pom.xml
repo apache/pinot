@@ -69,6 +69,12 @@
       </exclusions>
     </dependency>
     <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>pulsar</artifactId>
+      <version>1.17.1</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.apache.pulsar</groupId>
       <artifactId>pulsar-client-original</artifactId>
       <version>${pulsar.version}</version>

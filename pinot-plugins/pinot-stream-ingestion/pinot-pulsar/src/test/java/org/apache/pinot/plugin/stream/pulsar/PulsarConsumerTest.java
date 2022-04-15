@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.plugin.stream.pulsar;
 
+import com.google.common.base.Function;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
@@ -30,6 +32,7 @@ import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pulsar.client.admin.PulsarAdmin;
+import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.MessageRouter;
@@ -40,6 +43,11 @@ import org.apache.pulsar.client.api.TopicMetadata;
 import org.apache.pulsar.client.impl.BatchMessageIdImpl;
 import org.apache.pulsar.client.impl.MessageIdImpl;
 import org.apache.pulsar.client.internal.DefaultImplementation;
+import org.apache.pulsar.common.policies.data.InactiveTopicPolicies;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.PulsarContainer;
+import org.testcontainers.utility.DockerImageName;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -47,7 +55,9 @@ import org.testng.annotations.Test;
 
 
 public class PulsarConsumerTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PulsarConsumerTest.class);
 
+  private static final DockerImageName PULSAR_IMAGE = DockerImageName.parse("apachepulsar/pulsar:2.7.2");
   public static final String TABLE_NAME_WITH_TYPE = "tableName_REALTIME";
   public static final String TEST_TOPIC = "test-topic";
   public static final String TEST_TOPIC_BATCH = "test-topic-batch";
@@ -59,7 +69,7 @@ public class PulsarConsumerTest {
   public static final int BATCH_SIZE = 10;
 
   private PulsarClient _pulsarClient;
-  private PulsarStandaloneCluster _pulsarStandaloneCluster;
+  private PulsarContainer _pulsar = null;
   private HashMap<Integer, MessageId> _partitionToFirstMessageIdMap = new HashMap<>();
   private HashMap<Integer, MessageId> _partitionToFirstMessageIdMapBatch = new HashMap<>();
 
@@ -67,35 +77,79 @@ public class PulsarConsumerTest {
   public void setUp()
       throws Exception {
     try {
-      _pulsarStandaloneCluster = new PulsarStandaloneCluster();
+      _pulsar = new PulsarContainer(PULSAR_IMAGE);
+      _pulsar.start();
 
-      _pulsarStandaloneCluster.start();
+      // Waiting for namespace to be created.
+      // There should be a better approach.
+      Thread.sleep(20 * 1000L);
 
-      PulsarAdmin admin =
-          PulsarAdmin.builder().serviceHttpUrl("http://localhost:" + _pulsarStandaloneCluster.getAdminPort()).build();
+      PulsarAdmin admin = PulsarAdmin.builder().serviceHttpUrl(_pulsar.getHttpServiceUrl()).build();
 
-      String bootstrapServer = "pulsar://localhost:" + _pulsarStandaloneCluster.getBrokerPort();
+      String bootstrapServer = _pulsar.getPulsarBrokerUrl();
 
       _pulsarClient = PulsarClient.builder().serviceUrl(bootstrapServer).build();
 
-      admin.topics().createPartitionedTopic(TEST_TOPIC, NUM_PARTITION);
-      admin.topics().createPartitionedTopic(TEST_TOPIC_BATCH, NUM_PARTITION);
+      createTopics(admin);
 
       publishRecords();
       publishRecordsBatch();
+
+      waitForMessagesToPublish(admin, TEST_TOPIC);
+      waitForMessagesToPublish(admin, TEST_TOPIC_BATCH);
+
+      admin.close();
     } catch (Exception e) {
-      if (_pulsarStandaloneCluster != null) {
-        _pulsarStandaloneCluster.stop();
+      if (_pulsar != null) {
+        _pulsar.stop();
+        _pulsar = null;
       }
       throw new RuntimeException("Failed to setUp test environment", e);
     }
   }
 
+  private void createTopics(PulsarAdmin admin)
+      throws PulsarAdminException {
+    InactiveTopicPolicies inactiveTopicPolicies = new InactiveTopicPolicies();
+    inactiveTopicPolicies.setDeleteWhileInactive(false);
+    admin.namespaces().setInactiveTopicPolicies("public/default", inactiveTopicPolicies);
+
+    admin.topics().createPartitionedTopic(TEST_TOPIC, NUM_PARTITION);
+    admin.topics().createPartitionedTopic(TEST_TOPIC_BATCH, NUM_PARTITION);
+  }
+
+  private void waitForMessagesToPublish(PulsarAdmin admin, String topicName) {
+    waitForCondition(new Function<Void, Boolean>() {
+      @Nullable
+      @Override
+      public Boolean apply(@Nullable Void aVoid) {
+        try {
+          return getNumberOfEntries(admin, topicName) == NUM_RECORDS_PER_PARTITION * NUM_PARTITION;
+        } catch (Exception e) {
+          LOGGER.warn("Could not fetch number of messages in pulsar topic " + topicName, e);
+          return null;
+        }
+      }
+    }, 2000L, 60 * 1000L, "Failed to produce " + NUM_RECORDS_PER_PARTITION * NUM_PARTITION + " messages", true);
+  }
+
+  private long getNumberOfEntries(PulsarAdmin admin, String topicName) {
+    try {
+      return admin.topics().getPartitionedStats(topicName, false).msgInCounter;
+    } catch (Exception e) {
+      e.printStackTrace();
+      LOGGER.warn("Could not fetch number of rows in pulsar topic " + topicName, e);
+    }
+    return -1;
+  }
+
   @AfterClass
   public void tearDown()
       throws Exception {
-    if (_pulsarStandaloneCluster != null) {
-      _pulsarStandaloneCluster.stop();
+    if (_pulsar != null) {
+      _pulsar.stop();
+      _pulsarClient.close();
+      _pulsar = null;
     }
   }
 
@@ -149,7 +203,7 @@ public class PulsarConsumerTest {
 
   public StreamConfig getStreamConfig(String topicName) {
     String streamType = "pulsar";
-    String streamPulsarBrokerList = "pulsar://localhost:" + _pulsarStandaloneCluster.getBrokerPort();
+    String streamPulsarBrokerList = _pulsar.getPulsarBrokerUrl();
     String streamPulsarConsumerType = "simple";
     String tableNameWithType = TABLE_NAME_WITH_TYPE;
 
@@ -273,16 +327,35 @@ public class PulsarConsumerTest {
     }
   }
 
-  public MessageId getMessageIdForPartitionAndIndex(int partitionNum, int index) {
+  private MessageId getMessageIdForPartitionAndIndex(int partitionNum, int index) {
     MessageId startMessageIdRaw = _partitionToFirstMessageIdMap.get(partitionNum);
     MessageIdImpl startMessageId = MessageIdImpl.convertToMessageIdImpl(startMessageIdRaw);
     return DefaultImplementation.newMessageId(startMessageId.getLedgerId(), index, partitionNum);
   }
 
-  public MessageId getBatchMessageIdForPartitionAndIndex(int partitionNum, int index) {
+  private MessageId getBatchMessageIdForPartitionAndIndex(int partitionNum, int index) {
     MessageId startMessageIdRaw = _partitionToFirstMessageIdMapBatch.get(partitionNum);
     BatchMessageIdImpl startMessageId = (BatchMessageIdImpl) MessageIdImpl.convertToMessageIdImpl(startMessageIdRaw);
     return new BatchMessageIdImpl(startMessageId.getLedgerId(), index / BATCH_SIZE, partitionNum, index % BATCH_SIZE,
         startMessageId.getBatchSize(), startMessageId.getAcker());
+  }
+
+  private void waitForCondition(Function<Void, Boolean> condition, long checkIntervalMs, long timeoutMs,
+      @Nullable String errorMessage, boolean raiseError) {
+    long endTime = System.currentTimeMillis() + timeoutMs;
+    String errorMessageSuffix = errorMessage != null ? ", error message: " + errorMessage : "";
+    while (System.currentTimeMillis() < endTime) {
+      try {
+        if (Boolean.TRUE.equals(condition.apply(null))) {
+          return;
+        }
+        Thread.sleep(checkIntervalMs);
+      } catch (Exception e) {
+        Assert.fail("Caught exception while checking the condition" + errorMessageSuffix, e);
+      }
+    }
+    if (raiseError) {
+      Assert.fail("Failed to meet condition in " + timeoutMs + "ms" + errorMessageSuffix);
+    }
   }
 }
