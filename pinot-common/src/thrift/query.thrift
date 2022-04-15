@@ -37,6 +37,19 @@ struct PinotQuery {
   11: optional map<string, string> queryOptions;
   12: optional bool explain;
   13: optional map<Expression, Expression> expressionOverrideHints;
+  14: optional SqlType sqlType;
+  15: optional string command;
+}
+
+enum SqlType {
+  /* Data Query Language (DQL), e.g. SELECT */
+  DQL,
+  /* Data Control Language(DCL), e.g. GRANT, REVOKE */
+  DCL,
+  /* Data Manipulation Language (DML), e.g. INSERT, UPSERT, UPDATE, DELETE */
+  DML,
+  /* Data Definition Language (DDL), e.g. CREATE, DROP, ALTER, TRUNCATE */
+  DDL
 }
 
 enum ExpressionType {
