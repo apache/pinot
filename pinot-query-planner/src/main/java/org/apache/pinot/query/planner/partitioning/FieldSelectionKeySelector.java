@@ -26,8 +26,15 @@ public class FieldSelectionKeySelector implements KeySelector<Object[], Object> 
 
   private int _columnIndex;
 
+  public FieldSelectionKeySelector() {
+  }
+
   public FieldSelectionKeySelector(int columnIndex) {
     _columnIndex = columnIndex;
+  }
+
+  public int getColumnIndex() {
+    return _columnIndex;
   }
 
   @Override

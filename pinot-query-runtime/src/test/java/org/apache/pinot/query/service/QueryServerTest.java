@@ -20,29 +20,37 @@ package org.apache.pinot.query.service;
 
 import com.google.common.collect.Lists;
 import io.grpc.ManagedChannelBuilder;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestUtils;
 import org.apache.pinot.query.planner.QueryPlan;
+import org.apache.pinot.query.planner.StageMetadata;
+import org.apache.pinot.query.planner.nodes.StageNode;
 import org.apache.pinot.query.routing.WorkerInstance;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
+import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+
 
 public class QueryServerTest {
   private static final int QUERY_SERVER_COUNT = 2;
-  private Map<Integer, QueryServer> _queryServerMap = new HashMap<>();
-  private Map<Integer, ServerInstance> _queryServerInstanceMap = new HashMap<>();
+  private final Map<Integer, QueryServer> _queryServerMap = new HashMap<>();
+  private final Map<Integer, ServerInstance> _queryServerInstanceMap = new HashMap<>();
+  private final Map<Integer, QueryRunner> _queryRunnerMap = new HashMap<>();
 
   private QueryEnvironment _queryEnvironment;
 
@@ -52,9 +60,11 @@ public class QueryServerTest {
 
     for (int i = 0; i < QUERY_SERVER_COUNT; i++) {
       int availablePort = QueryEnvironmentTestUtils.getAvailablePort();
-      QueryServer queryServer = new QueryServer(availablePort, Mockito.mock(QueryRunner.class));
+      QueryRunner queryRunner = Mockito.mock(QueryRunner.class);
+      QueryServer queryServer = new QueryServer(availablePort, queryRunner);
       queryServer.start();
       _queryServerMap.put(availablePort, queryServer);
+      _queryRunnerMap.put(availablePort, queryRunner);
       // this only test the QueryServer functionality so the server port can be the same as the mailbox port.
       // this is only use for test identifier purpose.
       _queryServerInstanceMap.put(availablePort, new WorkerInstance("localhost", availablePort, availablePort));
@@ -73,17 +83,59 @@ public class QueryServerTest {
     }
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void testWorkerAcceptsWorkerRequestCorrect()
       throws Exception {
     QueryPlan queryPlan = _queryEnvironment.planQuery("SELECT * FROM a JOIN b ON a.col1 = b.col2");
 
-    int singleServerStageId = QueryEnvironmentTestUtils.getTestStageByServerCount(queryPlan, 1);
+    for (int stageId : queryPlan.getStageMetadataMap().keySet()) {
+      if (stageId > 0) { // we do not test reduce stage.
+        Worker.QueryRequest queryRequest = getQueryRequest(queryPlan, stageId);
 
-    Worker.QueryRequest queryRequest = getQueryRequest(queryPlan, singleServerStageId);
+        // submit the request for testing.
+        submitRequest(queryRequest);
 
-    // submit the request for testing.
-    submitRequest(queryRequest);
+        StageMetadata stageMetadata = queryPlan.getStageMetadataMap().get(stageId);
+
+        // ensure mock query runner received correctly deserialized payload.
+        // since submitRequest is async, we need to wait for the mockRunner to receive the query payload.
+        QueryRunner mockRunner = _queryRunnerMap.get(stageMetadata.getServerInstances().get(0).getPort());
+        TestUtils.waitForCondition(aVoid -> {
+          try {
+            Mockito.verify(mockRunner).processQuery(Mockito.argThat(distributedStagePlan -> {
+              StageNode stageNode = queryPlan.getQueryStageMap().get(stageId);
+              return isStageNodesEqual(stageNode, distributedStagePlan.getStageRoot()) && isMetadataMapsEqual(
+                  stageMetadata, distributedStagePlan.getMetadataMap().get(stageId));
+            }), any(ExecutorService.class), any(Map.class));
+            return true;
+          } catch (Throwable t) {
+            return false;
+          }
+        }, 1000L, "Error verifying mock QueryRunner intercepted query payload!");
+      }
+    }
+  }
+
+  private static boolean isMetadataMapsEqual(StageMetadata left, StageMetadata right) {
+    return left.getServerInstances().equals(right.getServerInstances())
+        && left.getServerInstanceToSegmentsMap().equals(right.getServerInstanceToSegmentsMap())
+        && left.getScannedTables().equals(right.getScannedTables());
+  }
+
+  private static boolean isStageNodesEqual(StageNode left, StageNode right) {
+    if (left.getStageId() != right.getStageId() || left.getClass() != right.getClass()
+        || left.getInputs().size() != right.getInputs().size()) {
+      return false;
+    }
+    left.getInputs().sort(Comparator.comparingInt(StageNode::getStageId));
+    right.getInputs().sort(Comparator.comparingInt(StageNode::getStageId));
+    for (int i = 0; i < left.getInputs().size(); i++) {
+      if (!isStageNodesEqual(left.getInputs().get(i), right.getInputs().get(i))) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private void submitRequest(Worker.QueryRequest queryRequest) {

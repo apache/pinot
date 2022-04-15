@@ -37,7 +37,6 @@ import org.apache.pinot.query.planner.nodes.JoinNode;
 import org.apache.pinot.query.planner.nodes.StageNode;
 import org.apache.pinot.query.planner.nodes.TableScanNode;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
-import org.apache.pinot.query.planner.partitioning.KeySelector;
 
 
 /**
@@ -93,8 +92,8 @@ public final class RelToStageConverter {
     RelDataType rightRowType = node.getRight().getRowType();
     int leftOperandIndex = ((RexInputRef) joinCondition.getOperands().get(0)).getIndex();
     int rightOperandIndex = ((RexInputRef) joinCondition.getOperands().get(1)).getIndex();
-    KeySelector<Object[], Object> leftFieldSelectionKeySelector = new FieldSelectionKeySelector(leftOperandIndex);
-    KeySelector<Object[], Object> rightFieldSelectionKeySelector =
+    FieldSelectionKeySelector leftFieldSelectionKeySelector = new FieldSelectionKeySelector(leftOperandIndex);
+    FieldSelectionKeySelector rightFieldSelectionKeySelector =
           new FieldSelectionKeySelector(rightOperandIndex - leftRowType.getFieldNames().size());
     return new JoinNode(currentStageId, joinType, Collections.singletonList(new JoinNode.JoinClause(
         leftFieldSelectionKeySelector, rightFieldSelectionKeySelector)));
