@@ -21,8 +21,10 @@ package org.apache.pinot.core.operator.filter;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.Collections;
 import java.util.List;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.ExpressionContext.Type;
+import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
@@ -32,6 +34,7 @@ import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.locationtech.jts.geom.Geometry;
 import org.roaringbitmap.buffer.BufferFastAggregation;
@@ -52,7 +55,9 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
   private final Predicate _predicate;
   private final int _numDocs;
   private final H3IndexReader _h3IndexReader;
-  private final LongSet _h3Ids;
+  private final LongSet _fullyCoverH3Cells;
+  private final LongSet _potentialCoverH3Cells;
+  private final boolean _isPositiveCheck;
 
   public H3InclusionIndexFilterOperator(IndexSegment segment, Predicate predicate, int numDocs) {
     _segment = segment;
@@ -64,6 +69,14 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
     // Assume first argument is Literal, and second argument is IDENTIFIER for St_Contains.
     assert arguments.get(1).getType() == Type.IDENTIFIER;
     assert arguments.get(0).getType() == Type.LITERAL;
+    EqPredicate eqPredicate = (EqPredicate) predicate;
+    if (eqPredicate.getValue().equals("1")) {
+      _isPositiveCheck = true;
+    } else if (eqPredicate.getValue().equals("0")) {
+      _isPositiveCheck = false;
+    } else {
+      throw new BadQueryRequestException("Expected value for ST_Contain is 0 or 1");
+    }
     // look up arg1's h3 indices
     _h3IndexReader = segment.getDataSource(arguments.get(1).getIdentifier()).getH3Index();
     // arg0 is the literal
@@ -71,37 +84,59 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
     // must be some h3 index
     assert _h3IndexReader != null;
 
-    // get the set of H3 cells at the specified resolution which completely cover the input shape.
-    _h3Ids = H3Utils.coverGeometryInH3(geometry, _h3IndexReader.getH3IndexResolution().getLowestResolution());
+    // get the set of H3 cells at the specified resolution which completely cover the input shape and potential cover.
+    Pair<LongSet, LongSet> fullCoverAndPotentialCoverCells =
+        H3Utils.coverGeometryInH3(geometry, _h3IndexReader.getH3IndexResolution().getLowestResolution());
+
+    _fullyCoverH3Cells = fullCoverAndPotentialCoverCells.getLeft();
+    _potentialCoverH3Cells = fullCoverAndPotentialCoverCells.getRight();
   }
 
   @Override
   protected FilterBlock getNextBlock() {
     // have list of h3 cell ids for polygon provided
     // return filtered num_docs
-    ImmutableRoaringBitmap[] partialMatchDocIds = new ImmutableRoaringBitmap[_h3Ids.size()];
+    ImmutableRoaringBitmap[] potentialMatchDocIds = new ImmutableRoaringBitmap[_potentialCoverH3Cells.size()];
     int i = 0;
-    for (long h3IndexId : _h3Ids) {
-      partialMatchDocIds[i++] = _h3IndexReader.getDocIds(h3IndexId);
+
+    for (long h3IndexId : _potentialCoverH3Cells) {
+      potentialMatchDocIds[i++] = _h3IndexReader.getDocIds(h3IndexId);
     }
-    // TODO: this can be further optimized to skip the H3 cells fully contained in the polygon
-    // https://github.com/apache/pinot/issues/8547
-    MutableRoaringBitmap mutableRoaringBitmap = BufferFastAggregation.or(partialMatchDocIds);
-    if (mutableRoaringBitmap.isEmpty()) {
-      // No doc is covered by the geometry.
-      mutableRoaringBitmap.flip(0L, _numDocs);
+
+    MutableRoaringBitmap potentialMatchMutableRoaringBitmap = BufferFastAggregation.or(potentialMatchDocIds);
+    if (_isPositiveCheck) {
+      ImmutableRoaringBitmap[] fullMatchDocIds = new ImmutableRoaringBitmap[_fullyCoverH3Cells.size()];
+      i = 0;
+      for (long h3IndexId : _fullyCoverH3Cells) {
+        fullMatchDocIds[i++] = _h3IndexReader.getDocIds(h3IndexId);
+      }
+
+      MutableRoaringBitmap fullMatchMutableRoaringBitmap = BufferFastAggregation.or(fullMatchDocIds);
+      return getFilterBlock(fullMatchMutableRoaringBitmap, potentialMatchMutableRoaringBitmap);
+    } else {
+      i = 0;
+      _potentialCoverH3Cells.removeAll(_fullyCoverH3Cells);
+      ImmutableRoaringBitmap[] potentialNotMatchMutableRoaringBitmap =
+          new ImmutableRoaringBitmap[_potentialCoverH3Cells.size()];
+      for (long h3IndexId : _potentialCoverH3Cells) {
+        potentialNotMatchMutableRoaringBitmap[i++] = _h3IndexReader.getDocIds(h3IndexId);
+      }
+
+      MutableRoaringBitmap potentialNotMatch = BufferFastAggregation.or(potentialNotMatchMutableRoaringBitmap);
+      potentialMatchMutableRoaringBitmap.flip(0L, _numDocs);
+      return getFilterBlock(potentialMatchMutableRoaringBitmap, potentialNotMatch);
     }
-    return getFilterBlock(mutableRoaringBitmap);
   }
 
   /**
    * Returns the filter block based on the given the partial match doc ids.
    */
-  private FilterBlock getFilterBlock(MutableRoaringBitmap partialMatchDocIds) {
+  private FilterBlock getFilterBlock(MutableRoaringBitmap fullMatchDocIds, MutableRoaringBitmap partialMatchDocIds) {
     ExpressionFilterOperator expressionFilterOperator = new ExpressionFilterOperator(_segment, _predicate, _numDocs);
     ScanBasedDocIdIterator docIdIterator =
         (ScanBasedDocIdIterator) expressionFilterOperator.getNextBlock().getBlockDocIdSet().iterator();
     MutableRoaringBitmap result = docIdIterator.applyAnd(partialMatchDocIds);
+    result.or(fullMatchDocIds);
     return new FilterBlock(new BitmapDocIdSet(result, _numDocs) {
       @Override
       public long getNumEntriesScannedInFilter() {

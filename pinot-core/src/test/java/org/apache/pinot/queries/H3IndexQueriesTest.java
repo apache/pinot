@@ -227,13 +227,23 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
       Assert.assertEquals((long) aggregationResult.get(0), NUM_RECORDS);
     }
 
-    // Test st contains in polygon
-    testQueryStContain("SELECT COUNT(*) FROM testTable WHERE ST_Contains(ST_GeomFromText('POLYGON ((\n"
-        + "             -122.0008564 37.5004316, \n"
-        + "             -121.9991291 37.5005168, \n"
-        + "             -121.9990325 37.4995294, \n"
-        + "             -122.0001268 37.4993506,  \n"
-        + "             -122.0008564 37.5004316))'), %s) = 1");
+    {
+      // Test st contains in polygon
+      testQueryStContain("SELECT COUNT(*) FROM testTable WHERE ST_Contains(ST_GeomFromText('POLYGON ((\n"
+          + "             -122.0008564 37.5004316, \n"
+          + "             -121.9991291 37.5005168, \n"
+          + "             -121.9990325 37.4995294, \n"
+          + "             -122.0001268 37.4993506,  \n"
+          + "             -122.0008564 37.5004316))'), %s) = 1");
+
+      // negative test
+      testQueryStContain("SELECT COUNT(*) FROM testTable WHERE ST_Contains(ST_GeomFromText('POLYGON ((\n"
+          + "             -122.0008564 37.5004316, \n"
+          + "             -121.9991291 37.5005168, \n"
+          + "             -121.9990325 37.4995294, \n"
+          + "             -122.0001268 37.4993506,  \n"
+          + "             -122.0008564 37.5004316))'), %s) = 0");
+    }
     {
       // Test st contains in polygon, doesn't have
       String query = "SELECT COUNT(*) FROM testTable WHERE ST_Contains(ST_GeomFromText('POLYGON ((\n"
@@ -246,7 +256,7 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
       IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
       // Expect 0 entries scanned in filter
       QueriesTestUtils
-          .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, NUM_RECORDS, 0,
+          .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 0, 0,
               NUM_RECORDS);
       List<Object> aggregationResult = resultsBlock.getAggregationResult();
       Assert.assertNotNull(aggregationResult);
@@ -260,7 +270,7 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
     List<GenericRow> records = new ArrayList<>(1);
     addRecord(records, -122.0008081, 37.5004231);
     setUp(records);
-    // Test point is vertex of a polygon.
+    // Test point is closed to border of a polygon but inside.
     String query = "SELECT COUNT(*) FROM testTable WHERE ST_Contains(ST_GeomFromText('POLYGON ((\n"
         + "             -122.0008564 37.5004316, \n"
         + "             -121.9991291 37.5005168, \n"
@@ -281,7 +291,7 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
     List<GenericRow> records = new ArrayList<>(1);
     addRecord(records, -122.0007277, 37.5005785);
     setUp(records);
-    // Test point is vertex of a polygon.
+    // Test point is closed to border of a polygon but outside.
     String query = "SELECT COUNT(*) FROM testTable WHERE ST_Contains(ST_GeomFromText('POLYGON ((\n"
         + "             -122.0008564 37.5004316, \n"
         + "             -121.9991291 37.5005168, \n"

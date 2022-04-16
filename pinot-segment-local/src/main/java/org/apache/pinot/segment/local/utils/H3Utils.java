@@ -29,6 +29,7 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.Pair;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryCollection;
@@ -68,32 +69,50 @@ public class H3Utils {
     return coveringH3Cells;
   }
 
-  private static LongSet coverPolygonInH3(Polygon polygon, int resolution) {
-    LongSet coveringH3Cells = new LongOpenHashSet(coverLineInH3(polygon.getExteriorRing(), resolution));
+  private static Pair<LongSet, LongSet> coverPolygonInH3(Polygon polygon, int resolution) {
+    LongSet potentialH3Cells = coverLineInH3(polygon.getExteriorRing(), resolution);
 
-    coveringH3Cells.addAll(H3_CORE.polyfill(
-        Arrays.asList(polygon.getCoordinates()).stream().map(coordinate -> new GeoCoord(coordinate.y, coordinate.x))
+    // TODO: this can be further optimized to use native H3 implementation. They have plan to support natively.
+    // https://github.com/apache/pinot/issues/8547
+    LongSet polyfilledSet = new LongOpenHashSet(H3_CORE.polyfill(
+        Arrays.stream(polygon.getExteriorRing().getCoordinates())
+            .map(coordinate -> new GeoCoord(coordinate.y, coordinate.x))
             .collect(Collectors.toList()), ImmutableList.of(), resolution));
-    return coveringH3Cells;
+
+    potentialH3Cells.addAll(polyfilledSet.stream()
+        .flatMap(cell -> H3_CORE.kRing(cell, 1).stream()).collect(Collectors.toSet()));
+    LongSet fullyContainedCell = new LongOpenHashSet(polyfilledSet.stream().filter(h3Cell -> polygon.contains(
+        GeometryUtils.GEOMETRY_FACTORY.createPolygon(
+            H3_CORE.h3ToGeoBoundary(h3Cell).stream().map(geoCoord -> new Coordinate(geoCoord.lng, geoCoord.lat))
+                .toArray(Coordinate[]::new)))).collect(Collectors.toSet()));
+
+
+    return Pair.of(fullyContainedCell, potentialH3Cells);
   }
 
-  // Return the set of H3 cells at the specified resolution which completely cover the input shape.
-  // inspired by https://github.com/uber/h3/issues/275
-  public static LongSet coverGeometryInH3(Geometry geometry, int resolution) {
-    LongSet coveringH3Cells = new LongOpenHashSet();
+  // Return a pair of cell ids: The first fully contain, the second is potential contain.
+  public static Pair<LongSet, LongSet> coverGeometryInH3(Geometry geometry, int resolution) {
     if (geometry instanceof Point) {
-      coveringH3Cells.add(H3_CORE.geoToH3(geometry.getCoordinate().y, geometry.getCoordinate().x, resolution));
+      LongSet potentialCover = new LongOpenHashSet();
+      potentialCover.add(H3_CORE.geoToH3(geometry.getCoordinate().y, geometry.getCoordinate().x, resolution));
+      return Pair.of(new LongOpenHashSet(), potentialCover);
     } else if (geometry instanceof LineString) {
-      coveringH3Cells.addAll(coverLineInH3(((LineString) geometry), resolution));
+      LongSet potentialCover = new LongOpenHashSet();
+      potentialCover.addAll(coverLineInH3(((LineString) geometry), resolution));
+      return Pair.of(new LongOpenHashSet(), potentialCover);
     } else if (geometry instanceof Polygon) {
-      coveringH3Cells.addAll(coverPolygonInH3(((Polygon) geometry), resolution));
+      return coverPolygonInH3(((Polygon) geometry), resolution);
     } else if (geometry instanceof GeometryCollection) {
+      LongOpenHashSet fullCover = new LongOpenHashSet();
+      LongOpenHashSet potentialCover = new LongOpenHashSet();
       for (int i = 0; i < geometry.getNumGeometries(); i++) {
-        coveringH3Cells.addAll(coverGeometryInH3(geometry.getGeometryN(i), resolution));
+        fullCover.addAll(coverGeometryInH3(geometry.getGeometryN(i), resolution).getLeft());
+        potentialCover.addAll(coverGeometryInH3(geometry.getGeometryN(i), resolution).getRight());
       }
+      potentialCover.removeAll(fullCover);
+      return Pair.of(fullCover, potentialCover);
     } else {
       throw new UnsupportedOperationException("Unexpected type: " + geometry.getGeometryType());
     }
-    return coveringH3Cells;
   }
 }
