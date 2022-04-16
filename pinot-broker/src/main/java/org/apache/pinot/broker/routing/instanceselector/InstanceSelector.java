@@ -33,7 +33,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 public interface InstanceSelector {
 
   /**
-   * Initializes the instance selector with the enabled instances, ideal stateexternal view,  and online segments
+   * Initializes the instance selector with the enabled instances, ideal state, external view and online segments
    * (segments with ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}).
    * Should be called only once before calling other methods.
    */

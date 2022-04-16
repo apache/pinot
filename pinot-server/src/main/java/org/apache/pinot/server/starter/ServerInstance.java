@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.server.starter;
 
-import com.google.common.base.Preconditions;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.LongAccumulator;
@@ -97,8 +96,8 @@ public class ServerInstance {
 
     TlsConfig tlsConfig =
         TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_TLS_PREFIX);
-    NettyConfig nettyConfig = NettyConfig
-        .extractNettyConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_NETTY_PREFIX);
+    NettyConfig nettyConfig =
+        NettyConfig.extractNettyConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_NETTY_PREFIX);
     accessControlFactory.init(
         serverConf.getPinotConfig().subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_ACCESS_CONTROL));
     _accessControl = accessControlFactory.create();
@@ -178,7 +177,11 @@ public class ServerInstance {
   }
 
   public synchronized void shutDown() {
-    Preconditions.checkState(_started, "Server instance is not running");
+    if (!_started) {
+      LOGGER.warn("Server instance is not running, skipping the shut down");
+      return;
+    }
+
     LOGGER.info("Shutting down server instance");
 
     if (_nettyTlsQueryServer != null) {

@@ -64,7 +64,7 @@ private[pinot] class PinotServerDataFetcher(
         submitRequestToPinotServer(offlineBrokerRequest, routingTableForRequest, null, null)
     }
 
-    val pinotServerResponse = pinotServerAsyncQueryResponse.getResponse.values().asScala.toList
+    val pinotServerResponse = pinotServerAsyncQueryResponse.getFinalResponses.values().asScala.toList
     logInfo(s"Pinot server total response time in millis: ${System.nanoTime() - requestStartTime}")
 
     closePinotServerConnection()

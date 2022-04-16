@@ -312,7 +312,7 @@ public class PinotScatterGatherQueryClient {
       Map<org.apache.pinot.core.transport.ServerInstance, List<String>> routingTable,
       AsyncQueryResponse asyncQueryResponse, String tableNameWithType) {
     try {
-      Map<ServerRoutingInstance, ServerResponse> queryResponses = asyncQueryResponse.getResponse();
+      Map<ServerRoutingInstance, ServerResponse> queryResponses = asyncQueryResponse.getFinalResponses();
       if (!ignoreEmptyResponses) {
         if (queryResponses.size() != routingTable.size()) {
           Map<String, String> routingTableForLogging = new HashMap<>();
@@ -323,7 +323,8 @@ public class PinotScatterGatherQueryClient {
           });
           throw new PinotException(ErrorCode.PINOT_INSUFFICIENT_SERVER_RESPONSE,
               String.format("%d of %d servers responded with routing table servers: %s, query stats: %s",
-                  queryResponses.size(), routingTable.size(), routingTableForLogging, asyncQueryResponse.getStats()));
+                  queryResponses.size(), routingTable.size(), routingTableForLogging,
+                  asyncQueryResponse.getServerStats()));
         }
       }
       Map<ServerInstance, DataTable> serverResponseMap = new HashMap<>();

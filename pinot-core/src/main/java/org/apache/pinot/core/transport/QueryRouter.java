@@ -142,8 +142,24 @@ public class QueryRouter {
       AsyncQueryResponse asyncQueryResponse, Exception e) {
     LOGGER.error("Caught exception while sending request {} to server: {}, marking query failed", requestId,
         serverRoutingInstance, e);
-    asyncQueryResponse.setBrokerRequestSendException(e);
-    asyncQueryResponse.markQueryFailed();
+    asyncQueryResponse.markQueryFailed(serverRoutingInstance, e);
+  }
+
+  /**
+   * Connects to the given server, returns {@code true} if the server is successfully connected.
+   */
+  public boolean connect(ServerInstance serverInstance) {
+    try {
+      if (_serverChannelsTls != null) {
+        _serverChannelsTls.connect(serverInstance.toServerRoutingInstance(TableType.OFFLINE, true));
+      } else {
+        _serverChannels.connect(serverInstance.toServerRoutingInstance(TableType.OFFLINE, false));
+      }
+      return true;
+    } catch (Exception e) {
+      LOGGER.debug("Failed to connect to server: {}", serverInstance, e);
+      return false;
+    }
   }
 
   public void shutDown() {
@@ -161,9 +177,9 @@ public class QueryRouter {
     }
   }
 
-  void markServerDown(ServerRoutingInstance serverRoutingInstance) {
+  void markServerDown(ServerRoutingInstance serverRoutingInstance, Exception exception) {
     for (AsyncQueryResponse asyncQueryResponse : _asyncQueryResponseMap.values()) {
-      asyncQueryResponse.markServerDown(serverRoutingInstance);
+      asyncQueryResponse.markServerDown(serverRoutingInstance, exception);
     }
   }
 
