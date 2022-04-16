@@ -109,7 +109,6 @@ public class H3Utils {
         fullCover.addAll(coverGeometryInH3(geometry.getGeometryN(i), resolution).getLeft());
         potentialCover.addAll(coverGeometryInH3(geometry.getGeometryN(i), resolution).getRight());
       }
-      potentialCover.removeAll(fullCover);
       return Pair.of(fullCover, potentialCover);
     } else {
       throw new UnsupportedOperationException("Unexpected type: " + geometry.getGeometryType());
