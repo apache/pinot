@@ -27,9 +27,23 @@ package org.apache.pinot.query.planner.nodes.serde;
 import org.apache.pinot.common.proto.Plan;
 
 
+/**
+ * Interface to convert between proto serialized payload and object.
+ *
+ * <p>Classes that implement {@code ProtoSerializable} should provide methods to convert to and from
+ * {@link Plan.ObjectField}.
+ */
 public interface ProtoSerializable {
 
-  void setObjectField(Plan.ObjectField objFields);
+  /**
+   * Setting object's own member variable from a serialized {@link Plan.ObjectField}.
+   * @param objFields the serialized ObjectField.
+   */
+  void fromObjectField(Plan.ObjectField objFields);
 
-  Plan.ObjectField getObjectField();
+  /**
+   * convert the object to a serialized {@link Plan.ObjectField}.
+   * @return the serialized ObjectField.
+   */
+  Plan.ObjectField toObjectField();
 }

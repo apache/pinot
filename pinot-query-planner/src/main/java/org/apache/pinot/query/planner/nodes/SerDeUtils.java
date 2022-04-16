@@ -28,7 +28,7 @@ public final class SerDeUtils {
 
   public static AbstractStageNode deserializeStageNode(Plan.StageNode protoNode) {
     AbstractStageNode stageNode = newNodeInstance(protoNode.getNodeName(), protoNode.getStageId());
-    stageNode.setObjectField(protoNode.getObjectField());
+    stageNode.fromObjectField(protoNode.getObjectField());
     for (Plan.StageNode protoChild : protoNode.getInputsList()) {
       stageNode.addInput(deserializeStageNode(protoChild));
     }
@@ -39,7 +39,7 @@ public final class SerDeUtils {
     Plan.StageNode.Builder builder = Plan.StageNode.newBuilder()
         .setStageId(stageNode.getStageId())
         .setNodeName(stageNode.getClass().getSimpleName())
-        .setObjectField(stageNode.getObjectField());
+        .setObjectField(stageNode.toObjectField());
     for (StageNode childNode : stageNode.getInputs()) {
       builder.addInputs(serializeStageNode((AbstractStageNode) childNode));
     }

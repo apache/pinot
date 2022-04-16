@@ -54,13 +54,13 @@ public abstract class AbstractStageNode implements StageNode, ProtoSerializable 
   }
 
   @Override
-  public void setObjectField(Plan.ObjectField objectField) {
-    ProtoSerializationUtils.fromObjectField(this, objectField);
+  public void fromObjectField(Plan.ObjectField objectField) {
+    ProtoSerializationUtils.setObjectFieldToObject(this, objectField);
   }
 
   @Override
-  public Plan.ObjectField getObjectField() {
-    return ProtoSerializationUtils.toObjectField(this);
+  public Plan.ObjectField toObjectField() {
+    return ProtoSerializationUtils.convertObjectToObjectField(this);
   }
 
   public RelDataType getRowType() {
