@@ -60,6 +60,7 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.Pairs;
+import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
@@ -105,6 +106,40 @@ public class CalciteSqlParser {
       return sql.substring(0, sqlLength - 1);
     }
     return sql;
+  }
+
+  public static SqlNodeAndOptions compileToSqlNodeAndOptions(String sql)
+      throws Exception {
+    // Remove the comments from the query
+    sql = removeComments(sql);
+
+    // Remove the terminating semicolon from the query
+    sql = removeTerminatingSemicolon(sql);
+
+    // Extract OPTION statements from sql as Calcite Parser doesn't parse it.
+    List<String> options = extractOptionsFromSql(sql);
+    if (!options.isEmpty()) {
+      sql = removeOptionsFromSql(sql);
+    }
+
+    try (StringReader inStream = new StringReader(sql)) {
+      SqlParserImpl sqlParser = newSqlParser(inStream);
+      return new SqlNodeAndOptions(sqlParser.parseSqlStmtEof(), options);
+    } catch (Throwable e) {
+      throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
+    }
+  }
+
+  public static PinotSqlType extractSqlType(SqlNode sqlNode) {
+    switch (sqlNode.getKind()) {
+      case OTHER_DDL:
+        if (sqlNode instanceof SqlInsertFromFile) {
+          return PinotSqlType.DML;
+        }
+        throw new SqlCompilationException("Unsupported SqlNode type - " + sqlNode.getKind());
+      default:
+        return PinotSqlType.DQL;
+    }
   }
 
   public static PinotQuery compileToPinotQuery(String sql)
@@ -324,10 +359,7 @@ public class CalciteSqlParser {
     return sqlParser;
   }
 
-  private static void setOptions(PinotQuery pinotQuery, List<String> optionsStatements) {
-    if (optionsStatements.isEmpty()) {
-      return;
-    }
+  public static Map<String, String> extractOptionsMap(List<String> optionsStatements) {
     Map<String, String> options = new HashMap<>();
     for (String optionsStatement : optionsStatements) {
       for (String option : optionsStatement.split(",")) {
@@ -338,10 +370,17 @@ public class CalciteSqlParser {
         options.put(splits[0].trim(), splits[1].trim());
       }
     }
-    pinotQuery.setQueryOptions(options);
+    return options;
   }
 
-  private static PinotQuery compileSqlNodeToPinotQuery(SqlNode sqlNode) {
+  private static void setOptions(PinotQuery pinotQuery, List<String> optionsStatements) {
+    if (optionsStatements.isEmpty()) {
+      return;
+    }
+    pinotQuery.setQueryOptions(extractOptionsMap(optionsStatements));
+  }
+
+  public static PinotQuery compileSqlNodeToPinotQuery(SqlNode sqlNode) {
     PinotQuery pinotQuery = new PinotQuery();
     if (sqlNode instanceof SqlExplain) {
       // Extract sql node for the query
