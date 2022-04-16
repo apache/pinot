@@ -146,11 +146,6 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
-
-  @Override
   public List<Operator> getChildOperators() {
     return Collections.emptyList();
   }
