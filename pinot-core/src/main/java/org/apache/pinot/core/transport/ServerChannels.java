@@ -63,6 +63,8 @@ import org.apache.thrift.transport.TTransportException;
 @ThreadSafe
 public class ServerChannels {
   public static final String CHANNEL_LOCK_TIMEOUT_MSG = "Timeout while acquiring channel lock";
+  private static final long TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS = 5_000L;
+
   private final QueryRouter _queryRouter;
   private final BrokerMetrics _brokerMetrics;
   // TSerializer currently is not thread safe, must be put into a ThreadLocal.
@@ -114,6 +116,11 @@ public class ServerChannels {
         .sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes, timeoutMs);
   }
 
+  public void connect(ServerRoutingInstance serverRoutingInstance)
+      throws InterruptedException, TimeoutException {
+    _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new).connect();
+  }
+
   public void shutDown() {
     // Shut down immediately
     _eventLoopGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
@@ -148,7 +155,7 @@ public class ServerChannels {
           });
     }
 
-    private void attachSSLHandler(SocketChannel ch) {
+    void attachSSLHandler(SocketChannel ch) {
       try {
         SslContextBuilder sslContextBuilder =
             SslContextBuilder.forClient().sslProvider(SslProvider.valueOf(_tlsConfig.getSslProvider()));
@@ -167,12 +174,13 @@ public class ServerChannels {
       }
     }
 
-    private void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
+    void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
         ServerRoutingInstance serverRoutingInstance, byte[] requestBytes, long timeoutMs)
-        throws Exception {
+        throws InterruptedException, TimeoutException {
       if (_channelLock.tryLock(timeoutMs, TimeUnit.MILLISECONDS)) {
         try {
-          sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes);
+          connectWithoutLocking();
+          sendRequestWithoutLocking(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes);
         } finally {
           _channelLock.unlock();
         }
@@ -181,24 +189,40 @@ public class ServerChannels {
       }
     }
 
-    private void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
-        ServerRoutingInstance serverRoutingInstance, byte[] requestBytes)
-        throws Exception {
+    void connectWithoutLocking()
+        throws InterruptedException {
       if (_channel == null || !_channel.isActive()) {
         long startTime = System.currentTimeMillis();
         _channel = _bootstrap.connect().sync().channel();
         _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.NETTY_CONNECTION_CONNECT_TIME_MS,
             System.currentTimeMillis() - startTime);
       }
-      long sendRequestStartTimeMs = System.currentTimeMillis();
+    }
+
+    void sendRequestWithoutLocking(String rawTableName, AsyncQueryResponse asyncQueryResponse,
+        ServerRoutingInstance serverRoutingInstance, byte[] requestBytes) {
+      long startTimeMs = System.currentTimeMillis();
       _channel.writeAndFlush(Unpooled.wrappedBuffer(requestBytes)).addListener(f -> {
-        long requestSentLatencyMs = System.currentTimeMillis() - sendRequestStartTimeMs;
+        long requestSentLatencyMs = System.currentTimeMillis() - startTimeMs;
         _brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.NETTY_CONNECTION_SEND_REQUEST_LATENCY,
             requestSentLatencyMs, TimeUnit.MILLISECONDS);
         asyncQueryResponse.markRequestSent(serverRoutingInstance, requestSentLatencyMs);
       });
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_REQUESTS_SENT, 1);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_BYTES_SENT, requestBytes.length);
+    }
+
+    void connect()
+        throws InterruptedException, TimeoutException {
+      if (_channelLock.tryLock(TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+        try {
+          connectWithoutLocking();
+        } finally {
+          _channelLock.unlock();
+        }
+      } else {
+        throw new TimeoutException(CHANNEL_LOCK_TIMEOUT_MSG);
+      }
     }
   }
 }

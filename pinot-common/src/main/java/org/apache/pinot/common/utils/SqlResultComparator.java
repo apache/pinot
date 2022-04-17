@@ -153,6 +153,12 @@ public class SqlResultComparator {
       if (!isSelectionQuery(query) && !isNumDocsScannedBetter(actual, expected)) {
         return false;
       }
+      if (isNumEntriesScannedInFilterPresent(expected) && !isNumEntriesScannedInFilterBetter(actual, expected)) {
+        return false;
+      }
+      if (isNumConsumingSegmentsQueriedPresent(expected) && !areNumConsumingSegmentsQueriedEqual(actual, expected)) {
+        return false;
+      }
     }
     return areResultsEqual;
   }
@@ -309,6 +315,10 @@ public class SqlResultComparator {
     return true;
   }
 
+  private static boolean isNumConsumingSegmentsQueriedPresent(JsonNode expected) {
+    return expected.get(FIELD_NUM_CONSUMING_SEGMENTS_QUERIED) != null;
+  }
+
   private static boolean areNumConsumingSegmentsQueriedEqual(JsonNode actual, JsonNode expected) {
     long actualNumConsumingSegmentsQueried = actual.get(FIELD_NUM_CONSUMING_SEGMENTS_QUERIED).asLong();
     long expectedNumConsumingSegmentsQueried = expected.get(FIELD_NUM_CONSUMING_SEGMENTS_QUERIED).asLong();
@@ -373,6 +383,10 @@ public class SqlResultComparator {
       return false;
     }
     return true;
+  }
+
+  private static boolean isNumEntriesScannedInFilterPresent(JsonNode expected) {
+    return expected.get(FIELD_NUM_ENTRIES_SCANNED_IN_FILTER) != null;
   }
 
   private static boolean isNumEntriesScannedInFilterBetter(JsonNode actual, JsonNode expected) {

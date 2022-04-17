@@ -1,0 +1,5 @@
+{
+    "commentMarker" : "#",
+    "header" :
+            "HoursSinceEpoch,generationNumber,stringDimSV1,stringDimSV2,longDimSV1,doubleDimSV1,intMetric1,longMetric1,floatMetric1,doubleMetric1,bytesMetric1"
+}

@@ -70,7 +70,7 @@ import org.roaringbitmap.RoaringBitmap;
  * </ul>
  */
 public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
-  private static final String OPERATOR_NAME = "SelectionOrderByOperator";
+
   private static final String EXPLAIN_NAME = "SELECT_ORDERBY";
 
   private final IndexSegment _indexSegment;
@@ -370,10 +370,6 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     return new IntermediateResultsBlock(dataSchema, _rows);
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public List<Operator> getChildOperators() {

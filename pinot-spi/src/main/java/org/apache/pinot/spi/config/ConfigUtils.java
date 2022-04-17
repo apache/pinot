@@ -40,9 +40,18 @@ public class ConfigUtils {
    * @return Config with environment variable applied.
    */
   public static <T extends BaseJsonConfig> T applyConfigWithEnvVariables(T config) {
+    return applyConfigWithEnvVariables(ENVIRONMENT_VARIABLES, config);
+  }
+
+  /**
+   * Apply environment variables to any given BaseJsonConfig.
+   *
+   * @return Config with environment variable applied.
+   */
+  public static <T extends BaseJsonConfig> T applyConfigWithEnvVariables(Map<String, String> environment, T config) {
     JsonNode jsonNode;
     try {
-      jsonNode = applyConfigWithEnvVariables(config.toJsonNode());
+      jsonNode = applyConfigWithEnvVariables(environment, config.toJsonNode());
     } catch (RuntimeException e) {
       throw new RuntimeException(String
           .format("Unable to apply environment variables on json config class [%s].", config.getClass().getName()), e);
@@ -56,7 +65,7 @@ public class ConfigUtils {
     }
   }
 
-  private static JsonNode applyConfigWithEnvVariables(JsonNode jsonNode) {
+  private static JsonNode applyConfigWithEnvVariables(Map<String, String> environment, JsonNode jsonNode) {
     final JsonNodeType nodeType = jsonNode.getNodeType();
     switch (nodeType) {
       case OBJECT:
@@ -64,7 +73,7 @@ public class ConfigUtils {
           Iterator<Map.Entry<String, JsonNode>> iterator = jsonNode.fields();
           while (iterator.hasNext()) {
             final Map.Entry<String, JsonNode> next = iterator.next();
-            next.setValue(applyConfigWithEnvVariables(next.getValue()));
+            next.setValue(applyConfigWithEnvVariables(environment, next.getValue()));
           }
         }
         break;
@@ -73,7 +82,7 @@ public class ConfigUtils {
           ArrayNode arrayNode = (ArrayNode) jsonNode;
           for (int i = 0; i < arrayNode.size(); i++) {
             JsonNode arrayElement = arrayNode.get(i);
-            arrayNode.set(i, applyConfigWithEnvVariables(arrayElement));
+            arrayNode.set(i, applyConfigWithEnvVariables(environment, arrayElement));
           }
         }
         break;
@@ -82,8 +91,9 @@ public class ConfigUtils {
         if (field.startsWith("${") && field.endsWith("}")) {
           String[] envVarSplits = field.substring(2, field.length() - 1).split(":", 2);
           String envVarKey = envVarSplits[0];
-          if (ENVIRONMENT_VARIABLES.containsKey(envVarKey)) {
-            return JsonNodeFactory.instance.textNode(ENVIRONMENT_VARIABLES.get(envVarKey));
+          String value = environment.get(envVarKey);
+          if (value != null) {
+            return JsonNodeFactory.instance.textNode(value);
           } else if (envVarSplits.length > 1) {
             return JsonNodeFactory.instance.textNode(envVarSplits[1]);
           }

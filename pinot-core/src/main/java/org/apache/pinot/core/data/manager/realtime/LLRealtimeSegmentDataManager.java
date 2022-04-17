@@ -64,6 +64,7 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -813,10 +814,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       // Build a segment from in-memory rows.If buildTgz is true, then build the tar.gz file as well
       // TODO Use an auto-closeable object to delete temp resources.
       File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + _segmentNameStr + "-" + now());
+
+      SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
+      segmentZKPropsConfig.setStartOffset(_segmentZKMetadata.getStartOffset());
+      segmentZKPropsConfig.setEndOffset(_currentOffset.toString());
       // lets convert the segment now
       RealtimeSegmentConverter converter =
-          new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), _schema,
-              _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(), _sortedColumn,
+          new RealtimeSegmentConverter(_realtimeSegment, segmentZKPropsConfig, tempSegmentFolder.getAbsolutePath(),
+              _schema, _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(), _sortedColumn,
               _invertedIndexColumns, _textIndexColumns, _fstIndexColumns, _noDictionaryColumns,
               _varLengthDictionaryColumns, _nullHandlingEnabled);
       _segmentLogger.info("Trying to build segment");

@@ -32,7 +32,7 @@ public final class EmptyFilterOperator extends BaseFilterOperator {
   private EmptyFilterOperator() {
   }
 
-  private static final String OPERATOR_NAME = "EmptyFilterOperator";
+
   private static final String EXPLAIN_NAME = "FILTER_EMPTY";
 
   private static final EmptyFilterOperator INSTANCE = new EmptyFilterOperator();
@@ -61,10 +61,6 @@ public final class EmptyFilterOperator extends BaseFilterOperator {
     return EmptyFilterBlock.getInstance();
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public String toExplainString() {

@@ -36,7 +36,6 @@ import org.apache.pinot.segment.spi.Constants;
  * matched documents) or already gathered enough documents (for selection queries).
  */
 public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
-  private static final String OPERATOR_NAME = "DocIdSetOperator";
   private static final String EXPLAIN_NAME = "DOC_ID_SET";
 
   private static final ThreadLocal<int[]> THREAD_LOCAL_DOC_IDS =
@@ -83,10 +82,6 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
     }
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public String toExplainString() {

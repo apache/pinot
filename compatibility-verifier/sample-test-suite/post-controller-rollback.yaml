@@ -33,9 +33,17 @@ operations:
     op: PRODUCE
     streamConfigFileName: feature-test-2-realtime-stream-config.json
     numRows: 66
-    inputDataFileName: data/RealtimeFeatureTest1-data-00.csv
+    inputDataFileName: data/FeatureTest2-data-realtime-00.csv
     recordReaderConfigFileName: data/recordReaderConfig.json
     tableConfigFileName: feature-test-2-realtime.json
+  - type: streamOp
+    description: publish rows to PinotRealtimeFeatureTest3Event
+    op: PRODUCE
+    streamConfigFileName: feature-test-3-realtime-stream-config.json
+    numRows: 300
+    inputDataFileName: data/FeatureTest3-data-realtime-00.csv
+    recordReaderConfigFileName: data/recordReaderConfig-FeatureTest3.json
+    tableConfigFileName: feature-test-3-realtime.json
   - type: queryOp
     description: Run query on FeatureTest1 using SQL
     queryFileName: queries/feature-test-1-sql.queries
@@ -44,6 +52,10 @@ operations:
     description: Run query on FeatureTest2 using SQL
     queryFileName: queries/feature-test-2-sql-realtime.queries
     expectedResultsFileName: query-results/feature-test-2-sql-realtime.results
+  - type: queryOp
+    description: Run query on FeatureTest3 using SQL
+    queryFileName: queries/feature-test-3-sql-realtime.queries
+    expectedResultsFileName: query-results/feature-test-3-sql-realtime.results
   - type: segmentOp
     description: Delete segment FeatureTest1_Segment
     op: DELETE

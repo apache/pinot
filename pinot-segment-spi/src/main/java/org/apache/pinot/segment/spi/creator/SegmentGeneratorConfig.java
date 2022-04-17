@@ -43,6 +43,7 @@ import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
@@ -67,6 +68,7 @@ public class SegmentGeneratorConfig implements Serializable {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGeneratorConfig.class);
+  public static final double DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD = 0.85d;
 
   private TableConfig _tableConfig;
   private final Map<String, String> _customProperties = new HashMap<>();
@@ -110,9 +112,13 @@ public class SegmentGeneratorConfig implements Serializable {
   private boolean _skipTimeValueCheck = false;
   private boolean _nullHandlingEnabled = false;
   private boolean _failOnEmptySegment = false;
+  private boolean _optimizeDictionaryForMetrics = false;
+  private double _noDictionarySizeRatioThreshold = DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD;
 
   // constructed from FieldConfig
   private Map<String, Map<String, String>> _columnProperties = new HashMap<>();
+
+  private SegmentZKPropsConfig _segmentZKPropsConfig;
 
   @Deprecated
   public SegmentGeneratorConfig() {
@@ -203,6 +209,8 @@ public class SegmentGeneratorConfig implements Serializable {
       _fstTypeForFSTIndex = tableConfig.getIndexingConfig().getFSTIndexType();
 
       _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
+      _optimizeDictionaryForMetrics = indexingConfig.isOptimizeDictionaryForMetrics();
+      _noDictionarySizeRatioThreshold = indexingConfig.getNoDictionarySizeRatioThreshold();
     }
   }
 
@@ -754,11 +762,35 @@ public class SegmentGeneratorConfig implements Serializable {
     _nullHandlingEnabled = nullHandlingEnabled;
   }
 
+  public boolean isOptimizeDictionaryForMetrics() {
+    return _optimizeDictionaryForMetrics;
+  }
+
+  public void setOptimizeDictionaryForMetrics(boolean optimizeDictionaryForMetrics) {
+    _optimizeDictionaryForMetrics = optimizeDictionaryForMetrics;
+  }
+
+  public double getNoDictionarySizeRatioThreshold() {
+    return _noDictionarySizeRatioThreshold;
+  }
+
+  public void setNoDictionarySizeRatioThreshold(double noDictionarySizeRatioThreshold) {
+    _noDictionarySizeRatioThreshold = noDictionarySizeRatioThreshold;
+  }
+
   public boolean isFailOnEmptySegment() {
     return _failOnEmptySegment;
   }
 
   public void setFailOnEmptySegment(boolean failOnEmptySegment) {
     _failOnEmptySegment = failOnEmptySegment;
+  }
+
+  public SegmentZKPropsConfig getSegmentZKPropsConfig() {
+    return _segmentZKPropsConfig;
+  }
+
+  public void setSegmentZKPropsConfig(SegmentZKPropsConfig segmentZKPropsConfig) {
+    _segmentZKPropsConfig = segmentZKPropsConfig;
   }
 }

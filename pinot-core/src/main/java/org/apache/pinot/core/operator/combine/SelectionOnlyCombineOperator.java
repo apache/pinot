@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings("rawtypes")
 public class SelectionOnlyCombineOperator extends BaseCombineOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SelectionOnlyCombineOperator.class);
-  private static final String OPERATOR_NAME = "SelectionOnlyCombineOperator";
+
   private static final String EXPLAIN_NAME = "COMBINE_SELECT";
 
   private final int _numRowsToKeep;
@@ -51,10 +51,6 @@ public class SelectionOnlyCombineOperator extends BaseCombineOperator {
     _numRowsToKeep = queryContext.getLimit();
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public String toExplainString() {

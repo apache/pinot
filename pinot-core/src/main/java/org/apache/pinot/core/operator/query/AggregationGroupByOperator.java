@@ -39,7 +39,6 @@ import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
  * segment.
  */
 public class AggregationGroupByOperator extends BaseOperator<IntermediateResultsBlock> {
-  private static final String OPERATOR_NAME = "AggregationGroupByOperator";
   private static final String EXPLAIN_NAME = "AGGREGATE_GROUPBY";
 
   private final QueryContext _queryContext;
@@ -76,11 +75,6 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
 
     // Build intermediate result block based on aggregation group-by result from the executor
     return new IntermediateResultsBlock(_queryContext.getAggregationFunctions(), groupByExecutor.getResult());
-  }
-
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
   }
 
   @Override

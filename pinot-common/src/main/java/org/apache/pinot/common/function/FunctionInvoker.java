@@ -53,7 +53,6 @@ public class FunctionInvoker {
       Class<?> clazz = functionInfo.getClazz();
       try {
         Constructor<?> constructor = functionInfo.getClazz().getDeclaredConstructor();
-        constructor.setAccessible(true);
         _instance = constructor.newInstance();
       } catch (Exception e) {
         throw new IllegalStateException("Caught exception while constructing class: " + clazz, e);

@@ -37,7 +37,6 @@ import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
  */
 @SuppressWarnings("rawtypes")
 public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> {
-  private static final String OPERATOR_NAME = "AggregationOperator";
   private static final String EXPLAIN_NAME = "AGGREGATE";
 
   private final AggregationFunction[] _aggregationFunctions;
@@ -72,11 +71,6 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
 
     // Build intermediate result block based on aggregation result from the executor
     return new IntermediateResultsBlock(_aggregationFunctions, aggregationExecutor.getResult(), false);
-  }
-
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
   }
 
   @Override

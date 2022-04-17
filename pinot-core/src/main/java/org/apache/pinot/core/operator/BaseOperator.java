@@ -35,7 +35,7 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
     if (Thread.interrupted()) {
       throw new EarlyTerminationException();
     }
-    try (InvocationScope execution = Tracing.getTracer().createScope(getClass())) {
+    try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {
       return getNextBlock();
     }
   }

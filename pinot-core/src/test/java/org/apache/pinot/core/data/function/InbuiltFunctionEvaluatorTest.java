@@ -140,10 +140,10 @@ public class InbuiltFunctionEvaluatorTest {
     }
   }
 
-  private static class MyFunc {
+  public static class MyFunc {
     String _baseString = "";
 
-    String appendToStringAndReturn(String addedString) {
+    public String appendToStringAndReturn(String addedString) {
       _baseString += addedString;
       return _baseString;
     }

@@ -114,8 +114,6 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
       _remainingPredicateColumns = remainingPredicateColumns;
     }
   }
-
-  private static final String OPERATOR_NAME = "StarTreeFilterOperator";
   // If (number of matching dictionary ids * threshold) > (number of child nodes), use scan to traverse nodes instead of
   // binary search on each dictionary id
   private static final int USE_SCAN_TO_TRAVERSE_NODES_THRESHOLD = 10;
@@ -160,10 +158,6 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     return _resultEmpty;
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public String toExplainString() {

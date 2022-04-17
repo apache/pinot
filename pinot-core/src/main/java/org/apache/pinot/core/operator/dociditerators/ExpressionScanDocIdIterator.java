@@ -272,7 +272,6 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
    * NOTE: This operator contains only one block.
    */
   private class RangeDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
-    static final String OPERATOR_NAME = "RangeDocIdSetOperator";
     static final String EXPLAIN_NAME = "DOC_ID_SET_RANGE";
 
     DocIdSetBlock _docIdSetBlock;
@@ -290,11 +289,6 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
       DocIdSetBlock docIdSetBlock = _docIdSetBlock;
       _docIdSetBlock = null;
       return docIdSetBlock;
-    }
-
-    @Override
-    public String getOperatorName() {
-      return OPERATOR_NAME;
     }
 
     @Override

@@ -230,6 +230,9 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.nettyConnection(\\w+)\"><>(\\w+)"
   name: "pinot_broker_nettyConnection_$1_$2"
   cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.unhealthyServers\"><>(\\w+)"
+  name: "pinot_broker_unhealthyServers_$1"
+  cache: true
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.clusterChangeCheck\"\"><>(\\w+)"
   name: "pinot_broker_clusterChangeCheck_$1"
   cache: true

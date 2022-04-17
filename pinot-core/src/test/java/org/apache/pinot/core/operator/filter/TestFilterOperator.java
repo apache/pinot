@@ -75,11 +75,6 @@ public class TestFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public String getOperatorName() {
-    return "TestFilterOperator";
-  }
-
-  @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
   }

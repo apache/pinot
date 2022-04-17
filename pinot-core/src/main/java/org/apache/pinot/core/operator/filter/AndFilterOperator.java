@@ -30,7 +30,6 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 public class AndFilterOperator extends BaseFilterOperator {
-  private static final String OPERATOR_NAME = "AndFilterOperator";
   private static final String EXPLAIN_NAME = "FILTER_AND";
 
   private final List<BaseFilterOperator> _filterOperators;
@@ -71,10 +70,6 @@ public class AndFilterOperator extends BaseFilterOperator {
     return BufferFastAggregation.and(bitmaps).getCardinality();
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public List<Operator> getChildOperators() {

@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.utils;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -34,8 +35,15 @@ public class BigDecimalUtilsTest {
     BigDecimal deserializedValue = BigDecimalUtils.deserialize(serializedValue);
     assertEquals(deserializedValue, value);
 
+    // Set the scale to a negative value
+    value = value.setScale(-1, RoundingMode.HALF_UP);
+    serializedValue = BigDecimalUtils.serialize(value);
+    assertEquals(BigDecimalUtils.byteSize(value), serializedValue.length);
+    deserializedValue = BigDecimalUtils.deserialize(serializedValue);
+    assertEquals(deserializedValue, value);
+
     // Set the scale to a negative value in byte
-    value = value.setScale(128, BigDecimal.ROUND_UNNECESSARY);
+    value = value.setScale(128, RoundingMode.HALF_UP);
     serializedValue = BigDecimalUtils.serialize(value);
     assertEquals(BigDecimalUtils.byteSize(value), serializedValue.length);
     deserializedValue = BigDecimalUtils.deserialize(serializedValue);

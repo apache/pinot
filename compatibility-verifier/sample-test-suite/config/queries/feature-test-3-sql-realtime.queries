@@ -1,0 +1,47 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+# rangeIndex[doubleDimSV1]
+SELECT longDimSV1, doubleDimSV1 from FeatureTest3 WHERE doubleDimSV1 > 90 and generationNumber = __GENERATION_NUMBER__ LIMIT 1000
+SELECT longDimSV1, doubleDimSV1 from FeatureTest3 WHERE doubleDimSV1 > 10 AND doubleDimSV1 < 20 AND generationNumber = __GENERATION_NUMBER__ LIMIT 1000
+SELECT longDimSV1, doubleDimSV1 from FeatureTest3 WHERE doubleDimSV1 > 99 AND generationNumber = __GENERATION_NUMBER__ LIMIT 1000
+SELECT longDimSV1, doubleDimSV1 from FeatureTest3 WHERE doubleDimSV1 < 0 AND generationNumber = __GENERATION_NUMBER__ LIMIT 1000
+SELECT longDimSV1, doubleDimSV1 from FeatureTest3 WHERE doubleDimSV1 < 20 AND generationNumber = __GENERATION_NUMBER__ LIMIT 1000
+SELECT longDimSV1, doubleDimSV1 from FeatureTest3 WHERE doubleDimSV1 > 45 AND doubleDimSV1 < 55 AND generationNumber = __GENERATION_NUMBER__ LIMIT 1000
+
+# bloomFilterColumns[stringDimSV1]; varLengthDictionaryColumns[stringDimSV1]; noDictionaryColumns["stringDimSV2","intMetric1", "longMetric1", "floatMetric1", "doubleMetric1", "bytesMetric1"]
+SELECT stringDimSV1, stringDimSV2, intMetric1, longMetric1, floatMetric1, doubleMetric1, bytesMetric1 FROM FeatureTest3 WHERE stringDimSV1='qmxauaacotyezcqw' AND  generationNumber = __GENERATION_NUMBER__
+SELECT stringDimSV1, stringDimSV2, intMetric1, longMetric1, floatMetric1, doubleMetric1, bytesMetric1 FROM FeatureTest3 WHERE stringDimSV1='qndigjvg' AND  generationNumber = __GENERATION_NUMBER__
+SELECT stringDimSV1, stringDimSV2, intMetric1, longMetric1, floatMetric1, doubleMetric1, bytesMetric1 FROM FeatureTest3 WHERE stringDimSV1='pbbeecjjabupkrf' AND  generationNumber = __GENERATION_NUMBER__
+SELECT stringDimSV1, stringDimSV2, intMetric1, longMetric1, floatMetric1, doubleMetric1, bytesMetric1 FROM FeatureTest3 WHERE stringDimSV1='wmwxikmztrzrb' AND  generationNumber = __GENERATION_NUMBER__
+SELECT stringDimSV1, stringDimSV2, intMetric1, longMetric1, floatMetric1, doubleMetric1, bytesMetric1 FROM FeatureTest3 WHERE stringDimSV1='ljuwlnaailbvukpk' AND  generationNumber = __GENERATION_NUMBER__
+SELECT stringDimSV1, stringDimSV2, intMetric1, longMetric1, floatMetric1, doubleMetric1, bytesMetric1 FROM FeatureTest3 WHERE stringDimSV1='mcpilzfivcfwci' AND  generationNumber = __GENERATION_NUMBER__
+SELECT stringDimSV1, stringDimSV2, intMetric1, longMetric1, floatMetric1, doubleMetric1, bytesMetric1 FROM FeatureTest3 WHERE stringDimSV1='pigrefok' AND  generationNumber = __GENERATION_NUMBER__
+SELECT stringDimSV1, stringDimSV2, intMetric1, longMetric1, floatMetric1, doubleMetric1, bytesMetric1 FROM FeatureTest3 WHERE stringDimSV1='mamolamidbvmo' AND  generationNumber = __GENERATION_NUMBER__
+
+# partitionedColumn[longDimSV1]; varLengthDictionaryColumns[stringDimSV1]; noDictionaryColumns["stringDimSV2","intMetric1", "longMetric1", "floatMetric1", "doubleMetric1", "bytesMetric1"]
+SELECT stringDimSV1, stringDimSV2, intMetric1, longMetric1, floatMetric1, doubleMetric1, bytesMetric1 FROM FeatureTest3 WHERE longDimSV1 IN (1, 2, 3) AND  generationNumber = __GENERATION_NUMBER__
+SELECT stringDimSV1, stringDimSV2, intMetric1, longMetric1, floatMetric1, doubleMetric1, bytesMetric1 FROM FeatureTest3 WHERE longDimSV1 IN (1, 4, 7) AND  generationNumber = __GENERATION_NUMBER__
+SELECT stringDimSV1, stringDimSV2, intMetric1, longMetric1, floatMetric1, doubleMetric1, bytesMetric1 FROM FeatureTest3 WHERE longDimSV1 IN (298, 299, 300) AND  generationNumber = __GENERATION_NUMBER__
+SELECT stringDimSV1, stringDimSV2, intMetric1, longMetric1, floatMetric1, doubleMetric1, bytesMetric1 FROM FeatureTest3 WHERE longDimSV1 IN (294, 297, 300) AND  generationNumber = __GENERATION_NUMBER__
+SELECT stringDimSV1, stringDimSV2, intMetric1, longMetric1, floatMetric1, doubleMetric1, bytesMetric1 FROM FeatureTest3 WHERE longDimSV1 IN (150, 153, 156) AND  generationNumber = __GENERATION_NUMBER__
+SELECT stringDimSV1, stringDimSV2, intMetric1, longMetric1, floatMetric1, doubleMetric1, bytesMetric1 FROM FeatureTest3 WHERE longDimSV1 IN (149, 152, 155) AND  generationNumber = __GENERATION_NUMBER__
+SELECT stringDimSV1, stringDimSV2, intMetric1, longMetric1, floatMetric1, doubleMetric1, bytesMetric1 FROM FeatureTest3 WHERE longDimSV1 = 7 AND  generationNumber = __GENERATION_NUMBER__
+SELECT stringDimSV1, stringDimSV2, intMetric1, longMetric1, floatMetric1, doubleMetric1, bytesMetric1 FROM FeatureTest3 WHERE longDimSV1 = 8 AND  generationNumber = __GENERATION_NUMBER__
+SELECT stringDimSV1, stringDimSV2, intMetric1, longMetric1, floatMetric1, doubleMetric1, bytesMetric1 FROM FeatureTest3 WHERE longDimSV1 = 9 AND  generationNumber = __GENERATION_NUMBER__

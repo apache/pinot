@@ -56,6 +56,7 @@
     <module>pinot-connectors</module>
     <module>pinot-segment-local</module>
     <module>pinot-compatibility-verifier</module>
+    <module>contrib/pinot-fmpp-maven-plugin</module>
   </modules>
 
   <licenses>
@@ -1662,6 +1663,8 @@
             <config>SCRIPT_STYLE</config>
             <queries>SCRIPT_STYLE</queries>
             <results>SCRIPT_STYLE</results>
+            <fmpp>SCRIPT_STYLE</fmpp>
+            <ftl>FTL_STYLE</ftl>
             <MockMaker>SCRIPT_STYLE</MockMaker>
             <appAssemblerScriptTemplate>SCRIPT_STYLE</appAssemblerScriptTemplate>
             <pql>SCRIPT_STYLE</pql>
@@ -1823,6 +1826,28 @@
             </configuration>
           </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <version>3.3.0</version>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>javacc-maven-plugin</artifactId>
+        <version>2.6</version>
+        <dependencies>
+          <dependency>
+            <groupId>net.java.dev.javacc</groupId>
+            <artifactId>javacc</artifactId>
+            <version>7.0.10</version>
+          </dependency>
+        </dependencies>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-plugin-plugin</artifactId>
+        <version>3.6.0</version>
       </plugin>
     </plugins>
   </build>

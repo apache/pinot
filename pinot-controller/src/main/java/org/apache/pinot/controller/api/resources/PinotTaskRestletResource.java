@@ -37,14 +37,29 @@ import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.container.AsyncResponse;
+import javax.ws.rs.container.Suspended;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.helix.task.TaskPartitionState;
 import org.apache.helix.task.TaskState;
+import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
+import org.apache.pinot.controller.api.exception.NoTaskScheduledException;
+import org.apache.pinot.controller.api.exception.TaskAlreadyExistsException;
+import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.spi.config.task.AdhocTaskConfig;
+import org.glassfish.grizzly.http.server.Request;
+import org.glassfish.jersey.server.ManagedAsync;
 import org.quartz.CronTrigger;
 import org.quartz.JobDataMap;
 import org.quartz.JobDetail;
@@ -55,6 +70,8 @@ import org.quartz.SchedulerMetaData;
 import org.quartz.SimpleTrigger;
 import org.quartz.Trigger;
 import org.quartz.impl.matchers.GroupMatcher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -67,6 +84,7 @@ import org.quartz.impl.matchers.GroupMatcher;
  *   <li>GET '/tasks/task/{taskName}/state': Get the task state for the given task</li>
  *   <li>GET '/tasks/task/{taskName}/config': Get the task config (a list of child task configs) for the given task</li>
  *   <li>POST '/tasks/schedule': Schedule tasks</li>
+ *   <li>POST '/tasks/execute': Execute an adhoc task</li>
  *   <li>PUT '/tasks/{taskType}/cleanup': Clean up finished tasks (COMPLETED, FAILED) for the given task type</li>
  *   <li>PUT '/tasks/{taskType}/stop': Stop all running/pending tasks (as well as the task queue) for the given task
  *   type</li>
@@ -78,6 +96,8 @@ import org.quartz.impl.matchers.GroupMatcher;
 @Api(tags = Constants.TASK_TAG)
 @Path("/")
 public class PinotTaskRestletResource {
+  public static final Logger LOGGER = LoggerFactory.getLogger(PinotTaskRestletResource.class);
+
   private static final String TASK_QUEUE_STATE_STOP = "STOP";
   private static final String TASK_QUEUE_STATE_RESUME = "RESUME";
 
@@ -363,6 +383,36 @@ public class PinotTaskRestletResource {
     } else {
       // Schedule tasks for all task types
       return tableName != null ? _pinotTaskManager.scheduleTasks(tableName) : _pinotTaskManager.scheduleTasks();
+    }
+  }
+
+  @POST
+  @ManagedAsync
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/tasks/execute")
+  @Authenticate(AccessType.CREATE)
+  @ApiOperation("Execute a task on minion")
+  public void executeAdhocTask(AdhocTaskConfig adhocTaskConfig, @Suspended AsyncResponse asyncResponse,
+      @Context Request requestContext) {
+    try {
+      asyncResponse.resume(_pinotTaskManager.createTask(adhocTaskConfig.getTaskType(), adhocTaskConfig.getTableName(),
+          adhocTaskConfig.getTaskName(), adhocTaskConfig.getTaskConfigs()));
+    } catch (TableNotFoundException e) {
+      throw new ControllerApplicationException(LOGGER, "Failed to find table: " + adhocTaskConfig.getTableName(),
+          Response.Status.NOT_FOUND, e);
+    } catch (TaskAlreadyExistsException e) {
+      throw new ControllerApplicationException(LOGGER, "Task already exists: " + adhocTaskConfig.getTaskName(),
+          Response.Status.CONFLICT, e);
+    } catch (UnknownTaskTypeException e) {
+      throw new ControllerApplicationException(LOGGER, "Unknown task type: " + adhocTaskConfig.getTaskType(),
+          Response.Status.NOT_FOUND, e);
+    } catch (NoTaskScheduledException e) {
+      throw new ControllerApplicationException(LOGGER,
+          "No task is generated for table: " + adhocTaskConfig.getTableName() + ", with task type: "
+              + adhocTaskConfig.getTaskType(), Response.Status.BAD_REQUEST);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          "Failed to create adhoc task: " + ExceptionUtils.getStackTrace(e), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 

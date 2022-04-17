@@ -48,7 +48,15 @@ jobs:
           NEW_COMMIT: ${{ github.event.inputs.newCommit }}
           WORKING_DIR: /tmp/compatibility-verifier
           TEST_SUITE: ${{ matrix.test_suite }}
-          MAVEN_OPTS: -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25 -Dmaven.wagon.http.retryHandler.count=3 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
+          MAVEN_OPTS: >
+            -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
+            -Dmaven.wagon.http.retryHandler.count=3 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
+            -XX:+IgnoreUnrecognizedVMOptions
+            --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
         run: .github/workflows/scripts/.pinot_compatibility_verifier.sh
       - name: Archive artifacts into zip
         if: always()
