@@ -133,6 +133,10 @@
                       <pattern>org.apache.kafka</pattern>
                       <shadedPattern>shaded.org.apache.kafka</shadedPattern>
                     </relocation>
+                    <relocation>
+                      <pattern>org.apache.commons</pattern>
+                      <shadedPattern>shaded.org.apache.commons</shadedPattern>
+                    </relocation>
                   </relocations>
                 </configuration>
               </execution>

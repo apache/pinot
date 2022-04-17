@@ -36,8 +36,8 @@
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
     <phase.prop>package</phase.prop>
-    <scala.binary.version>2.11</scala.binary.version>
-    <spark.version>2.4.0</spark.version>
+    <scala.binary.version>2.12</scala.binary.version>
+    <spark.version>3.2.1</spark.version>
   </properties>
 
   <dependencies>
@@ -84,12 +84,21 @@
           <groupId>com.zaxxer</groupId>
           <artifactId>HikariCP-java7</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>org.glassfish.hk2.external</groupId>
+          <artifactId>jakarta.inject</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>jakarta.ws.rs</groupId>
+          <artifactId>jakarta.ws.rs-api</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
       <groupId>org.scala-lang</groupId>
       <artifactId>scala-library</artifactId>
       <version>2.11.11</version>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>commons-logging</groupId>
