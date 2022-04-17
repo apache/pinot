@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.stream.pulsar;
 
 import com.google.common.base.Function;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -77,7 +78,7 @@ public class PulsarConsumerTest {
   public void setUp()
       throws Exception {
     try {
-      _pulsar = new PulsarContainer(PULSAR_IMAGE);
+      _pulsar = new PulsarContainer(PULSAR_IMAGE).withStartupTimeout(Duration.ofMinutes(2));
       _pulsar.start();
 
       // Waiting for namespace to be created.
@@ -228,6 +229,19 @@ public class PulsarConsumerTest {
   }
 
   @Test
+  public void testPulsarLevelConsumerReRuns() throws Exception {
+    for (int i = 0; i < 50; i++) {
+      testPartitionLevelConsumer();
+    }
+  }
+  @Test
+  public void testPulsarLevelConsumerBatchReRuns() throws Exception {
+    for (int i = 0; i < 50; i++) {
+      testPartitionLevelConsumerBatchMessages();
+    }
+  }
+
+  @Test(enabled = false)
   public void testPartitionLevelConsumer()
       throws Exception {
 
@@ -277,7 +291,7 @@ public class PulsarConsumerTest {
     }
   }
 
-  @Test
+  @Test(enabled = false)
   public void testPartitionLevelConsumerBatchMessages()
       throws Exception {
 
@@ -295,6 +309,7 @@ public class PulsarConsumerTest {
 
       final PartitionGroupConsumer consumer =
           streamConsumerFactory.createPartitionGroupConsumer(CLIENT_ID, partitionGroupConsumptionStatus);
+      //TODO: This test failed, check it out.
       final MessageBatch messageBatch1 = consumer.fetchMessages(new MessageIdStreamOffset(MessageId.earliest),
           new MessageIdStreamOffset(getBatchMessageIdForPartitionAndIndex(partition, 500)), 10000);
       Assert.assertEquals(messageBatch1.getMessageCount(), 500);
