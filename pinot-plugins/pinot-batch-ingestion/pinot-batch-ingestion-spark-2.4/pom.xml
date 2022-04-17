@@ -30,14 +30,15 @@
     <relativePath>..</relativePath>
   </parent>
 
-  <artifactId>pinot-batch-ingestion-spark</artifactId>
-  <name>Pinot Batch Ingestion for Spark</name>
+  <artifactId>pinot-batch-ingestion-spark-2.4</artifactId>
+  <name>Pinot Batch Ingestion for Spark 2.4</name>
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
     <phase.prop>package</phase.prop>
-    <scala.binary.version>2.12</scala.binary.version>
-    <spark.version>3.2.1</spark.version>
+    <scala.major.version>2.11</scala.major.version>
+    <spark.version>2.4.0</spark.version>
+    <scala.minor.version>2.11.11</scala.minor.version>
   </properties>
 
   <dependencies>
@@ -48,7 +49,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>
-      <artifactId>spark-core_${scala.binary.version}</artifactId>
+      <artifactId>spark-core_${scala.major.version}</artifactId>
       <version>${spark.version}</version>
       <scope>provided</scope>
       <exclusions>
@@ -97,7 +98,7 @@
     <dependency>
       <groupId>org.scala-lang</groupId>
       <artifactId>scala-library</artifactId>
-      <version>2.11.11</version>
+      <version>${scala.minor.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
