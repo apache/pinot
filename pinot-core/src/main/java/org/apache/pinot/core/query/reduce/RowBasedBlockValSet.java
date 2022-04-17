@@ -48,6 +48,11 @@ public class RowBasedBlockValSet implements BlockValSet {
   }
 
   @Override
+  public int getNumDocs() {
+    return _rows.size();
+  }
+
+  @Override
   public FieldSpec.DataType getValueType() {
     return _dataType;
   }

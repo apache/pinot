@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.common;
 
+import java.math.BigDecimal;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -49,9 +51,9 @@ public class RowBasedBlockValueFetcher {
   }
 
   private ValueFetcher createFetcher(BlockValSet blockValSet) {
-    DataType storedType = blockValSet.getValueType().getStoredType();
+    DataType dataType = blockValSet.getValueType();
     if (blockValSet.isSingleValue()) {
-      switch (storedType) {
+      switch (dataType.getStoredType()) {
         case INT:
           return new IntSingleValueFetcher(blockValSet.getIntValuesSV());
         case LONG:
@@ -63,12 +65,16 @@ public class RowBasedBlockValueFetcher {
         case STRING:
           return new StringSingleValueFetcher(blockValSet.getStringValuesSV());
         case BYTES:
+          if (dataType == DataType.BIG_DECIMAL) {
+            return new BigDecimalValueFetcher(blockValSet.getBytesValuesSV());
+          }
           return new BytesValueFetcher(blockValSet.getBytesValuesSV());
         default:
-          throw new IllegalStateException("Unsupported value type: " + storedType + " for single-value column");
+          throw new IllegalStateException(
+              "Unsupported value type: " + dataType.getStoredType() + " for single-value column");
       }
     } else {
-      switch (storedType) {
+      switch (dataType.getStoredType()) {
         case INT:
           return new IntMultiValueFetcher(blockValSet.getIntValuesMV());
         case LONG:
@@ -80,7 +86,8 @@ public class RowBasedBlockValueFetcher {
         case STRING:
           return new StringMultiValueFetcher(blockValSet.getStringValuesMV());
         default:
-          throw new IllegalStateException("Unsupported value type: " + storedType + " for multi-value column");
+          throw new IllegalStateException(
+              "Unsupported value type: " + dataType.getStoredType() + " for multi-value column");
       }
     }
   }
@@ -134,6 +141,19 @@ public class RowBasedBlockValueFetcher {
 
     public Double getValue(int docId) {
       return _values[docId];
+    }
+  }
+
+  private static class BigDecimalValueFetcher implements ValueFetcher {
+    private final byte[][] _values;
+
+    BigDecimalValueFetcher(byte[][] values) {
+      _values = values;
+    }
+
+    public BigDecimal getValue(int docId) {
+      // todo: pre-cache BigDecimalUtils.deserialize results in BigDecimal[] _values?
+      return BigDecimalUtils.deserialize(_values[docId]);
     }
   }
 

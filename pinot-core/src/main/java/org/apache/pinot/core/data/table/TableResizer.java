@@ -38,7 +38,6 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.postaggregation.PostAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -54,7 +53,6 @@ public class TableResizer {
   private final Map<FunctionContext, Integer> _aggregationFunctionIndexMap;
   private final int _numOrderByExpressions;
   private final OrderByValueExtractor[] _orderByValueExtractors;
-  private final ColumnDataType[] _orderByColumnDataTypes;
   private final Comparator<IntermediateRecord> _intermediateRecordComparator;
 
   public TableResizer(DataSchema dataSchema, QueryContext queryContext) {
@@ -80,7 +78,6 @@ public class TableResizer {
     assert orderByExpressions != null;
     _numOrderByExpressions = orderByExpressions.size();
     _orderByValueExtractors = new OrderByValueExtractor[_numOrderByExpressions];
-    _orderByColumnDataTypes = new ColumnDataType[_numOrderByExpressions];
     Comparator[] comparators = new Comparator[_numOrderByExpressions];
     for (int i = 0; i < _numOrderByExpressions; i++) {
       OrderByExpressionContext orderByExpression = orderByExpressions.get(i);
@@ -89,15 +86,7 @@ public class TableResizer {
     }
     _intermediateRecordComparator = (o1, o2) -> {
       for (int i = 0; i < _numOrderByExpressions; i++) {
-        int result;
-        if (_orderByValueExtractors[i].getValueType() == ColumnDataType.BIG_DECIMAL) {
-          // Comparing BigDecimals is not equivalent to comparing corresponding byte arrays.
-          result = comparators[i].compare(BigDecimalUtils.deserialize((ByteArray) o1._values[i]),
-              BigDecimalUtils.deserialize((ByteArray) o2._values[i]));
-        } else {
-          result = comparators[i].compare(o1._values[i], o2._values[i]);
-        }
-
+        int result = comparators[i].compare(o1._values[i], o2._values[i]);
         if (result != 0) {
           return result;
         }

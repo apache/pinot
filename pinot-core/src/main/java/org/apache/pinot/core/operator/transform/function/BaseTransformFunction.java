@@ -112,6 +112,13 @@ public abstract class BaseTransformFunction implements TransformFunction {
           String[] stringValues = transformToStringValuesSV(projectionBlock);
           ArrayCopyUtils.copy(stringValues, _intValuesSV, length);
           break;
+        case BYTES:
+          if (getResultMetadata().getDataType().equals(DataType.BIG_DECIMAL)) {
+            BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(projectionBlock);
+            ArrayCopyUtils.copy(bigDecimalValues, _intValuesSV, length);
+            break;
+          }
+          throw new IllegalStateException();
         default:
           throw new IllegalStateException();
       }
@@ -149,6 +156,13 @@ public abstract class BaseTransformFunction implements TransformFunction {
           String[] stringValues = transformToStringValuesSV(projectionBlock);
           ArrayCopyUtils.copy(stringValues, _longValuesSV, length);
           break;
+        case BYTES:
+          if (getResultMetadata().getDataType().equals(DataType.BIG_DECIMAL)) {
+            BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(projectionBlock);
+            ArrayCopyUtils.copy(bigDecimalValues, _longValuesSV, length);
+            break;
+          }
+          throw new IllegalStateException();
         default:
           throw new IllegalStateException();
       }
@@ -186,6 +200,13 @@ public abstract class BaseTransformFunction implements TransformFunction {
           String[] stringValues = transformToStringValuesSV(projectionBlock);
           ArrayCopyUtils.copy(stringValues, _floatValuesSV, length);
           break;
+        case BYTES:
+          if (getResultMetadata().getDataType().equals(DataType.BIG_DECIMAL)) {
+            BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(projectionBlock);
+            ArrayCopyUtils.copy(bigDecimalValues, _floatValuesSV, length);
+            break;
+          }
+          throw new IllegalStateException();
         default:
           throw new IllegalStateException();
       }
@@ -223,11 +244,41 @@ public abstract class BaseTransformFunction implements TransformFunction {
           String[] stringValues = transformToStringValuesSV(projectionBlock);
           ArrayCopyUtils.copy(stringValues, _doubleValuesSV, length);
           break;
+        case BYTES:
+          if (getResultMetadata().getDataType().equals(DataType.BIG_DECIMAL)) {
+            BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(projectionBlock);
+            ArrayCopyUtils.copy(bigDecimalValues, _doubleValuesSV, length);
+            break;
+          }
+          throw new IllegalStateException();
         default:
           throw new IllegalStateException();
       }
     }
     return _doubleValuesSV;
+  }
+
+  @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+    if (_bigDecimalValuesSV == null || _bigDecimalValuesSV.length < length) {
+      _bigDecimalValuesSV = new BigDecimal[length];
+    }
+
+    Dictionary dictionary = getDictionary();
+    if (dictionary != null) {
+      int[] dictIds = transformToDictIdsSV(projectionBlock);
+      byte[][] bytesValues = new byte[length][];
+      dictionary.readBytesValues(dictIds, length, bytesValues);
+      ArrayCopyUtils.copy(bytesValues, _bigDecimalValuesSV, length);
+    } else {
+      if (getResultMetadata().getDataType().getStoredType() == DataType.STRING) {
+        String[] stringValues = transformToStringValuesSV(projectionBlock);
+        ArrayCopyUtils.copy(stringValues, _bigDecimalValuesSV, length);
+      }
+      throw new IllegalStateException();
+    }
+    return _bigDecimalValuesSV;
   }
 
   @Override
@@ -261,6 +312,11 @@ public abstract class BaseTransformFunction implements TransformFunction {
           ArrayCopyUtils.copy(doubleValues, _stringValuesSV, length);
           break;
         case BYTES:
+          if (getResultMetadata().getDataType() == DataType.BIG_DECIMAL) {
+            BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(projectionBlock);
+            ArrayCopyUtils.copy(bigDecimalValues, _stringValuesSV, length);
+            break;
+          }
           byte[][] bytesValues = transformToBytesValuesSV(projectionBlock);
           ArrayCopyUtils.copy(bytesValues, _stringValuesSV, length);
           break;
@@ -282,8 +338,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
-      // todo: In the line below, _intValuesSV is populated but not returned! This is most likely a bug.
-      dictionary.readIntValues(dictIds, length, _intValuesSV);
+      dictionary.readBytesValues(dictIds, length, _byteValuesSV);
     } else {
       Preconditions.checkState(getResultMetadata().getDataType().getStoredType() == DataType.STRING);
       String[] stringValues = transformToStringValuesSV(projectionBlock);

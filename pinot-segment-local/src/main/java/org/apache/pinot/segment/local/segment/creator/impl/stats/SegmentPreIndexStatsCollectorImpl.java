@@ -68,7 +68,7 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
         case BYTES:
           if (dataType == FieldSpec.DataType.BIG_DECIMAL) {
             _columnStatsCollectorMap.put(column,
-                new BigDecimalColumnPredIndexStatsCollector(column, _statsCollectorConfig));
+                new BigDecimalColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           } else {
             _columnStatsCollectorMap.put(column, new BytesColumnPredIndexStatsCollector(column, _statsCollectorConfig));
           }

@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.selection;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -123,10 +124,8 @@ public class SelectionOperatorService {
         Object v2 = o2[index];
         int result;
         if (isNumber[i]) {
-          // BigDecimal is a Number, but underlying stored type is ByteArray.
-          if (v1.getClass().equals(ByteArray.class)) {
-            result = BigDecimalUtils.deserialize(
-                (ByteArray) v1).compareTo(BigDecimalUtils.deserialize((ByteArray) v2));
+          if (columnDataTypes[i] == ColumnDataType.BIG_DECIMAL) {
+            result = ((BigDecimal) v1).compareTo((BigDecimal) v2);
           } else {
             result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
           }

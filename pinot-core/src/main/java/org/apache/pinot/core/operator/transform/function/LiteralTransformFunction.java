@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.List;
@@ -87,7 +88,7 @@ public class LiteralTransformFunction implements TransformFunction {
         return DataType.FLOAT;
       } else if (number instanceof Double) {
         return DataType.DOUBLE;
-      } else if (number instanceof BigDecimal) {
+      } else if (number instanceof BigDecimal | number instanceof BigInteger) {
         return DataType.BIG_DECIMAL;
       } else {
         return DataType.STRING;
@@ -209,6 +210,18 @@ public class LiteralTransformFunction implements TransformFunction {
       _doubleResult = doubleResult;
     }
     return doubleResult;
+  }
+
+  @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    int numDocs = projectionBlock.getNumDocs();
+    BigDecimal[] bigDecimalResult = _bigDecimalResult;
+    if (bigDecimalResult == null || bigDecimalResult.length < numDocs) {
+      bigDecimalResult = new BigDecimal[numDocs];
+      Arrays.fill(bigDecimalResult, _bigDecimalLiteral);
+      _bigDecimalResult = bigDecimalResult;
+    }
+    return bigDecimalResult;
   }
 
   @Override

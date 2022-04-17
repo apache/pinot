@@ -73,8 +73,6 @@ public class JsonUtils {
   public static final ObjectWriter DEFAULT_WRITER = DEFAULT_MAPPER.writer();
   public static final ObjectWriter DEFAULT_PRETTY_WRITER = DEFAULT_MAPPER.writerWithDefaultPrettyPrinter();
 
-  // Note: updating DEFAULT_MAPPER to use exact BigDecimals is a backward-incompatible change. This is why a separate
-  // mapper is introduced where withExactBigDecimals is set to true.
   private static final ObjectMapper DEFAULT_MAPPER_WITH_EXACT_BIG_DECIMAL = (new ObjectMapper())
       .setNodeFactory(JsonNodeFactory.withExactBigDecimals(true))
       .configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true);

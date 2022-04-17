@@ -48,6 +48,11 @@ public class TransformBlockValSet implements BlockValSet {
   }
 
   @Override
+  public int getNumDocs() {
+    return _projectionBlock.getNumDocs();
+  }
+
+  @Override
   public DataType getValueType() {
     return _transformFunction.getResultMetadata().getDataType();
   }

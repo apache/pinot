@@ -22,77 +22,76 @@ import java.math.BigDecimal;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
-import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
- * Extension of {@link BaseImmutableDictionary} that implements immutable dictionary for byte[] type.
+ * Extension of {@link BaseImmutableDictionary} that implements immutable dictionary for BigDecimal type.
  */
-public class BytesDictionary extends BaseImmutableDictionary {
+public class BigDecimalDictionary extends BaseImmutableDictionary {
 
-  public BytesDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue) {
+  public BigDecimalDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue) {
+    // Works with VarLengthValueBuffer only.
     super(dataBuffer, length, numBytesPerValue, (byte) 0);
   }
 
   @Override
   public DataType getValueType() {
-    return DataType.BYTES;
+    return DataType.BIG_DECIMAL;
   }
 
   @Override
   public int insertionIndexOf(String stringValue) {
-    return binarySearch(BytesUtils.toBytes(stringValue));
+    return binarySearch(new BigDecimal(stringValue));
   }
 
   @Override
-  public ByteArray getMinVal() {
-    return new ByteArray(getBytes(0));
+  public BigDecimal getMinVal() {
+    return BigDecimalUtils.deserialize(getBytes(0));
   }
 
   @Override
-  public ByteArray getMaxVal() {
-    return new ByteArray(getBytes(length() - 1));
+  public BigDecimal getMaxVal() {
+    return BigDecimalUtils.deserialize(getBytes(length() - 1));
   }
 
   @Override
-  public byte[] get(int dictId) {
-    return getBytes(dictId);
-  }
-
-  @Override
-  public Object getInternal(int dictId) {
-    return new ByteArray(getBytes(dictId));
-  }
-
-  @Override
-  public int getIntValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public long getLongValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public float getFloatValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public double getDoubleValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public BigDecimal getBigDecimalValue(int dictId) {
+  public BigDecimal get(int dictId) {
     return BigDecimalUtils.deserialize(getBytes(dictId));
   }
 
   @Override
+  public Object getInternal(int dictId) {
+    return BigDecimalUtils.deserialize(getBytes(dictId));
+  }
+
+  @Override
+  public int getIntValue(int dictId) {
+    return get(dictId).intValue();
+  }
+
+  @Override
+  public long getLongValue(int dictId) {
+    return get(dictId).longValue();
+  }
+
+  @Override
+  public float getFloatValue(int dictId) {
+    return get(dictId).floatValue();
+  }
+
+  @Override
+  public double getDoubleValue(int dictId) {
+    return get(dictId).doubleValue();
+  }
+
+  @Override
+  public BigDecimal getBigDecimalValue(int dictId) {
+    return get(dictId);
+  }
+
+  @Override
   public String getStringValue(int dictId) {
-    return BytesUtils.toHexString(getBytes(dictId));
+    return get(dictId).toPlainString();
   }
 
   @Override

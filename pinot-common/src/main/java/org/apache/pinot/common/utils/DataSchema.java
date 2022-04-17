@@ -26,12 +26,12 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.EnumSet;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
@@ -351,6 +351,8 @@ public class DataSchema {
           return ((Number) value).floatValue();
         case DOUBLE:
           return ((Number) value).doubleValue();
+        case BIG_DECIMAL:
+          return (BigDecimal) value;
         case BOOLEAN:
           return (Integer) value == 1;
         case TIMESTAMP:
@@ -359,7 +361,6 @@ public class DataSchema {
         case JSON:
           return value.toString();
         case BYTES:
-        case BIG_DECIMAL:
           return ((ByteArray) value).getBytes();
         case INT_ARRAY:
           return (int[]) value;
@@ -388,7 +389,7 @@ public class DataSchema {
     public Serializable format(Object value) {
       switch (this) {
         case BIG_DECIMAL:
-          return BigDecimalUtils.deserialize((byte[]) value).toPlainString();
+          return ((BigDecimal) value).toPlainString();
         case TIMESTAMP:
           assert value instanceof Timestamp;
           return value.toString();
@@ -413,7 +414,7 @@ public class DataSchema {
         case DOUBLE:
           return ((Number) value).doubleValue();
         case BIG_DECIMAL:
-          return BigDecimalUtils.deserialize((ByteArray) value);
+          return (BigDecimal) value;
         case BOOLEAN:
           return (Integer) value == 1;
         case TIMESTAMP:

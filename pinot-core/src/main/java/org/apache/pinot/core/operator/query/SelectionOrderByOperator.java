@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -46,7 +47,6 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -167,12 +167,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
             break;
           case BYTES:
             if (dataTypes[i] == DataType.BIG_DECIMAL) {
-              // Note: The result of comparing two BigDecimals may differ from comparing the corresponding ByteArray(s).
-              // Example:
-              // v1 (BigDecimal) = 1.02122425491413449 > v2 (BigDecimal) = 0.02122425491413449.
-              // v1 (ByteArrary) = 0011016acfce0f0459c9 < v2 (ByteArray) = 0011078a55b17a59c9.
-              result = (BigDecimalUtils.deserialize((ByteArray) v1))
-                  .compareTo(BigDecimalUtils.deserialize((ByteArray) v2));
+              result = ((BigDecimal) v1).compareTo((BigDecimal) v2);
               break;
             }
             result = ((ByteArray) v1).compareTo((ByteArray) v2);

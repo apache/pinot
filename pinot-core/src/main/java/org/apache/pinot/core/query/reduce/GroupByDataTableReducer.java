@@ -58,7 +58,6 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
-import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
 /**
@@ -338,7 +337,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
 
     Future[] futures = new Future[numReduceThreadsToUse];
     CountDownLatch countDownLatch = new CountDownLatch(numDataTables);
-    ColumnDataType[] columnDataTypes = dataSchema.getStoredColumnDataTypes();
+    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
     for (int i = 0; i < numReduceThreadsToUse; i++) {
       List<DataTable> reduceGroup = reduceGroups.get(i);
       futures[i] = reducerContext.getExecutorService().submit(new TraceRunnable() {
@@ -372,7 +371,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
                       break;
                     case BYTES:
                       if (columnDataTypes[colId] == ColumnDataType.BIG_DECIMAL) {
-                        values[colId] = BigDecimalUtils.deserialize(dataTable.getBytes(rowId, colId));
+                        values[colId] = dataTable.getObject(rowId, colId);
                       } else {
                         values[colId] = dataTable.getBytes(rowId, colId);
                       }

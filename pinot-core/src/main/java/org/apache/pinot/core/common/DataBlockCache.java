@@ -255,9 +255,10 @@ public class DataBlockCache {
    * @param column Column name
    * @param evaluator transform evaluator
    * @param buffer values to fill
+   * @param parseExactBigDecimal parse exact BigDecimal values
    */
-  public void fillValues(String column, TransformEvaluator evaluator, String[] buffer) {
-    _dataFetcher.fetchStringValues(column, evaluator, _docIds, _length, buffer);
+  public void fillValues(String column, TransformEvaluator evaluator, String[] buffer, boolean parseExactBigDecimal) {
+    _dataFetcher.fetchStringValues(column, evaluator, _docIds, _length, buffer, parseExactBigDecimal);
   }
 
   /**

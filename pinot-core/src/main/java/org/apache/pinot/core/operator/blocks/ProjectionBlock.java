@@ -125,9 +125,10 @@ public class ProjectionBlock implements Block {
    * @param column column to evaluate against
    * @param evaluator the evaluator which produces values from the storage in the column
    * @param buffer the buffer to write outputs into
+   * @param parseExactBigDecimal parse exact BigDecimal values
    */
-  public void fillValues(String column, TransformEvaluator evaluator, String[] buffer) {
-    _dataBlockCache.fillValues(column, evaluator, buffer);
+  public void fillValues(String column, TransformEvaluator evaluator, String[] buffer, boolean parseExactBigDecimal) {
+    _dataBlockCache.fillValues(column, evaluator, buffer, parseExactBigDecimal);
   }
 
   /**

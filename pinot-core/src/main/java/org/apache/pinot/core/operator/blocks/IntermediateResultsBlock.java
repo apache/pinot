@@ -328,14 +328,14 @@ public class IntermediateResultsBlock implements Block {
   private DataTable getResultDataTable()
       throws IOException {
     DataTableBuilder dataTableBuilder = new DataTableBuilder(_dataSchema);
-    ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
+    ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
     Iterator<Record> iterator = _table.iterator();
     while (iterator.hasNext()) {
       Record record = iterator.next();
       dataTableBuilder.startRow();
       int columnIndex = 0;
       for (Object value : record.getValues()) {
-        setDataTableColumn(storedColumnDataTypes[columnIndex], dataTableBuilder, columnIndex, value);
+        setDataTableColumn(columnDataTypes[columnIndex], dataTableBuilder, columnIndex, value);
         columnIndex++;
       }
       dataTableBuilder.finishRow();
@@ -347,7 +347,7 @@ public class IntermediateResultsBlock implements Block {
   private void setDataTableColumn(ColumnDataType columnDataType, DataTableBuilder dataTableBuilder, int columnIndex,
       Object value)
       throws IOException {
-    switch (columnDataType) {
+    switch (columnDataType.getStoredType()) {
       case INT:
         dataTableBuilder.setColumn(columnIndex, (int) value);
         break;
@@ -364,7 +364,11 @@ public class IntermediateResultsBlock implements Block {
         dataTableBuilder.setColumn(columnIndex, (String) value);
         break;
       case BYTES:
-        dataTableBuilder.setColumn(columnIndex, (ByteArray) value);
+        if (columnDataType == ColumnDataType.BIG_DECIMAL) {
+            dataTableBuilder.setColumn(columnIndex, value);
+        } else {
+          dataTableBuilder.setColumn(columnIndex, (ByteArray) value);
+        }
         break;
       case OBJECT:
         dataTableBuilder.setColumn(columnIndex, value);

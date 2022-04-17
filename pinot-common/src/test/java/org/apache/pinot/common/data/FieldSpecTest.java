@@ -167,11 +167,11 @@ public class FieldSpecTest {
     Assert.assertEquals(fieldSpec1.getDefaultNullValue(), 1L);
 
     // Single-value BigDecimal type dimension field with default null value.
-    fieldSpec1 = new DimensionFieldSpec();
-    fieldSpec1.setName("svDimension");
+    fieldSpec1 = new MetricFieldSpec();
+    fieldSpec1.setName("svMetric");
     fieldSpec1.setDataType(BIG_DECIMAL);
     fieldSpec1.setDefaultNullValue(BigDecimal.ZERO);
-    fieldSpec2 = new DimensionFieldSpec("svDimension", BIG_DECIMAL, true, BigDecimal.ZERO);
+    fieldSpec2 = new MetricFieldSpec("svMetric", BIG_DECIMAL, BigDecimal.ZERO);
     Assert.assertEquals(fieldSpec1, fieldSpec2);
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
@@ -371,11 +371,11 @@ public class FieldSpecTest {
     Assert.assertEquals(first, second, ERROR_MESSAGE);
 
     // BigDecimal field
-    dimensionFields = new String[]{
+    String[] metricFields = new String[]{
         "\"name\":\"Salary\"", "\"dataType\":\"BIG_DECIMAL\""
     };
-    first = JsonUtils.stringToObject(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
-    second = JsonUtils.stringToObject(first.toJsonObject().toString(), DimensionFieldSpec.class);
+    first = JsonUtils.stringToObject(getRandomOrderJsonString(metricFields), MetricFieldSpec.class);
+    second = JsonUtils.stringToObject(first.toJsonObject().toString(), MetricFieldSpec.class);
     Assert.assertEquals(first, second, ERROR_MESSAGE);
   }
 

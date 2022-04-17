@@ -248,6 +248,19 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       assertEquals(rows.size(), 1);
       assertEquals(new BigDecimal((String) rows.get(0)[0]).compareTo(_sum.multiply(BigDecimal.valueOf(4))), 0);
     }
+    {
+      // This returns currently 25 rows instead of a single row!
+//      int limit = 25;
+//      String query = String.format(
+//          "SELECT SUMPRECISION(%s) AS sum FROM (SELECT %s FROM testTable ORDER BY %s LIMIT %d)",
+//          BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, limit);
+//      BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+//      ResultTable resultTable = brokerResponse.getResultTable();
+//      DataSchema dataSchema = resultTable.getDataSchema();
+//      assertEquals(dataSchema, new DataSchema(new String[]{"sum"}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
+//      List<Object[]> rows = resultTable.getRows();
+//      assertEquals(rows.size(), 1);
+    }
   }
 
   @AfterClass

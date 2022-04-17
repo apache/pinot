@@ -217,7 +217,22 @@ public class DataFetcher {
    */
   public void fetchStringValues(String column, TransformEvaluator evaluator, int[] inDocIds, int length,
       String[] outValues) {
-    _columnValueReaderMap.get(column).readStringValues(evaluator, inDocIds, length, outValues);
+    _columnValueReaderMap.get(column).readStringValues(evaluator, inDocIds, length, outValues, false);
+  }
+
+  /**
+   * Fetch and transform String values from a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
+   * @param parseExactBigDecimal parse exact BigDecimal values
+   */
+  public void fetchStringValues(String column, TransformEvaluator evaluator, int[] inDocIds, int length,
+      String[] outValues, boolean parseExactBigDecimal) {
+    _columnValueReaderMap.get(column).readStringValues(evaluator, inDocIds, length, outValues, parseExactBigDecimal);
   }
 
   /**
@@ -542,10 +557,11 @@ public class DataFetcher {
       }
     }
 
-    void readStringValues(TransformEvaluator evaluator, int[] docIds, int length, String[] valueBuffer) {
+    void readStringValues(TransformEvaluator evaluator, int[] docIds, int length, String[] valueBuffer,
+        boolean parseExactBigDecimal) {
       Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
       evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
-          valueBuffer);
+          valueBuffer, parseExactBigDecimal);
     }
 
     void readBytesValues(int[] docIds, int length, byte[][] valueBuffer) {
