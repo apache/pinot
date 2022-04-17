@@ -68,7 +68,7 @@ public class PulsarConsumerTest {
   public static final int NUM_PARTITION = 1;
   public static final int NUM_RECORDS_PER_PARTITION = 1000;
   public static final int BATCH_SIZE = 10;
-  public static final int CONSUMER_FETCH_TIMEOUT_MILLIS = 60000;
+  public static final int CONSUMER_FETCH_TIMEOUT_MILLIS = (int) Duration.ofMinutes(5).toMillis();
 
   private PulsarClient _pulsarClient;
   private PulsarContainer _pulsar = null;
@@ -79,7 +79,7 @@ public class PulsarConsumerTest {
   public void setUp()
       throws Exception {
     try {
-      _pulsar = new PulsarContainer(PULSAR_IMAGE).withStartupTimeout(Duration.ofMinutes(2));
+      _pulsar = new PulsarContainer(PULSAR_IMAGE).withStartupTimeout(Duration.ofMinutes(5));
       _pulsar.start();
 
       // Waiting for namespace to be created.
@@ -230,19 +230,6 @@ public class PulsarConsumerTest {
   }
 
   @Test
-  public void testPulsarLevelConsumerReRuns() throws Exception {
-    for (int i = 0; i < 50; i++) {
-      testPartitionLevelConsumer();
-    }
-  }
-  @Test
-  public void testPulsarLevelConsumerBatchReRuns() throws Exception {
-    for (int i = 0; i < 50; i++) {
-      testPartitionLevelConsumerBatchMessages();
-    }
-  }
-
-  @Test(enabled = false)
   public void testPartitionLevelConsumer()
       throws Exception {
 
@@ -295,7 +282,7 @@ public class PulsarConsumerTest {
     }
   }
 
-  @Test(enabled = false)
+  @Test
   public void testPartitionLevelConsumerBatchMessages()
       throws Exception {
 
