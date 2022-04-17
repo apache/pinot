@@ -75,6 +75,7 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
     } catch (TimeoutException e) {
       // The fetchMessages has thrown an exception. Most common cause is the timeout.
       // We return the records fetched till now along with the next start offset.
+      LOGGER.warn("Timeout occurred while fetching messages", e);
       pulsarResultFuture.cancel(true);
       return new PulsarMessageBatch(buildOffsetFilteringIterable(messagesList, startMessageId, endMessageId));
     } catch (Exception e) {
@@ -99,10 +100,12 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
         messagesList.add(nextMessage);
 
         if (Thread.interrupted()) {
+          LOGGER.warn("Thread interrupted while fetching messages");
           break;
         }
       }
 
+      LOGGER.info("Consumed {} messages from Pulsar topic", messagesList.size());
       return new PulsarMessageBatch(buildOffsetFilteringIterable(messagesList, startMessageId, endMessageId));
     } catch (PulsarClientException e) {
       LOGGER.warn("Error consuming records from Pulsar topic", e);
