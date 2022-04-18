@@ -82,9 +82,13 @@ public class CalciteSqlCompilerTest {
   public void testCaseWhenStatements() {
     //@formatter:off
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
-        "SELECT OrderID, Quantity,\n" + "CASE\n" + "    WHEN Quantity > 30 THEN 'The quantity is greater than 30'\n"
-            + "    WHEN Quantity = 30 THEN 'The quantity is 30'\n" + "    ELSE 'The quantity is under 30'\n"
-            + "END AS QuantityText\n" + "FROM OrderDetails");
+        "SELECT OrderID, Quantity,\n"
+            + "CASE\n"
+            + "    WHEN Quantity > 30 THEN 'The quantity is greater than 30'\n"
+            + "    WHEN Quantity = 30 THEN 'The quantity is 30'\n"
+            + "    ELSE 'The quantity is under 30'\n"
+            + "END AS QuantityText\n"
+            + "FROM OrderDetails");
     //@formatter:on
     Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "OrderID");
     Assert.assertEquals(pinotQuery.getSelectList().get(1).getIdentifier().getName(), "Quantity");
@@ -107,8 +111,13 @@ public class CalciteSqlCompilerTest {
 
     //@formatter:off
     pinotQuery = CalciteSqlParser.compileToPinotQuery(
-        "SELECT Quantity,\n" + "SUM(CASE\n" + "    WHEN Quantity > 30 THEN 3\n" + "    WHEN Quantity > 20 THEN 2\n"
-            + "    WHEN Quantity > 10 THEN 1\n" + "    ELSE 0\n" + "END) AS new_sum_quant\n"
+        "SELECT Quantity,\n"
+            + "SUM(CASE\n"
+            + "    WHEN Quantity > 30 THEN 3\n"
+            + "    WHEN Quantity > 20 THEN 2\n"
+            + "    WHEN Quantity > 10 THEN 1\n"
+            + "    ELSE 0\n"
+            + "END) AS new_sum_quant\n"
             + "FROM OrderDetails GROUP BY Quantity");
     //@formatter:on
     Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "Quantity");
@@ -142,10 +151,14 @@ public class CalciteSqlCompilerTest {
     // Not support Aggregation functions in case statements.
     try {
       //@formatter:off
-      CalciteSqlParser.compileToPinotQuery("SELECT OrderID, Quantity,\n" + "CASE\n"
-          + "    WHEN sum(Quantity) > 30 THEN 'The quantity is greater than 30'\n"
-          + "    WHEN sum(Quantity) = 30 THEN 'The quantity is 30'\n" + "    ELSE 'The quantity is under 30'\n"
-          + "END AS QuantityText\n" + "FROM OrderDetails");
+      CalciteSqlParser.compileToPinotQuery(
+          "SELECT OrderID, Quantity,\n"
+              + "CASE\n"
+              + "    WHEN sum(Quantity) > 30 THEN 'The quantity is greater than 30'\n"
+              + "    WHEN sum(Quantity) = 30 THEN 'The quantity is 30'\n"
+              + "    ELSE 'The quantity is under 30'\n"
+              + "END AS QuantityText\n"
+              + "FROM OrderDetails");
       //@formatter:on
     } catch (SqlCompilationException e) {
       Assert.assertEquals(e.getMessage(),

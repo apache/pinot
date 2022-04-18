@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.math.RandomUtils;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -57,6 +58,7 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
   private static final String INT_COL_NAME = "INT_COL";
   private static final String NO_INDEX_INT_COL_NAME = "NO_INDEX_COL";
   private static final String STATIC_INT_COL_NAME = "STATIC_INT_COL";
+  private static final String BOOLEAN_COL_NAME = "BOOLEAN_COL";
   private static final Integer NUM_ROWS = 30000;
 
   private IndexSegment _indexSegment;
@@ -111,6 +113,7 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
       row.putValue(INT_COL_NAME, i);
       row.putValue(NO_INDEX_INT_COL_NAME, i);
       row.putValue(STATIC_INT_COL_NAME, 10);
+      row.putValue(BOOLEAN_COL_NAME, RandomUtils.nextBoolean());
       rows.add(row);
     }
     return rows;
@@ -126,6 +129,7 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(NO_INDEX_INT_COL_NAME, FieldSpec.DataType.INT)
         .addSingleValueDimension(STATIC_INT_COL_NAME, FieldSpec.DataType.INT)
+        .addSingleValueDimension(BOOLEAN_COL_NAME, FieldSpec.DataType.BOOLEAN)
         .addMetric(INT_COL_NAME, FieldSpec.DataType.INT).build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR.getPath());
@@ -153,8 +157,8 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
 
   @Test
   public void testSimpleQueries() {
-    String filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 9999) FROM MyTable WHERE INT_COL < 1000000";
-    String nonFilterQuery = "SELECT SUM(INT_COL) FROM MyTable WHERE INT_COL > 9999 AND INT_COL < 1000000";
+    String filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE BOOLEAN_COL) FROM MyTable";
+    String nonFilterQuery = "SELECT SUM(INT_COL) FROM MyTable WHERE BOOLEAN_COL";
     testQuery(filterQuery, nonFilterQuery);
 
     filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL < 3) FROM MyTable WHERE INT_COL > 1";
