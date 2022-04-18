@@ -492,7 +492,7 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Validate table config for a table",
       notes = "This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
           + " This allows us to validate table config before apply.")
-  public ConfigValidationResponse checkTableConfig(
+  public ConfigValidationResponse<ObjectNode> checkTableConfig(
       String tableConfigStr,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip) {
@@ -505,7 +505,7 @@ public class PinotTableRestletResource {
     }
     ObjectNode validationResponse = validateConfig(tableConfig._obj,
         _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig._obj), typesToSkip);
-    return new ConfigValidationResponse(validationResponse, tableConfig._unparseableProps);
+    return new ConfigValidationResponse<>(validationResponse, tableConfig._unparseableProps);
   }
 
   @Deprecated
