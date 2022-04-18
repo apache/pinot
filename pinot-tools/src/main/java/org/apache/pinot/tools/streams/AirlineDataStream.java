@@ -50,12 +50,12 @@ public class AirlineDataStream {
   Schema _pinotSchema;
   String _timeColumnName;
   File _avroFile;
-  DataFileStream<GenericRecord> _avroDataStream;
   Integer _currentTimeValue = 16102;
   boolean _keepIndexing = true;
   ExecutorService _service;
   int _counter = 0;
   private StreamDataProducer _producer;
+  private PinotSourceStream _pinotStream;
 
   public AirlineDataStream(Schema pinotSchema, TableConfig tableConfig, File avroFile)
       throws Exception {
@@ -70,6 +70,7 @@ public class AirlineDataStream {
     createStream();
     _producer = producer;
     _service = Executors.newFixedThreadPool(1);
+    PinotSourceStream.builder().setProducer(_producer).setGenerator();
     QuickStartBase.printStatus(Quickstart.Color.YELLOW,
         "***** Offine data has max time as 16101, realtime will start consuming from time 16102 and increment time "
             + "every 60 events (which is approximately 60 seconds) *****");

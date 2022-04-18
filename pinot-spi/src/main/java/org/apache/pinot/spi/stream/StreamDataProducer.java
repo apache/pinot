@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.stream;
 
+import java.util.List;
 import java.util.Properties;
 
 
@@ -32,4 +33,32 @@ public interface StreamDataProducer {
   void produce(String topic, byte[] key, byte[] payload);
 
   void close();
+
+  default void produceBatch(String topic, List<byte[]> rows) {
+    for (byte[] row: rows) {
+      produce(topic, row);
+    }
+  }
+
+  default void produceKeyedBatch(String topic, List<RowWithKey> payloadWithKey) {
+    for (RowWithKey rowWithKey: payloadWithKey) {
+      produce(topic, rowWithKey.getKey(), rowWithKey.getPayload());
+    }
+  }
+  class RowWithKey {
+    private final byte[] _key;
+    private final byte[] _payload;
+    public RowWithKey(byte[] key, byte[] payload) {
+      _key = key;
+      _payload = payload;
+    }
+
+    public byte[] getKey() {
+      return _key;
+    }
+
+    public byte[] getPayload() {
+      return _payload;
+    }
+  }
 }
