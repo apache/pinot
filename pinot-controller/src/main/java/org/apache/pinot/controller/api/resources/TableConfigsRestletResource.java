@@ -367,7 +367,7 @@ public class TableConfigsRestletResource {
       throw new ControllerApplicationException(LOGGER,
           String.format("Invalid TableConfigs json string: %s", tableConfigsStr), Response.Status.BAD_REQUEST, e);
     }
-    String validationResponse = validateConfig(tableConfigs._obj, typesToSkip);
+    TableConfigs validationResponse = validateConfig(tableConfigs._obj, typesToSkip);
     return new ConfigValidationResponse(validationResponse, tableConfigs._unparseableProps);
   }
 
@@ -377,7 +377,7 @@ public class TableConfigsRestletResource {
     TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
   }
 
-  private String validateConfig(TableConfigs tableConfigs, @Nullable String typesToSkip) {
+  private TableConfigs validateConfig(TableConfigs tableConfigs, @Nullable String typesToSkip) {
     String rawTableName = tableConfigs.getTableName();
     TableConfig offlineTableConfig = tableConfigs.getOffline();
     TableConfig realtimeTableConfig = tableConfigs.getRealtime();
@@ -411,7 +411,7 @@ public class TableConfigsRestletResource {
         TableConfigUtils.verifyHybridTableConfigs(rawTableName, offlineTableConfig, realtimeTableConfig);
       }
 
-      return tableConfigs.toJsonString();
+      return tableConfigs;
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Invalid TableConfigs: %s. %s", rawTableName, e.getMessage()), Response.Status.BAD_REQUEST, e);

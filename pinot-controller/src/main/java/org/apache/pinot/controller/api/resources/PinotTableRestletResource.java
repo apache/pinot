@@ -503,7 +503,7 @@ public class PinotTableRestletResource {
       String msg = String.format("Invalid table config json string: %s", tableConfigStr);
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
-    String validationResponse = validateConfig(tableConfig._obj,
+    ObjectNode validationResponse = validateConfig(tableConfig._obj,
         _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig._obj), typesToSkip);
     return new ConfigValidationResponse(validationResponse, tableConfig._unparseableProps);
   }
@@ -527,10 +527,10 @@ public class PinotTableRestletResource {
     if (schema == null) {
       schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
     }
-    return validateConfig(tableSchemaConfig.getTableConfig(), schema, typesToSkip);
+    return validateConfig(tableSchemaConfig.getTableConfig(), schema, typesToSkip).toString();
   }
 
-  private String validateConfig(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip) {
+  private ObjectNode validateConfig(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip) {
     try {
       if (schema == null) {
         throw new SchemaNotFoundException("Got empty schema");
@@ -542,7 +542,7 @@ public class PinotTableRestletResource {
       } else {
         tableConfigValidateStr.set(TableType.REALTIME.name(), tableConfig.toJsonNode());
       }
-      return tableConfigValidateStr.toString();
+      return tableConfigValidateStr;
     } catch (Exception e) {
       String msg = String.format("Invalid table config: %s. %s", tableConfig.getTableName(), e.getMessage());
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
