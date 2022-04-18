@@ -93,7 +93,7 @@ public class SchemaTest {
     }
 
     schemaToValidate = new Schema();
-    schemaToValidate.addField(new DimensionFieldSpec("d", FieldSpec.DataType.BIG_DECIMAL, true));
+    schemaToValidate.addField(new MetricFieldSpec("d", FieldSpec.DataType.BIG_DECIMAL));
     schemaToValidate.validate();
 
     schemaToValidate = new Schema();
@@ -106,7 +106,7 @@ public class SchemaTest {
     String defaultString = "default";
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
         .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.INT, 10)
-        .addSingleValueDimension("svBigDecimalDimensionWithDefault", FieldSpec.DataType.BIG_DECIMAL, BigDecimal.TEN)
+        .addMetric("svBigDecimalMetricWithDefault", FieldSpec.DataType.BIG_DECIMAL, BigDecimal.TEN)
         .addSingleValueDimension("svDimensionWithMaxLength", FieldSpec.DataType.STRING, 20000, null)
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
         .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, defaultString)
@@ -132,13 +132,13 @@ public class SchemaTest {
     Assert.assertTrue(dimensionFieldSpec.isSingleValueField());
     Assert.assertEquals(dimensionFieldSpec.getDefaultNullValue(), 10);
 
-    dimensionFieldSpec = schema.getDimensionSpec("svBigDecimalDimensionWithDefault");
-    Assert.assertNotNull(dimensionFieldSpec);
-    Assert.assertEquals(dimensionFieldSpec.getFieldType(), FieldSpec.FieldType.DIMENSION);
-    Assert.assertEquals(dimensionFieldSpec.getName(), "svBigDecimalDimensionWithDefault");
-    Assert.assertEquals(dimensionFieldSpec.getDataType(), FieldSpec.DataType.BIG_DECIMAL);
-    Assert.assertTrue(dimensionFieldSpec.isSingleValueField());
-    Assert.assertEquals(dimensionFieldSpec.getDefaultNullValue(), BigDecimal.TEN);
+    MetricFieldSpec metricFieldSpec = schema.getMetricSpec("svBigDecimalMetricWithDefault");
+    Assert.assertNotNull(metricFieldSpec);
+    Assert.assertEquals(metricFieldSpec.getFieldType(), FieldSpec.FieldType.METRIC);
+    Assert.assertEquals(metricFieldSpec.getName(), "svBigDecimalMetricWithDefault");
+    Assert.assertEquals(metricFieldSpec.getDataType(), FieldSpec.DataType.BIG_DECIMAL);
+    Assert.assertTrue(metricFieldSpec.isSingleValueField());
+    Assert.assertEquals(metricFieldSpec.getDefaultNullValue(), BigDecimal.TEN);
 
     dimensionFieldSpec = schema.getDimensionSpec("svDimensionWithMaxLength");
     Assert.assertNotNull(dimensionFieldSpec);
@@ -174,7 +174,7 @@ public class SchemaTest {
     Assert.assertEquals(dimensionFieldSpec.getMaxLength(), 20000);
     Assert.assertEquals(dimensionFieldSpec.getDefaultNullValue(), "null");
 
-    MetricFieldSpec metricFieldSpec = schema.getMetricSpec("metric");
+    metricFieldSpec = schema.getMetricSpec("metric");
     Assert.assertNotNull(metricFieldSpec);
     Assert.assertEquals(metricFieldSpec.getFieldType(), FieldSpec.FieldType.METRIC);
     Assert.assertEquals(metricFieldSpec.getName(), "metric");

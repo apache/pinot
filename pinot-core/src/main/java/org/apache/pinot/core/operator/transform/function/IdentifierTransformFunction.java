@@ -187,8 +187,9 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
       String[] stringBuffer = new String[length];
       projectionBlock.fillValues(_columnName, evaluator, stringBuffer, true);
       ArrayCopyUtils.copy(stringBuffer, buffer, length);
+    } else {
+      throw new UnsupportedOperationException();
     }
-    throw new UnsupportedOperationException();
   }
 
   @Override

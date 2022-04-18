@@ -64,7 +64,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
 
   private static final String BIG_DECIMAL_COLUMN = "bigDecimalColumn";
   private static final Schema SCHEMA =
-      new Schema.SchemaBuilder().addSingleValueDimension(BIG_DECIMAL_COLUMN, DataType.BIG_DECIMAL).build();
+      new Schema.SchemaBuilder().addMetric(BIG_DECIMAL_COLUMN, DataType.BIG_DECIMAL).build();
   private static final TableConfig TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
 

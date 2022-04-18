@@ -172,7 +172,7 @@ public abstract class BaseTransformFunctionTest {
         .addSingleValueDimension(LONG_SV_COLUMN, FieldSpec.DataType.LONG)
         .addSingleValueDimension(FLOAT_SV_COLUMN, FieldSpec.DataType.FLOAT)
         .addSingleValueDimension(DOUBLE_SV_COLUMN, FieldSpec.DataType.DOUBLE)
-        .addSingleValueDimension(BIG_DECIMAL_SV_COLUMN, FieldSpec.DataType.BIG_DECIMAL)
+        .addMetric(BIG_DECIMAL_SV_COLUMN, FieldSpec.DataType.BIG_DECIMAL)
         .addSingleValueDimension(STRING_SV_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_ALPHANUM_SV_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(BYTES_SV_COLUMN, FieldSpec.DataType.BYTES)
