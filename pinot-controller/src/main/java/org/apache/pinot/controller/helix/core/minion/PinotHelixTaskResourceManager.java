@@ -49,6 +49,7 @@ import org.apache.helix.task.WorkflowConfig;
 import org.apache.helix.task.WorkflowContext;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.utils.DateTimeUtils;
+import org.apache.pinot.controller.api.exception.NoTaskMetadataException;
 import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -650,16 +651,15 @@ public class PinotHelixTaskResourceManager {
     return TASK_PREFIX + taskType + TASK_NAME_SEPARATOR + taskName;
   }
 
-  public String getTaskMetadataByTable(String taskType, String tableNameWithType) {
+  public String getTaskMetadataByTable(String taskType, String tableNameWithType)
+      throws JsonProcessingException {
     ZkHelixPropertyStore<ZNRecord> propertyStore = _helixResourceManager.getPropertyStore();
     ZNRecord raw = MinionTaskMetadataUtils.fetchTaskMetadata(propertyStore, taskType, tableNameWithType);
-    Preconditions
-        .checkState(raw != null, "Found task metadata for task type: %s for table: %s", taskType, tableNameWithType);
-    try {
-      return JsonUtils.objectToString(raw);
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException("Failed to convert task metadata to Json format", e);
+    if (raw == null) {
+      throw new NoTaskMetadataException(
+          String.format("No task metadata for task type: %s from table: %s", taskType, tableNameWithType));
     }
+    return JsonUtils.objectToString(raw);
   }
 
   public void deleteTaskMetadataByTable(String taskType, String tableNameWithType) {

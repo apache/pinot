@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -46,6 +47,7 @@ import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
+import org.apache.pinot.controller.api.exception.NoTaskMetadataException;
 import org.apache.pinot.controller.api.exception.NoTaskScheduledException;
 import org.apache.pinot.controller.api.exception.TaskAlreadyExistsException;
 import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
@@ -156,7 +158,15 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
           String tableNameWithType) {
-    return _pinotHelixTaskResourceManager.getTaskMetadataByTable(taskType, tableNameWithType);
+    try {
+      return _pinotHelixTaskResourceManager.getTaskMetadataByTable(taskType, tableNameWithType);
+    } catch (NoTaskMetadataException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
+    } catch (JsonProcessingException e) {
+      throw new ControllerApplicationException(LOGGER, String
+          .format("Failed to format task metadata into Json for task type: %s from table: %s", taskType,
+              tableNameWithType), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
   }
 
   @DELETE
