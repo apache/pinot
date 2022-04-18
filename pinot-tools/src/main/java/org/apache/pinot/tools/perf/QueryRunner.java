@@ -32,7 +32,6 @@ import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.concurrent.ThreadSafe;
@@ -298,57 +297,56 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
 
     final long startTimeAbsolute = System.currentTimeMillis();
+    boolean timeoutReached = false;
     long startTime = System.currentTimeMillis();
     long reportStartTime = startTime;
     int numReportIntervals = 0;
     int numTimesExecuted = 0;
-    try {
-      while (numTimesToRunQueries == 0 || numTimesExecuted < numTimesToRunQueries) {
-        for (String query : queries) {
-          if (timeout > 0 && System.currentTimeMillis() - startTimeAbsolute > timeout) {
-            LOGGER.warn("Timeout of {} sec reached. Aborting", timeout);
-            throw new TimeoutException("Timeout of " + timeout + " sec reached. Aborting");
-          }
 
-          JsonNode response = driver.postQuery(query, headers);
-          numQueriesExecuted++;
-          long brokerTime = response.get("timeUsedMs").asLong();
-          totalBrokerTime += brokerTime;
-          long clientTime = response.get("totalTime").asLong();
-          totalClientTime += clientTime;
-          boolean hasException = !response.get("exceptions").isEmpty();
-          numExceptions += hasException ? 1 : 0;
-          statisticsList.get(0).addValue(clientTime);
+    while (!timeoutReached && (numTimesToRunQueries == 0 || numTimesExecuted < numTimesToRunQueries)) {
+      for (String query : queries) {
+        if (timeout > 0 && System.currentTimeMillis() - startTimeAbsolute > timeout) {
+          LOGGER.info("Timeout of {} sec reached. Aborting", timeout);
+          timeoutReached = true;
+          break;
+        }
 
-          long currentTime = System.currentTimeMillis();
-          if (currentTime - reportStartTime >= reportIntervalMs) {
-            long timePassed = currentTime - startTime;
-            LOGGER.info("Time Passed: {}ms, Queries Executed: {}, Exceptions: {}, Average QPS: {}, " + "Average "
-                    + "Broker Time: {}ms, Average Client Time: {}ms.", timePassed, numQueriesExecuted, numExceptions,
-                numQueriesExecuted / ((double) timePassed / MILLIS_PER_SECOND),
-                totalBrokerTime / (double) numQueriesExecuted, totalClientTime / (double) numQueriesExecuted);
-            reportStartTime = currentTime;
-            numReportIntervals++;
+        JsonNode response = driver.postQuery(query, headers);
+        numQueriesExecuted++;
+        long brokerTime = response.get("timeUsedMs").asLong();
+        totalBrokerTime += brokerTime;
+        long clientTime = response.get("totalTime").asLong();
+        totalClientTime += clientTime;
+        boolean hasException = !response.get("exceptions").isEmpty();
+        numExceptions += hasException ? 1 : 0;
+        statisticsList.get(0).addValue(clientTime);
 
-            if ((numIntervalsToReportAndClearStatistics != 0) && (numReportIntervals
-                == numIntervalsToReportAndClearStatistics)) {
-              numReportIntervals = 0;
-              startTime = currentTime;
-              numQueriesExecuted = 0;
-              numExceptions = 0;
-              totalBrokerTime = 0L;
-              totalClientTime = 0L;
-              for (Statistics statistics : statisticsList) {
-                statistics.report();
-                statistics.clear();
-              }
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - reportStartTime >= reportIntervalMs) {
+          long timePassed = currentTime - startTime;
+          LOGGER.info("Time Passed: {}ms, Queries Executed: {}, Exceptions: {}, Average QPS: {}, " + "Average "
+                  + "Broker Time: {}ms, Average Client Time: {}ms.", timePassed, numQueriesExecuted, numExceptions,
+              numQueriesExecuted / ((double) timePassed / MILLIS_PER_SECOND),
+              totalBrokerTime / (double) numQueriesExecuted, totalClientTime / (double) numQueriesExecuted);
+          reportStartTime = currentTime;
+          numReportIntervals++;
+
+          if ((numIntervalsToReportAndClearStatistics != 0) && (numReportIntervals
+              == numIntervalsToReportAndClearStatistics)) {
+            numReportIntervals = 0;
+            startTime = currentTime;
+            numQueriesExecuted = 0;
+            numExceptions = 0;
+            totalBrokerTime = 0L;
+            totalClientTime = 0L;
+            for (Statistics statistics : statisticsList) {
+              statistics.report();
+              statistics.clear();
             }
           }
         }
-        numTimesExecuted++;
       }
-    } catch (TimeoutException e) {
-      LOGGER.info("Time out reached. {}", e.getMessage());
+      numTimesExecuted++;
     }
 
     long timePassed = System.currentTimeMillis() - startTime;
@@ -422,49 +420,45 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     long reportStartTime = startTime;
     int numReportIntervals = 0;
     int numTimesExecuted = 0;
-    try {
-      while (numTimesToRunQueries == 0 || numTimesExecuted < numTimesToRunQueries) {
-        if (executorService.isTerminated()) {
-          throw new IllegalThreadStateException("All threads got exception and already dead.");
-        }
-
-        if (timeout > 0 && System.currentTimeMillis() - startTimeAbsolute > timeout) {
-          throw new TimeoutException("Timeout of " + timeout + " sec reached. Aborting");
-        }
-
-        for (String query : queries) {
-          if (timeout > 0 && System.currentTimeMillis() - startTimeAbsolute > timeout) {
-            throw new TimeoutException("Timeout of " + timeout + " sec reached. Aborting");
-          }
-          while (!queryQueue.offer(query)) {
-            Thread.sleep(1);
-          }
-
-          long currentTime = System.currentTimeMillis();
-          if (currentTime - reportStartTime >= reportIntervalMs) {
-            long timePassed = currentTime - startTime;
-            int numQueriesExecutedInt = numQueriesExecuted.get();
-            LOGGER.info("Time Passed: {}ms, Queries Executed: {}, Exceptions: {}, Average QPS: {}, " + "Average "
-                    + "Broker Time: {}ms, Average Client Time: {}ms.", timePassed, numQueriesExecutedInt,
-                numExceptions.get(), numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
-                totalBrokerTime.get() / (double) numQueriesExecutedInt,
-                totalClientTime.get() / (double) numQueriesExecutedInt);
-            reportStartTime = currentTime;
-            numReportIntervals++;
-
-            if ((numIntervalsToReportAndClearStatistics != 0) && (numReportIntervals
-                == numIntervalsToReportAndClearStatistics)) {
-              numReportIntervals = 0;
-              startTime = currentTime;
-              reportAndClearStatistics(numQueriesExecuted, numExceptions, totalBrokerTime, totalClientTime,
-                  statisticsList);
-            }
-          }
-        }
-        numTimesExecuted++;
+    boolean timeoutReached = false;
+    while (!timeoutReached && (numTimesToRunQueries == 0 || numTimesExecuted < numTimesToRunQueries)) {
+      if (executorService.isTerminated()) {
+        throw new IllegalThreadStateException("All threads got exception and already dead.");
       }
-    } catch (TimeoutException e) {
-      LOGGER.info("Time out reached. {}", e.getMessage());
+
+      for (String query : queries) {
+        if (timeout > 0 && System.currentTimeMillis() - startTimeAbsolute > timeout) {
+          LOGGER.info("Timeout of {} sec reached. Aborting", timeout);
+          timeoutReached = true;
+          break;
+        }
+        while (!queryQueue.offer(query)) {
+          Thread.sleep(1);
+        }
+
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - reportStartTime >= reportIntervalMs) {
+          long timePassed = currentTime - startTime;
+          int numQueriesExecutedInt = numQueriesExecuted.get();
+          LOGGER.info("Time Passed: {}ms, Queries Executed: {}, Exceptions: {}, Average QPS: {}, " + "Average "
+                  + "Broker Time: {}ms, Average Client Time: {}ms.", timePassed, numQueriesExecutedInt,
+              numExceptions.get(),
+              numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
+              totalBrokerTime.get() / (double) numQueriesExecutedInt,
+              totalClientTime.get() / (double) numQueriesExecutedInt);
+          reportStartTime = currentTime;
+          numReportIntervals++;
+
+          if ((numIntervalsToReportAndClearStatistics != 0) && (numReportIntervals
+              == numIntervalsToReportAndClearStatistics)) {
+            numReportIntervals = 0;
+            startTime = currentTime;
+            reportAndClearStatistics(numQueriesExecuted, numExceptions, totalBrokerTime, totalClientTime,
+                statisticsList);
+          }
+        }
+      }
+      numTimesExecuted++;
     }
 
     // Wait for all queries getting executed.
@@ -548,59 +542,54 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     long reportStartTime = startTime;
     int numReportIntervals = 0;
     int numTimesExecuted = 0;
-    try {
-      while (numTimesToRunQueries == 0 || numTimesExecuted < numTimesToRunQueries) {
-        if (executorService.isTerminated()) {
-          throw new IllegalThreadStateException("All threads got exception and already dead.");
-        }
-
-        if (timeout > 0 && System.currentTimeMillis() - startTimeAbsolute > timeout) {
-          throw new TimeoutException("Timeout of " + timeout + " sec reached. Aborting");
-        }
-
-        long nextQueryNanos = System.nanoTime();
-        for (String query : queries) {
-          if (timeout > 0 && System.currentTimeMillis() - startTimeAbsolute > timeout) {
-            throw new TimeoutException("Timeout of " + timeout + " sec reached. Aborting");
-          }
-          long nanoTime = System.nanoTime();
-          while (nextQueryNanos > nanoTime - NANO_DELTA) {
-            Thread.sleep(Math.max((int) ((nextQueryNanos - nanoTime) / 1E6), 1));
-            nanoTime = System.nanoTime();
-          }
-
-          while (!queryQueue.offer(query)) {
-            Thread.sleep(1);
-          }
-
-          nextQueryNanos += queryIntervalNanos;
-
-          long currentTime = System.currentTimeMillis();
-          if (currentTime - reportStartTime >= reportIntervalMs) {
-            long timePassed = currentTime - startTime;
-            int numQueriesExecutedInt = numQueriesExecuted.get();
-            LOGGER.info("Target QPS: {}, Time Passed: {}ms, Queries Executed: {}, Exceptions: {}, Average QPS: {}, "
-                    + "Average Broker Time: {}ms, Average Client Time: {}ms, Queries Queued: {}.", startQPS, timePassed,
-                numQueriesExecutedInt, numExceptions.get(),
-                numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
-                totalBrokerTime.get() / (double) numQueriesExecutedInt,
-                totalClientTime.get() / (double) numQueriesExecutedInt, queryQueue.size());
-            reportStartTime = currentTime;
-            numReportIntervals++;
-
-            if ((numIntervalsToReportAndClearStatistics != 0) && (numReportIntervals
-                == numIntervalsToReportAndClearStatistics)) {
-              numReportIntervals = 0;
-              startTime = currentTime;
-              reportAndClearStatistics(numQueriesExecuted, numExceptions, totalBrokerTime, totalClientTime,
-                  statisticsList);
-            }
-          }
-        }
-        numTimesExecuted++;
+    boolean timeoutReached = false;
+    while (!timeoutReached && (numTimesToRunQueries == 0 || numTimesExecuted < numTimesToRunQueries)) {
+      if (executorService.isTerminated()) {
+        throw new IllegalThreadStateException("All threads got exception and already dead.");
       }
-    } catch (TimeoutException e) {
-      LOGGER.info("Time out reached. {}", e.getMessage());
+
+      long nextQueryNanos = System.nanoTime();
+      for (String query : queries) {
+        if (timeout > 0 && System.currentTimeMillis() - startTimeAbsolute > timeout) {
+          LOGGER.info("Timeout of {} sec reached. Aborting", timeout);
+          timeoutReached = true;
+          break;
+        }
+        long nanoTime = System.nanoTime();
+        while (nextQueryNanos > nanoTime - NANO_DELTA) {
+          Thread.sleep(Math.max((int) ((nextQueryNanos - nanoTime) / 1E6), 1));
+          nanoTime = System.nanoTime();
+        }
+
+        while (!queryQueue.offer(query)) {
+          Thread.sleep(1);
+        }
+
+        nextQueryNanos += queryIntervalNanos;
+
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - reportStartTime >= reportIntervalMs) {
+          long timePassed = currentTime - startTime;
+          int numQueriesExecutedInt = numQueriesExecuted.get();
+          LOGGER.info("Target QPS: {}, Time Passed: {}ms, Queries Executed: {}, Exceptions: {}, Average QPS: {}, "
+                  + "Average Broker Time: {}ms, Average Client Time: {}ms, Queries Queued: {}.", startQPS, timePassed,
+              numQueriesExecutedInt, numExceptions.get(),
+              numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
+              totalBrokerTime.get() / (double) numQueriesExecutedInt,
+              totalClientTime.get() / (double) numQueriesExecutedInt, queryQueue.size());
+          reportStartTime = currentTime;
+          numReportIntervals++;
+
+          if ((numIntervalsToReportAndClearStatistics != 0) && (numReportIntervals
+              == numIntervalsToReportAndClearStatistics)) {
+            numReportIntervals = 0;
+            startTime = currentTime;
+            reportAndClearStatistics(numQueriesExecuted, numExceptions, totalBrokerTime, totalClientTime,
+                statisticsList);
+          }
+        }
+      }
+      numTimesExecuted++;
     }
 
     // Wait for all queries getting executed.
@@ -691,81 +680,75 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     int numTimesExecuted = 0;
     double currentQPS = startQPS;
     long queryIntervalNanos = (long) (1E9 / currentQPS);
-    try {
-      while (numTimesToRunQueries == 0 || numTimesExecuted < numTimesToRunQueries) {
-        if (executorService.isTerminated()) {
-          throw new IllegalThreadStateException("All threads got exception and already dead.");
-        }
+    boolean timeoutReached = false;
+    while (!timeoutReached && (numTimesToRunQueries == 0 || numTimesExecuted < numTimesToRunQueries)) {
+      if (executorService.isTerminated()) {
+        throw new IllegalThreadStateException("All threads got exception and already dead.");
+      }
 
+      long nextQueryNanos = System.nanoTime();
+      for (String query : queries) {
         if (timeout > 0 && System.currentTimeMillis() - startTimeAbsolute > timeout) {
-          throw new TimeoutException("Timeout of " + timeout + " sec reached. Aborting");
+          LOGGER.info("Timeout of {} sec reached. Aborting", timeout);
+          timeoutReached = true;
+          break;
+        }
+        long nanoTime = System.nanoTime();
+        while (nextQueryNanos > nanoTime - NANO_DELTA) {
+          Thread.sleep(Math.max((int) ((nextQueryNanos - nanoTime) / 1E6), 1));
+          nanoTime = System.nanoTime();
         }
 
-        long nextQueryNanos = System.nanoTime();
-        for (String query : queries) {
-          if (timeout > 0 && System.currentTimeMillis() - startTimeAbsolute > timeout) {
-            throw new TimeoutException("Timeout of " + timeout + " sec reached. Aborting");
-          }
-          long nanoTime = System.nanoTime();
-          while (nextQueryNanos > nanoTime - NANO_DELTA) {
-            Thread.sleep(Math.max((int) ((nextQueryNanos - nanoTime) / 1E6), 1));
-            nanoTime = System.nanoTime();
-          }
+        while (!queryQueue.offer(query)) {
+          Thread.sleep(1);
+        }
 
-          while (!queryQueue.offer(query)) {
-            Thread.sleep(1);
-          }
+        nextQueryNanos += queryIntervalNanos;
 
-          nextQueryNanos += queryIntervalNanos;
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - reportStartTime >= reportIntervalMs) {
+          long timePassed = currentTime - startTime;
+          reportStartTime = currentTime;
+          numReportIntervals++;
 
-          long currentTime = System.currentTimeMillis();
-          if (currentTime - reportStartTime >= reportIntervalMs) {
-            long timePassed = currentTime - startTime;
-            reportStartTime = currentTime;
-            numReportIntervals++;
+          if (numReportIntervals == numIntervalsToIncreaseQPS) {
+            // Find the next interval.
+            LOGGER.info("--------------------------------------------------------------------------------");
+            LOGGER.info("REPORT FOR TARGET QPS: {}", currentQPS);
+            int numQueriesExecutedInt = numQueriesExecuted.get();
+            LOGGER.info("Current Target QPS: {}, Time Passed: {}ms, Queries Executed: {}, Exceptions: {}, "
+                    + "Average QPS: {}, Average Broker Time: {}ms, Average Client Time: {}ms, Queries Queued: {}.",
+                currentQPS, timePassed, numQueriesExecutedInt, numExceptions.get(),
+                numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
+                totalBrokerTime.get() / (double) numQueriesExecutedInt,
+                totalClientTime.get() / (double) numQueriesExecutedInt, queryQueue.size());
+            numReportIntervals = 0;
+            startTime = currentTime;
+            reportAndClearStatistics(numQueriesExecuted, numExceptions, totalBrokerTime, totalClientTime,
+                statisticsList);
 
-            if (numReportIntervals == numIntervalsToIncreaseQPS) {
-              // Find the next interval.
-              LOGGER.info("--------------------------------------------------------------------------------");
-              LOGGER.info("REPORT FOR TARGET QPS: {}", currentQPS);
-              int numQueriesExecutedInt = numQueriesExecuted.get();
-              LOGGER.info("Current Target QPS: {}, Time Passed: {}ms, Queries Executed: {}, Exceptions: {}, "
-                      + "Average QPS: {}, Average Broker Time: {}ms, Average Client Time: {}ms, Queries Queued: {}.",
-                  currentQPS, timePassed, numQueriesExecutedInt, numExceptions.get(),
-                  numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
-                  totalBrokerTime.get() / (double) numQueriesExecutedInt,
-                  totalClientTime.get() / (double) numQueriesExecutedInt, queryQueue.size());
-              numReportIntervals = 0;
+            currentQPS += deltaQPS;
+            queryIntervalNanos = (long) (1E9 / currentQPS);
+            LOGGER.info("Increase target QPS to: {}, the following statistics are for the new target QPS.", currentQPS);
+          } else {
+            int numQueriesExecutedInt = numQueriesExecuted.get();
+            LOGGER.info("Current Target QPS: {}, Time Passed: {}ms, Queries Executed: {}, Average QPS: {}, "
+                    + "Average Broker Time: {}ms, Average Client Time: {}ms, Queries Queued: {}.", currentQPS,
+                timePassed,
+                numQueriesExecutedInt, numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
+                totalBrokerTime.get() / (double) numQueriesExecutedInt,
+                totalClientTime.get() / (double) numQueriesExecutedInt, queryQueue.size());
+
+            if ((numIntervalsToReportAndClearStatistics != 0) && (
+                numReportIntervals % numIntervalsToReportAndClearStatistics == 0)) {
               startTime = currentTime;
               reportAndClearStatistics(numQueriesExecuted, numExceptions, totalBrokerTime, totalClientTime,
                   statisticsList);
-
-              currentQPS += deltaQPS;
-              queryIntervalNanos = (long) (1E9 / currentQPS);
-              LOGGER.info("Increase target QPS to: {}, the following statistics are for the new target QPS.",
-                  currentQPS);
-            } else {
-              int numQueriesExecutedInt = numQueriesExecuted.get();
-              LOGGER.info("Current Target QPS: {}, Time Passed: {}ms, Queries Executed: {}, Average QPS: {}, "
-                      + "Average Broker Time: {}ms, Average Client Time: {}ms, Queries Queued: {}.", currentQPS,
-                  timePassed,
-                  numQueriesExecutedInt, numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
-                  totalBrokerTime.get() / (double) numQueriesExecutedInt,
-                  totalClientTime.get() / (double) numQueriesExecutedInt, queryQueue.size());
-
-              if ((numIntervalsToReportAndClearStatistics != 0) && (
-                  numReportIntervals % numIntervalsToReportAndClearStatistics == 0)) {
-                startTime = currentTime;
-                reportAndClearStatistics(numQueriesExecuted, numExceptions, totalBrokerTime, totalClientTime,
-                    statisticsList);
-              }
             }
           }
         }
-        numTimesExecuted++;
       }
-    } catch (TimeoutException e) {
-      LOGGER.info("Time out reached. {}", e.getMessage());
+      numTimesExecuted++;
     }
 
     // Wait for all queries getting executed.
