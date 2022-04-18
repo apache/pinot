@@ -136,4 +136,13 @@ public class ArrayFunctions {
   public static String[] arrayConcatString(String[] values1, String[] values2) {
     return ArrayUtils.addAll(values1, values2);
   }
+
+  @ScalarFunction
+  public static double arraySum(Double[] values) {
+    double sum = 0.0d;
+    for (double val : values)
+      sum += val;
+    return sum;
+  }
+
 }

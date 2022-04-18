@@ -158,6 +158,22 @@ public class RecordTransformerTest {
     transformer = new FilterTransformer(tableConfig);
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
+
+    // expression true, filtered
+    genericRow = getRecord();
+    tableConfig.setIngestionConfig(
+        new IngestionConfig(null, null, new FilterConfig("equals(svInt, 123)"), null, null));
+    transformer = new FilterTransformer(tableConfig);
+    transformer.transform(genericRow);
+    Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
+
+    // expression true, filtered
+    genericRow = getRecord();
+    tableConfig.setIngestionConfig(
+        new IngestionConfig(null, null, new FilterConfig("equals(arraySum(mvFloat), 123)"), null, null));
+    transformer = new FilterTransformer(tableConfig);
+    transformer.transform(genericRow);
+    Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
   }
 
   @Test
