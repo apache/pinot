@@ -127,7 +127,6 @@ public class ArithmeticFunctions {
     return Math.pow(a, exponent);
   }
 
-
   // Big Decimal Implementation has been used here to avoid overflows
   // when multiplying by Math.pow(10, scale) for rounding
   @ScalarFunction
@@ -152,5 +151,20 @@ public class ArithmeticFunctions {
   @ScalarFunction
   public static double truncate(double a) {
     return Math.signum(a) * Math.floor(Math.abs(a));
+  }
+
+  @ScalarFunction(names = {"gte"})
+  public static boolean greaterThanOrEquals(double a, double b) {
+    return a >= b;
+  }
+
+  @ScalarFunction(names = {"lte"})
+  public static boolean lessThanOrEquals(double a, double b) {
+    return a <= b;
+  }
+
+  @ScalarFunction
+  public static boolean equals(double a, double b) {
+    return a == b;
   }
 }

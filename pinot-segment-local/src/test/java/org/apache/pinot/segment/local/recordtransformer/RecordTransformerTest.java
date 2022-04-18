@@ -132,6 +132,35 @@ public class RecordTransformerTest {
   }
 
   @Test
+  public void testFilterTransformerScalarFunctions() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+
+    // expression false, not filtered
+    GenericRow genericRow = getRecord();
+    tableConfig.setIngestionConfig(
+        new IngestionConfig(null, null, new FilterConfig("gte(svInt, 124)"), null, null));
+    RecordTransformer transformer = new FilterTransformer(tableConfig);
+    transformer.transform(genericRow);
+    Assert.assertFalse(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
+
+    // expression true, filtered
+    genericRow = getRecord();
+    tableConfig.setIngestionConfig(
+        new IngestionConfig(null, null, new FilterConfig("lte(svInt, 123)"), null, null));
+    transformer = new FilterTransformer(tableConfig);
+    transformer.transform(genericRow);
+    Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
+
+    // expression true, filtered
+    genericRow = getRecord();
+    tableConfig.setIngestionConfig(
+        new IngestionConfig(null, null, new FilterConfig("equals(svInt, 123)"), null, null));
+    transformer = new FilterTransformer(tableConfig);
+    transformer.transform(genericRow);
+    Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
+  }
+
+  @Test
   public void testDataTypeTransformer() {
     RecordTransformer transformer = new DataTypeTransformer(SCHEMA);
     GenericRow record = getRecord();
