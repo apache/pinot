@@ -43,9 +43,11 @@ import org.apache.pinot.segment.local.realtime.impl.dictionary.BaseOffHeapMutabl
 import org.apache.pinot.segment.local.realtime.impl.geospatial.MutableH3Index;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeNativeTextIndex;
 import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVector;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
+import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
@@ -136,6 +138,8 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Collection<MetricFieldSpec> _physicalMetricFieldSpecs;
   private final Collection<String> _physicalTimeColumnNames;
 
+  List<FieldConfig> _fieldConfigList;
+
   // default message metadata
   private volatile long _lastIndexedTimeMs = Long.MIN_VALUE;
   private volatile long _latestIngestionTimeMs = Long.MIN_VALUE;
@@ -165,6 +169,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _segmentName = config.getSegmentName();
     _schema = config.getSchema();
     _timeColumnName = config.getTimeColumnName();
+    _fieldConfigList = config.getFieldConfigList();
     _capacity = config.getCapacity();
     SegmentZKMetadata segmentZKMetadata = config.getSegmentZKMetadata();
     _segmentMetadata = new SegmentMetadataImpl(TableNameBuilder.extractRawTableName(_realtimeTableName),
@@ -281,17 +286,37 @@ public class MutableSegmentImpl implements MutableSegment {
           invertedIndexColumns.contains(column) ? indexProvider.newInvertedIndex(context.forInvertedIndex()) : null;
 
       // Text index
-      RealtimeLuceneTextIndex textIndex;
+      MutableTextIndex textIndex;
+      boolean shouldBuildLuceneIndex = true;
       if (textIndexColumns.contains(column)) {
-        // TODO - this logic is in the wrong place and belongs in a Lucene-specific submodule,
-        //  it is beyond the scope of realtime index pluggability to do this refactoring, so realtime
-        //  text indexes remain statically defined. Revisit this after this refactoring has been done.
-        textIndex = new RealtimeLuceneTextIndex(column, new File(config.getConsumerDir()), _segmentName);
-        if (_realtimeLuceneReaders == null) {
-          _realtimeLuceneReaders = new RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders(_segmentName);
+        if (_fieldConfigList != null) {
+          for (FieldConfig fieldConfig : _fieldConfigList) {
+            if (fieldConfig.getName().equalsIgnoreCase(column)) {
+              Map<String, String> properties = fieldConfig.getProperties();
+
+              if (TextIndexUtils.isFstTypeNative(properties)) {
+                shouldBuildLuceneIndex = false;
+              }
+            }
+          }
         }
-        _realtimeLuceneReaders.addReader(textIndex);
+
+        if (shouldBuildLuceneIndex) {
+          // TODO - this logic is in the wrong place and belongs in a Lucene-specific submodule,
+          //  it is beyond the scope of realtime index pluggability to do this refactoring, so realtime
+          //  text indexes remain statically defined. Revisit this after this refactoring has been done.
+          textIndex = new RealtimeLuceneTextIndex(column, new File(config.getConsumerDir()), _segmentName);
+          if (_realtimeLuceneReaders == null) {
+            _realtimeLuceneReaders = new RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders(_segmentName);
+          }
+          _realtimeLuceneReaders.addReader((RealtimeLuceneTextIndex) textIndex);
+        } else {
+          //TODO : Add native index
+          textIndex = null;
+        }
       } else {
+        //TODO: atri
+        textIndex = new RealtimeNativeTextIndex();
         textIndex = null;
       }
 
@@ -343,7 +368,6 @@ public class MutableSegmentImpl implements MutableSegment {
       _upsertComparisonColumn = null;
     }
   }
-
   /**
    * Decide whether a given column should be dictionary encoded or not
    * @param noDictionaryColumns no dictionary column set

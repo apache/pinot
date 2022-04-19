@@ -165,7 +165,7 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
 
     fieldConfigs.add(
         new FieldConfig(DOMAIN_NAMES_COL_NATIVE, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
-            null));
+            propertiesMap));
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(Arrays.asList(DOMAIN_NAMES_COL_LUCENE)).setFieldConfigList(fieldConfigs).build();
@@ -245,7 +245,27 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
 
     _indexSegment = _nativeIndexSegment;
     _indexSegments = Arrays.asList(_nativeIndexSegment);
-    query = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_NATIVE, 'www.domain1.*') LIMIT 50000";
+    query = "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'www.domain1.*' LIMIT 50000";
+    testSelectionResults(query, 256, null);
+
+    query = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, '%www.domain1') LIMIT 50000";
+    _indexSegment = _luceneSegment;
+    _indexSegments = Arrays.asList(_indexSegment);
+    testSelectionResults(query, 256, null);
+
+    query = "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS '.*www.domain1' LIMIT 50000";
+    _indexSegment = _nativeIndexSegment;
+    _indexSegments = Arrays.asList(_nativeIndexSegment);
+    testSelectionResults(query, 256, null);
+
+    query = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, '%www.domain1%') LIMIT 50000";
+    _indexSegment = _luceneSegment;
+    _indexSegments = Arrays.asList(_indexSegment);
+    testSelectionResults(query, 256, null);
+
+    query = "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS '.*www.domain1.*' LIMIT 50000";
+    _indexSegment = _nativeIndexSegment;
+    _indexSegments = Arrays.asList(_nativeIndexSegment);
     testSelectionResults(query, 256, null);
   }
 }

@@ -27,6 +27,7 @@ import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -35,6 +36,7 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
+import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -73,6 +75,7 @@ import org.slf4j.LoggerFactory;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.*;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment.*;
+import static org.apache.pinot.spi.config.table.FieldConfig.TEXT_FST_TYPE;
 
 
 /**
@@ -215,7 +218,17 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
 
       if (textIndexColumns.contains(columnName)) {
-        FSTType fstType = _config.getFSTIndexType();
+        FSTType fstType = FSTType.LUCENE;
+        List<FieldConfig> fieldConfigList = _config.getTableConfig().getFieldConfigList();
+        for (FieldConfig fieldConfig : fieldConfigList) {
+          if (fieldConfig.getName().equalsIgnoreCase(columnName)) {
+            Map<String, String> properties = fieldConfig.getProperties();
+
+            if (TextIndexUtils.isFstTypeNative(properties)) {
+              fstType = FSTType.NATIVE;
+            }
+          }
+        }
         _textIndexCreatorMap.put(columnName,
             _indexCreatorProvider.newTextIndexCreator(context.forTextIndex(fstType, true)));
       }

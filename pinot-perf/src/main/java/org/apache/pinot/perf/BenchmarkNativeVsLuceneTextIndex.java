@@ -90,7 +90,7 @@ public class BenchmarkNativeVsLuceneTextIndex {
   final String _luceneQuery =
       "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'www.domain1%') LIMIT 5000000";
   final String _nativeQuery =
-      "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_NATIVE, 'www.domain1.*') LIMIT 5000000";
+      "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'www.domain1.*' LIMIT 5000000";
   @Param("350000")
   int _numRows;
   @Param({"0", "1", "10", "100"})
@@ -182,7 +182,7 @@ public class BenchmarkNativeVsLuceneTextIndex {
 
     fieldConfigs.add(
         new FieldConfig(DOMAIN_NAMES_COL_NATIVE, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
-            null));
+            propertiesMap));
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(Arrays.asList(DOMAIN_NAMES_COL_LUCENE)).setFieldConfigList(fieldConfigs).build();

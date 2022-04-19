@@ -53,7 +53,7 @@ public class NativeClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_RECORDS = NUM_SKILLS * 1000;
 
   private static final String TEST_TEXT_COLUMN_QUERY =
-      "SELECT COUNT(*) FROM mytable WHERE TEXT_MATCH(skills, 'lea.*ng')";
+      "SELECT COUNT(*) FROM mytable WHERE skills CONTAINS 'lea.*ng'";
 
   @Override
   public String getTimeColumnName() {
