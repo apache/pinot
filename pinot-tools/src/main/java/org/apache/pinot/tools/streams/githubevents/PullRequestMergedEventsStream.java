@@ -24,9 +24,9 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
@@ -36,6 +36,8 @@ import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Quickstart;
+import org.apache.pinot.tools.streams.PinotRealtimeSource;
+import org.apache.pinot.tools.streams.PinotSourceGenerator;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.tools.utils.KinesisStarterUtils;
 import org.apache.pinot.tools.utils.StreamSourceType;
@@ -51,40 +53,37 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
  * Creates a PullRequestMergedEvent for each valid PR event.
  * Publishes the PullRequestMergedEvent to the given kafka topic
  */
-public class PullRequestMergedEventsStream {
+public class PullRequestMergedEventsStream implements PinotSourceGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(PullRequestMergedEventsStream.class);
   private static final long SLEEP_MILLIS = 10_000;
 
-  private final ExecutorService _service;
-  private boolean _keepStreaming = true;
-
-  private final Schema _avroSchema;
-  private final String _topicName;
-  private final GitHubAPICaller _gitHubAPICaller;
-
-  private StreamDataProducer _producer;
+  private Schema _avroSchema;
+  private GitHubAPICaller _gitHubAPICaller;
+  private String etag = null;
+  private PinotRealtimeSource _pinotStream;
 
   public PullRequestMergedEventsStream(File schemaFile, String topicName, String personalAccessToken,
       StreamDataProducer producer)
       throws Exception {
-    _service = Executors.newFixedThreadPool(2);
     try {
       _avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(org.apache.pinot.spi.data.Schema.fromFile(schemaFile));
     } catch (Exception e) {
       LOGGER.error("Got exception while reading Pinot schema from file: [" + schemaFile.getName() + "]");
       throw e;
     }
-    _topicName = topicName;
     _gitHubAPICaller = new GitHubAPICaller(personalAccessToken);
-    _producer = producer;
+    _pinotStream = PinotRealtimeSource.builder().setProducer(producer).setGenerator(this).setTopic(topicName).build();
   }
 
   public PullRequestMergedEventsStream(String schemaFilePath, String topicName, String personalAccessToken,
       StreamDataProducer producer)
       throws Exception {
-    _service = Executors.newFixedThreadPool(2);
+    this(getSchemaFile(schemaFilePath), topicName, personalAccessToken, producer);
+  }
+
+  public static File getSchemaFile(String schemaFilePath) {
+    File pinotSchema;
     try {
-      File pinotSchema;
       if (schemaFilePath == null) {
         ClassLoader classLoader = PullRequestMergedEventsStream.class.getClassLoader();
         URL resource = classLoader.getResource("examples/stream/githubEvents/pullRequestMergedEvents_schema.json");
@@ -93,14 +92,11 @@ public class PullRequestMergedEventsStream {
       } else {
         pinotSchema = new File(schemaFilePath);
       }
-      _avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(org.apache.pinot.spi.data.Schema.fromFile(pinotSchema));
     } catch (Exception e) {
       LOGGER.error("Got exception while reading Pinot schema from file: [" + schemaFilePath + "]");
       throw e;
     }
-    _topicName = topicName;
-    _gitHubAPICaller = new GitHubAPICaller(personalAccessToken);
-    _producer = producer;
+    return pinotSchema;
   }
 
   public static StreamDataProducer getKafkaStreamDataProducer()
@@ -181,92 +177,17 @@ public class PullRequestMergedEventsStream {
    * Shuts down the stream.
    */
   public void shutdown()
-      throws IOException, InterruptedException {
+      throws Exception {
     printStatus(Quickstart.Color.GREEN, "***** Shutting down pullRequestMergedEvents Stream *****");
-    _keepStreaming = false;
+    _pinotStream.close();
     Thread.sleep(3000L);
     _gitHubAPICaller.shutdown();
-    _producer.close();
-    _producer = null;
-    _service.shutdown();
-  }
-
-  /**
-   * Publishes the message to the kafka topic
-   */
-  private void publish(GenericRecord message)
-      throws IOException {
-    if (!_keepStreaming) {
-      return;
-    }
-    _producer.produce(_topicName, message.toString().getBytes(StandardCharsets.UTF_8));
   }
 
   public void start() {
 
     printStatus(Quickstart.Color.CYAN, "***** Starting pullRequestMergedEvents Stream *****");
-
-    _service.submit(() -> {
-
-      String etag = null;
-      while (true) {
-        if (!_keepStreaming) {
-          return;
-        }
-        try {
-          GitHubAPICaller.GitHubAPIResponse githubAPIResponse = _gitHubAPICaller.callEventsAPI(etag);
-          switch (githubAPIResponse._statusCode) {
-            case 200: // Read new events
-              etag = githubAPIResponse._etag;
-              JsonNode jsonArray = JsonUtils.stringToJsonNode(githubAPIResponse._responseString);
-              for (JsonNode eventElement : jsonArray) {
-                try {
-                  GenericRecord genericRecord = convertToPullRequestMergedGenericRecord(eventElement);
-                  if (genericRecord != null) {
-                    printStatus(Quickstart.Color.CYAN, genericRecord.toString());
-                    publish(genericRecord);
-                  }
-                } catch (Exception e) {
-                  LOGGER.error("Exception in publishing generic record. Skipping", e);
-                }
-              }
-              break;
-            case 304: // Not Modified
-              printStatus(Quickstart.Color.YELLOW, "Not modified. Checking again in 10s.");
-              Thread.sleep(SLEEP_MILLIS);
-              break;
-            case 408: // Timeout
-              printStatus(Quickstart.Color.YELLOW, "Timeout. Trying again in 10s.");
-              Thread.sleep(SLEEP_MILLIS);
-              break;
-            case 403: // Rate Limit exceeded
-              printStatus(Quickstart.Color.YELLOW,
-                  "Rate limit exceeded, sleeping until " + githubAPIResponse._resetTimeMs);
-              long sleepMs = Math.max(60_000L, githubAPIResponse._resetTimeMs - System.currentTimeMillis());
-              Thread.sleep(sleepMs);
-              break;
-            case 401: // Unauthorized
-              printStatus(Quickstart.Color.YELLOW,
-                  "Unauthorized call to GitHub events API. Status message: " + githubAPIResponse._statusMessage
-                      + ". Exiting.");
-              return;
-            default: // Unknown status code
-              printStatus(Quickstart.Color.YELLOW,
-                  "Unknown status code " + githubAPIResponse._statusCode + " statusMessage "
-                      + githubAPIResponse._statusMessage + ". Retry in 10s");
-              Thread.sleep(SLEEP_MILLIS);
-              break;
-          }
-        } catch (Exception e) {
-          LOGGER.error("Exception in reading events data", e);
-          try {
-            Thread.sleep(SLEEP_MILLIS);
-          } catch (InterruptedException ex) {
-            LOGGER.error("Caught exception in retry", ex);
-          }
-        }
-      }
-    });
+    _pinotStream.run();
   }
 
   /**
@@ -363,5 +284,73 @@ public class PullRequestMergedEventsStream {
     genericRecord.put("mergedTimeMillis", pullRequestMergedEvent.getMergedTimeMillis());
 
     return genericRecord;
+  }
+
+  @Override
+  public void init(Properties properties) {
+
+  }
+
+  @Override
+  public List<byte[]> generateRows() {
+    List<byte[]> retVal = new ArrayList<>();
+    try {
+      GitHubAPICaller.GitHubAPIResponse githubAPIResponse = _gitHubAPICaller.callEventsAPI(etag);
+      switch (githubAPIResponse._statusCode) {
+        case 200: // Read new events
+          etag = githubAPIResponse._etag;
+          JsonNode jsonArray = JsonUtils.stringToJsonNode(githubAPIResponse._responseString);
+          for (JsonNode eventElement : jsonArray) {
+            try {
+              GenericRecord genericRecord = convertToPullRequestMergedGenericRecord(eventElement);
+              if (genericRecord != null) {
+                printStatus(Quickstart.Color.CYAN, genericRecord.toString());
+                retVal.add(genericRecord.toString().getBytes(StandardCharsets.UTF_8));
+              }
+            } catch (Exception e) {
+              LOGGER.error("Exception in publishing generic record. Skipping", e);
+            }
+          }
+          break;
+        case 304: // Not Modified
+          printStatus(Quickstart.Color.YELLOW, "Not modified. Checking again in 10s.");
+          Thread.sleep(SLEEP_MILLIS);
+          break;
+        case 408: // Timeout
+          printStatus(Quickstart.Color.YELLOW, "Timeout. Trying again in 10s.");
+          Thread.sleep(SLEEP_MILLIS);
+          break;
+        case 403: // Rate Limit exceeded
+          printStatus(Quickstart.Color.YELLOW, "Rate limit exceeded, sleeping until " + githubAPIResponse._resetTimeMs);
+          long sleepMs = Math.max(60_000L, githubAPIResponse._resetTimeMs - System.currentTimeMillis());
+          Thread.sleep(sleepMs);
+          break;
+        case 401: // Unauthorized
+          String msg = "Unauthorized call to GitHub events API. Status message: " + githubAPIResponse._statusMessage
+              + ". Exiting.";
+          printStatus(Quickstart.Color.YELLOW, msg);
+          throw new RuntimeException(msg);
+        default: // Unknown status code
+          printStatus(Quickstart.Color.YELLOW,
+              "Unknown status code " + githubAPIResponse._statusCode + " statusMessage "
+                  + githubAPIResponse._statusMessage + ". Retry in 10s");
+          Thread.sleep(SLEEP_MILLIS);
+          break;
+      }
+    } catch (Exception e) {
+      LOGGER.error("Exception in reading events data", e);
+      try {
+        Thread.sleep(SLEEP_MILLIS);
+      } catch (InterruptedException ex) {
+        LOGGER.error("Caught exception in retry", ex);
+      }
+    }
+    return retVal;
+  }
+
+  @Override
+  public void close()
+      throws Exception {
+    _gitHubAPICaller.shutdown();
   }
 }

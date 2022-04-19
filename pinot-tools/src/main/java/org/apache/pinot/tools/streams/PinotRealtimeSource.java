@@ -29,9 +29,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class PinotSourceStream implements AutoCloseable {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotSourceStream.class);
-  public static final String KEY_OF_MAX_MESSAGE_PER_SECOND = "pinot.stream.max.qps";
+public class PinotRealtimeSource implements AutoCloseable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotRealtimeSource.class);
+  public static final String KEY_OF_MAX_MESSAGE_PER_SECOND = "pinot.stream.max.message.per.second";
   public static final String KEY_OF_TOPIC_NAME = "pinot.topic.name";
   public static final long DEFAULT_MAX_MESSAGE_PER_SECOND = Long.MAX_VALUE;
   public static final long DEFAULT_EMPTY_SOURCE_SLEEP_MS = 10;
@@ -41,11 +41,11 @@ public class PinotSourceStream implements AutoCloseable {
   protected final ExecutorService _executor;
   protected RateLimiter _rateLimiter;
   protected volatile boolean _shutdown;
-  public PinotSourceStream(Properties settings, PinotSourceGenerator generator, StreamDataProducer producer) {
+  public PinotRealtimeSource(Properties settings, PinotSourceGenerator generator, StreamDataProducer producer) {
     this(settings, generator, producer, Executors.newSingleThreadExecutor());
   }
 
-  public PinotSourceStream(Properties settings, PinotSourceGenerator generator, StreamDataProducer producer,
+  public PinotRealtimeSource(Properties settings, PinotSourceGenerator generator, StreamDataProducer producer,
       ExecutorService executor) {
     _producer = producer;
     Preconditions.checkNotNull(_producer, "Producer of a stream cannot be null");
@@ -104,7 +104,7 @@ public class PinotSourceStream implements AutoCloseable {
 
   public static class Builder {
     private String _topic;
-    private long _maxQps;
+    private long _maxMessagePerSecond;
     private PinotSourceGenerator _generator;
     private StreamDataProducer _producer;
     private ExecutorService _executor;
@@ -113,8 +113,8 @@ public class PinotSourceStream implements AutoCloseable {
       return this;
     }
 
-    public Builder setMaxQps(long maxQps) {
-      _maxQps = maxQps;
+    public Builder setMaxMessagePerSecond(long maxMessagePerSecond) {
+      _maxMessagePerSecond = maxMessagePerSecond;
       return this;
     }
 
@@ -132,11 +132,11 @@ public class PinotSourceStream implements AutoCloseable {
       _executor = executor;
       return this;
     }
-    public PinotSourceStream build() {
+    public PinotRealtimeSource build() {
       Properties properties = new Properties();
-      properties.setProperty(KEY_OF_MAX_MESSAGE_PER_SECOND, String.valueOf(_maxQps));
+      properties.setProperty(KEY_OF_MAX_MESSAGE_PER_SECOND, String.valueOf(_maxMessagePerSecond));
       properties.setProperty(KEY_OF_TOPIC_NAME, _topic);
-      return new PinotSourceStream(properties, _generator, _producer, _executor);
+      return new PinotRealtimeSource(properties, _generator, _producer, _executor);
     }
   }
 }
