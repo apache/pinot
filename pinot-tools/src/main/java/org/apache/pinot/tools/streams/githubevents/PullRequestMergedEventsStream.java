@@ -59,7 +59,7 @@ public class PullRequestMergedEventsStream implements PinotSourceGenerator {
 
   private Schema _avroSchema;
   private GitHubAPICaller _gitHubAPICaller;
-  private String etag = null;
+  private String _etag = null;
   private PinotRealtimeSource _pinotStream;
 
   public PullRequestMergedEventsStream(File schemaFile, String topicName, String personalAccessToken,
@@ -288,17 +288,16 @@ public class PullRequestMergedEventsStream implements PinotSourceGenerator {
 
   @Override
   public void init(Properties properties) {
-
   }
 
   @Override
   public List<byte[]> generateRows() {
     List<byte[]> retVal = new ArrayList<>();
     try {
-      GitHubAPICaller.GitHubAPIResponse githubAPIResponse = _gitHubAPICaller.callEventsAPI(etag);
+      GitHubAPICaller.GitHubAPIResponse githubAPIResponse = _gitHubAPICaller.callEventsAPI(_etag);
       switch (githubAPIResponse._statusCode) {
         case 200: // Read new events
-          etag = githubAPIResponse._etag;
+          _etag = githubAPIResponse._etag;
           JsonNode jsonArray = JsonUtils.stringToJsonNode(githubAPIResponse._responseString);
           for (JsonNode eventElement : jsonArray) {
             try {

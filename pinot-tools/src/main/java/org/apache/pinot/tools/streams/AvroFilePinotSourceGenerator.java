@@ -35,11 +35,11 @@ public class AvroFilePinotSourceGenerator implements PinotSourceGenerator {
   private final int _rowsPerBatch;
 
   public AvroFilePinotSourceGenerator(Schema pinotSchema, File avroFile) {
-    this(pinotSchema, avroFile, 1,  null, null);
+    this(pinotSchema, avroFile, 1, null, null);
   }
 
-  public AvroFilePinotSourceGenerator(Schema pinotSchema, File avroFile, int rowsPerBatch, @Nullable String timeColumnName,
-      @Nullable Function<Long, Long> rowNumberToTimeIndex) {
+  public AvroFilePinotSourceGenerator(Schema pinotSchema, File avroFile, int rowsPerBatch,
+      @Nullable String timeColumnName, @Nullable Function<Long, Long> rowNumberToTimeIndex) {
     _pinotSchema = pinotSchema;
     _rowsProduced = 0;
     _rowNumberToTimeIndex = rowNumberToTimeIndex;
