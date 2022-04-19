@@ -370,7 +370,7 @@ public class RangePredicateEvaluatorFactory {
       _upperInclusive = upperInclusive;
     }
 
-    public float geLowerBound() {
+    public float getLowerBound() {
       return _lowerBound;
     }
 
@@ -415,7 +415,7 @@ public class RangePredicateEvaluatorFactory {
       _upperInclusive = upperInclusive;
     }
 
-    public double geLowerBound() {
+    public double getLowerBound() {
       return _lowerBound;
     }
 
