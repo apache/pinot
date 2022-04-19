@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -359,7 +360,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
           Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
           List<String> partitionColumns = new ArrayList<>(columnPartitionMap.keySet());
           for (List<SegmentZKMetadata> selectedSegmentsPerBucket : selectedSegmentsForAllBuckets) {
-            Map<List<Integer>, List<SegmentZKMetadata>> partitionToSegments = new HashMap<>();
+            Map<List<Integer>, List<SegmentZKMetadata>> partitionToSegments = new LinkedHashMap<>();
             List<SegmentZKMetadata> outlierSegments = new ArrayList<>();
             for (SegmentZKMetadata selectedSegment : selectedSegmentsPerBucket) {
               SegmentPartitionMetadata segmentPartitionMetadata = selectedSegment.getPartitionMetadata();
