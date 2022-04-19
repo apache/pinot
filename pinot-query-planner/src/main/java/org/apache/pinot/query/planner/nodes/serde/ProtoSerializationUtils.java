@@ -34,6 +34,9 @@ import org.apache.pinot.common.proto.Plan;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ProtoSerializationUtils {
   private static final String ENUM_VALUE_KEY = "ENUM_VALUE_KEY";
+  private static final String NULL_OBJECT_CLASSNAME = "null";
+  private static final Plan.ObjectField NULL_OBJECT_VALUE = Plan.ObjectField.newBuilder()
+      .setObjectClassName(NULL_OBJECT_CLASSNAME).build();
 
   private ProtoSerializationUtils() {
     // do not instantiate.
@@ -68,23 +71,27 @@ public class ProtoSerializationUtils {
    * @return the converted proto ObjectField.
    */
   public static Plan.ObjectField convertObjectToObjectField(Object object) {
-    Plan.ObjectField.Builder builder = Plan.ObjectField.newBuilder();
-    builder.setObjectClassName(object.getClass().getName());
-    // special handling for enum
-    if (object instanceof Enum) {
-      builder.putMemberVariables(ENUM_VALUE_KEY, serializeMemberVariable(((Enum) object).name()));
-    } else {
-      try {
-        for (Field field : object.getClass().getDeclaredFields()) {
-          field.setAccessible(true);
-          Object fieldObject = field.get(object);
-          builder.putMemberVariables(field.getName(), serializeMemberVariable(fieldObject));
+    if (object != null) {
+      Plan.ObjectField.Builder builder = Plan.ObjectField.newBuilder();
+      builder.setObjectClassName(object.getClass().getName());
+      // special handling for enum
+      if (object instanceof Enum) {
+        builder.putMemberVariables(ENUM_VALUE_KEY, serializeMemberVariable(((Enum) object).name()));
+      } else {
+        try {
+          for (Field field : object.getClass().getDeclaredFields()) {
+            field.setAccessible(true);
+            Object fieldObject = field.get(object);
+            builder.putMemberVariables(field.getName(), serializeMemberVariable(fieldObject));
+          }
+        } catch (IllegalAccessException e) {
+          throw new IllegalStateException("Unable to serialize Object: " + object.getClass(), e);
         }
-      } catch (IllegalAccessException e) {
-        throw new IllegalStateException("Unable to serialize Object: " + object.getClass(), e);
       }
+      return builder.build();
+    } else {
+      return NULL_OBJECT_VALUE;
     }
-    return builder.build();
   }
 
   // --------------------------------------------------------------------------
@@ -215,18 +222,22 @@ public class ProtoSerializationUtils {
   }
 
   private static Object constructObject(Plan.ObjectField objectField) {
-    try {
-      Class<?> clazz = Class.forName(objectField.getObjectClassName());
-      if (clazz.isEnum()) {
-        return Enum.valueOf((Class<Enum>) clazz,
-            objectField.getMemberVariablesOrDefault(ENUM_VALUE_KEY, null).getLiteralField().getStringField());
-      } else {
-        Object obj = clazz.newInstance();
-        setObjectFieldToObject(obj, objectField);
-        return obj;
+    if (!NULL_OBJECT_CLASSNAME.equals(objectField.getObjectClassName())) {
+      try {
+        Class<?> clazz = Class.forName(objectField.getObjectClassName());
+        if (clazz.isEnum()) {
+          return Enum.valueOf((Class<Enum>) clazz,
+              objectField.getMemberVariablesOrDefault(ENUM_VALUE_KEY, null).getLiteralField().getStringField());
+        } else {
+          Object obj = clazz.newInstance();
+          setObjectFieldToObject(obj, objectField);
+          return obj;
+        }
+      } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
+        throw new IllegalStateException("Unable to create Object of type: " + objectField.getObjectClassName(), e);
       }
-    } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
-      throw new IllegalStateException("Unable to create Object of type: " + objectField.getObjectClassName(), e);
+    } else {
+      return null;
     }
   }
 }

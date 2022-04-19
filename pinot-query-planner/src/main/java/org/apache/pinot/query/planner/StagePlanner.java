@@ -29,6 +29,7 @@ import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.nodes.MailboxReceiveNode;
 import org.apache.pinot.query.planner.nodes.MailboxSendNode;
 import org.apache.pinot.query.planner.nodes.StageNode;
+import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.routing.WorkerManager;
 
 
@@ -67,7 +68,7 @@ public class StagePlanner {
     StageNode globalStageRoot = walkRelPlan(relRoot, getNewStageId());
 
     // global root needs to send results back to the ROOT, a.k.a. the client response node.
-    // the last stage is always a broadcast-gather.
+    // the last stage only has one receiver so doesn't matter what the exchange type is.
     StageNode globalReceiverNode =
         new MailboxReceiveNode(0, relRoot.getRowType(), globalStageRoot.getStageId(),
             RelDistribution.Type.BROADCAST_DISTRIBUTED);
@@ -96,13 +97,15 @@ public class StagePlanner {
     if (isExchangeNode(node)) {
       // 1. exchangeNode always have only one input, get its input converted as a new stage root.
       StageNode nextStageRoot = walkRelPlan(node.getInput(0), getNewStageId());
-      RelDistribution.Type exchangeType = ((LogicalExchange) node).distribution.getType();
+      RelDistribution distribution = ((LogicalExchange) node).getDistribution();
+      RelDistribution.Type exchangeType = distribution.getType();
 
       // 2. make an exchange sender and receiver node pair
       StageNode mailboxReceiver = new MailboxReceiveNode(currentStageId, node.getRowType(), nextStageRoot.getStageId(),
           exchangeType);
       StageNode mailboxSender = new MailboxSendNode(nextStageRoot.getStageId(), node.getRowType(),
-          mailboxReceiver.getStageId(), exchangeType);
+          mailboxReceiver.getStageId(), exchangeType, exchangeType == RelDistribution.Type.HASH_DISTRIBUTED
+          ? new FieldSelectionKeySelector(distribution.getKeys().get(0)) : null);
       mailboxSender.addInput(nextStageRoot);
 
       // 3. put the sender side as a completed stage.

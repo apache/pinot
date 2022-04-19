@@ -120,13 +120,9 @@ public class QueryRunnerTest {
     // execute this single stage.
     _servers.get(serverInstance).processQuery(distributedStagePlan, requestMetadataMap);
 
-    DataTableBlock dataTableBlock;
     // get the block back and it should have 5 rows
-    dataTableBlock = mailboxReceiveOperator.nextBlock();
-    Assert.assertEquals(dataTableBlock.getDataTable().getNumberOfRows(), 5);
-    // next block should be null as all servers finished sending.
-    dataTableBlock = mailboxReceiveOperator.nextBlock();
-    Assert.assertTrue(DataTableBlockUtils.isEndOfStream(dataTableBlock));
+    List<Object[]> resultRows = reduceMailboxReceive(mailboxReceiveOperator);
+    Assert.assertEquals(resultRows.size(), 5);
   }
 
   @Test
@@ -149,19 +145,9 @@ public class QueryRunnerTest {
         createReduceStageOperator(queryPlan.getStageMetadataMap().get(stageRoodId).getServerInstances(),
             Long.parseLong(requestMetadataMap.get("REQUEST_ID")), stageRoodId, _reducerGrpcPort);
 
-    int count = 0;
-    int rowCount = 0;
-    DataTableBlock dataTableBlock;
-    while (count < 2) { // we have 2 servers sending data.
-      dataTableBlock = mailboxReceiveOperator.nextBlock();
-      rowCount += dataTableBlock.getDataTable().getNumberOfRows();
-      count++;
-    }
     // assert that all table A segments returned successfully.
-    Assert.assertEquals(rowCount, 15);
-    // assert that the next block is null (e.g. finished receiving).
-    dataTableBlock = mailboxReceiveOperator.nextBlock();
-    Assert.assertTrue(DataTableBlockUtils.isEndOfStream(dataTableBlock));
+    List<Object[]> resultRows = reduceMailboxReceive(mailboxReceiveOperator);
+    Assert.assertEquals(resultRows.size(), 15);
   }
 
   @Test
@@ -187,31 +173,11 @@ public class QueryRunnerTest {
     }
     Preconditions.checkNotNull(mailboxReceiveOperator);
 
-    int count = 0;
-    int rowCount = 0;
-    List<Object[]> resultRows = new ArrayList<>();
-    DataTableBlock dataTableBlock;
-    while (count < 2) { // we have 2 servers sending data.
-      dataTableBlock = mailboxReceiveOperator.nextBlock();
-      if (dataTableBlock.getDataTable() != null) {
-        DataTable dataTable = dataTableBlock.getDataTable();
-        int numRows = dataTable.getNumberOfRows();
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          resultRows.add(extractRowFromDataTable(dataTable, rowId));
-        }
-        rowCount += numRows;
-      }
-      count++;
-    }
-
     // Assert that each of the 5 categories from left table is joined with right table.
     // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
     // thus the final JOIN result will be 15 x 1 = 15.
-    Assert.assertEquals(rowCount, 15);
-
-    // assert that the next block is null (e.g. finished receiving).
-    dataTableBlock = mailboxReceiveOperator.nextBlock();
-    Assert.assertTrue(DataTableBlockUtils.isEndOfStream(dataTableBlock));
+    List<Object[]> resultRows = reduceMailboxReceive(mailboxReceiveOperator);
+    Assert.assertEquals(resultRows.size(), 15);
   }
 
   @Test
@@ -238,34 +204,14 @@ public class QueryRunnerTest {
     }
     Preconditions.checkNotNull(mailboxReceiveOperator);
 
-    int count = 0;
-    int rowCount = 0;
-    List<Object[]> resultRows = new ArrayList<>();
-    DataTableBlock dataTableBlock;
-    while (count < 2) { // we have 2 servers sending data.
-      dataTableBlock = mailboxReceiveOperator.nextBlock();
-      if (dataTableBlock.getDataTable() != null) {
-        DataTable dataTable = dataTableBlock.getDataTable();
-        int numRows = dataTable.getNumberOfRows();
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          resultRows.add(extractRowFromDataTable(dataTable, rowId));
-        }
-        rowCount += numRows;
-      }
-      count++;
-    }
-
     // Assert that each of the 5 categories from left table is joined with right table.
     // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
     // thus the final JOIN result will be 15 x 1 = 15.
     // Next join with table C which has (5 on server1 and 10 on server2), since data is identical. each of the row of
     // the A JOIN B will have identical value of col3 as table C.col3 has. Since the values are cycling between
     // (1, 2, 42, 1, 2). we will have 6 1s, 6 2s, and 3 42s, total result count will be 36 + 36 + 9 = 81
-    Assert.assertEquals(rowCount, 81);
-
-    // assert that the next block is null (e.g. finished receiving).
-    dataTableBlock = mailboxReceiveOperator.nextBlock();
-    Assert.assertTrue(DataTableBlockUtils.isEndOfStream(dataTableBlock));
+    List<Object[]> resultRows = reduceMailboxReceive(mailboxReceiveOperator);
+    Assert.assertEquals(resultRows.size(), 81);
   }
 
   @Test
@@ -293,32 +239,31 @@ public class QueryRunnerTest {
     }
     Preconditions.checkNotNull(mailboxReceiveOperator);
 
-    int count = 0;
-    int rowCount = 0;
+    // Assert that each of the 5 categories from left table is joined with right table.
+    // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
+    // but only 1 out of 5 rows from table A will be selected out; and all in table B will be selected.
+    // thus the final JOIN result will be 1 x 3 x 1 = 3.
+    List<Object[]> resultRows = reduceMailboxReceive(mailboxReceiveOperator);
+    Assert.assertEquals(resultRows.size(), 3);
+  }
+
+  protected static List<Object[]> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator) {
     List<Object[]> resultRows = new ArrayList<>();
     DataTableBlock dataTableBlock;
-    while (count < 2) { // we have 2 servers sending data.
+    while (true) {
       dataTableBlock = mailboxReceiveOperator.nextBlock();
+      if (DataTableBlockUtils.isEndOfStream(dataTableBlock)) {
+        break;
+      }
       if (dataTableBlock.getDataTable() != null) {
         DataTable dataTable = dataTableBlock.getDataTable();
         int numRows = dataTable.getNumberOfRows();
         for (int rowId = 0; rowId < numRows; rowId++) {
           resultRows.add(extractRowFromDataTable(dataTable, rowId));
         }
-        rowCount += numRows;
       }
-      count++;
     }
-
-    // Assert that each of the 5 categories from left table is joined with right table.
-    // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
-    // but only 1 out of 5 rows from table A will be selected out; and all in table B will be selected.
-    // thus the final JOIN result will be 1 x 3 x 1 = 6.
-    Assert.assertEquals(rowCount, 3);
-
-    // assert that the next block is null (e.g. finished receiving).
-    dataTableBlock = mailboxReceiveOperator.nextBlock();
-    Assert.assertTrue(DataTableBlockUtils.isEndOfStream(dataTableBlock));
+    return resultRows;
   }
 
   protected MailboxReceiveOperator createReduceStageOperator(List<ServerInstance> sendingInstances, long jobId,

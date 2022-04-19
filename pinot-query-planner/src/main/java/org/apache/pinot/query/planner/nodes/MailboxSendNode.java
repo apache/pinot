@@ -18,22 +18,31 @@
  */
 package org.apache.pinot.query.planner.nodes;
 
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.pinot.query.planner.partitioning.KeySelector;
 
 
 public class MailboxSendNode extends AbstractStageNode {
   private int _receiverStageId;
   private RelDistribution.Type _exchangeType;
+  private KeySelector<Object[], Object> _partitionKeySelector;
 
   public MailboxSendNode(int stageId) {
     super(stageId, null);
   }
 
   public MailboxSendNode(int stageId, RelDataType rowType, int receiverStageId, RelDistribution.Type exchangeType) {
+    this(stageId, rowType, receiverStageId, exchangeType, null);
+  }
+
+  public MailboxSendNode(int stageId, RelDataType rowType, int receiverStageId, RelDistribution.Type exchangeType,
+      @Nullable KeySelector<Object[], Object> partitionKeySelector) {
     super(stageId, rowType);
     _receiverStageId = receiverStageId;
     _exchangeType = exchangeType;
+    _partitionKeySelector = partitionKeySelector;
   }
 
   public int getReceiverStageId() {
@@ -42,5 +51,9 @@ public class MailboxSendNode extends AbstractStageNode {
 
   public RelDistribution.Type getExchangeType() {
     return _exchangeType;
+  }
+
+  public KeySelector<Object[], Object> getPartitionKeySelector() {
+    return _partitionKeySelector;
   }
 }
