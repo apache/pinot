@@ -26,6 +26,52 @@ import javax.annotation.Nullable;
  * @param <T>
  */
 public interface RangeIndexReader<T> extends Closeable {
+
+  /**
+   * @return true if the results are exact and don't need refinement by scanning.
+   * This means {@see getPartiallyMatchingDocIds} will return null.
+   */
+  default boolean isExact() {
+    return true;
+  }
+
+  /**
+   * Returns the number of docs with a value between min and max, both inclusive.
+   * Doc ids returned by this method must correspond to values which
+   * satisfy the query.
+   * @param min the inclusive lower bound.
+   * @param max the inclusive upper bound.
+   * @return the matching doc ids.
+   */
+  int getNumMatchingDocs(int min, int max);
+
+  /**
+   * Returns the number of docs with a value between min and max, both inclusive.
+   * The count is exact unless {@see getPartiallyMatchingDocIds} returns a non-null value.
+   * @param min the inclusive lower bound.
+   * @param max the inclusive upper bound.
+   * @return the matching doc ids.
+   */
+  int getNumMatchingDocs(long min, long max);
+
+  /**
+   * Returns the number of docs with a value between min and max, both inclusive.
+   * The count is exact unless {@see getPartiallyMatchingDocIds} returns a non-null value.
+   * @param min the inclusive lower bound.
+   * @param max the inclusive upper bound.
+   * @return the matching doc ids.
+   */
+  int getNumMatchingDocs(float min, float max);
+
+  /**
+   * Returns the number of docs with a value between min and max, both inclusive.
+   * The count is exact unless {@see getPartiallyMatchingDocIds} returns a non-null value.
+   * @param min the inclusive lower bound.
+   * @param max the inclusive upper bound.
+   * @return the matching doc ids.
+   */
+  int getNumMatchingDocs(double min, double max);
+
   /**
    * Returns doc ids with a value between min and max, both inclusive.
    * Doc ids returned by this method must correspond to values which

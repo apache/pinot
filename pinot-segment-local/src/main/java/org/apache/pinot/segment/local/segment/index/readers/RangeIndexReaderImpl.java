@@ -103,6 +103,47 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
     }
   }
 
+  @Override
+  public boolean isExact() {
+    return false;
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public int getNumMatchingDocs(int min, int max) {
+    ImmutableRoaringBitmap matching = getMatchingDocIds(min, max);
+    return matching == null ? 0 : matching.getCardinality();
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public int getNumMatchingDocs(long min, long max) {
+    ImmutableRoaringBitmap matching = getMatchingDocIds(min, max);
+    return matching == null ? 0 : matching.getCardinality();
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public int getNumMatchingDocs(float min, float max) {
+    ImmutableRoaringBitmap matching = getMatchingDocIds(min, max);
+    return matching == null ? 0 : matching.getCardinality();
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public int getNumMatchingDocs(double min, double max) {
+    ImmutableRoaringBitmap matching = getMatchingDocIds(min, max);
+    return matching == null ? 0 : matching.getCardinality();
+  }
+
   /**
    * {@inheritDoc}
    */
