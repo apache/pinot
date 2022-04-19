@@ -107,4 +107,11 @@ public class PercentileTDigestMVQueriesTest extends PercentileTDigestQueriesTest
             + "PERCENTILEMV(%2$s, %1$d), PERCENTILETDIGESTMV(%2$s, %1$d), PERCENTILETDIGEST(%3$s, %1$d) FROM %4$s",
         percentile, DOUBLE_COLUMN, TDIGEST_COLUMN, TABLE_NAME);
   }
+
+  @Override
+  protected String getSmartTDigestQuery(int percentile) {
+    return String.format("SELECT PERCENTILEMV(%2$s, %1$d), PERCENTILESMARTTDIGEST(%2$s, %1$d), "
+            + "PERCENTILETDIGESTMV(%2$s, %1$d), PERCENTILESMARTTDIGEST(%2$s, %1$d, 'threshold=10') FROM %3$s",
+        percentile, DOUBLE_COLUMN, TABLE_NAME);
+  }
 }

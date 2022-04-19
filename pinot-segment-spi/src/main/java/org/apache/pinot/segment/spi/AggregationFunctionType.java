@@ -53,6 +53,7 @@ public enum AggregationFunctionType {
   PERCENTILERAWEST("percentileRawEst"),
   PERCENTILETDIGEST("percentileTDigest"),
   PERCENTILERAWTDIGEST("percentileRawTDigest"),
+  PERCENTILESMARTTDIGEST("percentileSmartTDigest"),
   IDSET("idSet"),
 
   // Geo aggregation functions
