@@ -29,6 +29,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Represents one Pinot Real Time Source that is capable of
+ * 1. Keep running forever
+ * 2. Pull from generator and write into StreamDataProducer
+ * The Source has a thread that is looping forever.
+ */
 public class PinotRealtimeSource implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotRealtimeSource.class);
   public static final String KEY_OF_MAX_MESSAGE_PER_SECOND = "pinot.stream.max.message.per.second";
@@ -41,10 +47,24 @@ public class PinotRealtimeSource implements AutoCloseable {
   protected final ExecutorService _executor;
   protected RateLimiter _rateLimiter;
   protected volatile boolean _shutdown;
+
+  /**
+   * Constructs a source by passing in a Properties file, a generator, and a producer
+   * @param settings the settings for all components passed in
+   * @param generator the generator that can create data
+   * @param producer the producer to write the generator's data into
+   */
   public PinotRealtimeSource(Properties settings, PinotSourceGenerator generator, StreamDataProducer producer) {
     this(settings, generator, producer, Executors.newSingleThreadExecutor());
   }
 
+  /**
+   * Constructs a source by passing in properties file, a generator, a producer and an executor service
+   * @param settings the settings for all components passed in
+   * @param generator the generator that can create data
+   * @param producer the producer to write the generator's data into
+   * @param executor the preferred executor instead of creating a thread pool.
+   */
   public PinotRealtimeSource(Properties settings, PinotSourceGenerator generator, StreamDataProducer producer,
       ExecutorService executor) {
     _producer = producer;
