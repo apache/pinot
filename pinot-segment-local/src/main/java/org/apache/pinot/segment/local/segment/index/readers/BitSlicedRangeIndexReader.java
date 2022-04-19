@@ -56,22 +56,22 @@ public class BitSlicedRangeIndexReader implements RangeIndexReader<ImmutableRoar
   }
 
   @Override
-  public int getMatchingDocCount(int min, int max) {
+  public int getNumMatchingDocs(int min, int max) {
     return queryRangeBitmapCardinality(Math.max(min, _min) - _min, max - _min, _max - _min);
   }
 
   @Override
-  public int getMatchingDocCount(long min, long max) {
+  public int getNumMatchingDocs(long min, long max) {
     return queryRangeBitmapCardinality(Math.max(min, _min) - _min, max - _min, _max - _min);
   }
 
   @Override
-  public int getMatchingDocCount(float min, float max) {
+  public int getNumMatchingDocs(float min, float max) {
     return queryRangeBitmapCardinality(FPOrdering.ordinalOf(min), FPOrdering.ordinalOf(max), 0xFFFFFFFFL);
   }
 
   @Override
-  public int getMatchingDocCount(double min, double max) {
+  public int getNumMatchingDocs(double min, double max) {
     return queryRangeBitmapCardinality(FPOrdering.ordinalOf(min), FPOrdering.ordinalOf(max), 0xFFFFFFFFFFFFFFFFL);
   }
 

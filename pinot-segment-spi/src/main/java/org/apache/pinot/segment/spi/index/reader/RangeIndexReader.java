@@ -34,6 +34,7 @@ public interface RangeIndexReader<T> extends Closeable {
   default boolean isExact() {
     return true;
   }
+
   /**
    * Returns the number of docs with a value between min and max, both inclusive.
    * Doc ids returned by this method must correspond to values which
@@ -42,7 +43,7 @@ public interface RangeIndexReader<T> extends Closeable {
    * @param max the inclusive upper bound.
    * @return the matching doc ids.
    */
-  int getMatchingDocCount(int min, int max);
+  int getNumMatchingDocs(int min, int max);
 
   /**
    * Returns the number of docs with a value between min and max, both inclusive.
@@ -51,7 +52,7 @@ public interface RangeIndexReader<T> extends Closeable {
    * @param max the inclusive upper bound.
    * @return the matching doc ids.
    */
-  int getMatchingDocCount(long min, long max);
+  int getNumMatchingDocs(long min, long max);
 
   /**
    * Returns the number of docs with a value between min and max, both inclusive.
@@ -60,7 +61,7 @@ public interface RangeIndexReader<T> extends Closeable {
    * @param max the inclusive upper bound.
    * @return the matching doc ids.
    */
-  int getMatchingDocCount(float min, float max);
+  int getNumMatchingDocs(float min, float max);
 
   /**
    * Returns the number of docs with a value between min and max, both inclusive.
@@ -69,7 +70,7 @@ public interface RangeIndexReader<T> extends Closeable {
    * @param max the inclusive upper bound.
    * @return the matching doc ids.
    */
-  int getMatchingDocCount(double min, double max);
+  int getNumMatchingDocs(double min, double max);
 
   /**
    * Returns doc ids with a value between min and max, both inclusive.

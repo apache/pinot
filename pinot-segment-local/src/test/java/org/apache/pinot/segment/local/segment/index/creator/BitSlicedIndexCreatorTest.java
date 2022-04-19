@@ -164,7 +164,7 @@ public class BitSlicedIndexCreatorTest {
       for (int quantile : dataset.quantiles()) {
         ImmutableRoaringBitmap reference = dataset.scan(prev, quantile);
         ImmutableRoaringBitmap result = reader.getMatchingDocIds(prev, quantile);
-        int resultCount = reader.getMatchingDocCount(prev, quantile);
+        int resultCount = reader.getNumMatchingDocs(prev, quantile);
         assertEquals(result, reference);
         assertEquals(resultCount, result == null ? 0 : result.getCardinality());
         prev = quantile;
@@ -194,7 +194,7 @@ public class BitSlicedIndexCreatorTest {
       for (long quantile : dataset.quantiles()) {
         ImmutableRoaringBitmap reference = dataset.scan(prev, quantile);
         ImmutableRoaringBitmap result = reader.getMatchingDocIds(prev, quantile);
-        int resultCount = reader.getMatchingDocCount(prev, quantile);
+        int resultCount = reader.getNumMatchingDocs(prev, quantile);
         assertEquals(result, reference);
         assertEquals(resultCount, result == null ? 0 : result.getCardinality());
         prev = quantile;
@@ -224,7 +224,7 @@ public class BitSlicedIndexCreatorTest {
       for (float quantile : dataset.quantiles()) {
         ImmutableRoaringBitmap reference = dataset.scan(prev, quantile);
         ImmutableRoaringBitmap result = reader.getMatchingDocIds(prev, quantile);
-        int resultCount = reader.getMatchingDocCount(prev, quantile);
+        int resultCount = reader.getNumMatchingDocs(prev, quantile);
         assertEquals(result, reference);
         assertEquals(resultCount, result == null ? 0 : result.getCardinality());
         prev = quantile;
@@ -254,7 +254,7 @@ public class BitSlicedIndexCreatorTest {
       for (double quantile : dataset.quantiles()) {
         ImmutableRoaringBitmap reference = dataset.scan(prev, quantile);
         ImmutableRoaringBitmap result = reader.getMatchingDocIds(prev, quantile);
-        int resultCount = reader.getMatchingDocCount(prev, quantile);
+        int resultCount = reader.getNumMatchingDocs(prev, quantile);
         assertEquals(result, reference);
         assertEquals(resultCount, result == null ? 0 : result.getCardinality());
         prev = quantile;

@@ -26,6 +26,7 @@ import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.DoubleRawValueBasedRangePredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.FloatRawValueBasedRangePredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.IntRawValueBasedRangePredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.LongRawValueBasedRangePredicateEvaluator;
@@ -102,7 +103,7 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
 
   @Override
   public int getNumMatchingDocs() {
-    return _rangeEvaluator.getMatchingDocCount();
+    return _rangeEvaluator.getNumMatchingDocs();
   }
 
   @Override
@@ -114,7 +115,6 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
   public BitmapCollection getBitmaps() {
     return new BitmapCollection(_numDocs, false, _rangeEvaluator.getMatchingDocIds());
   }
-
 
   @Override
   public List<Operator> getChildOperators() {
@@ -132,18 +132,23 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
   interface RangeEvaluator {
     static RangeEvaluator of(RangeIndexReader<ImmutableRoaringBitmap> rangeIndexReader,
         PredicateEvaluator predicateEvaluator) {
-      if (predicateEvaluator.isDictionaryBased()) {
-        return new IntRangeEvaluator(rangeIndexReader, predicateEvaluator);
+      if (predicateEvaluator instanceof SortedDictionaryBasedRangePredicateEvaluator) {
+        return new IntRangeEvaluator(rangeIndexReader,
+            (SortedDictionaryBasedRangePredicateEvaluator) predicateEvaluator);
       } else {
         switch (predicateEvaluator.getDataType()) {
           case INT:
-            return new IntRangeEvaluator(rangeIndexReader, predicateEvaluator);
+            return new IntRangeEvaluator(rangeIndexReader,
+                (IntRawValueBasedRangePredicateEvaluator) predicateEvaluator);
           case LONG:
-            return new LongRangeEvaluator(rangeIndexReader, predicateEvaluator);
+            return new LongRangeEvaluator(rangeIndexReader,
+                (LongRawValueBasedRangePredicateEvaluator) predicateEvaluator);
           case FLOAT:
-            return new FloatRangeEvaluator(rangeIndexReader, predicateEvaluator);
+            return new FloatRangeEvaluator(rangeIndexReader,
+                (FloatRawValueBasedRangePredicateEvaluator) predicateEvaluator);
           case DOUBLE:
-            return new DoubleRangeEvaluator(rangeIndexReader, predicateEvaluator);
+            return new DoubleRangeEvaluator(rangeIndexReader,
+                (DoubleRawValueBasedRangePredicateEvaluator) predicateEvaluator);
           default:
             throw new IllegalStateException("String and Bytes data type not supported for Range Indexing");
         }
@@ -154,7 +159,7 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
 
     ImmutableRoaringBitmap getPartiallyMatchingDocIds();
 
-    int getMatchingDocCount();
+    int getNumMatchingDocs();
 
     boolean isExact();
   }
@@ -164,17 +169,23 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
     final int _min;
     final int _max;
 
-    IntRangeEvaluator(
-        RangeIndexReader<ImmutableRoaringBitmap> rangeIndexReader, PredicateEvaluator predicateEvaluator) {
+    private IntRangeEvaluator(RangeIndexReader<ImmutableRoaringBitmap> rangeIndexReader, int min, int max) {
       _rangeIndexReader = rangeIndexReader;
-      if (predicateEvaluator instanceof SortedDictionaryBasedRangePredicateEvaluator) {
-        // NOTE: End dictionary id is exclusive in OfflineDictionaryBasedRangePredicateEvaluator.
-        _min = ((SortedDictionaryBasedRangePredicateEvaluator) predicateEvaluator).getStartDictId();
-        _max = ((SortedDictionaryBasedRangePredicateEvaluator) predicateEvaluator).getEndDictId() - 1;
-      } else {
-        _min = ((IntRawValueBasedRangePredicateEvaluator) predicateEvaluator).getLowerBound();
-        _max = ((IntRawValueBasedRangePredicateEvaluator) predicateEvaluator).getUpperBound();
-      }
+      _min = min;
+      _max = max;
+    }
+
+    IntRangeEvaluator(
+        RangeIndexReader<ImmutableRoaringBitmap> rangeIndexReader,
+        IntRawValueBasedRangePredicateEvaluator predicateEvaluator) {
+      this(rangeIndexReader, predicateEvaluator.getLowerBound(), predicateEvaluator.getUpperBound());
+    }
+
+    IntRangeEvaluator(
+        RangeIndexReader<ImmutableRoaringBitmap> rangeIndexReader,
+        SortedDictionaryBasedRangePredicateEvaluator predicateEvaluator) {
+      // NOTE: End dictionary id is exclusive in OfflineDictionaryBasedRangePredicateEvaluator.
+      this(rangeIndexReader, predicateEvaluator.getStartDictId(), predicateEvaluator.getEndDictId() - 1);
     }
 
     @Override
@@ -188,8 +199,8 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
     }
 
     @Override
-    public int getMatchingDocCount() {
-      return _rangeIndexReader.getMatchingDocCount(_min, _max);
+    public int getNumMatchingDocs() {
+      return _rangeIndexReader.getNumMatchingDocs(_min, _max);
     }
 
     @Override
@@ -204,10 +215,10 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
     final long _max;
 
     LongRangeEvaluator(RangeIndexReader<ImmutableRoaringBitmap> rangeIndexReader,
-        PredicateEvaluator predicateEvaluator) {
+        LongRawValueBasedRangePredicateEvaluator predicateEvaluator) {
       _rangeIndexReader = rangeIndexReader;
-      _min = ((LongRawValueBasedRangePredicateEvaluator) predicateEvaluator).getLowerBound();
-      _max = ((LongRawValueBasedRangePredicateEvaluator) predicateEvaluator).getUpperBound();
+      _min = predicateEvaluator.getLowerBound();
+      _max = predicateEvaluator.getUpperBound();
     }
 
     @Override
@@ -221,8 +232,8 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
     }
 
     @Override
-    public int getMatchingDocCount() {
-      return _rangeIndexReader.getMatchingDocCount(_min, _max);
+    public int getNumMatchingDocs() {
+      return _rangeIndexReader.getNumMatchingDocs(_min, _max);
     }
 
     @Override
@@ -237,10 +248,10 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
     final float _max;
 
     FloatRangeEvaluator(RangeIndexReader<ImmutableRoaringBitmap> rangeIndexReader,
-        PredicateEvaluator predicateEvaluator) {
+        FloatRawValueBasedRangePredicateEvaluator predicateEvaluator) {
       _rangeIndexReader = rangeIndexReader;
-      _min = ((FloatRawValueBasedRangePredicateEvaluator) predicateEvaluator).geLowerBound();
-      _max = ((FloatRawValueBasedRangePredicateEvaluator) predicateEvaluator).getUpperBound();
+      _min = predicateEvaluator.geLowerBound();
+      _max = predicateEvaluator.getUpperBound();
     }
 
     @Override
@@ -254,8 +265,8 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
     }
 
     @Override
-    public int getMatchingDocCount() {
-      return _rangeIndexReader.getMatchingDocCount(_min, _max);
+    public int getNumMatchingDocs() {
+      return _rangeIndexReader.getNumMatchingDocs(_min, _max);
     }
 
     @Override
@@ -270,10 +281,10 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
     final double _max;
 
     DoubleRangeEvaluator(RangeIndexReader<ImmutableRoaringBitmap> rangeIndexReader,
-        PredicateEvaluator predicateEvaluator) {
+        DoubleRawValueBasedRangePredicateEvaluator predicateEvaluator) {
       _rangeIndexReader = rangeIndexReader;
-      _min = ((FloatRawValueBasedRangePredicateEvaluator) predicateEvaluator).geLowerBound();
-      _max = ((FloatRawValueBasedRangePredicateEvaluator) predicateEvaluator).getUpperBound();
+      _min = predicateEvaluator.geLowerBound();
+      _max = predicateEvaluator.getUpperBound();
     }
 
     @Override
@@ -287,8 +298,8 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
     }
 
     @Override
-    public int getMatchingDocCount() {
-      return _rangeIndexReader.getMatchingDocCount(_min, _max);
+    public int getNumMatchingDocs() {
+      return _rangeIndexReader.getNumMatchingDocs(_min, _max);
     }
 
     @Override
