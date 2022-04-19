@@ -112,7 +112,9 @@ public class SegmentPrunerFactory {
     Set<String> partitionColumns = columnPartitionMap.keySet();
     LOGGER.info("Using PartitionSegmentPruner on partition columns: {} for table: {}", partitionColumns,
         tableNameWithType);
-    return new PartitionSegmentPruner(tableNameWithType, partitionColumns, propertyStore);
+    return partitionColumns.size() == 1 ? new SinglePartitionColumnSegmentPruner(tableNameWithType,
+        partitionColumns.iterator().next(), propertyStore)
+        : new MultiPartitionColumnsSegmentPruner(tableNameWithType, partitionColumns, propertyStore);
   }
 
   @Nullable

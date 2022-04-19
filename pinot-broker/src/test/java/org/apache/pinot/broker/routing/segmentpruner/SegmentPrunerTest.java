@@ -155,14 +155,15 @@ public class SegmentPrunerTest extends ControllerTest {
     columnPartitionConfigMap.put(PARTITION_COLUMN_1, new ColumnPartitionConfig("Modulo", 5));
     segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
     assertEquals(segmentPruners.size(), 1);
-    assertTrue(segmentPruners.get(0) instanceof PartitionSegmentPruner);
+    assertTrue(segmentPruners.get(0) instanceof SinglePartitionColumnSegmentPruner);
 
     // Multiple partition columns
     columnPartitionConfigMap.put(PARTITION_COLUMN_2, new ColumnPartitionConfig("Modulo", 5));
     segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
     assertEquals(segmentPruners.size(), 1);
-    assertTrue(segmentPruners.get(0) instanceof PartitionSegmentPruner);
-    PartitionSegmentPruner partitionSegmentPruner = (PartitionSegmentPruner) segmentPruners.get(0);
+    assertTrue(segmentPruners.get(0) instanceof MultiPartitionColumnsSegmentPruner);
+    MultiPartitionColumnsSegmentPruner partitionSegmentPruner =
+        (MultiPartitionColumnsSegmentPruner) segmentPruners.get(0);
     assertEquals(partitionSegmentPruner.getPartitionColumns(),
         Stream.of(PARTITION_COLUMN_1, PARTITION_COLUMN_2).collect(Collectors.toSet()));
 
@@ -175,13 +176,13 @@ public class SegmentPrunerTest extends ControllerTest {
     when(routingConfig.getRoutingTableBuilderName()).thenReturn(
         SegmentPrunerFactory.LEGACY_PARTITION_AWARE_OFFLINE_ROUTING);
     segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
-    assertTrue(segmentPruners.get(0) instanceof PartitionSegmentPruner);
+    assertTrue(segmentPruners.get(0) instanceof SinglePartitionColumnSegmentPruner);
     when(tableConfig.getTableType()).thenReturn(TableType.REALTIME);
     when(routingConfig.getRoutingTableBuilderName()).thenReturn(
         SegmentPrunerFactory.LEGACY_PARTITION_AWARE_REALTIME_ROUTING);
     segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
     assertEquals(segmentPruners.size(), 1);
-    assertTrue(segmentPruners.get(0) instanceof PartitionSegmentPruner);
+    assertTrue(segmentPruners.get(0) instanceof SinglePartitionColumnSegmentPruner);
   }
 
   @Test
@@ -266,8 +267,8 @@ public class SegmentPrunerTest extends ControllerTest {
     IdealState idealState = Mockito.mock(IdealState.class);
     ExternalView externalView = Mockito.mock(ExternalView.class);
 
-    PartitionSegmentPruner segmentPruner = new PartitionSegmentPruner(OFFLINE_TABLE_NAME,
-        Stream.of(PARTITION_COLUMN_1, PARTITION_COLUMN_2).collect(Collectors.toSet()), _propertyStore);
+    PartitionSegmentPruner segmentPruner =
+        new SinglePartitionColumnSegmentPruner(OFFLINE_TABLE_NAME, PARTITION_COLUMN_1, _propertyStore);
     Set<String> onlineSegments = new HashSet<>();
     segmentPruner.init(idealState, externalView, onlineSegments);
     assertEquals(segmentPruner.prune(brokerRequest1, Collections.emptySet()), Collections.emptySet());
@@ -338,6 +339,14 @@ public class SegmentPrunerTest extends ControllerTest {
         new HashSet<>(Arrays.asList(segment0, segment1)));
 
     // Multi-column partitioned segment.
+    segmentPruner = new MultiPartitionColumnsSegmentPruner(OFFLINE_TABLE_NAME,
+        Stream.of(PARTITION_COLUMN_1, PARTITION_COLUMN_2).collect(Collectors.toSet()), _propertyStore);
+    segmentPruner.init(idealState, externalView, onlineSegments);
+    assertEquals(segmentPruner.prune(brokerRequest1, Collections.emptySet()), Collections.emptySet());
+    assertEquals(segmentPruner.prune(brokerRequest2, Collections.emptySet()), Collections.emptySet());
+    assertEquals(segmentPruner.prune(brokerRequest3, Collections.emptySet()), Collections.emptySet());
+    assertEquals(segmentPruner.prune(brokerRequest4, Collections.emptySet()), Collections.emptySet());
+
     String segment2 = "segment2";
     onlineSegments.add(segment2);
     Map<String, ColumnPartitionMetadata> columnPartitionMetadataMap = new HashMap<>();

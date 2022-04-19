@@ -29,6 +29,7 @@ import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.I0Itec.zkclient.exception.ZkException;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.task.TaskState;
@@ -356,36 +357,35 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
           // Other segments which do not meet these conditions are considered as outlier segments, and additional tasks
           // are generated for them.
           Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
-          Set<String> partitionColumns = columnPartitionMap.keySet();
+          List<String> partitionColumns = new ArrayList<>(columnPartitionMap.keySet());
           for (List<SegmentZKMetadata> selectedSegmentsPerBucket : selectedSegmentsForAllBuckets) {
-            Map<String, List<SegmentZKMetadata>> partitionToSegments = new HashMap<>();
+            Map<List<Integer>, List<SegmentZKMetadata>> partitionToSegments = new HashMap<>();
             List<SegmentZKMetadata> outlierSegments = new ArrayList<>();
             for (SegmentZKMetadata selectedSegment : selectedSegmentsPerBucket) {
               SegmentPartitionMetadata segmentPartitionMetadata = selectedSegment.getPartitionMetadata();
-              List<Integer> partitionsBuffer = new ArrayList<>();
-              if (segmentPartitionMetadata != null && partitionColumns.equals(
+              List<Integer> partitions = new ArrayList<>();
+              if (segmentPartitionMetadata != null && CollectionUtils.isEqualCollection(partitionColumns,
                   segmentPartitionMetadata.getColumnPartitionMap().keySet())) {
                 for (String partitionColumn : partitionColumns) {
                   if (segmentPartitionMetadata.getPartitions(partitionColumn).size() == 1) {
-                    partitionsBuffer.add(segmentPartitionMetadata.getPartitions(partitionColumn).iterator().next());
+                    partitions.add(segmentPartitionMetadata.getPartitions(partitionColumn).iterator().next());
                   } else {
-                    partitionsBuffer.clear();
+                    partitions.clear();
                     break;
                   }
                 }
               }
-              if (partitionsBuffer.isEmpty()) {
+              if (partitions.isEmpty()) {
                 outlierSegments.add(selectedSegment);
               } else {
-                String partitionId = StringUtils.join(partitionsBuffer, "_");
-                partitionToSegments.computeIfAbsent(partitionId, k -> new ArrayList<>()).add(selectedSegment);
+                partitionToSegments.computeIfAbsent(partitions, k -> new ArrayList<>()).add(selectedSegment);
               }
             }
 
-            for (Map.Entry<String, List<SegmentZKMetadata>> partitionToSegmentsEntry : partitionToSegments.entrySet()) {
+            for (List<SegmentZKMetadata> partitionedSegments : partitionToSegments.values()) {
               pinotTaskConfigsForTable.addAll(
-                  createPinotTaskConfigs(partitionToSegmentsEntry.getValue(), offlineTableName, maxNumRecordsPerTask,
-                      mergeLevel, mergeConfigs, taskConfigs));
+                  createPinotTaskConfigs(partitionedSegments, offlineTableName, maxNumRecordsPerTask, mergeLevel,
+                      mergeConfigs, taskConfigs));
             }
 
             if (!outlierSegments.isEmpty()) {
