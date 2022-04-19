@@ -18,11 +18,22 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import java.util.Map;
+
 public final class SuccessResponse {
   private final String _status;
+  private Map<String, Object> _unparseableProps;
 
   public SuccessResponse(String status) {
     _status = status;
+  }
+
+  public Map<String, Object> getUnparseableProps() {
+    return _unparseableProps;
+  }
+
+  public void setUnparseableProps(Map<String, Object> unparseableProps) {
+    _unparseableProps = unparseableProps;
   }
 
   public String getStatus() {

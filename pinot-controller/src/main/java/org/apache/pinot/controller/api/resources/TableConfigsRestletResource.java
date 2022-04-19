@@ -357,18 +357,17 @@ public class TableConfigsRestletResource {
   @Path("/tableConfigs/validate")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Validate the TableConfigs", notes = "Validate the TableConfigs")
-  public ConfigValidationResponse<TableConfigs> validateConfig(String tableConfigsStr,
+  public String validateConfig(String tableConfigsStr,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip) {
-    JsonUtils.JsonPojoWithUnparsableProps<TableConfigs> tableConfigs;
+    TableConfigs tableConfigs;
     try {
-      tableConfigs = JsonUtils.stringToObjectAndUnparseableProps(tableConfigsStr, TableConfigs.class);
+      tableConfigs = JsonUtils.stringToObject(tableConfigsStr, TableConfigs.class);
     } catch (IOException e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Invalid TableConfigs json string: %s", tableConfigsStr), Response.Status.BAD_REQUEST, e);
     }
-    TableConfigs validationResponse = validateConfig(tableConfigs._obj, typesToSkip);
-    return new ConfigValidationResponse<>(validationResponse, tableConfigs._unparseableProps);
+    return validateConfig(tableConfigs, typesToSkip);
   }
 
   private void tuneConfig(TableConfig tableConfig, Schema schema) {
@@ -377,7 +376,7 @@ public class TableConfigsRestletResource {
     TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
   }
 
-  private TableConfigs validateConfig(TableConfigs tableConfigs, @Nullable String typesToSkip) {
+  private String validateConfig(TableConfigs tableConfigs, @Nullable String typesToSkip) {
     String rawTableName = tableConfigs.getTableName();
     TableConfig offlineTableConfig = tableConfigs.getOffline();
     TableConfig realtimeTableConfig = tableConfigs.getRealtime();
@@ -411,7 +410,7 @@ public class TableConfigsRestletResource {
         TableConfigUtils.verifyHybridTableConfigs(rawTableName, offlineTableConfig, realtimeTableConfig);
       }
 
-      return tableConfigs;
+      return tableConfigs.toJsonString();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Invalid TableConfigs: %s. %s", rawTableName, e.getMessage()), Response.Status.BAD_REQUEST, e);

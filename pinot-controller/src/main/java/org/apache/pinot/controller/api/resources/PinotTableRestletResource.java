@@ -159,10 +159,12 @@ public class PinotTableRestletResource {
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
     // TODO introduce a table config ctor with json string.
+    JsonUtils.JsonPojoWithUnparsableProps<TableConfig> tableConfigAndUnparsedProps;
     TableConfig tableConfig;
     String tableName;
     try {
-      tableConfig = JsonUtils.stringToObject(tableConfigStr, TableConfig.class);
+      tableConfigAndUnparsedProps = JsonUtils.stringToObjectAndUnparseableProps(tableConfigStr, TableConfig.class);
+      tableConfig = tableConfigAndUnparsedProps._obj;
 
       // validate permission
       tableName = tableConfig.getTableName();
@@ -194,7 +196,9 @@ public class PinotTableRestletResource {
       // TODO: validate that table was created successfully
       // (in realtime case, metadata might not have been created but would be created successfully in the next run of
       // the validation manager)
-      return new SuccessResponse("Table " + tableName + " succesfully added");
+      SuccessResponse successResponse = new SuccessResponse("Table " + tableName + " succesfully added");
+      successResponse.setUnparseableProps(tableConfigAndUnparsedProps._unparseableProps);
+      return successResponse;
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
       if (e instanceof InvalidTableConfigException) {
@@ -442,9 +446,11 @@ public class PinotTableRestletResource {
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, String tableConfigString)
       throws Exception {
+    JsonUtils.JsonPojoWithUnparsableProps<TableConfig> tableConfigJsonPojoWithUnparsableProps;
     TableConfig tableConfig;
     try {
-      tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
+      tableConfigJsonPojoWithUnparsableProps = JsonUtils.stringToObjectAndUnparseableProps(tableConfigString, TableConfig.class);
+      tableConfig = tableConfigJsonPojoWithUnparsableProps._obj;
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
       TableConfigUtils.validate(tableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
     } catch (Exception e) {
@@ -483,7 +489,9 @@ public class PinotTableRestletResource {
       throw e;
     }
 
-    return new SuccessResponse("Table config updated for " + tableName);
+    SuccessResponse successResponse = new SuccessResponse("Table config updated for " + tableName);
+    successResponse.setUnparseableProps(tableConfigJsonPojoWithUnparsableProps._unparseableProps);
+    return successResponse;
   }
 
   @POST
@@ -492,7 +500,7 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Validate table config for a table",
       notes = "This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
           + " This allows us to validate table config before apply.")
-  public ConfigValidationResponse<ObjectNode> checkTableConfig(
+  public ObjectNode checkTableConfig(
       String tableConfigStr,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip) {
@@ -505,7 +513,8 @@ public class PinotTableRestletResource {
     }
     ObjectNode validationResponse = validateConfig(tableConfig._obj,
         _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig._obj), typesToSkip);
-    return new ConfigValidationResponse<>(validationResponse, tableConfig._unparseableProps);
+    validationResponse.set("unparseableProps", JsonUtils.objectToJsonNode(tableConfig._unparseableProps));
+    return validationResponse;
   }
 
   @Deprecated
