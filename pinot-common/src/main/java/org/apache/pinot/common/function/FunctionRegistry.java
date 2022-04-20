@@ -121,7 +121,7 @@ public class FunctionRegistry {
   }
 
   public static void registerVarargsFunction(String functionName, Method method) {
-    FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass(), true, true);
+    FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass(), true);
     String canonicalName = canonicalize(functionName);
     VARARGS_FUNCTION_INFO_MAP.put(canonicalName, functionInfo);
   }

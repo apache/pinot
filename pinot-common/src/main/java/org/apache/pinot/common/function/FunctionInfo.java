@@ -25,20 +25,11 @@ public class FunctionInfo {
   private final Method _method;
   private final Class<?> _clazz;
   private final boolean _nullableParameters;
-  private final boolean _varargsFunction;
 
   public FunctionInfo(Method method, Class<?> clazz, boolean nullableParameters) {
     _method = method;
     _clazz = clazz;
     _nullableParameters = nullableParameters;
-    _varargsFunction = false;
-  }
-
-  public FunctionInfo(Method method, Class<?> clazz, boolean nullableParameters, boolean varargsFunction) {
-    _method = method;
-    _clazz = clazz;
-    _nullableParameters = nullableParameters;
-    _varargsFunction = varargsFunction;
   }
 
   public Method getMethod() {
