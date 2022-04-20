@@ -140,9 +140,9 @@ public class ArrayFunctions {
   @ScalarFunction
   public static double arraySum(Double[] values) {
     double sum = 0.0d;
-    for (double val : values)
+    for (double val : values) {
       sum += val;
+    }
     return sum;
   }
-
 }

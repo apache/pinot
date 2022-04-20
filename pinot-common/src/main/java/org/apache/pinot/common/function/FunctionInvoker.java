@@ -91,7 +91,8 @@ public class FunctionInvoker {
     if (!_method.isVarArgs()) {
       int numParameters = _parameterClasses.length;
       Preconditions.checkArgument(arguments.length == numParameters,
-          "Wrong number of arguments for method: %s, expected: %s, actual: %s", _method, numParameters, arguments.length);
+          "Wrong number of arguments for method: %s, expected: %s, actual: %s",
+          _method, numParameters, arguments.length);
       for (int i = 0; i < numParameters; i++) {
         // Skip conversion for null
         Object argument = arguments[i];
