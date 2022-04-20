@@ -27,6 +27,9 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
  * Arithmetic scalar functions.
  */
 public class ArithmeticFunctions {
+
+  private static final double DOUBLE_COMPARISON_TOLERANCE = 1e-7d;
+
   private ArithmeticFunctions() {
   }
 
@@ -165,6 +168,7 @@ public class ArithmeticFunctions {
 
   @ScalarFunction
   public static boolean equals(double a, double b) {
-    return a == b;
+    // To avoid approximation errors
+    return (Math.abs(a - b) < DOUBLE_COMPARISON_TOLERANCE);
   }
 }
