@@ -19,6 +19,7 @@
 package org.apache.pinot.common.function;
 
 import com.google.common.base.Preconditions;
+import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -87,27 +88,41 @@ public class FunctionInvoker {
    * conversion is not needed or supported.
    */
   public void convertTypes(Object[] arguments) {
-    int numParameters = _parameterClasses.length;
-    Preconditions.checkArgument(arguments.length == numParameters,
-        "Wrong number of arguments for method: %s, expected: %s, actual: %s", _method, numParameters, arguments.length);
-    for (int i = 0; i < numParameters; i++) {
-      // Skip conversion for null
-      Object argument = arguments[i];
-      if (argument == null) {
-        continue;
-      }
-      // Skip conversion if argument can be directly assigned
-      Class<?> parameterClass = _parameterClasses[i];
-      Class<?> argumentClass = argument.getClass();
-      if (parameterClass.isAssignableFrom(argumentClass)) {
-        continue;
-      }
+    if (!_method.isVarArgs()) {
+      int numParameters = _parameterClasses.length;
+      Preconditions.checkArgument(arguments.length == numParameters,
+          "Wrong number of arguments for method: %s, expected: %s, actual: %s", _method, numParameters, arguments.length);
+      for (int i = 0; i < numParameters; i++) {
+        // Skip conversion for null
+        Object argument = arguments[i];
+        if (argument == null) {
+          continue;
+        }
+        // Skip conversion if argument can be directly assigned
+        Class<?> parameterClass = _parameterClasses[i];
+        Class<?> argumentClass = argument.getClass();
+        if (parameterClass.isAssignableFrom(argumentClass)) {
+          continue;
+        }
 
-      PinotDataType parameterType = _parameterTypes[i];
-      PinotDataType argumentType = FunctionUtils.getArgumentType(argumentClass);
-      Preconditions.checkArgument(parameterType != null && argumentType != null,
-          "Cannot convert value from class: %s to class: %s", argumentClass, parameterClass);
-      arguments[i] = parameterType.convert(argument, argumentType);
+        PinotDataType parameterType = _parameterTypes[i];
+        PinotDataType argumentType = FunctionUtils.getArgumentType(argumentClass);
+        Preconditions.checkArgument(parameterType != null && argumentType != null,
+            "Cannot convert value from class: %s to class: %s", argumentClass, parameterClass);
+        arguments[i] = parameterType.convert(argument, argumentType);
+      }
+    } else {
+      Class<?> parameterBaseClass = _parameterClasses[0].getComponentType();
+      for (Object argument : arguments) {
+        if (argument == null) {
+          continue;
+        }
+        if (!parameterBaseClass.isAssignableFrom(argument.getClass())) {
+          // TODO add conversion if classes don't match
+          throw new IllegalArgumentException(
+              "Argument class" + argument.getClass() + "can't be converted to " + parameterBaseClass);
+        }
+      }
     }
   }
 
@@ -124,7 +139,16 @@ public class FunctionInvoker {
    */
   public Object invoke(Object[] arguments) {
     try {
-      return _method.invoke(_instance, arguments);
+      if (_method.isVarArgs()) {
+        Class<?> parameterBaseClass = _parameterClasses[0].getComponentType();
+        // Convert arguments to base class
+        Class<?> klass = Arrays.stream(_method.getParameterTypes()).findFirst().get().getComponentType();
+        Object[] paramArray = (Object[]) Array.newInstance(klass, arguments.length);
+        System.arraycopy(arguments, 0, paramArray, 0, arguments.length);
+        return _method.invoke(_instance, new Object[]{ paramArray });
+      } else {
+        return _method.invoke(_instance, arguments);
+      }
     } catch (Exception e) {
       throw new IllegalStateException(
           "Caught exception while invoking method: " + _method + " with arguments: " + Arrays.toString(arguments), e);

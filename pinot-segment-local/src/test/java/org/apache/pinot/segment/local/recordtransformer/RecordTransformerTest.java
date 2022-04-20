@@ -18,9 +18,16 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
+import java.lang.reflect.Array;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
@@ -32,6 +39,11 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.reflections.Reflections;
+import org.reflections.scanners.MethodAnnotationsScanner;
+import org.reflections.util.ClasspathHelper;
+import org.reflections.util.ConfigurationBuilder;
+import org.reflections.util.FilterBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -159,18 +171,31 @@ public class RecordTransformerTest {
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
-    // expression true, filtered
+    // expression false, filtered
     genericRow = getRecord();
     tableConfig.setIngestionConfig(
-        new IngestionConfig(null, null, new FilterConfig("equals(svInt, 123)"), null, null));
+        new IngestionConfig(null, null, new FilterConfig("equals(svInt, 124)"), null, null));
     transformer = new FilterTransformer(tableConfig);
+    transformer.transform(genericRow);
+    Assert.assertFalse(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
+  }
+
+  @Test
+  public void testLogicalScalarOps() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+
+    // expression true, filtered
+    GenericRow genericRow = getRecord();
+    tableConfig.setIngestionConfig(
+        new IngestionConfig(null, null, new FilterConfig("and(equals(svInt, 123), lte(svInt, 123))"), null, null));
+    RecordTransformer transformer = new FilterTransformer(tableConfig);
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // expression true, filtered
     genericRow = getRecord();
     tableConfig.setIngestionConfig(
-        new IngestionConfig(null, null, new FilterConfig("equals(arraySum(mvFloat), 123)"), null, null));
+        new IngestionConfig(null, null, new FilterConfig("or(equals(svInt, 125), lte(svInt, 124))"), null, null));
     transformer = new FilterTransformer(tableConfig);
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));

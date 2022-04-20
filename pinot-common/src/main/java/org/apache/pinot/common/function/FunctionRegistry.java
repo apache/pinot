@@ -46,6 +46,7 @@ public class FunctionRegistry {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FunctionRegistry.class);
   private static final Map<String, Map<Integer, FunctionInfo>> FUNCTION_INFO_MAP = new HashMap<>();
+  private static final Map<String, FunctionInfo> VARARGS_FUNCTION_INFO_MAP = new HashMap<>();
 
   /**
    * Registers the scalar functions via reflection.
@@ -70,10 +71,18 @@ public class FunctionRegistry {
         boolean nullableParameters = scalarFunction.nullableParameters();
         if (scalarFunctionNames.length > 0) {
           for (String name : scalarFunctionNames) {
-            FunctionRegistry.registerFunction(name, method, nullableParameters);
+            if (scalarFunction.vargsFunction()) {
+              FunctionRegistry.registerVarargsFunction(name, method);
+            } else {
+              FunctionRegistry.registerFunction(name, method, nullableParameters);
+            }
           }
         } else {
-          FunctionRegistry.registerFunction(method, nullableParameters);
+          if (scalarFunction.vargsFunction()) {
+            FunctionRegistry.registerVarargsFunction(method);
+          } else {
+            FunctionRegistry.registerFunction(method, nullableParameters);
+          }
         }
       }
     }
@@ -96,6 +105,10 @@ public class FunctionRegistry {
     registerFunction(method.getName(), method, nullableParameters);
   }
 
+  public static void registerVarargsFunction(Method method) {
+    registerVarargsFunction(method.getName(), method);
+  }
+
   /**
    * Registers a method with the given function name.
    */
@@ -105,6 +118,12 @@ public class FunctionRegistry {
     Map<Integer, FunctionInfo> functionInfoMap = FUNCTION_INFO_MAP.computeIfAbsent(canonicalName, k -> new HashMap<>());
     Preconditions.checkState(functionInfoMap.put(method.getParameterCount(), functionInfo) == null,
         "Function: %s with %s parameters is already registered", functionName, method.getParameterCount());
+  }
+
+  public static void registerVarargsFunction(String functionName, Method method) {
+    FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass(), true, true);
+    String canonicalName = canonicalize(functionName);
+    VARARGS_FUNCTION_INFO_MAP.put(canonicalName, functionInfo);
   }
 
   /**
@@ -122,7 +141,12 @@ public class FunctionRegistry {
   @Nullable
   public static FunctionInfo getFunctionInfo(String functionName, int numParameters) {
     Map<Integer, FunctionInfo> functionInfoMap = FUNCTION_INFO_MAP.get(canonicalize(functionName));
-    return functionInfoMap != null ? functionInfoMap.get(numParameters) : null;
+
+    if (functionInfoMap != null && functionInfoMap.containsKey(numParameters)) {
+      return functionInfoMap.get(numParameters);
+    } else {
+      return VARARGS_FUNCTION_INFO_MAP.getOrDefault(functionName, null);
+    }
   }
 
   private static String canonicalize(String functionName) {
