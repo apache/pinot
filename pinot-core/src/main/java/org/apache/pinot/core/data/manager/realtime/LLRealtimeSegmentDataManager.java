@@ -1462,13 +1462,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   /**
    * Checkpoints existing consumer before creating a new consumer instance
+   * Assumes there is a valid instance of {@link PartitionGroupConsumer}
    */
   private void recreateStreamConsumer(String reason) {
     _segmentLogger.warn("Recreating stream consumer for topic partition {}, reason: {}", _clientId, reason);
-    if (_partitionGroupConsumer != null) {
-      _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
-      closePartitionGroupConsumer();
-    }
+    _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
+    closePartitionGroupConsumer();
     _partitionGroupConsumer =
         _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
     _partitionGroupConsumer.start(_currentOffset);
