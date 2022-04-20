@@ -978,7 +978,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   private void closePartitionGroupConsumer() {
     try {
-//      _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
       _partitionGroupConsumer.close();
     } catch (Exception e) {
       _segmentLogger.warn("Could not close stream consumer", e);
@@ -1174,7 +1173,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   protected void startConsumerThread() {
     _consumerThread = new Thread(new PartitionConsumer(), _segmentNameStr);
-    _segmentLogger.info("Created new consumer thread {} for {}", _consumerThread, this.toString());
+    _segmentLogger.info("Created new consumer thread {} for {}", _consumerThread, this);
     _consumerThread.start();
   }
 
@@ -1334,7 +1333,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
 
     try {
-      _startOffset = _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset());
+      _startOffset = _partitionGroupConsumptionStatus.getStartOffset();
       _currentOffset = _streamPartitionMsgOffsetFactory.create(_startOffset);
       makeStreamConsumer("Starting");
       makeStreamMetadataProvider("Starting");
@@ -1352,7 +1351,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           new SegmentCommitterFactory(_segmentLogger, _protocolHandler, tableConfig, indexLoadingConfig, serverMetrics);
       _segmentLogger
           .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", _llcSegmentName,
-              _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC).toString());
+              _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
       startConsumerThread();
     } catch (Exception e) {
       // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
@@ -1460,14 +1459,19 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
     _partitionGroupConsumer.start(_currentOffset);
   }
+
   /**
    * Checkpoints existing consumer before creating a new consumer instance
    */
   private void recreateStreamConsumer(String reason) {
+    _segmentLogger.warn("Recreating stream consumer for topic partition {}, reason: {}", _clientId, reason);
     if (_partitionGroupConsumer != null) {
       _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
+      closePartitionGroupConsumer();
     }
-    makeStreamConsumer(reason);
+    _partitionGroupConsumer =
+        _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
+    _partitionGroupConsumer.start(_currentOffset);
   }
 
   /**
