@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.httpclient.SimpleHttpConnectionManager;
+import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -82,8 +82,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         controllerMetrics);
 
     _waitForPushTimeSeconds = config.getStatusCheckerWaitForPushTimeInSeconds();
-    _tableSizeReader = new TableSizeReader(executorService, new SimpleHttpConnectionManager(true), _controllerMetrics,
-        _pinotHelixResourceManager);
+    _tableSizeReader =
+        new TableSizeReader(executorService, new MultiThreadedHttpConnectionManager(), _controllerMetrics,
+            _pinotHelixResourceManager);
   }
 
   @Override
