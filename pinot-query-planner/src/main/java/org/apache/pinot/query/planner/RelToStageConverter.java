@@ -73,11 +73,11 @@ public final class RelToStageConverter {
   }
 
   private static StageNode convertLogicalProject(LogicalProject node, int currentStageId) {
-    return new ProjectNode(currentStageId, node.getProjects(), node.getRowType());
+    return new ProjectNode(currentStageId, node.getRowType(), node.getProjects());
   }
 
   private static StageNode convertLogicalFilter(LogicalFilter node, int currentStageId) {
-    return new FilterNode(currentStageId, node.getRowType(), node.getCondition(), node.getVariablesSet());
+    return new FilterNode(currentStageId, node.getRowType(), node.getCondition());
   }
 
   private static StageNode convertLogicalTableScan(LogicalTableScan node, int currentStageId) {

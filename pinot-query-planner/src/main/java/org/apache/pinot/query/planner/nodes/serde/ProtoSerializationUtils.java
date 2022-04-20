@@ -50,17 +50,20 @@ public class ProtoSerializationUtils {
    */
   public static void setObjectFieldToObject(Object object, Plan.ObjectField objectField) {
     Map<String, Plan.MemberVariableField> memberVariablesMap = objectField.getMemberVariablesMap();
-    try {
-      for (Map.Entry<String, Plan.MemberVariableField> e : memberVariablesMap.entrySet()) {
-        Object memberVarObject = constructMemberVariable(e.getValue());
-        if (memberVarObject != null) {
-          Field declaredField = object.getClass().getDeclaredField(e.getKey());
-          declaredField.setAccessible(true);
-          declaredField.set(object, memberVarObject);
+    for (Map.Entry<String, Plan.MemberVariableField> e : memberVariablesMap.entrySet()) {
+      try {
+        Field declaredField = object.getClass().getDeclaredField(e.getKey());
+        if (declaredField.isAnnotationPresent(ProtoProperties.class)) {
+          Object memberVarObject = constructMemberVariable(e.getValue());
+          if (memberVarObject != null) {
+            declaredField.setAccessible(true);
+            declaredField.set(object, memberVarObject);
+          }
         }
+      } catch (NoSuchFieldException | IllegalAccessException ex) {
+        throw new IllegalStateException("Unable to set Object " + object.getClass() + " on field " + e.getKey()
+            + "with object of type: " + objectField.getObjectClassName(), ex);
       }
-    } catch (NoSuchFieldException | IllegalAccessException e) {
-      throw new IllegalStateException("Unable to set Object field for: " + objectField.getObjectClassName(), e);
     }
   }
 
@@ -80,9 +83,11 @@ public class ProtoSerializationUtils {
       } else {
         try {
           for (Field field : object.getClass().getDeclaredFields()) {
-            field.setAccessible(true);
-            Object fieldObject = field.get(object);
-            builder.putMemberVariables(field.getName(), serializeMemberVariable(fieldObject));
+            if (field.isAnnotationPresent(ProtoProperties.class)) {
+              field.setAccessible(true);
+              Object fieldObject = field.get(object);
+              builder.putMemberVariables(field.getName(), serializeMemberVariable(fieldObject));
+            }
           }
         } catch (IllegalAccessException e) {
           throw new IllegalStateException("Unable to serialize Object: " + object.getClass(), e);

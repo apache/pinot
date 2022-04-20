@@ -47,6 +47,7 @@ import org.apache.pinot.query.service.QueryDispatcher;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.core.query.selection.SelectionOperatorUtils.extractRowFromDataTable;
@@ -101,59 +102,9 @@ public class QueryRunnerTest {
     _mailboxService.shutdown();
   }
 
-  @Test
-  public void testRunningTableScanOnlyQuery()
-      throws Exception {
-    QueryPlan queryPlan = _queryEnvironment.planQuery("SELECT * FROM b");
-    int stageRoodId = QueryEnvironmentTestUtils.getTestStageByServerCount(queryPlan, 1);
-    Map<String, String> requestMetadataMap =
-        ImmutableMap.of("REQUEST_ID", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
-
-    ServerInstance serverInstance = queryPlan.getStageMetadataMap().get(stageRoodId).getServerInstances().get(0);
-    DistributedStagePlan distributedStagePlan =
-        QueryDispatcher.constructDistributedStagePlan(queryPlan, stageRoodId, serverInstance);
-
-    MailboxReceiveOperator mailboxReceiveOperator =
-        createReduceStageOperator(queryPlan.getStageMetadataMap().get(stageRoodId).getServerInstances(),
-            Long.parseLong(requestMetadataMap.get("REQUEST_ID")), stageRoodId, _reducerGrpcPort);
-
-    // execute this single stage.
-    _servers.get(serverInstance).processQuery(distributedStagePlan, requestMetadataMap);
-
-    // get the block back and it should have 5 rows
-    List<Object[]> resultRows = reduceMailboxReceive(mailboxReceiveOperator);
-    Assert.assertEquals(resultRows.size(), 5);
-  }
-
-  @Test
-  public void testRunningTableScanMultipleServer()
-      throws Exception {
-    QueryPlan queryPlan = _queryEnvironment.planQuery("SELECT * FROM a");
-    int stageRoodId = QueryEnvironmentTestUtils.getTestStageByServerCount(queryPlan, 2);
-    Map<String, String> requestMetadataMap =
-        ImmutableMap.of("REQUEST_ID", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
-
-    for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageRoodId).getServerInstances()) {
-      DistributedStagePlan distributedStagePlan =
-          QueryDispatcher.constructDistributedStagePlan(queryPlan, stageRoodId, serverInstance);
-
-      // execute this single stage.
-      _servers.get(serverInstance).processQuery(distributedStagePlan, requestMetadataMap);
-    }
-
-    MailboxReceiveOperator mailboxReceiveOperator =
-        createReduceStageOperator(queryPlan.getStageMetadataMap().get(stageRoodId).getServerInstances(),
-            Long.parseLong(requestMetadataMap.get("REQUEST_ID")), stageRoodId, _reducerGrpcPort);
-
-    // assert that all table A segments returned successfully.
-    List<Object[]> resultRows = reduceMailboxReceive(mailboxReceiveOperator);
-    Assert.assertEquals(resultRows.size(), 15);
-  }
-
-  @Test
-  public void testJoin()
-      throws Exception {
-    QueryPlan queryPlan = _queryEnvironment.planQuery("SELECT * FROM a JOIN b on a.col1 = b.col2");
+  @Test(dataProvider = "testDataWithSqlToFinalRowCount")
+  public void testSqlWithFinalRowCountChecker(String sql, int expectedRowCount) {
+    QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
     Map<String, String> requestMetadataMap =
         ImmutableMap.of("REQUEST_ID", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
     MailboxReceiveOperator mailboxReceiveOperator = null;
@@ -173,78 +124,33 @@ public class QueryRunnerTest {
     }
     Preconditions.checkNotNull(mailboxReceiveOperator);
 
-    // Assert that each of the 5 categories from left table is joined with right table.
-    // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
-    // thus the final JOIN result will be 15 x 1 = 15.
     List<Object[]> resultRows = reduceMailboxReceive(mailboxReceiveOperator);
-    Assert.assertEquals(resultRows.size(), 15);
+    Assert.assertEquals(resultRows.size(), expectedRowCount);
   }
 
-  @Test
-  public void testMultipleJoin()
-      throws Exception {
-    QueryPlan queryPlan =
-        _queryEnvironment.planQuery("SELECT * FROM a JOIN b ON a.col1 = b.col2 " + "JOIN c ON a.col3 = c.col3");
-    Map<String, String> requestMetadataMap =
-        ImmutableMap.of("REQUEST_ID", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
-    MailboxReceiveOperator mailboxReceiveOperator = null;
-    for (int stageId : queryPlan.getStageMetadataMap().keySet()) {
-      if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
-        MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(stageId);
-        mailboxReceiveOperator = createReduceStageOperator(
-            queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
-            Long.parseLong(requestMetadataMap.get("REQUEST_ID")), reduceNode.getSenderStageId(), _reducerGrpcPort);
-      } else {
-        for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
-          DistributedStagePlan distributedStagePlan =
-              QueryDispatcher.constructDistributedStagePlan(queryPlan, stageId, serverInstance);
-          _servers.get(serverInstance).processQuery(distributedStagePlan, requestMetadataMap);
-        }
-      }
-    }
-    Preconditions.checkNotNull(mailboxReceiveOperator);
+  @DataProvider(name = "testDataWithSqlToFinalRowCount")
+  private Object[][] provideTestSqlAndRowCount() {
+    return new Object[][] {
+        new Object[]{"SELECT * FROM b", 5},
+        new Object[]{"SELECT * FROM a", 15},
 
-    // Assert that each of the 5 categories from left table is joined with right table.
-    // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
-    // thus the final JOIN result will be 15 x 1 = 15.
-    // Next join with table C which has (5 on server1 and 10 on server2), since data is identical. each of the row of
-    // the A JOIN B will have identical value of col3 as table C.col3 has. Since the values are cycling between
-    // (1, 2, 42, 1, 2). we will have 6 1s, 6 2s, and 3 42s, total result count will be 36 + 36 + 9 = 81
-    List<Object[]> resultRows = reduceMailboxReceive(mailboxReceiveOperator);
-    Assert.assertEquals(resultRows.size(), 81);
-  }
+        // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
+        // thus the final JOIN result will be 15 x 1 = 15.
+        // Next join with table C which has (5 on server1 and 10 on server2), since data is identical. each of the row
+        // of the A JOIN B will have identical value of col3 as table C.col3 has. Since the values are cycling between
+        // (1, 2, 42, 1, 2). we will have 6 1s, 6 2s, and 3 42s, total result count will be 36 + 36 + 9 = 81
+        new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2 JOIN c ON a.col3 = c.col3", 81},
 
-  @Test
-  public void testJoinProjectFilterPushDown()
-      throws Exception {
-    String sqlQuery = "SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2"
-        + " WHERE a.col3 >= 0 AND a.col2 = 'foo' AND b.col3 >= 0";
-    QueryPlan queryPlan = _queryEnvironment.planQuery(sqlQuery);
-    Map<String, String> requestMetadataMap =
-        ImmutableMap.of("REQUEST_ID", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
-    MailboxReceiveOperator mailboxReceiveOperator = null;
-    for (int stageId : queryPlan.getStageMetadataMap().keySet()) {
-      if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
-        MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(stageId);
-        mailboxReceiveOperator = createReduceStageOperator(
-            queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
-            Long.parseLong(requestMetadataMap.get("REQUEST_ID")), reduceNode.getSenderStageId(), _reducerGrpcPort);
-      } else {
-        for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
-          DistributedStagePlan distributedStagePlan =
-              QueryDispatcher.constructDistributedStagePlan(queryPlan, stageId, serverInstance);
-          _servers.get(serverInstance).processQuery(distributedStagePlan, requestMetadataMap);
-        }
-      }
-    }
-    Preconditions.checkNotNull(mailboxReceiveOperator);
+        // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
+        // thus the final JOIN result will be 15 x 1 = 15.
+        new Object[]{"SELECT * FROM a JOIN b on a.col1 = b.col2", 15},
 
-    // Assert that each of the 5 categories from left table is joined with right table.
-    // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
-    // but only 1 out of 5 rows from table A will be selected out; and all in table B will be selected.
-    // thus the final JOIN result will be 1 x 3 x 1 = 3.
-    List<Object[]> resultRows = reduceMailboxReceive(mailboxReceiveOperator);
-    Assert.assertEquals(resultRows.size(), 3);
+        // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
+        // but only 1 out of 5 rows from table A will be selected out; and all in table B will be selected.
+        // thus the final JOIN result will be 1 x 3 x 1 = 3.
+        new Object[]{"SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
+            + " WHERE a.col3 >= 0 AND a.col2 = 'foo' AND b.col3 >= 0", 3},
+    };
   }
 
   protected static List<Object[]> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator) {

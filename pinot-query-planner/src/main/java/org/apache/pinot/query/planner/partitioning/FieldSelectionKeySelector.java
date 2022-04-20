@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.query.planner.partitioning;
 
+import org.apache.pinot.query.planner.nodes.serde.ProtoProperties;
+
 
 /**
  * The {@code FieldSelectionKeySelector} simply extract a column value out from a row array {@link Object[]}.
  */
 public class FieldSelectionKeySelector implements KeySelector<Object[], Object> {
 
+  @ProtoProperties
   private int _columnIndex;
 
   public FieldSelectionKeySelector() {

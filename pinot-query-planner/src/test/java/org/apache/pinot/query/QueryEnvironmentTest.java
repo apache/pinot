@@ -22,35 +22,18 @@ import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.apache.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.calcite.sql.SqlNode;
-import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
-import org.apache.pinot.query.routing.WorkerManager;
-import org.apache.pinot.query.type.TypeFactory;
-import org.apache.pinot.query.type.TypeSystem;
 import org.testng.Assert;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-public class QueryEnvironmentTest {
-  private QueryEnvironment _queryEnvironment;
-
-  @BeforeClass
-  public void setUp() {
-    // the port doesn't matter as we are not actually making a server call.
-    RoutingManager routingManager = QueryEnvironmentTestUtils.getMockRoutingManager(1, 2);
-    _queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
-        CalciteSchemaBuilder.asRootSchema(new PinotCatalog(QueryEnvironmentTestUtils.mockTableCache())),
-        new WorkerManager("localhost", 3, routingManager));
-  }
+public class QueryEnvironmentTest extends QueryEnvironmentTestBase {
 
   @Test(dataProvider = "testQueryParserDataProvider")
   public void testQueryParser(String query, String digest)
@@ -61,7 +44,7 @@ public class QueryEnvironmentTest {
     Assert.assertEquals(sqlNode.toString(), digest);
   }
 
-  @Test(dataProvider = "testQueryRelDataProvider")
+  @Test(dataProvider = "testQueryDataProvider")
   public void testQueryToRel(String query)
       throws Exception {
     try {
@@ -112,20 +95,9 @@ public class QueryEnvironmentTest {
 
   @DataProvider(name = "testQueryParserDataProvider")
   private Object[][] provideQueriesAndDigest() {
-    Object[] simpleJoin = new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0",
-        "SELECT *\n" + "FROM `a`\n" + "INNER JOIN `b` ON `a`.`col1` = `b`.`col2`\n" + "WHERE `a`.`col3` >= 0"};
     return new Object[][] {
-        simpleJoin
-    };
-  }
-
-  @DataProvider(name = "testQueryRelDataProvider")
-  private Object[][] provideQueries() {
-    return new Object[][] {
-        new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2"},
-        new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0"},
-        new Object[]{"SELECT a.col1, a.ts, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
-            + "WHERE a.col3 >= 0 AND a.col2 IN  ('a', 'b') AND b.col3 < 0"},
+        new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0",
+            "SELECT *\n" + "FROM `a`\n" + "INNER JOIN `b` ON `a`.`col1` = `b`.`col2`\n" + "WHERE `a`.`col3` >= 0"},
     };
   }
 }

@@ -19,21 +19,25 @@
 package org.apache.pinot.query.planner.nodes;
 
 import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexNode;
+import org.apache.pinot.query.planner.nodes.serde.ProtoProperties;
+
 
 public class ProjectNode extends AbstractStageNode {
-  private List<RexNode> _projects;
+  @ProtoProperties
+  private List<RexExpression> _projects;
 
   public ProjectNode(int stageId) {
     super(stageId, null);
   }
-  public ProjectNode(int currentStageId, List<RexNode> projects, RelDataType rowType) {
+  public ProjectNode(int currentStageId, RelDataType rowType, List<RexNode> projects) {
     super(currentStageId, rowType);
-    _projects = projects;
+    _projects = projects.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
   }
 
-  public List<RexNode> getProjects() {
+  public List<RexExpression> getProjects() {
     return _projects;
   }
 

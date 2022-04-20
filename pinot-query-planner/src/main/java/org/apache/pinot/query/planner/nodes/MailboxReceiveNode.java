@@ -20,10 +20,13 @@ package org.apache.pinot.query.planner.nodes;
 
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.pinot.query.planner.nodes.serde.ProtoProperties;
 
 
 public class MailboxReceiveNode extends AbstractStageNode {
+  @ProtoProperties
   private int _senderStageId;
+  @ProtoProperties
   private RelDistribution.Type _exchangeType;
 
   public MailboxReceiveNode(int stageId) {

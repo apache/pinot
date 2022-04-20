@@ -21,12 +21,15 @@ package org.apache.pinot.query.planner.nodes;
 import java.util.List;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.pinot.query.planner.nodes.serde.ProtoProperties;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 
 
 public class JoinNode extends AbstractStageNode {
+  @ProtoProperties
   private JoinRelType _joinRelType;
+  @ProtoProperties
   private List<JoinClause> _criteria;
 
   public JoinNode(int stageId) {
@@ -48,7 +51,9 @@ public class JoinNode extends AbstractStageNode {
   }
 
   public static class JoinClause {
+    @ProtoProperties
     private KeySelector<Object[], Object> _leftJoinKeySelector;
+    @ProtoProperties
     private KeySelector<Object[], Object> _rightJoinKeySelector;
 
     public JoinClause() {

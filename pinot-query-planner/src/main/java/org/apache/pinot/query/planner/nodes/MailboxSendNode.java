@@ -21,12 +21,16 @@ package org.apache.pinot.query.planner.nodes;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.pinot.query.planner.nodes.serde.ProtoProperties;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 
 
 public class MailboxSendNode extends AbstractStageNode {
+  @ProtoProperties
   private int _receiverStageId;
+  @ProtoProperties
   private RelDistribution.Type _exchangeType;
+  @ProtoProperties
   private KeySelector<Object[], Object> _partitionKeySelector;
 
   public MailboxSendNode(int stageId) {

@@ -22,14 +22,18 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.pinot.common.proto.Plan;
+import org.apache.pinot.query.planner.nodes.serde.ProtoProperties;
 import org.apache.pinot.query.planner.nodes.serde.ProtoSerializable;
 import org.apache.pinot.query.planner.nodes.serde.ProtoSerializationUtils;
 
 
 public abstract class AbstractStageNode implements StageNode, ProtoSerializable {
 
+  @ProtoProperties
   protected final int _stageId;
+  @ProtoProperties
   protected final List<StageNode> _inputs;
+  @ProtoProperties
   protected RelDataType _rowType;
 
   public AbstractStageNode(int stageId, RelDataType rowType) {

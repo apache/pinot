@@ -18,31 +18,25 @@
  */
 package org.apache.pinot.query.planner.nodes;
 
-import java.util.Set;
-import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexNode;
+import org.apache.pinot.query.planner.nodes.serde.ProtoProperties;
 
 
 public class FilterNode extends AbstractStageNode {
-  private RexNode _condition;
-  private Set<CorrelationId> _variablesSet;
+  @ProtoProperties
+  private RexExpression _condition;
 
   public FilterNode(int stageId) {
     super(stageId, null);
   }
 
-  public FilterNode(int currentStageId, RelDataType rowType, RexNode condition, Set<CorrelationId> variablesSet) {
+  public FilterNode(int currentStageId, RelDataType rowType, RexNode condition) {
     super(currentStageId, rowType);
-    _condition = condition;
-    _variablesSet = variablesSet;
+    _condition = RexExpression.toRexExpression(condition);
   }
 
-  public RexNode getCondition() {
+  public RexExpression getCondition() {
     return _condition;
-  }
-
-  public Set<CorrelationId> getVariablesSet() {
-    return _variablesSet;
   }
 }
