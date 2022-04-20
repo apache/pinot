@@ -20,17 +20,12 @@ package org.apache.pinot.controller.api.resources;
 
 import java.util.Map;
 
-public class ConfigValidationResponse<T> {
-  private final T _validationResponse;
+public final class ConfigSuccessResponse extends SuccessResponse {
   private final Map<String, Object> _unparseableProps;
 
-  public ConfigValidationResponse(T validationResponse, Map<String, Object> unparseableProps) {
-    _validationResponse = validationResponse;
+  public ConfigSuccessResponse(String status, Map<String, Object> unparseableProps) {
+    super(status);
     _unparseableProps = unparseableProps;
-  }
-
-  public T getValidationResponse() {
-    return _validationResponse;
   }
 
   public Map<String, Object> getUnparseableProps() {

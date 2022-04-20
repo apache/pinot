@@ -123,8 +123,8 @@ public class TableConfigsRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tableConfigs/{tableName}")
   @Authenticate(AccessType.READ)
-  @ApiOperation(value = "Get the TableConfigs for a given raw tableName", notes = "Get the TableConfigs for a given "
-      + "raw tableName")
+  @ApiOperation(value = "Get the TableConfigs for a given raw tableName",
+      notes = "Get the TableConfigs for a given raw tableName")
   public String getConfig(
       @ApiParam(value = "Raw table name", required = true) @PathParam("tableName") String tableName) {
 
@@ -147,9 +147,10 @@ public class TableConfigsRestletResource {
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tableConfigs")
-  @ApiOperation(value = "Add the TableConfigs using the tableConfigsStr json", notes = "Add the TableConfigs using "
-      + "the tableConfigsStr json")
-  public SuccessResponse addConfig(String tableConfigsStr,
+  @ApiOperation(value = "Add the TableConfigs using the tableConfigsStr json",
+      notes = "Add the TableConfigs using the tableConfigsStr json")
+  public SuccessResponse addConfig(
+      String tableConfigsStr,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
@@ -163,8 +164,8 @@ public class TableConfigsRestletResource {
     }
 
     String rawTableName = tableConfigs.getTableName();
-    if (_pinotHelixResourceManager.hasOfflineTable(rawTableName) || _pinotHelixResourceManager.hasRealtimeTable(
-        rawTableName) || _pinotHelixResourceManager.getSchema(rawTableName) != null) {
+    if (_pinotHelixResourceManager.hasOfflineTable(rawTableName) || _pinotHelixResourceManager
+        .hasRealtimeTable(rawTableName) || _pinotHelixResourceManager.getSchema(rawTableName) != null) {
       throw new ControllerApplicationException(LOGGER,
           String.format("TableConfigs: %s already exists. Use PUT to update existing config", rawTableName),
           Response.Status.BAD_REQUEST);
@@ -177,18 +178,20 @@ public class TableConfigsRestletResource {
     try {
       String endpointUrl = request.getRequestURL().toString();
       AccessControl accessControl = _accessControlFactory.create();
-      _accessControlUtils.validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl,
-          accessControl);
+      _accessControlUtils
+          .validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl, accessControl);
 
       if (offlineTableConfig != null) {
         tuneConfig(offlineTableConfig, schema);
-        _accessControlUtils.validatePermission(offlineTableConfig.getTableName(), AccessType.CREATE, httpHeaders,
-            endpointUrl, accessControl);
+        _accessControlUtils
+            .validatePermission(offlineTableConfig.getTableName(), AccessType.CREATE, httpHeaders, endpointUrl,
+                accessControl);
       }
       if (realtimeTableConfig != null) {
         tuneConfig(realtimeTableConfig, schema);
-        _accessControlUtils.validatePermission(realtimeTableConfig.getTableName(), AccessType.CREATE, httpHeaders,
-            endpointUrl, accessControl);
+        _accessControlUtils
+            .validatePermission(realtimeTableConfig.getTableName(), AccessType.CREATE, httpHeaders, endpointUrl,
+                accessControl);
       }
 
       try {
@@ -241,8 +244,8 @@ public class TableConfigsRestletResource {
 
     try {
       boolean tableExists = false;
-      if (_pinotHelixResourceManager.hasRealtimeTable(tableName) || _pinotHelixResourceManager.hasOfflineTable(
-          tableName)) {
+      if (_pinotHelixResourceManager.hasRealtimeTable(tableName) || _pinotHelixResourceManager
+          .hasOfflineTable(tableName)) {
         tableExists = true;
       }
       // Delete whether tables exist or not
@@ -275,8 +278,8 @@ public class TableConfigsRestletResource {
   @Path("/tableConfigs/{tableName}")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Update the TableConfigs provided by the tableConfigsStr json", notes = "Update the "
-      + "TableConfigs provided by the tableConfigsStr json")
+  @ApiOperation(value = "Update the TableConfigs provided by the tableConfigsStr json",
+      notes = "Update the TableConfigs provided by the tableConfigsStr json")
   public SuccessResponse updateConfig(
       @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName")
           String tableName,
@@ -297,8 +300,8 @@ public class TableConfigsRestletResource {
           Response.Status.BAD_REQUEST, e);
     }
 
-    if (!_pinotHelixResourceManager.hasOfflineTable(tableName) && !_pinotHelixResourceManager.hasRealtimeTable(
-        tableName)) {
+    if (!_pinotHelixResourceManager.hasOfflineTable(tableName) && !_pinotHelixResourceManager
+        .hasRealtimeTable(tableName)) {
       throw new ControllerApplicationException(LOGGER,
           String.format("TableConfigs: %s does not exist. Use POST to create it first.", tableName),
           Response.Status.BAD_REQUEST);

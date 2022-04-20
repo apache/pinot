@@ -153,7 +153,8 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
   @ApiOperation(value = "Adds a table", notes = "Adds a table")
-  public SuccessResponse addTable(String tableConfigStr,
+  public ConfigSuccessResponse addTable(
+      String tableConfigStr,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
@@ -168,8 +169,8 @@ public class PinotTableRestletResource {
       // validate permission
       tableName = tableConfig.getTableName();
       String endpointUrl = request.getRequestURL().toString();
-      _accessControlUtils.validatePermission(tableName, AccessType.CREATE, httpHeaders, endpointUrl,
-          _accessControlFactory.create());
+      _accessControlUtils
+          .validatePermission(tableName, AccessType.CREATE, httpHeaders, endpointUrl, _accessControlFactory.create());
 
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
 
@@ -195,9 +196,8 @@ public class PinotTableRestletResource {
       // TODO: validate that table was created successfully
       // (in realtime case, metadata might not have been created but would be created successfully in the next run of
       // the validation manager)
-      SuccessResponse successResponse = new SuccessResponse("Table " + tableName + " succesfully added");
-      successResponse.setUnparseableProps(tableConfigAndUnparsedProps._unparseableProps);
-      return successResponse;
+      return new ConfigSuccessResponse("Table " + tableName + " succesfully added",
+          tableConfigAndUnparsedProps._unparseableProps);
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
       if (e instanceof InvalidTableConfigException) {
@@ -293,6 +293,10 @@ public class PinotTableRestletResource {
     }
   }
 
+  private enum SortType {
+    NAME, CREATIONTIME, LASTMODIFIEDTIME
+  }
+
   private String listTableConfigs(String tableName, @Nullable String tableTypeStr) {
     try {
       ObjectNode ret = JsonUtils.newObjectNode();
@@ -319,8 +323,8 @@ public class PinotTableRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}")
-  @ApiOperation(value = "Get/Enable/Disable/Drop a table", notes =
-      "Get/Enable/Disable/Drop a table. If table name is the only parameter specified "
+  @ApiOperation(value = "Get/Enable/Disable/Drop a table",
+      notes = "Get/Enable/Disable/Drop a table. If table name is the only parameter specified "
           + ", the tableconfig will be printed")
   public String alterTableStateOrListTableConfig(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
@@ -337,8 +341,8 @@ public class PinotTableRestletResource {
 
       // validate if user has permission to change the table state
       String endpointUrl = request.getRequestURL().toString();
-      _accessControlUtils.validatePermission(tableName, AccessType.UPDATE, httpHeaders, endpointUrl,
-          _accessControlFactory.create());
+      _accessControlUtils
+          .validatePermission(tableName, AccessType.UPDATE, httpHeaders, endpointUrl, _accessControlFactory.create());
 
       ArrayNode ret = JsonUtils.newArrayNode();
       boolean tableExists = false;
@@ -436,7 +440,7 @@ public class PinotTableRestletResource {
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Updates table config for a table", notes = "Updates table config for a table")
-  public SuccessResponse updateTableConfig(
+  public ConfigSuccessResponse updateTableConfig(
       @ApiParam(value = "Name of the table to update", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, String tableConfigString)
@@ -484,19 +488,18 @@ public class PinotTableRestletResource {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw e;
     }
-
-    SuccessResponse successResponse = new SuccessResponse("Table config updated for " + tableName);
-    successResponse.setUnparseableProps(tableConfigJsonPojoWithUnparsableProps._unparseableProps);
-    return successResponse;
+    return new ConfigSuccessResponse("Table config updated for " + tableName,
+        tableConfigJsonPojoWithUnparsableProps._unparseableProps);
   }
 
   @POST
   @Path("/tables/validate")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Validate table config for a table", notes =
-      "This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
+  @ApiOperation(value = "Validate table config for a table",
+      notes = "This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
           + " This allows us to validate table config before apply.")
-  public ObjectNode checkTableConfig(String tableConfigStr,
+  public ObjectNode checkTableConfig(
+      String tableConfigStr,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip) {
     JsonUtils.JsonPojoWithUnparsableProps<TableConfig> tableConfig;
@@ -518,12 +521,13 @@ public class PinotTableRestletResource {
   @Path("/tables/validateTableAndSchema")
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Validate table config for a table along with specified schema", notes =
-      "Deprecated. Use /tableConfigs/validate instead."
+  @ApiOperation(value = "Validate table config for a table along with specified schema",
+      notes = "Deprecated. Use /tableConfigs/validate instead."
           + "Validate given table config and schema. If specified schema is null, attempt to retrieve schema using the "
           + "table name. This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
           + " This allows us to validate table config before apply.")
-  public String validateTableAndSchema(TableAndSchemaConfig tableSchemaConfig,
+  public String validateTableAndSchema(
+      TableAndSchemaConfig tableSchemaConfig,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip) {
     TableConfig tableConfig = tableSchemaConfig.getTableConfig();
@@ -557,8 +561,8 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @Path("/tables/{tableName}/rebalance")
-  @ApiOperation(value = "Rebalances a table (reassign instances and segments for a table)", notes = "Rebalances a "
-      + "table (reassign instances and segments for a table)")
+  @ApiOperation(value = "Rebalances a table (reassign instances and segments for a table)",
+      notes = "Rebalances a table (reassign instances and segments for a table)")
   public RebalanceResult rebalance(
       @ApiParam(value = "Name of the table to rebalance", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
@@ -567,16 +571,16 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Whether to reassign instances before reassigning segments") @DefaultValue("false")
       @QueryParam("reassignInstances") boolean reassignInstances,
       @ApiParam(value = "Whether to reassign CONSUMING segments for real-time table") @DefaultValue("false")
-      @QueryParam("includeConsuming") boolean includeConsuming, @ApiParam(value =
-      "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign all "
+      @QueryParam("includeConsuming") boolean includeConsuming, @ApiParam(
+          value = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign all "
           + "segments in a round-robin fashion as if adding new segments to an empty table)") @DefaultValue("false")
   @QueryParam("bootstrap") boolean bootstrap,
       @ApiParam(value = "Whether to allow downtime for the rebalance") @DefaultValue("false") @QueryParam("downtime")
-          boolean downtime, @ApiParam(value =
-      "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum "
+          boolean downtime, @ApiParam(
+              value = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum "
           + "number of replicas allowed to be unavailable if value is negative") @DefaultValue("1")
-  @QueryParam("minAvailableReplicas") int minAvailableReplicas, @ApiParam(value =
-      "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot "
+  @QueryParam("minAvailableReplicas") int minAvailableReplicas, @ApiParam(
+      value = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot "
           + "be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts) {
 
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
@@ -775,9 +779,5 @@ public class PinotTableRestletResource {
         new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
     return tableMetadataReader.getAggregateTableMetadata(tableNameWithType, columns, numReplica,
         _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
-  }
-
-  private enum SortType {
-    NAME, CREATIONTIME, LASTMODIFIEDTIME
   }
 }
