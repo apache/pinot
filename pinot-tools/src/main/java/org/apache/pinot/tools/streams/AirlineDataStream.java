@@ -34,6 +34,7 @@ import org.apache.pinot.tools.utils.KafkaStarterUtils;
  * This is used in Hybrid Quickstart.
  */
 public class AirlineDataStream {
+  private static final String KAFKA_TOPIC_NAME = "flights-realtime";
   Schema _pinotSchema;
   String _timeColumnName;
   File _avroFile;
@@ -56,7 +57,8 @@ public class AirlineDataStream {
     AvroFilePinotSourceGenerator generator = new AvroFilePinotSourceGenerator(pinotSchema, avroFile, 1, _timeColumnName,
         (rowNumber) -> (_currentTimeValue + rowNumber / 60));
     _pinotStream =
-        PinotRealtimeSource.builder().setProducer(_producer).setGenerator(generator).setMaxMessagePerSecond(1).build();
+        PinotRealtimeSource.builder().setProducer(_producer).setGenerator(generator).setTopic(KAFKA_TOPIC_NAME)
+            .setMaxMessagePerSecond(1).build();
     QuickStartBase.printStatus(Quickstart.Color.YELLOW,
         "***** Offine data has max time as 16101, realtime will start consuming from time 16102 and increment time "
             + "every 60 events (which is approximately 60 seconds) *****");
