@@ -193,7 +193,7 @@ public class PinotTableRestletResourceTest {
             ImmutableMap.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *")))).build();
     try {
       String response = ControllerTestUtils.sendPostRequest(_createTableUrl, tableConfig.toJsonString());
-      Assert.assertEquals(response, "{\"status\":\"Table test_table_cron_schedule_OFFLINE succesfully added\"}");
+      Assert.assertEquals(response, "{{\"unparseableProps\":{},\"status\":\"Table test_table_cron_schedule_OFFLINE succesfully added\"}");
     } catch (IOException e) {
       // Expected 400 Bad Request
       Assert.fail("This is a valid table config with cron schedule");
@@ -469,12 +469,12 @@ public class PinotTableRestletResourceTest {
     // Create a valid REALTIME table
     TableConfig realtimeTableConfig = _realtimeBuilder.setTableName("testTable").build();
     String creationResponse = ControllerTestUtils.sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
-    Assert.assertEquals(creationResponse, "{\"status\":\"Table testTable_REALTIME succesfully added\"}");
+    Assert.assertEquals(creationResponse, "{{\"unparseableProps\":{},\"status\":\"Table testTable_REALTIME succesfully added\"}");
 
     // Create a valid OFFLINE table
     TableConfig offlineTableConfig = _offlineBuilder.setTableName("testTable").build();
     creationResponse = ControllerTestUtils.sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
-    Assert.assertEquals(creationResponse, "{\"status\":\"Table testTable_OFFLINE succesfully added\"}");
+    Assert.assertEquals(creationResponse, "{{\"unparseableProps\":{},\"status\":\"Table testTable_OFFLINE succesfully added\"}");
 
     // Case 1: Check table state with specifying tableType as realtime should return 1 [enabled]
     String realtimeStateResponse = ControllerTestUtils.sendGetRequest(StringUtil
