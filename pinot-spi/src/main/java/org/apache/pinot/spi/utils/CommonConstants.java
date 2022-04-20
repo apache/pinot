@@ -247,7 +247,7 @@ public class CommonConstants {
         public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";
         public static final String MIN_SEGMENT_GROUP_TRIM_SIZE = "minSegmentGroupTrimSize";
         public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
-        public static final String NUM_REPLICA_GROUPS = "numReplicaGroups";
+        public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
       }
     }
 

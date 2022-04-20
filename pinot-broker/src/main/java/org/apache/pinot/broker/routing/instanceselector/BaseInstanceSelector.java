@@ -265,10 +265,10 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   @Override
   public SelectionResult select(BrokerRequest brokerRequest, List<String> segments) {
     int requestId = (int) (_requestId.getAndIncrement() % MAX_REQUEST_ID);
-    Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
-    if (queryOptions == null) {
-      queryOptions = new HashMap<>();
-    }
+    Map<String, String> queryOptions = (brokerRequest.getPinotQuery() != null
+        && brokerRequest.getPinotQuery().getQueryOptions() != null)
+        ? brokerRequest.getPinotQuery().getQueryOptions()
+        : Collections.emptyMap();
     Map<String, String> segmentToInstanceMap = select(segments, requestId, _segmentToEnabledInstancesMap, queryOptions);
     Set<String> unavailableSegments = _unavailableSegments;
     if (unavailableSegments.isEmpty()) {

@@ -47,6 +47,8 @@ import static org.testng.Assert.assertTrue;
 
 
 public class InstanceSelectorTest {
+  private final static List<String> SEGMENTS = Arrays.asList("segment0", "segment1", "segment2", "segment3", "segment4",
+      "segment5", "segment6", "segment7", "segment8", "segment9", "segment10", "segment11");
 
   @Test
   public void testInstanceSelectorFactory() {
@@ -586,13 +588,14 @@ public class InstanceSelectorTest {
   }
 
   @Test
-  public void testReplicaGroupInstanceSelectorNumReplicaGroups() {
+  public void testReplicaGroupInstanceSelectorNumReplicaGroupsToQuery() {
     String offlineTableName = "testTable_OFFLINE";
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
     BrokerRequest brokerRequest = mock(BrokerRequest.class);
     PinotQuery pinotQuery = mock(PinotQuery.class);
     Map<String, String> queryOptions = new HashMap<>();
-    queryOptions.put("numReplicaGroups", "2");
+    // numReplicas = 3, fanning the query to 2 replica groups
+    queryOptions.put("numReplicaGroupsToQuery", "2");
     when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
@@ -615,69 +618,23 @@ public class InstanceSelectorTest {
     enabledInstances.add(instance1);
     enabledInstances.add(instance2);
 
-    String segment0 = "segment0";
-    String segment1 = "segment1";
-    String segment2 = "segment2";
-    String segment3 = "segment3";
-    String segment4 = "segment4";
-    String segment5 = "segment5";
-    String segment6 = "segment6";
-    String segment7 = "segment7";
-    String segment8 = "segment8";
-    String segment9 = "segment9";
-    String segment10 = "segment10";
-    String segment11 = "segment11";
-
     Map<String, String> idealStateInstanceStateMap0 = new TreeMap<>();
-    idealStateInstanceStateMap0.put(instance0, ONLINE);
-    idealStateInstanceStateMap0.put(instance1, ONLINE);
-    idealStateInstanceStateMap0.put(instance2, ONLINE);
-    idealStateSegmentAssignment.put(segment0, idealStateInstanceStateMap0);
-    idealStateSegmentAssignment.put(segment1, idealStateInstanceStateMap0);
-    idealStateSegmentAssignment.put(segment2, idealStateInstanceStateMap0);
-    idealStateSegmentAssignment.put(segment3, idealStateInstanceStateMap0);
-    idealStateSegmentAssignment.put(segment4, idealStateInstanceStateMap0);
-    idealStateSegmentAssignment.put(segment5, idealStateInstanceStateMap0);
-    idealStateSegmentAssignment.put(segment6, idealStateInstanceStateMap0);
-    idealStateSegmentAssignment.put(segment7, idealStateInstanceStateMap0);
-    idealStateSegmentAssignment.put(segment8, idealStateInstanceStateMap0);
-    idealStateSegmentAssignment.put(segment9, idealStateInstanceStateMap0);
-    idealStateSegmentAssignment.put(segment10, idealStateInstanceStateMap0);
-    idealStateSegmentAssignment.put(segment11, idealStateInstanceStateMap0);
-
     Map<String, String> externalViewInstanceStateMap0 = new TreeMap<>();
-    externalViewInstanceStateMap0.put(instance0, ONLINE);
-    externalViewInstanceStateMap0.put(instance1, ONLINE);
-    externalViewInstanceStateMap0.put(instance2, ONLINE);
-    externalViewSegmentAssignment.put(segment0, externalViewInstanceStateMap0);
-    externalViewSegmentAssignment.put(segment1, externalViewInstanceStateMap0);
-    externalViewSegmentAssignment.put(segment2, externalViewInstanceStateMap0);
-    externalViewSegmentAssignment.put(segment3, externalViewInstanceStateMap0);
-    externalViewSegmentAssignment.put(segment4, externalViewInstanceStateMap0);
-    externalViewSegmentAssignment.put(segment5, externalViewInstanceStateMap0);
-    externalViewSegmentAssignment.put(segment6, externalViewInstanceStateMap0);
-    externalViewSegmentAssignment.put(segment7, externalViewInstanceStateMap0);
-    externalViewSegmentAssignment.put(segment8, externalViewInstanceStateMap0);
-    externalViewSegmentAssignment.put(segment9, externalViewInstanceStateMap0);
-    externalViewSegmentAssignment.put(segment10, externalViewInstanceStateMap0);
-    externalViewSegmentAssignment.put(segment11, externalViewInstanceStateMap0);
 
+    for (String instance : enabledInstances) {
+      idealStateInstanceStateMap0.put(instance, ONLINE);
+      externalViewInstanceStateMap0.put(instance, ONLINE);
+    }
 
-    onlineSegments.add(segment0);
-    onlineSegments.add(segment1);
-    onlineSegments.add(segment2);
-    onlineSegments.add(segment3);
-    onlineSegments.add(segment4);
-    onlineSegments.add(segment5);
-    onlineSegments.add(segment6);
-    onlineSegments.add(segment7);
-    onlineSegments.add(segment8);
-    onlineSegments.add(segment9);
-    onlineSegments.add(segment10);
-    onlineSegments.add(segment11);
+    List<String> segments = getSegments();
+    // add all segments to both idealStateSegmentAssignment and externalViewSegmentAssignment maps and also to online
+    // segments
+    for (String segment: segments) {
+      idealStateSegmentAssignment.put(segment, idealStateInstanceStateMap0);
+      externalViewSegmentAssignment.put(segment, externalViewInstanceStateMap0);
+      onlineSegments.add(segment);
+    }
 
-    List<String> segments = Arrays.asList(segment0, segment1, segment2, segment3, segment4, segment5, segment6,
-        segment7, segment8, segment9, segment10, segment11);
     replicaGroupInstanceSelector.init(enabledInstances, idealState, externalView, onlineSegments);
     //   ReplicaGroupInstanceSelector
     //     segment0 -> instance0
@@ -694,21 +651,170 @@ public class InstanceSelectorTest {
     //     segment11 -> instance1
 
     Map<String, String> expectedReplicaGroupInstanceSelectorResult = new HashMap<>();
-    expectedReplicaGroupInstanceSelectorResult.put(segment0, instance0);
-    expectedReplicaGroupInstanceSelectorResult.put(segment1, instance1);
-    expectedReplicaGroupInstanceSelectorResult.put(segment2, instance0);
-    expectedReplicaGroupInstanceSelectorResult.put(segment3, instance1);
-    expectedReplicaGroupInstanceSelectorResult.put(segment4, instance0);
-    expectedReplicaGroupInstanceSelectorResult.put(segment5, instance1);
-    expectedReplicaGroupInstanceSelectorResult.put(segment6, instance0);
-    expectedReplicaGroupInstanceSelectorResult.put(segment7, instance1);
-    expectedReplicaGroupInstanceSelectorResult.put(segment8, instance0);
-    expectedReplicaGroupInstanceSelectorResult.put(segment9, instance1);
-    expectedReplicaGroupInstanceSelectorResult.put(segment10, instance0);
-    expectedReplicaGroupInstanceSelectorResult.put(segment11, instance1);
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(0), instance0);
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(1), instance1);
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(2), instance0);
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(3), instance1);
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(4), instance0);
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(5), instance1);
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(6), instance0);
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(7), instance1);
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(8), instance0);
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(9), instance1);
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(10), instance0);
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(11), instance1);
     InstanceSelector.SelectionResult selectionResult = replicaGroupInstanceSelector.select(brokerRequest, segments);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
+  }
+
+
+  @Test
+  public void testReplicaGroupInstanceSelectorNumReplicaGroupsToQueryGreaterThanReplicas() {
+    String offlineTableName = "testTable_OFFLINE";
+    BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
+    BrokerRequest brokerRequest = mock(BrokerRequest.class);
+    PinotQuery pinotQuery = mock(PinotQuery.class);
+    Map<String, String> queryOptions = new HashMap<>();
+    queryOptions.put("numReplicaGroupsToQuery", "4");
+
+    when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
+    when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
+
+    ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
+        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics);
+
+    Set<String> enabledInstances = new HashSet<>();
+    IdealState idealState = new IdealState(offlineTableName);
+    Map<String, Map<String, String>> idealStateSegmentAssignment = idealState.getRecord().getMapFields();
+    ExternalView externalView = new ExternalView(offlineTableName);
+    Map<String, Map<String, String>> externalViewSegmentAssignment = externalView.getRecord().getMapFields();
+    Set<String> onlineSegments = new HashSet<>();
+
+    // 12 online segments with each segment having all 3 instances as online
+    // replicas are 3
+    String instance0 = "instance0";
+    String instance1 = "instance1";
+    String instance2 = "instance2";
+    enabledInstances.add(instance0);
+    enabledInstances.add(instance1);
+    enabledInstances.add(instance2);
+
+    List<String> segments = getSegments();
+
+    Map<String, String> idealStateInstanceStateMap0 = new TreeMap<>();
+    Map<String, String> externalViewInstanceStateMap0 = new TreeMap<>();
+
+    for (String instance : enabledInstances) {
+      idealStateInstanceStateMap0.put(instance, ONLINE);
+      externalViewInstanceStateMap0.put(instance, ONLINE);
+    }
+
+    // add all segments to both idealStateSegmentAssignment and externalViewSegmentAssignment maps and also to online
+    // segments
+    for (String segment: segments) {
+      idealStateSegmentAssignment.put(segment, idealStateInstanceStateMap0);
+      externalViewSegmentAssignment.put(segment, externalViewInstanceStateMap0);
+      onlineSegments.add(segment);
+    }
+
+    replicaGroupInstanceSelector.init(enabledInstances, idealState, externalView, onlineSegments);
+    //   ReplicaGroupInstanceSelector
+    //     segment0 -> instance0
+    //     segment3 -> instance0
+    //     segment6 -> instance0
+    //     segment9 -> instance0
+    //     segment1 -> instance1
+    //     segment4 -> instance1
+    //     segment7 -> instance1
+    //     segment10 -> instance1
+    //     segment2 -> instance2
+    //     segment5 -> instance2
+    //     segment8 -> instance2
+    //     segment11 -> instance2
+
+    Map<String, String> expectedReplicaGroupInstanceSelectorResult = new HashMap<>();
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(0), instance0);
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(1), instance1);
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(2), instance2);
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(3), instance0);
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(4), instance1);
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(5), instance2);
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(6), instance0);
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(7), instance1);
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(8), instance2);
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(9), instance0);
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(10), instance1);
+    expectedReplicaGroupInstanceSelectorResult.put(segments.get(11), instance2);
+    InstanceSelector.SelectionResult selectionResult = replicaGroupInstanceSelector.select(brokerRequest, segments);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
+  }
+
+  @Test
+  public void testReplicaGroupInstanceSelectorNumReplicaGroupsNotSet() {
+    String offlineTableName = "testTable_OFFLINE";
+    BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
+    BrokerRequest brokerRequest = mock(BrokerRequest.class);
+    PinotQuery pinotQuery = mock(PinotQuery.class);
+    Map<String, String> queryOptions = new HashMap<>();
+
+    when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
+    when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
+
+    ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
+        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics);
+
+    Set<String> enabledInstances = new HashSet<>();
+    IdealState idealState = new IdealState(offlineTableName);
+    Map<String, Map<String, String>> idealStateSegmentAssignment = idealState.getRecord().getMapFields();
+    ExternalView externalView = new ExternalView(offlineTableName);
+    Map<String, Map<String, String>> externalViewSegmentAssignment = externalView.getRecord().getMapFields();
+    Set<String> onlineSegments = new HashSet<>();
+
+    // 12 online segments with each segment having all 3 instances as online
+    // replicas are 3
+    String instance0 = "instance0";
+    String instance1 = "instance1";
+    String instance2 = "instance2";
+    enabledInstances.add(instance0);
+    enabledInstances.add(instance1);
+    enabledInstances.add(instance2);
+
+    List<String> segments = getSegments();
+
+    Map<String, String> idealStateInstanceStateMap0 = new TreeMap<>();
+    Map<String, String> externalViewInstanceStateMap0 = new TreeMap<>();
+
+    for (String instance : enabledInstances) {
+      idealStateInstanceStateMap0.put(instance, ONLINE);
+      externalViewInstanceStateMap0.put(instance, ONLINE);
+    }
+
+    // add all segments to both idealStateSegmentAssignment and externalViewSegmentAssignment maps and also to online
+    // segments
+    for (String segment: segments) {
+      idealStateSegmentAssignment.put(segment, idealStateInstanceStateMap0);
+      externalViewSegmentAssignment.put(segment, externalViewInstanceStateMap0);
+      onlineSegments.add(segment);
+    }
+
+    replicaGroupInstanceSelector.init(enabledInstances, idealState, externalView, onlineSegments);
+    // since numReplicaGroupsToQuery is not set, first query should go to first replica group,
+    // 2nd query should go to next replica group
+
+    Map<String, String> expectedReplicaGroupInstanceSelectorResult = new HashMap<>();
+    for (String segment: segments) {
+      expectedReplicaGroupInstanceSelectorResult.put(segment, instance0);
+    }
+    InstanceSelector.SelectionResult selectionResult = replicaGroupInstanceSelector.select(brokerRequest, segments);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
+
+    for (String segment: segments) {
+      expectedReplicaGroupInstanceSelectorResult.put(segment, instance1);
+    }
+    selectionResult = replicaGroupInstanceSelector.select(brokerRequest, segments);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
   }
 
   @Test
@@ -998,5 +1104,9 @@ public class InstanceSelectorTest {
       assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
       assertEquals(selectionResult.getUnavailableSegments(), Arrays.asList(segment0, segment1));
     }
+  }
+
+  private static List<String> getSegments() {
+    return SEGMENTS;
   }
 }
