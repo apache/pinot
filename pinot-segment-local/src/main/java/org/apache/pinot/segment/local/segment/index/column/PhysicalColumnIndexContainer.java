@@ -123,7 +123,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       _bloomFilter = null;
     }
 
-    if (loadRangeIndex) {
+    if (loadRangeIndex && !metadata.isSorted()) {
       PinotDataBuffer buffer = segmentReader.getIndexFor(columnName, ColumnIndexType.RANGE_INDEX);
       _rangeIndex = indexReaderProvider.newRangeIndexReader(buffer, metadata);
     } else {
