@@ -29,7 +29,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
-import org.apache.pinot.query.parser.CalciteExpressionParser;
+import org.apache.pinot.query.parser.CalciteRexExpressionParser;
 import org.apache.pinot.query.planner.nodes.FilterNode;
 import org.apache.pinot.query.planner.nodes.MailboxSendNode;
 import org.apache.pinot.query.planner.nodes.ProjectNode;
@@ -101,10 +101,10 @@ public class ServerRequestUtils {
       pinotQuery.setSelectList(tableScanNode.getTableScanColumns().stream().map(RequestUtils::getIdentifierExpression)
           .collect(Collectors.toList()));
     } else if (node instanceof FilterNode) {
-      pinotQuery.setFilterExpression(CalciteExpressionParser.toExpression(
+      pinotQuery.setFilterExpression(CalciteRexExpressionParser.toExpression(
           ((FilterNode) node).getCondition(), pinotQuery));
     } else if (node instanceof ProjectNode) {
-      pinotQuery.setSelectList(CalciteExpressionParser.convertSelectList(
+      pinotQuery.setSelectList(CalciteRexExpressionParser.convertSelectList(
           ((ProjectNode) node).getProjects(), pinotQuery));
     } else if (node instanceof MailboxSendNode) {
       // TODO: MailboxSendNode should be the root of the leaf stage. but ignore for now since it is handle seperately

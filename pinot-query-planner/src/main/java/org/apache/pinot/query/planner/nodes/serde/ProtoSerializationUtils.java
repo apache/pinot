@@ -218,7 +218,7 @@ public class ProtoSerializationUtils {
     return list;
   }
 
-  private static Object constructMap(Plan.MapField mapField) {
+  private static Map constructMap(Plan.MapField mapField) {
     Map map = new HashMap();
     for (Map.Entry<String, Plan.MemberVariableField> e : mapField.getContentMap().entrySet()) {
       map.put(e.getKey(), constructMemberVariable(e.getValue()));
