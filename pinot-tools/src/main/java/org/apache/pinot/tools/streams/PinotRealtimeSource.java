@@ -71,7 +71,11 @@ public class PinotRealtimeSource implements AutoCloseable {
     Preconditions.checkNotNull(_producer, "Producer of a stream cannot be null");
     _generator = generator;
     Preconditions.checkNotNull(_generator, "Generator of a stream cannot be null");
-    _executor = executor;
+    if (executor == null) {
+      _executor = Executors.newSingleThreadExecutor();
+    } else {
+      _executor = executor;
+    }
     _topicName = settings.getProperty(KEY_OF_TOPIC_NAME);
     Preconditions.checkNotNull(_topicName, "Topic name needs to be set via " + KEY_OF_TOPIC_NAME);
     String qpsStr = settings.getProperty(KEY_OF_MAX_MESSAGE_PER_SECOND, String.valueOf(DEFAULT_MAX_MESSAGE_PER_SECOND));
@@ -157,6 +161,9 @@ public class PinotRealtimeSource implements AutoCloseable {
       Properties properties = new Properties();
       properties.setProperty(KEY_OF_MAX_MESSAGE_PER_SECOND, String.valueOf(_maxMessagePerSecond));
       properties.setProperty(KEY_OF_TOPIC_NAME, _topic);
+      if (_executor == null) {
+        return new PinotRealtimeSource(properties, _generator, _producer);
+      }
       return new PinotRealtimeSource(properties, _generator, _producer, _executor);
     }
   }
