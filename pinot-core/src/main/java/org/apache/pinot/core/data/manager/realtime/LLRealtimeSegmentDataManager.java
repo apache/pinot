@@ -371,7 +371,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _segmentLogger
           .warn("Stream transient exception when fetching messages, retrying (count={})", _consecutiveErrorCount, e);
       Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
-      makeStreamConsumer("Too many transient errors");
+      recreateStreamConsumer("Too many transient errors");
     }
   }
 
@@ -445,7 +445,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         if (consecutiveIdleCount > maxIdleCountBeforeStatUpdate) {
           _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 1);
           consecutiveIdleCount = 0;
-          makeStreamConsumer("Idle for too long");
+          recreateStreamConsumer("Idle for too long");
         }
       }
     }
@@ -978,7 +978,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   private void closePartitionGroupConsumer() {
     try {
-      _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
+//      _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
       _partitionGroupConsumer.close();
     } catch (Exception e) {
       _segmentLogger.warn("Could not close stream consumer", e);
@@ -1459,6 +1459,15 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _partitionGroupConsumer =
         _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
     _partitionGroupConsumer.start(_currentOffset);
+  }
+  /**
+   * Checkpoints existing consumer before creating a new consumer instance
+   */
+  private void recreateStreamConsumer(String reason) {
+    if (_partitionGroupConsumer != null) {
+      _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
+    }
+    makeStreamConsumer(reason);
   }
 
   /**
