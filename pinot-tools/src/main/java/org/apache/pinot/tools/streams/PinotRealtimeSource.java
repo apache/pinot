@@ -126,8 +126,8 @@ public class PinotRealtimeSource implements AutoCloseable {
     }
   }
 
-  static long extractMaxQps(Properties properties) {
-    String qpsStr = properties.getProperty(KEY_OF_MAX_MESSAGE_PER_SECOND, String.valueOf(DEFAULT_MAX_MESSAGE_PER_SECOND));
+  static long extractMaxQps(Properties settings) {
+    String qpsStr = settings.getProperty(KEY_OF_MAX_MESSAGE_PER_SECOND, String.valueOf(DEFAULT_MAX_MESSAGE_PER_SECOND));
     long maxQps = DEFAULT_MAX_MESSAGE_PER_SECOND;
     try {
       maxQps = Long.parseLong(qpsStr);
