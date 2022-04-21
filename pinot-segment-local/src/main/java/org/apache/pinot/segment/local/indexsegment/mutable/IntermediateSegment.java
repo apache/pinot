@@ -48,7 +48,6 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
-import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -80,8 +79,6 @@ public class IntermediateSegment implements MutableSegment {
   private final Schema _schema;
   private final TableConfig _tableConfig;
   private final String _segmentName;
-  private final PartitionFunction _partitionFunction;
-  private final String _partitionColumn;
   private final Map<String, IntermediateIndexContainer> _indexContainerMap = new HashMap<>();
   private final PinotDataBufferMemoryManager _memoryManager;
   private final File _mmapDir;
@@ -103,19 +100,6 @@ public class IntermediateSegment implements MutableSegment {
       }
     }
 
-    SegmentPartitionConfig segmentPartitionConfig = segmentGeneratorConfig.getSegmentPartitionConfig();
-    if (segmentPartitionConfig != null) {
-      Map<String, ColumnPartitionConfig> segmentPartitionConfigColumnPartitionMap =
-          segmentPartitionConfig.getColumnPartitionMap();
-      _partitionColumn = segmentPartitionConfigColumnPartitionMap.keySet().iterator().next();
-      _partitionFunction = PartitionFunctionFactory
-          .getPartitionFunction(segmentPartitionConfig.getFunctionName(_partitionColumn),
-              segmentPartitionConfig.getNumPartitions(_partitionColumn),
-              segmentPartitionConfig.getFunctionConfig(_partitionColumn));
-    } else {
-      _partitionColumn = null;
-      _partitionFunction = null;
-    }
     String outputDir = segmentGeneratorConfig.getOutDir();
     _mmapDir = new File(outputDir, _segmentName + "_mmap_" + UUID.randomUUID().toString());
     _mmapDir.mkdir();
@@ -127,10 +111,13 @@ public class IntermediateSegment implements MutableSegment {
       String column = fieldSpec.getName();
 
       // Partition info
+      SegmentPartitionConfig segmentPartitionConfig = segmentGeneratorConfig.getSegmentPartitionConfig();
       PartitionFunction partitionFunction = null;
       Set<Integer> partitions = null;
-      if (column.equals(_partitionColumn)) {
-        partitionFunction = _partitionFunction;
+      if (segmentPartitionConfig != null && segmentPartitionConfig.getColumnPartitionMap().containsKey(column)) {
+        partitionFunction =
+            PartitionFunctionFactory.getPartitionFunction(segmentPartitionConfig.getFunctionName(column),
+                segmentPartitionConfig.getNumPartitions(column), segmentPartitionConfig.getFunctionConfig(column));
         partitions = new HashSet<>();
         partitions.add(segmentGeneratorConfig.getSequenceId());
       }

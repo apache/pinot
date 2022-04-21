@@ -107,8 +107,15 @@ public class MergeRollupTaskGeneratorTest {
   private void checkPinotTaskConfig(Map<String, String> pinotTaskConfig, String segments, String mergeLevel,
       String mergeType, String partitionBucketTimePeriod, String roundBucketTimePeriod,
       String maxNumRecordsPerSegments) {
-    assertEquals(pinotTaskConfig.get(MinionConstants.TABLE_NAME_KEY), OFFLINE_TABLE_NAME);
     assertEquals(pinotTaskConfig.get(MinionConstants.SEGMENT_NAME_KEY), segments);
+    checkPinotTaskConfig(pinotTaskConfig, mergeLevel, mergeType, partitionBucketTimePeriod, roundBucketTimePeriod,
+        maxNumRecordsPerSegments);
+  }
+
+  private void checkPinotTaskConfig(Map<String, String> pinotTaskConfig, String mergeLevel,
+      String mergeType, String partitionBucketTimePeriod, String roundBucketTimePeriod,
+      String maxNumRecordsPerSegments) {
+    assertEquals(pinotTaskConfig.get(MinionConstants.TABLE_NAME_KEY), OFFLINE_TABLE_NAME);
     assertTrue("true".equalsIgnoreCase(pinotTaskConfig.get(MinionConstants.ENABLE_REPLACE_SEGMENTS_KEY)));
     assertEquals(pinotTaskConfig.get(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY), mergeLevel);
     assertEquals(pinotTaskConfig.get(MinionConstants.MergeRollupTask.MERGE_TYPE_KEY), mergeType);
@@ -433,10 +440,24 @@ public class MergeRollupTaskGeneratorTest {
     generator.init(mockClusterInfoProvide);
     List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
     assertEquals(pinotTaskConfigs.size(), 2);
-    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat", "1d",
-        null, "1000000");
-    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName3 + "," + segmentName4, DAILY, "concat", "1d",
-        null, "1000000");
+
+    String partitionedSegmentsGroup1 = segmentName1 + "," + segmentName2;
+    String partitionedSegmentsGroup2 = segmentName3 + "," + segmentName4;
+    boolean isPartitionedSegmentsGroup1Seen = false;
+    boolean isPartitionedSegmentsGroup2Seen = false;
+    for (PinotTaskConfig pinotTaskConfig : pinotTaskConfigs) {
+      if (!isPartitionedSegmentsGroup1Seen) {
+        isPartitionedSegmentsGroup1Seen =
+            pinotTaskConfig.getConfigs().get(MinionConstants.SEGMENT_NAME_KEY).equals(partitionedSegmentsGroup1);
+      }
+      if (!isPartitionedSegmentsGroup2Seen) {
+        isPartitionedSegmentsGroup2Seen =
+            pinotTaskConfig.getConfigs().get(MinionConstants.SEGMENT_NAME_KEY).equals(partitionedSegmentsGroup2);
+      }
+      assertTrue(isPartitionedSegmentsGroup1Seen || isPartitionedSegmentsGroup2Seen);
+      checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), DAILY, "concat", "1d", null, "1000000");
+    }
+    assertTrue(isPartitionedSegmentsGroup1Seen && isPartitionedSegmentsGroup2Seen);
 
     // With numMaxRecordsPerTask constraints
     tableTaskConfigs.put("daily.maxNumRecordsPerTask", "5000000");
@@ -447,10 +468,27 @@ public class MergeRollupTaskGeneratorTest {
 
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
     assertEquals(pinotTaskConfigs.size(), 3);
-    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat", "1d",
-        null, "1000000");
-    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName3, DAILY, "concat", "1d", null, "1000000");
-    checkPinotTaskConfig(pinotTaskConfigs.get(2).getConfigs(), segmentName4, DAILY, "concat", "1d", null, "1000000");
+
+    isPartitionedSegmentsGroup1Seen = false;
+    isPartitionedSegmentsGroup2Seen = false;
+    boolean isPartitionedSegmentsGroup3Seen = false;
+    for (PinotTaskConfig pinotTaskConfig : pinotTaskConfigs) {
+      if (!isPartitionedSegmentsGroup1Seen) {
+        isPartitionedSegmentsGroup1Seen =
+            pinotTaskConfig.getConfigs().get(MinionConstants.SEGMENT_NAME_KEY).equals(partitionedSegmentsGroup1);
+      }
+      if (!isPartitionedSegmentsGroup2Seen) {
+        isPartitionedSegmentsGroup2Seen =
+            pinotTaskConfig.getConfigs().get(MinionConstants.SEGMENT_NAME_KEY).equals(segmentName3);
+      }
+      if (!isPartitionedSegmentsGroup3Seen) {
+        isPartitionedSegmentsGroup3Seen =
+            pinotTaskConfig.getConfigs().get(MinionConstants.SEGMENT_NAME_KEY).equals(segmentName4);
+      }
+      assertTrue(isPartitionedSegmentsGroup1Seen || isPartitionedSegmentsGroup2Seen || isPartitionedSegmentsGroup3Seen);
+      checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), DAILY, "concat", "1d", null, "1000000");
+    }
+    assertTrue(isPartitionedSegmentsGroup1Seen && isPartitionedSegmentsGroup2Seen && isPartitionedSegmentsGroup3Seen);
   }
 
   /**

@@ -260,6 +260,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return DEFAULT_NULL_HANDLING_ENABLED;
   }
 
+  @Nullable
+  protected SegmentPartitionConfig getSegmentPartitionConfig() {
+    return null;
+  }
+
   /**
    * The following methods are based on the getters. Override the getters for non-default settings before calling these
    * methods.
@@ -294,7 +299,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
         .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
         .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
-        .setNullHandlingEnabled(getNullHandlingEnabled()).build();
+        .setNullHandlingEnabled(getNullHandlingEnabled()).setSegmentPartitionConfig(getSegmentPartitionConfig()).build();
   }
 
   /**
