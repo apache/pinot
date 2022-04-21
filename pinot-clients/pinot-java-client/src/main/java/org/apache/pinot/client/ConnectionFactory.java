@@ -70,6 +70,14 @@ public class ConnectionFactory {
     return fromController(scheme, controllerHost, controllerPort, 1000);
   }
 
+  /**
+   *
+   * @param scheme controller URL scheme
+   * @param controllerHost controller host
+   * @param controllerPort controller port
+   * @param brokerUpdateFreqInMillis frequency of broker data refresh using controller APIs
+   * @return A connection that connects to brokers as per the given controller
+   */
   public static Connection fromController(String scheme, String controllerHost, int controllerPort,
       long brokerUpdateFreqInMillis) {
     try {

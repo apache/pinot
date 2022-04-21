@@ -82,7 +82,7 @@ public class BrokerCacheUpdaterPeriodic implements UpdatableBrokerCache {
     try {
       _scheduledExecutorService.shutdown();
     } catch (Exception e) {
-      LOGGER.error("Broker cache update task cancellation failed", e);
+      LOGGER.error("Cannot shutdown Broker Cache update periodic task", e);
     }
   }
 }

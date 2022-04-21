@@ -145,21 +145,11 @@ public class BrokerCache {
   }
 
   public String getBroker(String tableName) {
-    List<String> brokers = (tableName == null) ? _brokerData._brokers : _brokerData._tableToBrokerMap.get(tableName);
+    List<String> brokers = (tableName == null) ? _brokerData.getBrokers() : _brokerData.getTableToBrokerMap().get(tableName);
     return brokers.get(_random.nextInt(brokers.size()));
   }
 
   public List<String> getBrokers() {
-    return _brokerData._brokers;
-  }
-
-  public static class BrokerData {
-    public Map<String, List<String>> _tableToBrokerMap;
-    public List<String> _brokers;
-
-    public BrokerData(Map<String, List<String>> tableToBrokerMap, List<String> brokers) {
-      _tableToBrokerMap = tableToBrokerMap;
-      _brokers = brokers;
-    }
+    return _brokerData.getBrokers();
   }
 }

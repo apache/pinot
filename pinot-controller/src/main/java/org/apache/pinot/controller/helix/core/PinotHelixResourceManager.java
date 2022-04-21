@@ -3380,7 +3380,7 @@ public class PinotHelixResourceManager {
    * Returns map of tableName to list of live brokers
    * @return Map of tableName to list of ONLINE brokers serving the table
    */
-  public Map<String, List<InstanceInfo>> getLiveBrokers() {
+  public Map<String, List<InstanceInfo>> getTableToLiveBrokersMapping() {
     ExternalView ev = _helixDataAccessor.getProperty(_keyBuilder.externalView(Helix.BROKER_RESOURCE_INSTANCE));
     if (ev == null) {
       throw new IllegalStateException("Failed to find external view for " + Helix.BROKER_RESOURCE_INSTANCE);

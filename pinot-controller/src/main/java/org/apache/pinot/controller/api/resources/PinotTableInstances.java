@@ -152,7 +152,7 @@ public class PinotTableInstances {
   })
   public Map<String, List<InstanceInfo>> getLiveBrokers() {
     try {
-      return _pinotHelixResourceManager.getLiveBrokers();
+      return _pinotHelixResourceManager.getTableToLiveBrokersMapping();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
     }
