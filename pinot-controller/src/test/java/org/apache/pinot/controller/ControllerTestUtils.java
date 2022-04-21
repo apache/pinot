@@ -57,7 +57,7 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.api.AccessControlTest;
 import org.apache.pinot.controller.helix.ControllerRequestClient;
-import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
+import org.apache.pinot.controller.helix.ControllerSegmentUrlBuilder;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -67,6 +67,7 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -103,6 +104,7 @@ public abstract class ControllerTestUtils {
   protected static int _controllerPort;
   protected static String _controllerBaseApiUrl;
   protected static ControllerRequestURLBuilder _controllerRequestURLBuilder;
+  protected static ControllerSegmentUrlBuilder _controllerSegmentUrlBuilder;
 
   protected static HttpClient _httpClient = null;
   protected static ControllerRequestClient _controllerRequestClient = null;
@@ -182,6 +184,7 @@ public abstract class ControllerTestUtils {
     _controllerPort = Integer.parseInt(_controllerConfig.getControllerPort());
     _controllerBaseApiUrl = "http://localhost:" + _controllerPort;
     _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
+    _controllerSegmentUrlBuilder = ControllerSegmentUrlBuilder.baseUrl(_controllerBaseApiUrl);
     _controllerDataDir = _controllerConfig.getDataDir();
 
     _controllerStarter = new ControllerStarter();
@@ -625,6 +628,10 @@ public abstract class ControllerTestUtils {
 
   public static ControllerRequestURLBuilder getControllerRequestURLBuilder() {
     return _controllerRequestURLBuilder;
+  }
+
+  public static ControllerSegmentUrlBuilder getControllerSegmentUrlBuilder() {
+    return _controllerSegmentUrlBuilder;
   }
 
   public static HelixAdmin getHelixAdmin() {

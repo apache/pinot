@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.helix.core.rebalance;
+package org.apache.pinot.spi.utils;
 
 /**
  * Constants for rebalance config properties
