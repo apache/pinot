@@ -71,11 +71,7 @@ public class PinotRealtimeSource implements AutoCloseable {
     Preconditions.checkNotNull(_producer, "Producer of a stream cannot be null");
     _generator = generator;
     Preconditions.checkNotNull(_generator, "Generator of a stream cannot be null");
-    if (executor == null) {
-      _executor = Executors.newSingleThreadExecutor();
-    } else {
-      _executor = executor;
-    }
+    _executor = executor == null ? Executors.newSingleThreadExecutor() : executor;
     _topicName = settings.getProperty(KEY_OF_TOPIC_NAME);
     Preconditions.checkNotNull(_topicName, "Topic name needs to be set via " + KEY_OF_TOPIC_NAME);
     String qpsStr = settings.getProperty(KEY_OF_MAX_MESSAGE_PER_SECOND, String.valueOf(DEFAULT_MAX_MESSAGE_PER_SECOND));
@@ -89,25 +85,23 @@ public class PinotRealtimeSource implements AutoCloseable {
   }
 
   public void run() {
-    _executor.execute(this::mainLoop);
-  }
-
-  public void mainLoop() {
-    while (!_shutdown) {
-      List<byte[]> rows = _generator.generateRows();
-      if (rows.isEmpty()) {
-        try {
-          Thread.sleep(DEFAULT_EMPTY_SOURCE_SLEEP_MS);
-        } catch (InterruptedException ex) {
-          LOGGER.info("Interrupted but will continue");
-        }
-      } else {
-        _rateLimiter.acquire(rows.size());
-        if (!_shutdown) {
-          _producer.produceBatch(_topicName, rows);
+    _executor.execute(() -> {
+      while (!_shutdown) {
+        List<byte[]> rows = _generator.generateRows();
+        if (rows.isEmpty()) {
+          try {
+            Thread.sleep(DEFAULT_EMPTY_SOURCE_SLEEP_MS);
+          } catch (InterruptedException ex) {
+            LOGGER.warn("Interrupted from sleep, will check shutdown flag later", ex);
+          }
+        } else {
+          _rateLimiter.acquire(rows.size());
+          if (!_shutdown) {
+            _producer.produceBatch(_topicName, rows);
+          }
         }
       }
-    }
+    });
   }
 
   @Override
@@ -116,10 +110,6 @@ public class PinotRealtimeSource implements AutoCloseable {
     _shutdown = true;
     _producer.close();
     _executor.shutdownNow();
-  }
-
-  public void stop() throws Exception {
-    close();
   }
 
   public static Builder builder() {

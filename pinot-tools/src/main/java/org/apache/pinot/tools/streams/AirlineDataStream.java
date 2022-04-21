@@ -38,8 +38,7 @@ public class AirlineDataStream {
   Schema _pinotSchema;
   String _timeColumnName;
   File _avroFile;
-  Integer _currentTimeValue = 16102;
-  boolean _keepIndexing = true;
+  final Integer _startTime = 16102;
   private StreamDataProducer _producer;
   private PinotRealtimeSource _pinotStream;
 
@@ -55,7 +54,7 @@ public class AirlineDataStream {
     _avroFile = avroFile;
     _producer = producer;
     AvroFilePinotSourceGenerator generator = new AvroFilePinotSourceGenerator(pinotSchema, avroFile, 1, _timeColumnName,
-        (rowNumber) -> (_currentTimeValue + rowNumber / 60));
+        (rowNumber) -> (_startTime + rowNumber / 60));
     _pinotStream =
         PinotRealtimeSource.builder().setProducer(_producer).setGenerator(generator).setTopic(KAFKA_TOPIC_NAME)
             .setMaxMessagePerSecond(1).build();
@@ -80,7 +79,6 @@ public class AirlineDataStream {
 
   public void shutdown()
       throws Exception {
-    _keepIndexing = false;
     _pinotStream.close();
     _producer.close();
     _producer = null;
