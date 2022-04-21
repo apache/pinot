@@ -19,6 +19,8 @@
 package org.apache.pinot.tools.utils;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
 import java.util.ServiceLoader;
@@ -51,7 +53,15 @@ public class KafkaStarterUtils {
       getKafkaConnectorPackageName() + ".KafkaStreamLevelConsumer";
 
   private static String getKafkaConnectorPackageName() {
-    return ServiceLoader.load(StreamConsumerFactory.class).iterator().next().getClass().getPackage().getName();
+    Iterator<StreamConsumerFactory> iterator = ServiceLoader.load(StreamConsumerFactory.class).iterator();
+    List<String> streamConsumerFactoryList = new ArrayList<>();
+    while (iterator.hasNext()) {
+      streamConsumerFactoryList.add(iterator.next().getClass().getPackage().getName());
+    }
+    if (streamConsumerFactoryList.size() > 1) {
+      Collections.sort(streamConsumerFactoryList, Collections.reverseOrder());
+    }
+    return streamConsumerFactoryList.get(0);
   }
 
   public static final String KAFKA_JSON_MESSAGE_DECODER_CLASS_NAME =
