@@ -267,21 +267,24 @@ public class SegmentPrunerTest extends ControllerTest {
     IdealState idealState = Mockito.mock(IdealState.class);
     ExternalView externalView = Mockito.mock(ExternalView.class);
 
-    PartitionSegmentPruner segmentPruner =
+    SinglePartitionColumnSegmentPruner singlePartitionColumnSegmentPruner =
         new SinglePartitionColumnSegmentPruner(OFFLINE_TABLE_NAME, PARTITION_COLUMN_1, _propertyStore);
     Set<String> onlineSegments = new HashSet<>();
-    segmentPruner.init(idealState, externalView, onlineSegments);
-    assertEquals(segmentPruner.prune(brokerRequest1, Collections.emptySet()), Collections.emptySet());
-    assertEquals(segmentPruner.prune(brokerRequest2, Collections.emptySet()), Collections.emptySet());
-    assertEquals(segmentPruner.prune(brokerRequest3, Collections.emptySet()), Collections.emptySet());
+    singlePartitionColumnSegmentPruner.init(idealState, externalView, onlineSegments);
+    assertEquals(singlePartitionColumnSegmentPruner.prune(brokerRequest1, Collections.emptySet()),
+        Collections.emptySet());
+    assertEquals(singlePartitionColumnSegmentPruner.prune(brokerRequest2, Collections.emptySet()),
+        Collections.emptySet());
+    assertEquals(singlePartitionColumnSegmentPruner.prune(brokerRequest3, Collections.emptySet()),
+        Collections.emptySet());
 
     // Segments without metadata (not updated yet) should not be pruned
     String newSegment = "newSegment";
-    assertEquals(segmentPruner.prune(brokerRequest1, Collections.singleton(newSegment)),
+    assertEquals(singlePartitionColumnSegmentPruner.prune(brokerRequest1, Collections.singleton(newSegment)),
         Collections.singletonList(newSegment));
-    assertEquals(segmentPruner.prune(brokerRequest2, Collections.singleton(newSegment)),
+    assertEquals(singlePartitionColumnSegmentPruner.prune(brokerRequest2, Collections.singleton(newSegment)),
         Collections.singletonList(newSegment));
-    assertEquals(segmentPruner.prune(brokerRequest3, Collections.singleton(newSegment)),
+    assertEquals(singlePartitionColumnSegmentPruner.prune(brokerRequest3, Collections.singleton(newSegment)),
         Collections.singletonList(newSegment));
 
     // Segments without partition metadata should not be pruned
@@ -291,15 +294,15 @@ public class SegmentPrunerTest extends ControllerTest {
         new SegmentZKMetadata(segmentWithoutPartitionMetadata);
     ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME,
         segmentZKMetadataWithoutPartitionMetadata);
-    segmentPruner.onAssignmentChange(idealState, externalView, onlineSegments);
-    assertEquals(
-        segmentPruner.prune(brokerRequest1, new HashSet<>(Collections.singletonList(segmentWithoutPartitionMetadata))),
+    singlePartitionColumnSegmentPruner.onAssignmentChange(idealState, externalView, onlineSegments);
+    assertEquals(singlePartitionColumnSegmentPruner.prune(brokerRequest1,
+            new HashSet<>(Collections.singletonList(segmentWithoutPartitionMetadata))),
         Collections.singletonList(segmentWithoutPartitionMetadata));
-    assertEquals(
-        segmentPruner.prune(brokerRequest2, new HashSet<>(Collections.singletonList(segmentWithoutPartitionMetadata))),
+    assertEquals(singlePartitionColumnSegmentPruner.prune(brokerRequest2,
+            new HashSet<>(Collections.singletonList(segmentWithoutPartitionMetadata))),
         Collections.singletonList(segmentWithoutPartitionMetadata));
-    assertEquals(
-        segmentPruner.prune(brokerRequest3, new HashSet<>(Collections.singletonList(segmentWithoutPartitionMetadata))),
+    assertEquals(singlePartitionColumnSegmentPruner.prune(brokerRequest3,
+            new HashSet<>(Collections.singletonList(segmentWithoutPartitionMetadata))),
         Collections.singletonList(segmentWithoutPartitionMetadata));
 
     // Test different partition functions and number of partitions
@@ -311,41 +314,55 @@ public class SegmentPrunerTest extends ControllerTest {
     String segment1 = "segment1";
     onlineSegments.add(segment1);
     setSegmentZKPartitionMetadata(OFFLINE_TABLE_NAME, segment1, "Murmur", 4, 0);
-    segmentPruner.onAssignmentChange(idealState, externalView, onlineSegments);
-    assertEquals(segmentPruner.prune(brokerRequest1, new HashSet<>(Arrays.asList(segment0, segment1))),
+    singlePartitionColumnSegmentPruner.onAssignmentChange(idealState, externalView, onlineSegments);
+    assertEquals(
+        singlePartitionColumnSegmentPruner.prune(brokerRequest1, new HashSet<>(Arrays.asList(segment0, segment1))),
         new HashSet<>(Arrays.asList(segment0, segment1)));
-    assertEquals(segmentPruner.prune(brokerRequest2, new HashSet<>(Arrays.asList(segment0, segment1))),
+    assertEquals(
+        singlePartitionColumnSegmentPruner.prune(brokerRequest2, new HashSet<>(Arrays.asList(segment0, segment1))),
         new HashSet<>(Arrays.asList(segment0, segment1)));
-    assertEquals(segmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1))),
+    assertEquals(
+        singlePartitionColumnSegmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1))),
         new HashSet<>(Collections.singletonList(segment1)));
 
     // Update partition metadata without refreshing should have no effect
     setSegmentZKPartitionMetadata(OFFLINE_TABLE_NAME, segment0, "Modulo", 4, 1);
-    segmentPruner.onAssignmentChange(idealState, externalView, onlineSegments);
-    assertEquals(segmentPruner.prune(brokerRequest1, new HashSet<>(Arrays.asList(segment0, segment1))),
+    singlePartitionColumnSegmentPruner.onAssignmentChange(idealState, externalView, onlineSegments);
+    assertEquals(
+        singlePartitionColumnSegmentPruner.prune(brokerRequest1, new HashSet<>(Arrays.asList(segment0, segment1))),
         new HashSet<>(Arrays.asList(segment0, segment1)));
-    assertEquals(segmentPruner.prune(brokerRequest2, new HashSet<>(Arrays.asList(segment0, segment1))),
+    assertEquals(
+        singlePartitionColumnSegmentPruner.prune(brokerRequest2, new HashSet<>(Arrays.asList(segment0, segment1))),
         new HashSet<>(Arrays.asList(segment0, segment1)));
-    assertEquals(segmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1))),
+    assertEquals(
+        singlePartitionColumnSegmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1))),
         new HashSet<>(Collections.singletonList(segment1)));
 
     // Refresh the changed segment should update the segment pruner
-    segmentPruner.refreshSegment(segment0);
-    assertEquals(segmentPruner.prune(brokerRequest1, new HashSet<>(Arrays.asList(segment0, segment1))),
+    singlePartitionColumnSegmentPruner.refreshSegment(segment0);
+    assertEquals(
+        singlePartitionColumnSegmentPruner.prune(brokerRequest1, new HashSet<>(Arrays.asList(segment0, segment1))),
         new HashSet<>(Arrays.asList(segment0, segment1)));
-    assertEquals(segmentPruner.prune(brokerRequest2, new HashSet<>(Arrays.asList(segment0, segment1))),
+    assertEquals(
+        singlePartitionColumnSegmentPruner.prune(brokerRequest2, new HashSet<>(Arrays.asList(segment0, segment1))),
         new HashSet<>(Collections.singletonList(segment1)));
-    assertEquals(segmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1))),
+    assertEquals(
+        singlePartitionColumnSegmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1))),
         new HashSet<>(Arrays.asList(segment0, segment1)));
 
     // Multi-column partitioned segment.
-    segmentPruner = new MultiPartitionColumnsSegmentPruner(OFFLINE_TABLE_NAME,
-        Stream.of(PARTITION_COLUMN_1, PARTITION_COLUMN_2).collect(Collectors.toSet()), _propertyStore);
-    segmentPruner.init(idealState, externalView, onlineSegments);
-    assertEquals(segmentPruner.prune(brokerRequest1, Collections.emptySet()), Collections.emptySet());
-    assertEquals(segmentPruner.prune(brokerRequest2, Collections.emptySet()), Collections.emptySet());
-    assertEquals(segmentPruner.prune(brokerRequest3, Collections.emptySet()), Collections.emptySet());
-    assertEquals(segmentPruner.prune(brokerRequest4, Collections.emptySet()), Collections.emptySet());
+    MultiPartitionColumnsSegmentPruner multiPartitionColumnsSegmentPruner =
+        new MultiPartitionColumnsSegmentPruner(OFFLINE_TABLE_NAME,
+            Stream.of(PARTITION_COLUMN_1, PARTITION_COLUMN_2).collect(Collectors.toSet()), _propertyStore);
+    multiPartitionColumnsSegmentPruner.init(idealState, externalView, onlineSegments);
+    assertEquals(multiPartitionColumnsSegmentPruner.prune(brokerRequest1, Collections.emptySet()),
+        Collections.emptySet());
+    assertEquals(multiPartitionColumnsSegmentPruner.prune(brokerRequest2, Collections.emptySet()),
+        Collections.emptySet());
+    assertEquals(multiPartitionColumnsSegmentPruner.prune(brokerRequest3, Collections.emptySet()),
+        Collections.emptySet());
+    assertEquals(multiPartitionColumnsSegmentPruner.prune(brokerRequest4, Collections.emptySet()),
+        Collections.emptySet());
 
     String segment2 = "segment2";
     onlineSegments.add(segment2);
@@ -358,15 +375,18 @@ public class SegmentPrunerTest extends ControllerTest {
     columnPartitionMetadataMap.put(PARTITION_COLUMN_2,
         new ColumnPartitionMetadata("BoundedColumnValue", 3, Collections.singleton(1), partitionColumn2FunctionConfig));
     setSegmentZKPartitionMetadata(OFFLINE_TABLE_NAME, segment2, columnPartitionMetadataMap);
-    segmentPruner.onAssignmentChange(idealState, externalView, onlineSegments);
-    assertEquals(segmentPruner.prune(brokerRequest1, new HashSet<>(Arrays.asList(segment0, segment1))),
+    multiPartitionColumnsSegmentPruner.onAssignmentChange(idealState, externalView, onlineSegments);
+    assertEquals(
+        multiPartitionColumnsSegmentPruner.prune(brokerRequest1, new HashSet<>(Arrays.asList(segment0, segment1))),
         new HashSet<>(Arrays.asList(segment0, segment1)));
-    assertEquals(segmentPruner.prune(brokerRequest2, new HashSet<>(Arrays.asList(segment0, segment1))),
+    assertEquals(
+        multiPartitionColumnsSegmentPruner.prune(brokerRequest2, new HashSet<>(Arrays.asList(segment0, segment1))),
         new HashSet<>(Collections.singletonList(segment1)));
-    assertEquals(segmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1))),
+    assertEquals(
+        multiPartitionColumnsSegmentPruner.prune(brokerRequest3, new HashSet<>(Arrays.asList(segment0, segment1))),
         new HashSet<>(Arrays.asList(segment0, segment1)));
-    assertEquals(segmentPruner.prune(brokerRequest4, new HashSet<>(Arrays.asList(segment0, segment1, segment2))),
-        new HashSet<>(Arrays.asList(segment1, segment2)));
+    assertEquals(multiPartitionColumnsSegmentPruner.prune(brokerRequest4,
+        new HashSet<>(Arrays.asList(segment0, segment1, segment2))), new HashSet<>(Arrays.asList(segment1, segment2)));
   }
 
   @Test(dataProvider = "compilerProvider")

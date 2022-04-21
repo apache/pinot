@@ -101,7 +101,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
         createOfflineTableConfig(SINGLE_LEVEL_CONCAT_TEST_TABLE, getSingleLevelConcatTaskConfig());
     TableConfig singleLevelRollupTableConfig =
         createOfflineTableConfig(SINGLE_LEVEL_ROLLUP_TEST_TABLE, getSingleLevelRollupTaskConfig(),
-            getMultiColumnSegmentPartitionConfig());
+            getMultiColumnsSegmentPartitionConfig());
     TableConfig multiLevelConcatTableConfig =
         createOfflineTableConfig(MULTI_LEVEL_CONCAT_TEST_TABLE, getMultiLevelConcatTaskConfig());
     addTableConfig(singleLevelConcatTableConfig);
@@ -187,7 +187,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     return new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
   }
 
-  private SegmentPartitionConfig getMultiColumnSegmentPartitionConfig() {
+  private SegmentPartitionConfig getMultiColumnsSegmentPartitionConfig() {
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
     ColumnPartitionConfig columnOneConfig = new ColumnPartitionConfig("murmur", 1);
     columnPartitionConfigMap.put("AirlineID", columnOneConfig);

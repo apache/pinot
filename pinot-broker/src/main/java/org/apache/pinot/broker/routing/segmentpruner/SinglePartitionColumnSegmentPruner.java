@@ -49,10 +49,10 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The {@code PartitionSegmentPruner} prunes segments based on their partition metadata stored in ZK. The pruner
- * supports queries with filter (or nested filter) of EQUALITY and IN predicates.
+ * The {@code SinglePartitionColumnSegmentPruner} prunes segments based on their partition metadata stored in ZK. The
+ * pruner supports queries with filter (or nested filter) of EQUALITY and IN predicates.
  */
-public class SinglePartitionColumnSegmentPruner implements PartitionSegmentPruner {
+public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
   private static final Logger LOGGER = LoggerFactory.getLogger(SinglePartitionColumnSegmentPruner.class);
   private static final PartitionInfo INVALID_PARTITION_INFO = new PartitionInfo(null, null);
 

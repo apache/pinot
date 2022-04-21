@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -30,7 +29,6 @@ import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.I0Itec.zkclient.exception.ZkException;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.task.TaskState;
@@ -360,13 +358,13 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
           Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
           List<String> partitionColumns = new ArrayList<>(columnPartitionMap.keySet());
           for (List<SegmentZKMetadata> selectedSegmentsPerBucket : selectedSegmentsForAllBuckets) {
-            Map<List<Integer>, List<SegmentZKMetadata>> partitionToSegments = new LinkedHashMap<>();
+            Map<List<Integer>, List<SegmentZKMetadata>> partitionToSegments = new HashMap<>();
             List<SegmentZKMetadata> outlierSegments = new ArrayList<>();
             for (SegmentZKMetadata selectedSegment : selectedSegmentsPerBucket) {
               SegmentPartitionMetadata segmentPartitionMetadata = selectedSegment.getPartitionMetadata();
               List<Integer> partitions = new ArrayList<>();
-              if (segmentPartitionMetadata != null && CollectionUtils.isEqualCollection(partitionColumns,
-                  segmentPartitionMetadata.getColumnPartitionMap().keySet())) {
+              if (segmentPartitionMetadata != null && columnPartitionMap.keySet()
+                  .equals(segmentPartitionMetadata.getColumnPartitionMap().keySet())) {
                 for (String partitionColumn : partitionColumns) {
                   if (segmentPartitionMetadata.getPartitions(partitionColumn).size() == 1) {
                     partitions.add(segmentPartitionMetadata.getPartitions(partitionColumn).iterator().next());

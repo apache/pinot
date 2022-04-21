@@ -62,7 +62,7 @@ public class SegmentPrunerFactory {
         List<SegmentPruner> configuredSegmentPruners = new ArrayList<>(segmentPrunerTypes.size());
         for (String segmentPrunerType : segmentPrunerTypes) {
           if (RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE.equalsIgnoreCase(segmentPrunerType)) {
-            PartitionSegmentPruner partitionSegmentPruner = getPartitionSegmentPruner(tableConfig, propertyStore);
+            SegmentPruner partitionSegmentPruner = getPartitionSegmentPruner(tableConfig, propertyStore);
             if (partitionSegmentPruner != null) {
               configuredSegmentPruners.add(partitionSegmentPruner);
             }
@@ -85,7 +85,7 @@ public class SegmentPrunerFactory {
         if ((tableType == TableType.OFFLINE && LEGACY_PARTITION_AWARE_OFFLINE_ROUTING.equalsIgnoreCase(
             routingTableBuilderName)) || (tableType == TableType.REALTIME
             && LEGACY_PARTITION_AWARE_REALTIME_ROUTING.equalsIgnoreCase(routingTableBuilderName))) {
-          PartitionSegmentPruner partitionSegmentPruner = getPartitionSegmentPruner(tableConfig, propertyStore);
+          SegmentPruner partitionSegmentPruner = getPartitionSegmentPruner(tableConfig, propertyStore);
           if (partitionSegmentPruner != null) {
             segmentPruners.add(partitionSegmentPruner);
           }
@@ -96,7 +96,7 @@ public class SegmentPrunerFactory {
   }
 
   @Nullable
-  private static PartitionSegmentPruner getPartitionSegmentPruner(TableConfig tableConfig,
+  private static SegmentPruner getPartitionSegmentPruner(TableConfig tableConfig,
       ZkHelixPropertyStore<ZNRecord> propertyStore) {
     String tableNameWithType = tableConfig.getTableName();
     SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
@@ -153,7 +153,8 @@ public class SegmentPrunerFactory {
       }
     }
     for (SegmentPruner pruner : pruners) {
-      if (pruner instanceof PartitionSegmentPruner) {
+      if (pruner instanceof SinglePartitionColumnSegmentPruner
+          || pruner instanceof MultiPartitionColumnsSegmentPruner) {
         sortedPruners.add(pruner);
       }
     }
