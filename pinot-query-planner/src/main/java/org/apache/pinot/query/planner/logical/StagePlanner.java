@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner;
+package org.apache.pinot.query.planner.logical;
 
 import java.util.HashMap;
 import java.util.List;
@@ -26,10 +26,12 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.logical.LogicalExchange;
 import org.apache.pinot.query.context.PlannerContext;
-import org.apache.pinot.query.planner.nodes.MailboxReceiveNode;
-import org.apache.pinot.query.planner.nodes.MailboxSendNode;
-import org.apache.pinot.query.planner.nodes.StageNode;
+import org.apache.pinot.query.planner.QueryPlan;
+import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
+import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
+import org.apache.pinot.query.planner.stage.MailboxSendNode;
+import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.routing.WorkerManager;
 
 

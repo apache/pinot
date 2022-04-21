@@ -22,28 +22,19 @@
  * DO NOT EDIT UNLESS YOU ARE SURE THAT YOU KNOW WHAT YOU ARE DOING
  *  @generated
  */
-package org.apache.pinot.query.planner.nodes.serde;
+package org.apache.pinot.query.planner.serde;
 
-import org.apache.pinot.common.proto.Plan;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 
 /**
- * Interface to convert between proto serialized payload and object.
- *
- * <p>Classes that implement {@code ProtoSerializable} should provide methods to convert to and from
- * {@link Plan.ObjectField}.
+ * Annotation {@code ProtoProperties} indicates whether a field defined in a
+ * {@link org.apache.pinot.query.planner.stage.StageNode} should be serialized.
  */
-public interface ProtoSerializable {
-
-  /**
-   * Setting object's own member variable from a serialized {@link Plan.ObjectField}.
-   * @param objFields the serialized ObjectField.
-   */
-  void fromObjectField(Plan.ObjectField objFields);
-
-  /**
-   * convert the object to a serialized {@link Plan.ObjectField}.
-   * @return the serialized ObjectField.
-   */
-  Plan.ObjectField toObjectField();
+@Target({ElementType.ANNOTATION_TYPE, ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER})
+@Retention(RetentionPolicy.RUNTIME)
+public @interface ProtoProperties {
 }

@@ -16,34 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.nodes;
+package org.apache.pinot.query.planner.hints;
 
-import java.util.List;
-import org.apache.calcite.rel.type.RelDataType;
-import org.apache.pinot.query.planner.nodes.serde.ProtoProperties;
+import org.apache.calcite.rel.hint.RelHint;
 
 
-public class TableScanNode extends AbstractStageNode {
-  @ProtoProperties
-  private String _tableName;
-  @ProtoProperties
-  private List<String> _tableScanColumns;
+/**
+ * Provide certain relational hint to query planner for better optimization.
+ */
+public class PinotRelationalHints {
+  public static final RelHint USE_HASH_JOIN = RelHint.builder("USE_HASH_JOIN").build();
+  public static final RelHint USE_BROADCAST_JOIN = RelHint.builder("USE_BROADCAST_JOIN").build();
 
-  public TableScanNode(int stageId) {
-    super(stageId, null);
-  }
-
-  public TableScanNode(int stageId, RelDataType rowType, String tableName, List<String> tableScanColumns) {
-    super(stageId, rowType);
-    _tableName = tableName;
-    _tableScanColumns = tableScanColumns;
-  }
-
-  public String getTableName() {
-    return _tableName;
-  }
-
-  public List<String> getTableScanColumns() {
-    return _tableScanColumns;
+  private PinotRelationalHints() {
+    // do not instantiate.
   }
 }

@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.nodes;
+package org.apache.pinot.query.planner.stage;
 
 import java.util.List;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.type.RelDataType;
-import org.apache.pinot.query.planner.nodes.serde.ProtoProperties;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
+import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
 public class JoinNode extends AbstractStageNode {

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.nodes.serde;
+package org.apache.pinot.query.planner.serde;
 
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Field;

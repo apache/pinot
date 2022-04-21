@@ -16,48 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.nodes;
+package org.apache.pinot.query.planner.stage;
 
-import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.type.RelDataType;
-import org.apache.pinot.query.planner.nodes.serde.ProtoProperties;
-import org.apache.pinot.query.planner.partitioning.KeySelector;
+import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
-public class MailboxSendNode extends AbstractStageNode {
+public class MailboxReceiveNode extends AbstractStageNode {
   @ProtoProperties
-  private int _receiverStageId;
+  private int _senderStageId;
   @ProtoProperties
   private RelDistribution.Type _exchangeType;
-  @ProtoProperties
-  private KeySelector<Object[], Object> _partitionKeySelector;
 
-  public MailboxSendNode(int stageId) {
+  public MailboxReceiveNode(int stageId) {
     super(stageId, null);
   }
 
-  public MailboxSendNode(int stageId, RelDataType rowType, int receiverStageId, RelDistribution.Type exchangeType) {
-    this(stageId, rowType, receiverStageId, exchangeType, null);
-  }
-
-  public MailboxSendNode(int stageId, RelDataType rowType, int receiverStageId, RelDistribution.Type exchangeType,
-      @Nullable KeySelector<Object[], Object> partitionKeySelector) {
+  public MailboxReceiveNode(int stageId, RelDataType rowType, int senderStageId, RelDistribution.Type exchangeType) {
     super(stageId, rowType);
-    _receiverStageId = receiverStageId;
+    _senderStageId = senderStageId;
     _exchangeType = exchangeType;
-    _partitionKeySelector = partitionKeySelector;
   }
 
-  public int getReceiverStageId() {
-    return _receiverStageId;
+  public int getSenderStageId() {
+    return _senderStageId;
   }
 
   public RelDistribution.Type getExchangeType() {
     return _exchangeType;
-  }
-
-  public KeySelector<Object[], Object> getPartitionKeySelector() {
-    return _partitionKeySelector;
   }
 }

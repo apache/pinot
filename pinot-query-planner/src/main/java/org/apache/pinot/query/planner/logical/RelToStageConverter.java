@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner;
+package org.apache.pinot.query.planner.logical;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
@@ -33,12 +33,12 @@ import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.pinot.query.planner.nodes.FilterNode;
-import org.apache.pinot.query.planner.nodes.JoinNode;
-import org.apache.pinot.query.planner.nodes.ProjectNode;
-import org.apache.pinot.query.planner.nodes.StageNode;
-import org.apache.pinot.query.planner.nodes.TableScanNode;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
+import org.apache.pinot.query.planner.stage.FilterNode;
+import org.apache.pinot.query.planner.stage.JoinNode;
+import org.apache.pinot.query.planner.stage.ProjectNode;
+import org.apache.pinot.query.planner.stage.StageNode;
+import org.apache.pinot.query.planner.stage.TableScanNode;
 
 
 /**

@@ -16,34 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.nodes;
+package org.apache.pinot.query.planner.stage;
 
-import org.apache.calcite.rel.RelDistribution;
+import java.util.List;
 import org.apache.calcite.rel.type.RelDataType;
-import org.apache.pinot.query.planner.nodes.serde.ProtoProperties;
+import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
-public class MailboxReceiveNode extends AbstractStageNode {
+public class TableScanNode extends AbstractStageNode {
   @ProtoProperties
-  private int _senderStageId;
+  private String _tableName;
   @ProtoProperties
-  private RelDistribution.Type _exchangeType;
+  private List<String> _tableScanColumns;
 
-  public MailboxReceiveNode(int stageId) {
+  public TableScanNode(int stageId) {
     super(stageId, null);
   }
 
-  public MailboxReceiveNode(int stageId, RelDataType rowType, int senderStageId, RelDistribution.Type exchangeType) {
+  public TableScanNode(int stageId, RelDataType rowType, String tableName, List<String> tableScanColumns) {
     super(stageId, rowType);
-    _senderStageId = senderStageId;
-    _exchangeType = exchangeType;
+    _tableName = tableName;
+    _tableScanColumns = tableScanColumns;
   }
 
-  public int getSenderStageId() {
-    return _senderStageId;
+  public String getTableName() {
+    return _tableName;
   }
 
-  public RelDistribution.Type getExchangeType() {
-    return _exchangeType;
+  public List<String> getTableScanColumns() {
+    return _tableScanColumns;
   }
 }

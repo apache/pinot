@@ -30,11 +30,11 @@ import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
-import org.apache.pinot.query.planner.nodes.FilterNode;
-import org.apache.pinot.query.planner.nodes.MailboxSendNode;
-import org.apache.pinot.query.planner.nodes.ProjectNode;
-import org.apache.pinot.query.planner.nodes.StageNode;
-import org.apache.pinot.query.planner.nodes.TableScanNode;
+import org.apache.pinot.query.planner.stage.FilterNode;
+import org.apache.pinot.query.planner.stage.MailboxSendNode;
+import org.apache.pinot.query.planner.stage.ProjectNode;
+import org.apache.pinot.query.planner.stage.StageNode;
+import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 
 

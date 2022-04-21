@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.nodes;
+package org.apache.pinot.query.planner.stage;
 
 import java.lang.reflect.Field;
 import java.util.List;
@@ -24,7 +24,7 @@ import java.util.Map;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.planner.QueryPlan;
-import org.apache.pinot.query.planner.nodes.serde.ProtoProperties;
+import org.apache.pinot.query.planner.serde.ProtoProperties;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -36,8 +36,8 @@ public class SerDeUtilsTest extends QueryEnvironmentTestBase {
       throws Exception {
     QueryPlan queryPlan = _queryEnvironment.planQuery(query);
     for (StageNode stageNode : queryPlan.getQueryStageMap().values()) {
-      Plan.StageNode serializedStageNode = SerDeUtils.serializeStageNode((AbstractStageNode) stageNode);
-      StageNode deserializedStageNode = SerDeUtils.deserializeStageNode(serializedStageNode);
+      Plan.StageNode serializedStageNode = StageNodeSerDeUtils.serializeStageNode((AbstractStageNode) stageNode);
+      StageNode deserializedStageNode = StageNodeSerDeUtils.deserializeStageNode(serializedStageNode);
       Assert.assertTrue(isObjectEqual(stageNode, deserializedStageNode));
     }
   }

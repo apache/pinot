@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.nodes;
+package org.apache.pinot.query.planner.logical;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -29,7 +29,7 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.NlsString;
-import org.apache.pinot.query.planner.nodes.serde.ProtoProperties;
+import org.apache.pinot.query.planner.serde.ProtoProperties;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 

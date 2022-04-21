@@ -16,27 +16,33 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.nodes;
+package org.apache.pinot.query.planner.stage;
 
+import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexNode;
-import org.apache.pinot.query.planner.nodes.serde.ProtoProperties;
+import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
-public class FilterNode extends AbstractStageNode {
+public class ProjectNode extends AbstractStageNode {
   @ProtoProperties
-  private RexExpression _condition;
+  private List<RexExpression> _projects;
 
-  public FilterNode(int stageId) {
+  public ProjectNode(int stageId) {
     super(stageId, null);
   }
-
-  public FilterNode(int currentStageId, RelDataType rowType, RexNode condition) {
+  public ProjectNode(int currentStageId, RelDataType rowType, List<RexNode> projects) {
     super(currentStageId, rowType);
-    _condition = RexExpression.toRexExpression(condition);
+    _projects = projects.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
   }
 
-  public RexExpression getCondition() {
-    return _condition;
+  public List<RexExpression> getProjects() {
+    return _projects;
+  }
+
+  public RelDataType getRowType() {
+    return _rowType;
   }
 }

@@ -16,25 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.nodes;
+package org.apache.pinot.query.planner.stage;
 
-import java.io.Serializable;
-import java.util.List;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rex.RexNode;
+import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
-/**
- * Stage Node is a serializable version of the {@link org.apache.calcite.rel.RelNode}.
- *
- * TODO: stage node currently uses java.io.Serializable as its serialization format.
- * We should experiment with other type of serialization format for better performance.
- * Essentially what we need is a way to exclude the planner context from the RelNode but only keeps the
- * constructed relational content because we will no longer revisit the planner after stage is created.
- */
-public interface StageNode extends Serializable {
+public class FilterNode extends AbstractStageNode {
+  @ProtoProperties
+  private RexExpression _condition;
 
-  List<StageNode> getInputs();
+  public FilterNode(int stageId) {
+    super(stageId, null);
+  }
 
-  void addInput(StageNode stageNode);
+  public FilterNode(int currentStageId, RelDataType rowType, RexNode condition) {
+    super(currentStageId, rowType);
+    _condition = RexExpression.toRexExpression(condition);
+  }
 
-  int getStageId();
+  public RexExpression getCondition() {
+    return _condition;
+  }
 }

@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.nodes;
+package org.apache.pinot.query.planner.stage;
 
 import org.apache.pinot.common.proto.Plan;
 
 
-public final class SerDeUtils {
-  private SerDeUtils() {
+public final class StageNodeSerDeUtils {
+  private StageNodeSerDeUtils() {
     // do not instantiate.
   }
 

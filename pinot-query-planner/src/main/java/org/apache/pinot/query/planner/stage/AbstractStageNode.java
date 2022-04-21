@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.nodes;
+package org.apache.pinot.query.planner.stage;
 
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.pinot.common.proto.Plan;
-import org.apache.pinot.query.planner.nodes.serde.ProtoProperties;
-import org.apache.pinot.query.planner.nodes.serde.ProtoSerializable;
-import org.apache.pinot.query.planner.nodes.serde.ProtoSerializationUtils;
+import org.apache.pinot.query.planner.serde.ProtoProperties;
+import org.apache.pinot.query.planner.serde.ProtoSerializable;
+import org.apache.pinot.query.planner.serde.ProtoSerializationUtils;
 
 
 public abstract class AbstractStageNode implements StageNode, ProtoSerializable {

@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.query.planner.partitioning;
 
-import org.apache.pinot.query.planner.nodes.serde.ProtoProperties;
+import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
 /**
