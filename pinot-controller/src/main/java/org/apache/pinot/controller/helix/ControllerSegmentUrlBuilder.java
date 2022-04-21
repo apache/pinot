@@ -16,29 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils;
+package org.apache.pinot.controller.helix;
 
-import org.apache.pinot.spi.utils.StringUtil;
-import org.testng.annotations.Test;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.utils.URIUtils;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertSame;
+public class ControllerSegmentUrlBuilder {
+  private final String _baseUrl;
 
+  private ControllerSegmentUrlBuilder(String baseUrl) {
+    _baseUrl = StringUtils.chomp(baseUrl, "/");
+  }
 
-/**
- * Tests for {@link StringUtil} class.
- */
-public class StringUtilTest {
+  public static ControllerSegmentUrlBuilder baseUrl(String baseUrl) {
+    return new ControllerSegmentUrlBuilder(baseUrl);
+  }
 
-  @Test
-  public void testSanitizeStringValue() {
-    assertEquals(StringUtil.sanitizeStringValue("pot\0ato", 3), "pot");
-    assertEquals(StringUtil.sanitizeStringValue("pot\0ato", 6), "pot");
-    assertEquals(StringUtil.sanitizeStringValue("potato", 2), "po");
-    assertEquals(StringUtil.sanitizeStringValue("pot\0ato", 2), "po");
+  public String forSegmentDeleteAPI(String tableName, String segmentName, String tableType) {
+    return URIUtils.getPath(_baseUrl, "segments", tableName, URIUtils.encode(segmentName)) + "?type=" + tableType;
+  }
 
-    String value = "potato";
-    assertSame(StringUtil.sanitizeStringValue(value, 6), value);
-    assertSame(StringUtil.sanitizeStringValue(value, 7), value);
+  public String forSegmentDownload(String tableName, String segmentName) {
+    return URIUtils.constructDownloadUrl(_baseUrl, tableName, segmentName);
   }
 }

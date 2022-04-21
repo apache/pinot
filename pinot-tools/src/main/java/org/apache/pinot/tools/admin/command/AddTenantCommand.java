@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
+import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.tools.Command;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

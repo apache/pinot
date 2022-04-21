@@ -41,7 +41,7 @@ public class AccessControlTest {
   public void testAccessDenied() {
     try {
       ControllerTestUtils.sendGetRequest(
-          ControllerTestUtils.getControllerRequestURLBuilder().forSegmentDownload(TABLE_NAME, "testSegment"));
+          ControllerTestUtils.getControllerSegmentUrlBuilder().forSegmentDownload(TABLE_NAME, "testSegment"));
       Assert.fail("Access not denied");
     } catch (IOException e) {
       Assert.assertTrue(e.getMessage().contains("Got error status code: 403 (Forbidden)"));

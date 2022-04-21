@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.helix;
+package org.apache.pinot.spi.utils.builder;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -26,11 +26,10 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.common.utils.URIUtils;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.utils.RebalanceConfigConstants;
+import org.apache.pinot.spi.utils.StringUtil;
 
 
 public class ControllerRequestURLBuilder {
@@ -281,16 +280,8 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tableConfigs", "validate");
   }
 
-  public String forSegmentDownload(String tableName, String segmentName) {
-    return URIUtils.constructDownloadUrl(_baseUrl, tableName, segmentName);
-  }
-
   public String forSegmentDelete(String tableName, String segmentName) {
     return StringUtil.join("/", _baseUrl, "segments", tableName, segmentName);
-  }
-
-  public String forSegmentDeleteAPI(String tableName, String segmentName, String tableType) {
-    return URIUtils.getPath(_baseUrl, "segments", tableName, URIUtils.encode(segmentName)) + "?type=" + tableType;
   }
 
   public String forSegmentDeleteAllAPI(String tableName, String tableType) {

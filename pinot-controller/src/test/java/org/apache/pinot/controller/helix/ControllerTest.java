@@ -66,6 +66,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.NetUtils;
+import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,6 +87,7 @@ public abstract class ControllerTest {
   protected static int _controllerPort;
   protected static String _controllerBaseApiUrl;
   protected static ControllerRequestURLBuilder _controllerRequestURLBuilder;
+  protected static ControllerSegmentUrlBuilder _controllerSegmentUrlBuilder;
 
   protected static HttpClient _httpClient = null;
   protected static ControllerRequestClient _controllerRequestClient = null;
@@ -187,6 +189,7 @@ public abstract class ControllerTest {
 
     _controllerBaseApiUrl = controllerScheme + "://localhost:" + _controllerPort;
     _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
+    _controllerSegmentUrlBuilder = ControllerSegmentUrlBuilder.baseUrl(_controllerBaseApiUrl);
     _controllerDataDir = config.getDataDir();
 
     _controllerStarter = getControllerStarter();

@@ -35,9 +35,9 @@ import org.apache.pinot.connector.flink.common.FlinkRowGenericRowConverter;
 import org.apache.pinot.connector.flink.http.PinotConnectionUtils;
 import org.apache.pinot.connector.flink.sink.PinotSinkFunction;
 import org.apache.pinot.controller.helix.ControllerRequestClient;
-import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 
 
 /**
