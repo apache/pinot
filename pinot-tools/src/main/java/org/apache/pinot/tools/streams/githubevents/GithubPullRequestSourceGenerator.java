@@ -49,7 +49,8 @@ public class GithubPullRequestSourceGenerator implements PinotSourceGenerator {
   private Schema _avroSchema;
   private String _etag = null;
 
-  public GithubPullRequestSourceGenerator(File schemaFile, String personalAccessToken) throws Exception {
+  public GithubPullRequestSourceGenerator(File schemaFile, String personalAccessToken)
+      throws Exception {
     try {
       _avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(org.apache.pinot.spi.data.Schema.fromFile(schemaFile));
     } catch (Exception e) {
@@ -58,6 +59,7 @@ public class GithubPullRequestSourceGenerator implements PinotSourceGenerator {
     }
     _gitHubAPICaller = new GitHubAPICaller(personalAccessToken);
   }
+
   private GenericRecord convertToPullRequestMergedGenericRecord(JsonNode event)
       throws IOException {
     GenericRecord genericRecord = null;
@@ -146,6 +148,7 @@ public class GithubPullRequestSourceGenerator implements PinotSourceGenerator {
 
     return genericRecord;
   }
+
   @Override
   public void init(Properties properties) {
   }
@@ -180,7 +183,8 @@ public class GithubPullRequestSourceGenerator implements PinotSourceGenerator {
           Thread.sleep(SLEEP_MILLIS);
           break;
         case 403: // Rate Limit exceeded
-          Quickstart.printStatus(Quickstart.Color.YELLOW, "Rate limit exceeded, sleeping until " + githubAPIResponse._resetTimeMs);
+          Quickstart.printStatus(Quickstart.Color.YELLOW,
+              "Rate limit exceeded, sleeping until " + githubAPIResponse._resetTimeMs);
           long sleepMs = Math.max(60_000L, githubAPIResponse._resetTimeMs - System.currentTimeMillis());
           Thread.sleep(sleepMs);
           break;
