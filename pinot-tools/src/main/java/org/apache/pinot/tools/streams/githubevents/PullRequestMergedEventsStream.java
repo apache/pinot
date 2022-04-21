@@ -47,14 +47,13 @@ public class PullRequestMergedEventsStream {
   private static final Logger LOGGER = LoggerFactory.getLogger(PullRequestMergedEventsStream.class);
 
   private PinotRealtimeSource _pinotStream;
-  private PinotSourceGenerator _generator;
 
   public PullRequestMergedEventsStream(File schemaFile, String topicName, String personalAccessToken,
       StreamDataProducer producer)
       throws Exception {
-    _generator = new GithubPullRequestGenerator(schemaFile, personalAccessToken);
+    PinotSourceGenerator generator = new GithubPullRequestGenerator(schemaFile, personalAccessToken);
     _pinotStream =
-        PinotRealtimeSource.builder().setProducer(producer).setGenerator(_generator).setTopic(topicName).build();
+        PinotRealtimeSource.builder().setProducer(producer).setGenerator(generator).setTopic(topicName).build();
   }
 
   public PullRequestMergedEventsStream(String schemaFilePath, String topicName, String personalAccessToken,
@@ -162,8 +161,6 @@ public class PullRequestMergedEventsStream {
       throws Exception {
     printStatus(Quickstart.Color.GREEN, "***** Shutting down pullRequestMergedEvents Stream *****");
     _pinotStream.close();
-    Thread.sleep(3000L);
-    _generator.close();
   }
 
   public void start() {
