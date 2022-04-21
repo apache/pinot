@@ -122,15 +122,12 @@ public class BrokerCache {
         if (tableToBrokersMap.containsKey(offlineTable) && tableToBrokersMap.containsKey(realtimeTable)) {
           List<String> realtimeBrokers = tableToBrokersMap.get(realtimeTable);
           List<String> offlineBrokers = tableToBrokersMap.get(offlineTable);
-          List<String> tableBrokers = realtimeBrokers
-              .stream()
-              .filter(offlineBrokers::contains)
-              .collect(Collectors.toList());
+          List<String> tableBrokers =
+              realtimeBrokers.stream().filter(offlineBrokers::contains).collect(Collectors.toList());
           tableToBrokersMap.put(tableName, tableBrokers);
         } else {
-          tableToBrokersMap.put(tableName,
-              tableToBrokersMap.getOrDefault(offlineTable,
-                  tableToBrokersMap.getOrDefault(realtimeTable, new ArrayList<>())));
+          tableToBrokersMap.put(tableName, tableToBrokersMap.getOrDefault(offlineTable,
+              tableToBrokersMap.getOrDefault(realtimeTable, new ArrayList<>())));
         }
       }
     });
@@ -145,7 +142,8 @@ public class BrokerCache {
   }
 
   public String getBroker(String tableName) {
-    List<String> brokers = (tableName == null) ? _brokerData.getBrokers() : _brokerData.getTableToBrokerMap().get(tableName);
+    List<String> brokers =
+        (tableName == null) ? _brokerData.getBrokers() : _brokerData.getTableToBrokerMap().get(tableName);
     return brokers.get(_random.nextInt(brokers.size()));
   }
 
