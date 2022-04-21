@@ -53,7 +53,7 @@ public class AirlineDataStream {
     _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     _avroFile = avroFile;
     _producer = producer;
-    AvroFilePinotSourceGenerator generator = new AvroFilePinotSourceGenerator(pinotSchema, avroFile, 1, _timeColumnName,
+    AvroFileSourceGenerator generator = new AvroFileSourceGenerator(pinotSchema, avroFile, 1, _timeColumnName,
         (rowNumber) -> (_startTime + rowNumber / 60));
     _pinotStream =
         PinotRealtimeSource.builder().setProducer(_producer).setGenerator(generator).setTopic(KAFKA_TOPIC_NAME)

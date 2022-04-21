@@ -29,6 +29,7 @@ import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
+import org.apache.pinot.spi.stream.RowWithKey;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.QuickStartBase;
 import org.apache.pinot.tools.Quickstart;
@@ -40,15 +41,15 @@ import org.slf4j.LoggerFactory;
 /**
  * The class that pulls events from GitHub by RPC calls, and converts them into byte[] so we can write to Kafka
  */
-public class GithubPullRequestGenerator implements PinotSourceGenerator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(GithubPullRequestGenerator.class);
+public class GithubPullRequestSourceGenerator implements PinotSourceGenerator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(GithubPullRequestSourceGenerator.class);
   private static final long SLEEP_MILLIS = 10_000;
 
   private GitHubAPICaller _gitHubAPICaller;
   private Schema _avroSchema;
   private String _etag = null;
 
-  public GithubPullRequestGenerator(File schemaFile, String personalAccessToken) throws Exception {
+  public GithubPullRequestSourceGenerator(File schemaFile, String personalAccessToken) throws Exception {
     try {
       _avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(org.apache.pinot.spi.data.Schema.fromFile(schemaFile));
     } catch (Exception e) {
@@ -150,8 +151,8 @@ public class GithubPullRequestGenerator implements PinotSourceGenerator {
   }
 
   @Override
-  public List<byte[]> generateRows() {
-    List<byte[]> retVal = new ArrayList<>();
+  public List<RowWithKey> generateRows() {
+    List<RowWithKey> retVal = new ArrayList<>();
     try {
       GitHubAPICaller.GitHubAPIResponse githubAPIResponse = _gitHubAPICaller.callEventsAPI(_etag);
       switch (githubAPIResponse._statusCode) {
@@ -163,7 +164,7 @@ public class GithubPullRequestGenerator implements PinotSourceGenerator {
               GenericRecord genericRecord = convertToPullRequestMergedGenericRecord(eventElement);
               if (genericRecord != null) {
                 QuickStartBase.printStatus(Quickstart.Color.CYAN, genericRecord.toString());
-                retVal.add(genericRecord.toString().getBytes(StandardCharsets.UTF_8));
+                retVal.add(new RowWithKey(null, genericRecord.toString().getBytes(StandardCharsets.UTF_8)));
               }
             } catch (Exception e) {
               LOGGER.error("Exception in publishing generic record. Skipping", e);

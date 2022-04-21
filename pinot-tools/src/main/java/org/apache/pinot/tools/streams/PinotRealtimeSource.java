@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.stream.RowWithKey;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,11 +43,12 @@ public class PinotRealtimeSource implements AutoCloseable {
   public static final String KEY_OF_TOPIC_NAME = "pinot.topic.name";
   public static final long DEFAULT_MAX_MESSAGE_PER_SECOND = Long.MAX_VALUE;
   public static final long DEFAULT_EMPTY_SOURCE_SLEEP_MS = 10;
-  protected final StreamDataProducer _producer;
-  protected final PinotSourceGenerator _generator;
-  protected final String _topicName;
-  protected final ExecutorService _executor;
-  protected RateLimiter _rateLimiter;
+  final StreamDataProducer _producer;
+  final PinotSourceGenerator _generator;
+  final String _topicName;
+  final ExecutorService _executor;
+  final Properties _properties;
+  PinotStreamRateLimiter _rateLimiter;
   protected volatile boolean _shutdown;
 
   /**
@@ -55,7 +58,7 @@ public class PinotRealtimeSource implements AutoCloseable {
    * @param producer the producer to write the generator's data into
    */
   public PinotRealtimeSource(Properties settings, PinotSourceGenerator generator, StreamDataProducer producer) {
-    this(settings, generator, producer, Executors.newSingleThreadExecutor());
+    this(settings, generator, producer, null, null);
   }
 
   /**
@@ -63,10 +66,12 @@ public class PinotRealtimeSource implements AutoCloseable {
    * @param settings the settings for all components passed in
    * @param generator the generator that can create data
    * @param producer the producer to write the generator's data into
-   * @param executor the preferred executor instead of creating a thread pool.
+   * @param executor the preferred executor instead of creating a thread pool. Null for default one
+   * @param rateLimiter the specialized rate limiter for customization. Null for default guava one
    */
   public PinotRealtimeSource(Properties settings, PinotSourceGenerator generator, StreamDataProducer producer,
-      ExecutorService executor) {
+      @Nullable ExecutorService executor, @Nullable PinotStreamRateLimiter rateLimiter) {
+    _properties = settings;
     _producer = producer;
     Preconditions.checkNotNull(_producer, "Producer of a stream cannot be null");
     _generator = generator;
@@ -74,20 +79,15 @@ public class PinotRealtimeSource implements AutoCloseable {
     _executor = executor == null ? Executors.newSingleThreadExecutor() : executor;
     _topicName = settings.getProperty(KEY_OF_TOPIC_NAME);
     Preconditions.checkNotNull(_topicName, "Topic name needs to be set via " + KEY_OF_TOPIC_NAME);
-    String qpsStr = settings.getProperty(KEY_OF_MAX_MESSAGE_PER_SECOND, String.valueOf(DEFAULT_MAX_MESSAGE_PER_SECOND));
-    long maxQps = DEFAULT_MAX_MESSAGE_PER_SECOND;
-    try {
-      maxQps = Long.parseLong(qpsStr);
-    } catch (NumberFormatException ex) {
-      LOGGER.warn("Cannot parse {} as max qps setting, using default {}", qpsStr, DEFAULT_MAX_MESSAGE_PER_SECOND);
-    }
-    _rateLimiter = RateLimiter.create(maxQps);
+    _rateLimiter = rateLimiter == null ? new GuavaRateLimiter(extractMaxQps(settings)) : rateLimiter;
   }
 
   public void run() {
     _executor.execute(() -> {
       while (!_shutdown) {
-        List<byte[]> rows = _generator.generateRows();
+        List<RowWithKey> rows = _generator.generateRows();
+        // we expect the generator implementation to return empty rows when there is no data available
+        // as a stream, we expect data to be available all the time
         if (rows.isEmpty()) {
           try {
             Thread.sleep(DEFAULT_EMPTY_SOURCE_SLEEP_MS);
@@ -97,7 +97,7 @@ public class PinotRealtimeSource implements AutoCloseable {
         } else {
           _rateLimiter.acquire(rows.size());
           if (!_shutdown) {
-            _producer.produceBatch(_topicName, rows);
+            _producer.produceKeyedBatch(_topicName, rows);
           }
         }
       }
@@ -112,6 +112,31 @@ public class PinotRealtimeSource implements AutoCloseable {
     _executor.shutdownNow();
   }
 
+  /**
+   * A simpler wrapper for guava-based rate limiter
+   */
+  private static class GuavaRateLimiter implements PinotStreamRateLimiter {
+    private final RateLimiter _rateLimiter;
+    public GuavaRateLimiter(long maxQps) {
+      _rateLimiter = RateLimiter.create(maxQps);
+    }
+    @Override
+    public void acquire(int permits) {
+      _rateLimiter.acquire();
+    }
+  }
+
+  static long extractMaxQps(Properties properties) {
+    String qpsStr = properties.getProperty(KEY_OF_MAX_MESSAGE_PER_SECOND, String.valueOf(DEFAULT_MAX_MESSAGE_PER_SECOND));
+    long maxQps = DEFAULT_MAX_MESSAGE_PER_SECOND;
+    try {
+      maxQps = Long.parseLong(qpsStr);
+    } catch (NumberFormatException ex) {
+      LOGGER.warn("Cannot parse {} as max qps setting, using default {}", qpsStr, DEFAULT_MAX_MESSAGE_PER_SECOND);
+    }
+    return maxQps;
+  }
+
   public static Builder builder() {
     return new Builder();
   }
@@ -122,6 +147,7 @@ public class PinotRealtimeSource implements AutoCloseable {
     private PinotSourceGenerator _generator;
     private StreamDataProducer _producer;
     private ExecutorService _executor;
+    private PinotStreamRateLimiter _rateLimiter;
     public Builder setTopic(String topic) {
       _topic = topic;
       return this;
@@ -146,15 +172,18 @@ public class PinotRealtimeSource implements AutoCloseable {
       _executor = executor;
       return this;
     }
+
+    public Builder setRateLimiter(PinotStreamRateLimiter rateLimiter) {
+      _rateLimiter = rateLimiter;
+      return this;
+    }
+
     public PinotRealtimeSource build() {
       Preconditions.checkNotNull(_topic, "PinotRealTimeSource should specify topic name");
       Properties properties = new Properties();
       properties.setProperty(KEY_OF_MAX_MESSAGE_PER_SECOND, String.valueOf(_maxMessagePerSecond));
       properties.setProperty(KEY_OF_TOPIC_NAME, _topic);
-      if (_executor == null) {
-        return new PinotRealtimeSource(properties, _generator, _producer);
-      }
-      return new PinotRealtimeSource(properties, _generator, _producer, _executor);
+      return new PinotRealtimeSource(properties, _generator, _producer, _executor, _rateLimiter);
     }
   }
 }

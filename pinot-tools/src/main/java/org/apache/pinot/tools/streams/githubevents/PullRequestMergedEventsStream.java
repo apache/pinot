@@ -51,7 +51,7 @@ public class PullRequestMergedEventsStream {
   public PullRequestMergedEventsStream(File schemaFile, String topicName, String personalAccessToken,
       StreamDataProducer producer)
       throws Exception {
-    PinotSourceGenerator generator = new GithubPullRequestGenerator(schemaFile, personalAccessToken);
+    PinotSourceGenerator generator = new GithubPullRequestSourceGenerator(schemaFile, personalAccessToken);
     _pinotStream =
         PinotRealtimeSource.builder().setProducer(producer).setGenerator(generator).setTopic(topicName).build();
   }

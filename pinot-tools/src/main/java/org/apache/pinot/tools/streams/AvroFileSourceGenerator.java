@@ -37,6 +37,7 @@ import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.stream.RowWithKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,10 +47,9 @@ import org.slf4j.LoggerFactory;
  * It will keep looping the same file and produce data output. We can pass in a lambda function to compute
  * time index based on row number.
  */
-public class AvroFilePinotSourceGenerator implements PinotSourceGenerator {
+public class AvroFileSourceGenerator implements PinotSourceGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotRealtimeSource.class);
   private DataFileStream<GenericRecord> _avroDataStream;
-  private final List<byte[]> _reusedBuffer;
   private final Schema _pinotSchema;
   private long _rowsProduced;
   // If this var is null, we will not set time index column
@@ -63,7 +63,7 @@ public class AvroFilePinotSourceGenerator implements PinotSourceGenerator {
    * @param pinotSchema the Pinot Schema so the avro rows can be produced
    * @param avroFile the avro file as source.
    */
-  public AvroFilePinotSourceGenerator(Schema pinotSchema, File avroFile) {
+  public AvroFileSourceGenerator(Schema pinotSchema, File avroFile) {
     this(pinotSchema, avroFile, 1, null, null);
   }
 
@@ -75,7 +75,7 @@ public class AvroFilePinotSourceGenerator implements PinotSourceGenerator {
    * @param timeColumnName the time column name for customizing/overriding time index. Null for skipping customization.
    * @param rowNumberToTimeIndex the lambda to compute time index based on row number. Null for skipping customization.
    */
-  public AvroFilePinotSourceGenerator(Schema pinotSchema, File avroFile, int rowsPerBatch,
+  public AvroFileSourceGenerator(Schema pinotSchema, File avroFile, int rowsPerBatch,
       @Nullable String timeColumnName, @Nullable Function<Long, Long> rowNumberToTimeIndex) {
     _pinotSchema = pinotSchema;
     _rowsProduced = 0;
@@ -86,7 +86,6 @@ public class AvroFilePinotSourceGenerator implements PinotSourceGenerator {
       Preconditions.checkNotNull(timeColumnSpec,
           "Time column " + timeColumnName + " is not found in schema, or is not a valid DateTime column");
     }
-    _reusedBuffer = new ArrayList<>();
     _avroFile = avroFile;
     _rowsPerBatch = rowsPerBatch;
   }
@@ -96,8 +95,8 @@ public class AvroFilePinotSourceGenerator implements PinotSourceGenerator {
   }
 
   @Override
-  public List<byte[]> generateRows() {
-    _reusedBuffer.clear();
+  public List<RowWithKey> generateRows() {
+    List<RowWithKey> retVal = new ArrayList<>();
     ensureStream();
     int rowsInCurrentBatch = 0;
     while (_avroDataStream.hasNext() && rowsInCurrentBatch < _rowsPerBatch) {
@@ -111,11 +110,11 @@ public class AvroFilePinotSourceGenerator implements PinotSourceGenerator {
         message.put(spec.getName(), record.get(spec.getName()));
       }
       message.put(_timeColumnName, _rowNumberToTimeIndex.apply(_rowsProduced));
-      _reusedBuffer.add(message.toString().getBytes(StandardCharsets.UTF_8));
+      retVal.add(new RowWithKey(null, message.toString().getBytes(StandardCharsets.UTF_8)));
       _rowsProduced += 1;
       rowsInCurrentBatch += 1;
     }
-    return _reusedBuffer;
+    return retVal;
   }
 
   @Override

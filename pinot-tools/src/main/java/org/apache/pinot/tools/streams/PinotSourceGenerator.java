@@ -20,6 +20,7 @@ package org.apache.pinot.tools.streams;
 
 import java.util.List;
 import java.util.Properties;
+import org.apache.pinot.spi.stream.RowWithKey;
 
 
 /**
@@ -37,7 +38,7 @@ public interface PinotSourceGenerator extends AutoCloseable {
   /**
    * Generate a small batch of rows represented by bytes.
    * It is up to the generator to define the binary format
-   * @return a small list of bytes, each element of the list will be written as one row of data
+   * @return a small list of RowWithKey, each element of the list will be written as one row of data
    */
-  List<byte[]> generateRows();
+  List<RowWithKey> generateRows();
 }

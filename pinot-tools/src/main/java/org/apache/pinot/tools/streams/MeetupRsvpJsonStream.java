@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.tools.streams;
 
-import java.util.function.Consumer;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-
-
+/**
+ * This class was created for UpsertJsonQuickStart. It is refactored to a point that
+ */
 public class MeetupRsvpJsonStream extends MeetupRsvpStream {
 
   public MeetupRsvpJsonStream()
@@ -32,22 +30,6 @@ public class MeetupRsvpJsonStream extends MeetupRsvpStream {
 
   public MeetupRsvpJsonStream(boolean partitionByKey)
       throws Exception {
-    super(partitionByKey);
-  }
-
-  @Override
-  protected Consumer<RSVP> createConsumer() {
-    return message -> {
-      if (_partitionByKey) {
-        try {
-          _producer.produce(_topicName, message.getRsvpId().getBytes(UTF_8), message.getPayload().toString()
-              .getBytes(UTF_8));
-        } catch (Exception e) {
-          LOGGER.error("Caught exception while processing the message: {}", message, e);
-        }
-      } else {
-        _producer.produce(_topicName, message.getPayload().toString().getBytes(UTF_8));
-      }
-    };
+    super(partitionByKey? RsvpSourceGenerator.KeyColumn.RSVP_ID: RsvpSourceGenerator.KeyColumn.NONE);
   }
 }
