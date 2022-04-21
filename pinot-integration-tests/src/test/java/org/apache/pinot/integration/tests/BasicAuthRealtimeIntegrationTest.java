@@ -192,7 +192,7 @@ public class BasicAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest
     for (int i = 0; i < offlineSegments.size(); i++) {
       String segment = offlineSegments.get(i).asText();
       Assert.assertTrue(
-          sendGetRequest(_controllerSegmentUrlBuilder.forSegmentDownload(getTableName(), segment), AUTH_HEADER).length()
+          sendGetRequest(_controllerRequestURLBuilder.forSegmentDownload(getTableName(), segment), AUTH_HEADER).length()
               > 200000); // download segment
     }
   }

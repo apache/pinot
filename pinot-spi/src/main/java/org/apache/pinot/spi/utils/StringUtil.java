@@ -21,7 +21,6 @@ package org.apache.pinot.spi.utils;
 import org.apache.commons.lang.StringUtils;
 
 
-// TODO: Use pinot-spi StringUtils instead
 public class StringUtil {
   private StringUtil() {
   }
