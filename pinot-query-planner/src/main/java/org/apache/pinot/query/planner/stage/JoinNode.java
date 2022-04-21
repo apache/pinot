@@ -33,11 +33,12 @@ public class JoinNode extends AbstractStageNode {
   private List<JoinClause> _criteria;
 
   public JoinNode(int stageId) {
-    super(stageId, null);
+    super(stageId);
   }
 
   public JoinNode(int stageId, RelDataType rowType, JoinRelType joinRelType, List<JoinClause> criteria) {
-    super(stageId, rowType);
+    super(stageId);
+    super._rowType = rowType;
     _joinRelType = joinRelType;
     _criteria = criteria;
   }

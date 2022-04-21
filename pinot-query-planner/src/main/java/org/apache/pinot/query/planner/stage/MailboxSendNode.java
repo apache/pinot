@@ -34,16 +34,18 @@ public class MailboxSendNode extends AbstractStageNode {
   private KeySelector<Object[], Object> _partitionKeySelector;
 
   public MailboxSendNode(int stageId) {
-    super(stageId, null);
+    super(stageId);
   }
 
   public MailboxSendNode(int stageId, RelDataType rowType, int receiverStageId, RelDistribution.Type exchangeType) {
+    // When exchangeType is not HASH_DISTRIBUTE, no partitionKeySelector is needed.
     this(stageId, rowType, receiverStageId, exchangeType, null);
   }
 
   public MailboxSendNode(int stageId, RelDataType rowType, int receiverStageId, RelDistribution.Type exchangeType,
       @Nullable KeySelector<Object[], Object> partitionKeySelector) {
-    super(stageId, rowType);
+    super(stageId);
+    super._rowType = rowType;
     _receiverStageId = receiverStageId;
     _exchangeType = exchangeType;
     _partitionKeySelector = partitionKeySelector;

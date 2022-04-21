@@ -31,10 +31,11 @@ public class ProjectNode extends AbstractStageNode {
   private List<RexExpression> _projects;
 
   public ProjectNode(int stageId) {
-    super(stageId, null);
+    super(stageId);
   }
   public ProjectNode(int currentStageId, RelDataType rowType, List<RexNode> projects) {
-    super(currentStageId, rowType);
+    super(currentStageId);
+    super._rowType = rowType;
     _projects = projects.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
   }
 

@@ -30,11 +30,12 @@ public class TableScanNode extends AbstractStageNode {
   private List<String> _tableScanColumns;
 
   public TableScanNode(int stageId) {
-    super(stageId, null);
+    super(stageId);
   }
 
   public TableScanNode(int stageId, RelDataType rowType, String tableName, List<String> tableScanColumns) {
-    super(stageId, rowType);
+    super(stageId);
+    super._rowType = rowType;
     _tableName = tableName;
     _tableScanColumns = tableScanColumns;
   }

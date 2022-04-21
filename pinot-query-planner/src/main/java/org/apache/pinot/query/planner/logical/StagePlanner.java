@@ -69,13 +69,13 @@ public class StagePlanner {
     // walk the plan and create stages.
     StageNode globalStageRoot = walkRelPlan(relRoot, getNewStageId());
 
-    // global root needs to send results back to the ROOT, a.k.a. the client response node.
-    // the last stage only has one receiver so doesn't matter what the exchange type is.
+    // global root needs to send results back to the ROOT, a.k.a. the client response node. the last stage only has one
+    // receiver so doesn't matter what the exchange type is. setting it to SINGLETON by default.
     StageNode globalReceiverNode =
         new MailboxReceiveNode(0, relRoot.getRowType(), globalStageRoot.getStageId(),
-            RelDistribution.Type.BROADCAST_DISTRIBUTED);
+            RelDistribution.Type.SINGLETON);
     StageNode globalSenderNode = new MailboxSendNode(globalStageRoot.getStageId(), relRoot.getRowType(),
-        globalReceiverNode.getStageId(), RelDistribution.Type.BROADCAST_DISTRIBUTED);
+        globalReceiverNode.getStageId(), RelDistribution.Type.SINGLETON);
     globalSenderNode.addInput(globalStageRoot);
     _queryStageMap.put(globalSenderNode.getStageId(), globalSenderNode);
     StageMetadata stageMetadata = _stageMetadataMap.get(globalSenderNode.getStageId());

@@ -29,11 +29,12 @@ public class FilterNode extends AbstractStageNode {
   private RexExpression _condition;
 
   public FilterNode(int stageId) {
-    super(stageId, null);
+    super(stageId);
   }
 
   public FilterNode(int currentStageId, RelDataType rowType, RexNode condition) {
-    super(currentStageId, rowType);
+    super(currentStageId);
+    super._rowType = rowType;
     _condition = RexExpression.toRexExpression(condition);
   }
 

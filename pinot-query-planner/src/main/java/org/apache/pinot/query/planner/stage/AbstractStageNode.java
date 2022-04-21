@@ -36,9 +36,8 @@ public abstract class AbstractStageNode implements StageNode, ProtoSerializable 
   @ProtoProperties
   protected RelDataType _rowType;
 
-  public AbstractStageNode(int stageId, RelDataType rowType) {
+  public AbstractStageNode(int stageId) {
     _stageId = stageId;
-    _rowType = rowType;
     _inputs = new ArrayList<>();
   }
 

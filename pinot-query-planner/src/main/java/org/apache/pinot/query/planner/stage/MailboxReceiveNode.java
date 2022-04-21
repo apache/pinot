@@ -30,11 +30,12 @@ public class MailboxReceiveNode extends AbstractStageNode {
   private RelDistribution.Type _exchangeType;
 
   public MailboxReceiveNode(int stageId) {
-    super(stageId, null);
+    super(stageId);
   }
 
   public MailboxReceiveNode(int stageId, RelDataType rowType, int senderStageId, RelDistribution.Type exchangeType) {
-    super(stageId, rowType);
+    super(stageId);
+    super._rowType = rowType;
     _senderStageId = senderStageId;
     _exchangeType = exchangeType;
   }

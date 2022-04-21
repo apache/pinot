@@ -32,7 +32,7 @@ import org.testng.annotations.Test;
 public class SerDeUtilsTest extends QueryEnvironmentTestBase {
 
   @Test(dataProvider = "testQueryDataProvider")
-  public void testQueryToRel(String query)
+  public void testQueryStagePlanSerDe(String query)
       throws Exception {
     QueryPlan queryPlan = _queryEnvironment.planQuery(query);
     for (StageNode stageNode : queryPlan.getQueryStageMap().values()) {
@@ -42,6 +42,7 @@ public class SerDeUtilsTest extends QueryEnvironmentTestBase {
     }
   }
 
+  @SuppressWarnings({"rawtypes"})
   private boolean isObjectEqual(Object left, Object right)
       throws IllegalAccessException {
     Class<?> clazz = left.getClass();
