@@ -18,16 +18,23 @@
  */
 package org.apache.pinot.client.controller;
 
+import io.netty.handler.ssl.ClientAuth;
+import io.netty.handler.ssl.JdkSslContext;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import javax.annotation.Nullable;
+import javax.net.ssl.SSLContext;
 import org.apache.pinot.client.PinotClientException;
 import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
 import org.apache.pinot.client.controller.response.SchemaResponse;
 import org.apache.pinot.client.controller.response.TableResponse;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.BoundRequestBuilder;
+import org.asynchttpclient.DefaultAsyncHttpClientConfig;
 import org.asynchttpclient.Dsl;
 import org.asynchttpclient.Response;
 import org.slf4j.Logger;
@@ -38,19 +45,35 @@ public class PinotControllerTransport {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotControllerTransport.class);
 
-  AsyncHttpClient _httpClient = Dsl.asyncHttpClient();
   Map<String, String> _headers;
+  private final String _scheme;
+  private final AsyncHttpClient _httpClient;
+
 
   public PinotControllerTransport() {
+    this(Collections.emptyMap(), CommonConstants.HTTP_PROTOCOL, null);
   }
 
   public PinotControllerTransport(Map<String, String> headers) {
+    this(headers, CommonConstants.HTTP_PROTOCOL, null);
+  }
+
+  public PinotControllerTransport(Map<String, String> headers, String scheme,
+      @Nullable SSLContext sslContext) {
     _headers = headers;
+    _scheme = scheme;
+
+    DefaultAsyncHttpClientConfig.Builder builder = Dsl.config();
+    if (sslContext != null) {
+      builder.setSslContext(new JdkSslContext(sslContext, true, ClientAuth.OPTIONAL));
+    }
+
+    _httpClient = Dsl.asyncHttpClient(builder.build());
   }
 
   public TableResponse getAllTables(String controllerAddress) {
     try {
-      String url = "http://" + controllerAddress + "/tables";
+      String url = _scheme + "://" + controllerAddress + "/tables";
       BoundRequestBuilder requestBuilder = _httpClient.prepareGet(url);
       if (_headers != null) {
         _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));
@@ -68,7 +91,7 @@ public class PinotControllerTransport {
 
   public SchemaResponse getTableSchema(String table, String controllerAddress) {
     try {
-      String url = "http://" + controllerAddress + "/tables/" + table + "/schema";
+      String url = _scheme + "://" + controllerAddress + "/tables/" + table + "/schema";
       BoundRequestBuilder requestBuilder = _httpClient.prepareGet(url);
       if (_headers != null) {
         _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));
@@ -86,7 +109,7 @@ public class PinotControllerTransport {
 
   public ControllerTenantBrokerResponse getBrokersFromController(String controllerAddress, String tenant) {
     try {
-      String url = "http://" + controllerAddress + "/v2/brokers/tenants/" + tenant;
+      String url = _scheme + "://" + controllerAddress + "/v2/brokers/tenants/" + tenant;
       BoundRequestBuilder requestBuilder = _httpClient.prepareGet(url);
       if (_headers != null) {
         _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));

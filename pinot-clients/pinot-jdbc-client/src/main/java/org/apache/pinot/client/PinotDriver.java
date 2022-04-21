@@ -34,7 +34,10 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.client.controller.PinotControllerTransport;
+import org.apache.pinot.client.controller.PinotControllerTransportFactory;
 import org.apache.pinot.client.utils.DriverUtils;
+import org.apache.pinot.common.utils.TlsUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.LoggerFactory;
 
 
@@ -52,9 +55,15 @@ public class PinotDriver implements Driver {
     try {
       LOGGER.info("Initiating connection to database for url: " + url);
       JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
+      PinotControllerTransportFactory pinotControllerTransportFactory = new PinotControllerTransportFactory();
 
       if (info.contains(INFO_SCHEME)) {
         factory.setScheme(info.getProperty(INFO_SCHEME));
+        pinotControllerTransportFactory.setScheme(info.getProperty(INFO_TENANT));
+        if (INFO_SCHEME.contentEquals(CommonConstants.HTTPS_PROTOCOL)) {
+          factory.setSslContext(DriverUtils.getSSLContextFromJDBCProps(info));
+          pinotControllerTransportFactory.setSslContext(TlsUtils.getSslContext());
+        }
       }
 
       Map<String, String> headers =
@@ -62,18 +71,17 @@ public class PinotDriver implements Driver {
                   entry -> Pair
                       .of(entry.getKey().toString().substring(INFO_HEADERS.length() + 1), entry.getValue().toString()))
               .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+
       if (!headers.isEmpty()) {
         factory.setHeaders(headers);
+        pinotControllerTransportFactory.setHeaders(headers);
       }
 
       PinotClientTransport pinotClientTransport = factory.buildTransport();
+      PinotControllerTransport pinotControllerTransport = pinotControllerTransportFactory.buildTransport();
       String controllerUrl = DriverUtils.getControllerFromURL(url);
       String tenant = info.getProperty(INFO_TENANT, DEFAULT_TENANT);
-      if (!headers.isEmpty()) {
-        PinotControllerTransport pinotControllerTransport = new PinotControllerTransport(headers);
-        return new PinotConnection(info, controllerUrl, pinotClientTransport, tenant, pinotControllerTransport);
-      }
-      return new PinotConnection(info, controllerUrl, pinotClientTransport, tenant);
+      return new PinotConnection(info, controllerUrl, pinotClientTransport, tenant, pinotControllerTransport);
     } catch (Exception e) {
       throw new SQLException(String.format("Failed to connect to url : %s", url), e);
     }
