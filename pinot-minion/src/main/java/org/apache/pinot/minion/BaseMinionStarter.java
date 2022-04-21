@@ -246,11 +246,26 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     // Initialize health check callback
     LOGGER.info("Initializing health check callback");
     ServiceStatus.setServiceStatusCallback(_instanceId, new ServiceStatus.ServiceStatusCallback() {
+      private volatile boolean _isStarted = false;
+
       @Override
       public ServiceStatus.Status getServiceStatus() {
         // TODO: add health check here
         minionMetrics.addMeteredGlobalValue(MinionMeter.HEALTH_CHECK_GOOD_CALLS, 1L);
-        return ServiceStatus.Status.GOOD;
+        if (_isStarted) {
+          if (_helixManager.isConnected()) {
+            return ServiceStatus.Status.GOOD;
+          } else {
+            return ServiceStatus.Status.BAD;
+          }
+        }
+
+        if (!_helixManager.isConnected()) {
+          return ServiceStatus.Status.STARTING;
+        } else {
+          _isStarted = true;
+          return ServiceStatus.Status.GOOD;
+        }
       }
 
       @Override
