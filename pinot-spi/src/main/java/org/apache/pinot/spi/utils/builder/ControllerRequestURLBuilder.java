@@ -194,8 +194,15 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forTableReload(String tableName, TableType tableType, boolean forceDownload) {
-    String query = String.format("reload?type=%s&forceDownload=%s", tableType.name(), forceDownload);
+    String query = String.format("reload?forceDownload=%s&type=%s", forceDownload, tableType.name());
     return StringUtil.join("/", _baseUrl, "segments", tableName, query);
+  }
+
+  public String forSegmentReload(String tableName, String segmentName, boolean forceDownload)
+      throws UnsupportedEncodingException {
+    String query = "reload?forceDownload=" + forceDownload;
+    String segName = URLEncoder.encode(segmentName, StandardCharsets.UTF_8.toString());
+    return StringUtil.join("/", _baseUrl, "segments", tableName, segName, query);
   }
 
   public String forTableSize(String tableName) {
@@ -288,10 +295,10 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forSegmentDelete(String tableName, String segmentName) {
-    return StringUtil.join("/", _baseUrl, "segments", tableName, encode(segmentName));
+    return StringUtil.join("/", _baseUrl, "segments", tableName, segmentName);
   }
 
-  public String forSegmentDeleteAll(String tableName, String tableType) {
+  public String forSegmentDeleteAllAPI(String tableName, String tableType) {
     return StringUtil.join("/", _baseUrl, "segments", tableName + "?type=" + tableType);
   }
 
@@ -312,7 +319,7 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forSegmentMetadata(String tableName, String segmentName) {
-    return StringUtil.join("/", _baseUrl, "segments", tableName, encode(segmentName), "metadata");
+    return StringUtil.join("/", _baseUrl, "segments", tableName, segmentName, "metadata");
   }
 
   public String forListAllCrcInformationForTable(String tableName) {
@@ -415,6 +422,10 @@ public class ControllerRequestURLBuilder {
 
   public String forZkGetChildren(String path) {
     return StringUtil.join("/", _baseUrl, "zk/getChildren", "?path=" + path);
+  }
+
+  public String forUpsertTableHeapEstimation(String columnStatsStr) {
+    return StringUtils.join("/", _baseUrl, "heapUsage", "?columnStats=" + columnStatsStr);
   }
 
   private static String encode(String s) {

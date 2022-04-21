@@ -70,6 +70,7 @@ import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
+import org.testng.collections.Lists;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.Instance.ADMIN_PORT_KEY;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY;
@@ -468,6 +469,12 @@ public abstract class ControllerTestUtils {
     schema.addField(new MetricFieldSpec("metricA", FieldSpec.DataType.INT, 0));
     schema.addField(new MetricFieldSpec("metricB", FieldSpec.DataType.DOUBLE, -1));
     schema.addField(new DateTimeFieldSpec("timeColumn", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:DAYS"));
+    return schema;
+  }
+
+  public static Schema createDummySchemaForUpsertTable(String tableName) {
+    Schema schema = createDummySchema(tableName);
+    schema.setPrimaryKeyColumns(Lists.newArrayList("dimA"));
     return schema;
   }
 
