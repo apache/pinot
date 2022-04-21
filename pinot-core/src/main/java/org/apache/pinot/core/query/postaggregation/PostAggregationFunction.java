@@ -19,7 +19,7 @@
 package org.apache.pinot.core.query.postaggregation;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.function.FunctionInfo;
+import org.apache.pinot.common.function.BuiltInFunctionDefinition;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.FunctionUtils;
@@ -37,7 +37,7 @@ public class PostAggregationFunction {
 
   public PostAggregationFunction(String functionName, ColumnDataType[] argumentTypes) {
     int numArguments = argumentTypes.length;
-    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
+    BuiltInFunctionDefinition functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
     if (functionInfo == null) {
       if (FunctionRegistry.containsFunction(functionName)) {
         throw new IllegalArgumentException(
@@ -47,7 +47,8 @@ public class PostAggregationFunction {
           String.format("Unsupported function: %s not found", functionName));
       }
     }
-    _functionInvoker = new FunctionInvoker(functionInfo);
+    _functionInvoker = new FunctionInvoker(functionInfo.getMethod(), functionInfo.getArgumentTypes(),
+        functionInfo.getResultType());
     Class<?>[] parameterClasses = _functionInvoker.getParameterClasses();
     PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
     int numParameters = parameterClasses.length;

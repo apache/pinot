@@ -19,9 +19,7 @@
 package org.apache.pinot.common.function;
 
 import com.google.common.base.Preconditions;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import org.apache.pinot.common.utils.PinotDataType;
 
@@ -32,32 +30,13 @@ import org.apache.pinot.common.utils.PinotDataType;
  */
 public class FunctionInvoker {
   private final Method _method;
-  private final Class<?>[] _parameterClasses;
   private final PinotDataType[] _parameterTypes;
-  private final Object _instance;
+  private final PinotDataType _returnType;
 
-  public FunctionInvoker(FunctionInfo functionInfo) {
-    _method = functionInfo.getMethod();
-    Class<?>[] parameterClasses = _method.getParameterTypes();
-    int numParameters = parameterClasses.length;
-    _parameterClasses = new Class<?>[numParameters];
-    _parameterTypes = new PinotDataType[numParameters];
-    for (int i = 0; i < numParameters; i++) {
-      Class<?> parameterClass = parameterClasses[i];
-      _parameterClasses[i] = parameterClass;
-      _parameterTypes[i] = FunctionUtils.getParameterType(parameterClass);
-    }
-    if (Modifier.isStatic(_method.getModifiers())) {
-      _instance = null;
-    } else {
-      Class<?> clazz = functionInfo.getClazz();
-      try {
-        Constructor<?> constructor = functionInfo.getClazz().getDeclaredConstructor();
-        _instance = constructor.newInstance();
-      } catch (Exception e) {
-        throw new IllegalStateException("Caught exception while constructing class: " + clazz, e);
-      }
-    }
+  public FunctionInvoker(Method method, PinotDataType[] parameterTypes, PinotDataType returnType) {
+    _method = method;
+    _parameterTypes = parameterTypes;
+    _returnType = returnType;
   }
 
   /**
@@ -71,7 +50,7 @@ public class FunctionInvoker {
    * Returns the class of the parameters.
    */
   public Class<?>[] getParameterClasses() {
-    return _parameterClasses;
+    return _method.getParameterTypes();
   }
 
   /**
@@ -87,7 +66,8 @@ public class FunctionInvoker {
    * conversion is not needed or supported.
    */
   public void convertTypes(Object[] arguments) {
-    int numParameters = _parameterClasses.length;
+    Class<?>[] parameterClasses = _method.getParameterTypes();
+    int numParameters = parameterClasses.length;
     Preconditions.checkArgument(arguments.length == numParameters,
         "Wrong number of arguments for method: %s, expected: %s, actual: %s", _method, numParameters, arguments.length);
     for (int i = 0; i < numParameters; i++) {
@@ -97,7 +77,7 @@ public class FunctionInvoker {
         continue;
       }
       // Skip conversion if argument can be directly assigned
-      Class<?> parameterClass = _parameterClasses[i];
+      Class<?> parameterClass = parameterClasses[i];
       Class<?> argumentClass = argument.getClass();
       if (parameterClass.isAssignableFrom(argumentClass)) {
         continue;
@@ -124,7 +104,7 @@ public class FunctionInvoker {
    */
   public Object invoke(Object[] arguments) {
     try {
-      return _method.invoke(_instance, arguments);
+      return _method.invoke(null, arguments);
     } catch (Exception e) {
       throw new IllegalStateException(
           "Caught exception while invoking method: " + _method + " with arguments: " + Arrays.toString(arguments), e);

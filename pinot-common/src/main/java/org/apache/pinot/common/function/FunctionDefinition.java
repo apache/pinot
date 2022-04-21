@@ -19,28 +19,24 @@
 package org.apache.pinot.common.function;
 
 import java.lang.reflect.Method;
+import org.apache.pinot.common.utils.PinotDataType;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
-public class FunctionInfo {
-  private final Method _method;
-  private final Class<?> _clazz;
-  private final boolean _nullableParameters;
+/**
+ * {@code FunctionDefinition} defines a function that can be invoked by Pinot.
+ */
+public interface FunctionDefinition {
 
-  public FunctionInfo(Method method, Class<?> clazz, boolean nullableParameters) {
-    _method = method;
-    _clazz = clazz;
-    _nullableParameters = nullableParameters;
-  }
+  String getName();
 
-  public Method getMethod() {
-    return _method;
-  }
+  PinotDataType[] getArgumentTypes(Class<?>[] argumentSignature);
 
-  public Class<?> getClazz() {
-    return _clazz;
-  }
+  PinotDataType[] getArgumentTypes(FieldSpec.DataType[] argumentDataTypes);
 
-  public boolean hasNullableParameters() {
-    return _nullableParameters;
-  }
+  PinotDataType getResultType(PinotDataType[] argumentTypes);
+
+  Method getFunction(PinotDataType[] argumentTypes);
+
+  Method getFunction(PinotDataType[] argumentTypes, Object[] literalObjects);
 }

@@ -18,14 +18,12 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import com.google.common.base.Preconditions;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.pinot.common.function.FunctionInfo;
+import org.apache.pinot.common.function.FunctionDefinition;
 import org.apache.pinot.common.function.FunctionInvoker;
-import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -37,10 +35,12 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * Wrapper transform function on the annotated scalar function.
  */
 public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
-  private final String _name;
-  private final FunctionInvoker _functionInvoker;
-  private final PinotDataType _resultType;
-  private final TransformResultMetadata _resultMetadata;
+  private final FunctionDefinition _functionDefinition;
+
+  private String _name;
+  private FunctionInvoker _functionInvoker;
+  private PinotDataType _resultType;
+  private TransformResultMetadata _resultMetadata;
 
   private Object[] _arguments;
   private int _numNonLiteralArguments;
@@ -61,27 +61,8 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   private double[][] _doubleMVResults;
   private String[][] _stringMVResults;
 
-  public ScalarTransformFunctionWrapper(FunctionInfo functionInfo) {
-    _name = functionInfo.getMethod().getName();
-    _functionInvoker = new FunctionInvoker(functionInfo);
-    Class<?>[] parameterClasses = _functionInvoker.getParameterClasses();
-    PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
-    int numParameters = parameterClasses.length;
-    for (int i = 0; i < numParameters; i++) {
-      Preconditions.checkArgument(parameterTypes[i] != null, "Unsupported parameter class: %s for method: %s",
-          parameterClasses[i], functionInfo.getMethod());
-    }
-    Class<?> resultClass = _functionInvoker.getResultClass();
-    PinotDataType resultType = FunctionUtils.getParameterType(resultClass);
-    if (resultType != null) {
-      _resultType = resultType;
-      _resultMetadata =
-          new TransformResultMetadata(FunctionUtils.getDataType(resultClass), _resultType.isSingleValue(), false);
-    } else {
-      // Handle unrecognized result class with STRING
-      _resultType = PinotDataType.STRING;
-      _resultMetadata = new TransformResultMetadata(DataType.STRING, true, false);
-    }
+  public ScalarTransformFunctionWrapper(FunctionDefinition functionDefinition) {
+    _functionDefinition = functionDefinition;
   }
 
   @Override
@@ -92,26 +73,39 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     int numArguments = arguments.size();
-    PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
-    Preconditions.checkArgument(numArguments == parameterTypes.length,
-        "Wrong number of arguments for method: %s, expected: %s, actual: %s", _functionInvoker.getMethod(),
-        parameterTypes.length, numArguments);
-
-    _arguments = new Object[numArguments];
+    DataType[] argumentDataTypes = new DataType[numArguments];
     _nonLiteralIndices = new int[numArguments];
     _nonLiteralFunctions = new TransformFunction[numArguments];
     for (int i = 0; i < numArguments; i++) {
       TransformFunction transformFunction = arguments.get(i);
       if (transformFunction instanceof LiteralTransformFunction) {
-        String literal = ((LiteralTransformFunction) transformFunction).getLiteral();
-        _arguments[i] = parameterTypes[i].convert(literal, PinotDataType.STRING);
+        LiteralTransformFunction literalTransformFunction = (LiteralTransformFunction) transformFunction;
+        String literal = literalTransformFunction.getLiteral();
+        argumentDataTypes[i] = literalTransformFunction.getResultMetadata().getDataType();
+        _arguments[i] = argumentDataTypes[i].convert(literal);
       } else {
         _nonLiteralIndices[_numNonLiteralArguments] = i;
         _nonLiteralFunctions[_numNonLiteralArguments] = transformFunction;
+        argumentDataTypes[i] = transformFunction.getResultMetadata().getDataType();
         _numNonLiteralArguments++;
       }
     }
     _nonLiteralValues = new Object[_numNonLiteralArguments][];
+    PinotDataType[] argumentTypes = _functionDefinition.getArgumentTypes(argumentDataTypes);
+    PinotDataType resultType = _functionDefinition.getResultType(argumentTypes);
+    if (resultType != null) {
+      _resultType = resultType;
+      _resultMetadata =
+          new TransformResultMetadata(PinotDataType.getFieldSpecDataTypeFromPinotDataType(_resultType),
+              _resultType.isSingleValue(), false);
+    } else {
+      // Handle unrecognized result class with STRING
+      _resultType = PinotDataType.STRING;
+      _resultMetadata = new TransformResultMetadata(DataType.STRING, true, false);
+    }
+
+    _functionInvoker = new FunctionInvoker(_functionDefinition.getFunction(argumentTypes), argumentTypes,
+        resultType);
   }
 
   @Override

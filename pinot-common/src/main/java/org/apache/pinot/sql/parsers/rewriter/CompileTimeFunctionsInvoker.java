@@ -21,7 +21,7 @@ package org.apache.pinot.sql.parsers.rewriter;
 import java.util.Arrays;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.function.FunctionInfo;
+import org.apache.pinot.common.function.BuiltInFunctionDefinition;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.request.Expression;
@@ -70,14 +70,15 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
     }
     String functionName = function.getOperator();
     if (compilable) {
-      FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numOperands);
+      BuiltInFunctionDefinition functionInfo = FunctionRegistry.getFunctionInfo(functionName, numOperands);
       if (functionInfo != null) {
         Object[] arguments = new Object[numOperands];
         for (int i = 0; i < numOperands; i++) {
           arguments[i] = function.getOperands().get(i).getLiteral().getFieldValue();
         }
         try {
-          FunctionInvoker invoker = new FunctionInvoker(functionInfo);
+          FunctionInvoker invoker = new FunctionInvoker(functionInfo.getMethod(), functionInfo.getArgumentTypes(),
+              functionInfo.getResultType());
           invoker.convertTypes(arguments);
           Object result = invoker.invoke(arguments);
           return RequestUtils.getLiteralExpression(result);

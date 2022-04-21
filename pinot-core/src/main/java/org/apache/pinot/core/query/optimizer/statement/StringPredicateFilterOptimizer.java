@@ -20,7 +20,7 @@ package org.apache.pinot.core.query.optimizer.statement;
 
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.function.FunctionInfo;
+import org.apache.pinot.common.function.BuiltInFunctionDefinition;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -115,7 +115,7 @@ public class StringPredicateFilterOptimizer implements StatementOptimizer {
     if (expressionType == ExpressionType.FUNCTION) {
       // Check if the function returns STRING as output.
       Function function = expression.getFunctionCall();
-      FunctionInfo functionInfo =
+      BuiltInFunctionDefinition functionInfo =
           FunctionRegistry.getFunctionInfo(function.getOperator(), function.getOperands().size());
       return functionInfo != null && functionInfo.getMethod().getReturnType() == String.class;
     }

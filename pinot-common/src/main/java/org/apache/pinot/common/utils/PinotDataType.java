@@ -1339,4 +1339,29 @@ public enum PinotDataType {
         throw new IllegalStateException("Cannot convert ColumnDataType: " + columnDataType + " to PinotDataType");
     }
   }
+
+  public static DataType getFieldSpecDataTypeFromPinotDataType(PinotDataType pinotDataType) {
+    switch (pinotDataType) {
+      case INTEGER:
+        return DataType.INT;
+      case LONG:
+        return DataType.LONG;
+      case FLOAT:
+        return DataType.FLOAT;
+      case DOUBLE:
+        return DataType.DOUBLE;
+      case BOOLEAN:
+        return DataType.BOOLEAN;
+      case TIMESTAMP:
+        return DataType.TIMESTAMP;
+      case JSON:
+        return DataType.JSON;
+      case STRING:
+        return DataType.STRING;
+      case BYTES:
+        return DataType.BYTES;
+      default:
+        throw new UnsupportedOperationException("Unsupported pinot data type: " + pinotDataType);
+    }
+  }
 }

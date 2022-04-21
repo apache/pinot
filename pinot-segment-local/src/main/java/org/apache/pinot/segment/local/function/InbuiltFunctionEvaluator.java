@@ -21,7 +21,7 @@ package org.apache.pinot.segment.local.function;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.function.FunctionInfo;
+import org.apache.pinot.common.function.BuiltInFunctionDefinition;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -68,7 +68,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
           childNodes[i] = planExecution(arguments.get(i));
         }
         String functionName = function.getFunctionName();
-        FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
+        BuiltInFunctionDefinition functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
         if (functionInfo == null) {
           if (FunctionRegistry.containsFunction(functionName)) {
             throw new IllegalStateException(
@@ -108,12 +108,13 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
   private static class FunctionExecutionNode implements ExecutableNode {
     final FunctionInvoker _functionInvoker;
-    final FunctionInfo _functionInfo;
+    final BuiltInFunctionDefinition _functionInfo;
     final ExecutableNode[] _argumentNodes;
     final Object[] _arguments;
 
-    FunctionExecutionNode(FunctionInfo functionInfo, ExecutableNode[] argumentNodes) {
-      _functionInvoker = new FunctionInvoker(functionInfo);
+    FunctionExecutionNode(BuiltInFunctionDefinition functionInfo, ExecutableNode[] argumentNodes) {
+      _functionInvoker = new FunctionInvoker(functionInfo.getMethod(), functionInfo.getArgumentTypes(),
+          functionInfo.getResultType());
       _functionInfo = functionInfo;
       _argumentNodes = argumentNodes;
       _arguments = new Object[_argumentNodes.length];
