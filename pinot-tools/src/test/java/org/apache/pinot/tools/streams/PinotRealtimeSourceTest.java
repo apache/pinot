@@ -29,7 +29,7 @@ import org.testng.annotations.Test;
 public class PinotRealtimeSourceTest {
   @Test
   public void testBuilder() {
-    PinotRealtimeSource realtimeSource = PinotRealtimeSource.builder().build();
+    PinotRealtimeSource realtimeSource = PinotRealtimeSource.builder().setTopic("mytopic").build();
     Assert.assertNotNull(realtimeSource);
 
     PinotStreamRateLimiter limiter = Mockito.mock(PinotStreamRateLimiter.class);
