@@ -49,7 +49,6 @@ public class RowWithKeyTest {
     Assert.assertEquals(b1WithKey.hashCode(), b2WithKey.hashCode());
 
     RowWithKey b2WithDifferentKey = new RowWithKey(k3, b2);
-    Assert.assertNotEquals(b2WithKey, b2WithDifferentKey);;
-
+    Assert.assertNotEquals(b2WithKey, b2WithDifferentKey);
   }
 }
