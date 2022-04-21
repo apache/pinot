@@ -62,7 +62,9 @@ public class MeetupRsvpStream {
               } catch (InterruptedException ex) {
                 LOGGER.warn("Interrupted from sleep but will continue", ex);
               }
-            }).build();
+            })
+            .setTopic(_topicName)
+            .build();
   }
 
   public void run()
