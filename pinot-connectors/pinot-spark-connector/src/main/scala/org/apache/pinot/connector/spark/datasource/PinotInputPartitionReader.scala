@@ -52,7 +52,7 @@ class PinotInputPartitionReader(
 
   private def fetchDataAndConvertToInternalRows(): Iterator[InternalRow] = {
     if (dataSourceOptions.useGrpcServer)
-      PinotGrpcServerDataFetcher(partitionId, pinotSplit, dataSourceOptions)
+      PinotGrpcServerDataFetcher(pinotSplit)
         .fetchData()
         .flatMap(PinotUtils.pinotDataTableToInternalRows(_, schema))
         .toIterator

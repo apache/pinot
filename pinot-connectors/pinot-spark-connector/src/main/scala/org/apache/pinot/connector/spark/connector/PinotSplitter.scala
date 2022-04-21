@@ -21,6 +21,7 @@ package org.apache.pinot.connector.spark.connector
 import java.util.regex.{Matcher, Pattern}
 
 import org.apache.pinot.connector.spark.connector.query.GeneratedSQLs
+import org.apache.pinot.connector.spark.datasource.PinotDataSourceReadOptions
 import org.apache.pinot.connector.spark.exceptions.PinotException
 import org.apache.pinot.connector.spark.utils.Logging
 import org.apache.pinot.spi.config.table.TableType
@@ -52,27 +53,28 @@ private[pinot] object PinotSplitter extends Logging {
   def generatePinotSplits(
       generatedSQLs: GeneratedSQLs,
       routingTable: Map[TableType, Map[String, List[String]]],
-      segmentsPerSplit: Int): List[PinotSplit] = {
+      grpcPortReader: String => Int,
+      readParameters: PinotDataSourceReadOptions): List[PinotSplit] = {
     routingTable.flatMap {
       case (tableType, serversToSegments) =>
         serversToSegments
           .map { case (server, segments) => parseServerInput(server, segments) }
           .flatMap {
-            case (matcher, segments) =>
+            case (matcher, server, segments) =>
               createPinotSplitsFromSubSplits(
                 tableType,
                 generatedSQLs,
                 matcher,
+                if (readParameters.useGrpcServer) grpcPortReader(server) else 0,
                 segments,
-                segmentsPerSplit
-              )
+                readParameters.segmentsPerSplit)
           }
     }.toList
   }
 
-  private def parseServerInput(server: String, segments: List[String]): (Matcher, List[String]) = {
+  private def parseServerInput(server: String, segments: List[String]): (Matcher, String, List[String]) = {
     val matcher = PINOT_SERVER_PATTERN.matcher(server)
-    if (matcher.matches() && matcher.groupCount() == 2) matcher -> segments
+    if (matcher.matches() && matcher.groupCount() == 2) (matcher, server, segments)
     else throw PinotException(s"'$server' did not match!?")
   }
 
@@ -80,14 +82,16 @@ private[pinot] object PinotSplitter extends Logging {
       tableType: TableType,
       generatedSQLs: GeneratedSQLs,
       serverMatcher: Matcher,
+      grpcPort: Int,
       segments: List[String],
       segmentsPerSplit: Int): Iterator[PinotSplit] = {
     val serverHost = serverMatcher.group(1)
     val serverPort = serverMatcher.group(2)
     val maxSegmentCount = Math.min(segments.size, segmentsPerSplit)
     segments.grouped(maxSegmentCount).map { subSegments =>
-      val serverAndSegments =
-        PinotServerAndSegments(serverHost, serverPort, subSegments, tableType)
+      val serverAndSegments = {
+        PinotServerAndSegments(serverHost, serverPort, grpcPort, subSegments, tableType)
+      }
       PinotSplit(generatedSQLs, serverAndSegments)
     }
   }
@@ -100,6 +104,7 @@ private[pinot] case class PinotSplit(
 private[pinot] case class PinotServerAndSegments(
     serverHost: String,
     serverPort: String,
+    serverGrpcPort: Int,
     segments: List[String],
     serverType: TableType) {
   override def toString: String = s"$serverHost:$serverPort($serverType)"

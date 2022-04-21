@@ -40,6 +40,7 @@ private[pinot] object PinotClusterClient extends Logging {
   private val TABLE_BROKER_INSTANCES_TEMPLATE = "http://%s//brokers/tables/%s"
   private val TIME_BOUNDARY_TEMPLATE = "http://%s/debug/timeBoundary/%s"
   private val ROUTING_TABLE_TEMPLATE = "http://%s/debug/routingTable/sql?query=%s"
+  private val INSTANCES_API_TEMPLATE = "http://%s/instances/%s"
 
   def getTableSchema(controllerUrl: String, tableName: String): Schema = {
     val rawTableName = TableNameBuilder.extractRawTableName(tableName)
@@ -176,6 +177,27 @@ private[pinot] object PinotClusterClient extends Logging {
     routingTables
   }
 
+  /**
+   * Get GRPC port information for a server
+   *
+   * @return grpc port number (int)
+   */
+  def getGrpcPortForInstance(controllerUrl: String, instance: String): Int = {
+    Try {
+      val uri = new URI(String.format(INSTANCES_API_TEMPLATE, controllerUrl, instance))
+      val response = HttpUtils.sendGetRequest(uri)
+      decodeTo[InstanceInfo](response)
+    } match {
+      case Success(decodedReponse) =>
+        decodedReponse.grpcPort
+      case Failure(exception) =>
+        throw PinotException(
+          s"An error occured while reading Grpc port for server: '$instance'",
+          exception
+        )
+    }
+  }
+
   private def getRoutingTableForQuery(brokerUrl: String, sql: String): Map[String, List[String]] = {
     Try {
       val encodedPqlQueryParam = URLEncoder.encode(sql, "UTF-8")
@@ -201,3 +223,5 @@ private[pinot] case class TimeBoundaryInfo(timeColumn: String, timeValue: String
 
   def getRealtimePredicate: String = s"$timeColumn >= $timeValue"
 }
+
+private[pinot] case class InstanceInfo(instanceName: String, grpcPort: Int)

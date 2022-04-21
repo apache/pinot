@@ -22,7 +22,6 @@ import io.grpc.ManagedChannelBuilder
 import org.apache.pinot.common.proto.PinotQueryServerGrpc
 import org.apache.pinot.common.proto.Server.ServerRequest
 import org.apache.pinot.common.utils.DataTable
-import org.apache.pinot.connector.spark.datasource.PinotDataSourceReadOptions
 import org.apache.pinot.connector.spark.exceptions.PinotException
 import org.apache.pinot.connector.spark.utils.Logging
 import org.apache.pinot.core.common.datatable.DataTableFactory
@@ -33,14 +32,11 @@ import scala.collection.JavaConverters._
  * Data fetcher from Pinot Grpc server with specific segments.
  * Eg: offline-server1: segment1, segment2, segment3
  */
-private[pinot] class PinotGrpcServerDataFetcher(
-                                                 partitionId: Int,
-                                                 pinotSplit: PinotSplit,
-                                                 dataSourceOptions: PinotDataSourceReadOptions)
+private[pinot] class PinotGrpcServerDataFetcher(pinotSplit: PinotSplit)
   extends Logging {
 
   private val channel = ManagedChannelBuilder
-    .forAddress(pinotSplit.serverAndSegments.serverHost, dataSourceOptions.grpcPort)
+    .forAddress(pinotSplit.serverAndSegments.serverHost, pinotSplit.serverAndSegments.serverGrpcPort)
     .usePlaintext()
     .asInstanceOf[ManagedChannelBuilder[_]].build()
   private val pinotServerBlockingStub = PinotQueryServerGrpc.newBlockingStub(channel)
@@ -63,7 +59,7 @@ private[pinot] class PinotGrpcServerDataFetcher(
         .filter(_.getNumberOfRows > 0)
 
       if (dataTables.isEmpty) {
-        throw PinotException(s"Empty response from ${pinotSplit.serverAndSegments.serverHost}:${dataSourceOptions.grpcPort}")
+        throw PinotException(s"Empty response from ${pinotSplit.serverAndSegments.serverHost}:${pinotSplit.serverAndSegments.serverGrpcPort}")
       }
 
       dataTables
@@ -75,10 +71,7 @@ private[pinot] class PinotGrpcServerDataFetcher(
 }
 
 object PinotGrpcServerDataFetcher {
-  def apply(
-             partitionId: Int,
-             pinotSplit: PinotSplit,
-             dataSourceOptions: PinotDataSourceReadOptions): PinotGrpcServerDataFetcher = {
-    new PinotGrpcServerDataFetcher(partitionId, pinotSplit, dataSourceOptions)
+  def apply(pinotSplit: PinotSplit): PinotGrpcServerDataFetcher = {
+    new PinotGrpcServerDataFetcher(pinotSplit)
   }
 }

@@ -38,7 +38,6 @@ class PinotDataSourceReadOptionsTest extends BaseTest {
       PinotDataSourceReadOptions.CONFIG_SEGMENTS_PER_SPLIT -> "1",
       PinotDataSourceReadOptions.CONFIG_USE_PUSH_DOWN_FILTERS -> "false",
       PinotDataSourceReadOptions.CONFIG_USE_GRPC_SERVER -> "false",
-      PinotDataSourceReadOptions.CONFIG_GRPC_PORT -> "8090"
     )
 
     val datasourceOptions = new DataSourceOptions(options.asJava)
@@ -53,8 +52,7 @@ class PinotDataSourceReadOptionsTest extends BaseTest {
         false,
         1,
         10000,
-        false,
-        8090
+        false
       )
 
     pinotDataSourceReadOptions shouldEqual expected
