@@ -240,7 +240,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     minionContext.setHelixPropertyStore(_helixManager.getHelixPropertyStore());
 
     LOGGER.info("Starting minion admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
-    _minionAdminApplication = new MinionAdminApiApplication(_config);
+    _minionAdminApplication = new MinionAdminApiApplication(_instanceId, _config);
     _minionAdminApplication.start(_listenerConfigs);
 
     // Initialize health check callback
