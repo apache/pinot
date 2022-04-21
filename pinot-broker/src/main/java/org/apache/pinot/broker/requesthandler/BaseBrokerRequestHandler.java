@@ -2133,6 +2133,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * <ul>
    *   <li>Value for 'LIMIT' <= configured value</li>
    *   <li>Query options must be set to SQL mode</li>
+   *   <li>Check if numReplicaGroupsToQuery option provided is valid</li>
    * </ul>
    */
   @VisibleForTesting
@@ -2150,6 +2151,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (queryOptions == null || !QueryOptionsUtils.isGroupByModeSQL(queryOptions)
         || !QueryOptionsUtils.isResponseFormatSQL(queryOptions)) {
       throw new IllegalStateException("SQL query should always have response format and group-by mode set to SQL");
+    }
+    try {
+    // throw errors if options is less than 1 or invalid
+      Integer numReplicaGroupsToQuery = QueryOptionsUtils.getNumReplicaGroupsToQuery(queryOptions);
+      if (numReplicaGroupsToQuery != null) {
+        Preconditions.checkState(numReplicaGroupsToQuery > 0, "numReplicaGroups must be "
+            + "positive number, got: %d", numReplicaGroupsToQuery);
+      }
+    } catch (NumberFormatException ex) {
+      String numReplicaGroupsToQuery = queryOptions.get(Broker.Request.QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY);
+      throw new IllegalStateException(String.format("numReplicaGroups must be a positive number, got: %s",
+          numReplicaGroupsToQuery));
     }
 
     if (pinotQuery.getDataSource().getSubquery() != null) {

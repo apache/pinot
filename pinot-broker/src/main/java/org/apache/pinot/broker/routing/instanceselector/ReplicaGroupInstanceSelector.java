@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 
 
 /**
@@ -40,6 +41,12 @@ import org.apache.pinot.common.utils.HashUtil;
  * request (there is no guarantee on choosing servers from the same replica-group though). In transitioning/error
  * scenario (external view does not match ideal state), there is no guarantee on picking the least server instances, but
  * the traffic is guaranteed to be evenly distributed to all available instances to avoid overwhelming hotspot servers.
+ *<p> If the query option NUM_REPLICA_GROUPS_TO_QUERY is provided, the servers to be picked will be from different
+ * replica groups such that segments are evenly distributed amongst the provided value of NUM_REPLICA_GROUPS_TO_QUERY.
+ * Thus in case of [S1, S2, S3] if NUM_REPLICA_GROUPS_TO_QUERY = 2, the ReplicaGroup S1 and ReplicaGroup S2 will be
+ * selected such that half the segments will come from S1 and other half from S2. If NUM_REPLICA_GROUPS_TO_QUERY value
+ * is much greater than available servers, then ReplicaGroupInstanceSelector will behave similar to
+ * BalancedInstanceSelector.
  */
 public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
@@ -49,15 +56,23 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
   @Override
   Map<String, String> select(List<String> segments, int requestId,
-      Map<String, List<String>> segmentToEnabledInstancesMap) {
+      Map<String, List<String>> segmentToEnabledInstancesMap, Map<String, String> queryOptions) {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
+    int replicaOffset = 0;
+    Integer replicaGroup = QueryOptionsUtils.getNumReplicaGroupsToQuery(queryOptions);
+    int numReplicaGroupsToQuery = replicaGroup == null ? 1 : replicaGroup;
     for (String segment : segments) {
       List<String> enabledInstances = segmentToEnabledInstancesMap.get(segment);
       // NOTE: enabledInstances can be null when there is no enabled instances for the segment, or the instance selector
       // has not been updated (we update all components for routing in sequence)
       if (enabledInstances != null) {
         int numEnabledInstances = enabledInstances.size();
-        segmentToSelectedInstanceMap.put(segment, enabledInstances.get(requestId % numEnabledInstances));
+        int instanceToSelect = (requestId + replicaOffset) % numEnabledInstances;
+        segmentToSelectedInstanceMap.put(segment, enabledInstances.get(instanceToSelect));
+        if (numReplicaGroupsToQuery > numEnabledInstances) {
+          numReplicaGroupsToQuery = numEnabledInstances;
+        }
+        replicaOffset = (replicaOffset + 1) % numReplicaGroupsToQuery;
       }
     }
     return segmentToSelectedInstanceMap;
