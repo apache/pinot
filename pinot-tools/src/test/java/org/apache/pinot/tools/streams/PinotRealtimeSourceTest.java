@@ -25,6 +25,7 @@ import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+
 public class PinotRealtimeSourceTest {
   @Test
   public void testBuilder() {
@@ -35,7 +36,8 @@ public class PinotRealtimeSourceTest {
     StreamDataProducer producer = Mockito.mock(StreamDataProducer.class);
     PinotSourceGenerator generator = Mockito.mock(PinotSourceGenerator.class);
     ExecutorService executorService = Mockito.mock(ExecutorService.class);
-    realtimeSource = PinotRealtimeSource.builder().setRateLimiter(limiter).setProducer(producer).setGenerator(generator).setTopic("mytopic").setExecutor(executorService).setMaxMessagePerSecond(9527).build();
+    realtimeSource = PinotRealtimeSource.builder().setRateLimiter(limiter).setProducer(producer).setGenerator(generator)
+        .setTopic("mytopic").setExecutor(executorService).setMaxMessagePerSecond(9527).build();
     Assert.assertEquals(realtimeSource._executor, executorService);
     Assert.assertEquals(realtimeSource._producer, producer);
     Assert.assertEquals(realtimeSource._topicName, "mytopic");
