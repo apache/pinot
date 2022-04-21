@@ -137,6 +137,14 @@
                       <pattern>org.apache.kafka</pattern>
                       <shadedPattern>shaded.kafka09.org.apache.kafka</shadedPattern>
                     </relocation>
+                    <relocation>
+                      <pattern>kafka</pattern>
+                      <shadedPattern>shaded.kafka09.kafka</shadedPattern>
+                    </relocation>
+                    <relocation>
+                      <pattern>scala</pattern>
+                      <shadedPattern>shaded.scala_2_10</shadedPattern>
+                    </relocation>
                   </relocations>
                 </configuration>
               </execution>
