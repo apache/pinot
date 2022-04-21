@@ -69,6 +69,7 @@ public class HybridQuickstart extends QuickStartBase {
   public Map<String, Object> getConfigOverrides() {
     Map<String, Object> overrides = new HashMap<>();
     overrides.put("pinot.server.grpc.enable", "true");
+    overrides.put("pinot.server.grpc.port", "8090");
     return overrides;
   }
 
