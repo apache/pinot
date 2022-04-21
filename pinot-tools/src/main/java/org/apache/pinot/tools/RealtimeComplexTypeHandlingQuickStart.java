@@ -32,7 +32,7 @@ import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.Quickstart.Color;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
-import org.apache.pinot.tools.streams.MeetupRsvpJsonStream;
+import org.apache.pinot.tools.streams.MeetupRsvpStream;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 
 import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
@@ -88,7 +88,7 @@ public class RealtimeComplexTypeHandlingQuickStart extends QuickStartBase {
     _kafkaStarter.start();
     _kafkaStarter.createTopic("meetupRSVPEvents", KafkaStarterUtils.getTopicCreationProps(2));
     printStatus(Color.CYAN, "***** Starting meetup data stream and publishing to Kafka *****");
-    MeetupRsvpJsonStream meetupRSVPProvider = new MeetupRsvpJsonStream();
+    MeetupRsvpStream meetupRSVPProvider = new MeetupRsvpStream();
     meetupRSVPProvider.run();
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, server and broker *****");
     runner.startAll();
