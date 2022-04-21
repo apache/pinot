@@ -181,7 +181,9 @@ public class PinotRealtimeSource implements AutoCloseable {
     public PinotRealtimeSource build() {
       Preconditions.checkNotNull(_topic, "PinotRealTimeSource should specify topic name");
       Properties properties = new Properties();
-      properties.setProperty(KEY_OF_MAX_MESSAGE_PER_SECOND, String.valueOf(_maxMessagePerSecond));
+      if (_maxMessagePerSecond > 0) {
+        properties.setProperty(KEY_OF_MAX_MESSAGE_PER_SECOND, String.valueOf(_maxMessagePerSecond));
+      }
       properties.setProperty(KEY_OF_TOPIC_NAME, _topic);
       return new PinotRealtimeSource(properties, _generator, _producer, _executor, _rateLimiter);
     }

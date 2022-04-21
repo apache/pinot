@@ -27,14 +27,16 @@ import org.testng.annotations.Test;
 
 
 public class PinotRealtimeSourceTest {
+
   @Test
   public void testBuilder() {
-    PinotRealtimeSource realtimeSource = PinotRealtimeSource.builder().setTopic("mytopic").build();
+    StreamDataProducer producer = Mockito.mock(StreamDataProducer.class);
+    PinotSourceGenerator generator = Mockito.mock(PinotSourceGenerator.class);
+    PinotRealtimeSource realtimeSource =
+        PinotRealtimeSource.builder().setTopic("mytopic").setProducer(producer).setGenerator(generator).build();
     Assert.assertNotNull(realtimeSource);
 
     PinotStreamRateLimiter limiter = Mockito.mock(PinotStreamRateLimiter.class);
-    StreamDataProducer producer = Mockito.mock(StreamDataProducer.class);
-    PinotSourceGenerator generator = Mockito.mock(PinotSourceGenerator.class);
     ExecutorService executorService = Mockito.mock(ExecutorService.class);
     realtimeSource = PinotRealtimeSource.builder().setRateLimiter(limiter).setProducer(producer).setGenerator(generator)
         .setTopic("mytopic").setExecutor(executorService).setMaxMessagePerSecond(9527).build();
@@ -45,5 +47,19 @@ public class PinotRealtimeSourceTest {
     Assert.assertNotNull(qps);
     Assert.assertEquals(qps, "9527");
     Assert.assertEquals(realtimeSource._rateLimiter, limiter);
+  }
+
+  @Test(expectedExceptions = NullPointerException.class)
+  public void testBuilderNoNullProducerThrowExceptions() {
+    PinotSourceGenerator generator = Mockito.mock(PinotSourceGenerator.class);
+    PinotRealtimeSource realtimeSource =
+        PinotRealtimeSource.builder().setTopic("mytopic").setGenerator(generator).build();
+  }
+
+  @Test(expectedExceptions = NullPointerException.class)
+  public void testBuilderNoNullGeneratorThrowExceptions() {
+    StreamDataProducer producer = Mockito.mock(StreamDataProducer.class);
+    PinotRealtimeSource realtimeSource =
+        PinotRealtimeSource.builder().setTopic("mytopic").setProducer(producer).build();
   }
 }
