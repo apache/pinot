@@ -27,6 +27,9 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
  * Arithmetic scalar functions.
  */
 public class ArithmeticFunctions {
+
+  private static final double DOUBLE_COMPARISON_TOLERANCE = 1e-7d;
+
   private ArithmeticFunctions() {
   }
 
@@ -152,5 +155,21 @@ public class ArithmeticFunctions {
   @ScalarFunction
   public static double truncate(double a) {
     return Math.signum(a) * Math.floor(Math.abs(a));
+  }
+
+  @ScalarFunction(names = {"gte"})
+  public static boolean greaterThanOrEquals(double a, double b) {
+    return a >= b;
+  }
+
+  @ScalarFunction(names = {"lte"})
+  public static boolean lessThanOrEquals(double a, double b) {
+    return a <= b;
+  }
+
+  @ScalarFunction
+  public static boolean equals(double a, double b) {
+    // To avoid approximation errors
+    return (Math.abs(a - b) < DOUBLE_COMPARISON_TOLERANCE);
   }
 }

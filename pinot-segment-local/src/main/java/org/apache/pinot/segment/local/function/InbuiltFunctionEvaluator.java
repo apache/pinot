@@ -28,6 +28,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.PinotReflectionUtils;
 
 
 /**
@@ -79,6 +80,16 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
           }
         }
         return new FunctionExecutionNode(functionInfo, childNodes);
+      case CONJUGATION:
+        FunctionContext fn = expression.getFunction();
+        List<ExpressionContext> args = fn.getArguments();
+        int n = args.size();
+        ExecutableNode[] argumentNodes = new ExecutableNode[n];
+        for (int i = 0; i < n; i++) {
+          argumentNodes[i] = planExecution(args.get(i));
+        }
+        return new ConjugationExecutionNode(expression.getFunction().getFunctionName(), argumentNodes);
+
       default:
         throw new IllegalStateException();
     }
@@ -104,6 +115,44 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     Object execute(GenericRow row);
 
     Object execute(Object[] values);
+  }
+
+  private static class ConjugationExecutionNode implements ExecutableNode {
+    private final String _name;
+    private final ExecutableNode[] _argumentNodes;
+
+    ConjugationExecutionNode(String name, ExecutableNode[] argumentNodes) {
+      _name = name;
+      _argumentNodes = argumentNodes;
+    }
+
+    @Override
+    public Object execute(GenericRow row) {
+      // TODO how to avoid this switch case?
+      switch (_name) {
+        case "and":
+          for (ExecutableNode executableNode :_argumentNodes) {
+            Boolean res = (Boolean) (executableNode.execute(row));
+            if (!res) {
+              return false;
+            }
+          }
+          return true;
+        case "or":
+          for (ExecutableNode executableNode :_argumentNodes) {
+            Boolean res = (Boolean) (executableNode.execute(row));
+            if (res)
+              return true;
+          }
+          return false;
+      }
+      return null;
+    }
+
+    @Override
+    public Object execute(Object[] values) {
+      return null;
+    }
   }
 
   private static class FunctionExecutionNode implements ExecutableNode {

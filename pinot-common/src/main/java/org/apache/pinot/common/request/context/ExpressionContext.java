@@ -18,8 +18,15 @@
  */
 package org.apache.pinot.common.request.context;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.Function;
+
+import static org.apache.pinot.common.request.context.RequestContextUtils.getExpression;
 
 
 /**
@@ -31,7 +38,7 @@ import java.util.Set;
  */
 public class ExpressionContext {
   public enum Type {
-    LITERAL, IDENTIFIER, FUNCTION
+    LITERAL, IDENTIFIER, FUNCTION, CONJUGATION
   }
 
   private final Type _type;
@@ -48,6 +55,11 @@ public class ExpressionContext {
 
   public static ExpressionContext forFunction(FunctionContext function) {
     return new ExpressionContext(Type.FUNCTION, null, function);
+  }
+
+  public static ExpressionContext forConjugation(Expression expression) {
+    String name = expression.getFunctionCall().getOperator();
+    return new ExpressionContext(Type.CONJUGATION, name, RequestContextUtils.getFunction(expression.getFunctionCall()));
   }
 
   private ExpressionContext(Type type, String value, FunctionContext function) {

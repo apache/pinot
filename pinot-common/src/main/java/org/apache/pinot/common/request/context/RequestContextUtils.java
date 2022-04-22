@@ -71,6 +71,8 @@ public class RequestContextUtils {
         return ExpressionContext.forIdentifier(thriftExpression.getIdentifier().getName());
       case FUNCTION:
         return ExpressionContext.forFunction(getFunction(thriftExpression.getFunctionCall()));
+      case CONJUGATION:
+        return ExpressionContext.forConjugation(thriftExpression);
       default:
         throw new IllegalStateException();
     }
