@@ -22,7 +22,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.StageMetadata;
-import org.apache.pinot.query.planner.nodes.StageNode;
+import org.apache.pinot.query.planner.stage.StageNode;
 
 
 /**

@@ -76,8 +76,9 @@ message LiteralField {
     bool boolField = 1;
     int32 intField = 2;
     int64 longField = 3;
-    double doubleField = 4;
-    string stringField = 5;
+    float floatField = 4;
+    double doubleField = 5;
+    string stringField = 6;
   }
 }
 

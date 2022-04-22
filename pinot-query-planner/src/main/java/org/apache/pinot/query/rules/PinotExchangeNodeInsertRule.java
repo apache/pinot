@@ -19,6 +19,8 @@
 package org.apache.pinot.query.rules;
 
 import com.google.common.collect.ImmutableList;
+import java.util.Collections;
+import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.hep.HepRelVertex;
@@ -27,9 +29,13 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.RelFactories;
+import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalExchange;
 import org.apache.calcite.rel.logical.LogicalJoin;
+import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.tools.RelBuilderFactory;
+import org.apache.pinot.query.planner.hints.PinotRelationalHints;
 
 
 /**
@@ -57,12 +63,26 @@ public class PinotExchangeNodeInsertRule extends RelOptRule {
 
   @Override
   public void onMatch(RelOptRuleCall call) {
+    // TODO: this only works for single equality JOIN. add generic condition parser
     Join join = call.rel(0);
     RelNode leftInput = join.getInput(0);
     RelNode rightInput = join.getInput(1);
 
-    RelNode leftExchange = LogicalExchange.create(leftInput, RelDistributions.SINGLETON);
-    RelNode rightExchange = LogicalExchange.create(rightInput, RelDistributions.BROADCAST_DISTRIBUTED);
+    RelNode leftExchange;
+    RelNode rightExchange;
+    List<RelHint> hints = join.getHints();
+    if (hints.contains(PinotRelationalHints.USE_HASH_DISTRIBUTE)) {
+      int leftOperandIndex = ((RexInputRef) ((RexCall) join.getCondition()).getOperands().get(0)).getIndex();
+      int rightOperandIndex = ((RexInputRef) ((RexCall) join.getCondition()).getOperands().get(1)).getIndex()
+          - join.getLeft().getRowType().getFieldNames().size();
+      leftExchange = LogicalExchange.create(leftInput,
+          RelDistributions.hash(Collections.singletonList(leftOperandIndex)));
+      rightExchange = LogicalExchange.create(rightInput,
+          RelDistributions.hash(Collections.singletonList(rightOperandIndex)));
+    } else { // if (hints.contains(PinotRelationalHints.USE_BROADCAST_JOIN))
+      leftExchange = LogicalExchange.create(leftInput, RelDistributions.SINGLETON);
+      rightExchange = LogicalExchange.create(rightInput, RelDistributions.BROADCAST_DISTRIBUTED);
+    }
 
     RelNode newJoinNode =
         new LogicalJoin(join.getCluster(), join.getTraitSet(), leftExchange, rightExchange, join.getCondition(),

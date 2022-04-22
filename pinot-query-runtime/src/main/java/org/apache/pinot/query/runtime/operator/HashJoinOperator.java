@@ -28,8 +28,8 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
-import org.apache.pinot.query.planner.nodes.JoinNode;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
+import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.runtime.blocks.DataTableBlock;
 import org.apache.pinot.query.runtime.blocks.DataTableBlockUtils;
 
@@ -42,7 +42,7 @@ import org.apache.pinot.query.runtime.blocks.DataTableBlockUtils;
  *
  * <p>For each of the data block received from the left table, it will generate a joint data block.
  */
-public class BroadcastJoinOperator extends BaseOperator<DataTableBlock> {
+public class HashJoinOperator extends BaseOperator<DataTableBlock> {
   private static final String OPERATOR_NAME = "BroadcastJoinOperator";
   private static final String EXPLAIN_NAME = "BROADCAST_JOIN";
 
@@ -57,7 +57,7 @@ public class BroadcastJoinOperator extends BaseOperator<DataTableBlock> {
   private KeySelector<Object[], Object> _leftKeySelector;
   private KeySelector<Object[], Object> _rightKeySelector;
 
-  public BroadcastJoinOperator(BaseOperator<DataTableBlock> leftTableOperator,
+  public HashJoinOperator(BaseOperator<DataTableBlock> leftTableOperator,
       BaseOperator<DataTableBlock> rightTableOperator, List<JoinNode.JoinClause> criteria) {
     // TODO: this assumes right table is broadcast.
     _leftKeySelector = criteria.get(0).getLeftJoinKeySelector();

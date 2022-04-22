@@ -16,30 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.nodes;
+package org.apache.pinot.query.planner.stage;
 
-import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rex.RexNode;
+import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
-public class MailboxSendNode extends AbstractStageNode {
-  private int _receiverStageId;
-  private RelDistribution.Type _exchangeType;
+public class FilterNode extends AbstractStageNode {
+  @ProtoProperties
+  private RexExpression _condition;
 
-  public MailboxSendNode(int stageId) {
+  public FilterNode(int stageId) {
     super(stageId);
   }
 
-  public MailboxSendNode(int stageId, int receiverStageId, RelDistribution.Type exchangeType) {
-    super(stageId);
-    _receiverStageId = receiverStageId;
-    _exchangeType = exchangeType;
+  public FilterNode(int currentStageId, RelDataType rowType, RexNode condition) {
+    super(currentStageId);
+    super._rowType = rowType;
+    _condition = RexExpression.toRexExpression(condition);
   }
 
-  public int getReceiverStageId() {
-    return _receiverStageId;
-  }
-
-  public RelDistribution.Type getExchangeType() {
-    return _exchangeType;
+  public RexExpression getCondition() {
+    return _condition;
   }
 }

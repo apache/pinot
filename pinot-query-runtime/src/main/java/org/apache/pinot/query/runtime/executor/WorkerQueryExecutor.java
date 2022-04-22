@@ -30,13 +30,15 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
-import org.apache.pinot.query.planner.nodes.JoinNode;
-import org.apache.pinot.query.planner.nodes.MailboxReceiveNode;
-import org.apache.pinot.query.planner.nodes.MailboxSendNode;
-import org.apache.pinot.query.planner.nodes.StageNode;
+import org.apache.pinot.query.planner.stage.FilterNode;
+import org.apache.pinot.query.planner.stage.JoinNode;
+import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
+import org.apache.pinot.query.planner.stage.MailboxSendNode;
+import org.apache.pinot.query.planner.stage.ProjectNode;
+import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.runtime.blocks.DataTableBlock;
 import org.apache.pinot.query.runtime.blocks.DataTableBlockUtils;
-import org.apache.pinot.query.runtime.operator.BroadcastJoinOperator;
+import org.apache.pinot.query.runtime.operator.HashJoinOperator;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
@@ -98,22 +100,27 @@ public class WorkerQueryExecutor {
   private BaseOperator<DataTableBlock> getOperator(long requestId, StageNode stageNode,
       Map<Integer, StageMetadata> metadataMap) {
     // TODO: optimize this into a framework. (physical planner)
-    if (stageNode instanceof MailboxSendNode) {
-      MailboxSendNode sendNode = (MailboxSendNode) stageNode;
-      BaseOperator<DataTableBlock> nextOperator = getOperator(requestId, sendNode.getInputs().get(0), metadataMap);
-      StageMetadata receivingStageMetadata = metadataMap.get(sendNode.getReceiverStageId());
-      return new MailboxSendOperator(_mailboxService, nextOperator, receivingStageMetadata.getServerInstances(),
-          sendNode.getExchangeType(), _hostName, _port, requestId, sendNode.getStageId());
-    } else if (stageNode instanceof MailboxReceiveNode) {
+    if (stageNode instanceof MailboxReceiveNode) {
       MailboxReceiveNode receiveNode = (MailboxReceiveNode) stageNode;
       List<ServerInstance> sendingInstances = metadataMap.get(receiveNode.getSenderStageId()).getServerInstances();
       return new MailboxReceiveOperator(_mailboxService, RelDistribution.Type.ANY, sendingInstances, _hostName, _port,
           requestId, receiveNode.getSenderStageId());
+    } else if (stageNode instanceof MailboxSendNode) {
+      MailboxSendNode sendNode = (MailboxSendNode) stageNode;
+      BaseOperator<DataTableBlock> nextOperator = getOperator(requestId, sendNode.getInputs().get(0), metadataMap);
+      StageMetadata receivingStageMetadata = metadataMap.get(sendNode.getReceiverStageId());
+      return new MailboxSendOperator(_mailboxService, nextOperator, receivingStageMetadata.getServerInstances(),
+          sendNode.getExchangeType(), sendNode.getPartitionKeySelector(), _hostName, _port, requestId,
+          sendNode.getStageId());
     } else if (stageNode instanceof JoinNode) {
       JoinNode joinNode = (JoinNode) stageNode;
       BaseOperator<DataTableBlock> leftOperator = getOperator(requestId, joinNode.getInputs().get(0), metadataMap);
       BaseOperator<DataTableBlock> rightOperator = getOperator(requestId, joinNode.getInputs().get(1), metadataMap);
-      return new BroadcastJoinOperator(leftOperator, rightOperator, joinNode.getCriteria());
+      return new HashJoinOperator(leftOperator, rightOperator, joinNode.getCriteria());
+    } else if (stageNode instanceof FilterNode) {
+      throw new UnsupportedOperationException("Unsupported!");
+    } else if (stageNode instanceof ProjectNode) {
+      throw new UnsupportedOperationException("Unsupported!");
     } else {
       throw new UnsupportedOperationException(
           String.format("Stage node type %s is not supported!", stageNode.getClass().getSimpleName()));

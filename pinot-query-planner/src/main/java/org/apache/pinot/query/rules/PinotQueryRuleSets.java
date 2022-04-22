@@ -45,6 +45,8 @@ public class PinotQueryRuleSets {
           CoreRules.FILTER_AGGREGATE_TRANSPOSE,
           // push filter through set operation
           CoreRules.FILTER_SET_OP_TRANSPOSE,
+          // push project through join,
+          CoreRules.PROJECT_JOIN_TRANSPOSE,
           // push project through set operation
           CoreRules.PROJECT_SET_OP_TRANSPOSE,
 
