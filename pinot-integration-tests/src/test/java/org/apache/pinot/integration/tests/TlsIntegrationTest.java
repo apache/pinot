@@ -283,10 +283,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   public void testUpdatedBrokerTlsPort() {
 
     List<InstanceConfig> instanceConfigs = HelixHelper.getInstanceConfigs(_helixManager);
-    List<ExtraInstanceConfig> securedInstances =
-        instanceConfigs.stream().map(ExtraInstanceConfig::new)
-            .filter(pinotInstanceConfig -> pinotInstanceConfig.getTlsPort() != null)
-            .collect(Collectors.toList());
+    List<ExtraInstanceConfig> securedInstances = instanceConfigs.stream().map(ExtraInstanceConfig::new)
+        .filter(pinotInstanceConfig -> pinotInstanceConfig.getTlsPort() != null).collect(Collectors.toList());
     Assert.assertFalse(securedInstances.isEmpty());
   }
 
@@ -493,7 +491,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     for (int i = 0; i < offlineSegments.size(); i++) {
       String segment = offlineSegments.get(i).asText();
       Assert.assertTrue(
-          sendGetRequest(_controllerSegmentUrlBuilder.forSegmentDownload(getTableName(), segment), AUTH_HEADER).length()
+          sendGetRequest(_controllerRequestURLBuilder.forSegmentDownload(getTableName(), segment), AUTH_HEADER).length()
               > 200000); // download segment
     }
   }

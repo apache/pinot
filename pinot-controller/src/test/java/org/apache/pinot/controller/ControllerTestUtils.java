@@ -57,7 +57,6 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.api.AccessControlTest;
 import org.apache.pinot.controller.helix.ControllerRequestClient;
-import org.apache.pinot.controller.helix.ControllerSegmentUrlBuilder;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -104,7 +103,6 @@ public abstract class ControllerTestUtils {
   protected static int _controllerPort;
   protected static String _controllerBaseApiUrl;
   protected static ControllerRequestURLBuilder _controllerRequestURLBuilder;
-  protected static ControllerSegmentUrlBuilder _controllerSegmentUrlBuilder;
 
   protected static HttpClient _httpClient = null;
   protected static ControllerRequestClient _controllerRequestClient = null;
@@ -184,7 +182,6 @@ public abstract class ControllerTestUtils {
     _controllerPort = Integer.parseInt(_controllerConfig.getControllerPort());
     _controllerBaseApiUrl = "http://localhost:" + _controllerPort;
     _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
-    _controllerSegmentUrlBuilder = ControllerSegmentUrlBuilder.baseUrl(_controllerBaseApiUrl);
     _controllerDataDir = _controllerConfig.getDataDir();
 
     _controllerStarter = new ControllerStarter();
@@ -525,8 +522,8 @@ public abstract class ControllerTestUtils {
   public static String sendGetRequest(String urlString)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(
-          new URL(urlString).toURI()));
+      SimpleHttpResponse resp =
+          HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(urlString).toURI()));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
       throw new IOException(e);
@@ -546,8 +543,8 @@ public abstract class ControllerTestUtils {
   public static String sendPostRequest(String urlString, String payload, Map<String, String> headers)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendJsonPostRequest(
-          new URL(urlString).toURI(), payload, headers));
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(
+          getHttpClient().sendJsonPostRequest(new URL(urlString).toURI(), payload, headers));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
       throw new IOException(e);
@@ -567,8 +564,8 @@ public abstract class ControllerTestUtils {
   public static String sendPutRequest(String urlString, String payload, Map<String, String> headers)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendJsonPutRequest(
-          new URL(urlString).toURI(), payload, headers));
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(
+          getHttpClient().sendJsonPutRequest(new URL(urlString).toURI(), payload, headers));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
       throw new IOException(e);
@@ -578,8 +575,8 @@ public abstract class ControllerTestUtils {
   public static String sendDeleteRequest(String urlString)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendDeleteRequest(
-          new URL(urlString).toURI()));
+      SimpleHttpResponse resp =
+          HttpClient.wrapAndThrowHttpException(getHttpClient().sendDeleteRequest(new URL(urlString).toURI()));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
       throw new IOException(e);
@@ -628,10 +625,6 @@ public abstract class ControllerTestUtils {
 
   public static ControllerRequestURLBuilder getControllerRequestURLBuilder() {
     return _controllerRequestURLBuilder;
-  }
-
-  public static ControllerSegmentUrlBuilder getControllerSegmentUrlBuilder() {
-    return _controllerSegmentUrlBuilder;
   }
 
   public static HelixAdmin getHelixAdmin() {

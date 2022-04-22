@@ -36,7 +36,12 @@ public class ControllerRequestURLBuilder {
   private final String _baseUrl;
 
   private ControllerRequestURLBuilder(String baseUrl) {
-    _baseUrl = StringUtils.chomp(baseUrl, "/");
+    int length = baseUrl.length();
+    if (baseUrl.charAt(length - 1) == '/') {
+      _baseUrl = baseUrl.substring(0, length - 1);
+    } else {
+      _baseUrl = baseUrl;
+    }
   }
 
   public static ControllerRequestURLBuilder baseUrl(String baseUrl) {
@@ -189,15 +194,8 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forTableReload(String tableName, TableType tableType, boolean forceDownload) {
-    String query = String.format("reload?forceDownload=%s&type=%s", forceDownload, tableType.name());
+    String query = String.format("reload?type=%s&forceDownload=%s", tableType.name(), forceDownload);
     return StringUtil.join("/", _baseUrl, "segments", tableName, query);
-  }
-
-  public String forSegmentReload(String tableName, String segmentName, boolean forceDownload)
-      throws UnsupportedEncodingException {
-    String query = "reload?forceDownload=" + forceDownload;
-    String segName = URLEncoder.encode(segmentName, StandardCharsets.UTF_8.toString());
-    return StringUtil.join("/", _baseUrl, "segments", tableName, segName, query);
   }
 
   public String forTableSize(String tableName) {
@@ -280,11 +278,20 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tableConfigs", "validate");
   }
 
-  public String forSegmentDelete(String tableName, String segmentName) {
-    return StringUtil.join("/", _baseUrl, "segments", tableName, segmentName);
+  public String forSegmentReload(String tableName, String segmentName, boolean forceDownload) {
+    return StringUtil.join("/", _baseUrl, "segments", tableName, encode(segmentName),
+        "reload?forceDownload=" + forceDownload);
   }
 
-  public String forSegmentDeleteAllAPI(String tableName, String tableType) {
+  public String forSegmentDownload(String tableName, String segmentName) {
+    return StringUtil.join("/", _baseUrl, "segments", tableName, encode(segmentName));
+  }
+
+  public String forSegmentDelete(String tableName, String segmentName) {
+    return StringUtil.join("/", _baseUrl, "segments", tableName, encode(segmentName));
+  }
+
+  public String forSegmentDeleteAll(String tableName, String tableType) {
     return StringUtil.join("/", _baseUrl, "segments", tableName + "?type=" + tableType);
   }
 
@@ -305,7 +312,7 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forSegmentMetadata(String tableName, String segmentName) {
-    return StringUtil.join("/", _baseUrl, "segments", tableName, segmentName, "metadata");
+    return StringUtil.join("/", _baseUrl, "segments", tableName, encode(segmentName), "metadata");
   }
 
   public String forListAllCrcInformationForTable(String tableName) {
@@ -408,5 +415,14 @@ public class ControllerRequestURLBuilder {
 
   public String forZkGetChildren(String path) {
     return StringUtil.join("/", _baseUrl, "zk/getChildren", "?path=" + path);
+  }
+
+  private static String encode(String s) {
+    try {
+      return URLEncoder.encode(s, "UTF-8");
+    } catch (Exception e) {
+      // Should never happen
+      throw new RuntimeException(e);
+    }
   }
 }
