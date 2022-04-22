@@ -21,14 +21,14 @@ package org.apache.pinot.controller.api.resources;
 import java.util.Map;
 
 public final class ConfigSuccessResponse extends SuccessResponse {
-  private final Map<String, Object> _unparseableProps;
+  private final Map<String, Object> _unrecognizedProperties;
 
-  public ConfigSuccessResponse(String status, Map<String, Object> unparseableProps) {
+  public ConfigSuccessResponse(String status, Map<String, Object> unrecognizedProperties) {
     super(status);
-    _unparseableProps = unparseableProps;
+    _unrecognizedProperties = unrecognizedProperties;
   }
 
-  public Map<String, Object> getUnparseableProps() {
-    return _unparseableProps;
+  public Map<String, Object> getUnrecognizedProperties() {
+    return _unrecognizedProperties;
   }
 }

@@ -22,11 +22,11 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class TestClass {
+public class JsonUtilsTestSamplePojo {
   int _primitiveIntegerField;
   String _stringField;
   Long _longField;
-  Klass _classField;
+  Clazz _classField;
 
   public int getPrimitiveIntegerField() {
     return _primitiveIntegerField;
@@ -52,16 +52,16 @@ public class TestClass {
     _longField = longField;
   }
 
-  public Klass getClassField() {
+  public Clazz getClassField() {
     return _classField;
   }
 
-  public void setClassField(Klass classField) {
+  public void setClassField(Clazz classField) {
     _classField = classField;
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
-  public class Klass {
+  public class Clazz {
     Integer _internalIntField;
     String _internalStringField;
 

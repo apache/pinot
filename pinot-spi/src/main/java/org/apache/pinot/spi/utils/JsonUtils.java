@@ -66,12 +66,20 @@ public class JsonUtils {
   }
 
   public static class JsonPojoWithUnparsableProps<T> {
-    public T _obj;
-    public Map<String, Object> _unparseableProps;
+    private final T _obj;
+    private final Map<String, Object> _unparseableProps;
 
     public JsonPojoWithUnparsableProps(T obj, Map<String, Object> unparseableProps) {
       _obj = obj;
       _unparseableProps = unparseableProps;
+    }
+
+    public T getObj() {
+      return _obj;
+    }
+
+    public Map<String, Object> getUnparseableProps() {
+      return _unparseableProps;
     }
   }
 
@@ -96,9 +104,10 @@ public class JsonUtils {
     return DEFAULT_READER.forType(valueType).readValue(jsonString);
   }
 
-  public static <T> JsonPojoWithUnparsableProps<T> stringToObjectAndUnparseableProps(String jsonString, Class<T> klass)
+  public static <T> JsonPojoWithUnparsableProps<T> stringToObjectAndUnparseableProps(String jsonString,
+      Class<T> valueType)
       throws IOException {
-    T instance = DEFAULT_READER.forType(klass).readValue(jsonString);
+    T instance = DEFAULT_READER.forType(valueType).readValue(jsonString);
 
     String instanceJson = DEFAULT_MAPPER.writeValueAsString(instance);
     Map<String, Object> inputJsonMap = flatten(DEFAULT_MAPPER.readValue(jsonString, GENERIC_JSON_TYPE));
@@ -115,7 +124,6 @@ public class JsonUtils {
   }
 
   private static Stream<Map.Entry<String, Object>> flatten(Map.Entry<String, Object> entry) {
-
     if (entry == null) {
       return Stream.empty();
     }
