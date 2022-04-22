@@ -24,6 +24,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
@@ -32,7 +33,7 @@ import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestUtils;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
-import org.apache.pinot.query.planner.nodes.StageNode;
+import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.routing.WorkerInstance;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
@@ -41,12 +42,14 @@ import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 
 
 public class QueryServerTest {
+  private static final Random RANDOM_REQUEST_ID_GEN = new Random();
   private static final int QUERY_SERVER_COUNT = 2;
   private final Map<Integer, QueryServer> _queryServerMap = new HashMap<>();
   private final Map<Integer, ServerInstance> _queryServerInstanceMap = new HashMap<>();
@@ -84,13 +87,14 @@ public class QueryServerTest {
   }
 
   @SuppressWarnings("unchecked")
-  @Test
-  public void testWorkerAcceptsWorkerRequestCorrect()
+  @Test(dataProvider = "testDataWithSqlToCompiledAsWorkerRequest")
+  public void testWorkerAcceptsWorkerRequestCorrect(String sql)
       throws Exception {
-    QueryPlan queryPlan = _queryEnvironment.planQuery("SELECT * FROM a JOIN b ON a.col1 = b.col2");
+    QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
 
     for (int stageId : queryPlan.getStageMetadataMap().keySet()) {
       if (stageId > 0) { // we do not test reduce stage.
+        // only get one worker request out.
         Worker.QueryRequest queryRequest = getQueryRequest(queryPlan, stageId);
 
         // submit the request for testing.
@@ -99,22 +103,37 @@ public class QueryServerTest {
         StageMetadata stageMetadata = queryPlan.getStageMetadataMap().get(stageId);
 
         // ensure mock query runner received correctly deserialized payload.
+        QueryRunner mockRunner = _queryRunnerMap.get(
+            Integer.parseInt(queryRequest.getMetadataOrThrow("SERVER_INSTANCE_PORT")));
+        String requestIdStr = queryRequest.getMetadataOrThrow("REQUEST_ID");
+
         // since submitRequest is async, we need to wait for the mockRunner to receive the query payload.
-        QueryRunner mockRunner = _queryRunnerMap.get(stageMetadata.getServerInstances().get(0).getPort());
         TestUtils.waitForCondition(aVoid -> {
           try {
             Mockito.verify(mockRunner).processQuery(Mockito.argThat(distributedStagePlan -> {
               StageNode stageNode = queryPlan.getQueryStageMap().get(stageId);
-              return isStageNodesEqual(stageNode, distributedStagePlan.getStageRoot()) && isMetadataMapsEqual(
-                  stageMetadata, distributedStagePlan.getMetadataMap().get(stageId));
-            }), any(ExecutorService.class), any(Map.class));
+              return isStageNodesEqual(stageNode, distributedStagePlan.getStageRoot())
+                  && isMetadataMapsEqual(stageMetadata, distributedStagePlan.getMetadataMap().get(stageId));
+            }), any(ExecutorService.class), Mockito.argThat(requestMetadataMap ->
+                requestIdStr.equals(requestMetadataMap.get("REQUEST_ID"))));
             return true;
           } catch (Throwable t) {
             return false;
           }
-        }, 1000L, "Error verifying mock QueryRunner intercepted query payload!");
+        }, 10000L, "Error verifying mock QueryRunner intercepted query payload!");
       }
     }
+  }
+
+  @DataProvider(name = "testDataWithSqlToCompiledAsWorkerRequest")
+  private Object[][] provideTestSqlToCompiledToWorkerRequest() {
+    return new Object[][] {
+        new Object[]{"SELECT * FROM b"},
+        new Object[]{"SELECT * FROM a"},
+        new Object[]{"SELECT * FROM a JOIN b ON a.col3 = b.col3"},
+        new Object[]{"SELECT a.col1, a.ts, c.col2, c.col3 FROM a JOIN c ON a.col1 = c.col2 "
+            + " WHERE (a.col3 >= 0 OR a.col2 = 'foo') AND c.col3 >= 0"},
+    };
   }
 
   private static boolean isMetadataMapsEqual(StageMetadata left, StageMetadata right) {
@@ -124,6 +143,8 @@ public class QueryServerTest {
   }
 
   private static boolean isStageNodesEqual(StageNode left, StageNode right) {
+    // This only checks the stage tree structure is correct. because the input/stageId fields are not
+    // part of the generic proto ser/de; which is tested in query planner.
     if (left.getStageId() != right.getStageId() || left.getClass() != right.getClass()
         || left.getInputs().size() != right.getInputs().size()) {
       return false;
@@ -153,6 +174,7 @@ public class QueryServerTest {
 
     return Worker.QueryRequest.newBuilder().setStagePlan(QueryPlanSerDeUtils.serialize(
             QueryDispatcher.constructDistributedStagePlan(queryPlan, stageId, serverInstance)))
+        .putMetadata("REQUEST_ID", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()))
         .putMetadata("SERVER_INSTANCE_HOST", serverInstance.getHostname())
         .putMetadata("SERVER_INSTANCE_PORT", String.valueOf(serverInstance.getPort())).build();
   }

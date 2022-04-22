@@ -57,7 +57,7 @@ import org.slf4j.LoggerFactory;
  * This class provide API to parse a SQL string into Pinot query {@link SqlNode}.
  *
  * <p>This class is extracted from {@link org.apache.pinot.sql.parsers.CalciteSqlParser}. It contains the logic
- * to parsed SQL into {@link SqlNode} and use {@link QueryRewriter} to rewrite the query with Pinot specific
+ * to parsed SQL string into {@link SqlNode} and use {@link QueryRewriter} to rewrite the query with Pinot specific
  * contextual info.
  */
 public class CalciteSqlParser {
