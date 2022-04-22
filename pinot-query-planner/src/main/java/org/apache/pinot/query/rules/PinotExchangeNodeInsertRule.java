@@ -71,7 +71,7 @@ public class PinotExchangeNodeInsertRule extends RelOptRule {
     RelNode leftExchange;
     RelNode rightExchange;
     List<RelHint> hints = join.getHints();
-    if (hints.contains(PinotRelationalHints.USE_HASH_JOIN)) {
+    if (hints.contains(PinotRelationalHints.USE_HASH_DISTRIBUTE)) {
       int leftOperandIndex = ((RexInputRef) ((RexCall) join.getCondition()).getOperands().get(0)).getIndex();
       int rightOperandIndex = ((RexInputRef) ((RexCall) join.getCondition()).getOperands().get(1)).getIndex()
           - join.getLeft().getRowType().getFieldNames().size();

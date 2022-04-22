@@ -25,8 +25,8 @@ import org.apache.calcite.rel.hint.RelHint;
  * Provide certain relational hint to query planner for better optimization.
  */
 public class PinotRelationalHints {
-  public static final RelHint USE_HASH_JOIN = RelHint.builder("USE_HASH_JOIN").build();
-  public static final RelHint USE_BROADCAST_JOIN = RelHint.builder("USE_BROADCAST_JOIN").build();
+  public static final RelHint USE_HASH_DISTRIBUTE = RelHint.builder("USE_HASH_DISTRIBUTE").build();
+  public static final RelHint USE_BROADCAST_DISTRIBUTE = RelHint.builder("USE_BROADCAST_DISTRIBUTE").build();
 
   private PinotRelationalHints() {
     // do not instantiate.
