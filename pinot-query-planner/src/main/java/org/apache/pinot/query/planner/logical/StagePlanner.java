@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner;
+package org.apache.pinot.query.planner.logical;
 
 import java.util.HashMap;
 import java.util.List;
@@ -26,9 +26,12 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.logical.LogicalExchange;
 import org.apache.pinot.query.context.PlannerContext;
-import org.apache.pinot.query.planner.nodes.MailboxReceiveNode;
-import org.apache.pinot.query.planner.nodes.MailboxSendNode;
-import org.apache.pinot.query.planner.nodes.StageNode;
+import org.apache.pinot.query.planner.QueryPlan;
+import org.apache.pinot.query.planner.StageMetadata;
+import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
+import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
+import org.apache.pinot.query.planner.stage.MailboxSendNode;
+import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.routing.WorkerManager;
 
 
@@ -66,12 +69,13 @@ public class StagePlanner {
     // walk the plan and create stages.
     StageNode globalStageRoot = walkRelPlan(relRoot, getNewStageId());
 
-    // global root needs to send results back to the ROOT, a.k.a. the client response node.
-    // the last stage is always a broadcast-gather.
+    // global root needs to send results back to the ROOT, a.k.a. the client response node. the last stage only has one
+    // receiver so doesn't matter what the exchange type is. setting it to SINGLETON by default.
     StageNode globalReceiverNode =
-        new MailboxReceiveNode(0, globalStageRoot.getStageId(), RelDistribution.Type.BROADCAST_DISTRIBUTED);
-    StageNode globalSenderNode = new MailboxSendNode(globalStageRoot.getStageId(), globalReceiverNode.getStageId(),
-        RelDistribution.Type.BROADCAST_DISTRIBUTED);
+        new MailboxReceiveNode(0, relRoot.getRowType(), globalStageRoot.getStageId(),
+            RelDistribution.Type.SINGLETON);
+    StageNode globalSenderNode = new MailboxSendNode(globalStageRoot.getStageId(), relRoot.getRowType(),
+        globalReceiverNode.getStageId(), RelDistribution.Type.SINGLETON);
     globalSenderNode.addInput(globalStageRoot);
     _queryStageMap.put(globalSenderNode.getStageId(), globalSenderNode);
     StageMetadata stageMetadata = _stageMetadataMap.get(globalSenderNode.getStageId());
@@ -95,12 +99,15 @@ public class StagePlanner {
     if (isExchangeNode(node)) {
       // 1. exchangeNode always have only one input, get its input converted as a new stage root.
       StageNode nextStageRoot = walkRelPlan(node.getInput(0), getNewStageId());
-      RelDistribution.Type exchangeType = ((LogicalExchange) node).distribution.getType();
+      RelDistribution distribution = ((LogicalExchange) node).getDistribution();
+      RelDistribution.Type exchangeType = distribution.getType();
 
       // 2. make an exchange sender and receiver node pair
-      StageNode mailboxReceiver = new MailboxReceiveNode(currentStageId, nextStageRoot.getStageId(), exchangeType);
-      StageNode mailboxSender = new MailboxSendNode(nextStageRoot.getStageId(), mailboxReceiver.getStageId(),
+      StageNode mailboxReceiver = new MailboxReceiveNode(currentStageId, node.getRowType(), nextStageRoot.getStageId(),
           exchangeType);
+      StageNode mailboxSender = new MailboxSendNode(nextStageRoot.getStageId(), node.getRowType(),
+          mailboxReceiver.getStageId(), exchangeType, exchangeType == RelDistribution.Type.HASH_DISTRIBUTED
+          ? new FieldSelectionKeySelector(distribution.getKeys().get(0)) : null);
       mailboxSender.addInput(nextStageRoot);
 
       // 3. put the sender side as a completed stage.

@@ -31,6 +31,7 @@ import org.apache.calcite.prepare.PlannerImpl;
 import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.hint.HintStrategyTable;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.sql.SqlKind;
@@ -43,9 +44,9 @@ import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.parser.CalciteSqlParser;
-import org.apache.pinot.query.planner.LogicalPlanner;
 import org.apache.pinot.query.planner.QueryPlan;
-import org.apache.pinot.query.planner.StagePlanner;
+import org.apache.pinot.query.planner.logical.LogicalPlanner;
+import org.apache.pinot.query.planner.logical.StagePlanner;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.rules.PinotQueryRuleSets;
 import org.apache.pinot.query.type.TypeFactory;
@@ -157,8 +158,13 @@ public class QueryEnvironment {
     RelOptCluster cluster = RelOptCluster.create(_relOptPlanner, rexBuilder);
     SqlToRelConverter sqlToRelConverter =
         new SqlToRelConverter(_planner, _validator, _catalogReader, cluster, StandardConvertletTable.INSTANCE,
-            SqlToRelConverter.config());
+            SqlToRelConverter.config().withHintStrategyTable(getHintStrategyTable(plannerContext)));
     return sqlToRelConverter.convertQuery(parsed, false, true);
+  }
+
+  // TODO: add hint strategy table based on plannerContext.
+  private HintStrategyTable getHintStrategyTable(PlannerContext plannerContext) {
+    return HintStrategyTable.builder().build();
   }
 
   protected RelNode optimize(RelRoot relRoot, PlannerContext plannerContext) {

@@ -18,11 +18,15 @@
  */
 package org.apache.pinot.query.parser;
 
+import java.util.List;
 import java.util.regex.Pattern;
 import org.apache.calcite.config.Lex;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.babel.SqlBabelParserImpl;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.sql.parsers.SqlCompilationException;
 
 
 /**
@@ -59,5 +63,56 @@ final class ParserUtils {
 
   private ParserUtils() {
     // do not instantiate.
+  }
+
+  public static String canonicalize(String functionName) {
+    return StringUtils.remove(functionName, '_').toLowerCase();
+  }
+
+  public static boolean isSameFunction(String function1, String function2) {
+    return canonicalize(function1).equals(canonicalize(function2));
+  }
+
+  public static void validateFunction(String functionName, List<Expression> operands) {
+    switch (canonicalize(functionName)) {
+      case "jsonextractscalar":
+        validateJsonExtractScalarFunction(operands);
+        break;
+      case "jsonextractkey":
+        validateJsonExtractKeyFunction(operands);
+        break;
+      default:
+        break;
+    }
+  }
+
+  private static void validateJsonExtractScalarFunction(List<Expression> operands) {
+    int numOperands = operands.size();
+
+    // Check that there are exactly 3 or 4 arguments
+    if (numOperands != 3 && numOperands != 4) {
+      throw new SqlCompilationException(
+          "Expect 3 or 4 arguments for transform function: jsonExtractScalar(jsonFieldName, 'jsonPath', "
+              + "'resultsType', ['defaultValue'])");
+    }
+    if (!operands.get(1).isSetLiteral() || !operands.get(2).isSetLiteral() || (numOperands == 4 && !operands.get(3)
+        .isSetLiteral())) {
+      throw new SqlCompilationException(
+          "Expect the 2nd/3rd/4th argument of transform function: jsonExtractScalar(jsonFieldName, 'jsonPath',"
+              + " 'resultsType', ['defaultValue']) to be a single-quoted literal value.");
+    }
+  }
+
+  private static void validateJsonExtractKeyFunction(List<Expression> operands) {
+    // Check that there are exactly 2 arguments
+    if (operands.size() != 2) {
+      throw new SqlCompilationException(
+          "Expect 2 arguments are required for transform function: jsonExtractKey(jsonFieldName, 'jsonPath')");
+    }
+    if (!operands.get(1).isSetLiteral()) {
+      throw new SqlCompilationException(
+          "Expect the 2nd argument for transform function: jsonExtractKey(jsonFieldName, 'jsonPath') to be a "
+              + "single-quoted literal value.");
+    }
   }
 }
