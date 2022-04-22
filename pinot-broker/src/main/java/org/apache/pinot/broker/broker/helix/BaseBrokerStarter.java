@@ -268,8 +268,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       }
     }
     _brokerRequestHandler.start();
-
-    _sqlQueryExecutor = new SqlQueryExecutor(_spectatorHelixManager);
+    String controllerUrl = _brokerConf.getProperty(Broker.CONTROLLER_URL);
+    if (controllerUrl != null) {
+      _sqlQueryExecutor = new SqlQueryExecutor(controllerUrl);
+    } else {
+      _sqlQueryExecutor = new SqlQueryExecutor(_spectatorHelixManager);
+    }
     LOGGER.info("Starting broker admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _brokerAdminApplication =
         new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,

@@ -101,8 +101,7 @@ public class PinotQueryResource {
         queryOptions = requestJson.get("queryOptions").asText();
       }
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, pqlQuery);
-      return getQueryResponse(pqlQuery, null, traceEnabled, queryOptions, httpHeaders,
-          CommonConstants.Broker.Request.PQL);
+      return getQueryResponse(pqlQuery, traceEnabled, queryOptions, httpHeaders, CommonConstants.Broker.Request.PQL);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing post request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
@@ -116,8 +115,7 @@ public class PinotQueryResource {
       @QueryParam("queryOptions") String queryOptions, @Context HttpHeaders httpHeaders) {
     try {
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, pqlQuery);
-      return getQueryResponse(pqlQuery, null, traceEnabled, queryOptions, httpHeaders,
-          CommonConstants.Broker.Request.PQL);
+      return getQueryResponse(pqlQuery, traceEnabled, queryOptions, httpHeaders, CommonConstants.Broker.Request.PQL);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
@@ -179,11 +177,22 @@ public class PinotQueryResource {
       @QueryParam("queryOptions") String queryOptions, @Context HttpHeaders httpHeaders) {
     try {
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
-      return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions);
+      SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
+      PinotSqlType sqlType = CalciteSqlParser.extractSqlType(sqlNodeAndOptions.getSqlNode());
+      if (sqlType == PinotSqlType.DQL) {
+        return getQueryResponse(sqlQuery, sqlNodeAndOptions.getSqlNode(), traceEnabled, queryOptions, httpHeaders,
+            CommonConstants.Broker.Request.SQL);
+      }
+      throw new UnsupportedOperationException("Unsupported SQL type - " + sqlType);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
     }
+  }
+
+  public String getQueryResponse(String query, String traceEnabled, String queryOptions, HttpHeaders httpHeaders,
+      String querySyntax) {
+    return getQueryResponse(query, null, traceEnabled, queryOptions, httpHeaders, querySyntax);
   }
 
   public String getQueryResponse(String query, @Nullable SqlNode sqlNode, String traceEnabled, String queryOptions,

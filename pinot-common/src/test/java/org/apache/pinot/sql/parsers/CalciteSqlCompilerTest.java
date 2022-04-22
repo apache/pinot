@@ -2624,6 +2624,7 @@ public class CalciteSqlCompilerTest {
     String customSql = "INSERT INTO db.tbl FROM FILE 'file:///tmp/file1', FILE 'file:///tmp/file2'";
     SqlNode sqlNode = testSqlWithCustomSqlParser(customSql);
     Assert.assertTrue(sqlNode instanceof SqlInsertFromFile);
+    Assert.assertEquals(CalciteSqlParser.extractSqlType(sqlNode), PinotSqlType.DML);
   }
 
   private static SqlNode testSqlWithCustomSqlParser(String sqlString) {

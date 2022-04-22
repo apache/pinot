@@ -416,7 +416,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       LOGGER.info("Realtime tables with High Level consumers will NOT be supported");
       _realtimeSegmentsManager = null;
     }
-    _sqlQueryExecutor = new SqlQueryExecutor(_helixParticipantManager);
+    _sqlQueryExecutor = new SqlQueryExecutor(_config.generateVipUrl());
 
     // Setting up periodic tasks
     List<PeriodicTask> controllerPeriodicTasks = setupControllerPeriodicTasks();

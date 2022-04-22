@@ -169,7 +169,7 @@ public class PinotClientRequest {
       if (debugOptions != null) {
         requestJson.put(Request.DEBUG_OPTIONS, debugOptions);
       }
-      BrokerResponse brokerResponse = executeSqlQuery(requestJson, makeHttpIdentity(requestContext));
+      BrokerResponse brokerResponse = executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true);
       asyncResponse.resume(brokerResponse.toJsonString());
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
@@ -197,7 +197,7 @@ public class PinotClientRequest {
       String queryOptions = constructSqlQueryOptions();
       // the only query options as of now are sql related. do not allow any custom query options in sql endpoint
       ObjectNode sqlRequestJson = ((ObjectNode) requestJson).put(Request.QUERY_OPTIONS, queryOptions);
-      BrokerResponse brokerResponse = executeSqlQuery(sqlRequestJson, makeHttpIdentity(requestContext));
+      BrokerResponse brokerResponse = executeSqlQuery(sqlRequestJson, makeHttpIdentity(requestContext), false);
       asyncResponse.resume(brokerResponse.toJsonString());
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing POST request", e);
@@ -206,7 +206,8 @@ public class PinotClientRequest {
     }
   }
 
-  private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity)
+  private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
+      boolean onlyDql)
       throws Exception {
     SqlNodeAndOptions sqlNodeAndOptions;
     try {
@@ -215,6 +216,10 @@ public class PinotClientRequest {
       return new BrokerResponseNative(QueryException.getException(QueryException.PQL_PARSING_ERROR, e));
     }
     PinotSqlType sqlType = CalciteSqlParser.extractSqlType(sqlNodeAndOptions.getSqlNode());
+    if (onlyDql && sqlType != PinotSqlType.DQL) {
+      return new BrokerResponseNative(QueryException.getException(QueryException.PQL_PARSING_ERROR,
+          new UnsupportedOperationException("Unsupported SQL type - " + sqlType + ", GET API only supports DQL.")));
+    }
     switch (sqlType) {
       case DQL:
         return _requestHandler.handleRequest(sqlRequestJson, httpRequesterIdentity, new RequestStatistics());
