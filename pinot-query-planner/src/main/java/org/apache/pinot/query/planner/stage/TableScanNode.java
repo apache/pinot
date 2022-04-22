@@ -16,32 +16,35 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.partitioning;
+package org.apache.pinot.query.planner.stage;
 
+import java.util.List;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
-/**
- * The {@code FieldSelectionKeySelector} simply extract a column value out from a row array {@link Object[]}.
- */
-public class FieldSelectionKeySelector implements KeySelector<Object[], Object> {
-
+public class TableScanNode extends AbstractStageNode {
   @ProtoProperties
-  private int _columnIndex;
+  private String _tableName;
+  @ProtoProperties
+  private List<String> _tableScanColumns;
 
-  public FieldSelectionKeySelector() {
+  public TableScanNode(int stageId) {
+    super(stageId);
   }
 
-  public FieldSelectionKeySelector(int columnIndex) {
-    _columnIndex = columnIndex;
+  public TableScanNode(int stageId, RelDataType rowType, String tableName, List<String> tableScanColumns) {
+    super(stageId);
+    super._rowType = rowType;
+    _tableName = tableName;
+    _tableScanColumns = tableScanColumns;
   }
 
-  public int getColumnIndex() {
-    return _columnIndex;
+  public String getTableName() {
+    return _tableName;
   }
 
-  @Override
-  public Object getKey(Object[] input) {
-    return input[_columnIndex];
+  public List<String> getTableScanColumns() {
+    return _tableScanColumns;
   }
 }

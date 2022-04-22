@@ -16,19 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.nodes;
+package org.apache.pinot.query.planner.stage;
 
 import org.apache.pinot.common.proto.Plan;
 
 
-public final class SerDeUtils {
-  private SerDeUtils() {
+public final class StageNodeSerDeUtils {
+  private StageNodeSerDeUtils() {
     // do not instantiate.
   }
 
   public static AbstractStageNode deserializeStageNode(Plan.StageNode protoNode) {
     AbstractStageNode stageNode = newNodeInstance(protoNode.getNodeName(), protoNode.getStageId());
-    stageNode.setObjectField(protoNode.getObjectField());
+    stageNode.fromObjectField(protoNode.getObjectField());
     for (Plan.StageNode protoChild : protoNode.getInputsList()) {
       stageNode.addInput(deserializeStageNode(protoChild));
     }
@@ -39,7 +39,7 @@ public final class SerDeUtils {
     Plan.StageNode.Builder builder = Plan.StageNode.newBuilder()
         .setStageId(stageNode.getStageId())
         .setNodeName(stageNode.getClass().getSimpleName())
-        .setObjectField(stageNode.getObjectField());
+        .setObjectField(stageNode.toObjectField());
     for (StageNode childNode : stageNode.getInputs()) {
       builder.addInputs(serializeStageNode((AbstractStageNode) childNode));
     }
@@ -52,8 +52,10 @@ public final class SerDeUtils {
         return new TableScanNode(stageId);
       case "JoinNode":
         return new JoinNode(stageId);
-      case "CalcNode":
-        return new CalcNode(stageId);
+      case "ProjectNode":
+        return new ProjectNode(stageId);
+      case "FilterNode":
+        return new FilterNode(stageId);
       case "MailboxSendNode":
         return new MailboxSendNode(stageId);
       case "MailboxReceiveNode":

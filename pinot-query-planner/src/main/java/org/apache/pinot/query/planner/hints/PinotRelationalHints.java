@@ -16,23 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.nodes;
+package org.apache.pinot.query.planner.hints;
+
+import org.apache.calcite.rel.hint.RelHint;
 
 
+/**
+ * Provide certain relational hint to query planner for better optimization.
+ */
+public class PinotRelationalHints {
+  public static final RelHint USE_HASH_DISTRIBUTE = RelHint.builder("USE_HASH_DISTRIBUTE").build();
+  public static final RelHint USE_BROADCAST_DISTRIBUTE = RelHint.builder("USE_BROADCAST_DISTRIBUTE").build();
 
-public class CalcNode extends AbstractStageNode {
-  private String _expression;
-
-  public CalcNode(int stageId) {
-    super(stageId);
-  }
-
-  public CalcNode(int stageId, String expression) {
-    super(stageId);
-    _expression = expression;
-  }
-
-  public String getExpression() {
-    return _expression;
+  private PinotRelationalHints() {
+    // do not instantiate.
   }
 }

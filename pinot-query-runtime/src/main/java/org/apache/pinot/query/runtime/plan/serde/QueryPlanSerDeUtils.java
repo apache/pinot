@@ -25,8 +25,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.StageMetadata;
-import org.apache.pinot.query.planner.nodes.AbstractStageNode;
-import org.apache.pinot.query.planner.nodes.SerDeUtils;
+import org.apache.pinot.query.planner.stage.AbstractStageNode;
+import org.apache.pinot.query.planner.stage.StageNodeSerDeUtils;
 import org.apache.pinot.query.routing.WorkerInstance;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 
@@ -43,7 +43,7 @@ public class QueryPlanSerDeUtils {
   public static DistributedStagePlan deserialize(Worker.StagePlan stagePlan) {
     DistributedStagePlan distributedStagePlan = new DistributedStagePlan(stagePlan.getStageId());
     distributedStagePlan.setServerInstance(stringToInstance(stagePlan.getInstanceId()));
-    distributedStagePlan.setStageRoot(SerDeUtils.deserializeStageNode(stagePlan.getStageRoot()));
+    distributedStagePlan.setStageRoot(StageNodeSerDeUtils.deserializeStageNode(stagePlan.getStageRoot()));
     Map<Integer, Worker.StageMetadata> metadataMap = stagePlan.getStageMetadataMap();
     distributedStagePlan.getMetadataMap().putAll(protoMapToStageMetadataMap(metadataMap));
     return distributedStagePlan;
@@ -53,7 +53,7 @@ public class QueryPlanSerDeUtils {
     return Worker.StagePlan.newBuilder()
         .setStageId(distributedStagePlan.getStageId())
         .setInstanceId(instanceToString(distributedStagePlan.getServerInstance()))
-        .setStageRoot(SerDeUtils.serializeStageNode((AbstractStageNode) distributedStagePlan.getStageRoot()))
+        .setStageRoot(StageNodeSerDeUtils.serializeStageNode((AbstractStageNode) distributedStagePlan.getStageRoot()))
         .putAllStageMetadata(stageMetadataMapToProtoMap(distributedStagePlan.getMetadataMap())).build();
   }
 

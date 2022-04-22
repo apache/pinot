@@ -24,8 +24,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.query.planner.nodes.StageNode;
-import org.apache.pinot.query.planner.nodes.TableScanNode;
+import org.apache.pinot.query.planner.stage.StageNode;
+import org.apache.pinot.query.planner.stage.TableScanNode;
 
 
 /**

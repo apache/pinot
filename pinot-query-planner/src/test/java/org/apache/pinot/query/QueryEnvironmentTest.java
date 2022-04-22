@@ -19,56 +19,45 @@
 package org.apache.pinot.query;
 
 import com.google.common.collect.ImmutableList;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.apache.calcite.jdbc.CalciteSchemaBuilder;
-import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelRoot;
-import org.apache.calcite.rel.RelWriter;
-import org.apache.calcite.rel.externalize.RelXmlWriter;
-import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlNode;
-import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
-import org.apache.pinot.query.routing.WorkerManager;
-import org.apache.pinot.query.type.TypeFactory;
-import org.apache.pinot.query.type.TypeSystem;
 import org.testng.Assert;
-import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-public class QueryEnvironmentTest {
-  private QueryEnvironment _queryEnvironment;
+public class QueryEnvironmentTest extends QueryEnvironmentTestBase {
 
-  @BeforeClass
-  public void setUp() {
-    // the port doesn't matter as we are not actually making a server call.
-    RoutingManager routingManager = QueryEnvironmentTestUtils.getMockRoutingManager(1, 2);
-    _queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
-        CalciteSchemaBuilder.asRootSchema(new PinotCatalog(QueryEnvironmentTestUtils.mockTableCache())),
-        new WorkerManager("localhost", 3, routingManager));
-  }
-
-  @Test
-  public void testSqlStrings()
-      throws Exception {
-    testQueryParsing("SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0",
-        "SELECT *\n" + "FROM `a`\n" + "INNER JOIN `b` ON `a`.`col1` = `b`.`col2`\n" + "WHERE `a`.`col3` >= 0");
-  }
-
-  @Test
-  public void testQueryToStages()
+  @Test(dataProvider = "testQueryParserDataProvider")
+  public void testQueryParser(String query, String digest)
       throws Exception {
     PlannerContext plannerContext = new PlannerContext();
+    SqlNode sqlNode = _queryEnvironment.parse(query, plannerContext);
+    _queryEnvironment.validate(sqlNode);
+    Assert.assertEquals(sqlNode.toString(), digest);
+  }
+
+  @Test(dataProvider = "testQueryDataProvider")
+  public void testQueryToRel(String query)
+      throws Exception {
+    try {
+      QueryPlan queryPlan = _queryEnvironment.planQuery(query);
+      Assert.assertNotNull(queryPlan);
+    } catch (RuntimeException e) {
+      Assert.fail("failed to plan query: " + query, e);
+    }
+  }
+
+  @Test
+  public void testQueryAndAssertStageContentForJoin()
+      throws Exception {
     String query = "SELECT * FROM a JOIN b ON a.col1 = b.col2";
     QueryPlan queryPlan = _queryEnvironment.planQuery(query);
     Assert.assertEquals(queryPlan.getQueryStageMap().size(), 4);
@@ -96,28 +85,19 @@ public class QueryEnvironmentTest {
   }
 
   @Test
-  public void testQueryToRel()
-      throws Exception {
-    PlannerContext plannerContext = new PlannerContext();
-    String query = "SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0";
-    SqlNode parsed = _queryEnvironment.parse(query, plannerContext);
-    SqlNode validated = _queryEnvironment.validate(parsed);
-    RelRoot relRoot = _queryEnvironment.toRelation(validated, plannerContext);
-    RelNode optimized = _queryEnvironment.optimize(relRoot, plannerContext);
-
-    // Assert that relational plan can be written into a ALL-ATTRIBUTE digest.
-    StringWriter sw = new StringWriter();
-    PrintWriter pw = new PrintWriter(sw);
-    RelWriter planWriter = new RelXmlWriter(pw, SqlExplainLevel.ALL_ATTRIBUTES);
-    optimized.explain(planWriter);
-    Assert.assertNotNull(sw.toString());
+  public void testQueryProjectFilterPushdownForJoin() {
+    String query = "SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
+        + "WHERE a.col3 >= 0 AND a.col2 IN  ('a', 'b') AND b.col3 < 0";
+    QueryPlan queryPlan = _queryEnvironment.planQuery(query);
+    Assert.assertEquals(queryPlan.getQueryStageMap().size(), 4);
+    Assert.assertEquals(queryPlan.getStageMetadataMap().size(), 4);
   }
 
-  private void testQueryParsing(String query, String digest)
-      throws Exception {
-    PlannerContext plannerContext = new PlannerContext();
-    SqlNode sqlNode = _queryEnvironment.parse(query, plannerContext);
-    _queryEnvironment.validate(sqlNode);
-    Assert.assertEquals(sqlNode.toString(), digest);
+  @DataProvider(name = "testQueryParserDataProvider")
+  private Object[][] provideQueriesAndDigest() {
+    return new Object[][] {
+        new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0",
+            "SELECT *\n" + "FROM `a`\n" + "INNER JOIN `b` ON `a`.`col1` = `b`.`col2`\n" + "WHERE `a`.`col3` >= 0"},
+    };
   }
 }

@@ -16,30 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.nodes;
+package org.apache.pinot.query.planner.stage;
 
 import java.util.List;
+import java.util.stream.Collectors;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rex.RexNode;
+import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
-public class TableScanNode extends AbstractStageNode {
-  private String _tableName;
-  private List<String> _tableScanColumns;
+public class ProjectNode extends AbstractStageNode {
+  @ProtoProperties
+  private List<RexExpression> _projects;
 
-  public TableScanNode(int stageId) {
+  public ProjectNode(int stageId) {
     super(stageId);
   }
-
-  public TableScanNode(int stageId, String tableName, List<String> tableScanColumns) {
-    super(stageId);
-    _tableName = tableName;
-    _tableScanColumns = tableScanColumns;
+  public ProjectNode(int currentStageId, RelDataType rowType, List<RexNode> projects) {
+    super(currentStageId);
+    super._rowType = rowType;
+    _projects = projects.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
   }
 
-  public String getTableName() {
-    return _tableName;
+  public List<RexExpression> getProjects() {
+    return _projects;
   }
 
-  public List<String> getTableScanColumns() {
-    return _tableScanColumns;
+  public RelDataType getRowType() {
+    return _rowType;
   }
 }

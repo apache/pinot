@@ -19,7 +19,8 @@
 package org.apache.pinot.query.planner;
 
 import java.util.Map;
-import org.apache.pinot.query.planner.nodes.StageNode;
+import org.apache.pinot.query.planner.logical.LogicalPlanner;
+import org.apache.pinot.query.planner.stage.StageNode;
 
 
 /**

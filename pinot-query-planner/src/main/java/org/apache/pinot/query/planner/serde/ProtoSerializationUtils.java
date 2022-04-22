@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.nodes.serde;
+package org.apache.pinot.query.planner.serde;
 
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Field;
@@ -28,48 +28,75 @@ import java.util.Set;
 import org.apache.pinot.common.proto.Plan;
 
 
+/**
+ * Utils to convert automatically from/to object that's implementing {@link ProtoSerializable}.
+ */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ProtoSerializationUtils {
   private static final String ENUM_VALUE_KEY = "ENUM_VALUE_KEY";
+  private static final String NULL_OBJECT_CLASSNAME = "null";
+  private static final Plan.ObjectField NULL_OBJECT_VALUE = Plan.ObjectField.newBuilder()
+      .setObjectClassName(NULL_OBJECT_CLASSNAME).build();
 
   private ProtoSerializationUtils() {
     // do not instantiate.
   }
 
-  public static void fromObjectField(Object object, Plan.ObjectField objectField) {
+  /**
+   * Reflectively set object's field based on {@link Plan.ObjectField} provided.
+   *
+   * @param object the object to be set.
+   * @param objectField the proto ObjectField from which the object will be set.
+   */
+  public static void setObjectFieldToObject(Object object, Plan.ObjectField objectField) {
     Map<String, Plan.MemberVariableField> memberVariablesMap = objectField.getMemberVariablesMap();
-    try {
-      for (Map.Entry<String, Plan.MemberVariableField> e : memberVariablesMap.entrySet()) {
-        Object memberVarObject = constructMemberVariable(e.getValue());
-        if (memberVarObject != null) {
-          Field declaredField = object.getClass().getDeclaredField(e.getKey());
-          declaredField.setAccessible(true);
-          declaredField.set(object, memberVarObject);
+    for (Map.Entry<String, Plan.MemberVariableField> e : memberVariablesMap.entrySet()) {
+      try {
+        Field declaredField = object.getClass().getDeclaredField(e.getKey());
+        if (declaredField.isAnnotationPresent(ProtoProperties.class)) {
+          Object memberVarObject = constructMemberVariable(e.getValue());
+          if (memberVarObject != null) {
+            declaredField.setAccessible(true);
+            declaredField.set(object, memberVarObject);
+          }
         }
+      } catch (NoSuchFieldException | IllegalAccessException ex) {
+        throw new IllegalStateException("Unable to set Object " + object.getClass() + " on field " + e.getKey()
+            + "with object of type: " + objectField.getObjectClassName(), ex);
       }
-    } catch (NoSuchFieldException | IllegalAccessException e) {
-      throw new IllegalStateException("Unable to set Object field for: " + objectField.getObjectClassName(), e);
     }
   }
 
-  public static Plan.ObjectField toObjectField(Object object) {
-    Plan.ObjectField.Builder builder = Plan.ObjectField.newBuilder();
-    builder.setObjectClassName(object.getClass().getName());
-    // special handling for enum
-    if (object instanceof Enum) {
-      builder.putMemberVariables(ENUM_VALUE_KEY, serializeMemberVariable(((Enum) object).name()));
-    } else {
-      try {
-        for (Field field : object.getClass().getDeclaredFields()) {
-          field.setAccessible(true);
-          Object fieldObject = field.get(object);
-          builder.putMemberVariables(field.getName(), serializeMemberVariable(fieldObject));
+  /**
+   * Convert object into a proto {@link Plan.ObjectField}.
+   *
+   * @param object object to be converted.
+   * @return the converted proto ObjectField.
+   */
+  public static Plan.ObjectField convertObjectToObjectField(Object object) {
+    if (object != null) {
+      Plan.ObjectField.Builder builder = Plan.ObjectField.newBuilder();
+      builder.setObjectClassName(object.getClass().getName());
+      // special handling for enum
+      if (object instanceof Enum) {
+        builder.putMemberVariables(ENUM_VALUE_KEY, serializeMemberVariable(((Enum) object).name()));
+      } else {
+        try {
+          for (Field field : object.getClass().getDeclaredFields()) {
+            if (field.isAnnotationPresent(ProtoProperties.class)) {
+              field.setAccessible(true);
+              Object fieldObject = field.get(object);
+              builder.putMemberVariables(field.getName(), serializeMemberVariable(fieldObject));
+            }
+          }
+        } catch (IllegalAccessException e) {
+          throw new IllegalStateException("Unable to serialize Object: " + object.getClass(), e);
         }
-      } catch (IllegalAccessException e) {
-        throw new IllegalStateException("Unable to serialize Object: " + object.getClass(), e);
       }
+      return builder.build();
+    } else {
+      return NULL_OBJECT_VALUE;
     }
-    return builder.build();
   }
 
   // --------------------------------------------------------------------------
@@ -88,6 +115,10 @@ public class ProtoSerializationUtils {
     return Plan.LiteralField.newBuilder().setLongField(val).build();
   }
 
+  private static Plan.LiteralField floatField(float val) {
+    return Plan.LiteralField.newBuilder().setFloatField(val).build();
+  }
+
   private static Plan.LiteralField doubleField(double val) {
     return Plan.LiteralField.newBuilder().setDoubleField(val).build();
   }
@@ -104,6 +135,8 @@ public class ProtoSerializationUtils {
       builder.setLiteralField(intField((Integer) fieldObject));
     } else if (fieldObject instanceof Long) {
       builder.setLiteralField(longField((Long) fieldObject));
+    } else if (fieldObject instanceof Float) {
+      builder.setLiteralField(floatField((Float) fieldObject));
     } else if (fieldObject instanceof Double) {
       builder.setLiteralField(doubleField((Double) fieldObject));
     } else if (fieldObject instanceof String) {
@@ -113,7 +146,7 @@ public class ProtoSerializationUtils {
     } else if (fieldObject instanceof Map) {
       builder.setMapField(serializeMapMemberVariable(fieldObject));
     } else {
-      builder.setObjectField(toObjectField(fieldObject));
+      builder.setObjectField(convertObjectToObjectField(fieldObject));
     }
     return builder.build();
   }
@@ -165,6 +198,8 @@ public class ProtoSerializationUtils {
         return literalField.getIntField();
       case LONGFIELD:
         return literalField.getLongField();
+      case FLOATFIELD:
+        return literalField.getFloatField();
       case DOUBLEFIELD:
         return literalField.getDoubleField();
       case STRINGFIELD:
@@ -183,7 +218,7 @@ public class ProtoSerializationUtils {
     return list;
   }
 
-  private static Object constructMap(Plan.MapField mapField) {
+  private static Map constructMap(Plan.MapField mapField) {
     Map map = new HashMap();
     for (Map.Entry<String, Plan.MemberVariableField> e : mapField.getContentMap().entrySet()) {
       map.put(e.getKey(), constructMemberVariable(e.getValue()));
@@ -192,18 +227,22 @@ public class ProtoSerializationUtils {
   }
 
   private static Object constructObject(Plan.ObjectField objectField) {
-    try {
-      Class<?> clazz = Class.forName(objectField.getObjectClassName());
-      if (clazz.isEnum()) {
-        return Enum.valueOf((Class<Enum>) clazz,
-            objectField.getMemberVariablesOrDefault(ENUM_VALUE_KEY, null).getLiteralField().getStringField());
-      } else {
-        Object obj = clazz.newInstance();
-        fromObjectField(obj, objectField);
-        return obj;
+    if (!NULL_OBJECT_CLASSNAME.equals(objectField.getObjectClassName())) {
+      try {
+        Class<?> clazz = Class.forName(objectField.getObjectClassName());
+        if (clazz.isEnum()) {
+          return Enum.valueOf((Class<Enum>) clazz,
+              objectField.getMemberVariablesOrDefault(ENUM_VALUE_KEY, null).getLiteralField().getStringField());
+        } else {
+          Object obj = clazz.newInstance();
+          setObjectFieldToObject(obj, objectField);
+          return obj;
+        }
+      } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
+        throw new IllegalStateException("Unable to create Object of type: " + objectField.getObjectClassName(), e);
       }
-    } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
-      throw new IllegalStateException("Unable to create Object of type: " + objectField.getObjectClassName(), e);
+    } else {
+      return null;
     }
   }
 }

@@ -31,7 +31,7 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
-import org.apache.pinot.query.planner.nodes.MailboxSendNode;
+import org.apache.pinot.query.planner.stage.MailboxSendNode;
 import org.apache.pinot.query.runtime.executor.WorkerQueryExecutor;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
@@ -100,8 +100,8 @@ public class QueryRunner {
       StageMetadata receivingStageMetadata = distributedStagePlan.getMetadataMap().get(sendNode.getReceiverStageId());
       MailboxSendOperator mailboxSendOperator =
           new MailboxSendOperator(_mailboxService, dataTable, receivingStageMetadata.getServerInstances(),
-              sendNode.getExchangeType(), _hostname, _port, serverQueryRequest.getRequestId(),
-              sendNode.getStageId());
+              sendNode.getExchangeType(), sendNode.getPartitionKeySelector(), _hostname, _port,
+              serverQueryRequest.getRequestId(), sendNode.getStageId());
       mailboxSendOperator.nextBlock();
     } else {
       _workerExecutor.processQuery(distributedStagePlan, requestMetadataMap, executorService);
