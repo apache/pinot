@@ -262,6 +262,42 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
       Assert.assertNotNull(aggregationResult);
       Assert.assertEquals((long) aggregationResult.get(0), 0);
     }
+
+    {
+      // Test st within in polygon
+      testQueryStContain("SELECT COUNT(*) FROM testTable WHERE ST_Within(%s, ST_GeomFromText('POLYGON ((\n"
+          + "             -122.0008564 37.5004316, \n"
+          + "             -121.9991291 37.5005168, \n"
+          + "             -121.9990325 37.4995294, \n"
+          + "             -122.0001268 37.4993506,  \n"
+          + "             -122.0008564 37.5004316))')) = 1");
+
+      // negative test
+      testQueryStContain("SELECT COUNT(*) FROM testTable WHERE ST_Within(%s, ST_GeomFromText('POLYGON ((\n"
+          + "             -122.0008564 37.5004316, \n"
+          + "             -121.9991291 37.5005168, \n"
+          + "             -121.9990325 37.4995294, \n"
+          + "             -122.0001268 37.4993506,  \n"
+          + "             -122.0008564 37.5004316))')) = 0");
+    }
+    {
+      // Test st within in polygon, doesn't have
+      String query = "SELECT COUNT(*) FROM testTable WHERE ST_Within(h3Column_geometry, ST_GeomFromText('POLYGON ((\n"
+          + "             122.0008564 -37.5004316, \n"
+          + "             121.9991291 -37.5005168, \n"
+          + "             121.9990325 -37.4995294, \n"
+          + "             122.0001268 -37.4993506,  \n"
+          + "             122.0008564 -37.5004316))')) = 1";
+      AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
+      IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+      // Expect 0 entries scanned in filter
+      QueriesTestUtils
+          .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 0, 0,
+              NUM_RECORDS);
+      List<Object> aggregationResult = resultsBlock.getAggregationResult();
+      Assert.assertNotNull(aggregationResult);
+      Assert.assertEquals((long) aggregationResult.get(0), 0);
+    }
   }
 
   @Test
@@ -286,6 +322,27 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
   }
 
   @Test
+  public void stWithinPointVeryCloseToBorderTest()
+      throws Exception {
+    List<GenericRow> records = new ArrayList<>(1);
+    addRecord(records, -122.0008081, 37.5004231);
+    setUp(records);
+    // Test point is closed to border of a polygon but inside.
+    String query = "SELECT COUNT(*) FROM testTable WHERE ST_Within(h3Column_geometry, ST_GeomFromText('POLYGON ((\n"
+        + "             -122.0008564 37.5004316, \n"
+        + "             -121.9991291 37.5005168, \n"
+        + "             -121.9990325 37.4995294, \n"
+        + "             -122.0001268 37.4993506,  \n"
+        + "             -122.0008564 37.5004316))')) = 1";
+    AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
+    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 1, 1, 0, 1);
+    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    Assert.assertNotNull(aggregationResult);
+    Assert.assertEquals((long) aggregationResult.get(0), 1);
+  }
+
+  @Test
   public void stContainPointVeryCloseToBorderButOutsideTest()
       throws Exception {
     List<GenericRow> records = new ArrayList<>(1);
@@ -298,6 +355,27 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
         + "             -121.9990325 37.4995294, \n"
         + "             -122.0001268 37.4993506,  \n"
         + "             -122.0008564 37.5004316))'), h3Column_geometry) = 1";
+    AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
+    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 1, 0, 1);
+    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    Assert.assertNotNull(aggregationResult);
+    Assert.assertEquals((long) aggregationResult.get(0), 0);
+  }
+
+  @Test
+  public void stWithinPointVeryCloseToBorderButOutsideTest()
+      throws Exception {
+    List<GenericRow> records = new ArrayList<>(1);
+    addRecord(records, -122.0007277, 37.5005785);
+    setUp(records);
+    // Test point is closed to border of a polygon but outside.
+    String query = "SELECT COUNT(*) FROM testTable WHERE ST_Within(h3Column_geometry, ST_GeomFromText('POLYGON ((\n"
+        + "             -122.0008564 37.5004316, \n"
+        + "             -121.9991291 37.5005168, \n"
+        + "             -121.9990325 37.4995294, \n"
+        + "             -122.0001268 37.4993506,  \n"
+        + "             -122.0008564 37.5004316))')) = 1";
     AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 1, 0, 1);

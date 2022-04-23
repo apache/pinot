@@ -34,6 +34,7 @@ import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
+import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
@@ -59,8 +60,8 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 public class FilterPlanNode implements PlanNode {
 
-  private static final Set<String> CAN_APPLY_H3_INDEX_FUNCTION_NAMES =
-      ImmutableSet.of("st_distance", "stdistance", "st_contains", "stcontains");
+  private static final Set<String> CAN_APPLY_H3_INCLUSION_INDEX_FUNCTION_NAMES =
+      ImmutableSet.of("st_within", "stwithin", "st_contains", "stcontains");
 
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;
@@ -112,26 +113,25 @@ public class FilterPlanNode implements PlanNode {
   }
 
   /**
-   * H3 index can be applied iff:
+   * H3 index can be applied on ST_Distance iff:
    * <ul>
-   *   <li>Predicate is of type RANGE or EQ</li>
-   *   <li>Left-hand-side of the predicate is an ST_Distance or ST_Contains function</li>
-   *   <li>One argument of the ST_Distance or ST_Contains function is an identifier, the other argument is an
-   *   literal</li>
+   *   <li>Predicate is of type RANGE</li>
+   *   <li>Left-hand-side of the predicate is an ST_Distance function</li>
+   *   <li>One argument of the ST_Distance function is an identifier, the other argument is an literal</li>
    *   <li>The identifier column has H3 index</li>
    * </ul>
    */
-  private boolean canApplyH3Index(Predicate predicate, FunctionContext function) {
-    if (predicate.getType() != Predicate.Type.RANGE && predicate.getType() != Predicate.Type.EQ) {
+  private boolean canApplyH3IndexForDistanceCheck(Predicate predicate, FunctionContext function) {
+    if (predicate.getType() != Predicate.Type.RANGE) {
       return false;
     }
     String functionName = function.getFunctionName();
-    if (!CAN_APPLY_H3_INDEX_FUNCTION_NAMES.contains(functionName)) {
+    if (!functionName.equals("st_distance") && !functionName.equals("stdistance")) {
       return false;
     }
     List<ExpressionContext> arguments = function.getArguments();
     if (arguments.size() != 2) {
-      throw new BadQueryRequestException("Expect 2 arguments for function: " + functionName);
+      throw new BadQueryRequestException("Expect 2 arguments for function: " + StDistanceFunction.FUNCTION_NAME);
     }
     // TODO: handle nested geography/geometry conversion functions
     String columnName = null;
@@ -144,6 +144,46 @@ public class FilterPlanNode implements PlanNode {
       }
     }
     return columnName != null && _indexSegment.getDataSource(columnName).getH3Index() != null && findLiteral;
+  }
+
+  /**
+   * H3 index can be applied for inclusion check iff:
+   * <ul>
+   *   <li>Predicate is of type EQ</li>
+   *   <li>Left-hand-side of the predicate is an ST_Within or ST_Contains function</li>
+   *   <li>For ST_Within, the first argument is an identifier, the second argument is literal</li>
+   *   <li>For ST_Contains function the first argument is literal, the second argument is an identifier</li>
+   *   <li>The identifier column has H3 index</li>
+   * </ul>
+   */
+  private boolean canApplyH3IndexForInclusionCheck(Predicate predicate, FunctionContext function) {
+    if (predicate.getType() != Predicate.Type.EQ) {
+      return false;
+    }
+    String functionName = function.getFunctionName();
+    if (!CAN_APPLY_H3_INCLUSION_INDEX_FUNCTION_NAMES.contains(functionName)) {
+      return false;
+    }
+    List<ExpressionContext> arguments = function.getArguments();
+    if (arguments.size() != 2) {
+      throw new BadQueryRequestException("Expect 2 arguments for function: " + functionName);
+    }
+    // TODO: handle nested geography/geometry conversion functions
+    if (functionName.equals("st_within") || functionName.equals("stwithin")) {
+      if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER
+          && arguments.get(1).getType() == ExpressionContext.Type.LITERAL) {
+        String columnName = arguments.get(0).getIdentifier();
+        return columnName != null && _indexSegment.getDataSource(columnName).getH3Index() != null;
+      }
+      return false;
+    } else {
+      if (arguments.get(1).getType() == ExpressionContext.Type.IDENTIFIER
+          && arguments.get(0).getType() == ExpressionContext.Type.LITERAL) {
+        String columnName = arguments.get(1).getIdentifier();
+        return columnName != null && _indexSegment.getDataSource(columnName).getH3Index() != null;
+      }
+      return false;
+    }
   }
 
   /**
@@ -188,20 +228,15 @@ public class FilterPlanNode implements PlanNode {
         Predicate predicate = filter.getPredicate();
         ExpressionContext lhs = predicate.getLhs();
         if (lhs.getType() == ExpressionContext.Type.FUNCTION) {
-          if (canApplyH3Index(predicate, lhs.getFunction())) {
-            String functionName = lhs.getFunction().getFunctionName();
-            if (functionName.equals("st_distance") || functionName.equals("stdistance")) {
+          if (canApplyH3IndexForDistanceCheck(predicate, lhs.getFunction())) {
               return new H3IndexFilterOperator(_indexSegment, predicate, numDocs);
-            } else if (functionName.equals("st_contains") || functionName.equals("stcontains")) {
-              return new H3InclusionIndexFilterOperator(_indexSegment, predicate, numDocs);
-            } else {
-              throw new IllegalStateException(
-                  String.format("Only %s can use H3 index.", CAN_APPLY_H3_INDEX_FUNCTION_NAMES));
-            }
+          } else if (canApplyH3IndexForInclusionCheck(predicate, lhs.getFunction())) {
+            return new H3InclusionIndexFilterOperator(_indexSegment, predicate, numDocs);
+          } else {
+            // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (IS_NULL,
+            //       IS_NOT_NULL, TEXT_MATCH)
+            return new ExpressionFilterOperator(_indexSegment, predicate, numDocs);
           }
-          // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (IS_NULL,
-          //       IS_NOT_NULL, TEXT_MATCH)
-          return new ExpressionFilterOperator(_indexSegment, predicate, numDocs);
         } else {
           String column = lhs.getIdentifier();
           DataSource dataSource = _indexSegment.getDataSource(column);
