@@ -72,7 +72,7 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
       _geometry = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(0).getLiteral()));
     }
     // must be some h3 index
-    assert _h3IndexReader != null;
+    assert _h3IndexReader != null : "the column must have H3 index setup.";
   }
 
   @Override
