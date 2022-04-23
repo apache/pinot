@@ -160,12 +160,8 @@ public class InstanceReplicaGroupPartitionSelector {
           }
         }
 
-        for (int replicaGroupId = 0; replicaGroupId < existingNumReplicaGroups; replicaGroupId++) {
+        for (int replicaGroupId = 0; replicaGroupId < numCommonReplicaGroups; replicaGroupId++) {
           Integer pool = replicaGroupIdToPoolMap.get(replicaGroupId);
-          if (pool == null) {
-            // Skip the replica group if it's no longer needed.
-            continue;
-          }
           // Step 2: filter out instances that belong to other replica groups which should not be the candidate.
           LinkedHashSet<String> candidateInstances = new LinkedHashSet<>(poolToCandidateInstancesMap.get(pool));
           for (int otherReplicaGroupId = 0;
