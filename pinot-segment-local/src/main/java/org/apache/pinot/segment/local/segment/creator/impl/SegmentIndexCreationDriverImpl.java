@@ -385,11 +385,13 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       ColumnStatistics columnProfile = _segmentStats.getColumnProfileFor(columnName);
       boolean useVarLengthDictionary = varLengthDictionaryColumns.contains(columnName);
       Object defaultNullValue = fieldSpec.getDefaultNullValue();
-      if (storedType == DataType.BYTES) {
+      if (storedType == DataType.BYTES || storedType == DataType.BIG_DECIMAL) {
         if (!columnProfile.isFixedLength()) {
           useVarLengthDictionary = true;
         }
-        defaultNullValue = new ByteArray((byte[]) defaultNullValue);
+        if (storedType == DataType.BYTES) {
+          defaultNullValue = new ByteArray((byte[]) defaultNullValue);
+        }
       }
       _indexCreationInfoMap.put(columnName,
           new ColumnIndexCreationInfo(columnProfile, true/*createDictionary*/, useVarLengthDictionary,

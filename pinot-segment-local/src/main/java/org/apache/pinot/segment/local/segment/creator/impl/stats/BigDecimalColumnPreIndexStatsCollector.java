@@ -48,10 +48,8 @@ public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatis
     if (entry instanceof Object[]) {
       throw new UnsupportedOperationException();
     } else {
-      BigDecimal value;
-      int length;
-      value = BigDecimalUtils.deserialize((byte[]) entry);
-      length = ((byte[]) entry).length;
+      BigDecimal value = (BigDecimal) entry;
+      int length = BigDecimalUtils.byteSize(value);
       addressSorted(value);
       if (_values.add(value)) {
         updatePartition(value);

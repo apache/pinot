@@ -528,11 +528,6 @@ public enum PinotDataType {
     public BigDecimal convert(Object value, PinotDataType sourceType) {
       return sourceType.toBigDecimal(value);
     }
-
-    @Override
-    public byte[] toInternal(Object value) {
-      return BigDecimalUtils.serialize((BigDecimal) value);
-    }
   },
 
   /**

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.blocks;
 
+import java.math.BigDecimal;
 import java.util.Map;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockDocIdSet;
@@ -120,15 +121,25 @@ public class ProjectionBlock implements Block {
   }
 
   /**
+   * Pushes a {@see TransformEvaluator} which will produce a BigDecimal value down
+   * to be evaluated against the column. This is an unstable API.
+   * @param column column to evaluate against
+   * @param evaluator the evaluator which produces values from the storage in the column
+   * @param buffer the buffer to write outputs into
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, BigDecimal[] buffer) {
+    _dataBlockCache.fillValues(column, evaluator, buffer);
+  }
+
+  /**
    * Pushes a {@see TransformEvaluator} which will produce a String value down
    * to be evaluated against the column. This is an unstable API.
    * @param column column to evaluate against
    * @param evaluator the evaluator which produces values from the storage in the column
    * @param buffer the buffer to write outputs into
-   * @param parseExactBigDecimal parse exact BigDecimal values
    */
-  public void fillValues(String column, TransformEvaluator evaluator, String[] buffer, boolean parseExactBigDecimal) {
-    _dataBlockCache.fillValues(column, evaluator, buffer, parseExactBigDecimal);
+  public void fillValues(String column, TransformEvaluator evaluator, String[] buffer) {
+    _dataBlockCache.fillValues(column, evaluator, buffer);
   }
 
   /**

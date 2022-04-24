@@ -210,54 +210,64 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
   }
 
   public <T extends ForwardIndexReaderContext> void evaluateBlock(int[] docIds, int length,
-      ForwardIndexReader<T> reader, T context, Dictionary dictionary, int[] dictIdsBuffer, String[] valueBuffer,
-      boolean parseExactBigDecimal) {
+      ForwardIndexReader<T> reader, T context, Dictionary dictionary, int[] dictIdsBuffer, BigDecimal[] valueBuffer) {
+    BigDecimal defaultValue = (_defaultValue instanceof BigDecimal) ? ((BigDecimal) _defaultValue) : BigDecimal.ZERO;
     if (reader.isDictionaryEncoded()) {
       reader.readDictIds(docIds, length, dictIdsBuffer, context);
       if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
-        if (parseExactBigDecimal) {
-          for (int i = 0; i < length; i++) {
-            processValue(i, extractFromBytesWithExactBigDecimal(dictionary, dictIdsBuffer[i]), valueBuffer);
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
-            processValue(i, extractFromBytes(dictionary, dictIdsBuffer[i]), valueBuffer);
-          }
+        for (int i = 0; i < length; i++) {
+          processValue(i, extractFromBytesWithExactBigDecimal(dictionary, dictIdsBuffer[i]), defaultValue, valueBuffer);
         }
       } else {
-        if (parseExactBigDecimal) {
-          for (int i = 0; i < length; i++) {
-            processValue(i, extractFromStringWithExactBigDecimal(dictionary, dictIdsBuffer[i]), valueBuffer);
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
-            processValue(i, extractFromString(dictionary, dictIdsBuffer[i]), valueBuffer);
-          }
+        for (int i = 0; i < length; i++) {
+          processValue(i, extractFromStringWithExactBigDecimal(dictionary, dictIdsBuffer[i]), defaultValue,
+              valueBuffer);
         }
       }
     } else {
       switch (reader.getValueType()) {
         case JSON:
         case STRING:
-          if (parseExactBigDecimal) {
-            for (int i = 0; i < length; i++) {
-              processValue(i, extractFromStringWithExactBigDecimal(reader, context, docIds[i]), valueBuffer);
-            }
-          } else {
-            for (int i = 0; i < length; i++) {
-              processValue(i, extractFromString(reader, context, docIds[i]), valueBuffer);
-            }
+          for (int i = 0; i < length; i++) {
+            processValue(i, extractFromStringWithExactBigDecimal(reader, context, docIds[i]), defaultValue,
+                valueBuffer);
           }
           break;
         case BYTES:
-          if (parseExactBigDecimal) {
-            for (int i = 0; i < length; i++) {
-              processValue(i, extractFromBytesWithExactBigDecimal(reader, context, docIds[i]), valueBuffer);
-            }
-          } else {
-            for (int i = 0; i < length; i++) {
-              processValue(i, extractFromBytes(reader, context, docIds[i]), valueBuffer);
-            }
+          for (int i = 0; i < length; i++) {
+            processValue(i, extractFromBytesWithExactBigDecimal(reader, context, docIds[i]), defaultValue, valueBuffer);
+          }
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+    }
+  }
+
+  public <T extends ForwardIndexReaderContext> void evaluateBlock(int[] docIds, int length,
+      ForwardIndexReader<T> reader, T context, Dictionary dictionary, int[] dictIdsBuffer, String[] valueBuffer) {
+    if (reader.isDictionaryEncoded()) {
+      reader.readDictIds(docIds, length, dictIdsBuffer, context);
+      if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
+        for (int i = 0; i < length; i++) {
+          processValue(i, extractFromBytes(dictionary, dictIdsBuffer[i]), valueBuffer);
+        }
+      } else {
+        for (int i = 0; i < length; i++) {
+          processValue(i, extractFromString(dictionary, dictIdsBuffer[i]), valueBuffer);
+        }
+      }
+    } else {
+      switch (reader.getValueType()) {
+        case JSON:
+        case STRING:
+          for (int i = 0; i < length; i++) {
+            processValue(i, extractFromString(reader, context, docIds[i]), valueBuffer);
+          }
+          break;
+        case BYTES:
+          for (int i = 0; i < length; i++) {
+            processValue(i, extractFromBytes(reader, context, docIds[i]), valueBuffer);
           }
           break;
         default:
@@ -516,6 +526,20 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
       }
     } else {
       valueBuffer[index] = Double.parseDouble(value.toString());
+    }
+  }
+
+  private void processValue(int index, Object value, BigDecimal defaultValue, BigDecimal[] valueBuffer) {
+    if (value instanceof BigDecimal) {
+      valueBuffer[index] = (BigDecimal) value;
+    } else if (value == null) {
+      if (_defaultValue != null) {
+        valueBuffer[index] = defaultValue;
+      } else {
+        throwPathNotFoundException();
+      }
+    } else {
+      valueBuffer[index] = new BigDecimal(value.toString());
     }
   }
 

@@ -108,6 +108,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
           sum = sum.add(new BigDecimal(stringValues[i]));
         }
         break;
+      case BIG_DECIMAL:
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         for (int i = 0; i < length; i++) {

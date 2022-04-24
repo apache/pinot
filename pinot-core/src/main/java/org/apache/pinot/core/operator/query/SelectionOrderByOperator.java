@@ -131,13 +131,13 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
     int numValuesToCompare = valueIndexList.size();
     int[] valueIndices = new int[numValuesToCompare];
-    DataType[] dataTypes = new DataType[numValuesToCompare];
+    DataType[] storedTypes = new DataType[numValuesToCompare];
     // Use multiplier -1 or 1 to control ascending/descending order
     int[] multipliers = new int[numValuesToCompare];
     for (int i = 0; i < numValuesToCompare; i++) {
       int valueIndex = valueIndexList.get(i);
       valueIndices[i] = valueIndex;
-      dataTypes[i] = _orderByExpressionMetadata[valueIndex].getDataType();
+      storedTypes[i] = _orderByExpressionMetadata[valueIndex].getDataType().getStoredType();
       multipliers[i] = _orderByExpressions.get(valueIndex).isAsc() ? -1 : 1;
     }
 
@@ -149,7 +149,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
         Object v1 = o1[index];
         Object v2 = o2[index];
         int result;
-        switch (dataTypes[i].getStoredType()) {
+        switch (storedTypes[i]) {
           case INT:
             result = ((Integer) v1).compareTo((Integer) v2);
             break;
@@ -162,14 +162,13 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
           case DOUBLE:
             result = ((Double) v1).compareTo((Double) v2);
             break;
+          case BIG_DECIMAL:
+            result = ((BigDecimal) v1).compareTo((BigDecimal) v2);
+            break;
           case STRING:
             result = ((String) v1).compareTo((String) v2);
             break;
           case BYTES:
-            if (dataTypes[i] == DataType.BIG_DECIMAL) {
-              result = ((BigDecimal) v1).compareTo((BigDecimal) v2);
-              break;
-            }
             result = ((ByteArray) v1).compareTo((ByteArray) v2);
             break;
           // NOTE: Multi-value columns are not comparable, so we should not reach here

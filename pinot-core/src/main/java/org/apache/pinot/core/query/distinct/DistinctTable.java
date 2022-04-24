@@ -239,13 +239,13 @@ public class DistinctTable {
       throws IOException {
     // NOTE: Serialize the DistinctTable as a DataTable
     DataTableBuilder dataTableBuilder = new DataTableBuilder(_dataSchema);
-    ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
-    int numColumns = columnDataTypes.length;
+    ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
+    int numColumns = storedColumnDataTypes.length;
     for (Record record : _records) {
       dataTableBuilder.startRow();
       Object[] values = record.getValues();
       for (int i = 0; i < numColumns; i++) {
-        switch (columnDataTypes[i].getStoredType()) {
+        switch (storedColumnDataTypes[i]) {
           case INT:
             dataTableBuilder.setColumn(i, (int) values[i]);
             break;
@@ -258,15 +258,14 @@ public class DistinctTable {
           case DOUBLE:
             dataTableBuilder.setColumn(i, (double) values[i]);
             break;
+          case BIG_DECIMAL:
+            dataTableBuilder.setColumn(i, values[i]);
+            break;
           case STRING:
             dataTableBuilder.setColumn(i, (String) values[i]);
             break;
           case BYTES:
-            if (columnDataTypes[i] == DataSchema.ColumnDataType.BIG_DECIMAL) {
-              dataTableBuilder.setColumn(i, values[i]);
-            } else {
-              dataTableBuilder.setColumn(i, (ByteArray) values[i]);
-            }
+            dataTableBuilder.setColumn(i, (ByteArray) values[i]);
             break;
           // Add other distinct column type supports here
           default:
@@ -309,12 +308,11 @@ public class DistinctTable {
           case STRING:
             values[j] = dataTable.getString(i, j);
             break;
+          case BIG_DECIMAL:
+            values[j] = dataTable.getObject(i, j);
+            break;
           case BYTES:
-            if (columnDataTypes[j] == ColumnDataType.BIG_DECIMAL) {
-              values[j] = dataTable.getObject(i, j);
-            } else {
-              values[j] = dataTable.getBytes(i, j);
-            }
+            values[j] = dataTable.getBytes(i, j);
             break;
           // Add other distinct column type supports here
           default:

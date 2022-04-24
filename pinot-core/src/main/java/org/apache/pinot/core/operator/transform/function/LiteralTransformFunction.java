@@ -31,7 +31,6 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 
@@ -243,11 +242,6 @@ public class LiteralTransformFunction implements TransformFunction {
     if (bytesResult == null || bytesResult.length < numDocs) {
       bytesResult = new byte[numDocs][];
       Arrays.fill(bytesResult, BytesUtils.toBytes(_literal));
-      if (_dataType == DataType.BIG_DECIMAL) {
-        Arrays.fill(bytesResult, BigDecimalUtils.serialize(_bigDecimalLiteral));
-      } else {
-        Arrays.fill(bytesResult, BytesUtils.toBytes(_literal));
-      }
       _bytesResult = bytesResult;
     }
     return bytesResult;

@@ -249,17 +249,17 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         return (loadOnHeap) ? new OnHeapDoubleDictionary(dictionaryBuffer, length)
             : new DoubleDictionary(dictionaryBuffer, length);
 
-      case STRING:
+      case BIG_DECIMAL:
         int numBytesPerValue = metadata.getColumnMaxLength();
+        return new BigDecimalDictionary(dictionaryBuffer, length, numBytesPerValue);
+
+      case STRING:
+        numBytesPerValue = metadata.getColumnMaxLength();
         byte paddingByte = (byte) metadata.getPaddingCharacter();
         return loadOnHeap ? new OnHeapStringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte)
             : new StringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte);
 
       case BYTES:
-        if (dataType == DataType.BIG_DECIMAL) {
-          numBytesPerValue = metadata.getColumnMaxLength();
-          return new BigDecimalDictionary(dictionaryBuffer, length, numBytesPerValue);
-        }
         numBytesPerValue = metadata.getColumnMaxLength();
         return new BytesDictionary(dictionaryBuffer, length, numBytesPerValue);
 

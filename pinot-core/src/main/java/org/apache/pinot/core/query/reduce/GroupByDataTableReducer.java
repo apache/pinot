@@ -337,7 +337,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
 
     Future[] futures = new Future[numReduceThreadsToUse];
     CountDownLatch countDownLatch = new CountDownLatch(numDataTables);
-    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+    ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     for (int i = 0; i < numReduceThreadsToUse; i++) {
       List<DataTable> reduceGroup = reduceGroups.get(i);
       futures[i] = reducerContext.getExecutorService().submit(new TraceRunnable() {
@@ -353,7 +353,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
               for (int rowId = 0; rowId < numRows; rowId++) {
                 Object[] values = new Object[_numColumns];
                 for (int colId = 0; colId < _numColumns; colId++) {
-                  switch (columnDataTypes[colId].getStoredType()) {
+                  switch (storedColumnDataTypes[colId]) {
                     case INT:
                       values[colId] = dataTable.getInt(rowId, colId);
                       break;
@@ -366,18 +366,15 @@ public class GroupByDataTableReducer implements DataTableReducer {
                     case DOUBLE:
                       values[colId] = dataTable.getDouble(rowId, colId);
                       break;
+                    case BIG_DECIMAL:
+                    case OBJECT:
+                      values[colId] = dataTable.getObject(rowId, colId);
+                      break;
                     case STRING:
                       values[colId] = dataTable.getString(rowId, colId);
                       break;
                     case BYTES:
-                      if (columnDataTypes[colId] == ColumnDataType.BIG_DECIMAL) {
-                        values[colId] = dataTable.getObject(rowId, colId);
-                      } else {
-                        values[colId] = dataTable.getBytes(rowId, colId);
-                      }
-                      break;
-                    case OBJECT:
-                      values[colId] = dataTable.getObject(rowId, colId);
+                      values[colId] = dataTable.getBytes(rowId, colId);
                       break;
                     // Add other aggregation intermediate result / group-by column type supports here
                     default:

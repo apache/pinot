@@ -56,7 +56,7 @@ public class FieldSpecTest {
     Assert.assertEquals(LONG.getStoredType(), LONG);
     Assert.assertEquals(FLOAT.getStoredType(), FLOAT);
     Assert.assertEquals(DOUBLE.getStoredType(), DOUBLE);
-    Assert.assertEquals(BIG_DECIMAL.getStoredType(), BYTES);
+    Assert.assertEquals(BIG_DECIMAL.getStoredType(), BIG_DECIMAL);
     Assert.assertEquals(BOOLEAN.getStoredType(), INT);
     Assert.assertEquals(TIMESTAMP.getStoredType(), LONG);
     Assert.assertEquals(STRING.getStoredType(), STRING);

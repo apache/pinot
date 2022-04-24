@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.selection;
 
 import java.io.Serializable;
-import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -253,15 +252,15 @@ public class SelectionOperatorUtils {
    */
   public static DataTable getDataTableFromRows(Collection<Object[]> rows, DataSchema dataSchema)
       throws Exception {
-    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
-    int numColumns = columnDataTypes.length;
+    ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
+    int numColumns = storedColumnDataTypes.length;
 
     DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
     for (Object[] row : rows) {
       dataTableBuilder.startRow();
       for (int i = 0; i < numColumns; i++) {
         Object columnValue = row[i];
-        switch (columnDataTypes[i].getStoredType()) {
+        switch (storedColumnDataTypes[i]) {
           // Single-value column
           case INT:
             dataTableBuilder.setColumn(i, ((Number) columnValue).intValue());
@@ -275,15 +274,14 @@ public class SelectionOperatorUtils {
           case DOUBLE:
             dataTableBuilder.setColumn(i, ((Number) columnValue).doubleValue());
             break;
+          case BIG_DECIMAL:
+            dataTableBuilder.setColumn(i, columnValue);
+            break;
           case STRING:
             dataTableBuilder.setColumn(i, ((String) columnValue));
             break;
           case BYTES:
-            if (columnDataTypes[i] == ColumnDataType.BIG_DECIMAL) {
-              dataTableBuilder.setColumn(i, (BigDecimal) columnValue);
-            } else {
-              dataTableBuilder.setColumn(i, (ByteArray) columnValue);
-            }
+            dataTableBuilder.setColumn(i, (ByteArray) columnValue);
             break;
 
           // Multi-value column
@@ -335,7 +333,7 @@ public class SelectionOperatorUtils {
 
           default:
             throw new IllegalStateException(String
-                .format("Unsupported data type: %s for column: %s", columnDataTypes[i].getStoredType(),
+                .format("Unsupported data type: %s for column: %s", storedColumnDataTypes[i],
                     dataSchema.getColumnName(i)));
         }
       }
@@ -354,12 +352,12 @@ public class SelectionOperatorUtils {
    */
   public static Object[] extractRowFromDataTable(DataTable dataTable, int rowId) {
     DataSchema dataSchema = dataTable.getDataSchema();
-    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
-    int numColumns = columnDataTypes.length;
+    ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
+    int numColumns = storedColumnDataTypes.length;
 
     Object[] row = new Object[numColumns];
     for (int i = 0; i < numColumns; i++) {
-      switch (columnDataTypes[i].getStoredType()) {
+      switch (storedColumnDataTypes[i]) {
         // Single-value column
         case INT:
           row[i] = dataTable.getInt(rowId, i);
@@ -373,15 +371,14 @@ public class SelectionOperatorUtils {
         case DOUBLE:
           row[i] = dataTable.getDouble(rowId, i);
           break;
+        case BIG_DECIMAL:
+          row[i] = dataTable.getObject(rowId, i);
+          break;
         case STRING:
           row[i] = dataTable.getString(rowId, i);
           break;
         case BYTES:
-          if (columnDataTypes[i] == ColumnDataType.BIG_DECIMAL) {
-            row[i] = dataTable.getObject(rowId, i);
-          } else {
-            row[i] = dataTable.getBytes(rowId, i);
-          }
+          row[i] = dataTable.getBytes(rowId, i);
           break;
 
         // Multi-value column
@@ -403,7 +400,7 @@ public class SelectionOperatorUtils {
 
         default:
           throw new IllegalStateException(String
-              .format("Unsupported data type: %s for column: %s", columnDataTypes[i].getStoredType(),
+              .format("Unsupported data type: %s for column: %s", storedColumnDataTypes[i],
                   dataSchema.getColumnName(i)));
       }
     }

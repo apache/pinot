@@ -328,14 +328,14 @@ public class IntermediateResultsBlock implements Block {
   private DataTable getResultDataTable()
       throws IOException {
     DataTableBuilder dataTableBuilder = new DataTableBuilder(_dataSchema);
-    ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
+    ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     Iterator<Record> iterator = _table.iterator();
     while (iterator.hasNext()) {
       Record record = iterator.next();
       dataTableBuilder.startRow();
       int columnIndex = 0;
       for (Object value : record.getValues()) {
-        setDataTableColumn(columnDataTypes[columnIndex], dataTableBuilder, columnIndex, value);
+        setDataTableColumn(storedColumnDataTypes[columnIndex], dataTableBuilder, columnIndex, value);
         columnIndex++;
       }
       dataTableBuilder.finishRow();
@@ -347,7 +347,7 @@ public class IntermediateResultsBlock implements Block {
   private void setDataTableColumn(ColumnDataType columnDataType, DataTableBuilder dataTableBuilder, int columnIndex,
       Object value)
       throws IOException {
-    switch (columnDataType.getStoredType()) {
+    switch (columnDataType) {
       case INT:
         dataTableBuilder.setColumn(columnIndex, (int) value);
         break;
@@ -360,15 +360,14 @@ public class IntermediateResultsBlock implements Block {
       case DOUBLE:
         dataTableBuilder.setColumn(columnIndex, (double) value);
         break;
+      case BIG_DECIMAL:
+        dataTableBuilder.setColumn(columnIndex, value);
+        break;
       case STRING:
         dataTableBuilder.setColumn(columnIndex, (String) value);
         break;
       case BYTES:
-        if (columnDataType == ColumnDataType.BIG_DECIMAL) {
-            dataTableBuilder.setColumn(columnIndex, value);
-        } else {
-          dataTableBuilder.setColumn(columnIndex, (ByteArray) value);
-        }
+        dataTableBuilder.setColumn(columnIndex, (ByteArray) value);
         break;
       case OBJECT:
         dataTableBuilder.setColumn(columnIndex, value);

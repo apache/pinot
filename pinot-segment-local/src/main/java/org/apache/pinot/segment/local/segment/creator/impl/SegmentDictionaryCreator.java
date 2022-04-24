@@ -49,7 +49,6 @@ public class SegmentDictionaryCreator implements Closeable {
 
   private final Object _sortedValues;
   private final String _columnName;
-  private final DataType _dataType;
   private final DataType _storedType;
   private final File _dictionaryFile;
   private final boolean _useVarLengthDictionary;
@@ -58,6 +57,7 @@ public class SegmentDictionaryCreator implements Closeable {
   private Long2IntOpenHashMap _longValueToIndexMap;
   private Float2IntOpenHashMap _floatValueToIndexMap;
   private Double2IntOpenHashMap _doubleValueToIndexMap;
+  private Object2IntOpenHashMap<BigDecimal> _bigDecimalValueToIndexMap;
   private Object2IntOpenHashMap<String> _stringValueToIndexMap;
   private Object2IntOpenHashMap<ByteArray> _bytesValueToIndexMap;
   private int _numBytesPerEntry = 0;
@@ -67,7 +67,6 @@ public class SegmentDictionaryCreator implements Closeable {
       throws IOException {
     _sortedValues = sortedValues;
     _columnName = fieldSpec.getName();
-    _dataType = fieldSpec.getDataType();
     _storedType = fieldSpec.getDataType().getStoredType();
     _dictionaryFile = new File(indexDir, _columnName + V1Constants.Dict.FILE_EXTENSION);
     FileUtils.touch(_dictionaryFile);
@@ -167,6 +166,28 @@ public class SegmentDictionaryCreator implements Closeable {
             numValues, sortedDoubles[0], sortedDoubles[numValues - 1]);
         return;
 
+      case BIG_DECIMAL:
+        BigDecimal[] sortedBigDecimals = (BigDecimal[]) _sortedValues;
+        numValues = sortedBigDecimals.length;
+
+        Preconditions.checkState(numValues > 0);
+        _bigDecimalValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
+
+        for (int i = 0; i < numValues; i++) {
+          BigDecimal value = sortedBigDecimals[i];
+          _bigDecimalValueToIndexMap.put(value, i);
+          _numBytesPerEntry = Math.max(_numBytesPerEntry, BigDecimalUtils.byteSize(value));
+        }
+
+        assert _useVarLengthDictionary;
+        try (VarLengthValueWriter writer = new VarLengthValueWriter(_dictionaryFile, sortedBigDecimals.length)) {
+          for (BigDecimal value : sortedBigDecimals) {
+            writer.add(BigDecimalUtils.serialize(value));
+          }
+        }
+        LOGGER.info("Using variable length dictionary for column: {}, size: {}", _columnName, _dictionaryFile.length());
+        return;
+
       case STRING:
         String[] sortedStrings = (String[]) _sortedValues;
         numValues = sortedStrings.length;
@@ -190,37 +211,13 @@ public class SegmentDictionaryCreator implements Closeable {
         return;
 
       case BYTES:
-        byte[][] sortedByteArrays;
-        if (_dataType == DataType.BIG_DECIMAL) {
-          BigDecimal[] sortedBytes = (BigDecimal[]) _sortedValues;
-          numValues = sortedBytes.length;
-
-          Preconditions.checkState(numValues > 0);
-          _bytesValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
-
-          sortedByteArrays = new byte[sortedBytes.length][];
-          for (int i = 0; i < numValues; i++) {
-            BigDecimal value = sortedBytes[i];
-            byte[] bytesValue = BigDecimalUtils.serialize(value);
-            sortedByteArrays[i] = bytesValue;
-            _bytesValueToIndexMap.put(new ByteArray(bytesValue), i);
-            _numBytesPerEntry = Math.max(_numBytesPerEntry, bytesValue.length);
-          }
-
-          writeBytesValueDictionary(sortedByteArrays);
-          LOGGER.info(
-              "Created dictionary for BYTES column: {} with cardinality: {}, max length in bytes: {}, range: {} to {}",
-              _columnName, numValues, _numBytesPerEntry, sortedBytes[0], sortedBytes[numValues - 1]);
-          return;
-        }
-
         ByteArray[] sortedBytes = (ByteArray[]) _sortedValues;
         numValues = sortedBytes.length;
 
         Preconditions.checkState(numValues > 0);
         _bytesValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
 
-        sortedByteArrays = new byte[sortedBytes.length][];
+        byte[][] sortedByteArrays = new byte[sortedBytes.length][];
         for (int i = 0; i < numValues; i++) {
           ByteArray value = sortedBytes[i];
           sortedByteArrays[i] = value.getBytes();
@@ -286,6 +283,8 @@ public class SegmentDictionaryCreator implements Closeable {
         return _doubleValueToIndexMap.get((double) value);
       case STRING:
         return _stringValueToIndexMap.getInt(value);
+      case BIG_DECIMAL:
+        return _bigDecimalValueToIndexMap.getInt((BigDecimal) value);
       case BYTES:
         return _bytesValueToIndexMap.get(new ByteArray((byte[]) value));
       default:

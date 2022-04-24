@@ -243,7 +243,7 @@ public class DataSchema {
     LONG,
     FLOAT,
     DOUBLE,
-    BIG_DECIMAL /* Stored as BYTES */,
+    BIG_DECIMAL,
     BOOLEAN /* Stored as INT */,
     TIMESTAMP /* Stored as LONG */,
     STRING,
@@ -273,8 +273,6 @@ public class DataSchema {
       switch (this) {
         case BOOLEAN:
           return INT;
-        case BIG_DECIMAL:
-          return BYTES;
         case TIMESTAMP:
           return LONG;
         case JSON:

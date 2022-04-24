@@ -262,18 +262,17 @@ public class ColumnMetadataImpl implements ColumnMetadata {
           builder.setMinValue(Double.valueOf(minString));
           builder.setMaxValue(Double.valueOf(maxString));
           break;
+        case BIG_DECIMAL:
+          builder.setMinValue(new BigDecimal(minString));
+          builder.setMaxValue(new BigDecimal(maxString));
+          break;
         case STRING:
           builder.setMinValue(minString);
           builder.setMaxValue(maxString);
           break;
         case BYTES:
-          if (dataType == DataType.BIG_DECIMAL) {
-            builder.setMinValue(new BigDecimal(minString));
-            builder.setMaxValue(new BigDecimal(maxString));
-          } else {
-            builder.setMinValue(BytesUtils.toByteArray(minString));
-            builder.setMaxValue(BytesUtils.toByteArray(maxString));
-          }
+          builder.setMinValue(BytesUtils.toByteArray(minString));
+          builder.setMaxValue(BytesUtils.toByteArray(maxString));
           break;
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + column);
