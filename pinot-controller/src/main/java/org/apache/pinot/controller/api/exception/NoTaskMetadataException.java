@@ -16,29 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils;
+package org.apache.pinot.controller.api.exception;
 
-import org.apache.pinot.spi.utils.StringUtil;
-import org.testng.annotations.Test;
+public class NoTaskMetadataException extends RuntimeException {
+  public NoTaskMetadataException(String message) {
+    super(message);
+  }
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertSame;
-
-
-/**
- * Tests for {@link StringUtil} class.
- */
-public class StringUtilTest {
-
-  @Test
-  public void testSanitizeStringValue() {
-    assertEquals(StringUtil.sanitizeStringValue("pot\0ato", 3), "pot");
-    assertEquals(StringUtil.sanitizeStringValue("pot\0ato", 6), "pot");
-    assertEquals(StringUtil.sanitizeStringValue("potato", 2), "po");
-    assertEquals(StringUtil.sanitizeStringValue("pot\0ato", 2), "po");
-
-    String value = "potato";
-    assertSame(StringUtil.sanitizeStringValue(value, 6), value);
-    assertSame(StringUtil.sanitizeStringValue(value, 7), value);
+  public NoTaskMetadataException(String message, Throwable cause) {
+    super(message, cause);
   }
 }

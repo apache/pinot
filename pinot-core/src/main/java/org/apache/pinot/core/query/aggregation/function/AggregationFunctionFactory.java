@@ -52,6 +52,9 @@ public class AggregationFunctionFactory {
       ExpressionContext firstArgument = arguments.get(0);
       if (upperCaseFunctionName.startsWith("PERCENTILE")) {
         String remainingFunctionName = upperCaseFunctionName.substring(10);
+        if (remainingFunctionName.equals("SMARTTDIGEST")) {
+          return new PercentileSmartTDigestAggregationFunction(arguments);
+        }
         int numArguments = arguments.size();
         if (numArguments == 1) {
           // Single argument percentile (e.g. Percentile99(foo), PercentileTDigest95(bar), etc.)

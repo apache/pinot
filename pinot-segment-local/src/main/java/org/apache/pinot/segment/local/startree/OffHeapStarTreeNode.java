@@ -27,50 +27,37 @@ import static org.apache.pinot.segment.local.startree.StarTreeBuilderUtils.INVAL
 
 public class OffHeapStarTreeNode implements StarTreeNode {
   public static final int NUM_SERIALIZABLE_FIELDS = 7;
-  public static final int SERIALIZABLE_SIZE_IN_BYTES = Integer.BYTES * NUM_SERIALIZABLE_FIELDS;
+  public static final long SERIALIZABLE_SIZE_IN_BYTES = Integer.BYTES * NUM_SERIALIZABLE_FIELDS;
+  private static final int DIMENSION_ID_OFFSET = 0;
+  private static final int DIMENSION_VALUE_OFFSET = DIMENSION_ID_OFFSET + Integer.BYTES;
+  private static final int START_DOC_ID_OFFSET = DIMENSION_VALUE_OFFSET + Integer.BYTES;
+  private static final int END_DOC_ID_OFFSET = START_DOC_ID_OFFSET + Integer.BYTES;
+  private static final int AGGREGATE_DOC_ID_OFFSET = END_DOC_ID_OFFSET + Integer.BYTES;
+  private static final int FIRST_CHILD_ID_OFFSET = AGGREGATE_DOC_ID_OFFSET + Integer.BYTES;
+  private static final int LAST_CHILD_ID_OFFSET = FIRST_CHILD_ID_OFFSET + Integer.BYTES;
 
   private final PinotDataBuffer _dataBuffer;
-  private final int _dimensionId;
-  private final int _dimensionValue;
-  private final int _startDocId;
-  private final int _endDocId;
-  private final int _aggregatedDocId;
+  private final int _nodeId;
   private final int _firstChildId;
-  private final int _lastChildId;
 
   public OffHeapStarTreeNode(PinotDataBuffer dataBuffer, int nodeId) {
     _dataBuffer = dataBuffer;
-    long offset = (long) nodeId * SERIALIZABLE_SIZE_IN_BYTES;
+    _nodeId = nodeId;
+    _firstChildId = getInt(FIRST_CHILD_ID_OFFSET);
+  }
 
-    _dimensionId = dataBuffer.getInt(offset);
-    offset += Integer.BYTES;
-
-    _dimensionValue = dataBuffer.getInt(offset);
-    offset += Integer.BYTES;
-
-    _startDocId = dataBuffer.getInt(offset);
-    offset += Integer.BYTES;
-
-    _endDocId = dataBuffer.getInt(offset);
-    offset += Integer.BYTES;
-
-    _aggregatedDocId = dataBuffer.getInt(offset);
-    offset += Integer.BYTES;
-
-    _firstChildId = dataBuffer.getInt(offset);
-    offset += Integer.BYTES;
-
-    _lastChildId = dataBuffer.getInt(offset);
+  private int getInt(int fieldOffset) {
+    return _dataBuffer.getInt(_nodeId * SERIALIZABLE_SIZE_IN_BYTES + fieldOffset);
   }
 
   @Override
   public int getDimensionId() {
-    return _dimensionId;
+    return getInt(DIMENSION_ID_OFFSET);
   }
 
   @Override
   public int getDimensionValue() {
-    return _dimensionValue;
+    return getInt(DIMENSION_VALUE_OFFSET);
   }
 
   @Override
@@ -78,23 +65,23 @@ public class OffHeapStarTreeNode implements StarTreeNode {
     if (_firstChildId == INVALID_ID) {
       return INVALID_ID;
     } else {
-      return _dataBuffer.getInt((long) _firstChildId * SERIALIZABLE_SIZE_IN_BYTES);
+      return _dataBuffer.getInt(_firstChildId * SERIALIZABLE_SIZE_IN_BYTES);
     }
   }
 
   @Override
   public int getStartDocId() {
-    return _startDocId;
+    return getInt(START_DOC_ID_OFFSET);
   }
 
   @Override
   public int getEndDocId() {
-    return _endDocId;
+    return getInt(END_DOC_ID_OFFSET);
   }
 
   @Override
   public int getAggregatedDocId() {
-    return _aggregatedDocId;
+    return getInt(AGGREGATE_DOC_ID_OFFSET);
   }
 
   @Override
@@ -102,7 +89,7 @@ public class OffHeapStarTreeNode implements StarTreeNode {
     if (_firstChildId == INVALID_ID) {
       return 0;
     } else {
-      return _lastChildId - _firstChildId + 1;
+      return getInt(LAST_CHILD_ID_OFFSET) - _firstChildId + 1;
     }
   }
 
@@ -129,7 +116,7 @@ public class OffHeapStarTreeNode implements StarTreeNode {
 
     // Binary search
     int low = _firstChildId;
-    int high = _lastChildId;
+    int high = getInt(LAST_CHILD_ID_OFFSET);
 
     while (low <= high) {
       int mid = (low + high) / 2;
@@ -151,6 +138,7 @@ public class OffHeapStarTreeNode implements StarTreeNode {
   public Iterator<OffHeapStarTreeNode> getChildrenIterator() {
     return new Iterator<OffHeapStarTreeNode>() {
       private int _currentChildId = _firstChildId;
+      private final int _lastChildId = getInt(LAST_CHILD_ID_OFFSET);
 
       @Override
       public boolean hasNext() {

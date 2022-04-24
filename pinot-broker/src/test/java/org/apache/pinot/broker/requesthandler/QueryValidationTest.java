@@ -202,6 +202,13 @@ public class QueryValidationTest {
     testRejectGroovyQuery("SELECT foo FROM bar", false);
   }
 
+  @Test
+  public void testReplicaGroupToQueryInvalidQuery() {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM MY_TABLE "
+        + "OPTION(numReplicaGroupsToQuery=illegal)");
+    Assert.assertThrows(IllegalStateException.class, () -> BaseBrokerRequestHandler.validateRequest(pinotQuery, 10));
+  }
+
   private void testRejectGroovyQuery(String query, boolean queryContainsGroovy) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
 

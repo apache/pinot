@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.minion;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.util.ArrayList;
@@ -35,6 +36,8 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.JobContext;
 import org.apache.helix.task.JobQueue;
@@ -44,10 +47,14 @@ import org.apache.helix.task.TaskPartitionState;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.task.WorkflowConfig;
 import org.apache.helix.task.WorkflowContext;
+import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.utils.DateTimeUtils;
+import org.apache.pinot.controller.api.exception.NoTaskMetadataException;
 import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,8 +75,10 @@ public class PinotHelixTaskResourceManager {
   private static final String TASK_PREFIX = "Task" + TASK_NAME_SEPARATOR;
 
   private final TaskDriver _taskDriver;
+  private final PinotHelixResourceManager _helixResourceManager;
 
-  public PinotHelixTaskResourceManager(TaskDriver taskDriver) {
+  public PinotHelixTaskResourceManager(PinotHelixResourceManager helixResourceManager, TaskDriver taskDriver) {
+    _helixResourceManager = helixResourceManager;
     _taskDriver = taskDriver;
   }
 
@@ -234,8 +243,7 @@ public class PinotHelixTaskResourceManager {
     Preconditions.checkState(numConcurrentTasksPerInstance > 0);
 
     String taskType = pinotTaskConfigs.get(0).getTaskType();
-    String parentTaskName =
-        getParentTaskName(taskType, UUID.randomUUID() + "_" + System.currentTimeMillis());
+    String parentTaskName = getParentTaskName(taskType, UUID.randomUUID() + "_" + System.currentTimeMillis());
     return submitTask(parentTaskName, pinotTaskConfigs, minionInstanceTag, taskTimeoutMs,
         numConcurrentTasksPerInstance);
   }
@@ -641,6 +649,22 @@ public class PinotHelixTaskResourceManager {
 
   public String getParentTaskName(String taskType, String taskName) {
     return TASK_PREFIX + taskType + TASK_NAME_SEPARATOR + taskName;
+  }
+
+  public String getTaskMetadataByTable(String taskType, String tableNameWithType)
+      throws JsonProcessingException {
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _helixResourceManager.getPropertyStore();
+    ZNRecord raw = MinionTaskMetadataUtils.fetchTaskMetadata(propertyStore, taskType, tableNameWithType);
+    if (raw == null) {
+      throw new NoTaskMetadataException(
+          String.format("No task metadata for task type: %s from table: %s", taskType, tableNameWithType));
+    }
+    return JsonUtils.objectToString(raw);
+  }
+
+  public void deleteTaskMetadataByTable(String taskType, String tableNameWithType) {
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _helixResourceManager.getPropertyStore();
+    MinionTaskMetadataUtils.deleteTaskMetadata(propertyStore, taskType, tableNameWithType);
   }
 
   @JsonPropertyOrder({"taskState", "subtaskCount", "startTime", "executionStartTime", "subtaskInfos"})

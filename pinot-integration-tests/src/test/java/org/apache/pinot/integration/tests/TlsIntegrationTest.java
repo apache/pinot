@@ -283,10 +283,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   public void testUpdatedBrokerTlsPort() {
 
     List<InstanceConfig> instanceConfigs = HelixHelper.getInstanceConfigs(_helixManager);
-    List<ExtraInstanceConfig> securedInstances =
-        instanceConfigs.stream().map(ExtraInstanceConfig::new)
-            .filter(pinotInstanceConfig -> pinotInstanceConfig.getTlsPort() != null)
-            .collect(Collectors.toList());
+    List<ExtraInstanceConfig> securedInstances = instanceConfigs.stream().map(ExtraInstanceConfig::new)
+        .filter(pinotInstanceConfig -> pinotInstanceConfig.getTlsPort() != null).collect(Collectors.toList());
     Assert.assertFalse(securedInstances.isEmpty());
   }
 

@@ -56,7 +56,7 @@ RUN  wget http://archive.apache.org/dist/thrift/0.12.0/thrift-0.12.0.tar.gz -O /
 RUN git clone ${PINOT_GIT_URL} ${PINOT_BUILD_DIR} && \
     cd ${PINOT_BUILD_DIR} && \
     git checkout ${PINOT_BRANCH} && \
-    mvn install package -DskipTests -Pbin-dist -Pbuild-shaded-jar -Dkafka.version=${KAFKA_VERSION} -Djdk.version=${JDK_VERSION} -T1C && \
+    mvn install package -DskipTests -Pbin-dist -Pbuild-shaded-jar -Djdk.version=${JDK_VERSION} -T1C && \
     mkdir -p ${PINOT_HOME}/configs && \
     mkdir -p ${PINOT_HOME}/data && \
     cp -r build/* ${PINOT_HOME}/. && \

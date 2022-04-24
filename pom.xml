@@ -173,30 +173,6 @@
 
   <profiles>
     <profile>
-      <id>kafka-0.9</id>
-      <activation>
-        <property>
-          <name>kafka.version</name>
-          <value>0.9</value>
-        </property>
-      </activation>
-      <properties>
-        <kafka.version>0.9</kafka.version>
-      </properties>
-    </profile>
-    <profile>
-      <id>kafka-2.0</id>
-      <activation>
-        <property>
-          <name>kafka.version</name>
-          <value>2.0</value>
-        </property>
-      </activation>
-      <properties>
-        <kafka.version>2.0</kafka.version>
-      </properties>
-    </profile>
-    <profile>
       <id>github-actions</id>
       <activation>
         <activeByDefault>false</activeByDefault>

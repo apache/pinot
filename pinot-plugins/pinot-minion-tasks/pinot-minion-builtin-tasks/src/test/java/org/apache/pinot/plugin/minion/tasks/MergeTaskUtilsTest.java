@@ -102,6 +102,20 @@ public class MergeTaskUtilsTest {
     assertEquals(columnPartitionConfig.getFunctionName(), "murmur");
     assertEquals(columnPartitionConfig.getNumPartitions(), 10);
 
+    // Table with multiple partition columns.
+    Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
+    columnPartitionConfigMap.put("memberId", new ColumnPartitionConfig("murmur", 10));
+    columnPartitionConfigMap.put("memberName", new ColumnPartitionConfig("HashCode", 5));
+    TableConfig tableConfigWithMultiplePartitionColumns =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable")
+            .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap)).build();
+    Schema schemaWithMultipleColumns = new Schema.SchemaBuilder().addSingleValueDimension("memberId", DataType.LONG)
+        .addSingleValueDimension("memberName", DataType.STRING).build();
+    partitionerConfigs =
+        MergeTaskUtils.getPartitionerConfigs(tableConfigWithMultiplePartitionColumns, schemaWithMultipleColumns,
+            taskConfig);
+    assertEquals(partitionerConfigs.size(), 2);
+
     // No partition column in table config
     TableConfig tableConfigWithoutPartitionColumn =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();

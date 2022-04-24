@@ -231,9 +231,9 @@ public class NonScanBasedAggregationOperator extends BaseOperator<IntermediateRe
 
   private static Object getDistinctCountSmartHLLResult(Dictionary dictionary,
       DistinctCountSmartHLLAggregationFunction function) {
-    if (dictionary.length() > function.getHllConversionThreshold()) {
+    if (dictionary.length() > function.getThreshold()) {
       // Store values into a HLL when the dictionary size exceeds the conversion threshold
-      return getDistinctValueHLL(dictionary, function.getHllLog2m());
+      return getDistinctValueHLL(dictionary, function.getLog2m());
     } else {
       return getDistinctValueSet(dictionary);
     }

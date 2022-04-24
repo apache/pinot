@@ -39,8 +39,11 @@ import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
+import org.apache.pinot.core.query.aggregation.function.DistinctCountSmartHLLAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -391,12 +394,11 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
   @Test
   public void testSmartHLL() {
     // Dictionary based
-    String query = "SELECT DISTINCTCOUNTSMARTHLL(intColumn, 'hllConversionThreshold=10'), "
-        + "DISTINCTCOUNTSMARTHLL(longColumn, 'hllConversionThreshold=10'), "
-        + "DISTINCTCOUNTSMARTHLL(floatColumn, 'hllConversionThreshold=10'), "
-        + "DISTINCTCOUNTSMARTHLL(doubleColumn, 'hllConversionThreshold=10'), "
-        + "DISTINCTCOUNTSMARTHLL(stringColumn, 'hllConversionThreshold=10'), "
-        + "DISTINCTCOUNTSMARTHLL(bytesColumn, 'hllConversionThreshold=10') FROM testTable";
+    String query = "SELECT DISTINCTCOUNTSMARTHLL(intColumn, 'threshold=10'), "
+        + "DISTINCTCOUNTSMARTHLL(longColumn, 'threshold=10'), " + "DISTINCTCOUNTSMARTHLL(floatColumn, 'threshold=10'), "
+        + "DISTINCTCOUNTSMARTHLL(doubleColumn, 'threshold=10'), "
+        + "DISTINCTCOUNTSMARTHLL(stringColumn, 'threshold=10'), "
+        + "DISTINCTCOUNTSMARTHLL(bytesColumn, 'threshold=10') FROM testTable";
 
     // Inner segment
     String[] interSegmentsExpectedResults = new String[6];
@@ -469,7 +471,7 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
     }
 
     // Change log2m
-    query = "SELECT DISTINCTCOUNTSMARTHLL(intColumn, 'hllLog2m=8;hllConversionThreshold=10') FROM testTable";
+    query = "SELECT DISTINCTCOUNTSMARTHLL(intColumn, 'threshold=10;log2m=8') FROM testTable";
     operator = getOperatorForSqlQuery(query);
     assertTrue(operator instanceof NonScanBasedAggregationOperator);
     aggregationResult = ((NonScanBasedAggregationOperator) operator).nextBlock().getAggregationResult();
@@ -479,6 +481,15 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
     HyperLogLog hll = (HyperLogLog) aggregationResult.get(0);
     // Check log2m is 8
     assertEquals(hll.sizeof(), 172);
+
+    // Test legacy parameters
+    query = "SELECT DISTINCTCOUNTSMARTHLL(intColumn, 'hllConversionThreshold=10;hllLog2m=8') FROM testTable";
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
+    assertNotNull(queryContext.getAggregationFunctions());
+    DistinctCountSmartHLLAggregationFunction function =
+        (DistinctCountSmartHLLAggregationFunction) queryContext.getAggregationFunctions()[0];
+    assertEquals(function.getThreshold(), 10);
+    assertEquals(function.getLog2m(), 8);
   }
 
   @AfterClass

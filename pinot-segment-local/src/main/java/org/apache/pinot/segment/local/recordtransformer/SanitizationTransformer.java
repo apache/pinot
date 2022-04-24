@@ -20,11 +20,11 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.StringUtil;
 
 
 /**

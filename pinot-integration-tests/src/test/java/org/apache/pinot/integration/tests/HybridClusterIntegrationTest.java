@@ -83,8 +83,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     addTableConfig(createRealtimeTableConfig(realtimeAvroFiles.get(0)));
 
     // Create and upload segments
-    ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir,
+        _tarDir);
     uploadSegments(getTableName(), _tarDir);
 
     // Push data into Kafka
@@ -123,18 +123,16 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testSegmentMetadataApi()
       throws Exception {
-    {
-      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName()));
-      JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
-      Assert.assertEquals(tableSegmentsMetadata.size(), 8);
+    String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName()));
+    JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
+    Assert.assertEquals(tableSegmentsMetadata.size(), 8);
 
-      JsonNode segmentMetadataFromAllEndpoint = tableSegmentsMetadata.elements().next();
-      String segmentName = URLEncoder.encode(segmentMetadataFromAllEndpoint.get("segmentName").asText(), "UTF-8");
-      jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(getTableName(), segmentName));
-      JsonNode segmentMetadataFromDirectEndpoint = JsonUtils.stringToJsonNode(jsonOutputStr);
-      Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
-          segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
-    }
+    JsonNode segmentMetadataFromAllEndpoint = tableSegmentsMetadata.elements().next();
+    String segmentName = segmentMetadataFromAllEndpoint.get("segmentName").asText();
+    jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(getTableName(), segmentName));
+    JsonNode segmentMetadataFromDirectEndpoint = JsonUtils.stringToJsonNode(jsonOutputStr);
+    Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
+        segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
   }
 
   @Test

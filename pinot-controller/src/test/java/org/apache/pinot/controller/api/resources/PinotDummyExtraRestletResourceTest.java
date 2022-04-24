@@ -20,8 +20,8 @@ package org.apache.pinot.controller.api.resources;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.controller.ControllerTestUtils;
+import org.apache.pinot.spi.utils.StringUtil;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
