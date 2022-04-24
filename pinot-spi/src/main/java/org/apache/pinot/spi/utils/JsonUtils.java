@@ -50,6 +50,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -63,24 +64,6 @@ import org.apache.pinot.spi.data.Schema;
 
 public class JsonUtils {
   private JsonUtils() {
-  }
-
-  public static class JsonPojoWithUnparsableProps<T> {
-    private final T _obj;
-    private final Map<String, Object> _unparseableProps;
-
-    public JsonPojoWithUnparsableProps(T obj, Map<String, Object> unparseableProps) {
-      _obj = obj;
-      _unparseableProps = unparseableProps;
-    }
-
-    public T getObj() {
-      return _obj;
-    }
-
-    public Map<String, Object> getUnparseableProps() {
-      return _unparseableProps;
-    }
   }
 
   // For flattening
@@ -104,7 +87,7 @@ public class JsonUtils {
     return DEFAULT_READER.forType(valueType).readValue(jsonString);
   }
 
-  public static <T> JsonPojoWithUnparsableProps<T> stringToObjectAndUnparseableProps(String jsonString,
+  public static <T> Pair<T, Map<String, Object>> stringToObjectAndUnparseableProps(String jsonString,
       Class<T> valueType)
       throws IOException {
     T instance = DEFAULT_READER.forType(valueType).readValue(jsonString);
@@ -114,7 +97,7 @@ public class JsonUtils {
     Map<String, Object> instanceJsonMap = flatten(DEFAULT_MAPPER.readValue(instanceJson, GENERIC_JSON_TYPE));
 
     MapDifference<String, Object> difference = Maps.difference(inputJsonMap, instanceJsonMap);
-    return new JsonPojoWithUnparsableProps<>(instance, difference.entriesOnlyOnLeft());
+    return Pair.of(instance, difference.entriesOnlyOnLeft());
   }
 
   public static Map<String, Object> flatten(Map<String, Object> map) {

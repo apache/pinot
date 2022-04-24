@@ -34,6 +34,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
@@ -55,6 +56,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -159,12 +161,12 @@ public class PinotTableRestletResource {
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
     // TODO introduce a table config ctor with json string.
-    JsonUtils.JsonPojoWithUnparsableProps<TableConfig> tableConfigAndUnparsedProps;
+    Pair<TableConfig, Map<String, Object>> tableConfigAndUnparsedProps;
     TableConfig tableConfig;
     String tableName;
     try {
       tableConfigAndUnparsedProps = JsonUtils.stringToObjectAndUnparseableProps(tableConfigStr, TableConfig.class);
-      tableConfig = tableConfigAndUnparsedProps.getObj();
+      tableConfig = tableConfigAndUnparsedProps.getLeft();
 
       // validate permission
       tableName = tableConfig.getTableName();
@@ -197,7 +199,7 @@ public class PinotTableRestletResource {
       // (in realtime case, metadata might not have been created but would be created successfully in the next run of
       // the validation manager)
       return new ConfigSuccessResponse("Table " + tableName + " succesfully added",
-          tableConfigAndUnparsedProps.getUnparseableProps());
+          tableConfigAndUnparsedProps.getRight());
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
       if (e instanceof InvalidTableConfigException) {
@@ -445,12 +447,12 @@ public class PinotTableRestletResource {
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, String tableConfigString)
       throws Exception {
-    JsonUtils.JsonPojoWithUnparsableProps<TableConfig> tableConfigJsonPojoWithUnparsableProps;
+    Pair<TableConfig, Map<String, Object>> tableConfigJsonPojoWithUnparsableProps;
     TableConfig tableConfig;
     try {
       tableConfigJsonPojoWithUnparsableProps =
           JsonUtils.stringToObjectAndUnparseableProps(tableConfigString, TableConfig.class);
-      tableConfig = tableConfigJsonPojoWithUnparsableProps.getObj();
+      tableConfig = tableConfigJsonPojoWithUnparsableProps.getLeft();
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
       TableConfigUtils.validate(tableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
     } catch (Exception e) {
@@ -489,7 +491,7 @@ public class PinotTableRestletResource {
       throw e;
     }
     return new ConfigSuccessResponse("Table config updated for " + tableName,
-        tableConfigJsonPojoWithUnparsableProps.getUnparseableProps());
+        tableConfigJsonPojoWithUnparsableProps.getRight());
   }
 
   @POST
@@ -502,7 +504,7 @@ public class PinotTableRestletResource {
       String tableConfigStr,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip) {
-    JsonUtils.JsonPojoWithUnparsableProps<TableConfig> tableConfig;
+    Pair<TableConfig, Map<String, Object>> tableConfig;
     try {
       tableConfig = JsonUtils.stringToObjectAndUnparseableProps(tableConfigStr, TableConfig.class);
     } catch (IOException e) {
@@ -510,9 +512,9 @@ public class PinotTableRestletResource {
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
     ObjectNode validationResponse =
-        validateConfig(tableConfig.getObj(), _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig.getObj()),
+        validateConfig(tableConfig.getLeft(), _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig.getLeft()),
             typesToSkip);
-    validationResponse.set("unrecognizedProperties", JsonUtils.objectToJsonNode(tableConfig.getUnparseableProps()));
+    validationResponse.set("unrecognizedProperties", JsonUtils.objectToJsonNode(tableConfig.getRight()));
     return validationResponse;
   }
 
