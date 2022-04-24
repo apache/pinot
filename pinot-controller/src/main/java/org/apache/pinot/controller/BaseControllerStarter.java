@@ -494,7 +494,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   private ServiceStatus.ServiceStatusCallback generateServiceStatusCallback(HelixManager helixManager) {
     return new ServiceStatus.ServiceStatusCallback() {
       private volatile boolean _isStarted = false;
-      private String _statusDescription = "Helix ZK Not connected as " + helixManager.getInstanceType();
+      private volatile String _statusDescription = "Helix ZK Not connected as " + helixManager.getInstanceType();
 
       @Override
       public ServiceStatus.Status getServiceStatus() {

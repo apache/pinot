@@ -247,6 +247,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     LOGGER.info("Initializing health check callback");
     ServiceStatus.setServiceStatusCallback(_instanceId, new ServiceStatus.ServiceStatusCallback() {
       private volatile boolean _isStarted = false;
+      private volatile String _statusDescription = "Helix ZK Not connected as " + _helixManager.getInstanceType();
 
       @Override
       public ServiceStatus.Status getServiceStatus() {
@@ -264,13 +265,14 @@ public abstract class BaseMinionStarter implements ServiceStartable {
           return ServiceStatus.Status.STARTING;
         } else {
           _isStarted = true;
+          _statusDescription = ServiceStatus.STATUS_DESCRIPTION_NONE;
           return ServiceStatus.Status.GOOD;
         }
       }
 
       @Override
       public String getStatusDescription() {
-        return ServiceStatus.STATUS_DESCRIPTION_NONE;
+        return _statusDescription;
       }
     });
 
