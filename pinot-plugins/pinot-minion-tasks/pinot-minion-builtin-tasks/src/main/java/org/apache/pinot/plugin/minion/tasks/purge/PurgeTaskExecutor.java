@@ -45,6 +45,7 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
 
     TableConfig tableConfig = getTableConfig(tableNameWithType);
+
     SegmentPurger.RecordPurgerFactory recordPurgerFactory = MINION_CONTEXT.getRecordPurgerFactory();
     SegmentPurger.RecordPurger recordPurger =
         recordPurgerFactory != null ? recordPurgerFactory.getRecordPurger(rawTableName) : null;
