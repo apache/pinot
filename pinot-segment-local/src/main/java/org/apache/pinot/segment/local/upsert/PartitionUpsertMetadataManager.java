@@ -103,13 +103,14 @@ public class PartitionUpsertMetadataManager {
           (primaryKey, currentRecordLocation) -> {
             if (currentRecordLocation != null) {
               // Existing primary key
+              IndexSegment currentSegment = currentRecordLocation.getSegment();
+              int comparisonResult = recordInfo._comparisonValue.compareTo(currentRecordLocation.getComparisonValue());
 
               // The current record is in the same segment
               // Update the record location when there is a tie to keep the newer record. Note that the record info
               // iterator will return records with incremental doc ids.
-              IndexSegment currentSegment = currentRecordLocation.getSegment();
               if (segment == currentSegment) {
-                if (recordInfo._comparisonValue.compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
+                if (comparisonResult >= 0) {
                   validDocIds.replace(currentRecordLocation.getDocId(), recordInfo._docId);
                   return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
                 } else {
@@ -124,7 +125,7 @@ public class PartitionUpsertMetadataManager {
               // doc ids for the old segment because it has not been replaced yet.
               String currentSegmentName = currentSegment.getSegmentName();
               if (segmentName.equals(currentSegmentName)) {
-                if (recordInfo._comparisonValue.compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
+                if (comparisonResult >= 0) {
                   validDocIds.add(recordInfo._docId);
                   return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
                 } else {
@@ -136,12 +137,10 @@ public class PartitionUpsertMetadataManager {
               // Update the record location when getting a newer comparison value, or the value is the same as the
               // current value, but the segment has a larger sequence number (the segment is newer than the current
               // segment).
-              if (recordInfo._comparisonValue.compareTo(currentRecordLocation.getComparisonValue()) > 0 || (
-                  recordInfo._comparisonValue == currentRecordLocation.getComparisonValue()
-                      && LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)
-                      && LLCSegmentName.isLowLevelConsumerSegmentName(currentSegmentName)
-                      && LLCSegmentName.getSequenceNumber(segmentName) > LLCSegmentName.getSequenceNumber(
-                      currentSegmentName))) {
+              if (comparisonResult > 0 || (comparisonResult == 0 && LLCSegmentName.isLowLevelConsumerSegmentName(
+                  segmentName) && LLCSegmentName.isLowLevelConsumerSegmentName(currentSegmentName)
+                  && LLCSegmentName.getSequenceNumber(segmentName) > LLCSegmentName.getSequenceNumber(
+                  currentSegmentName))) {
                 Objects.requireNonNull(currentSegment.getValidDocIds()).remove(currentRecordLocation.getDocId());
                 validDocIds.add(recordInfo._docId);
                 return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
