@@ -51,18 +51,22 @@ public class InstanceReplicaGroupPartitionConfig extends BaseJsonConfig {
           + "instances if not " + "specified")
   private final int _numInstancesPerPartition;
 
+  private final boolean _minimizeDataMovement;
+
   @JsonCreator
   public InstanceReplicaGroupPartitionConfig(@JsonProperty("replicaGroupBased") boolean replicaGroupBased,
       @JsonProperty("numInstances") int numInstances, @JsonProperty("numReplicaGroups") int numReplicaGroups,
       @JsonProperty("numInstancesPerReplicaGroup") int numInstancesPerReplicaGroup,
       @JsonProperty("numPartitions") int numPartitions,
-      @JsonProperty("numInstancesPerPartition") int numInstancesPerPartition) {
+      @JsonProperty("numInstancesPerPartition") int numInstancesPerPartition,
+      @JsonProperty("minimizeDataMovement") boolean minimizeDataMovement) {
     _replicaGroupBased = replicaGroupBased;
     _numInstances = numInstances;
     _numReplicaGroups = numReplicaGroups;
     _numInstancesPerReplicaGroup = numInstancesPerReplicaGroup;
     _numPartitions = numPartitions;
     _numInstancesPerPartition = numInstancesPerPartition;
+    _minimizeDataMovement = minimizeDataMovement;
   }
 
   public boolean isReplicaGroupBased() {
@@ -87,5 +91,9 @@ public class InstanceReplicaGroupPartitionConfig extends BaseJsonConfig {
 
   public int getNumInstancesPerPartition() {
     return _numInstancesPerPartition;
+  }
+
+  public boolean isMinimizeDataMovement() {
+    return _minimizeDataMovement;
   }
 }
