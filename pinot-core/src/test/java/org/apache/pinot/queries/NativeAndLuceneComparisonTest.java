@@ -54,7 +54,7 @@ import org.testng.annotations.Test;
 
 
 public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "TextSearchQueriesTest");
+  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "NativeAndLuceneComparisonTest");
   private static final String TABLE_NAME = "MyTable";
   private static final String SEGMENT_NAME_LUCENE = "testSegmentLucene";
   private static final String SEGMENT_NAME_NATIVE = "testSegmentNative";
@@ -264,6 +264,30 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
     testSelectionResults(query, 256, null);
 
     query = "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS '.*www.domain1.*' LIMIT 50000";
+    _indexSegment = _nativeIndexSegment;
+    _indexSegments = Arrays.asList(_nativeIndexSegment);
+    testSelectionResults(query, 256, null);
+
+    query = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'www.domain1% AND %www.domain1') LIMIT 50000";
+    _indexSegment = _luceneSegment;
+    _indexSegments = Arrays.asList(_indexSegment);
+    testSelectionResults(query, 256, null);
+
+    query =
+        "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'www.domain1.*' AND DOMAIN_NAMES_NATIVE CONTAINS '"
+            + ".*www.domain1' LIMIT 50000";
+    _indexSegment = _nativeIndexSegment;
+    _indexSegments = Arrays.asList(_nativeIndexSegment);
+    testSelectionResults(query, 256, null);
+
+    query = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'www.domain1% OR %www.domain1') LIMIT 50000";
+    _indexSegment = _luceneSegment;
+    _indexSegments = Arrays.asList(_indexSegment);
+    testSelectionResults(query, 256, null);
+
+    query =
+        "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'www.domain1.*' OR DOMAIN_NAMES_NATIVE CONTAINS '"
+            + ".*www.domain1' LIMIT 50000";
     _indexSegment = _nativeIndexSegment;
     _indexSegments = Arrays.asList(_nativeIndexSegment);
     testSelectionResults(query, 256, null);
