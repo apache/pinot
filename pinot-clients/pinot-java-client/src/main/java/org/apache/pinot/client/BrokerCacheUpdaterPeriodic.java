@@ -43,12 +43,7 @@ public class BrokerCacheUpdaterPeriodic implements UpdatableBrokerCache {
   }
 
   public void init() throws Exception {
-    try {
-      _brokerCache.updateBrokerData();
-    } catch (Exception e) {
-      LOGGER.error("Broker cache update failed", e);
-      throw e;
-    }
+    _brokerCache.updateBrokerData();
 
     if (_brokerUpdateFreqInMillis > 0) {
       _scheduledExecutorService.scheduleAtFixedRate(new Runnable() {

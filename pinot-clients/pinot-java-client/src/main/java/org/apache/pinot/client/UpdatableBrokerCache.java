@@ -36,13 +36,13 @@ public interface UpdatableBrokerCache {
   /**
    * Method to get one random broker for a given table
    * @param tableName
-   * @return
+   * @return Broker address corresponding to the table
    */
   String getBroker(String tableName);
 
   /**
    * Returns all the brokers currently in the cache
-   * @return
+   * @return List of all avaliable brokers
    */
   List<String> getBrokers();
 

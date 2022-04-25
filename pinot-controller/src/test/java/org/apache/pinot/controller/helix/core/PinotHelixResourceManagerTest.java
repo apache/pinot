@@ -53,6 +53,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.ControllerTestUtils;
+import org.apache.pinot.controller.api.resources.InstanceInfo;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -1078,6 +1079,43 @@ public class PinotHelixResourceManagerTest {
       }
     } while (System.currentTimeMillis() < endTimeMs);
     throw new RuntimeException("Timeout while waiting for segments to be deleted");
+  }
+
+  @Test
+  public void testGetTableToLiveBrokersMapping()
+      throws IOException {
+    Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 2, 0, 0);
+    PinotResourceManagerResponse response =
+        ControllerTestUtils.getHelixResourceManager().createBrokerTenant(brokerTenant);
+    Assert.assertTrue(response.isSuccessful());
+    // Create the table
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNumReplicas(ControllerTestUtils.MIN_NUM_REPLICAS).setBrokerTenant(BROKER_TENANT_NAME)
+        .setServerTenant(SERVER_TENANT_NAME).build();
+    ControllerTestUtils.getHelixResourceManager().addTable(tableConfig);
+    // Introduce a wait here for the EV is updated with live brokers for a table.
+    TestUtils.waitForCondition(aVoid -> {
+      ExternalView externalView = ControllerTestUtils.getHelixResourceManager().getHelixAdmin()
+          .getResourceExternalView(ControllerTestUtils.getHelixClusterName(),
+              CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+      int onlineBrokersCnt = 0;
+      Map<String, String> brokerToStateMap = externalView.getStateMap(OFFLINE_TABLE_NAME);
+      if (brokerToStateMap == null) {
+        return false;
+      }
+      for (Map.Entry<String, String> entry : brokerToStateMap.entrySet()) {
+        if ("ONLINE".equalsIgnoreCase(entry.getValue())) {
+          onlineBrokersCnt++;
+        }
+      }
+      return onlineBrokersCnt == 2;
+    }, TIMEOUT_IN_MS, "");
+
+    Map<String, List<InstanceInfo>> tableToBrokersMapping =
+        ControllerTestUtils.getHelixResourceManager().getTableToLiveBrokersMapping();
+
+    Assert.assertEquals(tableToBrokersMapping.size(), 1);
+    Assert.assertEquals(tableToBrokersMapping.get(OFFLINE_TABLE_NAME).size(), 2);
   }
 
   @Test
