@@ -147,8 +147,26 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
     @Override
     public Object execute(Object[] values) {
-      //
-      return null;
+      switch (_name) {
+        case "and":
+          for (ExecutableNode executableNode :_argumentNodes) {
+            Boolean res = (Boolean) (executableNode.execute(values));
+            if (!res) {
+              return false;
+            }
+          }
+          return true;
+        case "or":
+          for (ExecutableNode executableNode :_argumentNodes) {
+            Boolean res = (Boolean) (executableNode.execute(values));
+            if (res) {
+              return true;
+            }
+          }
+          return false;
+        default:
+          throw new IllegalArgumentException("Illegal function name passed" + _name);
+      }
     }
   }
 
