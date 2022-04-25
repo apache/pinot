@@ -26,7 +26,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
  * Represents a CONTAINS predicate.
  */
 public class ContainsPredicate implements Predicate {
-  private final ExpressionContext _lhs;
+  private ExpressionContext _lhs;
   private final String _value;
 
   public ContainsPredicate(ExpressionContext lhs, String value) {
@@ -42,6 +42,11 @@ public class ContainsPredicate implements Predicate {
   @Override
   public ExpressionContext getLhs() {
     return _lhs;
+  }
+
+  @Override
+  public void setLhs(ExpressionContext lhs) {
+    _lhs = lhs;
   }
 
   public String getValue() {

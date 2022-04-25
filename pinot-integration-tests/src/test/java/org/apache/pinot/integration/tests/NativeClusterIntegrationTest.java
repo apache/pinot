@@ -28,13 +28,11 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ResultSetGroup;
-import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -47,14 +45,13 @@ import static org.testng.Assert.assertTrue;
 public class NativeClusterIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String TEXT_COLUMN_NAME = "UniqueCarrier";
   private static final String TIME_COLUMN_NAME = "millisSinceEpoch";
-  private static final int NUM_SKILLS = 24;
   private static final String TEST_TEXT_COLUMN_QUERY =
       "SELECT COUNT(*) FROM mytable WHERE UniqueCarrier CONTAINS '.*l'";
+  private static final String TEST_TEXT_COLUMN_QUERY2 =
+      "SELECT COUNT(*) FROM mytable WHERE UniqueCarrier CONTAINS 'a.*'";
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 1;
 
-  private final List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbacks =
-      new ArrayList<>(getNumBrokers() + getNumServers());
   private String _schemaFileName = DEFAULT_SCHEMA_FILE_NAME;
 
   protected int getNumBrokers() {
@@ -159,10 +156,9 @@ public class NativeClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     waitForAllDocsLoaded(600_000L);
   }
 
-  protected void startServers() {
-    // Enable gRPC server
-    PinotConfiguration serverConfig = getDefaultServerConfiguration();
-    startServer(serverConfig);
+  protected void startServers()
+      throws Exception {
+    startServer();
   }
 
   @AfterClass
@@ -187,6 +183,12 @@ public class NativeClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
     assertEquals(resultTableResultSet.getRowCount(), 1);
     assertEquals(resultTableResultSet.getInt(0), 16731);
+
+    pinotResultSetGroup = connection.execute(TEST_TEXT_COLUMN_QUERY2);
+    resultTableResultSet = pinotResultSetGroup.getResultSet(0);
+
+    assertEquals(resultTableResultSet.getRowCount(), 1);
+    assertEquals(resultTableResultSet.getInt(0), 11240);
   }
 
   @Override
