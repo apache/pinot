@@ -27,7 +27,6 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
  * Arithmetic scalar functions.
  */
 public class ArithmeticFunctions {
-
   private ArithmeticFunctions() {
   }
 
