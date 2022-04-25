@@ -28,8 +28,6 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.PinotReflectionUtils;
-
 
 /**
  * Evaluates an expression.
@@ -141,16 +139,19 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
         case "or":
           for (ExecutableNode executableNode :_argumentNodes) {
             Boolean res = (Boolean) (executableNode.execute(row));
-            if (res)
+            if (res) {
               return true;
+            }
           }
           return false;
+        default:
+          throw new IllegalArgumentException("Illegal function name passed" + _name);
       }
-      return null;
     }
 
     @Override
     public Object execute(Object[] values) {
+      //
       return null;
     }
   }

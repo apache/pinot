@@ -18,15 +18,10 @@
  */
 package org.apache.pinot.common.request.context;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.Function;
 
-import static org.apache.pinot.common.request.context.RequestContextUtils.getExpression;
 
 
 /**
