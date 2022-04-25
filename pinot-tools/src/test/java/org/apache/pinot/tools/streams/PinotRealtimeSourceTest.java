@@ -31,7 +31,7 @@ public class PinotRealtimeSourceTest {
   @Test
   public void testBuilder() {
     StreamDataProducer producer = Mockito.mock(StreamDataProducer.class);
-    PinotSourceGenerator generator = Mockito.mock(PinotSourceGenerator.class);
+    PinotSourceDataGenerator generator = Mockito.mock(PinotSourceDataGenerator.class);
     PinotRealtimeSource realtimeSource =
         PinotRealtimeSource.builder().setTopic("mytopic").setProducer(producer).setGenerator(generator).build();
     Assert.assertNotNull(realtimeSource);
@@ -51,7 +51,7 @@ public class PinotRealtimeSourceTest {
 
   @Test(expectedExceptions = NullPointerException.class)
   public void testBuilderNoNullProducerThrowExceptions() {
-    PinotSourceGenerator generator = Mockito.mock(PinotSourceGenerator.class);
+    PinotSourceDataGenerator generator = Mockito.mock(PinotSourceDataGenerator.class);
     PinotRealtimeSource realtimeSource =
         PinotRealtimeSource.builder().setTopic("mytopic").setGenerator(generator).build();
   }

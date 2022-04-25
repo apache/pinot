@@ -27,7 +27,7 @@ import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.tools.Quickstart;
 import org.apache.pinot.tools.streams.PinotRealtimeSource;
-import org.apache.pinot.tools.streams.PinotSourceGenerator;
+import org.apache.pinot.tools.streams.PinotSourceDataGenerator;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.tools.utils.KinesisStarterUtils;
 import org.apache.pinot.tools.utils.StreamSourceType;
@@ -51,7 +51,7 @@ public class PullRequestMergedEventsStream {
   public PullRequestMergedEventsStream(File schemaFile, String topicName, String personalAccessToken,
       StreamDataProducer producer)
       throws Exception {
-    PinotSourceGenerator generator = new GithubPullRequestSourceGenerator(schemaFile, personalAccessToken);
+    PinotSourceDataGenerator generator = new GithubPullRequestSourceGenerator(schemaFile, personalAccessToken);
     _pinotStream =
         PinotRealtimeSource.builder().setProducer(producer).setGenerator(generator).setTopic(topicName).build();
   }

@@ -20,7 +20,7 @@ package org.apache.pinot.tools.streams;
 
 import java.util.List;
 import java.util.Properties;
-import org.apache.pinot.spi.stream.RowWithKey;
+import org.apache.pinot.spi.stream.StreamDataProducer;
 
 
 /**
@@ -28,7 +28,7 @@ import org.apache.pinot.spi.stream.RowWithKey;
  * For example it can be pulling a batch from Kafka, or polling some data via HTTP GET
  * The generator will be driven by PinotRealtimeSource to keep producing into some downstream sink
  */
-public interface PinotSourceGenerator extends AutoCloseable {
+public interface PinotSourceDataGenerator extends AutoCloseable {
   /**
    * Initialize the generator via a property file. It will be called at least once
    * @param properties the property files
@@ -40,5 +40,5 @@ public interface PinotSourceGenerator extends AutoCloseable {
    * It is up to the generator to define the binary format
    * @return a small list of RowWithKey, each element of the list will be written as one row of data
    */
-  List<RowWithKey> generateRows();
+  List<StreamDataProducer.RowWithKey> generateRows();
 }

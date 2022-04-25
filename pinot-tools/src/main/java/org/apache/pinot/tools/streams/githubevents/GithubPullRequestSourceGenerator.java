@@ -29,11 +29,11 @@ import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
-import org.apache.pinot.spi.stream.RowWithKey;
+import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.QuickStartBase;
 import org.apache.pinot.tools.Quickstart;
-import org.apache.pinot.tools.streams.PinotSourceGenerator;
+import org.apache.pinot.tools.streams.PinotSourceDataGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
 /**
  * The class that pulls events from GitHub by RPC calls, and converts them into byte[] so we can write to Kafka
  */
-public class GithubPullRequestSourceGenerator implements PinotSourceGenerator {
+public class GithubPullRequestSourceGenerator implements PinotSourceDataGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(GithubPullRequestSourceGenerator.class);
   private static final long SLEEP_MILLIS = 10_000;
 
@@ -154,8 +154,8 @@ public class GithubPullRequestSourceGenerator implements PinotSourceGenerator {
   }
 
   @Override
-  public List<RowWithKey> generateRows() {
-    List<RowWithKey> retVal = new ArrayList<>();
+  public List<StreamDataProducer.RowWithKey> generateRows() {
+    List<StreamDataProducer.RowWithKey> retVal = new ArrayList<>();
     try {
       GitHubAPICaller.GitHubAPIResponse githubAPIResponse = _gitHubAPICaller.callEventsAPI(_etag);
       switch (githubAPIResponse._statusCode) {
@@ -167,7 +167,8 @@ public class GithubPullRequestSourceGenerator implements PinotSourceGenerator {
               GenericRecord genericRecord = convertToPullRequestMergedGenericRecord(eventElement);
               if (genericRecord != null) {
                 QuickStartBase.printStatus(Quickstart.Color.CYAN, genericRecord.toString());
-                retVal.add(new RowWithKey(null, genericRecord.toString().getBytes(StandardCharsets.UTF_8)));
+                retVal.add(
+                    new StreamDataProducer.RowWithKey(null, genericRecord.toString().getBytes(StandardCharsets.UTF_8)));
               }
             } catch (Exception e) {
               LOGGER.error("Exception in publishing generic record. Skipping", e);

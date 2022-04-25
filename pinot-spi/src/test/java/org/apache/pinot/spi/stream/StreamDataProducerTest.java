@@ -24,7 +24,8 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class RowWithKeyTest {
+public class StreamDataProducerTest {
+
   @Test
   public void testRowWithKeyEquals() {
     byte[] b1 = new byte[]{11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
@@ -32,9 +33,9 @@ public class RowWithKeyTest {
     byte[] b3 = new byte[]{1, 2, 3, 4, 5, 6, 7, 8};
     byte[] k1 = "somekey".getBytes(StandardCharsets.UTF_8);
     byte[] k3 = "anotherkey".getBytes(StandardCharsets.UTF_8);
-    RowWithKey nullKey1 = new RowWithKey(null, b1);
-    RowWithKey nullKey2 = new RowWithKey(null, b2);
-    RowWithKey nullKey3 = new RowWithKey(null, b3);
+    StreamDataProducer.RowWithKey nullKey1 = new StreamDataProducer.RowWithKey(null, b1);
+    StreamDataProducer.RowWithKey nullKey2 = new StreamDataProducer.RowWithKey(null, b2);
+    StreamDataProducer.RowWithKey nullKey3 = new StreamDataProducer.RowWithKey(null, b3);
     Assert.assertEquals(nullKey2, nullKey1);
     Assert.assertEquals(nullKey1.hashCode(), nullKey2.hashCode());
     Assert.assertNotEquals(nullKey3, nullKey1);
@@ -42,13 +43,13 @@ public class RowWithKeyTest {
 
     Assert.assertEquals(nullKey1, nullKey1);
 
-    RowWithKey b2WithKey = new RowWithKey(k1, b2);
+    StreamDataProducer.RowWithKey b2WithKey = new StreamDataProducer.RowWithKey(k1, b2);
     Assert.assertNotEquals(nullKey2, b2WithKey);;
-    RowWithKey b1WithKey = new RowWithKey(k1, b1);
+    StreamDataProducer.RowWithKey b1WithKey = new StreamDataProducer.RowWithKey(k1, b1);
     Assert.assertEquals(b1WithKey, b2WithKey);
     Assert.assertEquals(b1WithKey.hashCode(), b2WithKey.hashCode());
 
-    RowWithKey b2WithDifferentKey = new RowWithKey(k3, b2);
+    StreamDataProducer.RowWithKey b2WithDifferentKey = new StreamDataProducer.RowWithKey(k3, b2);
     Assert.assertNotEquals(b2WithKey, b2WithDifferentKey);
   }
 }

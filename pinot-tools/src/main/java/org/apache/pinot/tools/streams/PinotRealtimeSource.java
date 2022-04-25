@@ -25,7 +25,6 @@ import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.stream.RowWithKey;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,7 +43,7 @@ public class PinotRealtimeSource implements AutoCloseable {
   public static final long DEFAULT_MAX_MESSAGE_PER_SECOND = Long.MAX_VALUE;
   public static final long DEFAULT_EMPTY_SOURCE_SLEEP_MS = 10;
   final StreamDataProducer _producer;
-  final PinotSourceGenerator _generator;
+  final PinotSourceDataGenerator _generator;
   final String _topicName;
   final ExecutorService _executor;
   final Properties _properties;
@@ -57,7 +56,7 @@ public class PinotRealtimeSource implements AutoCloseable {
    * @param generator the generator that can create data
    * @param producer the producer to write the generator's data into
    */
-  public PinotRealtimeSource(Properties settings, PinotSourceGenerator generator, StreamDataProducer producer) {
+  public PinotRealtimeSource(Properties settings, PinotSourceDataGenerator generator, StreamDataProducer producer) {
     this(settings, generator, producer, null, null);
   }
 
@@ -69,7 +68,7 @@ public class PinotRealtimeSource implements AutoCloseable {
    * @param executor the preferred executor instead of creating a thread pool. Null for default one
    * @param rateLimiter the specialized rate limiter for customization. Null for default guava one
    */
-  public PinotRealtimeSource(Properties settings, PinotSourceGenerator generator, StreamDataProducer producer,
+  public PinotRealtimeSource(Properties settings, PinotSourceDataGenerator generator, StreamDataProducer producer,
       @Nullable ExecutorService executor, @Nullable PinotStreamRateLimiter rateLimiter) {
     _properties = settings;
     _producer = producer;
@@ -85,7 +84,7 @@ public class PinotRealtimeSource implements AutoCloseable {
   public void run() {
     _executor.execute(() -> {
       while (!_shutdown) {
-        List<RowWithKey> rows = _generator.generateRows();
+        List<StreamDataProducer.RowWithKey> rows = _generator.generateRows();
         // we expect the generator implementation to return empty rows when there is no data available
         // as a stream, we expect data to be available all the time
         if (rows.isEmpty()) {
@@ -144,7 +143,7 @@ public class PinotRealtimeSource implements AutoCloseable {
   public static class Builder {
     private String _topic;
     private long _maxMessagePerSecond;
-    private PinotSourceGenerator _generator;
+    private PinotSourceDataGenerator _generator;
     private StreamDataProducer _producer;
     private ExecutorService _executor;
     private PinotStreamRateLimiter _rateLimiter;
@@ -158,7 +157,7 @@ public class PinotRealtimeSource implements AutoCloseable {
       return this;
     }
 
-    public Builder setGenerator(PinotSourceGenerator generator) {
+    public Builder setGenerator(PinotSourceDataGenerator generator) {
       _generator = generator;
       return this;
     }

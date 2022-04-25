@@ -37,7 +37,7 @@ import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.stream.RowWithKey;
+import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory;
  * It will keep looping the same file and produce data output. We can pass in a lambda function to compute
  * time index based on row number.
  */
-public class AvroFileSourceGenerator implements PinotSourceGenerator {
+public class AvroFileSourceGenerator implements PinotSourceDataGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotRealtimeSource.class);
   private DataFileStream<GenericRecord> _avroDataStream;
   private final Schema _pinotSchema;
@@ -95,8 +95,8 @@ public class AvroFileSourceGenerator implements PinotSourceGenerator {
   }
 
   @Override
-  public List<RowWithKey> generateRows() {
-    List<RowWithKey> retVal = new ArrayList<>();
+  public List<StreamDataProducer.RowWithKey> generateRows() {
+    List<StreamDataProducer.RowWithKey> retVal = new ArrayList<>();
     ensureStream();
     int rowsInCurrentBatch = 0;
     while (_avroDataStream.hasNext() && rowsInCurrentBatch < _rowsPerBatch) {
@@ -110,7 +110,7 @@ public class AvroFileSourceGenerator implements PinotSourceGenerator {
         message.put(spec.getName(), record.get(spec.getName()));
       }
       message.put(_timeColumnName, _rowNumberToTimeIndex.apply(_rowsProduced));
-      retVal.add(new RowWithKey(null, message.toString().getBytes(StandardCharsets.UTF_8)));
+      retVal.add(new StreamDataProducer.RowWithKey(null, message.toString().getBytes(StandardCharsets.UTF_8)));
       _rowsProduced += 1;
       rowsInCurrentBatch += 1;
     }

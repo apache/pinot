@@ -27,7 +27,7 @@ import java.time.format.DateTimeFormatterBuilder;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ThreadLocalRandom;
-import org.apache.pinot.spi.stream.RowWithKey;
+import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -36,7 +36,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 /**
  * A simple random generator that fakes RSVP
  */
-public class RsvpSourceGenerator implements PinotSourceGenerator {
+public class RsvpSourceGenerator implements PinotSourceDataGenerator {
   private final KeyColumn _keyColumn;
   public static final DateTimeFormatter DATE_TIME_FORMATTER =
       new DateTimeFormatterBuilder().parseCaseInsensitive().append(DateTimeFormatter.ISO_LOCAL_DATE).appendLiteral(' ')
@@ -69,7 +69,7 @@ public class RsvpSourceGenerator implements PinotSourceGenerator {
   }
 
   @Override
-  public List<RowWithKey> generateRows() {
+  public List<StreamDataProducer.RowWithKey> generateRows() {
     RSVP msg = createMessage();
     byte[] key;
     switch (_keyColumn) {
@@ -83,7 +83,7 @@ public class RsvpSourceGenerator implements PinotSourceGenerator {
         key = null;
         break;
     }
-    return ImmutableList.of(new RowWithKey(key, msg.getPayload().toString().getBytes(UTF_8)));
+    return ImmutableList.of(new StreamDataProducer.RowWithKey(key, msg.getPayload().toString().getBytes(UTF_8)));
   }
 
   @Override
