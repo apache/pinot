@@ -1116,6 +1116,12 @@ public class PinotHelixResourceManagerTest {
 
     Assert.assertEquals(tableToBrokersMapping.size(), 1);
     Assert.assertEquals(tableToBrokersMapping.get(OFFLINE_TABLE_NAME).size(), 2);
+
+    // Delete the table
+    ControllerTestUtils.getHelixResourceManager().deleteOfflineTable(TABLE_NAME);
+    ControllerTestUtils.getHelixResourceManager().deleteRealtimeTable(TABLE_NAME);
+    // Clean up.
+    untagBrokers();
   }
 
   @Test
