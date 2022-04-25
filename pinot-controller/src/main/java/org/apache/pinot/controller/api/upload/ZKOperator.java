@@ -34,6 +34,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -92,10 +93,11 @@ public class ZKOperator {
           Response.Status.CONFLICT);
     }
 
-    // TODO Allow segment refreshing for realtime tables.
-    if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
+    // Allow refreshing completed segments for realtime tables.
+    if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)
+        && new SegmentZKMetadata(segmentMetadataZNRecord).getStatus() != CommonConstants.Segment.Realtime.Status.DONE) {
       throw new ControllerApplicationException(LOGGER,
-          "Refresh existing segment " + segmentName + " for realtime table " + tableNameWithType
+          "Refreshing non-completed existing segment " + segmentName + " for realtime table " + tableNameWithType
               + " is not yet supported ", Response.Status.NOT_IMPLEMENTED);
     }
 
@@ -171,7 +173,7 @@ public class ZKOperator {
           .setCustomMap(segmentZKMetadataCustomMapModifier.modifyMap(existingSegmentZKMetadata.getCustomMap()));
 
       // Update ZK metadata and refresh the segment if necessary
-      long newCrc = Long.valueOf(segmentMetadata.getCrc());
+      long newCrc = Long.parseLong(segmentMetadata.getCrc());
       if (newCrc == existingCrc) {
         LOGGER.info(
             "New segment crc '{}' is the same as existing segment crc for segment '{}'. Updating ZK metadata without "
