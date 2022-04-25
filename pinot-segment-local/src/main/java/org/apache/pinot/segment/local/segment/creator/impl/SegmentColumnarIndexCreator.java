@@ -75,7 +75,6 @@ import org.slf4j.LoggerFactory;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.*;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment.*;
-import static org.apache.pinot.spi.config.table.FieldConfig.TEXT_FST_TYPE;
 
 
 /**
