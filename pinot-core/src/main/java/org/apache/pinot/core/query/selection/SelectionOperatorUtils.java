@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.selection;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -559,7 +560,7 @@ public class SelectionOperatorUtils {
       case DOUBLE:
         return THREAD_LOCAL_DOUBLE_FORMAT.get().format(((Number) value).doubleValue());
       case BIG_DECIMAL:
-        return BigDecimalUtils.deserialize((ByteArray) value).toPlainString();
+        return ((BigDecimal) value).toPlainString();
       case BOOLEAN:
         return (Integer) value == 1 ? "true" : "false";
       case TIMESTAMP:

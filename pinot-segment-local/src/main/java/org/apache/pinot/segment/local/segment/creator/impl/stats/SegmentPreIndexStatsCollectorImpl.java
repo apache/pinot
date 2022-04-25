@@ -48,8 +48,7 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
     Schema dataSchema = _statsCollectorConfig.getSchema();
     for (FieldSpec fieldSpec : dataSchema.getAllFieldSpecs()) {
       String column = fieldSpec.getName();
-      FieldSpec.DataType dataType = fieldSpec.getDataType();
-      switch (dataType.getStoredType()) {
+      switch (fieldSpec.getDataType().getStoredType()) {
         case INT:
           _columnStatsCollectorMap.put(column, new IntColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;

@@ -286,13 +286,13 @@ public class DistinctTable {
     DataTable dataTable = DataTableFactory.getDataTable(byteBuffer);
     DataSchema dataSchema = dataTable.getDataSchema();
     int numRecords = dataTable.getNumberOfRows();
-    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
-    int numColumns = columnDataTypes.length;
+    ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
+    int numColumns = storedColumnDataTypes.length;
     List<Record> records = new ArrayList<>(numRecords);
     for (int i = 0; i < numRecords; i++) {
       Object[] values = new Object[numColumns];
       for (int j = 0; j < numColumns; j++) {
-        switch (columnDataTypes[j].getStoredType()) {
+        switch (storedColumnDataTypes[j]) {
           case INT:
             values[j] = dataTable.getInt(i, j);
             break;
