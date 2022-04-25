@@ -29,8 +29,7 @@ package org.apache.pinot.common.request;
 public enum ExpressionType implements org.apache.thrift.TEnum {
   LITERAL(0),
   IDENTIFIER(1),
-  FUNCTION(2),
-  CONJUGATION(3);
+  FUNCTION(2);
 
   private final int value;
 
@@ -58,8 +57,6 @@ public enum ExpressionType implements org.apache.thrift.TEnum {
         return IDENTIFIER;
       case 2:
         return FUNCTION;
-      case 3:
-        return CONJUGATION;
       default:
         return null;
     }

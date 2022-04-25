@@ -33,7 +33,7 @@ import org.apache.pinot.common.request.Expression;
  */
 public class ExpressionContext {
   public enum Type {
-    LITERAL, IDENTIFIER, FUNCTION, CONJUGATION
+    LITERAL, IDENTIFIER, FUNCTION
   }
 
   private final Type _type;
@@ -50,11 +50,6 @@ public class ExpressionContext {
 
   public static ExpressionContext forFunction(FunctionContext function) {
     return new ExpressionContext(Type.FUNCTION, null, function);
-  }
-
-  public static ExpressionContext forConjugation(Expression expression) {
-    String name = expression.getFunctionCall().getOperator();
-    return new ExpressionContext(Type.CONJUGATION, name, RequestContextUtils.getFunction(expression.getFunctionCall()));
   }
 
   private ExpressionContext(Type type, String value, FunctionContext function) {

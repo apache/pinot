@@ -115,21 +115,9 @@ public class RequestUtils {
 
   public static Expression getFunctionExpression(String canonicalName) {
     assert canonicalName.equals(canonicalizeFunctionNamePreservingSpecialKey(canonicalName));
-    Expression expression = null;
-    Function function = null;
-    switch (canonicalName) {
-      case "AND":
-      case "OR":
-        expression = new Expression(ExpressionType.CONJUGATION);
-        function = new Function(canonicalName);
-        expression.setFunctionCall(function);
-        break;
-      default:
-        expression = new Expression(ExpressionType.FUNCTION);
-        function = new Function(canonicalName);
-        expression.setFunctionCall(function);
-        break;
-    }
+    Expression expression = new Expression(ExpressionType.FUNCTION);
+    Function function = new Function(canonicalName);
+    expression.setFunctionCall(function);
     return expression;
   }
 

@@ -67,27 +67,23 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
           childNodes[i] = planExecution(arguments.get(i));
         }
         String functionName = function.getFunctionName();
-        FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
-        if (functionInfo == null) {
-          if (FunctionRegistry.containsFunction(functionName)) {
-            throw new IllegalStateException(
-              String.format("Unsupported function: %s with %d parameters", functionName, numArguments));
-          } else {
-            throw new IllegalStateException(
-              String.format("Unsupported function: %s not found", functionName));
-          }
+        switch (functionName) {
+          case "and":
+          case "or":
+            return new ConjugationExecutionNode(functionName, childNodes);
+          default:
+            FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
+            if (functionInfo == null) {
+              if (FunctionRegistry.containsFunction(functionName)) {
+                throw new IllegalStateException(
+                    String.format("Unsupported function: %s with %d parameters", functionName, numArguments));
+              } else {
+                throw new IllegalStateException(
+                    String.format("Unsupported function: %s not found", functionName));
+              }
+            }
+            return new FunctionExecutionNode(functionInfo, childNodes);
         }
-        return new FunctionExecutionNode(functionInfo, childNodes);
-      case CONJUGATION:
-        FunctionContext fn = expression.getFunction();
-        List<ExpressionContext> args = fn.getArguments();
-        int n = args.size();
-        ExecutableNode[] argumentNodes = new ExecutableNode[n];
-        for (int i = 0; i < n; i++) {
-          argumentNodes[i] = planExecution(args.get(i));
-        }
-        return new ConjugationExecutionNode(expression.getFunction().getFunctionName(), argumentNodes);
-
       default:
         throw new IllegalStateException();
     }
