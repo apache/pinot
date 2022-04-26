@@ -136,8 +136,8 @@ public class PinotInstanceAssignmentRestletResource {
         try {
           if (InstanceAssignmentConfigUtils
               .allowInstanceAssignment(offlineTableConfig, InstancePartitionsType.OFFLINE)) {
-            instancePartitionsMap.put(InstancePartitionsType.OFFLINE, new InstanceAssignmentDriver(offlineTableConfig)
-                .assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs));
+            assignInstancesForInstancePartitionsType(instancePartitionsMap, offlineTableConfig, instanceConfigs,
+                InstancePartitionsType.OFFLINE);
           }
         } catch (IllegalStateException e) {
           throw new ControllerApplicationException(LOGGER, "Caught IllegalStateException", Response.Status.BAD_REQUEST,
@@ -152,19 +152,18 @@ public class PinotInstanceAssignmentRestletResource {
       TableConfig realtimeTableConfig = _resourceManager.getRealtimeTableConfig(tableName);
       if (realtimeTableConfig != null) {
         try {
-          InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(realtimeTableConfig);
           if (instancePartitionsType == InstancePartitionsType.CONSUMING || instancePartitionsType == null) {
             if (InstanceAssignmentConfigUtils
                 .allowInstanceAssignment(realtimeTableConfig, InstancePartitionsType.CONSUMING)) {
-              instancePartitionsMap.put(InstancePartitionsType.CONSUMING,
-                  instanceAssignmentDriver.assignInstances(InstancePartitionsType.CONSUMING, instanceConfigs));
+              assignInstancesForInstancePartitionsType(instancePartitionsMap, realtimeTableConfig, instanceConfigs,
+                  InstancePartitionsType.CONSUMING);
             }
           }
           if (instancePartitionsType == InstancePartitionsType.COMPLETED || instancePartitionsType == null) {
             if (InstanceAssignmentConfigUtils
                 .allowInstanceAssignment(realtimeTableConfig, InstancePartitionsType.COMPLETED)) {
-              instancePartitionsMap.put(InstancePartitionsType.COMPLETED,
-                  instanceAssignmentDriver.assignInstances(InstancePartitionsType.COMPLETED, instanceConfigs));
+              assignInstancesForInstancePartitionsType(instancePartitionsMap, realtimeTableConfig, instanceConfigs,
+                  InstancePartitionsType.COMPLETED);
             }
           }
         } catch (IllegalStateException e) {
@@ -189,6 +188,24 @@ public class PinotInstanceAssignmentRestletResource {
     }
 
     return instancePartitionsMap;
+  }
+
+  /**
+   * Assign instances given the type of instancePartitions.
+   * @param instancePartitionsMap the empty map to be filled.
+   * @param tableConfig table config
+   * @param instanceConfigs list of instance configs
+   * @param instancePartitionsType type of instancePartitions
+   */
+  private void assignInstancesForInstancePartitionsType(
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, TableConfig tableConfig,
+      List<InstanceConfig> instanceConfigs, InstancePartitionsType instancePartitionsType) {
+    String tableNameWithType = tableConfig.getTableName();
+    InstancePartitions existingInstancePartitions =
+        InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getHelixZkManager().getHelixPropertyStore(),
+            InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString()));
+    instancePartitionsMap.put(instancePartitionsType, new InstanceAssignmentDriver(tableConfig)
+        .assignInstances(instancePartitionsType, instanceConfigs, existingInstancePartitions));
   }
 
   private void persistInstancePartitionsHelper(InstancePartitions instancePartitions) {

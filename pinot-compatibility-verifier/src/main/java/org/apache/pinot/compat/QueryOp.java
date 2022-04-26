@@ -133,7 +133,8 @@ public class QueryOp extends BaseOp {
 
         if (expectedJson != null && actualJson != null) {
           try {
-            boolean passed = SqlResultComparator.areEqual(actualJson, expectedJson, query);
+            boolean passed = SqlResultComparator
+                .areEqual(actualJson, expectedJson, query);
             if (passed) {
               succeededQueryCount++;
               LOGGER.debug("Comparison PASSED: Line: {}, query: '{}', actual response: {}, expected response: {}",

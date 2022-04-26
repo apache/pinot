@@ -25,13 +25,16 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
+import org.apache.pinot.spi.trace.FilterType;
+import org.apache.pinot.spi.trace.InvocationRecording;
+import org.apache.pinot.spi.trace.Tracing;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /**
  * Filter operator for JSON_MATCH. E.g. SELECT ... WHERE JSON_MATCH(column_name, filter_string)
  */
 public class JsonMatchFilterOperator extends BaseFilterOperator {
-  private static final String OPERATOR_NAME = "JsonMatchFilterOperator";
   private static final String EXPLAIN_NAME = "FILTER_JSON_INDEX";
 
   private final JsonIndexReader _jsonIndex;
@@ -47,7 +50,9 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   protected FilterBlock getNextBlock() {
-    return new FilterBlock(new BitmapDocIdSet(_jsonIndex.getMatchingDocIds(_predicate.getValue()), _numDocs));
+    ImmutableRoaringBitmap bitmap = _jsonIndex.getMatchingDocIds(_predicate.getValue());
+    record(bitmap);
+    return new FilterBlock(new BitmapDocIdSet(bitmap, _numDocs));
   }
 
   @Override
@@ -71,11 +76,6 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
-
-  @Override
   public List<Operator> getChildOperators() {
     return Collections.emptyList();
   }
@@ -86,5 +86,14 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
     stringBuilder.append(",operator:").append(_predicate.getType());
     stringBuilder.append(",predicate:").append(_predicate.toString());
     return stringBuilder.append(')').toString();
+  }
+
+  private void record(ImmutableRoaringBitmap bitmap) {
+    InvocationRecording recording = Tracing.activeRecording();
+    if (recording.isEnabled()) {
+      recording.setColumnName(_predicate.getLhs().getIdentifier());
+      recording.setFilter(FilterType.INDEX, _predicate.getType().name());
+      recording.setNumDocsMatchingAfterFilter(bitmap.getCardinality());
+    }
   }
 }

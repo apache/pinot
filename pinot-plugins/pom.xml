@@ -125,6 +125,10 @@
                       <pattern>org.apache.parquet</pattern>
                       <shadedPattern>shaded.org.apache.parquet</shadedPattern>
                     </relocation>
+                    <relocation>
+                      <pattern>org.apache.kafka</pattern>
+                      <shadedPattern>shaded.org.apache.kafka</shadedPattern>
+                    </relocation>
                   </relocations>
                 </configuration>
               </execution>

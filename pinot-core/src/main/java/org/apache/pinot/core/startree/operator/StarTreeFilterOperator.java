@@ -21,13 +21,13 @@ package org.apache.pinot.core.startree.operator;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -114,8 +114,6 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
       _remainingPredicateColumns = remainingPredicateColumns;
     }
   }
-
-  private static final String OPERATOR_NAME = "StarTreeFilterOperator";
   // If (number of matching dictionary ids * threshold) > (number of child nodes), use scan to traverse nodes instead of
   // binary search on each dictionary id
   private static final int USE_SCAN_TO_TRAVERSE_NODES_THRESHOLD = 10;
@@ -160,10 +158,6 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     return _resultEmpty;
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public String toExplainString() {
@@ -241,7 +235,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     StarTreeNode starTreeRootNode = starTree.getRoot();
 
     // Use BFS to traverse the star tree
-    Queue<SearchEntry> queue = new LinkedList<>();
+    Queue<SearchEntry> queue = new ArrayDeque<>();
     queue.add(new SearchEntry(starTreeRootNode, _predicateEvaluatorsMap.keySet(), _groupByColumns));
     SearchEntry searchEntry;
     while ((searchEntry = queue.poll()) != null) {

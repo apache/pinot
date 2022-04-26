@@ -18,9 +18,14 @@
  */
 package org.apache.pinot.controller.helix.core.minion.generator;
 
+import java.util.List;
+import java.util.Map;
 import org.apache.helix.task.JobConfig;
+import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,5 +72,11 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
       }
     }
     return JobConfig.DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE;
+  }
+
+  @Override
+  public List<PinotTaskConfig> generateTasks(TableConfig tableConfig, Map<String, String> taskConfigs)
+      throws Exception {
+    throw new UnknownTaskTypeException("Adhoc task generation is not supported for task type - " + this.getTaskType());
   }
 }

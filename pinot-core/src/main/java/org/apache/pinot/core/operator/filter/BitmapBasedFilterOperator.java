@@ -28,13 +28,15 @@ import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
+import org.apache.pinot.spi.trace.FilterType;
+import org.apache.pinot.spi.trace.InvocationRecording;
+import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 @SuppressWarnings("rawtypes")
 public class BitmapBasedFilterOperator extends BaseFilterOperator {
-  private static final String OPERATOR_NAME = "BitmapBasedFilterOperator";
   private static final String EXPLAIN_NAME = "FILTER_INVERTED_INDEX";
 
   private final PredicateEvaluator _predicateEvaluator;
@@ -96,6 +98,12 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
       MutableRoaringBitmap docIds = ImmutableRoaringBitmap.or(bitmaps);
       if (_exclusive) {
         docIds.flip(0L, _numDocs);
+      }
+      InvocationRecording recording = Tracing.activeRecording();
+      if (recording.isEnabled()) {
+        recording.setColumnName(_predicateEvaluator.getPredicate().getLhs().getIdentifier());
+        recording.setNumDocsMatchingAfterFilter(docIds.getCardinality());
+        recording.setFilter(FilterType.INDEX, String.valueOf(_predicateEvaluator.getPredicateType()));
       }
       return new FilterBlock(new BitmapDocIdSet(docIds, _numDocs));
     }
@@ -162,10 +170,6 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
     }
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public List<Operator> getChildOperators() {

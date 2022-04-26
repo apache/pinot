@@ -40,4 +40,14 @@
     <isMultiline>true</isMultiline>
     <padLines>false</padLines>
   </javadoc_style>
+  <ftl_style>
+    <firstLine>&lt;#--</firstLine>
+    <beforeEachLine>// </beforeEachLine>
+    <endLine>--&gt;</endLine>
+    <firstLineDetectionPattern>(\s|\t)*/\*.*$</firstLineDetectionPattern>
+    <lastLineDetectionPattern>.*\*/(\s|\t)*$</lastLineDetectionPattern>
+    <allowBlankLines>false</allowBlankLines>
+    <isMultiline>true</isMultiline>
+    <padLines>false</padLines>
+  </ftl_style>
 </additionalHeaders>

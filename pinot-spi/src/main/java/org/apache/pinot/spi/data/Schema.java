@@ -715,6 +715,15 @@ public final class Schema implements Serializable {
     return result;
   }
 
+  public Schema clone() {
+    Schema cloned = new SchemaBuilder()
+        .setSchemaName(getSchemaName())
+        .setPrimaryKeyColumns(getPrimaryKeyColumns())
+        .build();
+    getAllFieldSpecs().forEach(fieldSpec -> cloned.addField(fieldSpec));
+    return cloned;
+  }
+
   /**
    * Helper method that converts a {@link TimeFieldSpec} to {@link DateTimeFieldSpec}
    * 1) If timeFieldSpec contains only incoming granularity spec, directly convert it to a dateTimeFieldSpec

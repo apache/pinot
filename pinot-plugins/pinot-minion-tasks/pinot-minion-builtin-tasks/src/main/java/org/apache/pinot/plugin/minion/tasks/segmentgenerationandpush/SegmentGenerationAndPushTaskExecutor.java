@@ -190,7 +190,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
       case METADATA:
         try {
           Map<String, String> segmentUriToTarPathMap = SegmentPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI,
-              pushJobSpec, new String[] { outputSegmentTarURI.toString() });
+              pushJobSpec, new String[]{outputSegmentTarURI.toString()});
           SegmentPushUtils.sendSegmentUriAndMetadata(spec, outputFileFS, segmentUriToTarPathMap);
         } catch (RetriableOperationException | AttemptsExceededException e) {
           throw new RuntimeException(e);
@@ -305,8 +305,8 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     }
     SegmentNameGeneratorSpec segmentNameGeneratorSpec = new SegmentNameGeneratorSpec();
     segmentNameGeneratorSpec.setType(taskConfigs.get(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE));
-    segmentNameGeneratorSpec.setConfigs(IngestionConfigUtils
-        .getConfigMapWithPrefix(taskConfigs, BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX));
+    segmentNameGeneratorSpec.setConfigs(IngestionConfigUtils.getConfigMapWithPrefix(taskConfigs,
+        BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX));
     taskSpec.setSegmentNameGeneratorSpec(segmentNameGeneratorSpec);
     taskSpec.setCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());
     return taskSpec;

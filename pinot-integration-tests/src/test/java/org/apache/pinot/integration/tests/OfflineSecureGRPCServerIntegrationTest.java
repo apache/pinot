@@ -23,7 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
 public class OfflineSecureGRPCServerIntegrationTest extends OfflineGRPCServerIntegrationTest {
@@ -33,16 +33,17 @@ public class OfflineSecureGRPCServerIntegrationTest extends OfflineGRPCServerInt
   private final URL _tlsStoreJKS = OfflineSecureGRPCServerIntegrationTest.class.getResource("/tlstest.jks");
 
   @Override
-  protected void setExtraServerConfigs(PinotConfiguration serverConfig) {
-    serverConfig.setProperty(CommonConstants.Server.CONFIG_OF_GRPCTLS_SERVER_ENABLED, true);
-    serverConfig.setProperty("pinot.server.grpctls.client.auth.enabled", true);
-    serverConfig.setProperty("pinot.server.grpctls.keystore.type", JKS);
-    serverConfig.setProperty("pinot.server.grpctls.keystore.path", _tlsStoreJKS);
-    serverConfig.setProperty("pinot.server.grpctls.keystore.password", PASSWORD);
-    serverConfig.setProperty("pinot.server.grpctls.truststore.type", JKS);
-    serverConfig.setProperty("pinot.server.grpctls.truststore.path", _tlsStoreJKS);
-    serverConfig.setProperty("pinot.server.grpctls.truststore.password", PASSWORD);
-    serverConfig.setProperty("pinot.server.grpctls.ssl.provider", JDK);
+  protected void overrideServerConf(PinotConfiguration serverConf) {
+    serverConf.setProperty(Server.CONFIG_OF_ENABLE_GRPC_SERVER, true);
+    serverConf.setProperty(Server.CONFIG_OF_GRPCTLS_SERVER_ENABLED, true);
+    serverConf.setProperty("pinot.server.grpctls.client.auth.enabled", true);
+    serverConf.setProperty("pinot.server.grpctls.keystore.type", JKS);
+    serverConf.setProperty("pinot.server.grpctls.keystore.path", _tlsStoreJKS);
+    serverConf.setProperty("pinot.server.grpctls.keystore.password", PASSWORD);
+    serverConf.setProperty("pinot.server.grpctls.truststore.type", JKS);
+    serverConf.setProperty("pinot.server.grpctls.truststore.path", _tlsStoreJKS);
+    serverConf.setProperty("pinot.server.grpctls.truststore.password", PASSWORD);
+    serverConf.setProperty("pinot.server.grpctls.ssl.provider", JDK);
   }
 
   @Override
@@ -57,6 +58,6 @@ public class OfflineSecureGRPCServerIntegrationTest extends OfflineGRPCServerInt
     configMap.put("tls.truststore.type", JKS);
     configMap.put("tls.ssl.provider", JDK);
     GrpcQueryClient.Config config = new GrpcQueryClient.Config(configMap);
-    return new GrpcQueryClient("localhost", CommonConstants.Server.DEFAULT_GRPC_PORT, config);
+    return new GrpcQueryClient("localhost", Server.DEFAULT_GRPC_PORT, config);
   }
 }

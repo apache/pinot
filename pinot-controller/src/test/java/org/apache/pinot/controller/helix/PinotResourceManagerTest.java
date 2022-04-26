@@ -73,6 +73,30 @@ public class PinotResourceManagerTest {
   }
 
   @Test
+  public void testTableCleanupAfterRealtimeClusterException()
+      throws Exception {
+    String invalidRealtimeTable = "invalidTable_REALTIME";
+    Schema dummySchema = ControllerTestUtils.createDummySchema(invalidRealtimeTable);
+    ControllerTestUtils.addSchema(dummySchema);
+
+    Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
+    // Missing replicasPerPartition
+    TableConfig invalidRealtimeTableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setStreamConfigs(streamConfigs).setTableName(invalidRealtimeTable)
+            .setSchemaName(dummySchema.getSchemaName()).build();
+    try {
+      ControllerTestUtils.getHelixResourceManager().addTable(invalidRealtimeTableConfig);
+      Assert.fail(
+          "Table creation should have thrown exception due to missing replicasPerPartition in validation config");
+    } catch (Exception e) {
+      // expected
+    }
+
+    // Verify invalid table config is cleaned up
+    Assert.assertNull(ControllerTestUtils.getHelixResourceManager().getTableConfig(invalidRealtimeTable));
+  }
+
+  @Test
   public void testUpdateSegmentZKMetadata() {
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata("testSegment");
 

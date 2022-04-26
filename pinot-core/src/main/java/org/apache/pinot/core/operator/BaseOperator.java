@@ -20,32 +20,22 @@ package org.apache.pinot.core.operator;
 
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.util.trace.TraceContext;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.pinot.spi.trace.InvocationScope;
+import org.apache.pinot.spi.trace.Tracing;
 
 
 /**
  * Any other Pinot Operators should extend BaseOperator
  */
 public abstract class BaseOperator<T extends Block> implements Operator<T> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BaseOperator.class);
 
   @Override
   public final T nextBlock() {
     if (Thread.interrupted()) {
       throw new EarlyTerminationException();
     }
-    if (TraceContext.traceEnabled()) {
-      long start = System.currentTimeMillis();
-      T nextBlock = getNextBlock();
-      long end = System.currentTimeMillis();
-      String operatorName = getOperatorName();
-      LOGGER.trace("Time spent in {}: {}", operatorName, (end - start));
-      TraceContext.logTime(operatorName, (end - start));
-      return nextBlock;
-    } else {
+    try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {
       return getNextBlock();
     }
   }

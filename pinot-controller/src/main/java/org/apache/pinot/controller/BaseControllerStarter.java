@@ -393,7 +393,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _helixResourceManager.start(_helixParticipantManager);
 
     LOGGER.info("Starting task resource manager");
-    _helixTaskResourceManager = new PinotHelixTaskResourceManager(new TaskDriver(_helixParticipantManager));
+    _helixTaskResourceManager =
+        new PinotHelixTaskResourceManager(_helixResourceManager, new TaskDriver(_helixParticipantManager));
 
     // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
     LOGGER.info("Starting realtime segment manager");
@@ -492,8 +493,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
   private ServiceStatus.ServiceStatusCallback generateServiceStatusCallback(HelixManager helixManager) {
     return new ServiceStatus.ServiceStatusCallback() {
-      private boolean _isStarted = false;
-      private String _statusDescription = "Helix ZK Not connected as " + helixManager.getInstanceType();
+      private volatile boolean _isStarted = false;
+      private volatile String _statusDescription = "Helix ZK Not connected as " + helixManager.getInstanceType();
 
       @Override
       public ServiceStatus.Status getServiceStatus() {

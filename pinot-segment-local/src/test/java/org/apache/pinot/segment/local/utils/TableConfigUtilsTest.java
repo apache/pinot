@@ -696,7 +696,7 @@ public class TableConfigUtilsTest {
         .setNoDictionaryColumns(Arrays.asList("myCol1")).build();
 
     try {
-      FieldConfig fieldConfig = new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null);
+      FieldConfig fieldConfig = new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {

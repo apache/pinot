@@ -83,6 +83,7 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
       List<String>> offlineRoutingTable, @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance,
       List<String>> realtimeRoutingTable, long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
       throws Exception {
+    // TODO: Support failure detection
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
     Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap = new HashMap<>();
     if (offlineBrokerRequest != null) {

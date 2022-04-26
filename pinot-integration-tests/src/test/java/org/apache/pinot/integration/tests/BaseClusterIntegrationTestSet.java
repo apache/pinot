@@ -30,7 +30,7 @@ import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
-import org.apache.pinot.server.starter.helix.HelixServerStarter;
+import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -76,12 +76,10 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   /**
    * Test server table data manager deletion after the table is dropped
    */
-  protected void cleanupTestTableDataManager(String tableNameWithType)
-      throws Exception {
-    List<HelixServerStarter> serverStarters = getServerStarters();
+  protected void cleanupTestTableDataManager(String tableNameWithType) {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        for (HelixServerStarter serverStarter : serverStarters) {
+        for (BaseServerStarter serverStarter : _serverStarters) {
           if (serverStarter.getServerInstance().getInstanceDataManager().getTableDataManager(tableNameWithType)
               != null) {
             return false;

@@ -38,7 +38,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 
 
 public class StreamingSelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock> {
-  private static final String OPERATOR_NAME = "StreamingSelectionOnlyOperator";
+
   private static final String EXPLAIN_NAME = "SELECT_STREAMING";
 
   private final IndexSegment _indexSegment;
@@ -98,10 +98,6 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<IntermediateRes
     return new IntermediateResultsBlock(_dataSchema, rows);
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public String toExplainString() {

@@ -46,7 +46,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * A filter operator that uses H3 index for geospatial data retrieval
  */
 public class H3IndexFilterOperator extends BaseFilterOperator {
-  private static final String OPERATOR_NAME = "H3IndexFilterOperator";
+
   private static final String EXPLAIN_NAME = "FILTER_H3_INDEX";
   private final IndexSegment _segment;
   private final Predicate _predicate;
@@ -240,10 +240,6 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
     });
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public List<Operator> getChildOperators() {

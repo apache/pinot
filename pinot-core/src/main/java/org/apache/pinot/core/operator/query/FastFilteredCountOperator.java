@@ -49,11 +49,6 @@ public class FastFilteredCountOperator extends BaseOperator<IntermediateResultsB
   }
 
   @Override
-  public String getOperatorName() {
-    return getClass().getSimpleName();
-  }
-
-  @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
   }

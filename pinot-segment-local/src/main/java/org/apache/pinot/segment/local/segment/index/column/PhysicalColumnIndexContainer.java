@@ -123,6 +123,13 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       _bloomFilter = null;
     }
 
+    if (loadRangeIndex && !metadata.isSorted()) {
+      PinotDataBuffer buffer = segmentReader.getIndexFor(columnName, ColumnIndexType.RANGE_INDEX);
+      _rangeIndex = indexReaderProvider.newRangeIndexReader(buffer, metadata);
+    } else {
+      _rangeIndex = null;
+    }
+
     PinotDataBuffer fwdIndexBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
     if (metadata.hasDictionary()) {
       // Dictionary-based index
@@ -135,7 +142,6 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
           SortedIndexReader<?> sortedIndexReader = indexReaderProvider.newSortedIndexReader(fwdIndexBuffer, metadata);
           _forwardIndex = sortedIndexReader;
           _invertedIndex = sortedIndexReader;
-          _rangeIndex = null;
           _fstIndex = null;
           return;
         }
@@ -154,18 +160,10 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       } else {
         _fstIndex = null;
       }
-
-      if (loadRangeIndex) {
-        PinotDataBuffer buffer = segmentReader.getIndexFor(columnName, ColumnIndexType.RANGE_INDEX);
-        _rangeIndex = indexReaderProvider.newRangeIndexReader(buffer, metadata);
-      } else {
-        _rangeIndex = null;
-      }
     } else {
       // Raw index
       _forwardIndex = indexReaderProvider.newForwardIndexReader(fwdIndexBuffer, metadata);
       _dictionary = null;
-      _rangeIndex = null;
       _invertedIndex = null;
       _fstIndex = null;
     }

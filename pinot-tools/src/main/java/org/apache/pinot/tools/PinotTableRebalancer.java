@@ -22,10 +22,10 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 
 
 /**

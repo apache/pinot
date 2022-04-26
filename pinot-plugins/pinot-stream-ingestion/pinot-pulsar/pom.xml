@@ -42,7 +42,6 @@
     <javax.servlet-api.version>3.1.0</javax.servlet-api.version>
     <javax.ws.rs-api.version>2.1</javax.ws.rs-api.version>
     <jersey-container-grizzly2-http.version>2.28</jersey-container-grizzly2-http.version>
-    <netty.version>4.1.74.Final</netty.version>
     <simpleclient_common.version>0.8.1</simpleclient_common.version>
     <grpc-proto.version>1.12.0</grpc-proto.version>
     <grpc-context.version>1.14.0</grpc-context.version>
@@ -68,6 +67,12 @@
           <artifactId>javax.servlet-api</artifactId>
         </exclusion>
       </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>pulsar</artifactId>
+      <version>1.17.1</version>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.pulsar</groupId>
@@ -110,154 +115,6 @@
       <version>${pulsar.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.apache.pulsar</groupId>
-      <artifactId>pulsar-broker</artifactId>
-      <version>${pulsar.version}</version>
-      <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>org.apache.pulsar</groupId>
-          <artifactId>pulsar-client-original</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.pulsar</groupId>
-          <artifactId>pulsar-client-admin-original</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>io.netty</groupId>
-          <artifactId>netty-resolver</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>javax.ws.rs</groupId>
-          <artifactId>javax.ws.rs-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>io.prometheus</groupId>
-          <artifactId>simpleclient_common</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.google.api.grpc</groupId>
-          <artifactId>proto-google-common-protos</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>io.grpc</groupId>
-          <artifactId>grpc-context</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>io.netty</groupId>
-          <artifactId>netty-tcnative-boringssl-static</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>commons-codec</groupId>
-          <artifactId>commons-codec</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.google.errorprone</groupId>
-          <artifactId>error_prone_annotations</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.glassfish.jersey.containers</groupId>
-          <artifactId>jersey-container-servlet-core</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>io.prometheus</groupId>
-          <artifactId>simpleclient</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.eclipse.jetty</groupId>
-          <artifactId>jetty-server</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.eclipse.jetty</groupId>
-          <artifactId>jetty-servlet</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.eclipse.jetty</groupId>
-          <artifactId>jetty-util</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.eclipse.jetty</groupId>
-          <artifactId>jetty-io</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.eclipse.jetty</groupId>
-          <artifactId>jetty-http</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.squareup.okio</groupId>
-          <artifactId>okio</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>io.prometheus</groupId>
-          <artifactId>simpleclient_hotspot</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>io.swagger</groupId>
-          <artifactId>swagger-annotations</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>io.grpc</groupId>
-          <artifactId>grpc-protobuf-lite</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>io.opencensus</groupId>
-          <artifactId>opencensus-contrib-grpc-metrics</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>io.opencensus</groupId>
-          <artifactId>opencensus-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.commons</groupId>
-          <artifactId>commons-collections4</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>javax.annotation</groupId>
-          <artifactId>javax.annotation-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.codehaus.mojo</groupId>
-          <artifactId>animal-sniffer-annotations</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.github.ben-manes.caffeine</groupId>
-          <artifactId>caffeine</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.beust</groupId>
-          <artifactId>jcommander</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>javax.servlet</groupId>
-          <artifactId>javax.servlet-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>io.netty</groupId>
-          <artifactId>netty-codec-socks</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>io.netty</groupId>
-          <artifactId>netty-transport-native-unix-common</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>jakarta.ws.rs</groupId>
-          <artifactId>jakarta.ws.rs-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.bouncycastle</groupId>
-          <artifactId>bcpkix-jdk15on</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.bouncycastle</groupId>
-          <artifactId>bcprov-ext-jdk15on</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.google.protobuf</groupId>
-          <artifactId>protobuf-java</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
       <groupId>javax.servlet</groupId>
       <artifactId>javax.servlet-api</artifactId>
       <version>${javax.servlet-api.version}</version>
@@ -285,7 +142,6 @@
     <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-resolver</artifactId>
-      <version>${netty.version}</version>
     </dependency>
     <dependency>
       <groupId>io.prometheus</groupId>
@@ -301,13 +157,6 @@
       <groupId>io.grpc</groupId>
       <artifactId>grpc-context</artifactId>
       <version>${grpc-context.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-bom</artifactId>
-      <version>${netty.version}</version>
-      <type>pom</type>
-      <scope>import</scope>
     </dependency>
     <dependency>
       <groupId>commons-codec</groupId>
@@ -382,7 +231,6 @@
     <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-codec-socks</artifactId>
-      <version>${netty.version}</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>

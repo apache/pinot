@@ -240,22 +240,39 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     minionContext.setHelixPropertyStore(_helixManager.getHelixPropertyStore());
 
     LOGGER.info("Starting minion admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
-    _minionAdminApplication = new MinionAdminApiApplication(_config);
+    _minionAdminApplication = new MinionAdminApiApplication(_instanceId, _config);
     _minionAdminApplication.start(_listenerConfigs);
 
     // Initialize health check callback
     LOGGER.info("Initializing health check callback");
     ServiceStatus.setServiceStatusCallback(_instanceId, new ServiceStatus.ServiceStatusCallback() {
+      private volatile boolean _isStarted = false;
+      private volatile String _statusDescription = "Helix ZK Not connected as " + _helixManager.getInstanceType();
+
       @Override
       public ServiceStatus.Status getServiceStatus() {
         // TODO: add health check here
         minionMetrics.addMeteredGlobalValue(MinionMeter.HEALTH_CHECK_GOOD_CALLS, 1L);
-        return ServiceStatus.Status.GOOD;
+        if (_isStarted) {
+          if (_helixManager.isConnected()) {
+            return ServiceStatus.Status.GOOD;
+          } else {
+            return ServiceStatus.Status.BAD;
+          }
+        }
+
+        if (!_helixManager.isConnected()) {
+          return ServiceStatus.Status.STARTING;
+        } else {
+          _isStarted = true;
+          _statusDescription = ServiceStatus.STATUS_DESCRIPTION_NONE;
+          return ServiceStatus.Status.GOOD;
+        }
       }
 
       @Override
       public String getStatusDescription() {
-        return ServiceStatus.STATUS_DESCRIPTION_NONE;
+        return _statusDescription;
       }
     });
 

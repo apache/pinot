@@ -92,7 +92,7 @@ public class QueryRoutingTest {
     // OFFLINE only
     AsyncQueryResponse asyncQueryResponse =
         _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
-    Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getResponse();
+    Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
     ServerResponse serverResponse = response.get(OFFLINE_SERVER_ROUTING_INSTANCE);
@@ -102,7 +102,7 @@ public class QueryRoutingTest {
     // REALTIME only
     asyncQueryResponse =
         _queryRouter.submitQuery(requestId, "testTable", null, null, BROKER_REQUEST, ROUTING_TABLE, 1_000L);
-    response = asyncQueryResponse.getResponse();
+    response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(REALTIME_SERVER_ROUTING_INSTANCE));
     serverResponse = response.get(REALTIME_SERVER_ROUTING_INSTANCE);
@@ -113,7 +113,7 @@ public class QueryRoutingTest {
     asyncQueryResponse =
         _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, BROKER_REQUEST, ROUTING_TABLE,
             1_000L);
-    response = asyncQueryResponse.getResponse();
+    response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 2);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
     serverResponse = response.get(OFFLINE_SERVER_ROUTING_INSTANCE);
@@ -140,7 +140,7 @@ public class QueryRoutingTest {
     long startTimeMs = System.currentTimeMillis();
     AsyncQueryResponse asyncQueryResponse =
         _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
-    Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getResponse();
+    Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
     ServerResponse serverResponse = response.get(OFFLINE_SERVER_ROUTING_INSTANCE);
@@ -170,7 +170,7 @@ public class QueryRoutingTest {
     long startTimeMs = System.currentTimeMillis();
     AsyncQueryResponse asyncQueryResponse =
         _queryRouter.submitQuery(requestId + 1, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
-    Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getResponse();
+    Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
     ServerResponse serverResponse = response.get(OFFLINE_SERVER_ROUTING_INSTANCE);
@@ -207,7 +207,7 @@ public class QueryRoutingTest {
     // Shut down the server before getting the response
     queryServer.shutDown();
 
-    Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getResponse();
+    Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
     ServerResponse serverResponse = response.get(OFFLINE_SERVER_ROUTING_INSTANCE);
@@ -222,7 +222,7 @@ public class QueryRoutingTest {
     startTimeMs = System.currentTimeMillis();
     asyncQueryResponse =
         _queryRouter.submitQuery(requestId + 1, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, timeoutMs);
-    response = asyncQueryResponse.getResponse();
+    response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
     serverResponse = response.get(OFFLINE_SERVER_ROUTING_INSTANCE);

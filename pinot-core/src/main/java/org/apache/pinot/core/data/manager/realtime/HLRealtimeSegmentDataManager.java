@@ -284,12 +284,10 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           updateCurrentDocumentCountMetrics();
           _segmentLogger.info("Indexed {} raw events", _realtimeSegment.getNumDocsIndexed());
           File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + System.currentTimeMillis());
-
           // lets convert the segment now
-
           RealtimeSegmentConverter converter =
-              new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
-                  _tableNameWithType, tableConfig, segmentZKMetadata.getSegmentName(), _sortedColumn,
+              new RealtimeSegmentConverter(_realtimeSegment, null, tempSegmentFolder.getAbsolutePath(),
+                  schema, _tableNameWithType, tableConfig, segmentZKMetadata.getSegmentName(), _sortedColumn,
                   _invertedIndexColumns, Collections.emptyList(), Collections.emptyList(), _noDictionaryColumns,
                   _varLengthDictionaryColumns, indexingConfig.isNullHandlingEnabled());
 

@@ -58,7 +58,7 @@ import org.slf4j.LoggerFactory;
 public class GroupByOrderByCombineOperator extends BaseCombineOperator {
   public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
   private static final Logger LOGGER = LoggerFactory.getLogger(GroupByOrderByCombineOperator.class);
-  private static final String OPERATOR_NAME = "GroupByOrderByCombineOperator";
+
   private static final String EXPLAIN_NAME = "COMBINE_GROUPBY_ORDERBY";
   private final int _trimSize;
   private final int _trimThreshold;
@@ -114,10 +114,6 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
     return queryContext;
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public String toExplainString() {

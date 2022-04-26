@@ -39,6 +39,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.api.RequesterIdentity;
@@ -85,6 +86,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -381,10 +383,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       offlineBrokerRequest = getOfflineBrokerRequest(serverBrokerRequest);
       PinotQuery offlinePinotQuery = offlineBrokerRequest.getPinotQuery();
       handleExpressionOverride(offlinePinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
+      handleTimestampIndexOverride(offlinePinotQuery, offlineTableConfig);
       _queryOptimizer.optimize(offlinePinotQuery, offlineTableConfig, schema);
       realtimeBrokerRequest = getRealtimeBrokerRequest(serverBrokerRequest);
       PinotQuery realtimePinotQuery = realtimeBrokerRequest.getPinotQuery();
       handleExpressionOverride(realtimePinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
+      handleTimestampIndexOverride(realtimePinotQuery, realtimeTableConfig);
       _queryOptimizer.optimize(realtimePinotQuery, realtimeTableConfig, schema);
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.HYBRID);
       requestStatistics.setOfflineServerTenant(getServerTenant(offlineTableName));
@@ -393,6 +397,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // OFFLINE only
       setTableName(serverBrokerRequest, offlineTableName);
       handleExpressionOverride(pinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
+      handleTimestampIndexOverride(pinotQuery, offlineTableConfig);
       _queryOptimizer.optimize(pinotQuery, offlineTableConfig, schema);
       offlineBrokerRequest = serverBrokerRequest;
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.OFFLINE);
@@ -401,6 +406,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // REALTIME only
       setTableName(serverBrokerRequest, realtimeTableName);
       handleExpressionOverride(pinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
+      handleTimestampIndexOverride(pinotQuery, realtimeTableConfig);
       _queryOptimizer.optimize(pinotQuery, realtimeTableConfig, schema);
       realtimeBrokerRequest = serverBrokerRequest;
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.REALTIME);
@@ -561,6 +567,64 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     logBrokerResponse(requestId, query, requestStatistics, brokerRequest, numUnavailableSegments, serverStats,
         brokerResponse, totalTimeMs);
     return brokerResponse;
+  }
+
+  private void handleTimestampIndexOverride(PinotQuery pinotQuery, @Nullable TableConfig tableConfig) {
+    if (tableConfig == null || tableConfig.getFieldConfigList() == null) {
+      return;
+    }
+
+    Set<String> timestampIndexColumns = _tableCache.getTimestampIndexColumns(tableConfig.getTableName());
+    if (CollectionUtils.isEmpty(timestampIndexColumns)) {
+      return;
+    }
+    for (Expression expression : pinotQuery.getSelectList()) {
+      setTimestampIndexExpressionOverrideHints(expression, timestampIndexColumns, pinotQuery);
+    }
+    setTimestampIndexExpressionOverrideHints(pinotQuery.getFilterExpression(), timestampIndexColumns, pinotQuery);
+    setTimestampIndexExpressionOverrideHints(pinotQuery.getHavingExpression(), timestampIndexColumns, pinotQuery);
+    List<Expression> groupByList = pinotQuery.getGroupByList();
+    if (CollectionUtils.isNotEmpty(groupByList)) {
+      groupByList.forEach(
+          expression -> setTimestampIndexExpressionOverrideHints(expression, timestampIndexColumns, pinotQuery));
+    }
+    List<Expression> orderByList = pinotQuery.getOrderByList();
+    if (CollectionUtils.isNotEmpty(orderByList)) {
+      orderByList.forEach(
+          expression -> setTimestampIndexExpressionOverrideHints(expression, timestampIndexColumns, pinotQuery));
+    }
+  }
+
+  private void setTimestampIndexExpressionOverrideHints(@Nullable Expression expression,
+      Set<String> timestampIndexColumns,
+      PinotQuery pinotQuery) {
+    if (expression == null || expression.getFunctionCall() == null) {
+      return;
+    }
+    Function function = expression.getFunctionCall();
+    switch (function.getOperator()) {
+      case "datetrunc":
+        String granularString = function.getOperands().get(0).getLiteral().getStringValue();
+        Expression timeExpression = function.getOperands().get(1);
+        if (((function.getOperandsSize() == 2)
+            || (function.getOperandsSize() == 3
+            && "MILLISECONDS".equalsIgnoreCase(function.getOperands().get(2).getLiteral().getStringValue())))
+            && TimestampIndexGranularity.isValidTimeGranularity(granularString)
+            && timeExpression.getIdentifier() != null) {
+          String timeColumn = timeExpression.getIdentifier().getName();
+          String timeColumnWithGranularity = TimestampIndexGranularity.getColumnNameWithGranularity(timeColumn,
+              TimestampIndexGranularity.valueOf(granularString));
+          if (timestampIndexColumns.contains(timeColumnWithGranularity)) {
+            pinotQuery.putToExpressionOverrideHints(expression,
+                RequestUtils.getIdentifierExpression(timeColumnWithGranularity));
+          }
+        }
+        break;
+      default:
+        break;
+    }
+    function.getOperands()
+        .forEach(operand -> setTimestampIndexExpressionOverrideHints(operand, timestampIndexColumns, pinotQuery));
   }
 
   /** Set EXPLAIN PLAN query to route to only one segment on one server. */
@@ -1795,6 +1859,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         return actualAlias;
       }
     }
+    if (columnName.charAt(0) == '$') {
+      return columnName;
+    }
     throw new BadQueryRequestException("Unknown columnName '" + columnName + "' found in the query");
   }
 
@@ -2066,6 +2133,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * <ul>
    *   <li>Value for 'LIMIT' <= configured value</li>
    *   <li>Query options must be set to SQL mode</li>
+   *   <li>Check if numReplicaGroupsToQuery option provided is valid</li>
    * </ul>
    */
   @VisibleForTesting
@@ -2083,6 +2151,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (queryOptions == null || !QueryOptionsUtils.isGroupByModeSQL(queryOptions)
         || !QueryOptionsUtils.isResponseFormatSQL(queryOptions)) {
       throw new IllegalStateException("SQL query should always have response format and group-by mode set to SQL");
+    }
+    try {
+    // throw errors if options is less than 1 or invalid
+      Integer numReplicaGroupsToQuery = QueryOptionsUtils.getNumReplicaGroupsToQuery(queryOptions);
+      if (numReplicaGroupsToQuery != null) {
+        Preconditions.checkState(numReplicaGroupsToQuery > 0, "numReplicaGroups must be "
+            + "positive number, got: %d", numReplicaGroupsToQuery);
+      }
+    } catch (NumberFormatException ex) {
+      String numReplicaGroupsToQuery = queryOptions.get(Broker.Request.QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY);
+      throw new IllegalStateException(String.format("numReplicaGroups must be a positive number, got: %s",
+          numReplicaGroupsToQuery));
     }
 
     if (pinotQuery.getDataSource().getSubquery() != null) {

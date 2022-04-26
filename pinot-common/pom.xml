@@ -98,6 +98,93 @@
           </java>
         </configuration>
       </plugin>
+      <plugin>
+        <!-- Extract parser grammar template from calcite-core.jar and put
+             it under ${project.build.directory} where all freemarker templates are. -->
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>unpack-parser-template</id>
+            <phase>initialize</phase>
+            <goals>
+              <goal>unpack</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>org.apache.calcite</groupId>
+                  <artifactId>calcite-core</artifactId>
+                  <type>jar</type>
+                  <overWrite>true</overWrite>
+                  <outputDirectory>${project.build.directory}/</outputDirectory>
+                  <includes>**/Parser.jj,**/default_config.fmpp</includes>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-fmpp-maven-plugin</artifactId>
+        <version>${project.version}</version>
+        <executions>
+          <execution>
+            <id>generate-fmpp-sources</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>generate</goal>
+            </goals>
+            <configuration>
+              <config>${project.basedir}/src/main/codegen/config.fmpp</config>
+              <output>${project.build.directory}/generated-sources/fmpp</output>
+              <templates>${project.build.directory}/codegen/templates</templates>
+              <data>tdd(${project.basedir}/src/main/codegen/config.fmpp), default:tdd(${project.build.directory}/codegen/default_config.fmpp)</data>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>add-generated-sources</id>
+            <phase>process-sources</phase>
+            <goals>
+              <goal>add-source</goal>
+            </goals>
+            <configuration>
+              <sources>
+                <source>${project.build.directory}/generated-sources/javacc</source>
+              </sources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>javacc-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <phase>generate-sources</phase>
+            <id>javacc</id>
+            <goals>
+              <goal>javacc</goal>
+            </goals>
+            <configuration>
+              <sourceDirectory>${project.build.directory}/generated-sources/fmpp</sourceDirectory>
+              <includes>
+                <include>**/Parser.jj</include>
+              </includes>
+              <lookAhead>2</lookAhead>
+              <isStatic>false</isStatic>
+              <outputDirectory>${project.build.directory}/generated-sources/javacc</outputDirectory>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
   <dependencies>

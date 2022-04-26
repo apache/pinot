@@ -18,20 +18,24 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
-import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
+import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
+import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.FailureDetector;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
-import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
@@ -53,26 +57,23 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
   }
 
   @Override
-  protected void startServers() {
-    startServers(NUM_SERVERS);
+  protected int getNumReplicas() {
+    return NUM_SERVERS;
+  }
+
+  @Override
+  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
+    brokerConf.setProperty(FailureDetector.CONFIG_OF_TYPE, FailureDetector.Type.CONNECTION.name());
   }
 
   @Test
   public void testUpdateBrokerResource()
       throws Exception {
     // Add a new broker to the cluster
-    Map<String, Object> properties = getDefaultBrokerConfiguration().toMap();
-    String clusterName = getHelixClusterName();
-    properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
-    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
-    int port = NetUtils.findOpenPort(DEFAULT_BROKER_PORT);
-    properties.put(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, port);
-    properties.put(CommonConstants.Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
-    HelixBrokerStarter brokerStarter = new HelixBrokerStarter();
-    brokerStarter.init(new PinotConfiguration(properties));
-    brokerStarter.start();
+    BaseBrokerStarter brokerStarter = startOneBroker(NUM_BROKERS);
 
     // Check if broker is added to all the tables in broker resource
+    String clusterName = getHelixClusterName();
     String brokerId = brokerStarter.getInstanceId();
     IdealState brokerResourceIdealState =
         _helixAdmin.getResourceIdealState(clusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
@@ -126,6 +127,93 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
 
     // Check if broker is dropped from the cluster
     assertFalse(_helixAdmin.getInstancesInCluster(clusterName).contains(brokerId));
+  }
+
+  @Test
+  public void testServerHardFailure()
+      throws Exception {
+    long expectedCountStarResult = getCountStarResult();
+    testCountStarQuery(3, false);
+    assertEquals(getCurrentCountStarResult(), expectedCountStarResult);
+
+    // Take a server and shut down its query server to mimic a hard failure
+    BaseServerStarter serverStarter = _serverStarters.get(NUM_SERVERS - 1);
+    serverStarter.getServerInstance().shutDown();
+
+    // First query should hit all servers and get connection refused exception
+    testCountStarQuery(NUM_SERVERS, true);
+
+    // Second query should not hit the failed server, and should return the correct result
+    testCountStarQuery(NUM_SERVERS - 1, false);
+
+    // Restart the failed server, and it should be included in the routing again
+    serverStarter.stop();
+    serverStarter = startOneServer(NUM_SERVERS - 1);
+    _serverStarters.set(NUM_SERVERS - 1, serverStarter);
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResult = postQuery("SELECT COUNT(*) FROM mytable");
+        // Result should always be correct
+        assertEquals(queryResult.get("resultTable").get("rows").get(0).get(0).longValue(), getCountStarResult());
+        return queryResult.get("numServersQueried").intValue() == NUM_SERVERS;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 10_000L, "Failed to include the restarted server into the routing");
+  }
+
+  private void testCountStarQuery(int expectedNumServersQueried, boolean exceptionExpected)
+      throws Exception {
+    JsonNode queryResult = postQuery("SELECT COUNT(*) FROM mytable");
+    assertEquals(queryResult.get("numServersQueried").intValue(), expectedNumServersQueried);
+    if (exceptionExpected) {
+      // 2 exceptions expected: 1. connection refused from the failed server; 2. servers not responded
+      JsonNode exceptions = queryResult.get("exceptions");
+      assertEquals(exceptions.size(), 2);
+      JsonNode firstException = exceptions.get(0);
+      assertEquals(firstException.get("errorCode").intValue(), QueryException.BROKER_REQUEST_SEND_ERROR_CODE);
+      assertTrue(firstException.get("message").textValue().contains("Connection refused"));
+      JsonNode secondException = exceptions.get(1);
+      assertEquals(secondException.get("errorCode").intValue(), QueryException.SERVER_NOT_RESPONDING_ERROR_CODE);
+    } else {
+      assertEquals(queryResult.get("resultTable").get("rows").get(0).get(0).longValue(), getCountStarResult());
+      assertTrue(queryResult.get("exceptions").isEmpty());
+    }
+  }
+
+  // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
+  @Test(enabled = false)
+  @Override
+  public void testStarTreeTriggering() {
+    // Ignored
+  }
+
+  // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
+  @Test(enabled = false)
+  @Override
+  public void testDefaultColumns() {
+    // Ignored
+  }
+
+  // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
+  @Test(enabled = false)
+  @Override
+  public void testBloomFilterTriggering() {
+    // Ignored
+  }
+
+  // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
+  @Test(enabled = false)
+  @Override
+  public void testRangeIndexTriggering() {
+    // Ignored
+  }
+
+  // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
+  @Test(enabled = false)
+  @Override
+  public void testInvertedIndexTriggering() {
+    // Ignored
   }
 
   @Test(enabled = false)

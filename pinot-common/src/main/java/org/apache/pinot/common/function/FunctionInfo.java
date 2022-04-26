@@ -27,7 +27,6 @@ public class FunctionInfo {
   private final boolean _nullableParameters;
 
   public FunctionInfo(Method method, Class<?> clazz, boolean nullableParameters) {
-    method.setAccessible(true);
     _method = method;
     _clazz = clazz;
     _nullableParameters = nullableParameters;

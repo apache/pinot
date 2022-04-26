@@ -117,7 +117,7 @@ public final class IngestionConfigUtils {
    * Fetch the properties which belong to record reader, by removing the identifier prefix
    */
   public static Map<String, String> getRecordReaderProps(Map<String, String> batchConfigMap) {
-    return getConfigMapWithPrefix(batchConfigMap, BatchConfigProperties.RECORD_READER_PROP_PREFIX + DOT_SEPARATOR);
+    return getConfigMapWithPrefix(batchConfigMap, BatchConfigProperties.RECORD_READER_PROP_PREFIX);
   }
 
   /**
@@ -125,17 +125,17 @@ public final class IngestionConfigUtils {
    */
   public static Map<String, String> getSegmentNameGeneratorProps(Map<String, String> batchConfigMap) {
     return getConfigMapWithPrefix(batchConfigMap,
-        BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + DOT_SEPARATOR);
+        BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX);
   }
 
   public static PinotConfiguration getInputFsProps(Map<String, String> batchConfigMap) {
     return new PinotConfiguration(
-        getPropsWithPrefix(batchConfigMap, BatchConfigProperties.INPUT_FS_PROP_PREFIX + DOT_SEPARATOR));
+        getPropsWithPrefix(batchConfigMap, BatchConfigProperties.INPUT_FS_PROP_PREFIX));
   }
 
   public static PinotConfiguration getOutputFsProps(Map<String, String> batchConfigMap) {
     return new PinotConfiguration(
-        getPropsWithPrefix(batchConfigMap, BatchConfigProperties.OUTPUT_FS_PROP_PREFIX + DOT_SEPARATOR));
+        getPropsWithPrefix(batchConfigMap, BatchConfigProperties.OUTPUT_FS_PROP_PREFIX));
   }
 
   /**
@@ -160,6 +160,9 @@ public final class IngestionConfigUtils {
 
   public static Map<String, String> getConfigMapWithPrefix(Map<String, String> batchConfigMap, String prefix) {
     Map<String, String> props = new HashMap<>();
+    if (!prefix.endsWith(DOT_SEPARATOR)) {
+      prefix = prefix + DOT_SEPARATOR;
+    }
     for (String configKey : batchConfigMap.keySet()) {
       if (configKey.startsWith(prefix)) {
         String[] splits = configKey.split(prefix, 2);

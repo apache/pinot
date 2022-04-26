@@ -9,10 +9,36 @@
     "replication": "1"
   },
   "tenants": {},
+  "fieldConfigList": [
+    {
+      "name": "ts",
+      "encodingType": "DICTIONARY",
+      "indexTypes": ["TIMESTAMP"],
+      "timestampConfig": {
+        "granularities": [
+          "DAY",
+          "WEEK",
+          "MONTH"
+        ]
+      }
+    }
+  ],
   "tableIndexConfig": {
     "loadMode": "MMAP"
   },
   "metadata": {
     "customConfigs": {}
+  },
+  "ingestionConfig": {
+    "transformConfigs": [
+      {
+        "columnName": "ts",
+        "transformFunction": "fromEpochDays(DaysSinceEpoch)"
+      },
+      {
+        "columnName": "tsRaw",
+        "transformFunction": "fromEpochDays(DaysSinceEpoch)"
+      }
+    ]
   }
 }

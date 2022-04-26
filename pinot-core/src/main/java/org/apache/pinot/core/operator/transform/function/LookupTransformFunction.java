@@ -130,6 +130,8 @@ public class LookupTransformFunction extends BaseTransformFunction {
     _dataManager = DimensionTableDataManager.getInstanceByTableName(dimTableName);
     Preconditions.checkArgument(_dataManager != null, "Dimension table does not exist: %s", dimTableName);
 
+    Preconditions.checkArgument(_dataManager.isPopulated(), "Dimension table is not populated: %s", dimTableName);
+
     _lookupColumnFieldSpec = _dataManager.getColumnFieldSpec(_dimColumnName);
     Preconditions
         .checkArgument(_lookupColumnFieldSpec != null, "Column does not exist in dimension table: %s:%s", dimTableName,
