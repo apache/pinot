@@ -111,62 +111,98 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     Object execute(Object[] values);
   }
 
-  private static class ConjugationExecutionNode implements ExecutableNode {
-    private final String _name;
-    private final ExecutableNode[] _argumentNodes;
+  public abstract class ConjugateFunction {
+    protected final ExecutableNode[] _argumentNodes;
 
-    ConjugationExecutionNode(String name, ExecutableNode[] argumentNodes) {
-      _name = name;
+    protected ConjugateFunction(ExecutableNode[] argumentNodes) {
       _argumentNodes = argumentNodes;
+    }
+
+    public abstract Object execute(GenericRow row);
+
+    public abstract Object execute(Object[] values);
+  }
+
+  public class ScalarAnd extends ConjugateFunction {
+    public ScalarAnd(ExecutableNode[] argumentNodes) {
+      super(argumentNodes);
     }
 
     @Override
     public Object execute(GenericRow row) {
-      // TODO how to avoid this switch case?
-      switch (_name) {
-        case "and":
-          for (ExecutableNode executableNode :_argumentNodes) {
-            Boolean res = (Boolean) (executableNode.execute(row));
-            if (!res) {
-              return false;
-            }
-          }
-          return true;
-        case "or":
-          for (ExecutableNode executableNode :_argumentNodes) {
-            Boolean res = (Boolean) (executableNode.execute(row));
-            if (res) {
-              return true;
-            }
-          }
+      for (ExecutableNode executableNode :_argumentNodes) {
+        Boolean res = (Boolean) (executableNode.execute(row));
+        if (!res) {
           return false;
-        default:
-          throw new IllegalArgumentException("Illegal function name passed" + _name);
+        }
       }
+      return true;
     }
 
     @Override
     public Object execute(Object[] values) {
-      switch (_name) {
-        case "and":
-          for (ExecutableNode executableNode :_argumentNodes) {
-            Boolean res = (Boolean) (executableNode.execute(values));
-            if (!res) {
-              return false;
-            }
-          }
-          return true;
-        case "or":
-          for (ExecutableNode executableNode :_argumentNodes) {
-            Boolean res = (Boolean) (executableNode.execute(values));
-            if (res) {
-              return true;
-            }
-          }
+      for (ExecutableNode executableNode :_argumentNodes) {
+        Boolean res = (Boolean) (executableNode.execute(values));
+        if (!res) {
           return false;
-        default:
-          throw new IllegalArgumentException("Illegal function name passed" + _name);
+        }
       }
+      return true;
+    }
+  }
+
+  public class ScalarOr extends ConjugateFunction {
+    public ScalarOr(ExecutableNode[] argumentNodes) {
+      super(argumentNodes);
+    }
+
+    @Override
+    public Object execute(GenericRow row) {
+      for (ExecutableNode executableNode :_argumentNodes) {
+        Boolean res = (Boolean) (executableNode.execute(row));
+        if (res) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    @Override
+    public Object execute(Object[] values) {
+      for (ExecutableNode executableNode :_argumentNodes) {
+        Boolean res = (Boolean) (executableNode.execute(values));
+        if (res) {
+          return true;
+        }
+      }
+      return false;
+    }
+  }
+
+  private class ConjugationExecutionNode implements ExecutableNode {
+    private final ConjugateFunction _conjugateFunction;
+
+    ConjugationExecutionNode(String name, ExecutableNode[] argumentNodes) {
+      switch (name) {
+        case "and":
+          _conjugateFunction = new ScalarAnd(argumentNodes);
+          break;
+        case "or":
+          _conjugateFunction = new ScalarOr(argumentNodes);
+          break;
+        default:
+          throw new IllegalArgumentException("Illegal function name passed" + name);
+      }
+    }
+
+    @Override
+    public Object execute(GenericRow row) {
+      return _conjugateFunction.execute(row);
+    }
+
+    @Override
+    public Object execute(Object[] values) {
+      return _conjugateFunction.execute(values);
     }
   }
 
