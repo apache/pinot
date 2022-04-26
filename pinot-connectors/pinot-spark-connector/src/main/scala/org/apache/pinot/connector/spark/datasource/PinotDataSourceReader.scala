@@ -81,16 +81,16 @@ class PinotDataSourceReader(options: DataSourceOptions, userSchema: Option[Struc
 
     val routingTable = PinotClusterClient.getRoutingTable(readParameters.broker, generatedSQLs)
 
-    val grpcPortMap : Map[String, Int] = Map()
-    val grpcPortReader = (instance:String) => { // cached reader to reduce network round trips
-      grpcPortMap.getOrElseUpdate(
+    val instanceInfo : Map[String, InstanceInfo] = Map()
+    val instanceInfoReader = (instance:String) => { // cached reader to reduce network round trips
+      instanceInfo.getOrElseUpdate(
         instance,
-        PinotClusterClient.getGrpcPortForInstance(readParameters.controller, instance)
+        PinotClusterClient.getInstanceInfo(readParameters.controller, instance)
       )
     }
 
     PinotSplitter
-      .generatePinotSplits(generatedSQLs, routingTable, grpcPortReader, readParameters)
+      .generatePinotSplits(generatedSQLs, routingTable, instanceInfoReader, readParameters)
       .zipWithIndex
       .map {
         case (pinotSplit, partitionId) =>

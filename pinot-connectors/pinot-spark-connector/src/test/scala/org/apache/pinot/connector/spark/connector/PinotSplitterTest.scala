@@ -21,15 +21,19 @@ package org.apache.pinot.connector.spark.connector
 import org.apache.pinot.connector.spark.BaseTest
 import org.apache.pinot.connector.spark.connector.query.GeneratedSQLs
 import org.apache.pinot.connector.spark.datasource.PinotDataSourceReadOptions
-import org.apache.pinot.connector.spark.exceptions.PinotException
 import org.apache.pinot.spi.config.table.TableType
+import java.util.regex.Pattern
 
 /**
  * Test num of Spark partitions by routing table and input configs.
  */
 class PinotSplitterTest extends BaseTest {
   private val generatedPql = GeneratedSQLs("tbl", None, "", "")
-  private val mockGrpcPortReader = (server: String) => 0
+  private val mockInstanceInfoReader = (server: String) => {
+    val matcher = Pattern.compile("Server_(.*)_(\\d+)").matcher(server)
+    matcher.matches()
+    InstanceInfo(server, matcher.group(1), matcher.group(2), -1)
+  }
 
   private val routingTable = Map(
     TableType.OFFLINE -> Map(
@@ -57,18 +61,16 @@ class PinotSplitterTest extends BaseTest {
 
   test("Total 5 partition splits should be created for maxNumSegmentPerServerRequest = 3") {
     val readOptions = getReadOptionsWithSegmentsPerSplit(3)
-
     val splitResults =
-      PinotSplitter.generatePinotSplits(generatedPql, routingTable, mockGrpcPortReader, readOptions)
+      PinotSplitter.generatePinotSplits(generatedPql, routingTable, mockInstanceInfoReader, readOptions)
 
     splitResults.size shouldEqual 5
   }
 
   test("Total 5 partition splits should be created for maxNumSegmentPerServerRequest = 90") {
     val readOptions = getReadOptionsWithSegmentsPerSplit(90)
-
     val splitResults =
-      PinotSplitter.generatePinotSplits(generatedPql, routingTable, mockGrpcPortReader, readOptions)
+      PinotSplitter.generatePinotSplits(generatedPql, routingTable, mockInstanceInfoReader, readOptions)
 
     splitResults.size shouldEqual 5
   }
@@ -76,7 +78,7 @@ class PinotSplitterTest extends BaseTest {
   test("Total 10 partition splits should be created for maxNumSegmentPerServerRequest = 1") {
     val readOptions = getReadOptionsWithSegmentsPerSplit(1)
     val splitResults =
-      PinotSplitter.generatePinotSplits(generatedPql, routingTable, mockGrpcPortReader, readOptions)
+      PinotSplitter.generatePinotSplits(generatedPql, routingTable, mockInstanceInfoReader, readOptions)
 
     splitResults.size shouldEqual 10
   }
@@ -87,11 +89,11 @@ class PinotSplitterTest extends BaseTest {
     )
     val readOptions = getReadOptionsWithSegmentsPerSplit(5)
 
-    val splitResults = PinotSplitter.generatePinotSplits(generatedPql, inputRoutingTable, mockGrpcPortReader, readOptions)
+    val splitResults = PinotSplitter.generatePinotSplits(generatedPql, inputRoutingTable, mockInstanceInfoReader, readOptions)
     val expectedOutput = List(
       PinotSplit(
         generatedPql,
-        PinotServerAndSegments("192.168.1.100", "9000", 0, List("segment1"), TableType.REALTIME)
+        PinotServerAndSegments("192.168.1.100", "9000", -1, List("segment1"), TableType.REALTIME)
       )
     )
 
@@ -111,7 +113,10 @@ class PinotSplitterTest extends BaseTest {
       1,
       1000,
       true)
-    val inputGrpcPortReader = (server: String) => 8090
+
+    val inputGrpcPortReader = (server: String) => {
+      InstanceInfo(server, "192.168.1.100", "9000", 8090)
+    }
 
     val splitResults =
       PinotSplitter.generatePinotSplits(generatedPql, inputRoutingTable, inputGrpcPortReader, inputReadOptions)
@@ -123,21 +128,5 @@ class PinotSplitterTest extends BaseTest {
     )
 
     expectedOutput should contain theSameElementsAs splitResults
-  }
-
-  test("GeneratePinotSplits method should throw exception due to wrong input Server_HOST_PORT") {
-    val inputRoutingTable = Map(
-      TableType.REALTIME -> Map(
-        "Server_192.168.1.100_9000" -> List("segment1"),
-        "Server_192.168.2.100" -> List("segment5")
-      )
-    )
-    val readOptions = getReadOptionsWithSegmentsPerSplit(5)
-
-    val exception = intercept[PinotException] {
-      PinotSplitter.generatePinotSplits(generatedPql, inputRoutingTable, mockGrpcPortReader, readOptions)
-    }
-
-    exception.getMessage shouldEqual "'Server_192.168.2.100' did not match!?"
   }
 }

@@ -178,21 +178,21 @@ private[pinot] object PinotClusterClient extends Logging {
   }
 
   /**
-   * Get GRPC port information for a server
+   * Get host information for a Pinot instance
    *
-   * @return grpc port number (int)
+   * @return InstanceInfo
    */
-  def getGrpcPortForInstance(controllerUrl: String, instance: String): Int = {
+  def getInstanceInfo(controllerUrl: String, instance: String): InstanceInfo = {
     Try {
       val uri = new URI(String.format(INSTANCES_API_TEMPLATE, controllerUrl, instance))
       val response = HttpUtils.sendGetRequest(uri)
       decodeTo[InstanceInfo](response)
     } match {
       case Success(decodedReponse) =>
-        decodedReponse.grpcPort
+        decodedReponse
       case Failure(exception) =>
         throw PinotException(
-          s"An error occured while reading Grpc port for server: '$instance'",
+          s"An error occured while reading instance info for: '$instance'",
           exception
         )
     }
@@ -224,4 +224,7 @@ private[pinot] case class TimeBoundaryInfo(timeColumn: String, timeValue: String
   def getRealtimePredicate: String = s"$timeColumn >= $timeValue"
 }
 
-private[pinot] case class InstanceInfo(instanceName: String, grpcPort: Int)
+private[pinot] case class InstanceInfo(instanceName: String,
+                                       hostName: String,
+                                       port: String,
+                                       grpcPort: Int)
