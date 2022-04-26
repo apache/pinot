@@ -46,18 +46,6 @@ public class PredicateComparisonRewriter implements QueryRewriter {
   }
 
   /**
-   This method converts a predicate expression to the what Pinot could evaluate.
-   1. For comparison expression, left operand could be any expression, but right operand only
-   supports literal. E.g. 'WHERE a > b' will be converted to 'WHERE a - b > 0'
-   2. Updates boolean predicates (literals and scalar functions) that are missing an EQUALS filter.
-   *
-   *
-   * @param expression current expression in the expression tree
-   * @param parentFunction parent expression
-   * @return re-written expression.
-   */
-
-  /**
    * This method converts a predicate expression to the what Pinot could evaluate.
    * 1. For comparison expression, left operand could be any expression, but right operand only
    *    supports literal. E.g. 'WHERE a > b' will be converted to 'WHERE a - b > 0'
