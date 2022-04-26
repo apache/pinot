@@ -36,8 +36,8 @@ import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
 import org.apache.pinot.query.planner.stage.ProjectNode;
 import org.apache.pinot.query.planner.stage.StageNode;
-import org.apache.pinot.query.runtime.blocks.DataTableBlock;
-import org.apache.pinot.query.runtime.blocks.DataTableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.DataBlockUtils;
+import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
@@ -83,12 +83,12 @@ public class WorkerQueryExecutor {
       ExecutorService executorService) {
     long requestId = Long.parseLong(requestMetadataMap.get("REQUEST_ID"));
     StageNode stageRoot = queryRequest.getStageRoot();
-    BaseOperator<DataTableBlock> rootOperator = getOperator(requestId, stageRoot, queryRequest.getMetadataMap());
+    BaseOperator<TransferableBlock> rootOperator = getOperator(requestId, stageRoot, queryRequest.getMetadataMap());
     executorService.submit(new TraceRunnable() {
       @Override
       public void runJob() {
         ThreadTimer executionThreadTimer = new ThreadTimer();
-        while (!DataTableBlockUtils.isEndOfStream(rootOperator.nextBlock())) {
+        while (!DataBlockUtils.isEndOfStream(rootOperator.nextBlock())) {
           LOGGER.debug("Result Block acquired");
         }
         LOGGER.info("Execution time:" + executionThreadTimer.getThreadTimeNs());
@@ -97,7 +97,7 @@ public class WorkerQueryExecutor {
   }
 
   // TODO: split this PhysicalPlanner into a separate module
-  private BaseOperator<DataTableBlock> getOperator(long requestId, StageNode stageNode,
+  private BaseOperator<TransferableBlock> getOperator(long requestId, StageNode stageNode,
       Map<Integer, StageMetadata> metadataMap) {
     // TODO: optimize this into a framework. (physical planner)
     if (stageNode instanceof MailboxReceiveNode) {
@@ -107,15 +107,15 @@ public class WorkerQueryExecutor {
           requestId, receiveNode.getSenderStageId());
     } else if (stageNode instanceof MailboxSendNode) {
       MailboxSendNode sendNode = (MailboxSendNode) stageNode;
-      BaseOperator<DataTableBlock> nextOperator = getOperator(requestId, sendNode.getInputs().get(0), metadataMap);
+      BaseOperator<TransferableBlock> nextOperator = getOperator(requestId, sendNode.getInputs().get(0), metadataMap);
       StageMetadata receivingStageMetadata = metadataMap.get(sendNode.getReceiverStageId());
       return new MailboxSendOperator(_mailboxService, nextOperator, receivingStageMetadata.getServerInstances(),
           sendNode.getExchangeType(), sendNode.getPartitionKeySelector(), _hostName, _port, requestId,
           sendNode.getStageId());
     } else if (stageNode instanceof JoinNode) {
       JoinNode joinNode = (JoinNode) stageNode;
-      BaseOperator<DataTableBlock> leftOperator = getOperator(requestId, joinNode.getInputs().get(0), metadataMap);
-      BaseOperator<DataTableBlock> rightOperator = getOperator(requestId, joinNode.getInputs().get(1), metadataMap);
+      BaseOperator<TransferableBlock> leftOperator = getOperator(requestId, joinNode.getInputs().get(0), metadataMap);
+      BaseOperator<TransferableBlock> rightOperator = getOperator(requestId, joinNode.getInputs().get(1), metadataMap);
       return new HashJoinOperator(leftOperator, rightOperator, joinNode.getCriteria());
     } else if (stageNode instanceof FilterNode) {
       throw new UnsupportedOperationException("Unsupported!");
