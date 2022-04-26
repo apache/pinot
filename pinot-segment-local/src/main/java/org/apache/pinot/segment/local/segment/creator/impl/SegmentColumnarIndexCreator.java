@@ -219,12 +219,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       if (textIndexColumns.contains(columnName)) {
         FSTType fstType = FSTType.LUCENE;
         List<FieldConfig> fieldConfigList = _config.getTableConfig().getFieldConfigList();
-        for (FieldConfig fieldConfig : fieldConfigList) {
-          if (fieldConfig.getName().equalsIgnoreCase(columnName)) {
-            Map<String, String> properties = fieldConfig.getProperties();
+        if (fieldConfigList != null) {
+          for (FieldConfig fieldConfig : fieldConfigList) {
+            if (fieldConfig.getName().equalsIgnoreCase(columnName)) {
+              Map<String, String> properties = fieldConfig.getProperties();
 
-            if (TextIndexUtils.isFstTypeNative(properties)) {
-              fstType = FSTType.NATIVE;
+              if (TextIndexUtils.isFstTypeNative(properties)) {
+                fstType = FSTType.NATIVE;
+              }
             }
           }
         }
