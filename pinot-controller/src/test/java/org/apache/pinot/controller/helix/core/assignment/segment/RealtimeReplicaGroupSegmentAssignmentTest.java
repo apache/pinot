@@ -43,7 +43,7 @@ import static org.testng.Assert.assertTrue;
 public class RealtimeReplicaGroupSegmentAssignmentTest {
   private static final int NUM_REPLICAS = 3;
   private static final int NUM_PARTITIONS = 4;
-  private static final int NUM_SEGMENTS = 100;
+  private static final int NUM_SEGMENTS = 24;
   private static final String CONSUMING_INSTANCE_NAME_PREFIX = "consumingInstance_";
   private static final int NUM_CONSUMING_INSTANCES = 9;
   private static final List<String> CONSUMING_INSTANCES =

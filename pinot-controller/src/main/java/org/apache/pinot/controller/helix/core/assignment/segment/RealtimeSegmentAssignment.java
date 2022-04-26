@@ -328,23 +328,26 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
       } else {
         // Replica-group based assignment
 
-        Map<Integer, List<String>> partitionGroupIdToSegmentsMap = new HashMap<>();
+        int numPartitions = instancePartitions.getNumPartitions();
+        Map<Integer, List<String>> instancePartitionIdToSegmentsMap = new HashMap<>();
         for (String segmentName : currentAssignment.keySet()) {
           int partitionGroupId = SegmentUtils
               .getRealtimeSegmentPartitionId(segmentName, _realtimeTableName, _helixManager, _partitionColumn);
-          partitionGroupIdToSegmentsMap.computeIfAbsent(partitionGroupId, k -> new ArrayList<>()).add(segmentName);
+          int instancePartitionId = partitionGroupId % numPartitions;
+          instancePartitionIdToSegmentsMap.computeIfAbsent(instancePartitionId, k -> new ArrayList<>())
+              .add(segmentName);
         }
 
         // NOTE: Shuffle the segments within the current assignment to avoid moving only new segments to the new added
         //       servers, which might cause hotspot servers because queries tend to hit the new segments. Use the table
         //       name hash as the random seed for the shuffle so that the result is deterministic.
         Random random = new Random(_realtimeTableName.hashCode());
-        for (List<String> segments : partitionGroupIdToSegmentsMap.values()) {
+        for (List<String> segments : instancePartitionIdToSegmentsMap.values()) {
           Collections.shuffle(segments, random);
         }
 
         newAssignment = SegmentAssignmentUtils
-            .rebalanceReplicaGroupBasedTable(currentAssignment, instancePartitions, partitionGroupIdToSegmentsMap);
+            .rebalanceReplicaGroupBasedTable(currentAssignment, instancePartitions, instancePartitionIdToSegmentsMap);
       }
     }
     return newAssignment;
