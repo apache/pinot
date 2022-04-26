@@ -19,15 +19,18 @@
 package org.apache.pinot.plugin.minion.tasks.purge;
 
 import com.google.common.base.Preconditions;
+
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import org.apache.pinot.common.data.Segment;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
-import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
+import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -40,12 +43,12 @@ import org.slf4j.LoggerFactory;
 
 
 @TaskGenerator
-public class PurgeTaskGenerator implements PinotTaskGenerator {
-    protected static final Logger LOGGER = LoggerFactory.getLogger(PurgeTaskGenerator.class);
+public class PurgeTaskGenerator extends BaseTaskGenerator {
+    private static final Logger LOGGER = LoggerFactory.getLogger(PurgeTaskGenerator.class);
 
     private static final PurgeTaskGenerator INSTANCE = new PurgeTaskGenerator();
 
-    protected ClusterInfoAccessor _clusterInfoAccessor;
+    private ClusterInfoAccessor _clusterInfoAccessor;
 
     public static Object newInstance() {
         return INSTANCE;
@@ -53,7 +56,7 @@ public class PurgeTaskGenerator implements PinotTaskGenerator {
 
     @Override
     public void init(ClusterInfoAccessor clusterInfoAccessor) {
-        LOGGER.info("I'm in init for the purge");
+        LOGGER.info("Initializing purge task");
         _clusterInfoAccessor = clusterInfoAccessor;
     }
 
@@ -69,21 +72,27 @@ public class PurgeTaskGenerator implements PinotTaskGenerator {
     public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
         String taskType = MinionConstants.PurgeTask.TASK_TYPE;
         List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
-        Set<Segment> runningSegments =
-                TaskGeneratorUtils.getRunningSegments(MinionConstants.PurgeTask.TASK_TYPE, _clusterInfoAccessor);
+
         for (TableConfig tableConfig : tableConfigs) {
+
             String tableName = tableConfig.getTableName();
+            if (tableConfig.getTableType() != TableType.REALTIME) {
+                LOGGER.warn("Skip generating task: {} for non-REALTIME table: {}", taskType, tableName);
+                continue;
+            }
             TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
             Preconditions.checkNotNull(tableTaskConfig);
             Map<String, String> taskConfigs =
                     tableTaskConfig.getConfigsForTaskType(MinionConstants.PurgeTask.TASK_TYPE);
-            Preconditions.checkNotNull(taskConfigs, "Task config shouldn't be null for Table: {}", tableName);
-
+            try {
+                Preconditions.checkNotNull(taskConfigs, "Task config shouldn't be null for Table: {}", tableName);
+            } catch (Exception e) {
+                continue;
+            }
             LOGGER.info("Start generating task configs for table: {} for task: {}", tableName, taskType);
 
             if (tableConfig.getTableType() == TableType.REALTIME) {
-                LOGGER.info("Task type : {}, cannot be run on table of type  {}",
-                        taskType, TableType.REALTIME);
+                LOGGER.info("Task type : {}, cannot be run on table of type  {}", taskType, TableType.REALTIME);
                 continue;
             }
                 // Get max number of tasks for this table
@@ -97,9 +106,12 @@ public class PurgeTaskGenerator implements PinotTaskGenerator {
                 }
             } else {
                 tableMaxNumTasks = Integer.MAX_VALUE;
+                LOGGER.warn("MaxNumTasks have been incorrectly set for table : {}, and task {}", tableName, taskType);
             }
             List<SegmentZKMetadata> offlineSegmentsZKMetadata = _clusterInfoAccessor.getSegmentsZKMetadata(tableName);
             int tableNumTasks = 0;
+            Set<Segment> runningSegments =
+                    TaskGeneratorUtils.getRunningSegments(MinionConstants.PurgeTask.TASK_TYPE, _clusterInfoAccessor);
             for (SegmentZKMetadata segmentZKMetadata : offlineSegmentsZKMetadata) {
                 Map<String, String> configs = new HashMap<>();
                 String segmentName = segmentZKMetadata.getSegmentName();
