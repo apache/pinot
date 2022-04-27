@@ -85,7 +85,6 @@ public class JsonUtils {
   private static final TypeReference<HashMap<String, Object>> GENERIC_JSON_TYPE =
       new TypeReference<HashMap<String, Object>>() { };
 
-
   public static <T> T stringToObject(String jsonString, Class<T> valueType)
       throws IOException {
     return DEFAULT_READER.forType(valueType).readValue(jsonString);
