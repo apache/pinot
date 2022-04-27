@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Collections;
-import java.util.PrimitiveIterator;
 import org.apache.avro.util.ByteBufferInputStream;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.segment.local.utils.nativefst.FST;
@@ -33,6 +32,7 @@ import org.apache.pinot.segment.local.utils.nativefst.utils.RegexpMatcher;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -113,7 +113,7 @@ public class NativeTextIndexReader implements TextIndexReader {
       ImmutableRoaringBitmap matchingDictIds = writer.get();
       MutableRoaringBitmap matchingDocIds = null;
 
-      for (PrimitiveIterator.OfInt it = matchingDictIds.stream().iterator(); it.hasNext(); ) {
+      for (PeekableIntIterator it = matchingDictIds.getIntIterator(); it.hasNext(); ) {
         int dictId = it.next();
 
         if (dictId >= 0) {
