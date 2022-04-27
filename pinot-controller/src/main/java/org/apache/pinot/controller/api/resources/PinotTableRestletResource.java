@@ -161,18 +161,19 @@ public class PinotTableRestletResource {
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
     // TODO introduce a table config ctor with json string.
-    Pair<TableConfig, Map<String, Object>> tableConfigAndUnparsedProps;
+    Pair<TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
     TableConfig tableConfig;
     String tableName;
     try {
-      tableConfigAndUnparsedProps = JsonUtils.stringToObjectAndUnparseableProps(tableConfigStr, TableConfig.class);
-      tableConfig = tableConfigAndUnparsedProps.getLeft();
+      tableConfigAndUnrecognizedProperties =
+          JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigStr, TableConfig.class);
+      tableConfig = tableConfigAndUnrecognizedProperties.getLeft();
 
       // validate permission
       tableName = tableConfig.getTableName();
       String endpointUrl = request.getRequestURL().toString();
-      _accessControlUtils
-          .validatePermission(tableName, AccessType.CREATE, httpHeaders, endpointUrl, _accessControlFactory.create());
+      _accessControlUtils.validatePermission(tableName, AccessType.CREATE, httpHeaders, endpointUrl,
+          _accessControlFactory.create());
 
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
 
@@ -199,7 +200,7 @@ public class PinotTableRestletResource {
       // (in realtime case, metadata might not have been created but would be created successfully in the next run of
       // the validation manager)
       return new ConfigSuccessResponse("Table " + tableName + " succesfully added",
-          tableConfigAndUnparsedProps.getRight());
+          tableConfigAndUnrecognizedProperties.getRight());
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
       if (e instanceof InvalidTableConfigException) {
@@ -451,7 +452,7 @@ public class PinotTableRestletResource {
     TableConfig tableConfig;
     try {
       tableConfigJsonPojoWithUnparsableProps =
-          JsonUtils.stringToObjectAndUnparseableProps(tableConfigString, TableConfig.class);
+          JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigString, TableConfig.class);
       tableConfig = tableConfigJsonPojoWithUnparsableProps.getLeft();
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
       TableConfigUtils.validate(tableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
@@ -506,7 +507,7 @@ public class PinotTableRestletResource {
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip) {
     Pair<TableConfig, Map<String, Object>> tableConfig;
     try {
-      tableConfig = JsonUtils.stringToObjectAndUnparseableProps(tableConfigStr, TableConfig.class);
+      tableConfig = JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigStr, TableConfig.class);
     } catch (IOException e) {
       String msg = String.format("Invalid table config json string: %s", tableConfigStr);
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);

@@ -275,12 +275,13 @@ public class JsonUtilsTest {
   }
 
   @Test
-  public void testUnparseableJson() throws Exception {
+  public void testUnrecognizedJsonProperties()
+      throws Exception {
     String inputJsonMissingProp = "{\"primitiveIntegerField\": 123, \"missingProp\": 567,"
         + " \"missingObjectProp\": {\"somestuff\": \"data\", \"somemorestuff\":\"moredata\"},"
         + "  \"classField\": {\"internalIntField\": 12, \"internalMissingField\": \"somedata\"}}";
-    Pair<JsonUtilsTestSamplePojo, Map<String, Object>>
-        parsedResp = JsonUtils.stringToObjectAndUnparseableProps(inputJsonMissingProp, JsonUtilsTestSamplePojo.class);
+    Pair<JsonUtilsTestSamplePojo, Map<String, Object>> parsedResp =
+        JsonUtils.stringToObjectAndUnrecognizedProperties(inputJsonMissingProp, JsonUtilsTestSamplePojo.class);
 
     Assert.assertTrue(parsedResp.getRight().containsKey("/missingProp"));
     Assert.assertTrue(parsedResp.getRight().containsKey("/missingObjectProp/somestuff"));

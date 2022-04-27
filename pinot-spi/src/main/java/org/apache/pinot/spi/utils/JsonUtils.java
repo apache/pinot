@@ -87,7 +87,7 @@ public class JsonUtils {
     return DEFAULT_READER.forType(valueType).readValue(jsonString);
   }
 
-  public static <T> Pair<T, Map<String, Object>> stringToObjectAndUnparseableProps(String jsonString,
+  public static <T> Pair<T, Map<String, Object>> stringToObjectAndUnrecognizedProperties(String jsonString,
       Class<T> valueType)
       throws IOException {
     T instance = DEFAULT_READER.forType(valueType).readValue(jsonString);
