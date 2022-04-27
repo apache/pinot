@@ -198,13 +198,6 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "segments", tableName, query);
   }
 
-  public String forSegmentReload(String tableName, String segmentName, boolean forceDownload)
-      throws UnsupportedEncodingException {
-    String query = "reload?forceDownload=" + forceDownload;
-    String segName = URLEncoder.encode(segmentName, StandardCharsets.UTF_8.toString());
-    return StringUtil.join("/", _baseUrl, "segments", tableName, segName, query);
-  }
-
   public String forTableSize(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "size");
   }
@@ -286,8 +279,8 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forSegmentReload(String tableName, String segmentName, boolean forceDownload) {
-    return StringUtil.join("/", _baseUrl, "segments", tableName, encode(segmentName),
-        "reload?forceDownload=" + forceDownload);
+    return StringUtil
+        .join("/", _baseUrl, "segments", tableName, encode(segmentName), "reload?forceDownload=" + forceDownload);
   }
 
   public String forSegmentDownload(String tableName, String segmentName) {
@@ -375,9 +368,9 @@ public class ControllerRequestURLBuilder {
 
   public String forIngestFromFile(String tableNameWithType, String batchConfigMapStr)
       throws UnsupportedEncodingException {
-    return String.format("%s?tableNameWithType=%s&batchConfigMapStr=%s",
-        StringUtil.join("/", _baseUrl, "ingestFromFile"), tableNameWithType,
-        URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8.toString()));
+    return String
+        .format("%s?tableNameWithType=%s&batchConfigMapStr=%s", StringUtil.join("/", _baseUrl, "ingestFromFile"),
+            tableNameWithType, URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8.toString()));
   }
 
   public String forIngestFromFile(String tableNameWithType, Map<String, String> batchConfigMap)
@@ -424,8 +417,9 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "zk/getChildren", "?path=" + path);
   }
 
-  public String forUpsertTableHeapEstimation(String columnStatsStr) {
-    return StringUtils.join("/", _baseUrl, "heapUsage", "?columnStats=" + columnStatsStr);
+  public String forUpsertTableHeapEstimation(long cardinality, int primaryKeySize, int numPartitions) {
+    return StringUtil.join("/", _baseUrl, "heapUsage",
+        "?cardinality=" + cardinality + "&primaryKeySize=" + primaryKeySize + "&numPartitions=" + numPartitions);
   }
 
   private static String encode(String s) {

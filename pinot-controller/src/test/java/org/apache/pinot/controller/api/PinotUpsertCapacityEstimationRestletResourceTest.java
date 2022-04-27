@@ -23,7 +23,6 @@ import java.io.File;
 import java.net.URL;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.api.resources.TableAndSchemaConfig;
-import org.apache.pinot.spi.config.table.ColumnStats;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -35,8 +34,6 @@ import static org.testng.Assert.assertEquals;
 
 
 public class PinotUpsertCapacityEstimationRestletResourceTest {
-  private static final String TABLE_NAME = "restletTable_UPSERT";
-
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -53,21 +50,20 @@ public class PinotUpsertCapacityEstimationRestletResourceTest {
     TableConfig tableConfig = JsonUtils.fileToObject(tableConfigFile, TableConfig.class);
 
     TableAndSchemaConfig tableAndSchemaConfig = new TableAndSchemaConfig(tableConfig, schema);
-    String columnStats = new ColumnStats(10000, 48, 16, 8).toString();
 
     String estimateHeapUsageUrl =
-        ControllerTestUtils.getControllerRequestURLBuilder().forUpsertTableHeapEstimation(columnStats);
+        ControllerTestUtils.getControllerRequestURLBuilder().forUpsertTableHeapEstimation(10000, 48, 8);
+
     JsonNode result = JsonUtils.stringToJsonNode(
         ControllerTestUtils.sendPostRequest(estimateHeapUsageUrl, tableAndSchemaConfig.toJsonString()));
-    assertEquals(result.get("tableName"), "restletTable_UPSERT");
-    assertEquals(result.get("bytesPerKey"), 48);
-    assertEquals(result.get("bytesPerValue"), 68);
-    assertEquals(result.get("totalKeySpace(bytes)"), 480000);
-    assertEquals(result.get("totalValueSpace(bytes)"), 680000);
-    assertEquals(result.get("totalSpace(bytes)"), "1160000");
-    assertEquals(result.get("numPartitions"), 8);
-    assertEquals(result.get("replicasPerPartition"), 3);
-    assertEquals(result.get("memoryPerHost"), 435000);
+    assertEquals(result.get("bytesPerKey").asInt(), 48);
+    assertEquals(result.get("bytesPerValue").asInt(), 64);
+    assertEquals(result.get("totalKeySpace(bytes)").asLong(), 480000);
+    assertEquals(result.get("totalValueSpace(bytes)").asLong(), 640000);
+    assertEquals(result.get("totalSpace(bytes)").asLong(), 1120000);
+    assertEquals(result.get("numPartitions").asInt(), 8);
+    assertEquals(result.get("replicasPerPartition").asInt(), 3);
+    assertEquals(result.get("memoryPerHost").asDouble(), 420000.0);
   }
 
   @AfterClass

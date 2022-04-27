@@ -163,7 +163,7 @@ public class ControllerRequestClient {
       throws IOException {
     try {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(new URL(
-          _controllerRequestURLBuilder.forSegmentDeleteAll(tableName, tableType.toString())).toURI()));
+          _controllerRequestURLBuilder.forSegmentDeleteAllAPI(tableName, tableType.toString())).toURI()));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }

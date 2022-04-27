@@ -20,7 +20,9 @@ package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /*
@@ -30,12 +32,10 @@ public class ColumnStats {
 
   public static final String CARDINALITY = "cardinality";
   public static final String PRIMARY_KEY_SIZE = "primaryKeySize";
-  public static final String COMPARISON_COL_SIZE = "comparisonColSize";
   public static final String NUM_PARTITIONS = "numPartitions";
 
   private long _cardinality;
   private int _primaryKeySize = 8;
-  private int _comparisonColSize = 8;
   private int _numPartitions = 0;
 
   public ColumnStats(long cardinality) {
@@ -45,11 +45,9 @@ public class ColumnStats {
   @JsonCreator
   public ColumnStats(@JsonProperty(value = CARDINALITY, required = true) long cardinality,
       @JsonProperty(value = PRIMARY_KEY_SIZE) int primaryKeySize,
-      @JsonProperty(value = COMPARISON_COL_SIZE) int comparisonColSize,
       @JsonProperty(value = NUM_PARTITIONS) int numPartitions) {
     _cardinality = cardinality;
     _primaryKeySize = primaryKeySize;
-    _comparisonColSize = comparisonColSize;
     _numPartitions = numPartitions;
   }
 
@@ -64,14 +62,8 @@ public class ColumnStats {
     return _primaryKeySize;
   }
 
-  @Nullable
-  @JsonProperty(COMPARISON_COL_SIZE)
-  public int getComparisonColSize() {
-    return _comparisonColSize;
-  }
-
   @JsonProperty(NUM_PARTITIONS)
-  public int getPartitionsNum() {
+  public int getNumPartitions() {
     return _numPartitions;
   }
 
@@ -79,15 +71,19 @@ public class ColumnStats {
     _cardinality = cardinality;
   }
 
-  public void setComparisonColSize(int comparisonColSize) {
-    _comparisonColSize = comparisonColSize;
-  }
-
   public void setPrimaryKeySize(int primaryKeySize) {
     _primaryKeySize = primaryKeySize;
   }
 
-  public void setPartitionsNum(int partitionsNum) {
-    _numPartitions = partitionsNum;
+  public void setNumPartitions(int numPartitions) {
+    _numPartitions = numPartitions;
+  }
+
+  public String toJsonString() {
+    try {
+      return JsonUtils.objectToString(this);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
   }
 }

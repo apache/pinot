@@ -21,8 +21,10 @@ package org.apache.pinot.controller.api.resources;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
 import java.io.IOException;
 import java.util.List;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -30,7 +32,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
-import org.apache.pinot.spi.config.table.ColumnStats;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -72,31 +73,36 @@ public class PinotUpsertCapacityEstimationRestletResource {
   @POST
   @Path("/heapUsage")
   @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Estimate memory usage for an upsert table", notes =
       "This API returns the estimated heap usage based on primary key column stats."
           + " This allows us to estimate table size before onboarding.")
-  public String estimateHeapUsage(@QueryParam("columnStats") String columnStatsStr,
-      TableAndSchemaConfig tableSchemaConfig) {
+  public String estimateHeapUsage(String tableSchemaConfigStr,
+      @ApiParam(value = "cardinality in string format", required = true) @QueryParam("cardinality") String cardinality,
+      @ApiParam(value = "primaryKeySize in string format") @QueryParam("primaryKeySize") String primaryKeySize,
+      @ApiParam(value = "numPartitions in string format") @QueryParam("numPartitions") String numPartitionsStr) {
     ObjectNode resultData = JsonUtils.newObjectNode();
+    TableAndSchemaConfig tableSchemaConfig;
+
+    try {
+      tableSchemaConfig = JsonUtils.stringToObject(tableSchemaConfigStr, TableAndSchemaConfig.class);
+    } catch (IOException e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Invalid TableSchemaConfigs json string: %s", tableSchemaConfigStr),
+          Response.Status.BAD_REQUEST, e);
+    }
 
     TableConfig tableConfig = tableSchemaConfig.getTableConfig();
     resultData.put("tableName", tableConfig.getTableName());
 
     Schema schema = tableSchemaConfig.getSchema();
-    ColumnStats columnStats;
-    try {
-      columnStats = JsonUtils.stringToObject(columnStatsStr, ColumnStats.class);
-    } catch (IOException e) {
-      String msg = String.format("Invalid column stats json string: %s", columnStatsStr);
-      throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
-    }
 
     // Estimated key space, it contains primary key columns
     int bytesPerKey = 0;
     List<String> primaryKeys = schema.getPrimaryKeyColumns();
 
-    if (columnStats.getPrimaryKeySize() != 0) {
-      bytesPerKey += columnStats.getPrimaryKeySize();
+    if (primaryKeySize != null) {
+      bytesPerKey += Integer.valueOf(primaryKeySize);
     } else {
       for (String primaryKey : primaryKeys) {
         FieldSpec.DataType dt = schema.getFieldSpecFor(primaryKey).getDataType();
@@ -114,13 +120,24 @@ public class PinotUpsertCapacityEstimationRestletResource {
       bytesPerKey += 32;
     }
 
-    // Estimated value space, it contains <segmentName, DocId, ComparisonValue(timestamp)>
-    int bytesPerValue =
-        tableConfig.getUpsertConfig().getComparisonColumn() != null ? 52 + columnStats.getComparisonColSize() : 64;
+    // Estimated value space, it contains <segmentName, DocId, ComparisonValue(timestamp)> and overhead.
+    int bytesPerValue = 64;
+    String comparisonColumn = tableConfig.getUpsertConfig().getComparisonColumn();
+    if (comparisonColumn != null) {
+      FieldSpec.DataType dt = schema.getFieldSpecFor(comparisonColumn).getDataType();
+      if (dt == FieldSpec.DataType.STRING || dt == FieldSpec.DataType.JSON || dt == FieldSpec.DataType.LIST
+          || dt == FieldSpec.DataType.MAP) {
+        String msg = "Not support data types for the comparison column";
+        throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST);
+      } else {
+        bytesPerValue = 52 + dt.size();
+      }
+    }
+
     resultData.put("bytesPerKey", bytesPerKey);
     resultData.put("bytesPerValue", bytesPerValue);
 
-    long primaryKeyCardinality = columnStats.getCardinality();
+    long primaryKeyCardinality = Long.valueOf(cardinality);
     long totalKeySpace = bytesPerKey * primaryKeyCardinality;
     long totalValueSpace = bytesPerValue * primaryKeyCardinality;
     long totalSpace = totalKeySpace + totalValueSpace;
@@ -129,15 +146,16 @@ public class PinotUpsertCapacityEstimationRestletResource {
     resultData.put("totalValueSpace(bytes)", totalValueSpace);
     resultData.put("totalSpace(bytes)", totalSpace);
 
-    // Use Partitions, replicas and host assignment.
-    if (columnStats.getPartitionsNum() > 0) {
-      int partitionsNum = columnStats.getPartitionsNum();
-      int replicasPerPartition = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
-      double memoryPerHost = (totalSpace * replicasPerPartition * 1.0) / partitionsNum;
-
-      resultData.put("numPartitions", partitionsNum);
-      resultData.put("replicasPerPartition", replicasPerPartition);
-      resultData.put("memoryPerHost", memoryPerHost);
+    // Use Partitions, replicas to calculate memoryPerHost for host assignment.
+    if (numPartitionsStr != null) {
+      int numPartitions = Integer.valueOf(numPartitionsStr);
+      if (numPartitions > 0) {
+        int replicasPerPartition = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
+        double memoryPerHost = (totalSpace * replicasPerPartition * 1.0) / numPartitions;
+        resultData.put("numPartitions", numPartitions);
+        resultData.put("replicasPerPartition", replicasPerPartition);
+        resultData.put("memoryPerHost", memoryPerHost);
+      }
     }
     return resultData.toString();
   }
