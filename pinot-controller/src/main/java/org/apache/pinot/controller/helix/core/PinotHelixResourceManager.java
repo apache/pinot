@@ -3175,8 +3175,12 @@ public class PinotHelixResourceManager {
             .format("Invalid segment lineage entry id (tableName='%s', segmentLineageEntryId='%s')", tableNameWithType,
                 segmentLineageEntryId));
 
-        // NO-OPS if the entry is already 'COMPLETED' or 'REVERTED'
-        if (lineageEntry.getState() != LineageEntryState.IN_PROGRESS) {
+        // NO-OPS if the entry is already 'COMPLETED', reject if the entry is 'REVERTED'
+        if (lineageEntry.getState() == LineageEntryState.COMPLETED) {
+          LOGGER.info("Found lineage entry is already in COMPLETED status. (tableNameWithType = {}, "
+              + "segmentLineageEntryId = {})", tableNameWithType, segmentLineageEntryId);
+          return true;
+        } else if (lineageEntry.getState() == LineageEntryState.REVERTED) {
           String errorMsg = String.format(
               "The target lineage entry state is not 'IN_PROGRESS'. Cannot update to 'COMPLETED' state. "
                   + "(tableNameWithType=%s, segmentLineageEntryId=%s, state=%s)", tableNameWithType,
