@@ -105,13 +105,20 @@ public class SelectionOperatorService {
 
     int numValuesToCompare = valueIndexList.size();
     int[] valueIndices = new int[numValuesToCompare];
-    boolean[] isNumber = new boolean[numValuesToCompare];
+    boolean[] useDoubleComparison = new boolean[numValuesToCompare];
+    boolean[] useBigDecimalComparison = new boolean[numValuesToCompare];
     // Use multiplier -1 or 1 to control ascending/descending order
     int[] multipliers = new int[numValuesToCompare];
     for (int i = 0; i < numValuesToCompare; i++) {
       int valueIndex = valueIndexList.get(i);
       valueIndices[i] = valueIndex;
-      isNumber[i] = columnDataTypes[valueIndex].isNumber();
+      if (columnDataTypes[valueIndex].isNumber()) {
+        if (columnDataTypes[i] == ColumnDataType.BIG_DECIMAL) {
+          useBigDecimalComparison[i] = true;
+        } else {
+          useDoubleComparison[i] = true;
+        }
+      }
       multipliers[i] = orderByExpressions.get(valueIndex).isAsc() ? -1 : 1;
     }
 
@@ -121,12 +128,10 @@ public class SelectionOperatorService {
         Object v1 = o1[index];
         Object v2 = o2[index];
         int result;
-        if (isNumber[i]) {
-          if (columnDataTypes[i] == ColumnDataType.BIG_DECIMAL) {
-            result = ((BigDecimal) v1).compareTo((BigDecimal) v2);
-          } else {
-            result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
-          }
+        if (useDoubleComparison[i]) {
+          result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
+        } else if (useBigDecimalComparison[i]) {
+          result = ((BigDecimal) v1).compareTo((BigDecimal) v2);
         } else {
           //noinspection unchecked
           result = ((Comparable) v1).compareTo(v2);

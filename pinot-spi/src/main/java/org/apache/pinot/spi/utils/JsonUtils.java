@@ -68,14 +68,12 @@ public class JsonUtils {
   public static final String WILDCARD = "*";
 
   // NOTE: Do not expose the ObjectMapper to prevent configuration change
-  private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
+  private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper()
+      .setNodeFactory(JsonNodeFactory.withExactBigDecimals(true))
+      .configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true);
   public static final ObjectReader DEFAULT_READER = DEFAULT_MAPPER.reader();
   public static final ObjectWriter DEFAULT_WRITER = DEFAULT_MAPPER.writer();
   public static final ObjectWriter DEFAULT_PRETTY_WRITER = DEFAULT_MAPPER.writerWithDefaultPrettyPrinter();
-
-  private static final ObjectMapper DEFAULT_MAPPER_WITH_EXACT_BIG_DECIMAL = (new ObjectMapper())
-      .setNodeFactory(JsonNodeFactory.withExactBigDecimals(true))
-      .configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true);
 
 
   public static <T> T stringToObject(String jsonString, Class<T> valueType)
@@ -114,17 +112,15 @@ public class JsonUtils {
   /**
    * Reads the first json object from the file that can contain multiple objects
    */
-  public static JsonNode fileToFirstJsonNode(File jsonFile, boolean parseExactBigDecimal)
+  public static JsonNode fileToFirstJsonNode(File jsonFile)
       throws IOException {
-    ObjectMapper objectMapper = parseExactBigDecimal ? DEFAULT_MAPPER_WITH_EXACT_BIG_DECIMAL : DEFAULT_MAPPER;
-
     try (InputStream inputStream = new FileInputStream(jsonFile)) {
       JsonFactory jf = new JsonFactory();
       JsonParser jp = jf.createParser(inputStream);
-      jp.setCodec(objectMapper);
+      jp.setCodec(DEFAULT_MAPPER);
       jp.nextToken();
       if (jp.hasCurrentToken()) {
-        return objectMapper.readTree(jp);
+        return DEFAULT_MAPPER.readTree(jp);
       }
       return null;
     }
@@ -419,10 +415,9 @@ public class JsonUtils {
   public static Schema getPinotSchemaFromJsonFile(File jsonFile,
       @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit,
       @Nullable List<String> fieldsToUnnest, String delimiter,
-      ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson,
-      boolean parseExactBigDecimal)
+      ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson)
       throws IOException {
-    JsonNode jsonNode = fileToFirstJsonNode(jsonFile, parseExactBigDecimal);
+    JsonNode jsonNode = fileToFirstJsonNode(jsonFile);
     if (fieldsToUnnest == null) {
       fieldsToUnnest = new ArrayList<>();
     }

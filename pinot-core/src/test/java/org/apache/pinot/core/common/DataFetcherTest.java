@@ -20,6 +20,7 @@ package org.apache.pinot.core.common;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -60,6 +61,7 @@ public class DataFetcherTest {
   private static final String LONG_COLUMN = "long";
   private static final String FLOAT_COLUMN = "float";
   private static final String DOUBLE_COLUMN = "double";
+  private static final String BIG_DECIMAL_COLUMN = "bigDecimal";
   private static final String STRING_COLUMN = "string";
   private static final String BYTES_COLUMN = "bytes";
   private static final String HEX_STRING_COLUMN = "hex_string";
@@ -67,6 +69,7 @@ public class DataFetcherTest {
   private static final String NO_DICT_LONG_COLUMN = "no_dict_long";
   private static final String NO_DICT_FLOAT_COLUMN = "no_dict_float";
   private static final String NO_DICT_DOUBLE_COLUMN = "no_dict_double";
+  private static final String NO_DICT_BIG_DECIMAL_COLUMN = "no_dict_big_decimal";
   private static final String NO_DICT_STRING_COLUMN = "no_dict_string";
   private static final String NO_DICT_BYTES_COLUMN = "no_dict_bytes";
   private static final String NO_DICT_HEX_STRING_COLUMN = "no_dict_hex_string";
@@ -95,6 +98,9 @@ public class DataFetcherTest {
       row.putValue(NO_DICT_FLOAT_COLUMN, (float) value);
       row.putValue(DOUBLE_COLUMN, (double) value);
       row.putValue(NO_DICT_DOUBLE_COLUMN, (double) value);
+      BigDecimal bigDecimalValue = BigDecimal.valueOf(value);
+      row.putValue(BIG_DECIMAL_COLUMN, bigDecimalValue);
+      row.putValue(NO_DICT_BIG_DECIMAL_COLUMN, bigDecimalValue);
       String stringValue = Integer.toString(value);
       row.putValue(STRING_COLUMN, stringValue);
       row.putValue(NO_DICT_STRING_COLUMN, stringValue);
@@ -116,6 +122,7 @@ public class DataFetcherTest {
         new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension(INT_COLUMN, DataType.INT)
             .addSingleValueDimension(LONG_COLUMN, DataType.LONG).addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
             .addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE)
+            .addMetric(BIG_DECIMAL_COLUMN, DataType.BIG_DECIMAL)
             .addSingleValueDimension(STRING_COLUMN, DataType.STRING)
             .addSingleValueDimension(BYTES_COLUMN, DataType.BYTES)
             .addSingleValueDimension(HEX_STRING_COLUMN, DataType.STRING)
@@ -123,6 +130,7 @@ public class DataFetcherTest {
             .addSingleValueDimension(NO_DICT_LONG_COLUMN, DataType.LONG)
             .addSingleValueDimension(NO_DICT_FLOAT_COLUMN, DataType.FLOAT)
             .addSingleValueDimension(NO_DICT_DOUBLE_COLUMN, DataType.DOUBLE)
+            .addMetric(NO_DICT_BIG_DECIMAL_COLUMN, DataType.BIG_DECIMAL)
             .addSingleValueDimension(NO_DICT_STRING_COLUMN, DataType.STRING)
             .addSingleValueDimension(NO_DICT_BYTES_COLUMN, DataType.BYTES)
             .addSingleValueDimension(NO_DICT_HEX_STRING_COLUMN, DataType.STRING).build();
@@ -148,11 +156,13 @@ public class DataFetcherTest {
     testFetchIntValues(LONG_COLUMN);
     testFetchIntValues(FLOAT_COLUMN);
     testFetchIntValues(DOUBLE_COLUMN);
+    testFetchIntValues(BIG_DECIMAL_COLUMN);
     testFetchIntValues(STRING_COLUMN);
     testFetchIntValues(NO_DICT_INT_COLUMN);
     testFetchIntValues(NO_DICT_LONG_COLUMN);
     testFetchIntValues(NO_DICT_FLOAT_COLUMN);
     testFetchIntValues(NO_DICT_DOUBLE_COLUMN);
+    testFetchIntValues(NO_DICT_BIG_DECIMAL_COLUMN);
     testFetchIntValues(NO_DICT_STRING_COLUMN);
   }
 
@@ -162,11 +172,13 @@ public class DataFetcherTest {
     testFetchLongValues(LONG_COLUMN);
     testFetchLongValues(FLOAT_COLUMN);
     testFetchLongValues(DOUBLE_COLUMN);
+    testFetchLongValues(BIG_DECIMAL_COLUMN);
     testFetchLongValues(STRING_COLUMN);
     testFetchLongValues(NO_DICT_INT_COLUMN);
     testFetchLongValues(NO_DICT_LONG_COLUMN);
     testFetchLongValues(NO_DICT_FLOAT_COLUMN);
     testFetchLongValues(NO_DICT_DOUBLE_COLUMN);
+    testFetchLongValues(NO_DICT_BIG_DECIMAL_COLUMN);
     testFetchLongValues(NO_DICT_STRING_COLUMN);
   }
 
@@ -176,11 +188,13 @@ public class DataFetcherTest {
     testFetchFloatValues(LONG_COLUMN);
     testFetchFloatValues(FLOAT_COLUMN);
     testFetchFloatValues(DOUBLE_COLUMN);
+    testFetchFloatValues(BIG_DECIMAL_COLUMN);
     testFetchFloatValues(STRING_COLUMN);
     testFetchFloatValues(NO_DICT_INT_COLUMN);
     testFetchFloatValues(NO_DICT_LONG_COLUMN);
     testFetchFloatValues(NO_DICT_FLOAT_COLUMN);
     testFetchFloatValues(NO_DICT_DOUBLE_COLUMN);
+    testFetchFloatValues(NO_DICT_BIG_DECIMAL_COLUMN);
     testFetchFloatValues(NO_DICT_STRING_COLUMN);
   }
 
@@ -190,12 +204,30 @@ public class DataFetcherTest {
     testFetchDoubleValues(LONG_COLUMN);
     testFetchDoubleValues(FLOAT_COLUMN);
     testFetchDoubleValues(DOUBLE_COLUMN);
+    testFetchDoubleValues(BIG_DECIMAL_COLUMN);
     testFetchDoubleValues(STRING_COLUMN);
     testFetchDoubleValues(NO_DICT_INT_COLUMN);
     testFetchDoubleValues(NO_DICT_LONG_COLUMN);
     testFetchDoubleValues(NO_DICT_FLOAT_COLUMN);
     testFetchDoubleValues(NO_DICT_DOUBLE_COLUMN);
+    testFetchDoubleValues(NO_DICT_BIG_DECIMAL_COLUMN);
     testFetchDoubleValues(NO_DICT_STRING_COLUMN);
+  }
+
+  @Test
+  public void testFetchBigDecimalValues() {
+    testFetchBigDecimalValues(INT_COLUMN);
+    testFetchBigDecimalValues(LONG_COLUMN);
+    testFetchBigDecimalValues(FLOAT_COLUMN);
+    testFetchBigDecimalValues(DOUBLE_COLUMN);
+    testFetchBigDecimalValues(BIG_DECIMAL_COLUMN);
+    testFetchBigDecimalValues(STRING_COLUMN);
+    testFetchBigDecimalValues(NO_DICT_INT_COLUMN);
+    testFetchBigDecimalValues(NO_DICT_LONG_COLUMN);
+    testFetchBigDecimalValues(NO_DICT_FLOAT_COLUMN);
+    testFetchBigDecimalValues(NO_DICT_DOUBLE_COLUMN);
+    testFetchBigDecimalValues(NO_DICT_BIG_DECIMAL_COLUMN);
+    testFetchBigDecimalValues(NO_DICT_STRING_COLUMN);
   }
 
   @Test
@@ -204,11 +236,13 @@ public class DataFetcherTest {
     testFetchStringValues(LONG_COLUMN);
     testFetchStringValues(FLOAT_COLUMN);
     testFetchStringValues(DOUBLE_COLUMN);
+    testFetchStringValues(BIG_DECIMAL_COLUMN);
     testFetchStringValues(STRING_COLUMN);
     testFetchStringValues(NO_DICT_INT_COLUMN);
     testFetchStringValues(NO_DICT_LONG_COLUMN);
     testFetchStringValues(NO_DICT_FLOAT_COLUMN);
     testFetchStringValues(NO_DICT_DOUBLE_COLUMN);
+    testFetchStringValues(NO_DICT_BIG_DECIMAL_COLUMN);
     testFetchStringValues(NO_DICT_STRING_COLUMN);
   }
 
@@ -224,8 +258,8 @@ public class DataFetcherTest {
   public void testFetchHexStringValues() {
     testFetchHexStringValues(BYTES_COLUMN);
     testFetchHexStringValues(HEX_STRING_COLUMN);
-    testFetchBytesValues(NO_DICT_BYTES_COLUMN);
-    testFetchBytesValues(NO_DICT_HEX_STRING_COLUMN);
+    testFetchHexStringValues(NO_DICT_BYTES_COLUMN);
+    testFetchHexStringValues(NO_DICT_HEX_STRING_COLUMN);
   }
 
   public void testFetchIntValues(String column) {
@@ -285,6 +319,21 @@ public class DataFetcherTest {
 
     for (int i = 0; i < length; i++) {
       Assert.assertEquals((int) doubleValues[i], _values[docIds[i]], ERROR_MESSAGE);
+    }
+  }
+
+  public void testFetchBigDecimalValues(String column) {
+    int[] docIds = new int[NUM_ROWS];
+    int length = 0;
+    for (int i = RANDOM.nextInt(MAX_STEP_LENGTH); i < NUM_ROWS; i += RANDOM.nextInt(MAX_STEP_LENGTH) + 1) {
+      docIds[length++] = i;
+    }
+
+    BigDecimal[] bigDecimalValues = new BigDecimal[length];
+    _dataFetcher.fetchBigDecimalValues(column, docIds, length, bigDecimalValues);
+
+    for (int i = 0; i < length; i++) {
+      Assert.assertEquals(bigDecimalValues[i].intValue(), _values[docIds[i]], ERROR_MESSAGE);
     }
   }
 

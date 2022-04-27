@@ -367,6 +367,8 @@ public class GroupByDataTableReducer implements DataTableReducer {
                       values[colId] = dataTable.getDouble(rowId, colId);
                       break;
                     case BIG_DECIMAL:
+                      values[colId] = dataTable.getBigDecimal(rowId, colId);
+                      break;
                     case OBJECT:
                       values[colId] = dataTable.getObject(rowId, colId);
                       break;

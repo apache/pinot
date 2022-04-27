@@ -275,7 +275,7 @@ public class SelectionOperatorUtils {
             dataTableBuilder.setColumn(i, ((Number) columnValue).doubleValue());
             break;
           case BIG_DECIMAL:
-            dataTableBuilder.setColumn(i, columnValue);
+            dataTableBuilder.setColumn(i, (BigDecimal) columnValue);
             break;
           case STRING:
             dataTableBuilder.setColumn(i, ((String) columnValue));
@@ -372,7 +372,7 @@ public class SelectionOperatorUtils {
           row[i] = dataTable.getDouble(rowId, i);
           break;
         case BIG_DECIMAL:
-          row[i] = dataTable.getObject(rowId, i);
+          row[i] = dataTable.getBigDecimal(rowId, i);
           break;
         case STRING:
           row[i] = dataTable.getString(rowId, i);

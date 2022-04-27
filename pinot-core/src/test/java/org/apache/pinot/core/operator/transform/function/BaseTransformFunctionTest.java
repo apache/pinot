@@ -211,12 +211,14 @@ public abstract class BaseTransformFunctionTest {
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
     float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
     double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
     String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       Assert.assertEquals(intValues[i], expectedValues[i]);
       Assert.assertEquals(longValues[i], expectedValues[i]);
       Assert.assertEquals(floatValues[i], (float) expectedValues[i]);
       Assert.assertEquals(doubleValues[i], (double) expectedValues[i]);
+      Assert.assertEquals(bigDecimalValues[i].intValue(), expectedValues[i]);
       Assert.assertEquals(stringValues[i], Integer.toString(expectedValues[i]));
     }
   }
@@ -226,12 +228,14 @@ public abstract class BaseTransformFunctionTest {
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
     float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
     double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
     String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       Assert.assertEquals(intValues[i], (int) expectedValues[i]);
       Assert.assertEquals(longValues[i], expectedValues[i]);
       Assert.assertEquals(floatValues[i], (float) expectedValues[i]);
       Assert.assertEquals(doubleValues[i], (double) expectedValues[i]);
+      Assert.assertEquals(bigDecimalValues[i].longValue(), expectedValues[i]);
       Assert.assertEquals(stringValues[i], Long.toString(expectedValues[i]));
     }
   }
@@ -241,12 +245,14 @@ public abstract class BaseTransformFunctionTest {
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
     float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
     double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
     String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       Assert.assertEquals(intValues[i], (int) expectedValues[i]);
       Assert.assertEquals(longValues[i], (long) expectedValues[i]);
       Assert.assertEquals(floatValues[i], expectedValues[i]);
       Assert.assertEquals(doubleValues[i], (double) expectedValues[i]);
+      Assert.assertEquals(bigDecimalValues[i].floatValue(), expectedValues[i]);
       Assert.assertEquals(stringValues[i], Float.toString(expectedValues[i]));
     }
   }
@@ -256,12 +262,23 @@ public abstract class BaseTransformFunctionTest {
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
     float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
     double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    BigDecimal[] bigDecimalValues = null;
+    try {
+      // 1- Some transform functions cannot work with BigDecimal (e.g. exp, ln, and sqrt).
+      // 2- NumberFormatException is thrown when converting double.NaN, Double.POSITIVE_INFINITY,
+      // or Double.NEGATIVE_INFINITY.
+      bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+    } catch (UnsupportedOperationException | NumberFormatException ignored) {
+    }
     String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       Assert.assertEquals(intValues[i], (int) expectedValues[i]);
       Assert.assertEquals(longValues[i], (long) expectedValues[i]);
       Assert.assertEquals(floatValues[i], (float) expectedValues[i]);
       Assert.assertEquals(doubleValues[i], expectedValues[i]);
+      if (bigDecimalValues != null) {
+        Assert.assertEquals(bigDecimalValues[i].doubleValue(), expectedValues[i]);
+      }
       Assert.assertEquals(stringValues[i], Double.toString(expectedValues[i]));
     }
   }
@@ -271,6 +288,7 @@ public abstract class BaseTransformFunctionTest {
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
     float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
     double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
     byte[][] bytesValues = transformFunction.transformToBytesValuesSV(_projectionBlock);
     String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -278,6 +296,7 @@ public abstract class BaseTransformFunctionTest {
       Assert.assertEquals(longValues[i], expectedValues[i].longValue());
       Assert.assertEquals(floatValues[i], expectedValues[i].floatValue());
       Assert.assertEquals(doubleValues[i], expectedValues[i].doubleValue());
+      Assert.assertEquals(bigDecimalValues[i].compareTo(expectedValues[i]), 0);
       Assert.assertEquals(BigDecimalUtils.deserialize(bytesValues[i]).compareTo(expectedValues[i]), 0);
       Assert.assertEquals((new BigDecimal(stringValues[i])).compareTo(expectedValues[i]), 0);
     }

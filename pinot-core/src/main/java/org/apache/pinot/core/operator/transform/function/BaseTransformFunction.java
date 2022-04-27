@@ -258,11 +258,30 @@ public abstract class BaseTransformFunction implements TransformFunction {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
       dictionary.readBigDecimalValues(dictIds, length, _bigDecimalValuesSV);
     } else {
-      if (getResultMetadata().getDataType().getStoredType() == DataType.STRING) {
-        String[] stringValues = transformToStringValuesSV(projectionBlock);
-        ArrayCopyUtils.copy(stringValues, _bigDecimalValuesSV, length);
+      switch (getResultMetadata().getDataType().getStoredType()) {
+        case INT:
+          int[] intValues = transformToIntValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(intValues, _bigDecimalValuesSV, length);
+          break;
+        case LONG:
+          long[] longValues = transformToLongValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(longValues, _bigDecimalValuesSV, length);
+          break;
+        case FLOAT:
+          float[] floatValues = transformToFloatValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(floatValues, _bigDecimalValuesSV, length);
+          break;
+        case DOUBLE:
+          double[] doubleValues = transformToDoubleValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(doubleValues, _bigDecimalValuesSV, length);
+          break;
+        case STRING:
+          String[] stringValues = transformToStringValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(stringValues, _bigDecimalValuesSV, length);
+          break;
+        default:
+          throw new IllegalStateException();
       }
-      throw new IllegalStateException();
     }
     return _bigDecimalValuesSV;
   }

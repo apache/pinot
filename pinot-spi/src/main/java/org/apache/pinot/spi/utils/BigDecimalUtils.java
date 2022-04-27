@@ -20,6 +20,7 @@ package org.apache.pinot.spi.utils;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 
 
 public class BigDecimalUtils {
@@ -64,5 +65,14 @@ public class BigDecimalUtils {
    */
   public static BigDecimal deserialize(ByteArray byteArray) {
     return deserialize(byteArray.getBytes());
+  }
+
+  /**
+   * Deserializes a big decimal from ByteBuffer.
+   */
+  public static BigDecimal deserialize(ByteBuffer byteBuffer) {
+    byte[] bytes = new byte[byteBuffer.remaining()];
+    byteBuffer.get(bytes);
+    return deserialize(bytes);
   }
 }

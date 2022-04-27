@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.math.NumberUtils;
+import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -60,10 +61,14 @@ public class LiteralTransformFunction implements TransformFunction {
   public LiteralTransformFunction(String literal) {
     _literal = literal;
     _dataType = inferLiteralDataType(literal);
-    if (_dataType == DataType.TIMESTAMP) {
-      _bigDecimalLiteral = BigDecimal.valueOf(Timestamp.valueOf(literal).getTime());
-    } else if (_dataType.isNumeric()) {
+    if (_dataType.isNumeric()) {
       _bigDecimalLiteral = new BigDecimal(_literal);
+    } else if (_dataType == DataType.BOOLEAN) {
+      _bigDecimalLiteral = PinotDataType.BOOLEAN.toBigDecimal(Boolean.valueOf(literal));
+    } else if (_dataType == DataType.TIMESTAMP) {
+      // inferLiteralDataType successfully interpreted the literal as TIMESTAMP. _bigDecimalLiteral is populated and
+      // assigned to _longLiteral.
+      _bigDecimalLiteral = PinotDataType.TIMESTAMP.toBigDecimal(Timestamp.valueOf(literal));
     } else {
       _bigDecimalLiteral = BigDecimal.ZERO;
     }

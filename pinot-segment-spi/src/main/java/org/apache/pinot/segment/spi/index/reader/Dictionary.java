@@ -133,12 +133,7 @@ public interface Dictionary extends Closeable {
 
   double getDoubleValue(int dictId);
 
-  /**
-   * NOTE: Overridden for STRING and BYTES dictionary only for now.
-   */
-  default BigDecimal getBigDecimalValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
+  BigDecimal getBigDecimalValue(int dictId);
 
   String getStringValue(int dictId);
 

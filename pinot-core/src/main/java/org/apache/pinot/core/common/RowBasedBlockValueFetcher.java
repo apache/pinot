@@ -61,10 +61,10 @@ public class RowBasedBlockValueFetcher {
           return new FloatSingleValueFetcher(blockValSet.getFloatValuesSV());
         case DOUBLE:
           return new DoubleSingleValueFetcher(blockValSet.getDoubleValuesSV());
-        case STRING:
-          return new StringSingleValueFetcher(blockValSet.getStringValuesSV());
         case BIG_DECIMAL:
           return new BigDecimalValueFetcher(blockValSet.getBigDecimalValuesSV());
+        case STRING:
+          return new StringSingleValueFetcher(blockValSet.getStringValuesSV());
         case BYTES:
           return new BytesValueFetcher(blockValSet.getBytesValuesSV());
         default:

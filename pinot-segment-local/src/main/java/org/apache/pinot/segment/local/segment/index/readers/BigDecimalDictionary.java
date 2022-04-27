@@ -56,12 +56,7 @@ public class BigDecimalDictionary extends BaseImmutableDictionary {
 
   @Override
   public BigDecimal get(int dictId) {
-    return BigDecimalUtils.deserialize(getBytes(dictId));
-  }
-
-  @Override
-  public Object getInternal(int dictId) {
-    return BigDecimalUtils.deserialize(getBytes(dictId));
+    return getBigDecimal(dictId);
   }
 
   @Override
@@ -86,7 +81,7 @@ public class BigDecimalDictionary extends BaseImmutableDictionary {
 
   @Override
   public BigDecimal getBigDecimalValue(int dictId) {
-    return get(dictId);
+    return getBigDecimal(dictId);
   }
 
   @Override
