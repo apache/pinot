@@ -169,6 +169,9 @@
     <!-- Checkstyle violation prop.-->
     <checkstyle.violation.severity>warning</checkstyle.violation.severity>
     <checkstyle.fail.on.violation>true</checkstyle.fail.on.violation>
+
+    <!-- Configuration for Packaging -->
+    <shade.prefix>org.apache.pinot.shaded</shade.prefix>
   </properties>
 
   <profiles>
