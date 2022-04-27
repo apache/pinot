@@ -165,19 +165,19 @@ public class RequestContextUtils {
   /**
    * Converts the given Thrift {@link Expression} into a {@link FilterContext}.
    * <p>NOTE: Currently the query engine only accepts string literals as the right-hand side of the predicate, so we
-   *          always convert the right-hand side expressions into strings.
+   *          always convert the right-hand side expressions into strings. We also update boolean predicates that are
+   *          missing an EQUALS filter operator.
    */
   public static FilterContext getFilter(Expression thriftExpression) {
-    return getFilterHelper(thriftExpression, null);
-  }
-
-  private static FilterContext getFilterHelper(Expression thriftExpression, Function parentFunction) {
     ExpressionType type = thriftExpression.getType();
     if (type == ExpressionType.FUNCTION) {
       Function thriftFunction = thriftExpression.getFunctionCall();
       String functionOperator = thriftFunction.getOperator();
+
+      // convert "WHERE startsWith(col, 'str')" to "WHERE startsWith(col, 'str') = true"
       if (!EnumUtils.isValidEnum(FilterKind.class, functionOperator)) {
-        return convertPredicateToBooleanExpression(thriftExpression, parentFunction);
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new EqPredicate(getExpression(thriftExpression), getStringValue(RequestUtils.getLiteralExpression(true))));
       }
 
       FilterKind filterKind = FilterKind.valueOf(thriftFunction.getOperator().toUpperCase());
@@ -187,19 +187,19 @@ public class RequestContextUtils {
         case AND:
           List<FilterContext> children = new ArrayList<>(numOperands);
           for (Expression operand : operands) {
-            children.add(getFilterHelper(operand, thriftFunction));
+            children.add(getFilter(operand));
           }
           return new FilterContext(FilterContext.Type.AND, children, null);
         case OR:
           children = new ArrayList<>(numOperands);
           for (Expression operand : operands) {
-            children.add(getFilterHelper(operand, thriftFunction));
+            children.add(getFilter(operand));
           }
           return new FilterContext(FilterContext.Type.OR, children, null);
         case NOT:
           assert numOperands == 1;
           return new FilterContext(FilterContext.Type.NOT,
-              new ArrayList<>(Collections.singletonList(getFilterHelper(operands.get(0), parentFunction))), null);
+              new ArrayList<>(Collections.singletonList(getFilter(operands.get(0)))), null);
         case EQUALS:
           return new FilterContext(FilterContext.Type.PREDICATE, null,
               new EqPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
@@ -266,21 +266,12 @@ public class RequestContextUtils {
           throw new IllegalStateException();
       }
     } else if (type == ExpressionType.IDENTIFIER) {
-      return convertPredicateToBooleanExpression(thriftExpression, parentFunction);
+      // Convert "WHERE a" to "WHERE a = true"
+      return new FilterContext(FilterContext.Type.PREDICATE, null,
+          new EqPredicate(getExpression(thriftExpression), getStringValue(RequestUtils.getLiteralExpression(true))));
     }
 
     throw new IllegalArgumentException();
-  }
-
-  private static FilterContext convertPredicateToBooleanExpression(Expression expression, Function parentFunction) {
-    if (parentFunction == null || (EnumUtils.isValidEnum(FilterKind.class, parentFunction.getOperator())
-        && !FilterKind.valueOf(parentFunction.getOperator()).isPredicate())) {
-      return new FilterContext(FilterContext.Type.PREDICATE, null,
-          new EqPredicate(getExpression(expression),
-              getStringValue(RequestUtils.getLiteralExpression(true))));
-    }
-
-    throw new IllegalStateException();
   }
 
   private static String getStringValue(Expression thriftExpression) {
@@ -294,21 +285,20 @@ public class RequestContextUtils {
   /**
    * Converts the given filter {@link ExpressionContext} into a {@link FilterContext}.
    * <p>NOTE: Currently the query engine only accepts string literals as the right-hand side of the predicate, so we
-   *          always convert the right-hand side expressions into strings.
+   *          always convert the right-hand side expressions into strings. We also update boolean predicates that are
+   *          missing an EQUALS filter operator.
    */
   public static FilterContext getFilter(ExpressionContext filterExpression) {
-    return getFilterHelper(filterExpression, null);
-  }
-
-  private static FilterContext getFilterHelper(ExpressionContext filterExpression, FunctionContext parentFunction) {
     ExpressionContext.Type type = filterExpression.getType();
     if (type == ExpressionContext.Type.FUNCTION) {
       FunctionContext filterFunction = filterExpression.getFunction();
       String functionOperator = filterFunction.getFunctionName().toUpperCase();
-      if (!EnumUtils.isValidEnum(FilterKind.class, functionOperator)) {
-        return convertPredicateToBooleanExpression(filterExpression, parentFunction);
-      }
 
+      // convert "WHERE startsWith(col, 'str')" to "WHERE startsWith(col, 'str') = true"
+      if (!EnumUtils.isValidEnum(FilterKind.class, functionOperator)) {
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new EqPredicate(filterExpression, getStringValue(RequestUtils.getLiteralExpression(true))));
+      }
 
       FilterKind filterKind = FilterKind.valueOf(filterFunction.getFunctionName().toUpperCase());
       List<ExpressionContext> operands = filterFunction.getArguments();
@@ -317,19 +307,19 @@ public class RequestContextUtils {
         case AND:
           List<FilterContext> children = new ArrayList<>(numOperands);
           for (ExpressionContext operand : operands) {
-            children.add(getFilterHelper(operand, filterFunction));
+            children.add(getFilter(operand));
           }
           return new FilterContext(FilterContext.Type.AND, children, null);
         case OR:
           children = new ArrayList<>(numOperands);
           for (ExpressionContext operand : operands) {
-            children.add(getFilterHelper(operand, filterFunction));
+            children.add(getFilter(operand));
           }
           return new FilterContext(FilterContext.Type.OR, children, null);
         case NOT:
           assert numOperands == 1;
           return new FilterContext(FilterContext.Type.NOT,
-              new ArrayList<>(Collections.singletonList(getFilterHelper(operands.get(0), filterFunction))), null);
+              new ArrayList<>(Collections.singletonList(getFilter(operands.get(0)))), null);
         case EQUALS:
           return new FilterContext(FilterContext.Type.PREDICATE, null,
               new EqPredicate(operands.get(0), getStringValue(operands.get(1))));
@@ -391,22 +381,12 @@ public class RequestContextUtils {
           throw new IllegalStateException();
       }
     } else if (type == ExpressionContext.Type.IDENTIFIER) {
-      return convertPredicateToBooleanExpression(filterExpression, parentFunction);
+      // Convert "WHERE a" to "WHERE a = true"
+      return new FilterContext(FilterContext.Type.PREDICATE, null,
+          new EqPredicate(filterExpression, getStringValue(RequestUtils.getLiteralExpression(true))));
     }
 
     throw new IllegalArgumentException();
-  }
-
-  private static FilterContext convertPredicateToBooleanExpression(ExpressionContext expression,
-      FunctionContext parentFunction) {
-    if (parentFunction == null || (
-        EnumUtils.isValidEnum(FilterKind.class, parentFunction.getFunctionName().toUpperCase()) && !FilterKind.valueOf(
-            parentFunction.getFunctionName().toUpperCase()).isPredicate())) {
-      return new FilterContext(FilterContext.Type.PREDICATE, null,
-          new EqPredicate(expression, getStringValue(RequestUtils.getLiteralExpression(true))));
-    }
-
-    throw new IllegalStateException();
   }
 
   private static String getStringValue(ExpressionContext expressionContext) {
