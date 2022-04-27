@@ -100,7 +100,7 @@ public class ImmutableDictionaryTypeConversionTest {
 
     _bigDecimalValues = new BigDecimal[NUM_VALUES];
     ArrayCopyUtils.copy(_intValues, _bigDecimalValues, NUM_VALUES);
-    for(BigDecimal bigDecimal : _bigDecimalValues) {
+    for (BigDecimal bigDecimal : _bigDecimalValues) {
       _bigDecimalByteLength = Math.max(_bigDecimalByteLength, BigDecimalUtils.byteSize(bigDecimal));
     }
 
@@ -273,7 +273,7 @@ public class ImmutableDictionaryTypeConversionTest {
     dictionary.readDoubleValues(_dictIds, NUM_VALUES, _doubleValuesBuffer);
     Assert.assertEquals(_doubleValuesBuffer, _doubleValues);
     dictionary.readBigDecimalValues(_dictIds, NUM_VALUES, _bigDecimalValuesBuffer);
-    for(int i = 0; i < _bigDecimalValuesBuffer.length; i++) {
+    for (int i = 0; i < _bigDecimalValuesBuffer.length; i++) {
       Assert.assertEquals(_bigDecimalValuesBuffer[i].compareTo(_bigDecimalValues[i]), 0);
     }
     dictionary.readStringValues(_dictIds, NUM_VALUES, _stringValuesBuffer);
