@@ -26,8 +26,9 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.data.Segment;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
-import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
+import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -40,7 +41,7 @@ import org.slf4j.LoggerFactory;
 
 
 @TaskGenerator
-public class PurgeTaskGenerator extends BaseTaskGenerator {
+public class PurgeTaskGenerator implements PinotTaskGenerator {
     private static final Logger LOGGER = LoggerFactory.getLogger(PurgeTaskGenerator.class);
 
     private static final PurgeTaskGenerator INSTANCE = new PurgeTaskGenerator();
@@ -67,32 +68,30 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
 
     @Override
     public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
+        LOGGER.info("Start generating PurgeTask");
         String taskType = MinionConstants.PurgeTask.TASK_TYPE;
         List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
 
         for (TableConfig tableConfig : tableConfigs) {
 
             String tableName = tableConfig.getTableName();
-            if (tableConfig.getTableType() != TableType.REALTIME) {
-                LOGGER.warn("Skip generating task: {} for non-REALTIME table: {}", taskType, tableName);
+            if (tableConfig.getTableType() == TableType.REALTIME) {
+                LOGGER.info("Task type : {}, cannot be run on table of type  {}", taskType, TableType.REALTIME);
                 continue;
             }
-            TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
-            Preconditions.checkNotNull(tableTaskConfig);
-            Map<String, String> taskConfigs =
-                    tableTaskConfig.getConfigsForTaskType(MinionConstants.PurgeTask.TASK_TYPE);
+
+            Map<String, String> taskConfigs;
             try {
+                TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
+                Preconditions.checkNotNull(tableTaskConfig);
+                taskConfigs =
+                        tableTaskConfig.getConfigsForTaskType(MinionConstants.PurgeTask.TASK_TYPE);
                 Preconditions.checkNotNull(taskConfigs, "Task config shouldn't be null for Table: {}", tableName);
             } catch (Exception e) {
                 continue;
             }
             LOGGER.info("Start generating task configs for table: {} for task: {}", tableName, taskType);
-
-            if (tableConfig.getTableType() == TableType.REALTIME) {
-                LOGGER.info("Task type : {}, cannot be run on table of type  {}", taskType, TableType.REALTIME);
-                continue;
-            }
-                // Get max number of tasks for this table
+            // Get max number of tasks for this table
             int tableMaxNumTasks;
             String tableMaxNumTasksConfig = taskConfigs.get(MinionConstants.TABLE_MAX_NUM_TASKS_KEY);
             if (tableMaxNumTasksConfig != null) {
@@ -128,8 +127,16 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
                 pinotTaskConfigs.add(new PinotTaskConfig(taskType, configs));
                 tableNumTasks++;
             }
-            LOGGER.info("Finished generating task configs for table: {} for task: {}", tableName, taskType);
+            LOGGER.info("Finished generating {} tasks configs for table: {} "
+                    + "for task: {}", tableNumTasks, tableName, taskType);
         }
         return pinotTaskConfigs;
+    }
+
+    @Override
+    public List<PinotTaskConfig> generateTasks(TableConfig tableConfig,
+                                               Map<String, String> taskConfigs) throws Exception {
+        throw new UnknownTaskTypeException("Adhoc task generation is not supported for task type : "
+                + this.getTaskType());
     }
 }
