@@ -257,9 +257,7 @@ public class FilterPlanNode implements PlanNode {
                   (ContainsPredicate) predicate, numDocs);
             case TEXT_MATCH:
               TextIndexReader textIndexReader = dataSource.getTextIndex();
-              if (textIndexReader == null) {
-                throw new IllegalStateException("TEXT_MATCH requested on a non text index enabled field");
-              }
+              // We could check for real time and segment Lucene reader, but easier to check the other way round
               if (textIndexReader instanceof NativeTextIndexReader) {
                 throw new UnsupportedOperationException("TEXT_MATCH is not supported on native text indices");
               }
