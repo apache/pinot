@@ -355,7 +355,7 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
   }
 
   @Test
-  public void testRebalanceTableWithPartitionColumn_instancePartitionsMapWithOnePartition() {
+  public void testRebalanceTableWithPartitionColumnAndInstancePartitionsMapWithOnePartition() {
     // make an unbalanced assignment by assigning all segments to the first three instances
     String instance0 = INSTANCE_NAME_PREFIX + "0";
     String instance1 = INSTANCE_NAME_PREFIX + "1";
@@ -371,7 +371,8 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
     Map<String, Map<String, String>> balancedAssignment = _segmentAssignmentWithPartition
         .rebalanceTable(unbalancedAssignment, _instancePartitionsMapWithoutPartition, null, null,
             new BaseConfiguration());
-    int[] actualNumSegmentsAssignedPerInstance = SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(balancedAssignment, INSTANCES);
+    int[] actualNumSegmentsAssignedPerInstance =
+        SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(balancedAssignment, INSTANCES);
     int[] expectedNumSegmentsAssignedPerInstance = new int[NUM_INSTANCES];
     Arrays.fill(expectedNumSegmentsAssignedPerInstance, NUM_SEGMENTS * NUM_REPLICAS / NUM_INSTANCES);
     assertEquals(actualNumSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
