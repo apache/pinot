@@ -22,7 +22,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import org.apache.avro.util.ByteBufferInputStream;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.segment.local.utils.nativefst.FST;
@@ -32,8 +34,6 @@ import org.apache.pinot.segment.local.utils.nativefst.utils.RegexpMatcher;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
-import org.roaringbitmap.PeekableIntIterator;
-import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -95,27 +95,17 @@ public class NativeTextIndexReader implements TextIndexReader {
 
   @Override
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
-    try {
-      RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
-      RegexpMatcher.regexMatch(searchQuery, _fst, writer::add);
-
-      return writer.get();
-    } catch (Exception e) {
-      throw new RuntimeException("Caught exception while running query: " + searchQuery, e);
-    }
+    throw new UnsupportedOperationException("");
   }
 
   @Override
   public MutableRoaringBitmap getDocIds(String searchQuery) {
     try {
-      RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
-      RegexpMatcher.regexMatch(searchQuery, _fst, writer::add);
-      ImmutableRoaringBitmap matchingDictIds = writer.get();
+      List<Integer> returnList = new ArrayList<>();
+      RegexpMatcher.regexMatch(searchQuery, _fst, returnList);
       MutableRoaringBitmap matchingDocIds = null;
 
-      for (PeekableIntIterator it = matchingDictIds.getIntIterator(); it.hasNext(); ) {
-        int dictId = it.next();
-
+      for (int dictId : returnList) {
         if (dictId >= 0) {
           ImmutableRoaringBitmap docIds = _invertedIndex.getDocIds(dictId);
           if (matchingDocIds == null) {
@@ -125,7 +115,6 @@ public class NativeTextIndexReader implements TextIndexReader {
           }
         }
       }
-
       return matchingDocIds == null ? new MutableRoaringBitmap() : matchingDocIds;
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while running query: " + searchQuery, e);

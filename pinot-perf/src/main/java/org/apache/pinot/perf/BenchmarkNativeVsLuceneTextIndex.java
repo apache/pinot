@@ -91,7 +91,7 @@ public class BenchmarkNativeVsLuceneTextIndex {
       "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'www.domain1%') LIMIT 5000000";
   final String _nativeQuery =
       "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'www.domain1.*' LIMIT 5000000";
-  @Param("350000")
+  @Param("1000000")
   int _numRows;
   @Param({"0", "1", "10", "100"})
   int _numBlocks;

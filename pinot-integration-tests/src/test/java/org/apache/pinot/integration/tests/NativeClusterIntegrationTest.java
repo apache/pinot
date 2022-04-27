@@ -50,16 +50,11 @@ public class NativeClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   private static final String TEST_TEXT_COLUMN_QUERY2 =
       "SELECT COUNT(*) FROM mytable WHERE UniqueCarrier CONTAINS 'a.*'";
   private static final int NUM_BROKERS = 1;
-  private static final int NUM_SERVERS = 1;
 
   private String _schemaFileName = DEFAULT_SCHEMA_FILE_NAME;
 
   protected int getNumBrokers() {
     return NUM_BROKERS;
-  }
-
-  protected int getNumServers() {
-    return NUM_SERVERS;
   }
 
   @Override
