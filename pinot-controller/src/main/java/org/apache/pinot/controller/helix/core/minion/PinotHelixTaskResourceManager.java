@@ -110,10 +110,8 @@ public class PinotHelixTaskResourceManager {
       // Task queue does not exist
       LOGGER.info("Creating task queue: {} for task type: {}", helixJobQueueName, taskType);
 
-      // Set full parallelism
-      // Don't allow overlap job assignment so that we can control number of concurrent tasks per instance
       JobQueue jobQueue = new JobQueue.Builder(helixJobQueueName)
-          .setWorkflowConfig(new WorkflowConfig.Builder().setParallelJobs(Integer.MAX_VALUE).build()).build();
+          .setWorkflowConfig(new WorkflowConfig.Builder().build()).build();
       _taskDriver.createQueue(jobQueue);
     }
 
