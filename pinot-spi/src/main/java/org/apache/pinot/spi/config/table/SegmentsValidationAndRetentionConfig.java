@@ -43,6 +43,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
   private String _crypterClassName;
+  private boolean _minimizeDataMovement;
   // Possible values can be http or https. If this field is set, a Pinot server can download segments from peer servers
   // using the specified download scheme. Both realtime tables and offline tables can set this field.
   // For more usage of this field, please refer to this design doc: https://tinyurl.com/f63ru4sb
@@ -189,5 +190,13 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   public void setCrypterClassName(String crypterClassName) {
     _crypterClassName = crypterClassName;
+  }
+
+  public boolean isMinimizeDataMovement() {
+    return _minimizeDataMovement;
+  }
+
+  public void setMinimizeDataMovement(boolean minimizeDataMovement) {
+    _minimizeDataMovement = minimizeDataMovement;
   }
 }

@@ -18,14 +18,17 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-public class SuccessResponse {
-  private final String _status;
+import java.util.Map;
 
-  public SuccessResponse(String status) {
-    _status = status;
+public final class ConfigSuccessResponse extends SuccessResponse {
+  private final Map<String, Object> _unrecognizedProperties;
+
+  public ConfigSuccessResponse(String status, Map<String, Object> unrecognizedProperties) {
+    super(status);
+    _unrecognizedProperties = unrecognizedProperties;
   }
 
-  public String getStatus() {
-    return _status;
+  public Map<String, Object> getUnrecognizedProperties() {
+    return _unrecognizedProperties;
   }
 }

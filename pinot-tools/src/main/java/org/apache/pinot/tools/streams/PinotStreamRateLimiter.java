@@ -16,16 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.resources;
 
-public class SuccessResponse {
-  private final String _status;
+package org.apache.pinot.tools.streams;
 
-  public SuccessResponse(String status) {
-    _status = status;
-  }
-
-  public String getStatus() {
-    return _status;
-  }
+/**
+ * Represents a very simple rate limiter that is used by Pinot
+ */
+@FunctionalInterface
+public interface PinotStreamRateLimiter {
+  /**
+   * Blocks current thread until X permits are available
+   * @param permits how many permits we wish to acquire
+   */
+  void acquire(int permits);
 }

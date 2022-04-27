@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -271,6 +272,21 @@ public class JsonUtilsTest {
       assertEquals(thirdFlattenedRecord.get(".addresses..country"), "ca");
       assertEquals(thirdFlattenedRecord.get(".addresses..street"), "second st");
     }
+  }
+
+  @Test
+  public void testUnrecognizedJsonProperties()
+      throws Exception {
+    String inputJsonMissingProp = "{\"primitiveIntegerField\": 123, \"missingProp\": 567,"
+        + " \"missingObjectProp\": {\"somestuff\": \"data\", \"somemorestuff\":\"moredata\"},"
+        + "  \"classField\": {\"internalIntField\": 12, \"internalMissingField\": \"somedata\"}}";
+    Pair<JsonUtilsTestSamplePojo, Map<String, Object>> parsedResp =
+        JsonUtils.stringToObjectAndUnrecognizedProperties(inputJsonMissingProp, JsonUtilsTestSamplePojo.class);
+
+    Assert.assertTrue(parsedResp.getRight().containsKey("/missingProp"));
+    Assert.assertTrue(parsedResp.getRight().containsKey("/missingObjectProp/somestuff"));
+    Assert.assertTrue(parsedResp.getRight().containsKey("/missingObjectProp/somemorestuff"));
+    Assert.assertTrue(parsedResp.getRight().containsKey("/classField/internalMissingField"));
   }
 
   @Test
