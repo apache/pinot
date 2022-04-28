@@ -185,7 +185,8 @@ public class RecordTransformerTest {
     // expression true, filtered
     GenericRow genericRow = getRecord();
     tableConfig.setIngestionConfig(
-        new IngestionConfig(null, null, new FilterConfig("AND(EQUALS(svInt, 123), LESS_THAN_OR_EQUAL(svDouble, 200))"), null, null));
+        new IngestionConfig(null, null,
+            new FilterConfig("AND(EQUALS(svInt, 123), LESS_THAN_OR_EQUAL(svDouble, 200))"), null, null));
     RecordTransformer transformer = new FilterTransformer(tableConfig);
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
@@ -193,7 +194,8 @@ public class RecordTransformerTest {
     // expression true, filtered
     genericRow = getRecord();
     tableConfig.setIngestionConfig(
-        new IngestionConfig(null, null, new FilterConfig("OR(EQUALS(svInt, 125), LESS_THAN_OR_EQUAL(svLong, 200))"), null, null));
+        new IngestionConfig(null, null,
+            new FilterConfig("OR(EQUALS(svInt, 125), LESS_THAN_OR_EQUAL(svLong, 200))"), null, null));
     transformer = new FilterTransformer(tableConfig);
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
