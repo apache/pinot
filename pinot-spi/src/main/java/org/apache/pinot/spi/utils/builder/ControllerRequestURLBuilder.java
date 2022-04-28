@@ -194,7 +194,7 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forTableReload(String tableName, TableType tableType, boolean forceDownload) {
-    String query = String.format("reload?forceDownload=%s&type=%s", forceDownload, tableType.name());
+    String query = String.format("reload?type=%s&forceDownload=%s", tableType.name(), forceDownload);
     return StringUtil.join("/", _baseUrl, "segments", tableName, query);
   }
 
@@ -279,8 +279,8 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forSegmentReload(String tableName, String segmentName, boolean forceDownload) {
-    return StringUtil
-        .join("/", _baseUrl, "segments", tableName, encode(segmentName), "reload?forceDownload=" + forceDownload);
+    return StringUtil.join("/", _baseUrl, "segments", tableName, encode(segmentName),
+        "reload?forceDownload=" + forceDownload);
   }
 
   public String forSegmentDownload(String tableName, String segmentName) {
@@ -288,10 +288,10 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forSegmentDelete(String tableName, String segmentName) {
-    return StringUtil.join("/", _baseUrl, "segments", tableName, segmentName);
+    return StringUtil.join("/", _baseUrl, "segments", tableName, encode(segmentName));
   }
 
-  public String forSegmentDeleteAllAPI(String tableName, String tableType) {
+  public String forSegmentDeleteAll(String tableName, String tableType) {
     return StringUtil.join("/", _baseUrl, "segments", tableName + "?type=" + tableType);
   }
 
@@ -312,7 +312,7 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forSegmentMetadata(String tableName, String segmentName) {
-    return StringUtil.join("/", _baseUrl, "segments", tableName, segmentName, "metadata");
+    return StringUtil.join("/", _baseUrl, "segments", tableName, encode(segmentName), "metadata");
   }
 
   public String forListAllCrcInformationForTable(String tableName) {
@@ -368,9 +368,9 @@ public class ControllerRequestURLBuilder {
 
   public String forIngestFromFile(String tableNameWithType, String batchConfigMapStr)
       throws UnsupportedEncodingException {
-    return String
-        .format("%s?tableNameWithType=%s&batchConfigMapStr=%s", StringUtil.join("/", _baseUrl, "ingestFromFile"),
-            tableNameWithType, URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8.toString()));
+    return String.format("%s?tableNameWithType=%s&batchConfigMapStr=%s",
+        StringUtil.join("/", _baseUrl, "ingestFromFile"), tableNameWithType,
+        URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8.toString()));
   }
 
   public String forIngestFromFile(String tableNameWithType, Map<String, String> batchConfigMap)
