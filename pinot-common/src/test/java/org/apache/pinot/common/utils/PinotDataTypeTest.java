@@ -309,7 +309,6 @@ public class PinotDataTypeTest {
       assertInvalidConversion(null, sourceType, BYTE, UnsupportedOperationException.class);
       assertInvalidConversion(null, sourceType, CHARACTER, UnsupportedOperationException.class);
       assertInvalidConversion(null, sourceType, SHORT, UnsupportedOperationException.class);
-      assertInvalidConversion(null, sourceType, OBJECT, UnsupportedOperationException.class);
       assertInvalidConversion(null, sourceType, BYTE_ARRAY, UnsupportedOperationException.class);
       assertInvalidConversion(null, sourceType, CHARACTER_ARRAY, UnsupportedOperationException.class);
       assertInvalidConversion(null, sourceType, SHORT_ARRAY, UnsupportedOperationException.class);
