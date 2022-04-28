@@ -80,7 +80,7 @@ public abstract class SegmentPreprocessingJob extends BaseSegmentJob {
         return controllerRestApi.getSchema();
       } else {
         try (InputStream inputStream = FileSystem.get(_schemaFile.toUri(), getConf()).open(_schemaFile)) {
-          return org.apache.pinot.spi.data.Schema.fromInputSteam(inputStream);
+          return org.apache.pinot.spi.data.Schema.fromInputStream(inputStream);
         }
       }
     }

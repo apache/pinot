@@ -135,7 +135,7 @@ public abstract class SegmentCreationJob extends BaseSegmentJob {
         // Schema file could be stored local or remotely.
         try (InputStream inputStream = FileSystem.get(new Path(_schemaFile).toUri(), getConf())
             .open(new Path(_schemaFile))) {
-          return Schema.fromInputSteam(inputStream);
+          return Schema.fromInputStream(inputStream);
         }
       }
     }

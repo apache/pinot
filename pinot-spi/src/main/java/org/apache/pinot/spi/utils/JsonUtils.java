@@ -80,29 +80,41 @@ public class JsonUtils {
   public static final ObjectWriter DEFAULT_WRITER = DEFAULT_MAPPER.writer();
   public static final ObjectWriter DEFAULT_PRETTY_WRITER = DEFAULT_MAPPER.writerWithDefaultPrettyPrinter();
   private static final TypeReference<HashMap<String, Object>> GENERIC_JSON_TYPE =
-      new TypeReference<HashMap<String, Object>>() { };
+      new TypeReference<HashMap<String, Object>>() {
+      };
 
   public static <T> T stringToObject(String jsonString, Class<T> valueType)
       throws IOException {
     return DEFAULT_READER.forType(valueType).readValue(jsonString);
   }
 
+  public static <T> Pair<T, Map<String, Object>> inputStreamToObjectAndUnrecognizedProperties(
+      InputStream jsonInputStream, Class<T> valueType)
+      throws IOException {
+    T instance = DEFAULT_READER.forType(valueType).readValue(jsonInputStream);
+    Map<String, Object> inputJsonMap = flatten(DEFAULT_MAPPER.readValue(jsonInputStream, GENERIC_JSON_TYPE));
+    return compareObjectAndJson(inputJsonMap, instance);
+  }
+
   public static <T> Pair<T, Map<String, Object>> stringToObjectAndUnrecognizedProperties(String jsonString,
       Class<T> valueType)
       throws IOException {
     T instance = DEFAULT_READER.forType(valueType).readValue(jsonString);
-
-    String instanceJson = DEFAULT_MAPPER.writeValueAsString(instance);
     Map<String, Object> inputJsonMap = flatten(DEFAULT_MAPPER.readValue(jsonString, GENERIC_JSON_TYPE));
+    return compareObjectAndJson(inputJsonMap, instance);
+  }
+
+  private static <T> Pair<T, Map<String, Object>> compareObjectAndJson(Map<String, Object> inputJsonMap, T instance)
+      throws JsonProcessingException {
+    String instanceJson = DEFAULT_MAPPER.writeValueAsString(instance);
     Map<String, Object> instanceJsonMap = flatten(DEFAULT_MAPPER.readValue(instanceJson, GENERIC_JSON_TYPE));
 
     MapDifference<String, Object> difference = Maps.difference(inputJsonMap, instanceJsonMap);
     return Pair.of(instance, difference.entriesOnlyOnLeft());
   }
 
-  public static Map<String, Object> flatten(Map<String, Object> map) {
-    return map.entrySet().stream()
-        .flatMap(JsonUtils::flatten)
+  private static Map<String, Object> flatten(Map<String, Object> map) {
+    return map.entrySet().stream().flatMap(JsonUtils::flatten)
         .collect(LinkedHashMap::new, (m, e) -> m.put("/" + e.getKey(), e.getValue()), LinkedHashMap::putAll);
   }
 
