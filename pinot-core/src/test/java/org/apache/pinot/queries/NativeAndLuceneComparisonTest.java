@@ -236,60 +236,63 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
     }
   }
 
+  private void testSelectionResults(String nativeQuery, String luceneQuery) {
+    _indexSegment = _nativeIndexSegment;
+    _indexSegments = Arrays.asList(_nativeIndexSegment);
+    Operator<IntermediateResultsBlock> operator = getOperatorForSqlQuery(nativeQuery);
+    IntermediateResultsBlock operatorResult = operator.nextBlock();
+    List<Object[]> resultset = (List<Object[]>) operatorResult.getSelectionResult();
+    Assert.assertNotNull(resultset);
+
+    _indexSegment = _luceneSegment;
+    _indexSegments = Arrays.asList(_luceneSegment);
+    operator = getOperatorForSqlQuery(luceneQuery);
+    operatorResult = operator.nextBlock();
+    List<Object[]> resultset2 = (List<Object[]>) operatorResult.getSelectionResult();
+    Assert.assertNotNull(resultset2);
+
+    Assert.assertEquals(resultset.size(), resultset2.size());
+    for (int i = 0; i < resultset.size(); i++) {
+      Object[] actualRow = resultset.get(i);
+      Object[] expectedRow = resultset2.get(i);
+      Assert.assertEquals(actualRow.length, expectedRow.length);
+      for (int j = 0; j < actualRow.length; j++) {
+        Object actualColValue = actualRow[j];
+        Object expectedColValue = expectedRow[j];
+        Assert.assertEquals(actualColValue, expectedColValue);
+      }
+    }
+  }
+
   @Test
   public void testQueries() {
-    String query = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'www.domain1%') LIMIT 50000";
-    _indexSegment = _luceneSegment;
-    _indexSegments = Arrays.asList(_indexSegment);
-    testSelectionResults(query, 256, null);
+    String luceneQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'www.domain1%') LIMIT 50000";
+    String nativeQuery = "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'www.domain1.*' LIMIT 50000";
+    testSelectionResults(nativeQuery, luceneQuery);
 
-    _indexSegment = _nativeIndexSegment;
-    _indexSegments = Arrays.asList(_nativeIndexSegment);
-    query = "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'www.domain1.*' LIMIT 50000";
-    testSelectionResults(query, 256, null);
+    nativeQuery = "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS '.*www.domain1' LIMIT 50000";
+    luceneQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, '%www.domain1') LIMIT 50000";
+    testSelectionResults(nativeQuery, luceneQuery);
 
-    query = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, '%www.domain1') LIMIT 50000";
-    _indexSegment = _luceneSegment;
-    _indexSegments = Arrays.asList(_indexSegment);
-    testSelectionResults(query, 256, null);
+    nativeQuery = "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS '.*www.domain1.*' LIMIT 50000";
+    luceneQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, '%www.domain1%') LIMIT 50000";
+    testSelectionResults(nativeQuery, luceneQuery);
+    testSelectionResults(nativeQuery, luceneQuery);
 
-    query = "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS '.*www.domain1' LIMIT 50000";
-    _indexSegment = _nativeIndexSegment;
-    _indexSegments = Arrays.asList(_nativeIndexSegment);
-    testSelectionResults(query, 256, null);
-
-    query = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, '%www.domain1%') LIMIT 50000";
-    _indexSegment = _luceneSegment;
-    _indexSegments = Arrays.asList(_indexSegment);
-    testSelectionResults(query, 256, null);
-
-    query = "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS '.*www.domain1.*' LIMIT 50000";
-    _indexSegment = _nativeIndexSegment;
-    _indexSegments = Arrays.asList(_nativeIndexSegment);
-    testSelectionResults(query, 256, null);
-
-    query = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'www.domain1% AND %www.domain1') LIMIT 50000";
-    _indexSegment = _luceneSegment;
-    _indexSegments = Arrays.asList(_indexSegment);
-    testSelectionResults(query, 256, null);
-
-    query =
+    nativeQuery =
         "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'www.domain1.*' AND DOMAIN_NAMES_NATIVE CONTAINS '"
             + ".*www.domain1' LIMIT 50000";
-    _indexSegment = _nativeIndexSegment;
-    _indexSegments = Arrays.asList(_nativeIndexSegment);
-    testSelectionResults(query, 256, null);
+    luceneQuery =
+        "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'www.domain1% AND %www.domain1') LIMIT 50000";
+    testSelectionResults(nativeQuery, luceneQuery);
+    testSelectionResults(nativeQuery, luceneQuery);
 
-    query = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'www.domain1% OR %www.domain1') LIMIT 50000";
-    _indexSegment = _luceneSegment;
-    _indexSegments = Arrays.asList(_indexSegment);
-    testSelectionResults(query, 256, null);
-
-    query =
+    nativeQuery =
         "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'www.domain1.*' OR DOMAIN_NAMES_NATIVE CONTAINS '"
             + ".*www.domain1' LIMIT 50000";
-    _indexSegment = _nativeIndexSegment;
-    _indexSegments = Arrays.asList(_nativeIndexSegment);
-    testSelectionResults(query, 256, null);
+    luceneQuery =
+        "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'www.domain1% OR %www.domain1') LIMIT 50000";
+    testSelectionResults(nativeQuery, luceneQuery);
+    testSelectionResults(nativeQuery, luceneQuery);
   }
 }

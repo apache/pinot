@@ -22,6 +22,8 @@ import java.io.File;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 
 
@@ -54,5 +56,29 @@ public class TextIndexUtils {
     }
 
     return false;
+  }
+
+  public static FSTType getFSTTypeOfIndex(File segmentIndexDir, String columnName) {
+    boolean foundNativeTextIndex = false;
+    boolean foundLuceneTextIndex = false;
+    File file = SegmentDirectoryPaths.findTextIndexIndexFileNative(segmentIndexDir, columnName);
+
+    if (file != null) {
+      foundNativeTextIndex = true;
+    }
+    file = SegmentDirectoryPaths.findTextIndexIndexFile(segmentIndexDir, columnName);
+
+    if (file != null) {
+      foundLuceneTextIndex = true;
+    }
+
+    if (foundLuceneTextIndex == true && foundNativeTextIndex == true) {
+      // Use Lucene by default
+      return FSTType.LUCENE;
+    } else if (foundLuceneTextIndex == false && foundNativeTextIndex == false) {
+      throw new IllegalStateException("No text index found");
+    }
+
+    return foundLuceneTextIndex == true ? FSTType.LUCENE : FSTType.NATIVE;
   }
 }

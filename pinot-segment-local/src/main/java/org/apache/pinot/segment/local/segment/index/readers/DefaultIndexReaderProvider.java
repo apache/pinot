@@ -53,6 +53,7 @@ import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.provider.IndexReaderProvider;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -161,7 +162,8 @@ public class DefaultIndexReaderProvider implements IndexReaderProvider {
   @Override
   public TextIndexReader newTextIndexReader(File file, ColumnMetadata columnMetadata,
       @Nullable Map<String, String> textIndexProperties) {
-    if (TextIndexUtils.isFstTypeNative(textIndexProperties)) {
+    FSTType textIndexFSTType = TextIndexUtils.getFSTTypeOfIndex(file, columnMetadata.getColumnName());
+    if (textIndexFSTType == FSTType.NATIVE) {
       return new NativeTextIndexReader(columnMetadata.getColumnName(), file);
     }
     return new LuceneTextIndexReader(columnMetadata.getColumnName(), file, columnMetadata.getTotalDocs(),

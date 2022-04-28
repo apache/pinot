@@ -28,6 +28,7 @@ import java.util.List;
 import org.apache.avro.util.ByteBufferInputStream;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.segment.local.utils.nativefst.FST;
+import org.apache.pinot.segment.local.utils.nativefst.FSTHeader;
 import org.apache.pinot.segment.local.utils.nativefst.ImmutableFST;
 import org.apache.pinot.segment.local.utils.nativefst.NativeTextIndexCreator;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RegexpMatcher;
@@ -74,6 +75,12 @@ public class NativeTextIndexReader implements TextIndexReader {
   }
 
   private void populateIndexes() {
+    int fstMagic = _buffer.getInt(0);
+
+    if (fstMagic != FSTHeader.FST_MAGIC) {
+      throw new IllegalStateException("Native FST declared but header is not matching");
+    }
+
     long invertedIndexLength = _buffer.getLong(4);
     long fstDataLength = _buffer.getLong(12);
     int numBitMaps = _buffer.getInt(20);
