@@ -113,13 +113,11 @@ public class NativeTextIndexReader implements TextIndexReader {
       MutableRoaringBitmap matchingDocIds = null;
 
       for (int dictId : returnList) {
-        if (dictId >= 0) {
-          ImmutableRoaringBitmap docIds = _invertedIndex.getDocIds(dictId);
-          if (matchingDocIds == null) {
-            matchingDocIds = docIds.toMutableRoaringBitmap();
-          } else {
-            matchingDocIds.or(docIds);
-          }
+        ImmutableRoaringBitmap docIds = _invertedIndex.getDocIds(dictId);
+        if (matchingDocIds == null) {
+          matchingDocIds = docIds.toMutableRoaringBitmap();
+        } else {
+          matchingDocIds.or(docIds);
         }
       }
       return matchingDocIds == null ? new MutableRoaringBitmap() : matchingDocIds;

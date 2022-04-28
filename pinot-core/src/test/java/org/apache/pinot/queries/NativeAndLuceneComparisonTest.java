@@ -19,7 +19,6 @@
 package org.apache.pinot.queries;
 
 import java.io.File;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -125,6 +124,19 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
       row.putField(DOMAIN_NAMES_COL_NATIVE, domain);
       rows.add(row);
     }
+
+    String textValue = "\n" + "Prince Andrew kept looking with an amused smile from Pierre to the\n"
+        + "vicomte and from the vicomte to their hostess. In the first moment of\n"
+        + "Pierre’s outburst Anna Pávlovna, despite her social experience, was\n"
+        + "horror-struck. But when she saw that Pierre’s sacrilegious words\n"
+        + "had not exasperated the vicomte, and had convinced herself that it was\n"
+        + "impossible to stop him, she rallied her forces and joined the vicomte in\n"
+        + "a vigorous attack on the orator";
+    GenericRow row = new GenericRow();
+    row.putField(DOMAIN_NAMES_COL_LUCENE, textValue);
+    row.putField(DOMAIN_NAMES_COL_NATIVE, textValue);
+    rows.add(row);
+
     return rows;
   }
 
@@ -138,8 +150,7 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
             null));
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInvertedIndexColumns(Arrays.asList(DOMAIN_NAMES_COL_LUCENE))
-        .setFieldConfigList(fieldConfigs).build();
+        .setInvertedIndexColumns(Arrays.asList(DOMAIN_NAMES_COL_LUCENE)).setFieldConfigList(fieldConfigs).build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(DOMAIN_NAMES_COL_LUCENE, FieldSpec.DataType.STRING).build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
@@ -216,26 +227,6 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
     return ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME_NATIVE), indexLoadingConfig);
   }
 
-  private void testSelectionResults(String query, int expectedResultSize, List<Serializable[]> expectedResults) {
-    Operator<IntermediateResultsBlock> operator = getOperatorForSqlQuery(query);
-    IntermediateResultsBlock operatorResult = operator.nextBlock();
-    List<Object[]> resultset = (List<Object[]>) operatorResult.getSelectionResult();
-    Assert.assertNotNull(resultset);
-    Assert.assertEquals(resultset.size(), expectedResultSize);
-    if (expectedResults != null) {
-      for (int i = 0; i < expectedResultSize; i++) {
-        Object[] actualRow = resultset.get(i);
-        Object[] expectedRow = expectedResults.get(i);
-        Assert.assertEquals(actualRow.length, expectedRow.length);
-        for (int j = 0; j < actualRow.length; j++) {
-          Object actualColValue = actualRow[j];
-          Object expectedColValue = expectedRow[j];
-          Assert.assertEquals(actualColValue, expectedColValue);
-        }
-      }
-    }
-  }
-
   private void testSelectionResults(String nativeQuery, String luceneQuery) {
     _indexSegment = _nativeIndexSegment;
     _indexSegments = Arrays.asList(_nativeIndexSegment);
@@ -292,6 +283,11 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
             + ".*www.domain1' LIMIT 50000";
     luceneQuery =
         "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'www.domain1% OR %www.domain1') LIMIT 50000";
+    testSelectionResults(nativeQuery, luceneQuery);
+    testSelectionResults(nativeQuery, luceneQuery);
+
+    nativeQuery = "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'vicomte' LIMIT 50000";
+    luceneQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'vicomte') LIMIT 50000";
     testSelectionResults(nativeQuery, luceneQuery);
     testSelectionResults(nativeQuery, luceneQuery);
   }

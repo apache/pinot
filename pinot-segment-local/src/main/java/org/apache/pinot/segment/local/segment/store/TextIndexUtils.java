@@ -72,13 +72,13 @@ public class TextIndexUtils {
       foundLuceneTextIndex = true;
     }
 
-    if (foundLuceneTextIndex == true && foundNativeTextIndex == true) {
+    if (foundLuceneTextIndex && foundNativeTextIndex) {
       // Use Lucene by default
       return FSTType.LUCENE;
-    } else if (foundLuceneTextIndex == false && foundNativeTextIndex == false) {
+    } else if (foundLuceneTextIndex && foundNativeTextIndex) {
       throw new IllegalStateException("No text index found");
     }
 
-    return foundLuceneTextIndex == true ? FSTType.LUCENE : FSTType.NATIVE;
+    return foundLuceneTextIndex ? FSTType.LUCENE : FSTType.NATIVE;
   }
 }
