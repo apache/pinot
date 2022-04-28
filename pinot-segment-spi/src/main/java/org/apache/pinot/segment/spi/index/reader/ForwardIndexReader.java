@@ -267,6 +267,8 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * @param context Reader context
    */
   default void readValuesSV(int[] docIds, int length, BigDecimal[] values, T context) {
+    // todo(nhejazi): add raw index support to the BIG_DECIMAL type. In most of the cases, it will be more efficient
+    //  to store big decimal as raw.
     switch (getValueType()) {
       case INT:
         for (int i = 0; i < length; i++) {

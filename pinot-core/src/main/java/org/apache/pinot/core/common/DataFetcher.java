@@ -524,8 +524,6 @@ public class DataFetcher {
           valueBuffer);
     }
 
-    // todo(nhejazi): add raw index support to the BIG_DECIMAL type. In most of the cases, it will be more efficient
-    //  to store big decimal as raw.
     void readBigDecimalValues(int[] docIds, int length, BigDecimal[] valueBuffer) {
       Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
       ForwardIndexReaderContext readerContext = getReaderContext();
