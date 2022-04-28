@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.function;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
@@ -28,6 +29,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
+
 
 /**
  * Evaluates an expression.
@@ -69,8 +71,12 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
         String functionName = function.getFunctionName();
         switch (functionName) {
           case "and":
+            return new AndExecutionNode(childNodes);
           case "or":
-            return new ConjugationExecutionNode(functionName, childNodes);
+            return new OrExecutionNode(childNodes);
+          case "not":
+            Preconditions.checkState(numArguments == 1, "Unsupported number of arguments for NOT operator");
+            return new NotExecutionNode(childNodes[0]);
           default:
             FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
             if (functionInfo == null) {
@@ -111,51 +117,31 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     Object execute(Object[] values);
   }
 
-  public abstract class ConjugateFunction {
-    protected final ExecutableNode[] _argumentNodes;
+  private static class NotExecutionNode implements ExecutableNode {
+    private final ExecutableNode _argumentNode;
 
-    protected ConjugateFunction(ExecutableNode[] argumentNodes) {
+    NotExecutionNode(ExecutableNode argumentNode) {
+      _argumentNode = argumentNode;
+    }
+
+    @Override
+    public Object execute(GenericRow row) {
+      return !((Boolean) (_argumentNode.execute(row)));
+    }
+
+    @Override
+    public Object execute(Object[] values) {
+      return !((Boolean) (_argumentNode.execute(values)));
+    }
+  }
+
+  private static class OrExecutionNode implements ExecutableNode {
+    private final ExecutableNode[] _argumentNodes;
+
+    OrExecutionNode(ExecutableNode[] argumentNodes) {
       _argumentNodes = argumentNodes;
     }
 
-    public abstract Object execute(GenericRow row);
-
-    public abstract Object execute(Object[] values);
-  }
-
-  public class ScalarAnd extends ConjugateFunction {
-    public ScalarAnd(ExecutableNode[] argumentNodes) {
-      super(argumentNodes);
-    }
-
-    @Override
-    public Object execute(GenericRow row) {
-      for (ExecutableNode executableNode :_argumentNodes) {
-        Boolean res = (Boolean) (executableNode.execute(row));
-        if (!res) {
-          return false;
-        }
-      }
-      return true;
-    }
-
-    @Override
-    public Object execute(Object[] values) {
-      for (ExecutableNode executableNode :_argumentNodes) {
-        Boolean res = (Boolean) (executableNode.execute(values));
-        if (!res) {
-          return false;
-        }
-      }
-      return true;
-    }
-  }
-
-  public class ScalarOr extends ConjugateFunction {
-    public ScalarOr(ExecutableNode[] argumentNodes) {
-      super(argumentNodes);
-    }
-
     @Override
     public Object execute(GenericRow row) {
       for (ExecutableNode executableNode :_argumentNodes) {
@@ -179,30 +165,33 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     }
   }
 
-  private class ConjugationExecutionNode implements ExecutableNode {
-    private final ConjugateFunction _conjugateFunction;
+  private static class AndExecutionNode implements ExecutableNode {
+    private final ExecutableNode[] _argumentNodes;
 
-    ConjugationExecutionNode(String name, ExecutableNode[] argumentNodes) {
-      switch (name) {
-        case "and":
-          _conjugateFunction = new ScalarAnd(argumentNodes);
-          break;
-        case "or":
-          _conjugateFunction = new ScalarOr(argumentNodes);
-          break;
-        default:
-          throw new IllegalArgumentException("Illegal function name passed" + name);
-      }
+    AndExecutionNode(ExecutableNode[] argumentNodes) {
+      _argumentNodes = argumentNodes;
     }
 
     @Override
     public Object execute(GenericRow row) {
-      return _conjugateFunction.execute(row);
+      for (ExecutableNode executableNode :_argumentNodes) {
+        Boolean res = (Boolean) (executableNode.execute(row));
+        if (!res) {
+          return false;
+        }
+      }
+      return true;
     }
 
     @Override
     public Object execute(Object[] values) {
-      return _conjugateFunction.execute(values);
+      for (ExecutableNode executableNode :_argumentNodes) {
+        Boolean res = (Boolean) (executableNode.execute(values));
+        if (!res) {
+          return false;
+        }
+      }
+      return true;
     }
   }
 

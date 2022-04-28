@@ -22,7 +22,6 @@ import java.util.Objects;
 import java.util.Set;
 
 
-
 /**
  * The {@code ExpressionContext} class represents an expression in the query.
  * <p>The expression can be a LITERAL (e.g. 1, "abc"), an IDENTIFIER (e.g. memberId, timestamp), or a FUNCTION (e.g.
