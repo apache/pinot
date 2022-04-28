@@ -28,6 +28,7 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.locationtech.jts.geom.Coordinate;
@@ -76,18 +77,21 @@ public class H3Utils {
     // https://github.com/apache/pinot/issues/8547
     LongSet polyfilledSet = new LongOpenHashSet(H3_CORE.polyfill(
         Arrays.stream(polygon.getExteriorRing().getCoordinates())
-            .map(coordinate -> new GeoCoord(coordinate.y, coordinate.x))
-            .collect(Collectors.toList()), Collections.emptyList(), resolution));
-
-    potentialH3Cells.addAll(polyfilledSet.stream()
-        .flatMap(cell -> H3_CORE.kRing(cell, 1).stream()).collect(Collectors.toSet()));
-    LongSet fullyContainedCell = new LongOpenHashSet(polyfilledSet.stream().filter(h3Cell -> polygon.contains(
-        GeometryUtils.GEOMETRY_FACTORY.createPolygon(
-            H3_CORE.h3ToGeoBoundary(h3Cell).stream().map(geoCoord -> new Coordinate(geoCoord.lng, geoCoord.lat))
-                .toArray(Coordinate[]::new)))).collect(Collectors.toSet()));
-
-
+            .map(coordinate -> new GeoCoord(coordinate.y, coordinate.x)).collect(Collectors.toList()),
+        Collections.emptyList(), resolution));
+    potentialH3Cells
+        .addAll(polyfilledSet.stream().flatMap(cell -> H3_CORE.kRing(cell, 1).stream()).collect(Collectors.toSet()));
+    LongSet fullyContainedCell = new LongOpenHashSet(
+        polyfilledSet.stream().filter(h3Cell -> polygon.contains(createPolygonFromH3Cell(h3Cell)))
+            .collect(Collectors.toSet()));
     return Pair.of(fullyContainedCell, potentialH3Cells);
+  }
+
+  private static Polygon createPolygonFromH3Cell(long h3Cell) {
+    List<GeoCoord> boundary = H3_CORE.h3ToGeoBoundary(h3Cell);
+    boundary.add(boundary.get(0));
+    return GeometryUtils.GEOMETRY_FACTORY.createPolygon(
+        boundary.stream().map(geoCoord -> new Coordinate(geoCoord.lng, geoCoord.lat)).toArray(Coordinate[]::new));
   }
 
   // Return a pair of cell ids: The first fully contain, the second is potential contain.
