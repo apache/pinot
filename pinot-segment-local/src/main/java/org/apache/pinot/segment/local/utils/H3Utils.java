@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.utils;
 
-import com.google.common.collect.ImmutableList;
 import com.uber.h3core.H3Core;
 import com.uber.h3core.exceptions.LineUndefinedException;
 import com.uber.h3core.util.GeoCoord;
@@ -28,6 +27,7 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.locationtech.jts.geom.Coordinate;
@@ -77,7 +77,7 @@ public class H3Utils {
     LongSet polyfilledSet = new LongOpenHashSet(H3_CORE.polyfill(
         Arrays.stream(polygon.getExteriorRing().getCoordinates())
             .map(coordinate -> new GeoCoord(coordinate.y, coordinate.x))
-            .collect(Collectors.toList()), ImmutableList.of(), resolution));
+            .collect(Collectors.toList()), Collections.emptyList(), resolution));
 
     potentialH3Cells.addAll(polyfilledSet.stream()
         .flatMap(cell -> H3_CORE.kRing(cell, 1).stream()).collect(Collectors.toSet()));
@@ -91,6 +91,7 @@ public class H3Utils {
   }
 
   // Return a pair of cell ids: The first fully contain, the second is potential contain.
+  // potential contains contain the fully contain.
   public static Pair<LongSet, LongSet> coverGeometryInH3(Geometry geometry, int resolution) {
     if (geometry instanceof Point) {
       LongSet potentialCover = new LongOpenHashSet();

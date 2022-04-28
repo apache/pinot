@@ -19,13 +19,11 @@
 package org.apache.pinot.core.plan;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -59,9 +57,6 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class FilterPlanNode implements PlanNode {
-
-  private static final Set<String> CAN_APPLY_H3_INCLUSION_INDEX_FUNCTION_NAMES =
-      ImmutableSet.of("st_within", "stwithin", "st_contains", "stcontains");
 
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;
@@ -161,7 +156,7 @@ public class FilterPlanNode implements PlanNode {
       return false;
     }
     String functionName = function.getFunctionName();
-    if (!CAN_APPLY_H3_INCLUSION_INDEX_FUNCTION_NAMES.contains(functionName)) {
+    if (!functionName.equals("stwithin") && !functionName.equals("stcontains")) {
       return false;
     }
     List<ExpressionContext> arguments = function.getArguments();
@@ -169,18 +164,18 @@ public class FilterPlanNode implements PlanNode {
       throw new BadQueryRequestException("Expect 2 arguments for function: " + functionName);
     }
     // TODO: handle nested geography/geometry conversion functions
-    if (functionName.equals("st_within") || functionName.equals("stwithin")) {
+    if (functionName.equals("stwithin")) {
       if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER
           && arguments.get(1).getType() == ExpressionContext.Type.LITERAL) {
         String columnName = arguments.get(0).getIdentifier();
-        return columnName != null && _indexSegment.getDataSource(columnName).getH3Index() != null;
+        return _indexSegment.getDataSource(columnName).getH3Index() != null;
       }
       return false;
     } else {
       if (arguments.get(1).getType() == ExpressionContext.Type.IDENTIFIER
           && arguments.get(0).getType() == ExpressionContext.Type.LITERAL) {
         String columnName = arguments.get(1).getIdentifier();
-        return columnName != null && _indexSegment.getDataSource(columnName).getH3Index() != null;
+        return _indexSegment.getDataSource(columnName).getH3Index() != null;
       }
       return false;
     }
