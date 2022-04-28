@@ -157,8 +157,7 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
           // big decimals. Confirm this is a backward compatible change?
           Assert.assertEquals(Float.compare(_floatSVValues[i], ((Number) resultMap.get(0).get("floatSV")).floatValue()),
               0);
-          // Note: some doubles are now being parsed as BigDecimals. This is backward-incompatible change.
-          Assert.assertEquals(_doubleSVValues[i], ((Number) resultMap.get(0).get("doubleSV")).doubleValue());
+          Assert.assertEquals(_doubleSVValues[i], resultMap.get(0).get("doubleSV"));
           // Disabled:
           // Assert.assertEquals(_bigDecimalSVValues[i], (BigDecimal) resultMap.get(0).get("bigDecimalSV"));
           Assert.assertEquals(_stringSVValues[i], resultMap.get(0).get("stringSV"));

@@ -67,15 +67,14 @@ public class JSONRecordReaderTest extends AbstractRecordReaderTest {
       for (FieldSpec fieldSpec : _pinotSchema.getAllFieldSpecs()) {
         String fieldSpecName = fieldSpec.getName();
         if (fieldSpec.isSingleValueField()) {
-          Assert.assertEquals(fieldSpec.getDataType().convert(actualRecord.getValue(fieldSpecName).toString()),
-              expectedRecord.get(fieldSpecName));
+          Assert.assertEquals(actualRecord.getValue(fieldSpecName).toString(),
+              expectedRecord.get(fieldSpecName).toString());
         } else {
           Object[] actualRecords = (Object[]) actualRecord.getValue(fieldSpecName);
           List expectedRecords = (List) expectedRecord.get(fieldSpecName);
           Assert.assertEquals(actualRecords.length, expectedRecords.size());
           for (int j = 0; j < actualRecords.length; j++) {
-            Assert.assertEquals(fieldSpec.getDataType().convert(actualRecords[j].toString()),
-                expectedRecords.get(j));
+            Assert.assertEquals(actualRecords[j].toString(), expectedRecords.get(j).toString());
           }
         }
       }

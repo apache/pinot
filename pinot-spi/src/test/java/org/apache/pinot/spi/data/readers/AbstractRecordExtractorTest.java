@@ -21,7 +21,6 @@ package org.apache.pinot.spi.data.readers;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -150,18 +149,7 @@ public abstract class AbstractRecordExtractorTest {
       }
     } else {
       if (expectedValue != null) {
-        if (actualValue.getClass() == BigDecimal.class) {
-          // double/float may get parsed as BigDecimal since default object mapper parses exact BigDecimal.
-          if (expectedValue.getClass() == Double.class) {
-            Assert.assertEquals(((BigDecimal) actualValue).doubleValue(), expectedValue);
-          } else if (expectedValue.getClass() == Float.class) {
-            Assert.assertEquals(((BigDecimal) actualValue).floatValue(), expectedValue);
-          } else {
-            Assert.assertEquals(actualValue, expectedValue);
-          }
-        } else {
-          Assert.assertEquals(actualValue, expectedValue);
-        }
+        Assert.assertEquals(actualValue, expectedValue);
       } else {
         Assert.assertNull(actualValue);
       }

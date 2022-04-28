@@ -22,7 +22,6 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
@@ -77,8 +76,7 @@ public class JsonUtils {
 
   // NOTE: Do not expose the ObjectMapper to prevent configuration change
   private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper()
-      .setNodeFactory(JsonNodeFactory.withExactBigDecimals(true))
-      .configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true);
+      .setNodeFactory(JsonNodeFactory.withExactBigDecimals(true));
   public static final ObjectReader DEFAULT_READER = DEFAULT_MAPPER.reader();
   public static final ObjectWriter DEFAULT_WRITER = DEFAULT_MAPPER.writer();
   public static final ObjectWriter DEFAULT_PRETTY_WRITER = DEFAULT_MAPPER.writerWithDefaultPrettyPrinter();

@@ -297,7 +297,7 @@ public class JsonUtilsTest {
     Map<String, FieldSpec.FieldType> fieldSpecMap =
         new ImmutableMap.Builder<String, FieldSpec.FieldType>().put("d1", FieldSpec.FieldType.DIMENSION)
             .put("hoursSinceEpoch", FieldSpec.FieldType.DATE_TIME).put("m1", FieldSpec.FieldType.METRIC)
-            .put("bigDecimal", FieldSpec.FieldType.METRIC).build();
+            .build();
     Schema inferredPinotSchema = JsonUtils
         .getPinotSchemaFromJsonFile(file, fieldSpecMap, TimeUnit.HOURS, new ArrayList<>(), ".",
             ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE);
@@ -306,7 +306,6 @@ public class JsonUtilsTest {
         .addSingleValueDimension("tuple.address.streetaddress", FieldSpec.DataType.STRING)
         .addSingleValueDimension("tuple.address.city", FieldSpec.DataType.STRING)
         .addSingleValueDimension("entries", FieldSpec.DataType.STRING)
-        .addMetric("bigDecimal", FieldSpec.DataType.BIG_DECIMAL)
         .addMultiValueDimension("d2", FieldSpec.DataType.INT)
         .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build();
     Assert.assertEquals(inferredPinotSchema, expectedSchema);
@@ -321,7 +320,6 @@ public class JsonUtilsTest {
         .addSingleValueDimension("tuple.address.city", FieldSpec.DataType.STRING)
         .addSingleValueDimension("entries.id", FieldSpec.DataType.INT)
         .addSingleValueDimension("entries.description", FieldSpec.DataType.STRING)
-        .addMetric("bigDecimal", FieldSpec.DataType.BIG_DECIMAL)
         .addMultiValueDimension("d2", FieldSpec.DataType.INT)
         .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build();
     Assert.assertEquals(inferredPinotSchema, expectedSchema);
@@ -335,7 +333,6 @@ public class JsonUtilsTest {
         .addSingleValueDimension("tuple_address_streetaddress", FieldSpec.DataType.STRING)
         .addSingleValueDimension("tuple_address_city", FieldSpec.DataType.STRING)
         .addSingleValueDimension("entries", FieldSpec.DataType.STRING)
-        .addMetric("bigDecimal", FieldSpec.DataType.BIG_DECIMAL)
         .addMultiValueDimension("d2", FieldSpec.DataType.INT)
         .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build();
     Assert.assertEquals(inferredPinotSchema, expectedSchema);
@@ -350,7 +347,6 @@ public class JsonUtilsTest {
         .addSingleValueDimension("tuple.address.city", FieldSpec.DataType.STRING)
         .addSingleValueDimension("entries.id", FieldSpec.DataType.INT)
         .addSingleValueDimension("entries.description", FieldSpec.DataType.STRING)
-        .addMetric("bigDecimal", FieldSpec.DataType.BIG_DECIMAL)
         .addSingleValueDimension("d2", FieldSpec.DataType.STRING)
         .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build();
     Assert.assertEquals(inferredPinotSchema, expectedSchema);
