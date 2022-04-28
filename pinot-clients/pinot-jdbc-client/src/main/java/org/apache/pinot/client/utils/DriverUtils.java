@@ -27,7 +27,10 @@ import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.net.ssl.SSLContext;
+import org.apache.commons.configuration.MapConfiguration;
+import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.utils.TlsUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,33 +39,18 @@ public class DriverUtils {
   public static final String SCHEME = "jdbc";
   public static final String DRIVER = "pinot";
   public static final Logger LOG = LoggerFactory.getLogger(DriverUtils.class);
-  public static final String QUERY_SEPERATOR = "&";
-  public static final String PARAM_SEPERATOR = "=";
-  public static final String CONTROLLER = "controller";
   private static final String LIMIT_STATEMENT_REGEX = "\\s(limit)\\s";
 
   // SSL Properties
-  public static final String KEYSTORE_TYPE = "keystore.type";
-  public static final String KEYSTORE_PATH = "keystore.path";
-  public static final String KEYSTORE_PASSWORD = "keystore.password";
-  public static final String TRUSTSTORE_TYPE = "truststore.type";
-  public static final String TRUSTSTORE_PATH = "truststore.path";
-  public static final String TRUSTSTORE_PASSWORD = "truststore.password";
+  public static final String PINOT_JDBC_TLS_PREFIX = "pinot.jdbc.tls";
 
   private DriverUtils() {
   }
 
   public static SSLContext getSSLContextFromJDBCProps(Properties properties) {
-    String keyStorePath = properties.getProperty(KEYSTORE_PATH);
-    String keyStoreType = properties.getProperty(KEYSTORE_TYPE);
-    String keyStorePass = properties.getProperty(KEYSTORE_PASSWORD);
-
-    String trustStorePath = properties.getProperty(TRUSTSTORE_PATH);
-    String trustStoreType = properties.getProperty(TRUSTSTORE_TYPE);
-    String trustStorePass = properties.getProperty(TRUSTSTORE_PASSWORD);
-
-    TlsUtils.installDefaultSSLSocketFactory(keyStoreType, keyStorePath, keyStorePass,
-        trustStoreType, trustStorePath, trustStorePass);
+    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(
+        new PinotConfiguration(new MapConfiguration(properties)), PINOT_JDBC_TLS_PREFIX);
+    TlsUtils.installDefaultSSLSocketFactory(tlsConfig);
     return TlsUtils.getSslContext();
   }
 
