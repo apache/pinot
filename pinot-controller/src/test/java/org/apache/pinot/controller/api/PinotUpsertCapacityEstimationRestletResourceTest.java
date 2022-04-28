@@ -62,8 +62,7 @@ public class PinotUpsertCapacityEstimationRestletResourceTest {
     assertEquals(result.get("totalValueSpace(bytes)").asLong(), 640000);
     assertEquals(result.get("totalSpace(bytes)").asLong(), 1120000);
     assertEquals(result.get("numPartitions").asInt(), 8);
-    assertEquals(result.get("replicasPerPartition").asInt(), 3);
-    assertEquals(result.get("memoryPerHost").asDouble(), 420000.0);
+    assertEquals(result.get("totalSpacePerPartition(bytes)").asDouble(), 140000.0);
   }
 
   @AfterClass

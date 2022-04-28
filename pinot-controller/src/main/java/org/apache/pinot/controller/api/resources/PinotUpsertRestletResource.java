@@ -42,9 +42,9 @@ import org.slf4j.LoggerFactory;
 
 @Api(tags = Constants.UPSERT_RESOURCE_TAG)
 @Path("/")
-public class PinotUpsertCapacityEstimationRestletResource {
+public class PinotUpsertRestletResource {
 
-  public static final Logger LOGGER = LoggerFactory.getLogger(PinotUpsertCapacityEstimationRestletResource.class);
+  public static final Logger LOGGER = LoggerFactory.getLogger(PinotUpsertRestletResource.class);
 
   /**
    * The API to estimate heap usage for a Pinot upsert table.
@@ -71,16 +71,16 @@ public class PinotUpsertCapacityEstimationRestletResource {
    * ```
    */
   @POST
-  @Path("/heapUsage")
+  @Path("/estimateHeapUsage")
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Estimate memory usage for an upsert table", notes =
       "This API returns the estimated heap usage based on primary key column stats."
           + " This allows us to estimate table size before onboarding.")
   public String estimateHeapUsage(String tableSchemaConfigStr,
-      @ApiParam(value = "cardinality in string format", required = true) @QueryParam("cardinality") String cardinality,
-      @ApiParam(value = "primaryKeySize in string format") @QueryParam("primaryKeySize") String primaryKeySize,
-      @ApiParam(value = "numPartitions in string format") @QueryParam("numPartitions") String numPartitionsStr) {
+      @ApiParam(value = "cardinality", required = true) @QueryParam("cardinality") long cardinality,
+      @ApiParam(value = "primaryKeySize", defaultValue = "-1") @QueryParam("primaryKeySize") int primaryKeySize,
+      @ApiParam(value = "numPartitions", defaultValue = "-1") @QueryParam("numPartitions") int numPartitions) {
     ObjectNode resultData = JsonUtils.newObjectNode();
     TableAndSchemaConfig tableSchemaConfig;
 
@@ -97,20 +97,17 @@ public class PinotUpsertCapacityEstimationRestletResource {
 
     Schema schema = tableSchemaConfig.getSchema();
 
-    // Estimated key space, it contains primary key columns
+    // Estimated key space, it contains primary key columns.
     int bytesPerKey = 0;
     List<String> primaryKeys = schema.getPrimaryKeyColumns();
 
-    if (primaryKeySize != null) {
-      bytesPerKey += Integer.valueOf(primaryKeySize);
+    if (primaryKeySize > 0) {
+      bytesPerKey = primaryKeySize;
     } else {
       for (String primaryKey : primaryKeys) {
         FieldSpec.DataType dt = schema.getFieldSpecFor(primaryKey).getDataType();
-        if (dt == FieldSpec.DataType.JSON || dt == FieldSpec.DataType.LIST || dt == FieldSpec.DataType.MAP) {
-          String msg = "Not support data types for primary key columns";
-          throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST);
-        } else if (dt == FieldSpec.DataType.STRING) {
-          String msg = "Missing primary key sizes for String columns";
+        if (!dt.isFixedWidth()) {
+          String msg = "Primary key sizes much be provided for non fixed-width columns";
           throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST);
         } else {
           bytesPerKey += dt.size();
@@ -125,8 +122,7 @@ public class PinotUpsertCapacityEstimationRestletResource {
     String comparisonColumn = tableConfig.getUpsertConfig().getComparisonColumn();
     if (comparisonColumn != null) {
       FieldSpec.DataType dt = schema.getFieldSpecFor(comparisonColumn).getDataType();
-      if (dt == FieldSpec.DataType.STRING || dt == FieldSpec.DataType.JSON || dt == FieldSpec.DataType.LIST
-          || dt == FieldSpec.DataType.MAP) {
+      if (!dt.isFixedWidth()) {
         String msg = "Not support data types for the comparison column";
         throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST);
       } else {
@@ -137,9 +133,8 @@ public class PinotUpsertCapacityEstimationRestletResource {
     resultData.put("bytesPerKey", bytesPerKey);
     resultData.put("bytesPerValue", bytesPerValue);
 
-    long primaryKeyCardinality = Long.valueOf(cardinality);
-    long totalKeySpace = bytesPerKey * primaryKeyCardinality;
-    long totalValueSpace = bytesPerValue * primaryKeyCardinality;
+    long totalKeySpace = bytesPerKey * cardinality;
+    long totalValueSpace = bytesPerValue * cardinality;
     long totalSpace = totalKeySpace + totalValueSpace;
 
     resultData.put("totalKeySpace(bytes)", totalKeySpace);
@@ -147,15 +142,10 @@ public class PinotUpsertCapacityEstimationRestletResource {
     resultData.put("totalSpace(bytes)", totalSpace);
 
     // Use Partitions, replicas to calculate memoryPerHost for host assignment.
-    if (numPartitionsStr != null) {
-      int numPartitions = Integer.valueOf(numPartitionsStr);
-      if (numPartitions > 0) {
-        int replicasPerPartition = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
-        double memoryPerHost = (totalSpace * replicasPerPartition * 1.0) / numPartitions;
-        resultData.put("numPartitions", numPartitions);
-        resultData.put("replicasPerPartition", replicasPerPartition);
-        resultData.put("memoryPerHost", memoryPerHost);
-      }
+    if (numPartitions > 0) {
+      double totalSpacePerPartition = (totalSpace * 1.0) / numPartitions;
+      resultData.put("numPartitions", numPartitions);
+      resultData.put("totalSpacePerPartition(bytes)", totalSpacePerPartition);
     }
     return resultData.toString();
   }

@@ -70,7 +70,6 @@ import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
-import org.testng.collections.Lists;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.Instance.ADMIN_PORT_KEY;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY;
@@ -474,7 +473,7 @@ public abstract class ControllerTestUtils {
 
   public static Schema createDummySchemaForUpsertTable(String tableName) {
     Schema schema = createDummySchema(tableName);
-    schema.setPrimaryKeyColumns(Lists.newArrayList("dimA"));
+    schema.setPrimaryKeyColumns(Collections.singletonList("dimA"));
     return schema;
   }
 
