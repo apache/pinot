@@ -238,6 +238,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "externalview");
   }
 
+  public String forSchemaValidate() {
+    return StringUtil.join("/", _baseUrl, "schemas", "validate");
+  }
+
   public String forSchemaCreate() {
     return StringUtil.join("/", _baseUrl, "schemas");
   }

@@ -48,11 +48,10 @@ public class PinotSchemaRestletResourceTest {
         + "    \"name\" : \"subject\",\n" + "    \"dataType\" : \"STRING\"\n" + "  } ],\n"
         + "  \"metricFieldSpecs\" : [ {\n" + "    \"name\" : \"score\",\n" + "    \"dataType\" : \"FLOAT\"\n"
         + "  } ]}";
-
     try {
       final String response = ControllerTestUtils
           .sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaCreate(), schemaString);
-      Assert.assertEquals(response, "{\"status\":\"transcript successfully added\"}");
+      Assert.assertEquals(response, "{\"unrecognizedProperties\":{},\"status\":\"transcript successfully added\"}");
     } catch (IOException e) {
       // should not reach here
       Assert.fail("Shouldn't have caught an exception: " + e.getMessage());
@@ -170,6 +169,66 @@ public class PinotSchemaRestletResourceTest {
         ControllerTestUtils.getControllerRequestURLBuilder().forSchemaUpdate(newSchemaName),
         schema.toSingleLineJsonString());
     Assert.assertEquals(resp.getStatusCode(), 404);
+  }
+
+  @Test
+  public void testUnrecognizedProperties()
+      throws IOException {
+    String schemaStringWithExtraProps =
+        "{\n" + "  \"schemaName\" : \"transcript2\",\"illegalKey1\" : 1, \n" + "  \"dimensionFieldSpecs\" : [ {\n"
+            + "    \"name\" : \"studentID\",\n" + "    \"dataType\" : \"STRING\"\n" + "  }, {\n"
+            + "    \"name\" : \"firstName\",\n" + "    \"dataType\" : \"STRING\"\n" + "  }, {\n"
+            + "    \"name\" : \"lastName\",\n" + "    \"dataType\" : \"STRING\"\n" + "  }, {\n"
+            + "    \"name\" : \"gender\",\n" + "    \"dataType\" : \"STRING\"\n" + "  }, {\n"
+            + "    \"name\" : \"subject\",\n" + "    \"dataType\" : \"STRING\"\n" + "  } ],\n"
+            + "  \"metricFieldSpecs\" : [ {\n" + "    \"name\" : \"score\",\n" + "    \"dataType\" : \"FLOAT\"\n"
+            + "  } ]}";
+
+    String response =
+        ControllerTestUtils.sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaValidate(),
+            schemaStringWithExtraProps);
+    Assert.assertTrue(response.contains("/illegalKey1\" : 1"));
+
+    response =
+        ControllerTestUtils.sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forSchemaCreate(),
+            schemaStringWithExtraProps);
+    Assert.assertEquals(response,
+        "{\"unrecognizedProperties\":{\"/illegalKey1\":1},\"status\":\"transcript2 successfully added\"}");
+
+    response = ControllerTestUtils.sendPutRequest(
+        ControllerTestUtils.getControllerRequestURLBuilder().forSchemaUpdate("transcript2"),
+        schemaStringWithExtraProps);
+    Assert.assertEquals(response,
+        "{\"unrecognizedProperties\":{\"/illegalKey1\":1},\"status\":\"transcript2 successfully added\"}");
+  }
+
+  @Test
+  public void testUnrecognizedPropertiesFileEndpoints()
+      throws IOException {
+    String schemaStringWithExtraProps =
+        "{\n" + "  \"schemaName\" : \"transcript2\",\"illegalKey1\" : 1, \n" + "  \"dimensionFieldSpecs\" : [ {\n"
+            + "    \"name\" : \"studentID\",\n" + "    \"dataType\" : \"STRING\"\n" + "  }, {\n"
+            + "    \"name\" : \"firstName\",\n" + "    \"dataType\" : \"STRING\"\n" + "  }, {\n"
+            + "    \"name\" : \"lastName\",\n" + "    \"dataType\" : \"STRING\"\n" + "  }, {\n"
+            + "    \"name\" : \"gender\",\n" + "    \"dataType\" : \"STRING\"\n" + "  }, {\n"
+            + "    \"name\" : \"subject\",\n" + "    \"dataType\" : \"STRING\"\n" + "  } ],\n"
+            + "  \"metricFieldSpecs\" : [ {\n" + "    \"name\" : \"score\",\n" + "    \"dataType\" : \"FLOAT\"\n"
+            + "  } ]}";
+
+    SimpleHttpResponse response = ControllerTestUtils.sendMultipartPostRequest(
+        ControllerTestUtils.getControllerRequestURLBuilder().forSchemaValidate(), schemaStringWithExtraProps);
+    Assert.assertTrue(response.getResponse().contains("/illegalKey1\" : 1"));
+
+    response = ControllerTestUtils.sendMultipartPostRequest(
+        ControllerTestUtils.getControllerRequestURLBuilder().forSchemaCreate(), schemaStringWithExtraProps);
+    Assert.assertEquals(response.getResponse(),
+        "{\"unrecognizedProperties\":{\"/illegalKey1\":1},\"status\":\"transcript2 successfully added\"}");
+
+    response = ControllerTestUtils.sendMultipartPutRequest(
+        ControllerTestUtils.getControllerRequestURLBuilder().forSchemaUpdate("transcript2"),
+        schemaStringWithExtraProps);
+    Assert.assertEquals(response.getResponse(),
+        "{\"unrecognizedProperties\":{\"/illegalKey1\":1},\"status\":\"transcript2 successfully added\"}");
   }
 
   @AfterClass
