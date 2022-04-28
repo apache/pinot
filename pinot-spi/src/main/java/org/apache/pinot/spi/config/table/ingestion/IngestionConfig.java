@@ -46,7 +46,7 @@ public class IngestionConfig extends BaseJsonConfig {
   private List<TransformConfig> _transformConfigs;
 
   @JsonPropertyDescription("Configs related to record aggregation function applied during ingestion")
-  private final List<AggregationConfig> _aggregationConfigs;
+  private List<AggregationConfig> _aggregationConfigs;
 
   @JsonPropertyDescription("Config related to handling complex type")
   private ComplexTypeConfig _complexTypeConfig;
@@ -113,6 +113,10 @@ public class IngestionConfig extends BaseJsonConfig {
 
   public void setTransformConfigs(List<TransformConfig> transformConfigs) {
     _transformConfigs = transformConfigs;
+  }
+
+  public void setAggregationConfigs(List<AggregationConfig> aggregationConfigs) {
+    _aggregationConfigs = aggregationConfigs;
   }
 
   public void setComplexTypeConfig(ComplexTypeConfig complexTypeConfig) {

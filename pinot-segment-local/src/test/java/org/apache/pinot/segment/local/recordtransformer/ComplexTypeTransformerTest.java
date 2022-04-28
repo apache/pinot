@@ -438,4 +438,26 @@ public class ComplexTypeTransformerTest {
     Assert.assertEquals(genericRow.getValue("im1.bb"), "u");
     Assert.assertEquals(genericRow.getValue("test.c"), 3);
   }
+
+  @Test
+  public void getComplexTypeTransformerTest() {
+    ComplexTypeConfig complexTypeConfigWithNullFields = new ComplexTypeConfig(null, null, null, null);
+
+    IngestionConfig ingestionConfig = new IngestionConfig(null, null, null, null, null, complexTypeConfigWithNullFields);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test_null").setIngestionConfig(ingestionConfig).build();
+
+    ComplexTypeTransformer complexTypeTransformer = ComplexTypeTransformer.getComplexTypeTransformer(tableConfig);
+    Assert.assertNull(complexTypeTransformer);
+
+    List<String> fieldToUnnest = Collections.singletonList("foo_bar");
+    ComplexTypeConfig complexTypeConfigWithNonNullField =
+        new ComplexTypeConfig(fieldToUnnest, null, null, null);
+    ingestionConfig = new IngestionConfig(null, null, null, null, null, complexTypeConfigWithNonNullField);
+    tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test_non_null").setIngestionConfig(ingestionConfig)
+            .build();
+    complexTypeTransformer = ComplexTypeTransformer.getComplexTypeTransformer(tableConfig);
+    Assert.assertNotNull(complexTypeTransformer);
+  }
 }
