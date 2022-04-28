@@ -36,10 +36,12 @@ object PinotDataSourceReadOptions {
   val CONFIG_USE_PUSH_DOWN_FILTERS = "usePushDownFilters"
   val CONFIG_SEGMENTS_PER_SPLIT = "segmentsPerSplit"
   val CONFIG_PINOT_SERVER_TIMEOUT_MS = "pinotServerTimeoutMs"
+  var CONFIG_USE_GRPC_SERVER = "useGrpcServer"
   private[pinot] val DEFAULT_CONTROLLER: String = "localhost:9000"
   private[pinot] val DEFAULT_USE_PUSH_DOWN_FILTERS: Boolean = true
   private[pinot] val DEFAULT_SEGMENTS_PER_SPLIT: Int = 3
   private[pinot] val DEFAULT_PINOT_SERVER_TIMEOUT_MS: Long = 10000
+  private[pinot] val DEFAULT_USE_GRPC_SERVER: Boolean = false
 
   private[pinot] val tableTypes = Seq("OFFLINE", "REALTIME", "HYBRID")
 
@@ -75,6 +77,7 @@ object PinotDataSourceReadOptions {
     val segmentsPerSplit = options.getInt(CONFIG_SEGMENTS_PER_SPLIT, DEFAULT_SEGMENTS_PER_SPLIT)
     val pinotServerTimeoutMs =
       options.getLong(CONFIG_PINOT_SERVER_TIMEOUT_MS, DEFAULT_PINOT_SERVER_TIMEOUT_MS)
+    val useGrpcServer = options.getBoolean(CONFIG_USE_GRPC_SERVER, DEFAULT_USE_GRPC_SERVER)
 
     PinotDataSourceReadOptions(
       tableName,
@@ -83,7 +86,8 @@ object PinotDataSourceReadOptions {
       broker,
       usePushDownFilters,
       segmentsPerSplit,
-      pinotServerTimeoutMs
+      pinotServerTimeoutMs,
+      useGrpcServer
     )
   }
 }
@@ -96,4 +100,5 @@ private[pinot] case class PinotDataSourceReadOptions(
     broker: String,
     usePushDownFilters: Boolean,
     segmentsPerSplit: Int,
-    pinotServerTimeoutMs: Long)
+    pinotServerTimeoutMs: Long,
+    useGrpcServer: Boolean)

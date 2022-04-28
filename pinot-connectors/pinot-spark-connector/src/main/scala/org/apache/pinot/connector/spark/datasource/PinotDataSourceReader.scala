@@ -34,6 +34,7 @@ import org.apache.spark.sql.sources.v2.reader.{
 import org.apache.spark.sql.types._
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable.Map
 
 /**
  * Spark-Pinot datasource reader to read metadata and create partition splits.
@@ -80,8 +81,16 @@ class PinotDataSourceReader(options: DataSourceOptions, userSchema: Option[Struc
 
     val routingTable = PinotClusterClient.getRoutingTable(readParameters.broker, generatedSQLs)
 
+    val instanceInfo : Map[String, InstanceInfo] = Map()
+    val instanceInfoReader = (instance:String) => { // cached reader to reduce network round trips
+      instanceInfo.getOrElseUpdate(
+        instance,
+        PinotClusterClient.getInstanceInfo(readParameters.controller, instance)
+      )
+    }
+
     PinotSplitter
-      .generatePinotSplits(generatedSQLs, routingTable, readParameters.segmentsPerSplit)
+      .generatePinotSplits(generatedSQLs, routingTable, instanceInfoReader, readParameters)
       .zipWithIndex
       .map {
         case (pinotSplit, partitionId) =>
