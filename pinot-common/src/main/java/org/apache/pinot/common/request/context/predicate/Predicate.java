@@ -28,7 +28,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
  */
 public interface Predicate {
   enum Type {
-    EQ, NOT_EQ(true), IN, NOT_IN(true), RANGE, REGEXP_LIKE, TEXT_MATCH, CONTAINS, JSON_MATCH, IS_NULL, IS_NOT_NULL(true);
+    EQ, NOT_EQ(true), IN, NOT_IN(true), RANGE, REGEXP_LIKE, CONTAINS, TEXT_MATCH, JSON_MATCH, IS_NULL, IS_NOT_NULL(true);
 
     private final boolean _exclusive;
 

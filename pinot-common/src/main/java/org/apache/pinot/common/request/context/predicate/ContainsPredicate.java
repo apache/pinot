@@ -25,12 +25,11 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 /**
  * Represents a CONTAINS predicate.
  */
-public class ContainsPredicate implements Predicate {
-  private ExpressionContext _lhs;
+public class ContainsPredicate extends BasePredicate {
   private final String _value;
 
   public ContainsPredicate(ExpressionContext lhs, String value) {
-    _lhs = lhs;
+    super(lhs);
     _value = value;
   }
 

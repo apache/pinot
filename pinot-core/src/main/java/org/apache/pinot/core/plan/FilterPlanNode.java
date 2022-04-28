@@ -245,14 +245,10 @@ public class FilterPlanNode implements PlanNode {
           }
           switch (predicate.getType()) {
             case CONTAINS:
-              if (dataSource.getTextIndex() == null) {
-                throw new IllegalStateException("CONTAINS requested on a non text index enabled field");
-              }
               TextIndexReader nativeTextIndexReader = dataSource.getTextIndex();
               if (!(nativeTextIndexReader instanceof NativeTextIndexReader)) {
                 throw new UnsupportedOperationException("CONTAINS is supported only on native text indices");
               }
-
               return new ContainsFilterOperator((NativeTextIndexReader) nativeTextIndexReader,
                   (ContainsPredicate) predicate, numDocs);
             case TEXT_MATCH:
@@ -261,7 +257,6 @@ public class FilterPlanNode implements PlanNode {
               if (textIndexReader instanceof NativeTextIndexReader) {
                 throw new UnsupportedOperationException("TEXT_MATCH is not supported on native text indices");
               }
-
               return new TextMatchFilterOperator(dataSource.getTextIndex(), (TextMatchPredicate) predicate, numDocs);
             case REGEXP_LIKE:
               // FST Index is available only for rolled out segments. So, we use different evaluator for rolled out and

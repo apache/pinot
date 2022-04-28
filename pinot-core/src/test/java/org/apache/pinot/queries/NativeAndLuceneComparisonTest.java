@@ -138,7 +138,7 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
             null));
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInvertedIndexColumns(Arrays.asList(DOMAIN_NAMES_COL_LUCENE, DOMAIN_NAMES_COL_NATIVE))
+        .setInvertedIndexColumns(Arrays.asList(DOMAIN_NAMES_COL_LUCENE))
         .setFieldConfigList(fieldConfigs).build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(DOMAIN_NAMES_COL_LUCENE, FieldSpec.DataType.STRING).build();
@@ -168,7 +168,7 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
             propertiesMap));
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInvertedIndexColumns(Arrays.asList(DOMAIN_NAMES_COL_LUCENE)).setFieldConfigList(fieldConfigs).build();
+        .setInvertedIndexColumns(Arrays.asList(DOMAIN_NAMES_COL_NATIVE)).setFieldConfigList(fieldConfigs).build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(DOMAIN_NAMES_COL_NATIVE, FieldSpec.DataType.STRING).build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);

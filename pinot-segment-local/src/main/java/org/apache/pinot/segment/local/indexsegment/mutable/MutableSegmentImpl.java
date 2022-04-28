@@ -137,7 +137,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Collection<MetricFieldSpec> _physicalMetricFieldSpecs;
   private final Collection<String> _physicalTimeColumnNames;
 
-  List<FieldConfig> _fieldConfigList;
+  private final List<FieldConfig> _fieldConfigList;
 
   // default message metadata
   private volatile long _lastIndexedTimeMs = Long.MIN_VALUE;
