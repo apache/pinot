@@ -67,7 +67,7 @@ public class NativeTextIndexReader implements TextIndexReader {
 
   private File getTextIndexFile(File segmentIndexDir) {
     // will return null if file does not exist
-    File file = SegmentDirectoryPaths.findTextIndexIndexFileNative(segmentIndexDir, _column);
+    File file = SegmentDirectoryPaths.findNativeTextIndexIndexFile(segmentIndexDir, _column);
     if (file == null) {
       throw new IllegalStateException("Failed to find text index file for column: " + _column);
     }

@@ -23,12 +23,12 @@ import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
 import org.apache.pinot.segment.local.utils.nativefst.NativeTextIndexCreator;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.segment.spi.V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION;
+import static org.testng.AssertJUnit.assertEquals;
 
 
 public class NativeTextIndexCreatorTest {
@@ -67,23 +67,23 @@ public class NativeTextIndexCreatorTest {
     try (NativeTextIndexReader reader = new NativeTextIndexReader("testFSTColumn", fstFile.getParentFile())) {
 
       int[] matchedDocIds = reader.getDocIds("hello.*").toArray();
-      Assert.assertEquals(2, matchedDocIds.length);
-      Assert.assertEquals(0, matchedDocIds[0]);
-      Assert.assertEquals(1, matchedDocIds[1]);
+      assertEquals(2, matchedDocIds.length);
+      assertEquals(0, matchedDocIds[0]);
+      assertEquals(1, matchedDocIds[1]);
 
       matchedDocIds = reader.getDocIds(".*llo").toArray();
-      Assert.assertEquals(2, matchedDocIds.length);
-      Assert.assertEquals(0, matchedDocIds[0]);
-      Assert.assertEquals(1, matchedDocIds[1]);
+      assertEquals(2, matchedDocIds.length);
+      assertEquals(0, matchedDocIds[0]);
+      assertEquals(1, matchedDocIds[1]);
 
       matchedDocIds = reader.getDocIds("wor.*").toArray();
-      Assert.assertEquals(2, matchedDocIds.length);
-      Assert.assertEquals(0, matchedDocIds[0]);
-      Assert.assertEquals(1, matchedDocIds[1]);
+      assertEquals(2, matchedDocIds.length);
+      assertEquals(0, matchedDocIds[0]);
+      assertEquals(1, matchedDocIds[1]);
 
       matchedDocIds = reader.getDocIds("zoo.*").toArray();
-      Assert.assertEquals(1, matchedDocIds.length);
-      Assert.assertEquals(3, matchedDocIds[0]);
+      assertEquals(1, matchedDocIds.length);
+      assertEquals(3, matchedDocIds[0]);
     }
   }
 }

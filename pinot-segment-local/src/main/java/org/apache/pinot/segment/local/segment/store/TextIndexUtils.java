@@ -61,7 +61,7 @@ public class TextIndexUtils {
   public static FSTType getFSTTypeOfIndex(File segmentIndexDir, String columnName) {
     boolean foundNativeTextIndex = false;
     boolean foundLuceneTextIndex = false;
-    File file = SegmentDirectoryPaths.findTextIndexIndexFileNative(segmentIndexDir, columnName);
+    File file = SegmentDirectoryPaths.findNativeTextIndexIndexFile(segmentIndexDir, columnName);
 
     if (file != null) {
       foundNativeTextIndex = true;

@@ -221,7 +221,6 @@ public class IndexLoadingConfig {
         if (fieldConfig.getIndexType() == FieldConfig.IndexType.TEXT) {
           _textIndexColumns.add(column);
           Map<String, String> propertiesMap = fieldConfig.getProperties();
-
           if (TextIndexUtils.isFstTypeNative(propertiesMap)) {
             _fstIndexType = FSTType.NATIVE;
           }
