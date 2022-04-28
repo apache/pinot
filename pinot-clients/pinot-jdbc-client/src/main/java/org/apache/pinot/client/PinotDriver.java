@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.client;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterables;
 import java.net.URI;
 import java.sql.Connection;
@@ -32,6 +33,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import javax.net.ssl.SSLContext;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.PinotControllerTransportFactory;
@@ -48,6 +50,14 @@ public class PinotDriver implements Driver {
   public static final String DEFAULT_TENANT = "DefaultTenant";
   public static final String INFO_SCHEME = "scheme";
   public static final String INFO_HEADERS = "headers";
+  private SSLContext _sslContext = null;
+
+  public PinotDriver() { }
+
+  @VisibleForTesting
+  public PinotDriver(SSLContext sslContext) {
+    _sslContext = sslContext;
+  }
 
   @Override
   public Connection connect(String url, Properties info)
@@ -57,12 +67,17 @@ public class PinotDriver implements Driver {
       JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
       PinotControllerTransportFactory pinotControllerTransportFactory = new PinotControllerTransportFactory();
 
-      if (info.contains(INFO_SCHEME)) {
+      if (info.containsKey(INFO_SCHEME)) {
         factory.setScheme(info.getProperty(INFO_SCHEME));
-        pinotControllerTransportFactory.setScheme(info.getProperty(INFO_TENANT));
-        if (INFO_SCHEME.contentEquals(CommonConstants.HTTPS_PROTOCOL)) {
-          factory.setSslContext(DriverUtils.getSSLContextFromJDBCProps(info));
-          pinotControllerTransportFactory.setSslContext(TlsUtils.getSslContext());
+        pinotControllerTransportFactory.setScheme(info.getProperty(INFO_SCHEME));
+        if (info.getProperty(INFO_SCHEME).contentEquals(CommonConstants.HTTPS_PROTOCOL)) {
+          if (_sslContext == null) {
+            factory.setSslContext(DriverUtils.getSSLContextFromJDBCProps(info));
+            pinotControllerTransportFactory.setSslContext(TlsUtils.getSslContext());
+          } else {
+            factory.setSslContext(_sslContext);
+            pinotControllerTransportFactory.setSslContext(_sslContext);
+          }
         }
       }
 
