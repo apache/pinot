@@ -268,10 +268,6 @@ public class PinotSegmentUploadDownloadRestletResource {
       if (tableType == TableType.OFFLINE) {
         tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
       } else {
-        if (!_pinotHelixResourceManager.isUpsertTable(rawTableName)) {
-          throw new UnsupportedOperationException(
-              "Upload segment to non-upsert realtime table is not supported " + rawTableName);
-        }
         tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
       }
 

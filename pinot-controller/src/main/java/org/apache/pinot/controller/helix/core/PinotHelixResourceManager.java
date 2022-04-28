@@ -1979,9 +1979,6 @@ public class PinotHelixResourceManager {
     segmentZKMetadata.setSizeInBytes(segmentSizeInBytes);
 
     if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
-      Preconditions.checkState(isUpsertTable(tableNameWithType),
-          "Upload segment " + segmentName + " for non upsert enabled realtime table " + tableNameWithType
-              + " is not supported");
       // Set fields specific to realtime segments.
       segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.UPLOADED);
     } else {
@@ -1995,23 +1992,23 @@ public class PinotHelixResourceManager {
   public void assignTableSegment(String tableNameWithType, String segmentName) {
     String segmentZKMetadataPath =
         ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
-    InstancePartitionsType instancePartitionsType;
-    if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
-      // In an upsert enabled LLC realtime table, all segments of the same partition are collocated on the same server
-      // -- consuming or completed. So it is fine to use CONSUMING as the InstancePartitionsType.
-      // TODO When upload segments is open to all realtime tables, we should change the type to COMPLETED instead.
-      // In addition, RealtimeSegmentAssignment.assignSegment(..) method should be updated so that the method does not
-      // assign segments to CONSUMING instance partition only.
-      instancePartitionsType = InstancePartitionsType.CONSUMING;
-    } else {
-      instancePartitionsType = InstancePartitionsType.OFFLINE;
-    }
 
     // Assign instances for the segment and add it into IdealState
     try {
       TableConfig tableConfig = getTableConfig(tableNameWithType);
       Preconditions.checkState(tableConfig != null, "Failed to find table config for table: " + tableNameWithType);
-      SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
+      InstancePartitionsType instancePartitionsType;
+      if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
+        if (tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE) {
+          instancePartitionsType = InstancePartitionsType.COMPLETED;
+        } else {
+          instancePartitionsType = InstancePartitionsType.CONSUMING;
+        }
+      } else {
+        instancePartitionsType = InstancePartitionsType.OFFLINE;
+      }
+      SegmentAssignment segmentAssignment =
+          SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = Collections
           .singletonMap(instancePartitionsType, InstancePartitionsUtils
               .fetchOrComputeInstancePartitions(_helixZkManager, tableConfig, instancePartitionsType));

@@ -34,7 +34,6 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,13 +89,6 @@ public class ZKOperator {
       throw new ControllerApplicationException(LOGGER,
           "Segment: " + segmentName + " already exists in table: " + tableNameWithType + ". Refresh not permitted.",
           Response.Status.CONFLICT);
-    }
-
-    // TODO Allow segment refreshing for realtime tables.
-    if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
-      throw new ControllerApplicationException(LOGGER,
-          "Refresh existing segment " + segmentName + " for realtime table " + tableNameWithType
-              + " is not yet supported ", Response.Status.NOT_IMPLEMENTED);
     }
 
     LOGGER.info("Segment {} from table {} already exists, refreshing if necessary", segmentName, tableNameWithType);

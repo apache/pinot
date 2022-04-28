@@ -359,6 +359,16 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
   }
 
+  /*
+   * This method is implemented to allow refreshing the segments in realtime tables.
+   */
+  @Override
+  public void addSegment(File indexDir, IndexLoadingConfig indexLoadingConfig)
+      throws Exception {
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema));
+  }
+
   @Override
   public void addSegment(ImmutableSegment immutableSegment) {
     if (isUpsertEnabled()) {
@@ -369,8 +379,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   private void handleUpsert(ImmutableSegmentImpl immutableSegment) {
     String segmentName = immutableSegment.getSegmentName();
-    int partitionGroupId = SegmentUtils
+    Integer partitionGroupId = SegmentUtils
         .getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, _primaryKeyColumns.get(0));
+    Preconditions.checkNotNull(
+        String.format("PartitionGroupId is not available for segment '%s' (upsert-enabled table)", segmentName));
     PartitionUpsertMetadataManager partitionUpsertMetadataManager =
         _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionGroupId);
     ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
