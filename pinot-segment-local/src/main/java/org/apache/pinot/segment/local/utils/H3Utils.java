@@ -71,18 +71,26 @@ public class H3Utils {
   }
 
   private static Pair<LongSet, LongSet> coverPolygonInH3(Polygon polygon, int resolution) {
-    LongSet potentialH3Cells = coverLineInH3(polygon.getExteriorRing(), resolution);
-
+    List<Long> polyfillCells = H3_CORE.polyfill(Arrays.stream(polygon.getExteriorRing().getCoordinates())
+            .map(coordinate -> new GeoCoord(coordinate.y, coordinate.x)).collect(Collectors.toList()),
+        Collections.emptyList(), resolution);
     // TODO: this can be further optimized to use native H3 implementation. They have plan to support natively.
     // https://github.com/apache/pinot/issues/8547
-    LongSet polyfilledSet = new LongOpenHashSet(H3_CORE.polyfill(
-        Arrays.stream(polygon.getExteriorRing().getCoordinates())
-            .map(coordinate -> new GeoCoord(coordinate.y, coordinate.x)).collect(Collectors.toList()),
-        Collections.emptyList(), resolution));
+    LongSet potentialH3Cells = new LongOpenHashSet();
+    if (polyfillCells.isEmpty()) {
+      // If the polyfill cells are empty, meaning the polygon might be smaller than a single cell in the H3 system.
+      // So just get whatever one. here choose the first one. the follow up kRing(firstCell, 1) will cover the whole
+      // polygon if there is potential not covered by the first point's belonging cell.
+      // ref: https://github.com/uber/h3/issues/456#issuecomment-827760163
+      Coordinate represent = polygon.getCoordinate();
+      potentialH3Cells.add(H3_CORE.geoToH3(represent.getY(), represent.getX(), resolution));
+    } else {
+      potentialH3Cells.addAll(polyfillCells);
+    }
     potentialH3Cells
-        .addAll(polyfilledSet.stream().flatMap(cell -> H3_CORE.kRing(cell, 1).stream()).collect(Collectors.toSet()));
+        .addAll(potentialH3Cells.stream().flatMap(cell -> H3_CORE.kRing(cell, 1).stream()).collect(Collectors.toSet()));
     LongSet fullyContainedCell = new LongOpenHashSet(
-        polyfilledSet.stream().filter(h3Cell -> polygon.contains(createPolygonFromH3Cell(h3Cell)))
+        potentialH3Cells.stream().filter(h3Cell -> polygon.contains(createPolygonFromH3Cell(h3Cell)))
             .collect(Collectors.toSet()));
     return Pair.of(fullyContainedCell, potentialH3Cells);
   }
