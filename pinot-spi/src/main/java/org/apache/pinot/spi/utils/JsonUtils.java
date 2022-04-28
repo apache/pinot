@@ -91,9 +91,8 @@ public class JsonUtils {
   public static <T> Pair<T, Map<String, Object>> inputStreamToObjectAndUnrecognizedProperties(
       InputStream jsonInputStream, Class<T> valueType)
       throws IOException {
-    T instance = DEFAULT_READER.forType(valueType).readValue(jsonInputStream);
-    Map<String, Object> inputJsonMap = flatten(DEFAULT_MAPPER.readValue(jsonInputStream, GENERIC_JSON_TYPE));
-    return compareObjectAndJson(inputJsonMap, instance);
+    String jsonString = StringUtil.inputStreamToString(jsonInputStream);
+    return stringToObjectAndUnrecognizedProperties(jsonString, valueType);
   }
 
   public static <T> Pair<T, Map<String, Object>> stringToObjectAndUnrecognizedProperties(String jsonString,
@@ -101,11 +100,7 @@ public class JsonUtils {
       throws IOException {
     T instance = DEFAULT_READER.forType(valueType).readValue(jsonString);
     Map<String, Object> inputJsonMap = flatten(DEFAULT_MAPPER.readValue(jsonString, GENERIC_JSON_TYPE));
-    return compareObjectAndJson(inputJsonMap, instance);
-  }
 
-  private static <T> Pair<T, Map<String, Object>> compareObjectAndJson(Map<String, Object> inputJsonMap, T instance)
-      throws JsonProcessingException {
     String instanceJson = DEFAULT_MAPPER.writeValueAsString(instance);
     Map<String, Object> instanceJsonMap = flatten(DEFAULT_MAPPER.readValue(instanceJson, GENERIC_JSON_TYPE));
 

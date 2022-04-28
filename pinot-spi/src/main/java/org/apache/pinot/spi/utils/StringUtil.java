@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.spi.utils;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import org.apache.commons.lang.StringUtils;
 
 
@@ -52,5 +56,23 @@ public class StringUtil {
       return value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
     return value.substring(0, Math.min(index, maxLength));
+  }
+
+  /**
+   * InputStream object to String
+   * @param inputStream InputStream to be converted
+   * @return String holding the contents of the inputStream
+   * @throws IOException
+   */
+  public static String inputStreamToString(InputStream inputStream)
+      throws IOException {
+    ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+    int nRead;
+    byte[] data = new byte[1024];
+    while ((nRead = inputStream.read(data, 0, data.length)) != -1) {
+      buffer.write(data, 0, nRead);
+    }
+    buffer.flush();
+    return buffer.toString(StandardCharsets.UTF_8);
   }
 }
