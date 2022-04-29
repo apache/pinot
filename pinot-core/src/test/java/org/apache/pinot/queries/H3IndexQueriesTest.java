@@ -288,7 +288,7 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
           + "             121.9990325 -37.4995294, \n"
           + "             122.0001268 -37.4993506,  \n"
           + "             122.0008564 -37.5004316))')) = 1";
-      AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
+      AggregationOperator aggregationOperator = getOperator(query);
       IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
       // Expect 0 entries scanned in filter
       QueriesTestUtils
@@ -313,7 +313,7 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
         + "             -121.9990325 37.4995294, \n"
         + "             -122.0001268 37.4993506,  \n"
         + "             -122.0008564 37.5004316))'), h3Column_geometry) = 1";
-    AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
+    AggregationOperator aggregationOperator = getOperator(query);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 1, 1, 0, 1);
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
@@ -334,7 +334,7 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
         + "             -121.9990325 37.4995294, \n"
         + "             -122.0001268 37.4993506,  \n"
         + "             -122.0008564 37.5004316))')) = 1";
-    AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
+    AggregationOperator aggregationOperator = getOperator(query);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 1, 1, 0, 1);
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
@@ -355,7 +355,7 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
         + "             -121.9990325 37.4995294, \n"
         + "             -122.0001268 37.4993506,  \n"
         + "             -122.0008564 37.5004316))'), h3Column_geometry) = 1";
-    AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
+    AggregationOperator aggregationOperator = getOperator(query);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 1, 0, 1);
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
@@ -376,7 +376,7 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
         + "             -121.9990325 37.4995294, \n"
         + "             -122.0001268 37.4993506,  \n"
         + "             -122.0008564 37.5004316))')) = 1";
-    AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
+    AggregationOperator aggregationOperator = getOperator(query);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 1, 0, 1);
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
