@@ -568,7 +568,7 @@ public class TableConfigsRestletResourceTest {
   @Test
   public void testUnrecognizedProperties()
       throws IOException {
-    String tableName = "testDelete1";
+    String tableName = "testUnrecognized1";
     TableConfig offlineTableConfig = getOfflineTableConfig(tableName);
     Schema schema = getSchema(tableName);
     TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, null);
@@ -587,14 +587,17 @@ public class TableConfigsRestletResourceTest {
     // Create
     response = ControllerTestUtils.sendPostRequest(_createTableConfigsUrl, tableConfigsJson.toPrettyString());
     Assert.assertEquals(response, "{\"unrecognizedProperties\":{\"/illegalKey1\":1},\"status\":\"TableConfigs "
-        + "testDelete1 successfully added\"}");
+        + "testUnrecognized1 successfully added\"}");
 
     // Update
     response = ControllerTestUtils.sendPutRequest(
-        ControllerTestUtils.getControllerRequestURLBuilder().forTableConfigsUpdate("testDelete1"),
+        ControllerTestUtils.getControllerRequestURLBuilder().forTableConfigsUpdate(tableName),
         tableConfigsJson.toPrettyString());
     Assert.assertEquals(response,
-        "{\"unrecognizedProperties\":{\"/illegalKey1\":1},\"status\":\"TableConfigs updated for testDelete1\"}");
+        "{\"unrecognizedProperties\":{\"/illegalKey1\":1},\"status\":\"TableConfigs updated for testUnrecognized1\"}");
+    // Delete
+    ControllerTestUtils.sendDeleteRequest(
+        ControllerTestUtils.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
   }
 
   @AfterClass

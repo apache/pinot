@@ -150,9 +150,10 @@ public class TableConfigsRestletResource {
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tableConfigs")
-  @ApiOperation(value = "Add the TableConfigs using the tableConfigsStr json", notes = "Add the TableConfigs using "
-      + "the tableConfigsStr json")
-  public ConfigSuccessResponse addConfig(String tableConfigsStr,
+  @ApiOperation(value = "Add the TableConfigs using the tableConfigsStr json",
+      notes = "Add the TableConfigs using the tableConfigsStr json")
+  public ConfigSuccessResponse addConfig(
+      String tableConfigsStr,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
@@ -284,8 +285,8 @@ public class TableConfigsRestletResource {
   @Path("/tableConfigs/{tableName}")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Update the TableConfigs provided by the tableConfigsStr json", notes = "Update the "
-      + "TableConfigs provided by the tableConfigsStr json")
+  @ApiOperation(value = "Update the TableConfigs provided by the tableConfigsStr json",
+      notes = "Update the TableConfigs provided by the tableConfigsStr json")
   public ConfigSuccessResponse updateConfig(
       @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName")
           String tableName,

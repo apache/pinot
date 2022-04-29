@@ -148,9 +148,10 @@ public class PinotSchemaRestletResource {
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update a schema", notes = "Updates a schema")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Successfully updated schema"), @ApiResponse(code = 404, message = "Schema "
-      + "not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500,
-      message = "Internal error")
+      @ApiResponse(code = 200, message = "Successfully updated schema"),
+      @ApiResponse(code = 404, message = "Schema not found"),
+      @ApiResponse(code = 400, message = "Missing or invalid request body"),
+      @ApiResponse(code = 500, message = "Internal error")
   })
   public ConfigSuccessResponse updateSchema(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
@@ -170,9 +171,10 @@ public class PinotSchemaRestletResource {
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update a schema", notes = "Updates a schema")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Successfully updated schema"), @ApiResponse(code = 404, message = "Schema "
-      + "not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500,
-      message = "Internal error")
+      @ApiResponse(code = 200, message = "Successfully updated schema"),
+      @ApiResponse(code = 404, message = "Schema not found"),
+      @ApiResponse(code = 400, message = "Missing or invalid request body"),
+      @ApiResponse(code = 500, message = "Internal error")
   })
   public ConfigSuccessResponse updateSchema(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
@@ -195,9 +197,10 @@ public class PinotSchemaRestletResource {
   @Path("/schemas")
   @ApiOperation(value = "Add a new schema", notes = "Adds a new schema")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Successfully created schema"), @ApiResponse(code = 409, message = "Schema "
-      + "already exists"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code =
-      500, message = "Internal error")
+      @ApiResponse(code = 200, message = "Successfully created schema"),
+      @ApiResponse(code = 409, message = "Schema already exists"),
+      @ApiResponse(code = 400, message = "Missing or invalid request body"),
+      @ApiResponse(code = 500, message = "Internal error")
   })
   public ConfigSuccessResponse addSchema(
       @ApiParam(value = "Whether to override the schema if the schema exists") @DefaultValue("true")
@@ -220,9 +223,10 @@ public class PinotSchemaRestletResource {
   @Path("/schemas")
   @ApiOperation(value = "Add a new schema", notes = "Adds a new schema")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Successfully created schema"), @ApiResponse(code = 409, message = "Schema "
-      + "already exists"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code =
-      500, message = "Internal error")
+      @ApiResponse(code = 200, message = "Successfully created schema"),
+      @ApiResponse(code = 409, message = "Schema already exists"),
+      @ApiResponse(code = 400, message = "Missing or invalid request body"),
+      @ApiResponse(code = 500, message = "Internal error")
   })
   public ConfigSuccessResponse addSchema(
       @ApiParam(value = "Whether to override the schema if the schema exists") @DefaultValue("true")
@@ -276,8 +280,9 @@ public class PinotSchemaRestletResource {
   @ApiOperation(value = "Validate schema", notes = "This API returns the schema that matches the one you get "
       + "from 'GET /schema/{schemaName}'. This allows us to validate schema before apply.")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Successfully validated schema"), @ApiResponse(code = 400, message =
-      "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")
+      @ApiResponse(code = 200, message = "Successfully validated schema"),
+      @ApiResponse(code = 400, message = "Missing or invalid request body"),
+      @ApiResponse(code = 500, message = "Internal error")
   })
   public String validateSchema(String schemaJsonString) {
     Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps = null;
