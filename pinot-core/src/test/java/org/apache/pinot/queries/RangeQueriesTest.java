@@ -180,7 +180,7 @@ public class RangeQueriesTest extends BaseQueriesTest {
 
   @Test(dataProvider = "selectionTestCases")
   public void testSelectionOverRangeFilter(String query, int min, int max) {
-    Operator<?> operator = getOperatorForSqlQuery(query);
+    Operator<?> operator = getOperator(query);
     assertTrue(operator instanceof SelectionOnlyOperator);
     for (Object[] row : Objects.requireNonNull(((SelectionOnlyOperator) operator).nextBlock().getSelectionResult())) {
       int value = (int) row[0];
@@ -191,7 +191,7 @@ public class RangeQueriesTest extends BaseQueriesTest {
 
   @Test(dataProvider = "countTestCases")
   public void testCountOverRangeFilter(String query, int expectedCount) {
-    Operator<?> operator = getOperatorForSqlQuery(query);
+    Operator<?> operator = getOperator(query);
     assertTrue(operator instanceof FastFilteredCountOperator);
     List<Object> aggregationResult = ((FastFilteredCountOperator) operator).nextBlock().getAggregationResult();
     assertNotNull(aggregationResult);

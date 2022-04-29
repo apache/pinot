@@ -146,27 +146,23 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
             + RAW_LZ4_INDEX_COLUMNS.size());
 
     for (String indexColumn : RAW_SNAPPY_INDEX_COLUMNS) {
-      fieldConfigs.add(
-          new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
-              FieldConfig.CompressionCodec.SNAPPY, null));
+      fieldConfigs.add(new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
+          FieldConfig.CompressionCodec.SNAPPY, null));
     }
 
     for (String indexColumn : RAW_ZSTANDARD_INDEX_COLUMNS) {
-      fieldConfigs.add(
-          new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
-              FieldConfig.CompressionCodec.ZSTANDARD, null));
+      fieldConfigs.add(new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
+          FieldConfig.CompressionCodec.ZSTANDARD, null));
     }
 
     for (String indexColumn : RAW_PASS_THROUGH_INDEX_COLUMNS) {
-      fieldConfigs.add(
-          new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
-              FieldConfig.CompressionCodec.PASS_THROUGH, null));
+      fieldConfigs.add(new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
+          FieldConfig.CompressionCodec.PASS_THROUGH, null));
     }
 
     for (String indexColumn : RAW_LZ4_INDEX_COLUMNS) {
-      fieldConfigs.add(
-          new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
-              FieldConfig.CompressionCodec.LZ4, null));
+      fieldConfigs.add(new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
+          FieldConfig.CompressionCodec.LZ4, null));
     }
 
     List<String> noDictionaryColumns = new ArrayList<>();
@@ -202,8 +198,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
     }
   }
 
-  private List<GenericRow> createTestData()
-      throws Exception {
+  private List<GenericRow> createTestData() {
     List<GenericRow> rows = new ArrayList<>();
 
     //Generate random data
@@ -249,13 +244,10 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
    * Tests for basic compression codec queries.
    */
   @Test
-  public void testQueriesWithCompressionCodec()
-      throws Exception {
-
-    String query =
-        "SELECT SNAPPY_STRING, ZSTANDARD_STRING, PASS_THROUGH_STRING, LZ4_STRING, SNAPPY_INTEGER, ZSTANDARD_INTEGER, "
-            + "PASS_THROUGH_INTEGER, LZ4_INTEGER, "
-            + "SNAPPY_LONG, ZSTANDARD_LONG, PASS_THROUGH_LONG, LZ4_LONG FROM MyTable LIMIT 1000";
+  public void testQueriesWithCompressionCodec() {
+    String query = "SELECT SNAPPY_STRING, ZSTANDARD_STRING, PASS_THROUGH_STRING, LZ4_STRING, "
+        + "SNAPPY_INTEGER, ZSTANDARD_INTEGER, PASS_THROUGH_INTEGER, LZ4_INTEGER, "
+        + "SNAPPY_LONG, ZSTANDARD_LONG, PASS_THROUGH_LONG, LZ4_LONG FROM MyTable LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
     for (GenericRow row : _rows) {
@@ -275,10 +267,8 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
    * Tests for filter over integer values compression codec queries.
    */
   @Test
-  public void testZstandardIntegerFilterQueriesWithCompressionCodec()
-      throws Exception {
-
-    String query = "SELECT ZSTANDARD_INTEGER FROM MyTable " + "WHERE ZSTANDARD_INTEGER > 1000 LIMIT 1000";
+  public void testZstandardIntegerFilterQueriesWithCompressionCodec() {
+    String query = "SELECT ZSTANDARD_INTEGER FROM MyTable WHERE ZSTANDARD_INTEGER > 1000 LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
     for (GenericRow row : _rows) {
@@ -294,10 +284,8 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
    * Tests for filter over integer values LZ4 compression codec queries.
    */
   @Test
-  public void testLZ4IntegerFilterQueriesWithCompressionCodec()
-      throws Exception {
-
-    String query = "SELECT LZ4_INTEGER FROM MyTable " + "WHERE LZ4_INTEGER > 1000 LIMIT 1000";
+  public void testLZ4IntegerFilterQueriesWithCompressionCodec() {
+    String query = "SELECT LZ4_INTEGER FROM MyTable WHERE LZ4_INTEGER > 1000 LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
     for (GenericRow row : _rows) {
@@ -313,10 +301,8 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
    * Tests for filter over integer values compression codec queries.
    */
   @Test
-  public void testSnappyIntegerFilterQueriesWithCompressionCodec()
-      throws Exception {
-
-    String query = "SELECT SNAPPY_INTEGER FROM MyTable " + "WHERE SNAPPY_INTEGER > 100 LIMIT 1000";
+  public void testSnappyIntegerFilterQueriesWithCompressionCodec() {
+    String query = "SELECT SNAPPY_INTEGER FROM MyTable WHERE SNAPPY_INTEGER > 100 LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
     for (GenericRow row : _rows) {
@@ -332,10 +318,8 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
    * Tests for filter over integer values compression codec queries.
    */
   @Test
-  public void testPassThroughIntegerFilterQueriesWithCompressionCodec()
-      throws Exception {
-
-    String query = "SELECT PASS_THROUGH_INTEGER FROM MyTable " + "WHERE PASS_THROUGH_INTEGER > 100 LIMIT 1000";
+  public void testPassThroughIntegerFilterQueriesWithCompressionCodec() {
+    String query = "SELECT PASS_THROUGH_INTEGER FROM MyTable WHERE PASS_THROUGH_INTEGER > 100 LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
     for (GenericRow row : _rows) {
@@ -351,8 +335,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
    * Tests for filter over string values zstandard compression codec queries.
    */
   @Test
-  public void testZstandardStringFilterQueriesWithCompressionCodec()
-      throws Exception {
+  public void testZstandardStringFilterQueriesWithCompressionCodec() {
     String query = "SELECT ZSTANDARD_STRING FROM MyTable WHERE ZSTANDARD_STRING = 'hello_world_123' LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
@@ -369,8 +352,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
    * Tests for filter over string values LZ4 compression codec queries.
    */
   @Test
-  public void testLZ4StringFilterQueriesWithCompressionCodec()
-      throws Exception {
+  public void testLZ4StringFilterQueriesWithCompressionCodec() {
     String query = "SELECT LZ4_STRING FROM MyTable WHERE LZ4_STRING = 'hello_world_123' LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
@@ -387,8 +369,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
    * Tests for filter over string values snappy compression codec queries.
    */
   @Test
-  public void testSnappyStringFilterQueriesWithCompressionCodec()
-      throws Exception {
+  public void testSnappyStringFilterQueriesWithCompressionCodec() {
     String query = "SELECT SNAPPY_STRING FROM MyTable WHERE SNAPPY_STRING = 'hello_world_123' LIMIT 1000";
     ArrayList<Serializable[]> expected = new ArrayList<>();
 
@@ -404,9 +385,8 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
   /*
    * Helper methods for tests
    */
-  private void testSelectQueryHelper(String query, int expectedResultSize, List<Serializable[]> expectedResults)
-      throws Exception {
-    SelectionOnlyOperator operator = getOperatorForSqlQuery(query);
+  private void testSelectQueryHelper(String query, int expectedResultSize, List<Serializable[]> expectedResults) {
+    SelectionOnlyOperator operator = getOperator(query);
     IntermediateResultsBlock operatorResult = operator.nextBlock();
     List<Object[]> resultset = (List<Object[]>) operatorResult.getSelectionResult();
     Assert.assertNotNull(resultset);

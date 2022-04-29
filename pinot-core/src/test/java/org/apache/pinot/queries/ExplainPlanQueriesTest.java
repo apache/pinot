@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -43,7 +42,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -182,39 +180,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
 
   /** Checks the correctness of EXPLAIN PLAN output. */
   private void check(String query, ResultTable expected) {
-    BrokerResponseNative response = getBrokerResponseForSqlQuery(query);
-    ResultTable actual = response.getResultTable();
-
-    System.out.println(resultTableToString("Expected", expected));
-    System.out.println(resultTableToString("Actual", actual));
-
-    Assert.assertEquals(actual.getDataSchema(), expected.getDataSchema());
-    Assert.assertEquals(actual.getRows().size(), expected.getRows().size());
-
-    List<Object[]> expectedRows = expected.getRows();
-    List<Object[]> actualRows = actual.getRows();
-    for (int i = 0; i < expectedRows.size(); i++) {
-      Object[] expectedRow = expectedRows.get(i);
-      Object[] actualRow = actualRows.get(i);
-      Assert.assertEquals(actualRow.length, expectedRow.length);
-
-      for (int j = 0; j < actualRow.length; j++) {
-        Assert.assertEquals(actualRow[j], expectedRow[j]);
-      }
-    }
-  }
-
-  /** This function is used to generated expected results while creating test cases; otherwise, not used. */
-  private static String resultTableToString(String tag, ResultTable table) {
-    System.out.println("\n" + tag + ":");
-    List<Object[]> rows = table.getRows();
-
-    StringBuffer buffer = new StringBuffer();
-    for (Object[] row : rows) {
-      buffer.append("result.add(new Object[]{\"" + row[0] + "\", " + row[1] + ", " + row[2] + "});\n");
-    }
-
-    return buffer.toString();
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query), expected);
   }
 
   @Test

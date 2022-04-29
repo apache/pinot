@@ -37,11 +37,12 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeTest;
+
+import static org.testng.Assert.assertNotNull;
 
 
 /**
@@ -69,9 +70,11 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "SingleValueQueriesTest");
 
   // Hard-coded query filter.
-  private static final String QUERY_FILTER =
-      " WHERE column1 > 100000000" + " AND column3 BETWEEN 20000000 AND 1000000000" + " AND column5 = 'gFuH'"
-          + " AND (column6 < 500000000 OR column11 NOT IN ('t', 'P'))" + " AND daysSinceEpoch = 126164076";
+  protected static final String FILTER = " WHERE column1 > 100000000"
+      + " AND column3 BETWEEN 20000000 AND 1000000000"
+      + " AND column5 = 'gFuH'"
+      + " AND (column6 < 500000000 OR column11 NOT IN ('t', 'P'))"
+      + " AND daysSinceEpoch = 126164076";
 
   private IndexSegment _indexSegment;
   // Contains 2 identical index segments.
@@ -84,7 +87,7 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
 
     // Get resource file path.
     URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
-    Assert.assertNotNull(resource);
+    assertNotNull(resource);
     String filePath = resource.getFile();
 
     // Build the segment schema.
@@ -111,8 +114,8 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
     // to have the time column values in allowed range. Until then, the check
     // is explicitly disabled
     segmentGeneratorConfig.setSkipTimeValueCheck(true);
-    segmentGeneratorConfig
-        .setInvertedIndexCreationColumns(Arrays.asList("column6", "column7", "column11", "column17", "column18"));
+    segmentGeneratorConfig.setInvertedIndexCreationColumns(
+        Arrays.asList("column6", "column7", "column11", "column17", "column18"));
 
     // Build the index segment.
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
@@ -140,7 +143,7 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
 
   @Override
   protected String getFilter() {
-    return QUERY_FILTER;
+    return FILTER;
   }
 
   @Override

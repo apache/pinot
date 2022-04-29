@@ -29,12 +29,10 @@ import org.apache.commons.io.FileUtils;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.theta.UpdateSketch;
 import org.apache.datasketches.theta.UpdateSketchBuilder;
-import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
+import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
@@ -165,7 +163,7 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
         + "DISTINCT_COUNT_THETA_SKETCH(bytesColumn) FROM testTable";
 
     // Inner segment
-    AggregationOperator aggregationOperator = getOperatorForPqlQuery(query);
+    AggregationOperator aggregationOperator = getOperator(query);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         11 * NUM_RECORDS, NUM_RECORDS);
@@ -184,18 +182,17 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
     }
 
     // Inter segments
-    String[] expectedResults = new String[11];
+    Object[] expectedResults = new Object[11];
     for (int i = 0; i < 11; i++) {
       if (i < 5) {
-        expectedResults[i] = Integer.toString(NUM_RECORDS);
+        expectedResults[i] = (long) NUM_RECORDS;
       } else {
-        expectedResults[i] = Integer.toString(3 * NUM_RECORDS);
+        expectedResults[i] = (long) (3 * NUM_RECORDS);
       }
     }
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 4 * 11 * NUM_RECORDS, 4 * NUM_RECORDS,
-            expectedResults);
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 4 * NUM_RECORDS, 0, 4 * 11 * NUM_RECORDS, 4 * NUM_RECORDS,
+        expectedResults);
   }
 
   @Test
@@ -210,11 +207,10 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
       String query = baseQuery + (groupBySV ? "intSVColumn" : "intMVColumn");
 
       // Inner segment
-      AggregationGroupByOperator aggregationGroupByOperator = getOperatorForPqlQuery(query);
-      IntermediateResultsBlock resultsBlock = aggregationGroupByOperator.nextBlock();
-      QueriesTestUtils
-          .testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
-              11 * NUM_RECORDS, NUM_RECORDS);
+      AggregationGroupByOrderByOperator groupByOperator = getOperator(query);
+      IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
+      QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
+          11 * NUM_RECORDS, NUM_RECORDS);
       AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
       assertNotNull(aggregationGroupByResult);
       int numGroups = 0;
@@ -240,24 +236,20 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
       }
 
       // Inter segments
-      BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
       assertEquals(brokerResponse.getNumDocsScanned(), 4 * NUM_RECORDS);
       assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
       assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 4 * 11 * NUM_RECORDS);
       assertEquals(brokerResponse.getTotalDocs(), 4 * NUM_RECORDS);
-      List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
-      assertEquals(aggregationResults.size(), 11);
-      for (int i = 0; i < 11; i++) {
-        AggregationResult aggregationResult = aggregationResults.get(i);
-        List<GroupByResult> groupByResults = aggregationResult.getGroupByResult();
-        assertNotNull(groupByResults);
-        for (GroupByResult groupByResult : groupByResults) {
-          List<String> group = groupByResult.getGroup();
-          assertEquals(group.size(), 1);
+      List<Object[]> rows = brokerResponse.getResultTable().getRows();
+      assertEquals(rows.size(), 10);
+      for (Object[] row : rows) {
+        assertEquals(row.length, 11);
+        for (int i = 0; i < 11; i++) {
           if (i < 5) {
-            assertEquals(groupByResult.getValue(), Integer.toString(1));
+            assertEquals(row[i], 1L);
           } else {
-            assertEquals(groupByResult.getValue(), Integer.toString(3));
+            assertEquals(row[i], 3L);
           }
         }
       }
@@ -279,7 +271,7 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
         + "'SET_UNION($4,SET_DIFF(SET_INTERSECT($1,$2),$3))') FROM testTable";
 
     // Inner segment
-    AggregationOperator aggregationOperator = getOperatorForPqlQuery(query);
+    AggregationOperator aggregationOperator = getOperator(query);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         8 * NUM_RECORDS, NUM_RECORDS);
@@ -295,18 +287,17 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
     assertEquals(Math.round(sketches.get(4).getEstimate()), 100);
 
     // Inter segments
-    String[] expectedResults = new String[]{Integer.toString(225)};
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 4 * 8 * NUM_RECORDS, 4 * NUM_RECORDS,
-            expectedResults);
+    Object[] expectedResults = new Object[]{225L};
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 4 * NUM_RECORDS, 0, 4 * 8 * NUM_RECORDS, 4 * NUM_RECORDS,
+        expectedResults);
   }
 
   @Test
   public void testDistinctCountRawThetaSketch() {
     String query = "SELECT DISTINCT_COUNT_RAW_THETA_SKETCH(intSVColumn) FROM testTable";
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    String serializedSketch = (String) brokerResponse.getAggregationResults().get(0).getValue();
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    String serializedSketch = (String) brokerResponse.getResultTable().getRows().get(0)[0];
     Sketch sketch = ObjectSerDeUtils.DATA_SKETCH_SER_DE.deserialize(Base64.getDecoder().decode(serializedSketch));
     assertEquals(Math.round(sketch.getEstimate()), NUM_RECORDS);
   }
@@ -329,7 +320,7 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
 
   private void testInvalidQuery(String query) {
     try {
-      getBrokerResponseForSqlQuery(query);
+      getBrokerResponse(query);
       fail();
     } catch (BadQueryRequestException e) {
       // Expected

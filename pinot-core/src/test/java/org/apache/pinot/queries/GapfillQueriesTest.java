@@ -51,7 +51,6 @@ import org.testng.annotations.Test;
  * Queries test for Gapfill queries.
  */
 // TODO: Item 1. table alias for subquery in next PR
-@SuppressWarnings("rawtypes")
 public class GapfillQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "PostAggregationGapfillQueriesTest");
   private static final String RAW_TABLE_NAME = "parkingData";
@@ -161,7 +160,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + "WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     int[][] expectedOccupiedSlotsCounts1 =
         new int[][]{{6, 6}, {8, 4}, {10, 2}, {12, 0}, {6, 4}, {4, 6}, {2, 10}, {0, 10}};
@@ -206,7 +205,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " WHERE isOccupied = 1 "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{6, 8, 10, 12, 6, 4, 2, 0};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -249,7 +248,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + ") "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     int[][] expectedOccupiedSlotsCounts1 = new int[][]{{2, 6}, {4, 4}, {6, 2}, {8, 0}, {6, 2}, {4, 4}, {2, 6}, {0, 8}};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -294,7 +293,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " WHERE occupied = 1 "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{2, 4, 6, 8, 6, 4, 2};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -331,7 +330,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + "ORDER BY 1 "
         + "LIMIT 200";
 
-    BrokerResponseNative dateTimeConvertBrokerResponse = getBrokerResponseForSqlQuery(dataTimeConvertQuery);
+    BrokerResponseNative dateTimeConvertBrokerResponse = getBrokerResponse(dataTimeConvertQuery);
 
     ResultTable dateTimeConvertResultTable = dateTimeConvertBrokerResponse.getResultTable();
     Assert.assertEquals(dateTimeConvertResultTable.getRows().size(), 8);
@@ -352,7 +351,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{6, 8, 10, 12, 6, 4, 2, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -384,7 +383,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{6, 8, 10, 12, 6, 4, 2};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -423,7 +422,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col, levelId "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCountsForLevel11 = new double[]{4, 5, 6, 5, 3, 2, 1, 0};
     double[] expectedOccupiedSlotsCountsForLevel21 = new double[]{2, 3, 4, 7, 3, 2, 1, 0};
@@ -470,7 +469,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col, levelId "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCountsForLevel12 = new double[]{4, 5, 6, 5, 3, 2, 1};
     double[] expectedOccupiedSlotsCountsForLevel22 = new double[]{2, 3, 4, 7, 3, 2, 1};
@@ -525,7 +524,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " HAVING occupied_slots_count > 0"
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCountsForLevel11 = new double[]{4, 5, 6, 5, 3, 2, 1};
     double[] expectedOccupiedSlotsCountsForLevel21 = new double[]{2, 3, 4, 7, 3, 2, 1};
@@ -585,7 +584,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{2, 4, 6, 8, 6, 4, 2, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -623,7 +622,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{2, 4, 6, 8, 6, 4, 2};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -668,7 +667,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col, levelId "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{1, 2, 3, 4, 3, 2, 1, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -710,7 +709,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col, levelId "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{1, 2, 3, 4, 3, 2, 1};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -755,7 +754,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " HAVING occupied_slots_count > 0"
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{1, 2, 3, 4, 3, 2, 1};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -794,7 +793,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + "WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     int[][] expectedOccupiedSlotsCounts1 =
         new int[][]{{6, 6}, {8, 4}, {10, 2}, {12, 0}, {6, 4}, {4, 6}, {2, 10}, {0, 10}};
@@ -837,7 +836,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " WHERE isOccupied = 1 "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{6, 8, 10, 12, 6, 4, 2, 0};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -878,7 +877,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + ") "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     int[][] expectedOccupiedSlotsCounts1 = new int[][]{{2, 6}, {4, 4}, {6, 2}, {8, 0}, {6, 2}, {4, 4}, {2, 6}, {0, 8}};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -922,7 +921,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " WHERE occupied = 1 "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{2, 4, 6, 8, 6, 4, 2};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -962,7 +961,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{6, 8, 10, 12, 6, 4, 2, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -992,7 +991,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{6, 8, 10, 12, 6, 4, 2};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -1028,7 +1027,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col, levelId "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCountsForLevel11 = new double[]{4, 5, 6, 5, 3, 2, 1, 0};
     double[] expectedOccupiedSlotsCountsForLevel21 = new double[]{2, 3, 4, 7, 3, 2, 1, 0};
@@ -1073,7 +1072,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col, levelId "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCountsForLevel12 = new double[]{4, 5, 6, 5, 3, 2, 1};
     double[] expectedOccupiedSlotsCountsForLevel22 = new double[]{2, 3, 4, 7, 3, 2, 1};
@@ -1125,7 +1124,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " HAVING occupied_slots_count > 0"
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCountsForLevel11 = new double[]{4, 5, 6, 5, 3, 2, 1};
     double[] expectedOccupiedSlotsCountsForLevel21 = new double[]{2, 3, 4, 7, 3, 2, 1};
@@ -1182,7 +1181,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{2, 4, 6, 8, 6, 4, 2, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -1218,7 +1217,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{2, 4, 6, 8, 6, 4, 2};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -1260,7 +1259,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col, levelId "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{1, 2, 3, 4, 3, 2, 1, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -1300,7 +1299,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col, levelId "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{1, 2, 3, 4, 3, 2, 1};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -1343,7 +1342,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " HAVING occupied_slots_count > 0"
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{1, 2, 3, 4, 3, 2, 1};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -1380,7 +1379,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     int[][] expectedOccupiedSlotsCounts1 =
         new int[][]{{6, 6}, {8, 4}, {10, 2}, {12, 0}, {6, 4}, {4, 6}, {2, 10}, {0, 10}};
@@ -1423,7 +1422,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " WHERE isOccupied = 1 "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{6, 8, 10, 12, 6, 4, 2, 0};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -1463,7 +1462,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + ") "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     int[][] expectedOccupiedSlotsCounts1 = new int[][]{{2, 6}, {4, 4}, {6, 2}, {8, 0}, {6, 2}, {4, 4}, {2, 6}, {0, 8}};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -1506,7 +1505,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " WHERE occupied = 1 "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{2, 4, 6, 8, 6, 4, 2};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -1546,7 +1545,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{6, 8, 10, 12, 6, 4, 2, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -1576,7 +1575,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{6, 8, 10, 12, 6, 4, 2};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -1612,7 +1611,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col, levelId "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCountsForLevel11 = new double[]{4, 5, 6, 5, 3, 2, 1, 0};
     double[] expectedOccupiedSlotsCountsForLevel21 = new double[]{2, 3, 4, 7, 3, 2, 1, 0};
@@ -1657,7 +1656,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col, levelId "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCountsForLevel12 = new double[]{4, 5, 6, 5, 3, 2, 1};
     double[] expectedOccupiedSlotsCountsForLevel22 = new double[]{2, 3, 4, 7, 3, 2, 1};
@@ -1709,7 +1708,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " HAVING occupied_slots_count > 0"
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCountsForLevel11 = new double[]{4, 5, 6, 5, 3, 2, 1};
     double[] expectedOccupiedSlotsCountsForLevel21 = new double[]{2, 3, 4, 7, 3, 2, 1};
@@ -1766,7 +1765,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{2, 4, 6, 8, 6, 4, 2, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -1802,7 +1801,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{2, 4, 6, 8, 6, 4, 2};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -1844,7 +1843,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col, levelId "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{1, 2, 3, 4, 3, 2, 1, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -1884,7 +1883,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col, levelId "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{1, 2, 3, 4, 3, 2, 1};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -1927,7 +1926,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " HAVING occupied_slots_count > 0"
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{1, 2, 3, 4, 3, 2, 1};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -1965,7 +1964,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     int[][] expectedOccupiedSlotsCounts1 =
         new int[][]{{6, 6}, {8, 4}, {10, 2}, {12, 0}, {6, 4}, {4, 6}, {2, 10}, {0, 10}};
@@ -2008,7 +2007,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " WHERE isOccupied = 1 "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{6, 8, 10, 12, 6, 4, 2, 0};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -2049,7 +2048,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + ") "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     int[][] expectedOccupiedSlotsCounts1 = new int[][]{{2, 6}, {4, 4}, {6, 2}, {8, 0}, {6, 2}, {4, 4}, {2, 6}, {0, 8}};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -2093,7 +2092,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " WHERE occupied = 1 "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{2, 4, 6, 8, 6, 4, 2};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -2133,7 +2132,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{6, 8, 10, 12, 6, 4, 2, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -2163,7 +2162,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{6, 8, 10, 12, 6, 4, 2};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -2199,7 +2198,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col, levelId "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCountsForLevel11 = new double[]{4, 5, 6, 5, 3, 2, 1, 0};
     double[] expectedOccupiedSlotsCountsForLevel21 = new double[]{2, 3, 4, 7, 3, 2, 1, 0};
@@ -2244,7 +2243,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col, levelId "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCountsForLevel12 = new double[]{4, 5, 6, 5, 3, 2, 1};
     double[] expectedOccupiedSlotsCountsForLevel22 = new double[]{2, 3, 4, 7, 3, 2, 1};
@@ -2296,7 +2295,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " HAVING occupied_slots_count > 0"
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCountsForLevel11 = new double[]{4, 5, 6, 5, 3, 2, 1};
     double[] expectedOccupiedSlotsCountsForLevel21 = new double[]{2, 3, 4, 7, 3, 2, 1};
@@ -2353,7 +2352,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{2, 4, 6, 8, 6, 4, 2, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -2389,7 +2388,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{2, 4, 6, 8, 6, 4, 2};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -2431,7 +2430,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col, levelId "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{1, 2, 3, 4, 3, 2, 1, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -2471,7 +2470,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col, levelId "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{1, 2, 3, 4, 3, 2, 1};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -2514,7 +2513,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " HAVING occupied_slots_count > 0"
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{1, 2, 3, 4, 3, 2, 1};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -2552,7 +2551,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "  LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     int[][] expectedOccupiedSlotsCounts1 =
         new int[][]{{6, 6}, {8, 4}, {10, 2}, {12, 0}, {6, 4}, {4, 6}, {2, 10}, {0, 10}};
@@ -2595,7 +2594,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " WHERE isOccupied = 1 "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{6, 8, 10, 12, 6, 4, 2, 0};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -2636,7 +2635,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + ") "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     int[][] expectedOccupiedSlotsCounts1 = new int[][]{{2, 6}, {4, 4}, {6, 2}, {8, 0}, {6, 2}, {4, 4}, {2, 6}, {0, 8}};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -2680,7 +2679,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " WHERE occupied = 1 "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{2, 4, 6, 8, 6, 4, 2};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -2720,7 +2719,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{6, 8, 10, 12, 6, 4, 2, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -2750,7 +2749,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{6, 8, 10, 12, 6, 4, 2};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -2786,7 +2785,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col, levelId "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCountsForLevel11 = new double[]{4, 5, 6, 5, 3, 2, 1, 0};
     double[] expectedOccupiedSlotsCountsForLevel21 = new double[]{2, 3, 4, 7, 3, 2, 1, 0};
@@ -2831,7 +2830,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col, levelId "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCountsForLevel12 = new double[]{4, 5, 6, 5, 3, 2, 1};
     double[] expectedOccupiedSlotsCountsForLevel22 = new double[]{2, 3, 4, 7, 3, 2, 1};
@@ -2882,7 +2881,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " HAVING occupied_slots_count > 0"
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCountsForLevel11 = new double[]{4, 5, 6, 5, 3, 2, 1};
     double[] expectedOccupiedSlotsCountsForLevel21 = new double[]{2, 3, 4, 7, 3, 2, 1};
@@ -2939,7 +2938,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{2, 4, 6, 8, 6, 4, 2, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -2975,7 +2974,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{2, 4, 6, 8, 6, 4, 2};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -3017,7 +3016,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col, levelId "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{1, 2, 3, 4, 3, 2, 1, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -3057,7 +3056,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col, levelId "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{1, 2, 3, 4, 3, 2, 1};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -3100,7 +3099,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " HAVING occupied_slots_count > 0"
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{1, 2, 3, 4, 3, 2, 1};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -3141,7 +3140,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " LIMIT 200 ";
 
     try {
-      getBrokerResponseForSqlQuery(gapfillQuery);
+      getBrokerResponse(gapfillQuery);
       Assert.fail();
     } catch (Exception ex) {
       Assert.assertTrue(ex.getClass().getSimpleName().equals("IllegalArgumentException"));
@@ -3167,7 +3166,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " LIMIT 200 ";
 
     try {
-      getBrokerResponseForSqlQuery(gapfillQuery);
+      getBrokerResponse(gapfillQuery);
       Assert.fail();
     } catch (Exception ex) {
       Assert.assertTrue(ex.getClass().getSimpleName().equals("IllegalArgumentException"));
@@ -3203,7 +3202,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 40 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{2, 4, 6, 8, 6};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -3240,7 +3239,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 6 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{2, 4, 6, 8, 6, 4};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -3275,7 +3274,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + "ORDER BY time_col, levelId "
         + "LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     int[][] expectedOccupiedSlotsCounts1 =
         new int[][]{{6, 6}, {8, 4}, {10, 2}, {12, 0}, {6, 4}, {4, 6}, {2, 10}, {0, 10}};
@@ -3321,7 +3320,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " WHERE isOccupied = 1 "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{6, 8, 10, 12, 6, 4, 2, 0};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -3365,7 +3364,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + ") "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     int[][] expectedOccupiedSlotsCounts1 = new int[][]{{2, 6}, {4, 4}, {6, 2}, {8, 0}, {6, 2}, {4, 4}, {2, 6}, {0, 8}};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -3412,7 +3411,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
             + " WHERE occupied = 1 "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{2, 4, 6, 8, 6, 4, 2};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -3449,7 +3448,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + "ORDER BY 1 "
         + "LIMIT 200";
 
-    BrokerResponseNative dateTimeConvertBrokerResponse = getBrokerResponseForSqlQuery(dataTimeConvertQuery);
+    BrokerResponseNative dateTimeConvertBrokerResponse = getBrokerResponse(dataTimeConvertQuery);
 
     ResultTable dateTimeConvertResultTable = dateTimeConvertBrokerResponse.getResultTable();
     Assert.assertEquals(dateTimeConvertResultTable.getRows().size(), 8);
@@ -3471,7 +3470,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{6, 8, 10, 12, 6, 4, 2, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -3504,7 +3503,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{6, 8, 10, 12, 6, 4, 2};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -3550,7 +3549,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{2, 4, 6, 8, 6, 4, 2, 0};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -3589,7 +3588,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{2, 4, 6, 8, 6, 4, 2};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -3635,7 +3634,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 2000 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     long [] expectedOccupiedSlotsCounts1 = new long[]{16, 36, 60, 79, 88, 60, 33, 21};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -3673,7 +3672,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 2000 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{16, 36, 60, 79, 88, 60, 33, 21};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -3706,7 +3705,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + "WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     int[][] expectedOccupiedSlotsCounts1 =
         new int[][]{{6, 4}, {4, 6}};
@@ -3751,7 +3750,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " WHERE isOccupied = 1 "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{6, 4};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -3794,7 +3793,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + ") "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     int[][] expectedOccupiedSlotsCounts1 = new int[][]{{6, 2}, {4, 4}};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -3839,7 +3838,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " WHERE occupied = 1 "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{6, 4};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -3876,7 +3875,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + "ORDER BY 1 "
         + "LIMIT 200";
 
-    BrokerResponseNative dateTimeConvertBrokerResponse = getBrokerResponseForSqlQuery(dataTimeConvertQuery);
+    BrokerResponseNative dateTimeConvertBrokerResponse = getBrokerResponse(dataTimeConvertQuery);
 
     ResultTable dateTimeConvertResultTable = dateTimeConvertBrokerResponse.getResultTable();
     Assert.assertEquals(dateTimeConvertResultTable.getRows().size(), 8);
@@ -3897,7 +3896,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{6, 4};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -3929,7 +3928,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{6, 4};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
@@ -3974,7 +3973,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponseForSqlQuery(gapfillQuery1);
+    BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{6, 4};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
@@ -4012,7 +4011,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + " GROUP BY time_col "
         + " LIMIT 200 ";
 
-    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponseForSqlQuery(gapfillQuery2);
+    BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{6, 4};
     ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
