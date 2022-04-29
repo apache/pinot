@@ -264,7 +264,7 @@ public class BenchmarkQueries extends BaseQueriesTest {
 
   @Benchmark
   public BrokerResponseNative query() {
-    return getBrokerResponseForSqlQuery(_query);
+    return getBrokerResponse(_query);
   }
 
   @Override

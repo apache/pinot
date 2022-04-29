@@ -25,8 +25,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
+import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
@@ -49,7 +48,6 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
 
 
 public class CastQueriesTest extends BaseQueriesTest {
@@ -124,9 +122,8 @@ public class CastQueriesTest extends BaseQueriesTest {
     String query = "select cast(sum(" + X_COL + ") as int), "
         + "cast(sum(" + Y_COL + ") as int) "
         + "from " + RAW_TABLE_NAME;
-    Operator<?> operator = getOperatorForSqlQuery(query);
-    assertTrue(operator instanceof AggregationOperator);
-    List<Object> aggregationResult = ((AggregationOperator) operator).nextBlock().getAggregationResult();
+    AggregationOperator aggregationOperator = getOperator(query);
+    List<Object> aggregationResult = aggregationOperator.nextBlock().getAggregationResult();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 2);
     assertEquals(((Number) aggregationResult.get(0)).intValue(), NUM_RECORDS / 2);
@@ -139,9 +136,8 @@ public class CastQueriesTest extends BaseQueriesTest {
         + "cast(sum(" + Y_COL + ") as int) "
         + "from " + RAW_TABLE_NAME + " "
         + "group by " + CLASSIFICATION_COLUMN;
-    Operator<?> operator = getOperatorForSqlQuery(query);
-    assertTrue(operator instanceof AggregationGroupByOperator);
-    AggregationGroupByResult result = ((AggregationGroupByOperator) operator).nextBlock().getAggregationGroupByResult();
+    AggregationGroupByOrderByOperator groupByOperator = getOperator(query);
+    AggregationGroupByResult result = groupByOperator.nextBlock().getAggregationGroupByResult();
     assertNotNull(result);
     Iterator<GroupKeyGenerator.GroupKey> it = result.getGroupKeyIterator();
     while (it.hasNext()) {
@@ -158,9 +154,8 @@ public class CastQueriesTest extends BaseQueriesTest {
     String query = "select cast(" + CLASSIFICATION_COLUMN + " as int)"
         + " from " + RAW_TABLE_NAME
         + " where " + CLASSIFICATION_COLUMN + " = cast(0 as string) limit " + NUM_RECORDS;
-    Operator<?> operator = getOperatorForSqlQuery(query);
-    assertTrue(operator instanceof SelectionOnlyOperator);
-    Collection<Object[]> result = ((SelectionOnlyOperator) operator).nextBlock().getSelectionResult();
+    SelectionOnlyOperator selectionOperator = getOperator(query);
+    Collection<Object[]> result = selectionOperator.nextBlock().getSelectionResult();
     assertNotNull(result);
     assertEquals(result.size(), NUM_RECORDS / BUCKET_SIZE);
     for (Object[] row : result) {

@@ -140,8 +140,8 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
   }
 
   private void testQuery(String filterQuery, String nonFilterQuery) {
-    ResultTable filterQueryResultTable = getBrokerResponseForSqlQuery(filterQuery).getResultTable();
-    ResultTable nonFilterQueryResultTable = getBrokerResponseForSqlQuery(nonFilterQuery).getResultTable();
+    ResultTable filterQueryResultTable = getBrokerResponse(filterQuery).getResultTable();
+    ResultTable nonFilterQueryResultTable = getBrokerResponse(nonFilterQuery).getResultTable();
     assertEquals(filterQueryResultTable.getDataSchema(), nonFilterQueryResultTable.getDataSchema());
     List<Object[]> filterQueryRows = filterQueryResultTable.getRows();
     List<Object[]> nonFilterQueryRows = nonFilterQueryResultTable.getRows();
@@ -317,6 +317,6 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
   public void testGroupBySupport() {
     String filterQuery = "SELECT MIN(INT_COL) FILTER(WHERE NO_INDEX_COL > 2), MAX(INT_COL) FILTER(WHERE INT_COL > 2) "
         + "FROM MyTable WHERE INT_COL < 1000 GROUP BY INT_COL";
-    getBrokerResponseForSqlQuery(filterQuery);
+    getBrokerResponse(filterQuery);
   }
 }

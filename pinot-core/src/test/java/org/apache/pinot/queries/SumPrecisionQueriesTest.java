@@ -155,7 +155,7 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
         + "SUM_PRECISION(doubleColumn), SUM_PRECISION(stringColumn), SUM_PRECISION(bytesColumn) FROM testTable";
 
     // Inner segment
-    Operator operator = getOperatorForSqlQuery(query);
+    Operator operator = getOperator(query);
     assertTrue(operator instanceof AggregationOperator);
     List<Object> aggregationResult = ((AggregationOperator) operator).nextBlock().getAggregationResult();
     assertNotNull(aggregationResult);
@@ -168,7 +168,7 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
     assertEquals(aggregationResult.get(5), _doubleSum);
 
     // Inter segment
-    BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
     ResultTable resultTable = brokerResponse.getResultTable();
     DataSchema expectedDataSchema = new DataSchema(new String[]{
         "sumprecision(intColumn)", "sumprecision(longColumn)", "sumprecision(floatColumn)",
@@ -194,7 +194,7 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
         + "FROM testTable";
 
     // Inner segment
-    Operator operator = getOperatorForSqlQuery(query);
+    Operator operator = getOperator(query);
     assertTrue(operator instanceof AggregationOperator);
     List<Object> aggregationResult = ((AggregationOperator) operator).nextBlock().getAggregationResult();
     assertNotNull(aggregationResult);
@@ -207,7 +207,7 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
     assertEquals(aggregationResult.get(5), _doubleSum);
 
     // Inter segment
-    BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
     ResultTable resultTable = brokerResponse.getResultTable();
     DataSchema expectedDataSchema = new DataSchema(new String[]{
         "sumprecision(intColumn)", "sumprecision(longColumn)", "sumprecision(floatColumn)",
@@ -234,7 +234,7 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
         + "SUM_PRECISION(bytesColumn, 10, 3) FROM testTable";
 
     // Inner segment
-    Operator operator = getOperatorForSqlQuery(query);
+    Operator operator = getOperator(query);
     assertTrue(operator instanceof AggregationOperator);
     List<Object> aggregationResult = ((AggregationOperator) operator).nextBlock().getAggregationResult();
     assertNotNull(aggregationResult);
@@ -247,7 +247,7 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
     assertEquals(aggregationResult.get(5), _doubleSum);
 
     // Inter segment
-    BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
     ResultTable resultTable = brokerResponse.getResultTable();
     DataSchema expectedDataSchema = new DataSchema(new String[]{
         "sumprecision(intColumn)", "sumprecision(longColumn)", "sumprecision(floatColumn)",
@@ -272,7 +272,7 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
     String query = "SELECT SUM_PRECISION(intColumn) * 2 FROM testTable";
 
     // Inner segment
-    Operator operator = getOperatorForSqlQuery(query);
+    Operator operator = getOperator(query);
     assertTrue(operator instanceof AggregationOperator);
     List<Object> aggregationResult = ((AggregationOperator) operator).nextBlock().getAggregationResult();
     assertNotNull(aggregationResult);
@@ -280,7 +280,7 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
     assertEquals(aggregationResult.get(0), _intSum);
 
     // Inter segment
-    BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
     ResultTable resultTable = brokerResponse.getResultTable();
     DataSchema expectedDataSchema =
         new DataSchema(new String[]{"times(sumprecision(intColumn),'2')"}, new ColumnDataType[]{ColumnDataType.DOUBLE});

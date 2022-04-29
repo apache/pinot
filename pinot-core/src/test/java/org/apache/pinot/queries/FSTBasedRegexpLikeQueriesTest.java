@@ -19,23 +19,23 @@
 package org.apache.pinot.queries;
 
 import java.io.File;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
+import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -47,6 +47,8 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
+import org.apache.pinot.spi.config.table.FieldConfig.IndexType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -58,6 +60,9 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 
 public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
@@ -121,7 +126,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  private List<String> getURLSufficies() {
+  private List<String> getURLSuffixes() {
     return Arrays.asList("/a", "/b", "/c", "/d");
   }
 
@@ -130,28 +135,26 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
   }
 
   private List<String> getDomainNames() {
-    return Arrays
-        .asList("www.domain1.com", "www.domain1.co.ab", "www.domain1.co.bc", "www.domain1.co.cd", "www.sd.domain1.com",
-            "www.sd.domain1.co.ab", "www.sd.domain1.co.bc", "www.sd.domain1.co.cd", "www.domain2.com",
-            "www.domain2.co.ab", "www.domain2.co.bc", "www.domain2.co.cd", "www.sd.domain2.com", "www.sd.domain2.co.ab",
-            "www.sd.domain2.co.bc", "www.sd.domain2.co.cd");
+    return Arrays.asList("www.domain1.com", "www.domain1.co.ab", "www.domain1.co.bc", "www.domain1.co.cd",
+        "www.sd.domain1.com", "www.sd.domain1.co.ab", "www.sd.domain1.co.bc", "www.sd.domain1.co.cd", "www.domain2.com",
+        "www.domain2.co.ab", "www.domain2.co.bc", "www.domain2.co.cd", "www.sd.domain2.com", "www.sd.domain2.co.ab",
+        "www.sd.domain2.co.bc", "www.sd.domain2.co.cd");
   }
 
-  private List<GenericRow> createTestData(int numRows)
-      throws Exception {
+  private List<GenericRow> createTestData() {
     List<GenericRow> rows = new ArrayList<>();
     List<String> domainNames = getDomainNames();
-    List<String> urlSufficies = getURLSufficies();
+    List<String> urlSuffixes = getURLSuffixes();
     List<String> noIndexData = getNoIndexData();
-    for (int i = 0; i < numRows; i++) {
+    for (int i = 0; i < NUM_ROWS; i++) {
       String domain = domainNames.get(i % domainNames.size());
-      String url = domain + urlSufficies.get(i % urlSufficies.size());
+      String url = domain + urlSuffixes.get(i % urlSuffixes.size());
 
       GenericRow row = new GenericRow();
-      row.putField(INT_COL_NAME, INT_BASE_VALUE + i);
-      row.putField(NO_INDEX_STRING_COL_NAME, noIndexData.get(i % noIndexData.size()));
-      row.putField(DOMAIN_NAMES_COL, domain);
-      row.putField(URL_COL, url);
+      row.putValue(INT_COL_NAME, INT_BASE_VALUE + i);
+      row.putValue(NO_INDEX_STRING_COL_NAME, noIndexData.get(i % noIndexData.size()));
+      row.putValue(DOMAIN_NAMES_COL, domain);
+      row.putValue(URL_COL, url);
       rows.add(row);
     }
     return rows;
@@ -159,15 +162,15 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
 
   private void buildSegment(FSTType fstType)
       throws Exception {
-    List<GenericRow> rows = createTestData(NUM_ROWS);
+    List<GenericRow> rows = createTestData();
     List<FieldConfig> fieldConfigs = new ArrayList<>();
     fieldConfigs.add(
-        new FieldConfig(DOMAIN_NAMES_COL, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null));
-    fieldConfigs
-        .add(new FieldConfig(URL_COL, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null));
-
+        new FieldConfig(DOMAIN_NAMES_COL, EncodingType.DICTIONARY, Collections.singletonList(IndexType.FST), null,
+            null));
+    fieldConfigs.add(
+        new FieldConfig(URL_COL, EncodingType.DICTIONARY, Collections.singletonList(IndexType.FST), null, null));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInvertedIndexColumns(Arrays.asList(DOMAIN_NAMES_COL)).setFieldConfigList(fieldConfigs).build();
+        .setInvertedIndexColumns(Collections.singletonList(DOMAIN_NAMES_COL)).setFieldConfigList(fieldConfigs).build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(DOMAIN_NAMES_COL, FieldSpec.DataType.STRING)
         .addSingleValueDimension(URL_COL, FieldSpec.DataType.STRING)
@@ -186,72 +189,37 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     }
   }
 
-  private void testInterSegmentSelectionQueryHelper(String query, int expectedResultSize,
-      List<Serializable[]> expectedResults) {
-    // PQL
-    BrokerResponseNative brokerResponseNative = getBrokerResponseForPqlQuery(query);
-    SelectionResults selectionResults = brokerResponseNative.getSelectionResults();
-    List<String> columns = selectionResults.getColumns();
-    Assert.assertEquals(columns.size(), 2);
-    List<Serializable[]> rows = selectionResults.getRows();
-    Assert.assertEquals(rows.size(), expectedResultSize);
-
-    if (expectedResults != null) {
-      for (int i = 0; i < expectedResults.size(); i++) {
-        Serializable[] actualRow = rows.get(i);
-        Serializable[] expectedRow = expectedResults.get(i);
-        Assert.assertEquals(actualRow[0], String.valueOf(expectedRow[0]));
-        Assert.assertEquals(actualRow[1], expectedRow[1]);
-      }
-    }
-
-    // SQL
-    brokerResponseNative = getBrokerResponseForSqlQuery(query);
-    ResultTable resultTable = brokerResponseNative.getResultTable();
-    DataSchema dataSchema = resultTable.getDataSchema();
-    Assert.assertEquals(dataSchema.size(), 2);
-    Assert.assertEquals(dataSchema.getColumnName(0), "INT_COL");
-    Assert.assertEquals(dataSchema.getColumnName(1), "URL_COL");
-    Assert.assertEquals(dataSchema.getColumnDataType(0), DataSchema.ColumnDataType.INT);
-    Assert.assertEquals(dataSchema.getColumnDataType(1), DataSchema.ColumnDataType.STRING);
-    List<Object[]> results = resultTable.getRows();
-    Assert.assertEquals(results.size(), expectedResultSize);
-
-    if (expectedResults != null) {
-      for (int i = 0; i < expectedResults.size(); i++) {
-        Object[] actualRow = results.get(i);
-        Serializable[] expectedRow = expectedResults.get(i);
-        Assert.assertEquals(actualRow, expectedRow);
-      }
-    }
-  }
-
-  private void testSelectionResults(String query, int expectedResultSize, List<Serializable[]> expectedResults)
-      throws Exception {
-    Operator<IntermediateResultsBlock> operator = getOperatorForSqlQuery(query);
-    IntermediateResultsBlock operatorResult = operator.nextBlock();
-    List<Object[]> resultset = (List<Object[]>) operatorResult.getSelectionResult();
-    Assert.assertNotNull(resultset);
-    Assert.assertEquals(resultset.size(), expectedResultSize);
+  private void testInnerSegmentSelectionQuery(String query, int expectedResultSize,
+      @Nullable List<Object[]> expectedResults) {
+    Operator<IntermediateResultsBlock> operator = getOperator(query);
+    IntermediateResultsBlock resultsBlock = operator.nextBlock();
+    List<Object[]> results = (List<Object[]>) resultsBlock.getSelectionResult();
+    assertNotNull(results);
+    assertEquals(results.size(), expectedResultSize);
     if (expectedResults != null) {
       for (int i = 0; i < expectedResultSize; i++) {
-        Object[] actualRow = resultset.get(i);
-        Object[] expectedRow = expectedResults.get(i);
-        Assert.assertEquals(actualRow.length, expectedRow.length);
-        for (int j = 0; j < actualRow.length; j++) {
-          Object actualColValue = actualRow[j];
-          Object expectedColValue = expectedRow[j];
-          Assert.assertEquals(actualColValue, expectedColValue);
-        }
+        assertEquals(results.get(i), expectedResults.get(i));
       }
     }
   }
 
-  private AggregationGroupByResult getGroupByResults(String query)
-      throws Exception {
-    AggregationGroupByOperator operator = getOperatorForPqlQuery(query);
-    IntermediateResultsBlock resultsBlock = operator.nextBlock();
-    return resultsBlock.getAggregationGroupByResult();
+  private void testInterSegmentsSelectionQuery(String query, int expectedResultSize,
+      @Nullable List<Object[]> expectedRows) {
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    DataSchema expectedDataSchema = new DataSchema(new String[]{"INT_COL", "URL_COL"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
+    if (expectedRows != null) {
+      QueriesTestUtils.testInterSegmentsResult(brokerResponse, new ResultTable(expectedDataSchema, expectedRows));
+    } else {
+      ResultTable resultTable = brokerResponse.getResultTable();
+      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+      assertEquals(resultTable.getRows().size(), expectedResultSize);
+    }
+  }
+
+  private AggregationGroupByResult getGroupByResults(String query) {
+    AggregationGroupByOrderByOperator groupByOrderByOperator = getOperator(query);
+    return groupByOrderByOperator.nextBlock().getAggregationGroupByResult();
   }
 
   private void matchGroupResult(AggregationGroupByResult result, String key, long count) {
@@ -260,266 +228,226 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     while (groupKeyIterator.hasNext()) {
       GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
       if (groupKey._keys[0].equals(key)) {
-        Assert.assertEquals(((Number) result.getResultForGroupId(0, groupKey._groupId)).longValue(), count);
+        assertEquals(((Number) result.getResultForGroupId(0, groupKey._groupId)).longValue(), count);
         found = true;
       }
     }
     Assert.assertTrue(found);
   }
 
-  private void testInterSegmentAggregationQueryHelper(String query, long expectedCount) {
-    // PQL
-    BrokerResponseNative brokerResponseNative = getBrokerResponseForPqlQuery(query);
-    List<AggregationResult> aggregationResults = brokerResponseNative.getAggregationResults();
-    Assert.assertEquals(aggregationResults.size(), 1);
-    Assert.assertEquals(aggregationResults.get(0).getValue().toString(), String.valueOf(expectedCount));
-
-    // SQL
-    brokerResponseNative = getBrokerResponseForSqlQuery(query);
-    ResultTable resultTable = brokerResponseNative.getResultTable();
-    DataSchema dataSchema = resultTable.getDataSchema();
-    Assert.assertEquals(dataSchema.size(), 1);
-    Assert.assertEquals(dataSchema.getColumnName(0), "count(*)");
-    Assert.assertEquals(dataSchema.getColumnDataType(0), DataSchema.ColumnDataType.LONG);
-    List<Object[]> rows = resultTable.getRows();
-    Assert.assertEquals(rows.size(), 1);
-    Object[] row = rows.get(0);
-    Assert.assertEquals(row.length, 1);
-    Assert.assertEquals(row[0], expectedCount);
+  private void testInterSegmentsCountQuery(String query, long expectedCount) {
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query),
+        new ResultTable(new DataSchema(new String[]{"count(*)"}, new ColumnDataType[]{ColumnDataType.LONG}),
+            Collections.singletonList(new Object[]{expectedCount})));
   }
 
   @Test
-  public void testFSTBasedRegexLike()
-      throws Exception {
+  public void testFSTBasedRegexLike() {
     // Select queries on col with FST + inverted index.
     String query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') LIMIT 50000";
-    testSelectionResults(query, 256, null);
+    testInnerSegmentSelectionQuery(query, 256, null);
 
     query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.sd.domain1.*') LIMIT 50000";
-    testSelectionResults(query, 256, null);
+    testInnerSegmentSelectionQuery(query, 256, null);
 
     query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, '.*domain1.*') LIMIT 50000";
-    testSelectionResults(query, 512, null);
+    testInnerSegmentSelectionQuery(query, 512, null);
 
     query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, '.*domain.*') LIMIT 50000";
-    testSelectionResults(query, 1024, null);
+    testInnerSegmentSelectionQuery(query, 1024, null);
 
     query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, '.*com') LIMIT 50000";
-    testSelectionResults(query, 256, null);
+    testInnerSegmentSelectionQuery(query, 256, null);
 
     // Select queries on col with just FST index.
     query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, 'www.domain1.*') LIMIT 50000";
-    testSelectionResults(query, 256, null);
+    testInnerSegmentSelectionQuery(query, 256, null);
 
     query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, 'www.domain1.*') LIMIT 5";
-    List<Serializable[]> expected = new ArrayList<>();
-    expected.add(new Serializable[]{1000, "www.domain1.com/a"});
-    expected.add(new Serializable[]{1001, "www.domain1.co.ab/b"});
-    expected.add(new Serializable[]{1002, "www.domain1.co.bc/c"});
-    expected.add(new Serializable[]{1003, "www.domain1.co.cd/d"});
-    expected.add(new Serializable[]{1016, "www.domain1.com/a"});
-    testSelectionResults(query, 5, expected);
+    List<Object[]> expected = new ArrayList<>();
+    expected.add(new Object[]{1000, "www.domain1.com/a"});
+    expected.add(new Object[]{1001, "www.domain1.co.ab/b"});
+    expected.add(new Object[]{1002, "www.domain1.co.bc/c"});
+    expected.add(new Object[]{1003, "www.domain1.co.cd/d"});
+    expected.add(new Object[]{1016, "www.domain1.com/a"});
+    testInnerSegmentSelectionQuery(query, 5, expected);
 
     query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, 'www.sd.domain1.*') LIMIT 50000";
-    testSelectionResults(query, 256, null);
+    testInnerSegmentSelectionQuery(query, 256, null);
 
     query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*domain1.*') LIMIT 50000";
-    testSelectionResults(query, 512, null);
+    testInnerSegmentSelectionQuery(query, 512, null);
 
     query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*domain.*') LIMIT 50000";
-    testSelectionResults(query, 1024, null);
+    testInnerSegmentSelectionQuery(query, 1024, null);
 
     query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*domain.*') LIMIT 5";
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{1000, "www.domain1.com/a"});
-    expected.add(new Serializable[]{1001, "www.domain1.co.ab/b"});
-    expected.add(new Serializable[]{1002, "www.domain1.co.bc/c"});
-    expected.add(new Serializable[]{1003, "www.domain1.co.cd/d"});
-    expected.add(new Serializable[]{1004, "www.sd.domain1.com/a"});
-    testSelectionResults(query, 5, expected);
-    testSelectionResults(query, 5, null);
+    expected.add(new Object[]{1000, "www.domain1.com/a"});
+    expected.add(new Object[]{1001, "www.domain1.co.ab/b"});
+    expected.add(new Object[]{1002, "www.domain1.co.bc/c"});
+    expected.add(new Object[]{1003, "www.domain1.co.cd/d"});
+    expected.add(new Object[]{1004, "www.sd.domain1.com/a"});
+    testInnerSegmentSelectionQuery(query, 5, expected);
 
     query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/a') LIMIT 50000";
-    testSelectionResults(query, 256, null);
+    testInnerSegmentSelectionQuery(query, 256, null);
 
     query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/a') LIMIT 5";
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{1000, "www.domain1.com/a"});
-    expected.add(new Serializable[]{1004, "www.sd.domain1.com/b"});
-    expected.add(new Serializable[]{1008, "www.domain2.com/c"});
-    expected.add(new Serializable[]{1012, "www.sd.domain2.co.cd/d"});
-    expected.add(new Serializable[]{1016, "www.domain1.com/a"});
-    testSelectionResults(query, 5, null);
+    expected.add(new Object[]{1000, "www.domain1.com/a"});
+    expected.add(new Object[]{1004, "www.sd.domain1.com/b"});
+    expected.add(new Object[]{1008, "www.domain2.com/c"});
+    expected.add(new Object[]{1012, "www.sd.domain2.co.cd/d"});
+    expected.add(new Object[]{1016, "www.domain1.com/a"});
+    testInnerSegmentSelectionQuery(query, 5, null);
   }
 
   @Test
-  public void testLikeOperator()
-      throws Exception {
+  public void testLikeOperator() {
 
     String query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE 'www.dom_in1.com' LIMIT 50000";
-    testSelectionResults(query, 64, null);
+    testInnerSegmentSelectionQuery(query, 64, null);
 
     query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE 'www.do_ai%' LIMIT 50000";
-    testSelectionResults(query, 512, null);
+    testInnerSegmentSelectionQuery(query, 512, null);
 
     query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE 'www.domain1%' LIMIT 50000";
-    testSelectionResults(query, 256, null);
+    testInnerSegmentSelectionQuery(query, 256, null);
 
     query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE 'www.sd.domain1%' LIMIT 50000";
-    testSelectionResults(query, 256, null);
+    testInnerSegmentSelectionQuery(query, 256, null);
 
     query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE '%domain1%' LIMIT 50000";
-    testSelectionResults(query, 512, null);
+    testInnerSegmentSelectionQuery(query, 512, null);
 
     query = "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE '%com' LIMIT 50000";
-    testSelectionResults(query, 256, null);
+    testInnerSegmentSelectionQuery(query, 256, null);
   }
 
   @Test
-  public void testFSTBasedRegexpLikeWithOtherFilters()
-      throws Exception {
-    String query;
-
+  public void testFSTBasedRegexpLikeWithOtherFilters() {
     // Select queries on columns with combination of FST Index , (FST + Inverted Index), No index and other constraints.
-    query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, "
-            + "'test1') LIMIT 50000";
-    testSelectionResults(query, 52, null);
+    String query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/a') AND "
+        + "REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
+    testInnerSegmentSelectionQuery(query, 52, null);
 
-    query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, "
-            + "'test1') LIMIT 50000";
-    testSelectionResults(query, 51, null);
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/b') AND "
+        + "REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
+    testInnerSegmentSelectionQuery(query, 51, null);
 
-    query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') AND REGEXP_LIKE"
-            + "(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
-    testSelectionResults(query, 13, null);
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') AND "
+        + "REGEXP_LIKE(URL_COL, '.*/a') AND REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
+    testInnerSegmentSelectionQuery(query, 13, null);
 
-    query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.co\\..*') AND REGEXP_LIKE"
-            + "(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
-    testSelectionResults(query, 0, null);
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.co\\..*') AND "
+        + "REGEXP_LIKE(URL_COL, '.*/a') AND REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
+    testInnerSegmentSelectionQuery(query, 0, null);
 
-    query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.co\\..*') AND REGEXP_LIKE"
-            + "(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
-    testSelectionResults(query, 12, null);
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.co\\..*') AND "
+        + "REGEXP_LIKE(URL_COL, '.*/b') AND REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
+    testInnerSegmentSelectionQuery(query, 12, null);
 
-    query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, "
-            + "'test1') and INT_COL=1000 LIMIT 50000";
-    List<Serializable[]> expected = new ArrayList<>();
-    expected.add(new Serializable[]{1000, "www.domain1.com/a"});
-    testSelectionResults(query, 1, expected);
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/a') AND "
+        + "REGEXP_LIKE(NO_INDEX_COL, 'test1') AND INT_COL=1000 LIMIT 50000";
+    List<Object[]> expected = new ArrayList<>();
+    expected.add(new Object[]{1000, "www.domain1.com/a"});
+    testInnerSegmentSelectionQuery(query, 1, expected);
 
-    query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') AND REGEXP_LIKE"
-            + "(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, 'test2') and INT_COL=1001 LIMIT 50000";
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') AND "
+        + "REGEXP_LIKE(URL_COL, '.*/b') AND REGEXP_LIKE(NO_INDEX_COL, 'test2') AND INT_COL=1001 LIMIT 50000";
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{1001, "www.domain1.co.ab/b"});
-    testSelectionResults(query, 1, expected);
+    expected.add(new Object[]{1001, "www.domain1.co.ab/b"});
+    testInnerSegmentSelectionQuery(query, 1, expected);
   }
 
   @Test
-  public void testGroupByOnFSTBasedRegexpLike()
-      throws Exception {
+  public void testGroupByOnFSTBasedRegexpLike() {
     String query;
-    query =
-        "SELECT DOMAIN_NAMES, count(*) FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') group by "
-            + "DOMAIN_NAMES LIMIT 50000";
+    query = "SELECT DOMAIN_NAMES, count(*) FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') GROUP BY "
+        + "DOMAIN_NAMES LIMIT 50000";
     AggregationGroupByResult result = getGroupByResults(query);
     matchGroupResult(result, "www.domain1.com", 64);
     matchGroupResult(result, "www.domain1.co.ab", 64);
     matchGroupResult(result, "www.domain1.co.bc", 64);
     matchGroupResult(result, "www.domain1.co.cd", 64);
 
-    query =
-        "SELECT URL_COL, count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, "
-            + "'test1') group by URL_COL LIMIT 5000";
+    query = "SELECT URL_COL, count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/a') AND "
+        + "REGEXP_LIKE(NO_INDEX_COL, 'test1') GROUP BY URL_COL LIMIT 5000";
     result = getGroupByResults(query);
     matchGroupResult(result, "www.domain1.com/a", 13);
     matchGroupResult(result, "www.sd.domain1.com/a", 13);
     matchGroupResult(result, "www.domain2.com/a", 13);
     matchGroupResult(result, "www.sd.domain2.com/a", 13);
 
-    query =
-        "SELECT URL_COL, count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, "
-            + "'test1') group by URL_COL LIMIT 5000";
+    query = "SELECT URL_COL, count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/b') AND "
+        + "REGEXP_LIKE(NO_INDEX_COL, 'test1') GROUP BY URL_COL LIMIT 5000";
     result = getGroupByResults(query);
     matchGroupResult(result, "www.domain1.co.ab/b", 12);
     matchGroupResult(result, "www.sd.domain1.co.ab/b", 13);
     matchGroupResult(result, "www.domain2.co.ab/b", 13);
     matchGroupResult(result, "www.sd.domain2.co.ab/b", 13);
 
-    query =
-        "SELECT URL_COL, count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, "
-            + "'test1') AND INT_COL > 1005 group by URL_COL LIMIT 5000";
+    query = "SELECT URL_COL, count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/b') AND "
+        + "REGEXP_LIKE(NO_INDEX_COL, 'test1') AND INT_COL > 1005 GROUP BY URL_COL LIMIT 5000";
     result = getGroupByResults(query);
     matchGroupResult(result, "www.domain1.co.ab/b", 12);
     matchGroupResult(result, "www.sd.domain1.co.ab/b", 12);
     matchGroupResult(result, "www.domain2.co.ab/b", 13);
     matchGroupResult(result, "www.sd.domain2.co.ab/b", 13);
 
-    query =
-        "SELECT URL_COL, count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, 'www.domain1.*/a') group by URL_COL LIMIT "
-            + "50000";
+    query = "SELECT URL_COL, count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, 'www.domain1.*/a') GROUP BY URL_COL "
+        + "LIMIT 50000";
     result = getGroupByResults(query);
     matchGroupResult(result, "www.domain1.com/a", 64);
   }
 
   @Test
   public void testInterSegment() {
-    String query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') AND REGEXP_LIKE"
-            + "(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, 'test2') and INT_COL=1001 LIMIT 50000";
-    List<Serializable[]> expected = new ArrayList<>();
-    expected.add(new Serializable[]{1001, "www.domain1.co.ab/b"});
-    expected.add(new Serializable[]{1001, "www.domain1.co.ab/b"});
-    expected.add(new Serializable[]{1001, "www.domain1.co.ab/b"});
-    expected.add(new Serializable[]{1001, "www.domain1.co.ab/b"});
-    testInterSegmentSelectionQueryHelper(query, 4, expected);
+    String query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') AND "
+        + "REGEXP_LIKE(URL_COL, '.*/b') AND REGEXP_LIKE(NO_INDEX_COL, 'test2') AND INT_COL=1001 LIMIT 50000";
+    List<Object[]> expected = new ArrayList<>();
+    expected.add(new Object[]{1001, "www.domain1.co.ab/b"});
+    expected.add(new Object[]{1001, "www.domain1.co.ab/b"});
+    expected.add(new Object[]{1001, "www.domain1.co.ab/b"});
+    expected.add(new Object[]{1001, "www.domain1.co.ab/b"});
+    testInterSegmentsSelectionQuery(query, 4, expected);
 
-    query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, "
-            + "'test1') and INT_COL=1000 LIMIT 50000";
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/a') AND "
+        + "REGEXP_LIKE(NO_INDEX_COL, 'test1') AND INT_COL=1000 LIMIT 50000";
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{1000, "www.domain1.com/a"});
-    expected.add(new Serializable[]{1000, "www.domain1.com/a"});
-    expected.add(new Serializable[]{1000, "www.domain1.com/a"});
-    expected.add(new Serializable[]{1000, "www.domain1.com/a"});
-    testInterSegmentSelectionQueryHelper(query, 4, expected);
+    expected.add(new Object[]{1000, "www.domain1.com/a"});
+    expected.add(new Object[]{1000, "www.domain1.com/a"});
+    expected.add(new Object[]{1000, "www.domain1.com/a"});
+    expected.add(new Object[]{1000, "www.domain1.com/a"});
+    testInterSegmentsSelectionQuery(query, 4, expected);
 
-    query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.co\\..*') AND REGEXP_LIKE"
-            + "(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, 'test1') ORDER  BY INT_COL LIMIT 5000";
-    testInterSegmentSelectionQueryHelper(query, 48, null);
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.co\\..*') AND "
+        + "REGEXP_LIKE(URL_COL, '.*/b') AND REGEXP_LIKE(NO_INDEX_COL, 'test1') ORDER  BY INT_COL LIMIT 5000";
+    testInterSegmentsSelectionQuery(query, 48, null);
 
-    query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.co\\..*') AND REGEXP_LIKE"
-            + "(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
-    testInterSegmentSelectionQueryHelper(query, 0, null);
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.co\\..*') AND "
+        + "REGEXP_LIKE(URL_COL, '.*/a') AND REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
+    testInterSegmentsSelectionQuery(query, 0, null);
 
-    query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') AND REGEXP_LIKE"
-            + "(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
-    testInterSegmentSelectionQueryHelper(query, 52, null);
+    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*') AND "
+        + "REGEXP_LIKE(URL_COL, '.*/a') AND REGEXP_LIKE(NO_INDEX_COL, 'test1') LIMIT 50000";
+    testInterSegmentsSelectionQuery(query, 52, null);
 
     query = "SELECT count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, 'www.domain1.*/a')";
-    testInterSegmentAggregationQueryHelper(query, 256);
+    testInterSegmentsCountQuery(query, 256);
 
-    query =
-        "SELECT count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, 'test1') AND "
-            + "INT_COL > 1005 ";
-    testInterSegmentAggregationQueryHelper(query, 200);
+    query = "SELECT count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/b') AND REGEXP_LIKE(NO_INDEX_COL, 'test1') "
+        + "AND INT_COL > 1005 ";
+    testInterSegmentsCountQuery(query, 200);
 
-    query = "SELECT count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/b') and REGEXP_LIKE(NO_INDEX_COL, 'test1')";
-    testInterSegmentAggregationQueryHelper(query, 204);
+    query = "SELECT count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/b') AND REGEXP_LIKE(NO_INDEX_COL, 'test1')";
+    testInterSegmentsCountQuery(query, 204);
 
-    query = "SELECT count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/a') and REGEXP_LIKE(NO_INDEX_COL, 'test1')";
-    testInterSegmentAggregationQueryHelper(query, 208);
+    query = "SELECT count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/a') AND REGEXP_LIKE(NO_INDEX_COL, 'test1')";
+    testInterSegmentsCountQuery(query, 208);
 
     query = "SELECT count(*) FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*')";
-    testInterSegmentAggregationQueryHelper(query, 1024);
+    testInterSegmentsCountQuery(query, 1024);
   }
 }

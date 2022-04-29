@@ -137,12 +137,12 @@ public class NotOperatorQueriesTest extends BaseQueriesTest {
 
   private void testNotOperator(String filter, long expectedSegmentResult) {
     String query = "SELECT COUNT(*) FROM testTable WHERE " + filter;
-    BaseOperator<IntermediateResultsBlock> aggregationOperator = getOperatorForSqlQuery(query);
+    BaseOperator<IntermediateResultsBlock> aggregationOperator = getOperator(query);
     List<Object> segmentResults = aggregationOperator.nextBlock().getAggregationResult();
     assertNotNull(segmentResults);
     assertEquals((long) segmentResults.get(0), expectedSegmentResult);
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
     ResultTable resultTable = brokerResponse.getResultTable();
     Object[] brokerResults = resultTable.getRows().get(0);
     assertEquals((long) brokerResults[0], 4 * expectedSegmentResult);

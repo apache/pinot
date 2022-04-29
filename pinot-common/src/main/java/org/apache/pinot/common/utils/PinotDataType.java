@@ -808,6 +808,11 @@ public enum PinotDataType {
     public byte[] toBytes(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from OBJECT to BYTES");
     }
+
+    @Override
+    public Object convert(Object value, PinotDataType sourceType) {
+      return value;
+    }
   },
 
   BYTE_ARRAY {

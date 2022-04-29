@@ -132,7 +132,7 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
           .asList("SELECT COUNT(*) FROM testTable WHERE ST_Distance(h3Column, ST_Point(-122, 37.5, 1)) < -1",
               "SELECT COUNT(*) FROM testTable WHERE ST_Distance(h3Column, ST_Point(-122, 37.5, 1)) BETWEEN 100 AND "
                   + "50")) {
-        AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
+        AggregationOperator aggregationOperator = getOperator(query);
         IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
         // Expect 0 entries scanned in filter
         QueriesTestUtils
@@ -146,7 +146,7 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
     // No bound
     {
       String query = "SELECT COUNT(*) FROM testTable WHERE ST_Distance(h3Column, ST_Point(-122, 37.5, 1)) > -1";
-      AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
+      AggregationOperator aggregationOperator = getOperator(query);
       IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
       // Expect 0 entries scanned in filter
       QueriesTestUtils
@@ -200,7 +200,7 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
     // Distance is too large, should fall back to scan-based ExpressionFilterOperator
     {
       String query = "SELECT COUNT(*) FROM testTable WHERE ST_Distance(h3Column, ST_Point(-122, 37.5, 1)) < 10000000";
-      AggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
+      AggregationOperator aggregationOperator = getOperator(query);
       IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
       // Expect 10000 entries scanned in filter
       QueriesTestUtils
@@ -215,8 +215,8 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
   private void testQuery(String queryTemplate) {
     String h3IndexQuery = String.format(queryTemplate, H3_INDEX_COLUMN);
     String nonH3IndexQuery = String.format(queryTemplate, NON_H3_INDEX_COLUMN);
-    AggregationOperator h3IndexOperator = getOperatorForSqlQuery(h3IndexQuery);
-    AggregationOperator nonH3IndexOperator = getOperatorForSqlQuery(nonH3IndexQuery);
+    AggregationOperator h3IndexOperator = getOperator(h3IndexQuery);
+    AggregationOperator nonH3IndexOperator = getOperator(nonH3IndexQuery);
     IntermediateResultsBlock h3IndexResultsBlock = h3IndexOperator.nextBlock();
     IntermediateResultsBlock nonH3IndexResultsBlock = nonH3IndexOperator.nextBlock();
     // Expect less than 10000 entries scanned in filter

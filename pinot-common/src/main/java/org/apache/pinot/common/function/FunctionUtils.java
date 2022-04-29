@@ -53,6 +53,7 @@ public class FunctionUtils {
     put(float[].class, PinotDataType.PRIMITIVE_FLOAT_ARRAY);
     put(double[].class, PinotDataType.PRIMITIVE_DOUBLE_ARRAY);
     put(String[].class, PinotDataType.STRING_ARRAY);
+    put(Object.class, PinotDataType.OBJECT);
   }};
 
   // Types allowed as the function argument (actual value passed into the function) for type conversion
@@ -78,6 +79,7 @@ public class FunctionUtils {
     put(double[].class, PinotDataType.PRIMITIVE_DOUBLE_ARRAY);
     put(Double[].class, PinotDataType.DOUBLE_ARRAY);
     put(String[].class, PinotDataType.STRING_ARRAY);
+    put(Object.class, PinotDataType.OBJECT);
   }};
 
   private static final Map<Class<?>, DataType> DATA_TYPE_MAP = new HashMap<Class<?>, DataType>() {{
@@ -122,6 +124,7 @@ public class FunctionUtils {
     put(float[].class, ColumnDataType.FLOAT_ARRAY);
     put(double[].class, ColumnDataType.DOUBLE_ARRAY);
     put(String[].class, ColumnDataType.STRING_ARRAY);
+    put(Object.class, ColumnDataType.OBJECT);
   }};
 
   /**

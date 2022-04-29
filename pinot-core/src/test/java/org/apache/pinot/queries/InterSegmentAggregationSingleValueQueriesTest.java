@@ -18,16 +18,17 @@
  */
 package org.apache.pinot.queries;
 
-import java.io.Serializable;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.SelectionResults;
+import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.spi.utils.BytesUtils;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertFalse;
@@ -35,7 +36,7 @@ import static org.testng.Assert.assertTrue;
 
 
 public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleValueQueriesTest {
-  private static final String GROUP_BY = " group by column9";
+  private static final String GROUP_BY = " GROUP BY column9 ORDER BY v1 DESC, v2 DESC LIMIT 1";
 
   // Allow 5% quantile error due to the randomness of TDigest merge
   private static final double PERCENTILE_TDIGEST_DELTA = 0.05 * Integer.MAX_VALUE;
@@ -44,525 +45,527 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   public void testCount() {
     String query = "SELECT COUNT(*) FROM testTable";
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L,
-        new String[]{"120000"});
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    DataSchema expectedDataSchema = new DataSchema(new String[]{"count(*)"}, new ColumnDataType[]{ColumnDataType.LONG});
+    Object[] expectedResults = new Object[]{120000L};
+    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 0L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 0L, 120000L,
-        new String[]{"24516"});
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResults[0] = 24516L;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 0L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 120000L, 120000L,
-        new String[]{"64420"});
+    String groupBy = " GROUP BY column9 ORDER BY COUNT(*) DESC LIMIT 1";
+    brokerResponse = getBrokerResponse(query + groupBy);
+    expectedResults[0] = 64420L;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 120000L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 24516L, 120000L,
-        new String[]{"17080"});
+    brokerResponse = getBrokerResponse(query + FILTER + groupBy);
+    expectedResults[0] = 17080L;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 24516L, 120000L, expectedResultTable);
+
+    query = "SELECT COUNT(*) AS v1 FROM testTable";
+
+    brokerResponse = getBrokerResponse(query);
+    expectedDataSchema = new DataSchema(new String[]{"v1"}, new ColumnDataType[]{ColumnDataType.LONG});
+    expectedResults = new Object[]{120000L};
+    expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 0L, 120000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResults[0] = 24516L;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 0L, 120000L, expectedResultTable);
+
+    groupBy = " GROUP BY column9 ORDER BY v1 DESC LIMIT 1";
+    brokerResponse = getBrokerResponse(query + groupBy);
+    expectedResults[0] = 64420L;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 120000L, 120000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER + groupBy);
+    expectedResults[0] = 17080L;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 24516L, 120000L, expectedResultTable);
   }
 
   @Test
   public void testMax() {
-    String query = "SELECT MAX(column1), MAX(column3) FROM testTable";
+    String query = "SELECT MAX(column1) AS v1, MAX(column3) AS v2 FROM testTable";
 
     // Without filter, query should be answered by DictionaryBasedAggregationOperator (numEntriesScannedPostFilter = 0)
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L,
-        new String[]{"2146952047.00000", "2147419555.00000"});
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    DataSchema expectedDataSchema =
+        new DataSchema(new String[]{"v1", "v2"}, new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
+    ResultTable expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146952047.0, 2147419555.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 0L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
-        new String[]{"2146952047.00000", "999813884.00000"});
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146952047.0, 999813884.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
-        new String[]{"2146952047.00000", "2147419555.00000"});
+    brokerResponse = getBrokerResponse(query + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146952047.0, 2146630496.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 360000L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
-        new String[]{"2146952047.00000", "999813884.00000"});
+    brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146952047.0, 999813884.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
   }
 
   @Test
   public void testMin() {
-    String query = "SELECT MIN(column1), MIN(column3) FROM testTable";
+    String query = "SELECT MIN(column1) AS v1, MIN(column3) AS v2 FROM testTable";
 
     // Without filter, query should be answered by DictionaryBasedAggregationOperator (numEntriesScannedPostFilter = 0)
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L,
-        new String[]{"240528.00000", "17891.00000"});
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    DataSchema expectedDataSchema =
+        new DataSchema(new String[]{"v1", "v2"}, new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
+    ResultTable expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{240528.0, 17891.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 0L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
-        new String[]{"101116473.00000", "20396372.00000"});
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{101116473.0, 20396372.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
-        new String[]{"240528.00000", "17891.00000"});
+    String groupBy = " GROUP BY column9 ORDER BY v1, v2 LIMIT 1";
+    brokerResponse = getBrokerResponse(query + groupBy);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{240528.0, 17891.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 360000L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
-        new String[]{"101116473.00000", "20396372.00000"});
+    brokerResponse = getBrokerResponse(query + FILTER + groupBy);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{101116473.0, 91804599.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
   }
 
   @Test
   public void testSum() {
-    String query = "SELECT SUM(column1), SUM(column3) FROM testTable";
+    String query = "SELECT SUM(column1) AS v1, SUM(column3) AS v2 FROM testTable";
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L,
-        new String[]{"129268741751388.00000", "129156636756600.00000"});
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    DataSchema expectedDataSchema =
+        new DataSchema(new String[]{"v1", "v2"}, new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
+    ResultTable expectedResultTable = new ResultTable(expectedDataSchema,
+        Collections.singletonList(new Object[]{129268741751388.0, 129156636756600.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 240000L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
-        new String[]{"27503790384288.00000", "12429178874916.00000"});
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResultTable = new ResultTable(expectedDataSchema,
+        Collections.singletonList(new Object[]{27503790384288.0, 12429178874916.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
-        new String[]{"69526727335224.00000", "69225631719808.00000"});
+    brokerResponse = getBrokerResponse(query + GROUP_BY);
+    expectedResultTable = new ResultTable(expectedDataSchema,
+        Collections.singletonList(new Object[]{69526727335224.0, 69225631719808.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 360000L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
-        new String[]{"19058003631876.00000", "8606725456500.00000"});
+    brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{19058003631876.0, 8606725456500.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
   }
 
   @Test
   public void testAvg() {
-    String query = "SELECT AVG(column1), AVG(column3) FROM testTable";
+    String query = "SELECT AVG(column1) AS v1, AVG(column3) AS v2 FROM testTable";
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L,
-        new String[]{"1077239514.59490", "1076305306.30500"});
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    DataSchema expectedDataSchema =
+        new DataSchema(new String[]{"v1", "v2"}, new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
+    ResultTable expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1077239514.5949, 1076305306.305}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 240000L, 120000L, expectedResultTable, 1e-5);
 
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
-        new String[]{"1121871038.68037", "506982332.96280"});
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1121871038.68037, 506982332.96280}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable,
+        1e-5);
 
-    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
-        new String[]{"2142595699.00000", "2141451242.00000"});
+    brokerResponse = getBrokerResponse(query + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2142595699.0, 334963174.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 360000L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
-        new String[]{"2142595699.00000", "999309554.00000"});
+    brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2142595699.0, 334963174.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
   }
 
   @Test
   public void testMinMaxRange() {
-    String query = "SELECT MINMAXRANGE(column1), MINMAXRANGE(column3) FROM testTable";
+    String query = "SELECT MINMAXRANGE(column1) AS v1, MINMAXRANGE(column3) AS v2 FROM testTable";
 
     // Without filter, query should be answered by DictionaryBasedAggregationOperator (numEntriesScannedPostFilter = 0)
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L,
-        new String[]{"2146711519.00000", "2147401664.00000"});
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    DataSchema expectedDataSchema =
+        new DataSchema(new String[]{"v1", "v2"}, new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
+    ResultTable expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146711519.0, 2147401664.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 0L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
-        new String[]{"2045835574.00000", "979417512.00000"});
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2045835574.0, 979417512.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
-        new String[]{"2146711519.00000", "2146612605.00000"});
+    brokerResponse = getBrokerResponse(query + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146711519.0, 2146612605.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 360000L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
-        new String[]{"2044094181.00000", "979417512.00000"});
+    brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2044094181.0, 979417512.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
   }
 
   @Test
   public void testDistinctCount() {
-    String query = "SELECT DISTINCTCOUNT(column1), DISTINCTCOUNT(column3) FROM testTable";
+    String query = "SELECT DISTINCTCOUNT(column1) AS v1, DISTINCTCOUNT(column3) AS v2 FROM testTable";
 
     // Without filter, query should be answered by DictionaryBasedAggregationOperator (numEntriesScannedPostFilter = 0)
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L,
-        new String[]{"6582", "21910"});
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    DataSchema expectedDataSchema =
+        new DataSchema(new String[]{"v1", "v2"}, new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT});
+    ResultTable expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{6582, 21910}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 0L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
-        new String[]{"1872", "4556"});
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1872, 4556}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
-        new String[]{"3495", "11961"});
+    brokerResponse = getBrokerResponse(query + GROUP_BY);
+    expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{3495, 11961}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 360000L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
-        new String[]{"1272", "3289"});
+    brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
+    expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1272, 3289}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
   }
 
   @Test
   public void testDistinctCountHLL() {
-    String query = "SELECT DISTINCTCOUNTHLL(column1), DISTINCTCOUNTHLL(column3) FROM testTable";
+    String query = "SELECT DISTINCTCOUNTHLL(column1) AS v1, DISTINCTCOUNTHLL(column3) AS v2 FROM testTable";
 
     // Without filter, query should be answered by DictionaryBasedAggregationOperator (numEntriesScannedPostFilter = 0)
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L,
-        new String[]{"5977", "23825"});
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    DataSchema expectedDataSchema =
+        new DataSchema(new String[]{"v1", "v2"}, new ColumnDataType[]{ColumnDataType.LONG, ColumnDataType.LONG});
+    ResultTable expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{5977L, 23825L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 0L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
-        new String[]{"1886", "4492"});
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1886L, 4492L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
-        new String[]{"3592", "11889"});
+    brokerResponse = getBrokerResponse(query + GROUP_BY);
+    expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{3592L, 11889L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 360000L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
-        new String[]{"1324", "3197"});
+    brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
+    expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1324L, 3197L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
   }
 
   @Test
   public void testDistinctCountRawHLL() {
-    String query = "SELECT DISTINCTCOUNTRAWHLL(column1), DISTINCTCOUNTRAWHLL(column3) FROM testTable";
-    Function<Serializable, String> cardinalityExtractor = value -> String.valueOf(
-        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String) value)).cardinality());
+    String query = "SELECT DISTINCTCOUNTRAWHLL(column1) AS v1, DISTINCTCOUNTRAWHLL(column3) AS v2 FROM testTable";
+    Function<Object, Object> cardinalityExtractor =
+        value -> ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String) value)).cardinality();
 
     // Without filter, query should be answered by DictionaryBasedAggregationOperator (numEntriesScannedPostFilter = 0)
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L, cardinalityExtractor,
-        new String[]{"5977", "23825"});
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    DataSchema expectedDataSchema =
+        new DataSchema(new String[]{"v1", "v2"}, new ColumnDataType[]{ColumnDataType.LONG, ColumnDataType.LONG});
+    ResultTable expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{5977L, 23825L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 0L, 120000L, expectedResultTable,
+        cardinalityExtractor);
 
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
-        cardinalityExtractor, new String[]{"1886", "4492"});
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1886L, 4492L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable,
+        cardinalityExtractor);
 
-    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
-        cardinalityExtractor, new String[]{"3592", "11889"});
+    brokerResponse = getBrokerResponse(query + GROUP_BY);
+    expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{3592L, 11889L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 360000L, 120000L, expectedResultTable,
+        cardinalityExtractor);
 
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
-        cardinalityExtractor, new String[]{"1324", "3197"});
+    brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
+    expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1324L, 3197L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable,
+        cardinalityExtractor);
   }
 
   @Test
-  public void testPercentile50() {
-    List<String> queries = Arrays.asList("SELECT PERCENTILE50(column1), PERCENTILE50(column3) FROM testTable",
-        "SELECT PERCENTILE(column1, 50), PERCENTILE(column3, 50) FROM testTable",
-        "SELECT PERCENTILE(column1, '50'), PERCENTILE(column3, '50') FROM testTable",
-        "SELECT PERCENTILE(column1, \"50\"), PERCENTILE(column3, \"50\") FROM testTable");
-
+  public void testPercentile() {
+    List<String> queries =
+        Arrays.asList("SELECT PERCENTILE50(column1) AS v1, PERCENTILE50(column3) AS v2 FROM testTable",
+            "SELECT PERCENTILE(column1, 50) AS v1, PERCENTILE(column3, 50) AS v2 FROM testTable",
+            "SELECT PERCENTILE(column1, '50') AS v1, PERCENTILE(column3, '50') AS v2 FROM testTable");
+    DataSchema expectedDataSchema =
+        new DataSchema(new String[]{"v1", "v2"}, new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
     for (String query : queries) {
-      BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-      QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L,
-          new String[]{"1107310944.00000", "1080136306.00000"});
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      ResultTable expectedResultTable =
+          new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1107310944.0, 1080136306.0}));
+      QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 240000L, 120000L, expectedResultTable);
 
-      brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-      QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
-          new String[]{"1139674505.00000", "505053732.00000"});
+      brokerResponse = getBrokerResponse(query + FILTER);
+      expectedResultTable =
+          new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1139674505.0, 505053732.0}));
+      QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
 
-      brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY);
-      QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
-          new String[]{"2146791843.00000", "2141451242.00000"});
+      brokerResponse = getBrokerResponse(query + GROUP_BY);
+      expectedResultTable =
+          new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146791843.0, 1418523221.0}));
+      QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 360000L, 120000L, expectedResultTable);
 
-      brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
-      QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
-          new String[]{"2142595699.00000", "999309554.00000"});
+      brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
+      expectedResultTable =
+          new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2142595699.0, 334963174.0}));
+      QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
     }
+
+    String query = "SELECT PERCENTILE90(column1) AS v1, PERCENTILE90(column3) AS v2 FROM testTable";
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    ResultTable expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1943040511.0, 1936611145.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 240000L, 120000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1936730975.0, 899534534.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146791843.0, 1418523221.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 360000L, 120000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2142595699.0, 334963174.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
+
+    query = "SELECT PERCENTILE95(column1) AS v1, PERCENTILE95(column3) AS v2 FROM testTable";
+
+    brokerResponse = getBrokerResponse(query);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2071559385.0, 2042409652.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 240000L, 120000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2096857943.0, 947763150.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146791843.0, 1418523221.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 360000L, 120000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2142595699.0, 334963174.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
+
+    query = "SELECT PERCENTILE99(column1) AS v1, PERCENTILE99(column3) AS v2 FROM testTable";
+
+    brokerResponse = getBrokerResponse(query);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2139354437.0, 2125299552.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 240000L, 120000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146232405.0, 990669195.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146791843.0, 1418523221.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 360000L, 120000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146232405.0, 990259756.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
   }
 
   @Test
-  public void testPercentile90() {
-    String query = "SELECT PERCENTILE90(column1), PERCENTILE90(column3) FROM testTable";
+  public void testPercentileEst() {
+    String query = "SELECT PERCENTILEEST50(column1) AS v1, PERCENTILEEST50(column3) AS v2 FROM testTable";
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L,
-        new String[]{"1943040511.00000", "1936611145.00000"});
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    DataSchema expectedDataSchema =
+        new DataSchema(new String[]{"v1", "v2"}, new ColumnDataType[]{ColumnDataType.LONG, ColumnDataType.LONG});
+    ResultTable expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1107310944L, 1082130431L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 240000L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
-        new String[]{"1936730975.00000", "899534534.00000"});
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1139674505L, 509607935L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
-        new String[]{"2146791843.00000", "2147278341.00000"});
+    brokerResponse = getBrokerResponse(query + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146791843L, 1418523221L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 360000L, 120000L, expectedResultTable);
 
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
-        new String[]{"2142595699.00000", "999309554.00000"});
+    brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2142595699L, 334963174L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
+
+    query = "SELECT PERCENTILEEST90(column1) AS v1, PERCENTILEEST90(column3) AS v2 FROM testTable";
+
+    brokerResponse = getBrokerResponse(query);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1946157055L, 1946157055L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 240000L, 120000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1939865599L, 902299647L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146791843L, 1418523221L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 360000L, 120000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2142595699L, 334963174L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
+
+    query = "SELECT PERCENTILEEST95(column1) AS v1, PERCENTILEEST95(column3) AS v2 FROM testTable";
+
+    brokerResponse = getBrokerResponse(query);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2080374783L, 2051014655L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 240000L, 120000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2109734911L, 950009855L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146791843L, 1418523221L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 360000L, 120000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2142595699L, 334963174L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
+
+    query = "SELECT PERCENTILEEST99(column1) AS v1, PERCENTILEEST99(column3) AS v2 FROM testTable";
+
+    brokerResponse = getBrokerResponse(query);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2143289343L, 2143289343L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 240000L, 120000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146232405L, 991952895L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146791843L, 1418523221L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 360000L, 120000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
+    expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146232405L, 993001471L}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
   }
 
   @Test
-  public void testPercentile95() {
-    String query = "SELECT PERCENTILE95(column1), PERCENTILE95(column3) FROM testTable";
-
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L,
-        new String[]{"2071559385.00000", "2042409652.00000"});
-
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
-        new String[]{"2096857943.00000", "947763150.00000"});
-
-    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
-        new String[]{"2146791843.00000", "2147419555.00000"});
-
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
-        new String[]{"2142595699.00000", "999309554.00000"});
+  public void testPercentileRawEst() {
+    testPercentileRawEst(50);
+    testPercentileRawEst(90);
+    testPercentileRawEst(95);
+    testPercentileRawEst(99);
   }
 
-  @Test
-  public void testPercentile99() {
-    String query = "SELECT PERCENTILE99(column1), PERCENTILE99(column3) FROM testTable";
-
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L,
-        new String[]{"2139354437.00000", "2125299552.00000"});
-
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
-        new String[]{"2146232405.00000", "990669195.00000"});
-
-    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
-        new String[]{"2146791843.00000", "2147419555.00000"});
-
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
-        new String[]{"2146232405.00000", "999309554.00000"});
-  }
-
-  @Test
-  public void testPercentileEst50() {
-    String query = "SELECT PERCENTILEEST50(column1), PERCENTILEEST50(column3) FROM testTable";
-
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L,
-        new String[]{"1107310944", "1082130431"});
-
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
-        new String[]{"1139674505", "509607935"});
-
-    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
-        new String[]{"2146791843", "2141451242"});
-
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
-        new String[]{"2142595699", "999309554"});
-  }
-
-  @Test
-  public void testPercentileEst90() {
-    String query = "SELECT PERCENTILEEST90(column1), PERCENTILEEST90(column3) FROM testTable";
-
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L,
-        new String[]{"1946157055", "1946157055"});
-
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
-        new String[]{"1939865599", "902299647"});
-
-    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
-        new String[]{"2146791843", "2147278341"});
-
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
-        new String[]{"2142595699", "999309554"});
-  }
-
-  @Test
-  public void testPercentileEst95() {
-    String query = "SELECT PERCENTILEEST95(column1), PERCENTILEEST95(column3) FROM testTable";
-
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L,
-        new String[]{"2080374783", "2051014655"});
-
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
-        new String[]{"2109734911", "950009855"});
-
-    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
-        new String[]{"2146791843", "2147419555"});
-
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
-        new String[]{"2142595699", "999309554"});
-  }
-
-  @Test
-  public void testPercentileEst99() {
-    String query = "SELECT PERCENTILEEST99(column1), PERCENTILEEST99(column3) FROM testTable";
-
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L,
-        new String[]{"2143289343", "2143289343"});
-
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
-        new String[]{"2146232405", "991952895"});
-
-    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
-        new String[]{"2146791843", "2147419555"});
-
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
-        new String[]{"2146232405", "999309554"});
-  }
-
-  @Test
-  public void testPercentileRawEst50() {
-    testPercentileRawEstAggregationFunction(50);
-  }
-
-  @Test
-  public void testPercentileRawEst90() {
-    testPercentileRawEstAggregationFunction(90);
-  }
-
-  @Test
-  public void testPercentileRawEst95() {
-    testPercentileRawEstAggregationFunction(95);
-  }
-
-  @Test
-  public void testPercentileRawEst99() {
-    testPercentileRawEstAggregationFunction(99);
-  }
-
-  private void queryAndTestAggregationResult(String query, ExpectedQueryResult<String> expectedQueryResults,
-      Function<Serializable, String> responseMapper) {
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, expectedQueryResults.getNumDocsScanned(),
-        expectedQueryResults.getNumEntriesScannedInFilter(), expectedQueryResults.getNumEntriesScannedPostFilter(),
-        expectedQueryResults.getNumTotalDocs(), responseMapper, expectedQueryResults.getResults());
-  }
-
-  private void testPercentileRawEstAggregationFunction(int percentile) {
-    Function<Serializable, String> quantileExtractor = value -> String.valueOf(
-        ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
-            .getQuantile(percentile / 100.0));
+  private void testPercentileRawEst(int percentile) {
+    Function<Object, Object> quantileExtractor =
+        value -> ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
+            .getQuantile(percentile / 100.0);
 
     String rawQuery =
-        String.format("SELECT PERCENTILERAWEST%d(column1), PERCENTILERAWEST%d(column3) FROM testTable", percentile,
-            percentile);
-
-    String query = String.format("SELECT PERCENTILEEST%d(column1), PERCENTILEEST%d(column3) FROM testTable", percentile,
-        percentile);
-
-    queryAndTestAggregationResult(rawQuery, getExpectedQueryResults(query), quantileExtractor);
-
-    queryAndTestAggregationResult(rawQuery + getFilter(), getExpectedQueryResults(query + getFilter()),
-        quantileExtractor);
-
-    queryAndTestAggregationResult(rawQuery + GROUP_BY, getExpectedQueryResults(query + GROUP_BY), quantileExtractor);
-
-    queryAndTestAggregationResult(rawQuery + getFilter() + GROUP_BY,
-        getExpectedQueryResults(query + getFilter() + GROUP_BY), quantileExtractor);
-  }
-
-  @Test
-  public void testPercentileRawTDigest50() {
-    testPercentileRawTDigestAggregationFunction(50);
-  }
-
-  @Test
-  public void testPercentileRawTDigest90() {
-    testPercentileRawTDigestAggregationFunction(90);
-  }
-
-  @Test
-  public void testPercentileRawTDigest95() {
-    testPercentileRawTDigestAggregationFunction(95);
-  }
-
-  @Test
-  public void testPercentileRawTDigest99() {
-    testPercentileRawTDigestAggregationFunction(99);
-  }
-
-  private void testPercentileRawTDigestAggregationFunction(int percentile) {
-    Function<Serializable, String> quantileExtractor = value -> String.valueOf(
-        ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value)).quantile(percentile / 100.0));
-
-    String rawQuery =
-        String.format("SELECT PERCENTILERAWTDIGEST%d(column1), PERCENTILERAWTDIGEST%d(column3) FROM testTable",
+        String.format("SELECT PERCENTILERAWEST%d(column1) AS v1, PERCENTILERAWEST%d(column3) AS v2 FROM testTable",
             percentile, percentile);
-
-    String query =
-        String.format("SELECT PERCENTILETDIGEST%d(column1), PERCENTILETDIGEST%d(column3) FROM testTable", percentile,
-            percentile);
-
-    queryAndTestAggregationResultWithDelta(rawQuery, getExpectedQueryResults(query), quantileExtractor);
-
-    queryAndTestAggregationResultWithDelta(rawQuery + getFilter(), getExpectedQueryResults(query + getFilter()),
+    String regularQuery =
+        String.format("SELECT PERCENTILEEST%d(column1) AS v1, PERCENTILEEST%d(column3) AS v2 FROM testTable",
+            percentile, percentile);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery), getBrokerResponse(regularQuery),
         quantileExtractor);
-
-    queryAndTestAggregationResultWithDelta(rawQuery + GROUP_BY, getExpectedQueryResults(query + GROUP_BY),
-        quantileExtractor);
-
-    queryAndTestAggregationResultWithDelta(rawQuery + getFilter() + GROUP_BY,
-        getExpectedQueryResults(query + getFilter() + GROUP_BY), quantileExtractor);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + FILTER),
+        getBrokerResponse(regularQuery + FILTER), quantileExtractor);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + GROUP_BY),
+        getBrokerResponse(regularQuery + GROUP_BY), quantileExtractor);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + FILTER + GROUP_BY),
+        getBrokerResponse(regularQuery + FILTER + GROUP_BY), quantileExtractor);
   }
 
-  private ExpectedQueryResult<String> getExpectedQueryResults(String query) {
-    return QueriesTestUtils.buildExpectedResponse(getBrokerResponseForPqlQuery(query));
+  @Test
+  public void testPercentileRawTDigest() {
+    testPercentileRawTDigest(50);
+    testPercentileRawTDigest(90);
+    testPercentileRawTDigest(95);
+    testPercentileRawTDigest(99);
   }
 
-  private void queryAndTestAggregationResultWithDelta(String query, ExpectedQueryResult<String> expectedQueryResults,
-      Function<Serializable, String> responseMapper) {
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
+  private void testPercentileRawTDigest(int percentile) {
+    Function<Object, Object> quantileExtractor =
+        value -> ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
+            .quantile(percentile / 100.0);
 
-    QueriesTestUtils.testInterSegmentApproximateAggregationResult(brokerResponse,
-        expectedQueryResults.getNumDocsScanned(), expectedQueryResults.getNumEntriesScannedInFilter(),
-        expectedQueryResults.getNumEntriesScannedPostFilter(), expectedQueryResults.getNumTotalDocs(), responseMapper,
-        expectedQueryResults.getResults(), PERCENTILE_TDIGEST_DELTA);
+    String rawQuery = String.format(
+        "SELECT PERCENTILERAWTDIGEST%d(column1) AS v1, PERCENTILERAWTDIGEST%d(column3) AS v2 FROM testTable",
+        percentile, percentile);
+    String regularQuery =
+        String.format("SELECT PERCENTILETDIGEST%d(column1) AS v1, PERCENTILETDIGEST%d(column3) AS v2 FROM testTable",
+            percentile, percentile);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery), getBrokerResponse(regularQuery),
+        quantileExtractor, PERCENTILE_TDIGEST_DELTA);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + FILTER),
+        getBrokerResponse(regularQuery + FILTER), quantileExtractor, PERCENTILE_TDIGEST_DELTA);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + GROUP_BY),
+        getBrokerResponse(regularQuery + GROUP_BY), quantileExtractor, PERCENTILE_TDIGEST_DELTA);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + FILTER + GROUP_BY),
+        getBrokerResponse(regularQuery + FILTER + GROUP_BY), quantileExtractor, PERCENTILE_TDIGEST_DELTA);
   }
 
   @Test
   public void testNumGroupsLimit() {
     String query = "SELECT COUNT(*) FROM testTable GROUP BY column1";
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
     assertFalse(brokerResponse.isNumGroupsLimitReached());
 
-    brokerResponse = getBrokerResponseForPqlQuery(query,
+    brokerResponse = getBrokerResponse(query,
         new InstancePlanMakerImplV2(1000, 1000, InstancePlanMakerImplV2.DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE,
             InstancePlanMakerImplV2.DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE,
             InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD));
     assertTrue(brokerResponse.isNumGroupsLimitReached());
-  }
-
-  /**
-   * Test DISTINCT on single column multiple segment. Since the dataset
-   * is Avro files, the only thing we currently check
-   * for correctness is the actual number of DISTINCT
-   * records returned
-   */
-  @Test
-  public void testInterSegmentDistinctSingleColumn() {
-    final String query = "SELECT DISTINCT(column1) FROM testTable LIMIT 1000000";
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    final SelectionResults selectionResults = brokerResponse.getSelectionResults();
-    Assert.assertEquals(selectionResults.getColumns().size(), 1);
-    Assert.assertEquals(selectionResults.getColumns().get(0), "column1");
-    Assert.assertEquals(selectionResults.getRows().size(), 6582);
-  }
-
-  /**
-   * Test DISTINCT on single column multiple segment. Since the dataset
-   * is Avro files, the only thing we currently check
-   * for correctness is the actual number of DISTINCT
-   * records returned
-   */
-  @Test
-  public void testInterSegmentDistinctMultiColumn() {
-    final String query = "SELECT DISTINCT(column1, column3) FROM testTable LIMIT 1000000";
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    final SelectionResults selectionResults = brokerResponse.getSelectionResults();
-    Assert.assertEquals(selectionResults.getColumns().size(), 2);
-    Assert.assertEquals(selectionResults.getColumns().get(0), "column1");
-    Assert.assertEquals(selectionResults.getColumns().get(1), "column3");
-    Assert.assertEquals(selectionResults.getRows().size(), 21968);
   }
 }
