@@ -369,14 +369,14 @@ public class GroupByDataTableReducer implements DataTableReducer {
                     case BIG_DECIMAL:
                       values[colId] = dataTable.getBigDecimal(rowId, colId);
                       break;
-                    case OBJECT:
-                      values[colId] = dataTable.getObject(rowId, colId);
-                      break;
                     case STRING:
                       values[colId] = dataTable.getString(rowId, colId);
                       break;
                     case BYTES:
                       values[colId] = dataTable.getBytes(rowId, colId);
+                      break;
+                    case OBJECT:
+                      values[colId] = dataTable.getObject(rowId, colId);
                       break;
                     // Add other aggregation intermediate result / group-by column type supports here
                     default:

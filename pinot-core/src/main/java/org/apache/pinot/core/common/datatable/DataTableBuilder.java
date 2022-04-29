@@ -161,7 +161,8 @@ public class DataTableBuilder {
     _currentRowDataByteBuffer.putDouble(value);
   }
 
-  public void setColumn(int colId, BigDecimal value) throws IOException {
+  public void setColumn(int colId, BigDecimal value)
+      throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     byte[] bytes = BigDecimalUtils.serialize(value);

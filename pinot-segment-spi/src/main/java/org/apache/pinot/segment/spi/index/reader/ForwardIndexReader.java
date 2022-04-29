@@ -22,6 +22,7 @@ import java.io.Closeable;
 import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
 /**
@@ -293,6 +294,11 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
       case STRING:
         for (int i = 0; i < length; i++) {
           values[i] = new BigDecimal(getString(docIds[i], context));
+        }
+        break;
+      case BYTES:
+        for (int i = 0; i < length; i++) {
+          values[i] = BigDecimalUtils.deserialize(getBytes(docIds[i], context));
         }
         break;
       default:
