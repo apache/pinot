@@ -77,52 +77,44 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 public class BenchmarkNativeVsLuceneTextIndex {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "TextSearchQueriesTest");
   private static final String TABLE_NAME = "MyTable";
-  private static final String SEGMENT_NAME_LUCENE = "testSegmentLucene";
   private static final String SEGMENT_NAME_NATIVE = "testSegmentNative";
-  private static final String DOMAIN_NAMES_COL_LUCENE = "DOMAIN_NAMES_LUCENE";
-  private static final String DOMAIN_NAMES_COL_NATIVE = "DOMAIN_NAMES_NATIVE";
+  private static final String DOMAIN_NAMES_COL = "DOMAIN_NAMES_COL";
   private static final String INT_COL = "INT_COL";
 
   private IndexSegment _indexSegment;
 
-  private IndexSegment _luceneSegment;
-  private IndexSegment _nativeIndexSegment;
-
   final String _luceneQuery =
-      "SELECT SUM(INT_COL) FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'www.domain1%')";
+      "SELECT SUM(INT_COL) FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_COL, 'www.domain1%')";
   final String _nativeQuery =
-      "SELECT SUM(INT_COL) FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'www.domain1.*'";
+      "SELECT SUM(INT_COL) FROM MyTable WHERE DOMAIN_NAMES_COL CONTAINS 'www.domain1.*'";
   @Param("1000000")
   int _numRows;
   @Param({"0", "1", "10", "100"})
   int _numBlocks;
-  @Param({"native", "lucene"})
-  String _fstType;
+  @Param({"NATIVE", "LUCENE"})
+  private FSTType _fstType;
 
   private PlanMaker _planMaker;
-  private QueryContext _luceneQueryContext;
-  private QueryContext _nativeQueryContext;
   private QueryContext _queryContext;
 
   @Setup(Level.Trial)
   public void setUp()
       throws Exception {
     _planMaker = new InstancePlanMakerImplV2();
-    _luceneQueryContext = QueryContextConverterUtils.getQueryContextFromSQL(_luceneQuery);
-    _nativeQueryContext = QueryContextConverterUtils.getQueryContextFromSQL(_nativeQuery);
+    if (_fstType == FSTType.LUCENE) {
+      _queryContext = QueryContextConverterUtils.getQueryContextFromSQL(_luceneQuery);
+    } else {
+      _queryContext = QueryContextConverterUtils.getQueryContextFromSQL(_nativeQuery);
+    }
     FileUtils.deleteQuietly(INDEX_DIR);
 
-    buildLuceneSegment();
-    buildNativeTextIndexSegment();
+    buildSegment(_fstType);
 
-    _luceneSegment = loadLuceneSegment();
-    _nativeIndexSegment = loadNativeIndexSegment();
+    _indexSegment = loadSegment(_fstType);
   }
 
   @TearDown(Level.Trial)
   public void tearDown() {
-    _luceneSegment.destroy();
-    _nativeIndexSegment.destroy();
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
@@ -139,59 +131,31 @@ public class BenchmarkNativeVsLuceneTextIndex {
     for (int i = 0; i < numRows; i++) {
       String domain = domainNames.get(i % domainNames.size());
       GenericRow row = new GenericRow();
-      row.putField(DOMAIN_NAMES_COL_LUCENE, domain);
-      row.putField(DOMAIN_NAMES_COL_NATIVE, domain);
+      row.putField(DOMAIN_NAMES_COL, domain);
       row.putField(INT_COL, i);
       rows.add(row);
     }
     return rows;
   }
 
-  private void buildLuceneSegment()
-      throws Exception {
-    List<GenericRow> rows = createTestData(_numRows);
-    List<FieldConfig> fieldConfigs = new ArrayList<>();
-
-    fieldConfigs.add(
-        new FieldConfig(DOMAIN_NAMES_COL_LUCENE, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
-            null));
-
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInvertedIndexColumns(Arrays.asList(DOMAIN_NAMES_COL_LUCENE))
-        .setFieldConfigList(fieldConfigs).build();
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension(DOMAIN_NAMES_COL_LUCENE, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(INT_COL, FieldSpec.DataType.INT)
-        .build();
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
-    config.setOutDir(INDEX_DIR.getPath());
-    config.setTableName(TABLE_NAME);
-    config.setSegmentName(SEGMENT_NAME_LUCENE);
-
-    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
-      driver.init(config, recordReader);
-      driver.build();
-    }
-  }
-
-  private void buildNativeTextIndexSegment()
+  private void buildSegment(FSTType fstType)
       throws Exception {
     List<GenericRow> rows = createTestData(_numRows);
     List<FieldConfig> fieldConfigs = new ArrayList<>();
     Map<String, String> propertiesMap = new HashMap<>();
-    FSTType fstType = FSTType.NATIVE;
 
-    propertiesMap.put(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL);
+    if (fstType == FSTType.NATIVE) {
+      propertiesMap.put(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL);
+    }
 
     fieldConfigs.add(
-        new FieldConfig(DOMAIN_NAMES_COL_NATIVE, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
+        new FieldConfig(DOMAIN_NAMES_COL, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
             propertiesMap));
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInvertedIndexColumns(Arrays.asList(DOMAIN_NAMES_COL_NATIVE)).setFieldConfigList(fieldConfigs).build();
+        .setInvertedIndexColumns(Arrays.asList(DOMAIN_NAMES_COL)).setFieldConfigList(fieldConfigs).build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension(DOMAIN_NAMES_COL_NATIVE, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(DOMAIN_NAMES_COL, FieldSpec.DataType.STRING)
         .addSingleValueDimension(INT_COL, FieldSpec.DataType.INT)
         .build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
@@ -207,51 +171,36 @@ public class BenchmarkNativeVsLuceneTextIndex {
     }
   }
 
-  private ImmutableSegment loadLuceneSegment()
-      throws Exception {
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    Set<String> textIndexCols = new HashSet<>();
-    textIndexCols.add(DOMAIN_NAMES_COL_LUCENE);
-    indexLoadingConfig.setTextIndexColumns(textIndexCols);
-    Set<String> invertedIndexCols = new HashSet<>();
-    invertedIndexCols.add(DOMAIN_NAMES_COL_LUCENE);
-    indexLoadingConfig.setInvertedIndexColumns(invertedIndexCols);
-    return ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME_LUCENE), indexLoadingConfig);
-  }
-
-  private ImmutableSegment loadNativeIndexSegment()
+  private ImmutableSegment loadSegment(FSTType fstType)
       throws Exception {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
     Map<String, String> propertiesMap = new HashMap<>();
-    FSTType fstType = FSTType.NATIVE;
-    propertiesMap.put(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL);
 
-    Map<String, Map<String, String>> columnPropertiesParentMap = new HashMap<>();
+    if (fstType == FSTType.NATIVE) {
+      propertiesMap.put(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL);
+    }
+
     Set<String> textIndexCols = new HashSet<>();
-    textIndexCols.add(DOMAIN_NAMES_COL_NATIVE);
+    textIndexCols.add(DOMAIN_NAMES_COL);
     indexLoadingConfig.setTextIndexColumns(textIndexCols);
     indexLoadingConfig.setFSTIndexType(fstType);
     Set<String> invertedIndexCols = new HashSet<>();
-    invertedIndexCols.add(DOMAIN_NAMES_COL_NATIVE);
+    invertedIndexCols.add(DOMAIN_NAMES_COL);
     indexLoadingConfig.setInvertedIndexColumns(invertedIndexCols);
-    columnPropertiesParentMap.put(DOMAIN_NAMES_COL_NATIVE, propertiesMap);
-    indexLoadingConfig.setColumnProperties(columnPropertiesParentMap);
+
+
+    if (fstType == FSTType.NATIVE) {
+      Map<String, Map<String, String>> columnPropertiesParentMap = new HashMap<>();
+      columnPropertiesParentMap.put(DOMAIN_NAMES_COL, propertiesMap);
+      indexLoadingConfig.setColumnProperties(columnPropertiesParentMap);
+    }
+
     return ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME_NATIVE), indexLoadingConfig);
   }
 
   @Benchmark
   @CompilerControl(CompilerControl.Mode.DONT_INLINE)
   public void query(Blackhole bh) {
-    if (_fstType.equalsIgnoreCase("lucene")) {
-      _indexSegment = _luceneSegment;
-      _queryContext = _luceneQueryContext;
-    } else if (_fstType.equalsIgnoreCase("native")) {
-      _indexSegment = _nativeIndexSegment;
-      _queryContext = _nativeQueryContext;
-    } else {
-      throw new IllegalStateException("Unknown value seen");
-    }
-
     Operator<?> operator = _planMaker.makeSegmentPlanNode(_indexSegment, _queryContext).run();
     for (int i = 0; i < _numBlocks; i++) {
       bh.consume(operator.nextBlock());
