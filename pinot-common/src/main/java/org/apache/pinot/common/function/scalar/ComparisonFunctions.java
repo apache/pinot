@@ -27,38 +27,38 @@ public class ComparisonFunctions {
   private ComparisonFunctions() {
   }
 
-  @ScalarFunction(names = {"GREATER_THAN", "gt"})
+  @ScalarFunction
   public static boolean greaterThan(double a, double b) {
     return a > b;
   }
 
-  @ScalarFunction(names = {"GREATER_THAN_OR_EQUAL", "gte"})
-  public static boolean greaterThanOrEquals(double a, double b) {
+  @ScalarFunction
+  public static boolean greaterThanOrEqual(double a, double b) {
     return a >= b;
   }
 
-  @ScalarFunction(names = {"LESS_THAN", "lt"})
+  @ScalarFunction
   public static boolean lessThan(double a, double b) {
     return a < b;
   }
 
-  @ScalarFunction(names = {"LESS_THAN_OR_EQUAL", "lte"})
-  public static boolean lessThanOrEquals(double a, double b) {
+  @ScalarFunction
+  public static boolean lessThanOrEqual(double a, double b) {
     return a <= b;
   }
 
-  @ScalarFunction(names = {"NOT_EQUALS", "neq"})
+  @ScalarFunction
   public static boolean notEquals(double a, double b) {
     return (Math.abs(a - b) >= DOUBLE_COMPARISON_TOLERANCE);
   }
 
-  @ScalarFunction(names = {"EQUALS", "eq"})
+  @ScalarFunction
   public static boolean equals(double a, double b) {
     // To avoid approximation errors
     return (Math.abs(a - b) < DOUBLE_COMPARISON_TOLERANCE);
   }
 
-  @ScalarFunction(names = {"BETWEEN", "bw"})
+  @ScalarFunction
   public static boolean between(double val, double a, double b) {
     return (val > a) && (val < b);
   }

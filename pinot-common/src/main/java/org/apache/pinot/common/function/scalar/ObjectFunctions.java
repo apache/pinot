@@ -25,12 +25,12 @@ public class ObjectFunctions {
   private ObjectFunctions() {
   }
 
-  @ScalarFunction(names = {"IS_NULL"})
+  @ScalarFunction(nullableParameters = true)
   public static boolean isNull(Object obj) {
     return obj == null;
   }
 
-  @ScalarFunction(names = {"IS_NOT_NULL"})
+  @ScalarFunction(nullableParameters = true)
   public static boolean isNotNull(Object obj) {
     return !isNull(obj);
   }

@@ -126,12 +126,12 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
     @Override
     public Object execute(GenericRow row) {
-      return !((Boolean) (_argumentNode.execute(row)));
+      return !((Boolean) _argumentNode.execute(row));
     }
 
     @Override
     public Object execute(Object[] values) {
-      return !((Boolean) (_argumentNode.execute(values)));
+      return !((Boolean) _argumentNode.execute(values));
     }
   }
 
@@ -145,7 +145,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     @Override
     public Object execute(GenericRow row) {
       for (ExecutableNode executableNode :_argumentNodes) {
-        Boolean res = (Boolean) (executableNode.execute(row));
+        Boolean res = (Boolean) executableNode.execute(row);
         if (res) {
           return true;
         }
@@ -156,7 +156,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     @Override
     public Object execute(Object[] values) {
       for (ExecutableNode executableNode :_argumentNodes) {
-        Boolean res = (Boolean) (executableNode.execute(values));
+        Boolean res = (Boolean) executableNode.execute(values);
         if (res) {
           return true;
         }
@@ -175,7 +175,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     @Override
     public Object execute(GenericRow row) {
       for (ExecutableNode executableNode :_argumentNodes) {
-        Boolean res = (Boolean) (executableNode.execute(row));
+        Boolean res = (Boolean) executableNode.execute(row);
         if (!res) {
           return false;
         }
@@ -186,7 +186,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     @Override
     public Object execute(Object[] values) {
       for (ExecutableNode executableNode :_argumentNodes) {
-        Boolean res = (Boolean) (executableNode.execute(values));
+        Boolean res = (Boolean) executableNode.execute(values);
         if (!res) {
           return false;
         }
