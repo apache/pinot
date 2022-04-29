@@ -129,7 +129,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
   public void testQueries() {
     {
       String query = "SELECT * FROM testTable";
-      BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
@@ -146,7 +146,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT * FROM testTable ORDER BY %s DESC LIMIT 40", BIG_DECIMAL_COLUMN);
       // getBrokerResponseForSqlQuery(query) runs SQL query on multiple index segments. The result should be equivalent
       // to querying 4 identical index segments.
-      BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
@@ -165,7 +165,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
     {
       String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s", BIG_DECIMAL_COLUMN,
           BIG_DECIMAL_COLUMN);
-      BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
@@ -182,7 +182,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       int limit = 40;
       String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s LIMIT %d",
           BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, limit);
-      BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
@@ -197,7 +197,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
     }
     {
       String query = String.format("SELECT COUNT(%s) AS count FROM testTable", BIG_DECIMAL_COLUMN);
-      BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"count"}, new ColumnDataType[]{ColumnDataType.LONG}));
@@ -208,7 +208,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
     {
       String query = String.format("SELECT %s FROM testTable GROUP BY %s ORDER BY %s DESC",
           BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN);
-      BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{BIG_DECIMAL_COLUMN},
@@ -224,7 +224,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
     {
       String query = String.format("SELECT COUNT(*) AS count, %s FROM testTable GROUP BY %s ORDER BY %s DESC",
           BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN);
-      BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"count", BIG_DECIMAL_COLUMN},
@@ -240,7 +240,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
     }
     {
       String query = String.format("SELECT SUMPRECISION(%s) AS sum FROM testTable", BIG_DECIMAL_COLUMN);
-      BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"sum"}, new ColumnDataType[]{ColumnDataType.STRING}));
@@ -254,7 +254,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
 //      String query = String.format(
 //          "SELECT SUMPRECISION(%s) AS sum FROM (SELECT %s FROM testTable ORDER BY %s LIMIT %d)",
 //          BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, limit);
-//      BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+//      BrokerResponseNative brokerResponse = getBrokerResponse(query);
 //      ResultTable resultTable = brokerResponse.getResultTable();
 //      DataSchema dataSchema = resultTable.getDataSchema();
 //      assertEquals(dataSchema, new DataSchema(new String[]{"sum"}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
