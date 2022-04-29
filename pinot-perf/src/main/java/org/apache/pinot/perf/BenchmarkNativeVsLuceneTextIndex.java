@@ -253,9 +253,7 @@ public class BenchmarkNativeVsLuceneTextIndex {
     }
 
     Operator<?> operator = _planMaker.makeSegmentPlanNode(_indexSegment, _queryContext).run();
-    bh.consume(operator);
     for (int i = 0; i < _numBlocks; i++) {
-      operator.nextBlock();
       bh.consume(operator.nextBlock());
     }
   }
