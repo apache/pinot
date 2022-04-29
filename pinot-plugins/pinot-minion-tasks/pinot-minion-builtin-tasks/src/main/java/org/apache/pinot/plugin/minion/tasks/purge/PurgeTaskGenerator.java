@@ -68,6 +68,7 @@ public class PurgeTaskGenerator implements PinotTaskGenerator {
 
     @Override
     public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
+        // TODO: Pick lastly purged segment first to avoid looping again and again on the same segment
         LOGGER.info("Start generating PurgeTask");
         String taskType = MinionConstants.PurgeTask.TASK_TYPE;
         List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
