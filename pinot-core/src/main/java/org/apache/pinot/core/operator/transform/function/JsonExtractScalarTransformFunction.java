@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.transform.function;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Option;
@@ -58,7 +57,6 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "jsonExtractScalar";
 
   private static final ObjectMapper OBJECT_MAPPER_WITH_EXACT_BIG_DECIMAL = new ObjectMapper()
-      .setNodeFactory(JsonNodeFactory.withExactBigDecimals(true))
       .configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true);
 
   private static final ParseContext JSON_PARSER_CONTEXT_WITH_EXACT_BIG_DECIMAL = JsonPath.using(

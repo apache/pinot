@@ -20,7 +20,6 @@ package org.apache.pinot.core.common.evaluators;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.InvalidPathException;
 import com.jayway.jsonpath.JsonPath;
@@ -43,7 +42,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
 
   private static final ObjectMapper OBJECT_MAPPER_WITH_EXACT_BIG_DECIMAL = new ObjectMapper()
-      .setNodeFactory(JsonNodeFactory.withExactBigDecimals(true))
       .configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true);
 
   private static final ParseContext JSON_PARSER_CONTEXT = JsonPath.using(

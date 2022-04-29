@@ -75,8 +75,7 @@ public class JsonUtils {
   public static final String WILDCARD = "*";
 
   // NOTE: Do not expose the ObjectMapper to prevent configuration change
-  private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper()
-      .setNodeFactory(JsonNodeFactory.withExactBigDecimals(true));
+  private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
   public static final ObjectReader DEFAULT_READER = DEFAULT_MAPPER.reader();
   public static final ObjectWriter DEFAULT_WRITER = DEFAULT_MAPPER.writer();
   public static final ObjectWriter DEFAULT_PRETTY_WRITER = DEFAULT_MAPPER.writerWithDefaultPrettyPrinter();
