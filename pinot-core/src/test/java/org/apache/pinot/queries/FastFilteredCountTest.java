@@ -307,7 +307,7 @@ public class FastFilteredCountTest extends BaseQueriesTest {
 
   @Test(dataProvider = "testCases")
   public void test(String query, int expectedCount) {
-    Operator<?> operator = getOperatorForSqlQuery(query);
+    Operator<?> operator = getOperator(query);
     assertTrue(operator instanceof FastFilteredCountOperator);
     List<Object> aggregationResult = ((FastFilteredCountOperator) operator).nextBlock().getAggregationResult();
     assertNotNull(aggregationResult);
