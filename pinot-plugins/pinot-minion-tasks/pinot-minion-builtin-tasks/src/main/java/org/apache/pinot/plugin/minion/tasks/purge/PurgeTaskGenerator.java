@@ -28,7 +28,7 @@ import org.apache.pinot.common.data.Segment;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
-import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
+import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -41,16 +41,10 @@ import org.slf4j.LoggerFactory;
 
 
 @TaskGenerator
-public class PurgeTaskGenerator implements PinotTaskGenerator {
+public class PurgeTaskGenerator extends BaseTaskGenerator {
     private static final Logger LOGGER = LoggerFactory.getLogger(PurgeTaskGenerator.class);
 
-    private static final PurgeTaskGenerator INSTANCE = new PurgeTaskGenerator();
-
     private ClusterInfoAccessor _clusterInfoAccessor;
-
-    public static Object newInstance() {
-        return INSTANCE;
-    }
 
     @Override
     public void init(ClusterInfoAccessor clusterInfoAccessor) {
@@ -58,13 +52,10 @@ public class PurgeTaskGenerator implements PinotTaskGenerator {
         _clusterInfoAccessor = clusterInfoAccessor;
     }
 
-
     @Override
     public String getTaskType() {
         return MinionConstants.PurgeTask.TASK_TYPE;
     }
-
-
 
     @Override
     public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
@@ -100,10 +91,10 @@ public class PurgeTaskGenerator implements PinotTaskGenerator {
                     tableMaxNumTasks = Integer.parseInt(tableMaxNumTasksConfig);
                 } catch (Exception e) {
                     tableMaxNumTasks = Integer.MAX_VALUE;
+                    LOGGER.warn("MaxNumTasks have been wrongly set for table : {}, and task {}", tableName, taskType);
                 }
             } else {
                 tableMaxNumTasks = Integer.MAX_VALUE;
-                LOGGER.warn("MaxNumTasks have been incorrectly set for table : {}, and task {}", tableName, taskType);
             }
             List<SegmentZKMetadata> offlineSegmentsZKMetadata = _clusterInfoAccessor.getSegmentsZKMetadata(tableName);
             int tableNumTasks = 0;
