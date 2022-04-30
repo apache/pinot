@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.readers;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.io.File;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
@@ -28,7 +29,9 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.Assert;
@@ -46,6 +49,7 @@ public class ImmutableDictionaryTypeConversionTest {
   private static final String LONG_COLUMN_NAME = "longColumn";
   private static final String FLOAT_COLUMN_NAME = "floatColumn";
   private static final String DOUBLE_COLUMN_NAME = "doubleColumn";
+  private static final String BIG_DECIMAL_COLUMN_NAME = "bigDecimalColumn";
   private static final String STRING_COLUMN_NAME = "stringColumn";
   private static final String BYTES_COLUMN_NAME = "bytesColumn";
   private static final int NUM_VALUES = 1000;
@@ -59,6 +63,8 @@ public class ImmutableDictionaryTypeConversionTest {
   private long[] _longValues;
   private float[] _floatValues;
   private double[] _doubleValues;
+  private BigDecimal[] _bigDecimalValues;
+  private int _bigDecimalByteLength;
   private String[] _stringValues;
   private ByteArray[] _bytesValues;
 
@@ -67,6 +73,7 @@ public class ImmutableDictionaryTypeConversionTest {
   private long[] _longValuesBuffer;
   private float[] _floatValuesBuffer;
   private double[] _doubleValuesBuffer;
+  private BigDecimal[] _bigDecimalValuesBuffer;
   private String[] _stringValuesBuffer;
   private byte[][] _bytesValuesBuffer;
 
@@ -90,6 +97,12 @@ public class ImmutableDictionaryTypeConversionTest {
 
     _doubleValues = new double[NUM_VALUES];
     ArrayCopyUtils.copy(_intValues, _doubleValues, NUM_VALUES);
+
+    _bigDecimalValues = new BigDecimal[NUM_VALUES];
+    ArrayCopyUtils.copy(_intValues, _bigDecimalValues, NUM_VALUES);
+    for (BigDecimal bigDecimal : _bigDecimalValues) {
+      _bigDecimalByteLength = Math.max(_bigDecimalByteLength, BigDecimalUtils.byteSize(bigDecimal));
+    }
 
     _stringValues = new String[NUM_VALUES];
     ArrayCopyUtils.copy(_intValues, _stringValues, NUM_VALUES);
@@ -119,6 +132,14 @@ public class ImmutableDictionaryTypeConversionTest {
       dictionaryCreator.build();
     }
 
+    MetricFieldSpec bigDecimalMetricField = new MetricFieldSpec(BIG_DECIMAL_COLUMN_NAME,
+        FieldSpec.DataType.BIG_DECIMAL);
+    bigDecimalMetricField.setSingleValueField(true);
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_bigDecimalValues,
+        bigDecimalMetricField, TEMP_DIR)) {
+      dictionaryCreator.build();
+    }
+
     try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_stringValues,
         new DimensionFieldSpec(STRING_COLUMN_NAME, FieldSpec.DataType.STRING, true), TEMP_DIR)) {
       dictionaryCreator.build();
@@ -139,6 +160,7 @@ public class ImmutableDictionaryTypeConversionTest {
     _longValuesBuffer = new long[NUM_VALUES];
     _floatValuesBuffer = new float[NUM_VALUES];
     _doubleValuesBuffer = new double[NUM_VALUES];
+    _bigDecimalValuesBuffer = new BigDecimal[NUM_VALUES];
     _stringValuesBuffer = new String[NUM_VALUES];
     _bytesValuesBuffer = new byte[NUM_VALUES][];
   }
@@ -223,6 +245,16 @@ public class ImmutableDictionaryTypeConversionTest {
     }
   }
 
+  @Test
+  public void testBigDecimalDictionary()
+      throws Exception {
+    try (BigDecimalDictionary bigDecimalDictionary = new BigDecimalDictionary(PinotDataBuffer
+        .mapReadOnlyBigEndianFile(new File(TEMP_DIR, BIG_DECIMAL_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
+        NUM_VALUES, _bigDecimalByteLength)) {
+      testNumericDictionary(bigDecimalDictionary);
+    }
+  }
+
   private void testNumericDictionary(BaseImmutableDictionary dictionary) {
     for (int i = 0; i < NUM_VALUES; i++) {
       Assert.assertEquals(((Number) dictionary.get(i)).intValue(), _intValues[i]);
@@ -240,6 +272,10 @@ public class ImmutableDictionaryTypeConversionTest {
     Assert.assertEquals(_floatValuesBuffer, _floatValues);
     dictionary.readDoubleValues(_dictIds, NUM_VALUES, _doubleValuesBuffer);
     Assert.assertEquals(_doubleValuesBuffer, _doubleValues);
+    dictionary.readBigDecimalValues(_dictIds, NUM_VALUES, _bigDecimalValuesBuffer);
+    for (int i = 0; i < _bigDecimalValuesBuffer.length; i++) {
+      Assert.assertEquals(_bigDecimalValuesBuffer[i].compareTo(_bigDecimalValues[i]), 0);
+    }
     dictionary.readStringValues(_dictIds, NUM_VALUES, _stringValuesBuffer);
     for (int i = 0; i < NUM_VALUES; i++) {
       Assert.assertEquals(Double.parseDouble(_stringValuesBuffer[i]), _doubleValues[i]);
@@ -247,13 +283,17 @@ public class ImmutableDictionaryTypeConversionTest {
 
     try {
       dictionary.getBytesValue(0);
-      Assert.fail();
+      if (dictionary.getClass() != BigDecimalDictionary.class) {
+        Assert.fail();
+      }
     } catch (UnsupportedOperationException e) {
       // Expected
     }
     try {
       dictionary.readBytesValues(_dictIds, NUM_VALUES, _bytesValuesBuffer);
-      Assert.fail();
+      if (dictionary.getClass() != BigDecimalDictionary.class) {
+        Assert.fail();
+      }
     } catch (UnsupportedOperationException e) {
       // Expected
     }

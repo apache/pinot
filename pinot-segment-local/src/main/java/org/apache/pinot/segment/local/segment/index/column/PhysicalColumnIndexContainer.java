@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.Map;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDictionary;
+import org.apache.pinot.segment.local.segment.index.readers.BigDecimalDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.BytesDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.DoubleDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.FloatDictionary;
@@ -246,8 +247,12 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         return (loadOnHeap) ? new OnHeapDoubleDictionary(dictionaryBuffer, length)
             : new DoubleDictionary(dictionaryBuffer, length);
 
-      case STRING:
+      case BIG_DECIMAL:
         int numBytesPerValue = metadata.getColumnMaxLength();
+        return new BigDecimalDictionary(dictionaryBuffer, length, numBytesPerValue);
+
+      case STRING:
+        numBytesPerValue = metadata.getColumnMaxLength();
         byte paddingByte = (byte) metadata.getPaddingCharacter();
         return loadOnHeap ? new OnHeapStringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte)
             : new StringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte);

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
@@ -116,6 +117,14 @@ public interface TransformFunction {
    * @return Transformation result
    */
   double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock);
+
+  /**
+   * Transforms the data from the given projection block to single-valued BigDecimal values.
+   *
+   * @param projectionBlock Projection result
+   * @return Transformation result
+   */
+  BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock);
 
   /**
    * Transforms the data from the given projection block to single-valued string values.

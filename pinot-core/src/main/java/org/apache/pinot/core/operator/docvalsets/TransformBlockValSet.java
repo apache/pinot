@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.docvalsets;
 
+import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
@@ -100,6 +101,14 @@ public class TransformBlockValSet implements BlockValSet {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.DOUBLE, true);
       return _transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    }
+  }
+
+  @Override
+  public BigDecimal[] getBigDecimalValuesSV() {
+    try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
+      recordTransformValues(scope, DataType.BIG_DECIMAL, true);
+      return _transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
     }
   }
 

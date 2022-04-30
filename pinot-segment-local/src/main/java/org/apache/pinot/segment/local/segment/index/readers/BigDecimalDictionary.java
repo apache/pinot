@@ -19,97 +19,78 @@
 package org.apache.pinot.segment.local.segment.index.readers;
 
 import java.math.BigDecimal;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
-import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
- * Dictionary of a single bytes ({@code byte[]}) value.
+ * Extension of {@link BaseImmutableDictionary} that implements immutable dictionary for BigDecimal type.
  */
-public class ConstantValueBytesDictionary extends BaseImmutableDictionary {
-  private final byte[] _value;
+public class BigDecimalDictionary extends BaseImmutableDictionary {
 
-  public ConstantValueBytesDictionary(byte[] value) {
-    super(1);
-    _value = value;
+  public BigDecimalDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue) {
+    // Works with VarLengthValueBuffer only.
+    super(dataBuffer, length, numBytesPerValue, (byte) 0);
   }
 
   @Override
   public DataType getValueType() {
-    return DataType.BYTES;
+    return DataType.BIG_DECIMAL;
   }
 
   @Override
   public int insertionIndexOf(String stringValue) {
-    int result = ByteArray.compare(BytesUtils.toBytes(stringValue), _value);
-    if (result < 0) {
-      return -1;
-    }
-    if (result > 0) {
-      return -2;
-    }
-    return 0;
+    return binarySearch(new BigDecimal(stringValue));
   }
 
   @Override
-  public ByteArray getMinVal() {
-    return new ByteArray(_value);
+  public BigDecimal getMinVal() {
+    return BigDecimalUtils.deserialize(getBytes(0));
   }
 
   @Override
-  public ByteArray getMaxVal() {
-    return new ByteArray(_value);
+  public BigDecimal getMaxVal() {
+    return BigDecimalUtils.deserialize(getBytes(length() - 1));
   }
 
   @Override
-  public Object getSortedValues() {
-    return new ByteArray[]{new ByteArray(_value)};
-  }
-
-  @Override
-  public byte[] get(int dictId) {
-    return _value;
-  }
-
-  @Override
-  public Object getInternal(int dictId) {
-    return new ByteArray(_value);
+  public BigDecimal get(int dictId) {
+    return getBigDecimal(dictId);
   }
 
   @Override
   public int getIntValue(int dictId) {
-    throw new UnsupportedOperationException();
+    return get(dictId).intValue();
   }
 
   @Override
   public long getLongValue(int dictId) {
-    throw new UnsupportedOperationException();
+    return get(dictId).longValue();
   }
 
   @Override
   public float getFloatValue(int dictId) {
-    throw new UnsupportedOperationException();
+    return get(dictId).floatValue();
   }
 
   @Override
   public double getDoubleValue(int dictId) {
-    throw new UnsupportedOperationException();
+    return get(dictId).doubleValue();
   }
 
   @Override
   public BigDecimal getBigDecimalValue(int dictId) {
-    return BigDecimalUtils.deserialize(_value);
+    return getBigDecimal(dictId);
   }
 
   @Override
   public String getStringValue(int dictId) {
-    return BytesUtils.toHexString(_value);
+    return get(dictId).toPlainString();
   }
 
   @Override
   public byte[] getBytesValue(int dictId) {
-    return _value;
+    return getBytes(dictId);
   }
 }

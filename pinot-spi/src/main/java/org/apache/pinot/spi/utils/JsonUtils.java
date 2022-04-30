@@ -556,6 +556,8 @@ public class JsonUtils {
       return DataType.BOOLEAN;
     } else if (jsonNode.isBinary()) {
       return DataType.BYTES;
+    } else if (jsonNode.isBigDecimal()) {
+      return DataType.BIG_DECIMAL;
     } else {
       return DataType.STRING;
     }

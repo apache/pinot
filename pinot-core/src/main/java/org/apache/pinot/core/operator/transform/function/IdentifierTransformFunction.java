@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
@@ -99,6 +100,12 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
     return projectionBlock.getBlockValueSet(_columnName).getDoubleValuesSV();
   }
 
+
+  @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    return projectionBlock.getBlockValueSet(_columnName).getBigDecimalValuesSV();
+  }
+
   @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getStringValuesSV();
@@ -152,6 +159,12 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
   @Override
   public void transformToDoubleValuesSV(ProjectionBlock projectionBlock, TransformEvaluator evaluator,
       double[] buffer) {
+    projectionBlock.fillValues(_columnName, evaluator, buffer);
+  }
+
+  @Override
+  public void transformToBigDecimalValuesSV(ProjectionBlock projectionBlock, TransformEvaluator evaluator,
+      BigDecimal[] buffer) {
     projectionBlock.fillValues(_columnName, evaluator, buffer);
   }
 

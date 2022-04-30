@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers;
 
+import java.math.BigDecimal;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -61,6 +62,11 @@ public class LongDictionary extends BaseImmutableDictionary {
   @Override
   public double getDoubleValue(int dictId) {
     return getLong(dictId);
+  }
+
+  @Override
+  public BigDecimal getBigDecimalValue(int dictId) {
+    return BigDecimal.valueOf(getLong(dictId));
   }
 
   @Override

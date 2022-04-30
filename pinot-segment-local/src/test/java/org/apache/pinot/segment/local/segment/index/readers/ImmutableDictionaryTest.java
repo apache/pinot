@@ -23,10 +23,12 @@ import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.io.File;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
+import java.util.TreeSet;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
@@ -34,6 +36,8 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.Assert;
@@ -51,6 +55,7 @@ public class ImmutableDictionaryTest {
   private static final String LONG_COLUMN_NAME = "longColumn";
   private static final String FLOAT_COLUMN_NAME = "floatColumn";
   private static final String DOUBLE_COLUMN_NAME = "doubleColumn";
+  private static final String BIG_DECIMAL_COLUMN_NAME = "bigDecimalColumn";
   private static final String STRING_COLUMN_NAME = "stringColumn";
   private static final String BYTES_COLUMN_NAME = "bytesColumn";
   private static final int NUM_VALUES = 1000;
@@ -61,6 +66,8 @@ public class ImmutableDictionaryTest {
   private long[] _longValues;
   private float[] _floatValues;
   private double[] _doubleValues;
+  private BigDecimal[] _bigDecimalValues;
+  private int _bigDecimalByteLength;
   private String[] _stringValues;
   private ByteArray[] _bytesValues;
 
@@ -99,6 +106,15 @@ public class ImmutableDictionaryTest {
     _doubleValues = doubleSet.toDoubleArray();
     Arrays.sort(_doubleValues);
 
+    TreeSet<BigDecimal> bigDecimalSet = new TreeSet<>();
+    while (bigDecimalSet.size() < NUM_VALUES) {
+      BigDecimal bigDecimal = BigDecimal.valueOf(RANDOM.nextDouble());
+      _bigDecimalByteLength = Math.max(_bigDecimalByteLength, BigDecimalUtils.byteSize(bigDecimal));
+      bigDecimalSet.add(bigDecimal);
+    }
+    _bigDecimalValues = bigDecimalSet.toArray(new BigDecimal[0]);
+    Arrays.sort(_bigDecimalValues);
+
     Set<String> stringSet = new HashSet<>();
     while (stringSet.size() < NUM_VALUES) {
       stringSet.add(RandomStringUtils.random(RANDOM.nextInt(MAX_STRING_LENGTH)).replace('\0', ' '));
@@ -132,6 +148,17 @@ public class ImmutableDictionaryTest {
 
     try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_doubleValues,
         new DimensionFieldSpec(DOUBLE_COLUMN_NAME, FieldSpec.DataType.DOUBLE, true), TEMP_DIR)) {
+      dictionaryCreator.build();
+    }
+
+    // Note: BigDecimalDictionary requires setting useVarLengthDictionary to true.
+    boolean useVarLengthDictionary = true;
+    MetricFieldSpec bigDecimalMetricField =
+        new MetricFieldSpec(BIG_DECIMAL_COLUMN_NAME, FieldSpec.DataType.BIG_DECIMAL);
+    bigDecimalMetricField.setSingleValueField(true);
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_bigDecimalValues,
+        bigDecimalMetricField, TEMP_DIR,
+        useVarLengthDictionary)) {
       dictionaryCreator.build();
     }
 
@@ -293,6 +320,34 @@ public class ImmutableDictionaryTest {
       double randomDouble = RANDOM.nextDouble();
       assertEquals(doubleDictionary.insertionIndexOf(String.valueOf(randomDouble)),
           Arrays.binarySearch(_doubleValues, randomDouble));
+    }
+  }
+
+  @Test
+  public void testBigDecimalDictionary()
+      throws Exception {
+    try (BigDecimalDictionary bigDecimalDictionary = new BigDecimalDictionary(PinotDataBuffer
+        .mapReadOnlyBigEndianFile(new File(TEMP_DIR, BIG_DECIMAL_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
+        NUM_VALUES, _bigDecimalByteLength)) {
+      testBigDecimalDictionary(bigDecimalDictionary);
+    }
+  }
+
+  private void testBigDecimalDictionary(BaseImmutableDictionary bigDecimalDictionary) {
+    for (int i = 0; i < NUM_VALUES; i++) {
+      assertEquals(bigDecimalDictionary.get(i), _bigDecimalValues[i]);
+      assertEquals(bigDecimalDictionary.getIntValue(i), _bigDecimalValues[i].intValue());
+      assertEquals(bigDecimalDictionary.getLongValue(i), _bigDecimalValues[i].longValue());
+      assertEquals(bigDecimalDictionary.getFloatValue(i), _bigDecimalValues[i].floatValue());
+      assertEquals(bigDecimalDictionary.getDoubleValue(i), _bigDecimalValues[i].doubleValue());
+      assertEquals(bigDecimalDictionary.getBigDecimalValue(i), _bigDecimalValues[i]);
+      Assert.assertEquals(new BigDecimal(bigDecimalDictionary.getStringValue(i)), _bigDecimalValues[i]);
+
+      assertEquals(bigDecimalDictionary.indexOf(String.valueOf(_bigDecimalValues[i])), i);
+
+      BigDecimal randomBigDecimal = BigDecimal.valueOf(RANDOM.nextDouble());
+      assertEquals(bigDecimalDictionary.insertionIndexOf(String.valueOf(randomBigDecimal)),
+          Arrays.binarySearch(_bigDecimalValues, randomBigDecimal));
     }
   }
 

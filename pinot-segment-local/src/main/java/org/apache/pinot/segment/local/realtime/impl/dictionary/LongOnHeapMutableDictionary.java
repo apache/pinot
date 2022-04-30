@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.realtime.impl.dictionary;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.ints.IntSets;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -184,6 +185,11 @@ public class LongOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   @Override
   public double getDoubleValue(int dictId) {
     return getLongValue(dictId);
+  }
+
+  @Override
+  public BigDecimal getBigDecimalValue(int dictId) {
+    return BigDecimal.valueOf(getLongValue(dictId));
   }
 
   @Override

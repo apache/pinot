@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.ParseContext;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.JsonPathCache;
@@ -46,12 +49,19 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * jsonExtractScalar(jsonFieldName, 'jsonPath', 'resultsType')
  * <code>jsonFieldName</code> is the Json String field/expression.
  * <code>jsonPath</code> is a JsonPath expression which used to read from JSON document
- * <code>results_type</code> refers to the results data type, could be INT, LONG, FLOAT, DOUBLE, STRING, INT_ARRAY,
- * LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY.
+ * <code>results_type</code> refers to the results data type, could be INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL, STRING,
+ * INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY.
  *
  */
 public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "jsonExtractScalar";
+
+  private static final ObjectMapper OBJECT_MAPPER_WITH_BIG_DECIMAL = new ObjectMapper()
+      .configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true);
+
+  private static final ParseContext JSON_PARSER_CONTEXT_WITH_BIG_DECIMAL = JsonPath.using(
+      new Configuration.ConfigurationBuilder().jsonProvider(new JacksonJsonProvider(OBJECT_MAPPER_WITH_BIG_DECIMAL))
+          .mappingProvider(new JacksonMappingProvider()).options(Option.SUPPRESS_EXCEPTIONS).build());
 
   private static final ParseContext JSON_PARSER_CONTEXT = JsonPath.using(
       new Configuration.ConfigurationBuilder().jsonProvider(new JacksonJsonProvider())
@@ -99,8 +109,8 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     } catch (Exception e) {
       throw new IllegalStateException(String.format(
           "Unsupported results type: %s for jsonExtractScalar function. Supported types are: "
-              + "INT/LONG/FLOAT/DOUBLE/BOOLEAN/TIMESTAMP/STRING/INT_ARRAY/LONG_ARRAY/FLOAT_ARRAY/DOUBLE_ARRAY"
-              + "/STRING_ARRAY", resultsType));
+              + "INT/LONG/FLOAT/DOUBLE/BOOLEAN/BIG_DECIMAL/TIMESTAMP/STRING/INT_ARRAY/LONG_ARRAY/FLOAT_ARRAY"
+              + "/DOUBLE_ARRAY/STRING_ARRAY", resultsType));
     }
   }
 
@@ -280,6 +290,48 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    int numDocs = projectionBlock.getNumDocs();
+    if (_bigDecimalValuesSV == null || _bigDecimalValuesSV.length < numDocs) {
+      _bigDecimalValuesSV = new BigDecimal[numDocs];
+    }
+    if (_jsonFieldTransformFunction instanceof PushDownTransformFunction) {
+      ((PushDownTransformFunction) _jsonFieldTransformFunction)
+          .transformToBigDecimalValuesSV(projectionBlock, _jsonPathEvaluator, _bigDecimalValuesSV);
+      return _bigDecimalValuesSV;
+    }
+    return transformTransformedValuesToBigDecimalValuesSV(projectionBlock);
+  }
+
+  private BigDecimal[] transformTransformedValuesToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    // operating on the output of another transform so can't pass the evaluation down to the storage
+    ensureJsonPathCompiled();
+    String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
+    int numDocs = projectionBlock.getNumDocs();
+    for (int i = 0; i < numDocs; i++) {
+      Object result = null;
+      try {
+        result = JSON_PARSER_CONTEXT_WITH_BIG_DECIMAL.parse(jsonStrings[i]).read(_jsonPath);
+      } catch (Exception ignored) {
+      }
+      if (result == null) {
+        if (_defaultValue != null) {
+          _bigDecimalValuesSV[i] = (BigDecimal) _defaultValue;
+          continue;
+        }
+        throw new RuntimeException(
+            String.format("Illegal Json Path: [%s], when reading [%s]", _jsonPathString, jsonStrings[i]));
+      }
+      if (result instanceof Number) {
+        _bigDecimalValuesSV[i] = (BigDecimal) result;
+      } else {
+        _bigDecimalValuesSV[i] = new BigDecimal(result.toString());
+      }
+    }
+    return _bigDecimalValuesSV;
+  }
+
+  @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
     if (_stringValuesSV == null || _stringValuesSV.length < numDocs) {
@@ -301,7 +353,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     for (int i = 0; i < numDocs; i++) {
       Object result = null;
       try {
-        result = JSON_PARSER_CONTEXT.parse(jsonStrings[i]).read(_jsonPath);
+        result = JSON_PARSER_CONTEXT_WITH_BIG_DECIMAL.parse(jsonStrings[i]).read(_jsonPath);
       } catch (Exception ignored) {
       }
       if (result == null) {

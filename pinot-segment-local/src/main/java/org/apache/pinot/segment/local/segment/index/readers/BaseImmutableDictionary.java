@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.readers;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.segment.local.io.util.ValueReader;
@@ -189,6 +190,24 @@ public abstract class BaseImmutableDictionary implements Dictionary {
     return -(low + 1);
   }
 
+  protected int binarySearch(BigDecimal value) {
+    int low = 0;
+    int high = _length - 1;
+    while (low <= high) {
+      int mid = (low + high) >>> 1;
+      BigDecimal midValue = _valueReader.getBigDecimal(mid, _numBytesPerValue);
+      int compareResult = midValue.compareTo(value);
+      if (compareResult < 0) {
+        low = mid + 1;
+      } else if (compareResult > 0) {
+        high = mid - 1;
+      } else {
+        return mid;
+      }
+    }
+    return -(low + 1);
+  }
+
   /**
    * WARNING: With non-zero padding byte, binary search result might not reflect the real insertion index for the value.
    * E.g. with padding byte 'b', if unpadded value "aa" is in the dictionary, and stored as "aab", then unpadded value
@@ -279,6 +298,10 @@ public abstract class BaseImmutableDictionary implements Dictionary {
 
   protected double getDouble(int dictId) {
     return _valueReader.getDouble(dictId);
+  }
+
+  protected BigDecimal getBigDecimal(int dictId) {
+    return _valueReader.getBigDecimal(dictId, _numBytesPerValue);
   }
 
   protected String getUnpaddedString(int dictId, byte[] buffer) {
