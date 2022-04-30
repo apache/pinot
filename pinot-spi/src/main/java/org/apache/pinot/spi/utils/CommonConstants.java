@@ -231,6 +231,8 @@ public class CommonConstants {
 
     public static final String DISABLE_GROOVY = "pinot.broker.disable.query.groovy";
 
+    public static final String CONTROLLER_URL = "pinot.broker.controller.url";
+
     public static class Request {
       public static final String PQL = "pql";
       public static final String SQL = "sql";

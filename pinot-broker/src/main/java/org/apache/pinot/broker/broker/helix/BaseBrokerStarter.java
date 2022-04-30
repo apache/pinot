@@ -58,6 +58,7 @@ import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -103,6 +104,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected BrokerRoutingManager _routingManager;
   protected AccessControlFactory _accessControlFactory;
   protected BrokerRequestHandler _brokerRequestHandler;
+  protected SqlQueryExecutor _sqlQueryExecutor;
   protected BrokerAdminApiApplication _brokerAdminApplication;
   protected ClusterChangeMediator _clusterChangeMediator;
   // Participant Helix manager handles Helix functionality such as state transitions and messages
@@ -266,10 +268,16 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       }
     }
     _brokerRequestHandler.start();
-
+    String controllerUrl = _brokerConf.getProperty(Broker.CONTROLLER_URL);
+    if (controllerUrl != null) {
+      _sqlQueryExecutor = new SqlQueryExecutor(controllerUrl);
+    } else {
+      _sqlQueryExecutor = new SqlQueryExecutor(_spectatorHelixManager);
+    }
     LOGGER.info("Starting broker admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _brokerAdminApplication =
-        new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf);
+        new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
+            _sqlQueryExecutor);
     _brokerAdminApplication.start(_listenerConfigs);
 
     LOGGER.info("Initializing cluster change mediator");

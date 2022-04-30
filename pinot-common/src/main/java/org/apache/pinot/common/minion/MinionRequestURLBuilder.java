@@ -90,4 +90,8 @@ public class MinionRequestURLBuilder {
   public String forTaskTypeDelete(String taskType) {
     return StringUtil.join("/", _baseUrl, "tasks", taskType);
   }
+
+  public String forTaskExecute() {
+    return StringUtil.join("/", _baseUrl, "tasks/execute");
+  }
 }

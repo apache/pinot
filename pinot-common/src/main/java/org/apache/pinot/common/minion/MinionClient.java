@@ -27,10 +27,12 @@ import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.config.task.AdhocTaskConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -107,6 +109,25 @@ public class MinionClient {
               responseString));
     }
     return responseString;
+  }
+
+  public Map<String, String> executeTask(AdhocTaskConfig adhocTaskConfig, @Nullable Map<String, String> headers)
+      throws IOException {
+    HttpPost httpPost = createHttpPostRequest(MinionRequestURLBuilder.baseUrl(getControllerUrl()).forTaskExecute());
+    httpPost.setEntity(new StringEntity(adhocTaskConfig.toJsonString()));
+    if (headers != null) {
+      headers.remove("content-length");
+      headers.entrySet().forEach(entry -> httpPost.setHeader(entry.getKey(), entry.getValue()));
+    }
+    HttpResponse response = HTTP_CLIENT.execute(httpPost);
+    int statusCode = response.getStatusLine().getStatusCode();
+    final String responseString = IOUtils.toString(response.getEntity().getContent());
+    if (statusCode >= 400) {
+      throw new HttpException(String
+          .format("Unable to get tasks states map. Error code %d, Error message: %s", statusCode, responseString));
+    }
+    return JsonUtils.stringToObject(responseString, new TypeReference<Map<String, String>>() {
+    });
   }
 
   private HttpGet createHttpGetRequest(String uri) {
