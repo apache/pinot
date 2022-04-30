@@ -35,6 +35,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -94,6 +95,51 @@ public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIn
           // To avoid the NoTaskScheduledException after all files are ingested.
           sendPostRequest(url, JsonUtils.objectToString(adhocTaskConfig),
               Collections.singletonMap("accept", "application/json"));
+        }
+        return getTotalDocs(tableName) == rowCnt;
+      } catch (Exception e) {
+        LOGGER.error("Failed to get expected totalDocs: " + rowCnt, e);
+        return false;
+      }
+    }, 5000L, 600_000L, "Failed to load " + rowCnt + " documents", true);
+    JsonNode result = postQuery("SELECT COUNT(*) FROM " + tableName, _brokerBaseApiUrl);
+    // One segment per file.
+    assertEquals(result.get("numSegmentsQueried").asInt(), 7);
+  }
+
+  @Test
+  public void testInsertIntoFromFileQueryToBroker()
+      throws Exception {
+    testInsertIntoFromFile("testInsertIntoFromFileQueryToBroker", "testInsertIntoFromFileQueryToBrokerTask", false);
+  }
+
+  @Test
+  public void testInsertIntoFromFileQueryToController()
+      throws Exception {
+    testInsertIntoFromFile("testInsertIntoFromFileQueryToController", "testInsertIntoFromFileQueryToControllerTask",
+        true);
+  }
+
+  private void testInsertIntoFromFile(String tableName, String taskName, boolean queryController)
+      throws Exception {
+    addSchemaAndTableConfig(tableName);
+
+    File inputDir = new File(_tempDir, tableName);
+    int rowCnt = prepInputFiles(inputDir, 7, 10);
+    assertEquals(rowCnt, 70);
+
+    String insertFileStatement =
+        String.format("INSERT INTO %s FROM FILE '%s' OPTION(taskName=%s)", tableName, inputDir.getAbsolutePath(),
+            taskName);
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        if (getTotalDocs(tableName) < rowCnt) {
+          JsonNode response = queryController ? postQueryToController(insertFileStatement, _controllerBaseApiUrl)
+              : postQuery(insertFileStatement, _brokerBaseApiUrl);
+          Assert.assertEquals(response.get("resultTable").get("rows").get(0).get(0).asText(),
+              tableName + "_OFFLINE");
+          Assert.assertEquals(response.get("resultTable").get("rows").get(0).get(1).asText(),
+              "Task_SegmentGenerationAndPushTask_" + taskName);
         }
         return getTotalDocs(tableName) == rowCnt;
       } catch (Exception e) {

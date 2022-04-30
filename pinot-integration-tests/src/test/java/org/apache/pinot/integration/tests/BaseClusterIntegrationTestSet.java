@@ -306,7 +306,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         // matching query
         "SELECT count(*) FROM mytable",
         // query that does not match any row
-        "SELECT count(*) FROM mytable where non_existing_column='non_existing_value",
+        "SELECT count(*) FROM mytable where non_existing_column='non_existing_value'",
         // query a non existing table
         "SELECT count(*) FROM mytable_foo"
     };
