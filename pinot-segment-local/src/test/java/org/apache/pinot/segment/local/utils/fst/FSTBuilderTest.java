@@ -18,11 +18,12 @@
  */
 package org.apache.pinot.segment.local.utils.fst;
 
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntList;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteOrder;
-import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
@@ -80,13 +81,15 @@ public class FSTBuilderTest {
     PinotBufferIndexInput indexInput = new PinotBufferIndexInput(pinotDataBuffer, 0L, fstFile.length());
     FST<Long> readFST = new FST(indexInput, outputs, new OffHeapFSTStore());
 
-    List<Long> results = RegexpMatcher.regexMatch("hello.*123", fst);
+    IntList results = new IntArrayList();
+    RegexpMatcher.regexMatch("hello.*123", fst, results::add);
     Assert.assertEquals(results.size(), 1);
-    Assert.assertEquals(results.get(0).longValue(), 21L);
+    Assert.assertEquals(results.getInt(0), 21);
 
-    results = RegexpMatcher.regexMatch(".*world", fst);
+    results.clear();
+    RegexpMatcher.regexMatch(".*world", fst, results::add);
     Assert.assertEquals(results.size(), 1);
-    Assert.assertEquals(results.get(0).longValue(), 12L);
+    Assert.assertEquals(results.getInt(0), 12);
   }
 
   @AfterClass

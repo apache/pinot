@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.index.readers;
 
 import java.io.IOException;
-import java.util.List;
 import org.apache.lucene.util.fst.FST;
 import org.apache.lucene.util.fst.OffHeapFSTStore;
 import org.apache.lucene.util.fst.PositiveIntOutputs;
@@ -27,6 +26,7 @@ import org.apache.pinot.segment.local.utils.fst.PinotBufferIndexInput;
 import org.apache.pinot.segment.local.utils.fst.RegexpMatcher;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -62,12 +62,9 @@ public class LuceneFSTIndexReader implements TextIndexReader {
   @Override
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
     try {
-      MutableRoaringBitmap dictIds = new MutableRoaringBitmap();
-      List<Long> matchingIds = RegexpMatcher.regexMatch(searchQuery, _readFST);
-      for (Long matchingId : matchingIds) {
-        dictIds.add(matchingId.intValue());
-      }
-      return dictIds.toImmutableRoaringBitmap();
+      RoaringBitmapWriter<MutableRoaringBitmap> dictIdsAccumulator = RoaringBitmapWriter.bufferWriter().get();
+      RegexpMatcher.regexMatch(searchQuery, _readFST, dictIdsAccumulator::add);
+      return dictIdsAccumulator.get();
     } catch (Exception ex) {
       LOGGER.error("Error getting matching Ids from FST", ex);
       throw new RuntimeException(ex);

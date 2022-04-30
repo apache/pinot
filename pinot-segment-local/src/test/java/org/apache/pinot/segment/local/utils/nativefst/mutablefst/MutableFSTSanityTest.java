@@ -70,7 +70,8 @@ public class MutableFSTSanityTest {
   private void testRegex(String regex)
       throws IOException {
     List<Long> nativeResults = regexQueryNrHitsWithResults(regex, _mutableFST);
-    List<Long> results = RegexpMatcher.regexMatch(regex, _fst);
+    List<Long> results = new ArrayList<>();
+    RegexpMatcher.regexMatch(regex, _fst, i -> results.add((long) i));
     nativeResults.sort(null);
     results.sort(null);
     assertEquals(nativeResults, results);

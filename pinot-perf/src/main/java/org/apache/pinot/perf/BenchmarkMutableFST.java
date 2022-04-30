@@ -21,7 +21,6 @@ package org.apache.pinot.perf;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.List;
 import java.util.Objects;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -84,14 +83,15 @@ public class BenchmarkMutableFST {
   public MutableRoaringBitmap testMutableRegex() {
     RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
     RealTimeRegexpMatcher.regexMatch(_regex, _mutableFST, writer::add);
-
     return writer.get();
   }
 
   @Benchmark
-  public List testLuceneRegex()
+  public MutableRoaringBitmap testLuceneRegex()
       throws IOException {
-    return RegexpMatcher.regexMatch(_regex, _fst);
+    RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
+    RegexpMatcher.regexMatch(_regex, _fst, writer::add);
+    return writer.get();
   }
 
   public static void main(String[] args)

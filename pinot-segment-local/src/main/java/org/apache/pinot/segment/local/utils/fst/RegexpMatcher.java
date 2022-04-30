@@ -20,8 +20,8 @@ package org.apache.pinot.segment.local.utils.fst;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.function.IntConsumer;
 import org.apache.lucene.util.IntsRefBuilder;
 import org.apache.lucene.util.automaton.Automaton;
 import org.apache.lucene.util.automaton.CharacterRunAutomaton;
@@ -54,10 +54,10 @@ public class RegexpMatcher {
     _automaton = (new RegExp(_regexQuery)).toAutomaton();
   }
 
-  public static List<Long> regexMatch(String regexQuery, FST<Long> fst)
+  public static void regexMatch(String regexQuery, FST<Long> fst, IntConsumer consumer)
       throws IOException {
     RegexpMatcher matcher = new RegexpMatcher(regexQuery, fst);
-    return matcher.regexMatchOnFST();
+    matcher.regexMatchOnFST(consumer);
   }
 
   // Matches "input" string with _regexQuery Automaton.
@@ -82,16 +82,15 @@ public class RegexpMatcher {
    * @return
    * @throws IOException
    */
-  public List<Long> regexMatchOnFST()
+  public void regexMatchOnFST(IntConsumer consumer)
       throws IOException {
-    final List<Path<Long>> queue = new ArrayList<>();
-    final List<Path<Long>> endNodes = new ArrayList<>();
     if (_automaton.getNumStates() == 0) {
-      return Collections.emptyList();
+      return;
     }
+    final List<Path<Long>> queue = new ArrayList<>();
 
     // Automaton start state and FST start node is added to the queue.
-    queue.add(new Path<>(0, _fst.getFirstArc(new FST.Arc<Long>()), _fst.outputs.getNoOutput(), new IntsRefBuilder()));
+    queue.add(new Path<>(0, _fst.getFirstArc(new FST.Arc<>()), _fst.outputs.getNoOutput(), new IntsRefBuilder()));
 
     final FST.Arc<Long> scratchArc = new FST.Arc<>();
     final FST.BytesReader fstReader = _fst.getBytesReader();
@@ -104,7 +103,7 @@ public class RegexpMatcher {
       // contains the result set.
       if (_automaton.isAccept(path._state)) {
         if (path._fstNode.isFinal()) {
-          endNodes.add(path);
+          consumer.accept(path._output.intValue());
         }
       }
 
@@ -121,7 +120,7 @@ public class RegexpMatcher {
             final IntsRefBuilder newInput = new IntsRefBuilder();
             newInput.copyInts(currentInput.get());
             newInput.append(t.min);
-            queue.add(new Path<Long>(t.dest, new FST.Arc<Long>().copyFrom(nextArc),
+            queue.add(new Path<>(t.dest, new FST.Arc<Long>().copyFrom(nextArc),
                 _fst.outputs.add(path._output, nextArc.output), newInput));
           }
         } else {
@@ -137,13 +136,6 @@ public class RegexpMatcher {
         }
       }
     }
-
-    // From the result set of matched entries gather the values stored and return.
-    ArrayList<Long> matchedIds = new ArrayList<>();
-    for (Path<Long> path : endNodes) {
-      matchedIds.add(path._output);
-    }
-    return matchedIds;
   }
 
   public static final class Path<T> {

@@ -23,6 +23,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.SortedMap;
@@ -76,7 +77,8 @@ public class FSTSanityTest {
   private void testRegex(String regex)
       throws IOException {
     List<Long> nativeResults = FSTTestUtils.regexQueryNrHitsWithResults(regex, _nativeFST);
-    List<Long> results = RegexpMatcher.regexMatch(regex, _fst);
+    List<Long> results = new ArrayList<>();
+    RegexpMatcher.regexMatch(regex, _fst, i -> results.add((long) i));
     nativeResults.sort(null);
     results.sort(null);
     assertEquals(nativeResults, results);

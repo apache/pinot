@@ -90,7 +90,9 @@ public class BenchmarkFST {
   @Benchmark
   public void testLuceneRegex(Blackhole blackhole)
       throws IOException {
-    blackhole.consume(org.apache.pinot.segment.local.utils.fst.RegexpMatcher.regexMatch(_regex, _fst));
+    RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
+    org.apache.pinot.segment.local.utils.fst.RegexpMatcher.regexMatch(_regex, _fst, writer::add);
+    blackhole.consume(writer.get());
   }
 
   public static void main(String[] args)
