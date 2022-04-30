@@ -21,8 +21,8 @@
 
 image:
   repository: apachepinot/pinot
-  tag: latest-jdk11 # release-0.7.1
-  pullPolicy: IfNotPresent
+  tag: latest # release-0.7.1
+  pullPolicy: Always
 
 cluster:
   name: pinot-quickstart
