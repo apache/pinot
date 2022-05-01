@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.realtime.impl.forward;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.segment.local.io.reader.impl.FixedByteSingleValueMultiColReader;
@@ -28,6 +29,7 @@ import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -151,6 +153,12 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
   public double getDouble(int docId) {
     int bufferId = getBufferId(docId);
     return _readers.get(bufferId).getDouble(docId);
+  }
+
+  @Override
+  public BigDecimal getBigDecimal(int docId) {
+    int bufferId = getBufferId(docId);
+    return _readers.get(bufferId).getBigDecimal(docId);
   }
 
   private int getBufferId(int row) {
@@ -293,6 +301,10 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
 
     public double getDouble(int row) {
       return _reader.getDouble(row - _startRowId, 0);
+    }
+
+    public BigDecimal getBigDecimal(int row) {
+      return BigDecimalUtils.deserialize(_reader.getBytes(row - _startRowId, 0));
     }
 
     public FixedByteSingleValueMultiColReader getReader() {

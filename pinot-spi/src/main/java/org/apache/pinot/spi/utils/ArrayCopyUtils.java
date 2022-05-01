@@ -186,6 +186,12 @@ public class ArrayCopyUtils {
     }
   }
 
+  public static void copy(BigDecimal[] src, byte[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = BigDecimalUtils.serialize(src[i]);
+    }
+  }
+
   public static void copy(String[] src, int[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = Double.valueOf(src[i]).intValue();

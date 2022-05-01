@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Random;
 import org.apache.pinot.common.function.TransformFunctionType;
@@ -86,6 +87,38 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
   }
 
   @Test
+  public void testCaseTransformFunctionWithBigDecimalResults() {
+    BigDecimal val1 = new BigDecimal("100.99887766554433221");
+    BigDecimal val2 = new BigDecimal("10.1122334455667788909");
+    BigDecimal[] expectedBigDecimalResults = new BigDecimal[NUM_ROWS];
+    Arrays.fill(expectedBigDecimalResults, val1);
+    testCaseQueryWithBigDecimalResults("true", expectedBigDecimalResults);
+    Arrays.fill(expectedBigDecimalResults, val2);
+    testCaseQueryWithBigDecimalResults("false", expectedBigDecimalResults);
+
+    for (TransformFunctionType functionType : BINARY_OPERATOR_TRANSFORM_FUNCTIONS) {
+      testCaseQueryWithBigDecimalResults(String.format("%s(%s, %s)", functionType.getName(), INT_SV_COLUMN,
+              String.format("%d", _intSVValues[INDEX_TO_COMPARE])),
+          getExpectedBigDecimalResults(INT_SV_COLUMN, functionType));
+      testCaseQueryWithBigDecimalResults(String.format("%s(%s, %s)", functionType.getName(), LONG_SV_COLUMN,
+              String.format("%d", _longSVValues[INDEX_TO_COMPARE])),
+          getExpectedBigDecimalResults(LONG_SV_COLUMN, functionType));
+      testCaseQueryWithBigDecimalResults(String.format("%s(%s, %s)", functionType.getName(), FLOAT_SV_COLUMN,
+              String.format("%f", _floatSVValues[INDEX_TO_COMPARE])),
+          getExpectedBigDecimalResults(FLOAT_SV_COLUMN, functionType));
+      testCaseQueryWithBigDecimalResults(String.format("%s(%s, %s)", functionType.getName(), DOUBLE_SV_COLUMN,
+              String.format("%.20f", _doubleSVValues[INDEX_TO_COMPARE])),
+          getExpectedBigDecimalResults(DOUBLE_SV_COLUMN, functionType));
+      testCaseQueryWithBigDecimalResults(String.format("%s(%s, %s)", functionType.getName(), BIG_DECIMAL_SV_COLUMN,
+              String.format("'%s'", _bigDecimalSVValues[INDEX_TO_COMPARE].toPlainString())),
+          getExpectedBigDecimalResults(BIG_DECIMAL_SV_COLUMN, functionType));
+      testCaseQueryWithBigDecimalResults(String.format("%s(%s, %s)", functionType.getName(), STRING_SV_COLUMN,
+              String.format("'%s'", _stringSVValues[INDEX_TO_COMPARE])),
+          getExpectedBigDecimalResults(STRING_SV_COLUMN, functionType));
+    }
+  }
+
+  @Test
   public void testCaseTransformFunctionWithStringResults() {
     String[] expectedStringResults = new String[NUM_ROWS];
     Arrays.fill(expectedStringResults, "aaa");
@@ -128,6 +161,18 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
     Assert.assertTrue(transformFunction instanceof CaseTransformFunction);
     Assert.assertEquals(transformFunction.getName(), CaseTransformFunction.FUNCTION_NAME);
     Assert.assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.FLOAT);
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  private void testCaseQueryWithBigDecimalResults(String predicate, BigDecimal[] expectedValues) {
+    // Note: defining decimal literals within quotes preserves precision.
+    ExpressionContext expression =
+        RequestContextUtils.getExpressionFromSQL(String.format(
+            "CASE WHEN %s THEN '100.99887766554433221' ELSE '10.1122334455667788909' END", predicate));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof CaseTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), CaseTransformFunction.FUNCTION_NAME);
+    Assert.assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.BIG_DECIMAL);
     testTransformFunction(transformFunction, expectedValues);
   }
 
@@ -391,6 +436,163 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
               break;
             case LESS_THAN_OR_EQUAL:
               result[i] = (_stringSVValues[i].compareTo(_stringSVValues[INDEX_TO_COMPARE]) <= 0) ? 100 : 10;
+              break;
+            default:
+              throw new IllegalStateException("Not supported type - " + type);
+          }
+          break;
+        default:
+          break;
+      }
+    }
+    return result;
+  }
+
+  private BigDecimal[] getExpectedBigDecimalResults(String column, TransformFunctionType type) {
+    BigDecimal[] result = new BigDecimal[NUM_ROWS];
+    BigDecimal val1 = new BigDecimal("100.99887766554433221");
+    BigDecimal val2 = new BigDecimal("10.1122334455667788909");
+    for (int i = 0; i < NUM_ROWS; i++) {
+      switch (column) {
+        case INT_SV_COLUMN:
+          switch (type) {
+            case EQUALS:
+              result[i] = (_intSVValues[i] == _intSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            case NOT_EQUALS:
+              result[i] = (_intSVValues[i] != _intSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            case GREATER_THAN:
+              result[i] = (_intSVValues[i] > _intSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            case GREATER_THAN_OR_EQUAL:
+              result[i] = (_intSVValues[i] >= _intSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            case LESS_THAN:
+              result[i] = (_intSVValues[i] < _intSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            case LESS_THAN_OR_EQUAL:
+              result[i] = (_intSVValues[i] <= _intSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            default:
+              throw new IllegalStateException("Not supported type - " + type);
+          }
+          break;
+        case LONG_SV_COLUMN:
+          switch (type) {
+            case EQUALS:
+              result[i] = (_longSVValues[i] == _longSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            case NOT_EQUALS:
+              result[i] = (_longSVValues[i] != _longSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            case GREATER_THAN:
+              result[i] = (_longSVValues[i] > _longSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            case GREATER_THAN_OR_EQUAL:
+              result[i] = (_longSVValues[i] >= _longSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            case LESS_THAN:
+              result[i] = (_longSVValues[i] < _longSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            case LESS_THAN_OR_EQUAL:
+              result[i] = (_longSVValues[i] <= _longSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            default:
+              throw new IllegalStateException("Not supported type - " + type);
+          }
+          break;
+        case FLOAT_SV_COLUMN:
+          switch (type) {
+            case EQUALS:
+              result[i] = (_floatSVValues[i] == _floatSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            case NOT_EQUALS:
+              result[i] = (_floatSVValues[i] != _floatSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            case GREATER_THAN:
+              result[i] = (_floatSVValues[i] > _floatSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            case GREATER_THAN_OR_EQUAL:
+              result[i] = (_floatSVValues[i] >= _floatSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            case LESS_THAN:
+              result[i] = (_floatSVValues[i] < _floatSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            case LESS_THAN_OR_EQUAL:
+              result[i] = (_floatSVValues[i] <= _floatSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            default:
+              throw new IllegalStateException("Not supported type - " + type);
+          }
+          break;
+        case DOUBLE_SV_COLUMN:
+          switch (type) {
+            case EQUALS:
+              result[i] = (_doubleSVValues[i] == _doubleSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            case NOT_EQUALS:
+              result[i] = (_doubleSVValues[i] != _doubleSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            case GREATER_THAN:
+              result[i] = (_doubleSVValues[i] > _doubleSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            case GREATER_THAN_OR_EQUAL:
+              result[i] = (_doubleSVValues[i] >= _doubleSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            case LESS_THAN:
+              result[i] = (_doubleSVValues[i] < _doubleSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            case LESS_THAN_OR_EQUAL:
+              result[i] = (_doubleSVValues[i] <= _doubleSVValues[INDEX_TO_COMPARE]) ? val1 : val2;
+              break;
+            default:
+              throw new IllegalStateException("Not supported type - " + type);
+          }
+          break;
+        case BIG_DECIMAL_SV_COLUMN:
+          switch (type) {
+            case EQUALS:
+              result[i] = _bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) == 0 ? val1 : val2;
+              break;
+            case NOT_EQUALS:
+              result[i] = _bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) != 0 ? val1 : val2;
+              break;
+            case GREATER_THAN:
+              result[i] = _bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) > 0 ? val1 : val2;
+              break;
+            case GREATER_THAN_OR_EQUAL:
+              result[i] = _bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) >= 0 ? val1 : val2;
+              break;
+            case LESS_THAN:
+              result[i] = _bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) < 0 ? val1 : val2;
+              break;
+            case LESS_THAN_OR_EQUAL:
+              result[i] = _bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[INDEX_TO_COMPARE]) <= 0 ? val1 : val2;
+              break;
+            default:
+              throw new IllegalStateException("Not supported type - " + type);
+          }
+          break;
+        case STRING_SV_COLUMN:
+          switch (type) {
+            case EQUALS:
+              result[i] = (_stringSVValues[i].compareTo(_stringSVValues[INDEX_TO_COMPARE]) == 0) ? val1 : val2;
+              break;
+            case NOT_EQUALS:
+              result[i] = (_stringSVValues[i].compareTo(_stringSVValues[INDEX_TO_COMPARE]) != 0) ? val1 : val2;
+              break;
+            case GREATER_THAN:
+              result[i] = (_stringSVValues[i].compareTo(_stringSVValues[INDEX_TO_COMPARE]) > 0) ? val1 : val2;
+              break;
+            case GREATER_THAN_OR_EQUAL:
+              result[i] = (_stringSVValues[i].compareTo(_stringSVValues[INDEX_TO_COMPARE]) >= 0) ? val1 : val2;
+              break;
+            case LESS_THAN:
+              result[i] = (_stringSVValues[i].compareTo(_stringSVValues[INDEX_TO_COMPARE]) < 0) ? val1 : val2;
+              break;
+            case LESS_THAN_OR_EQUAL:
+              result[i] = (_stringSVValues[i].compareTo(_stringSVValues[INDEX_TO_COMPARE]) <= 0) ? val1 : val2;
               break;
             default:
               throw new IllegalStateException("Not supported type - " + type);

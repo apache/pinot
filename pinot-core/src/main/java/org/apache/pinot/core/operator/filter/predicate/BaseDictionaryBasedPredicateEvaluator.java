@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import java.math.BigDecimal;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -77,6 +78,11 @@ public abstract class BaseDictionaryBasedPredicateEvaluator extends BasePredicat
 
   @Override
   public final boolean applyMV(double[] values, int length) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public final boolean applySV(BigDecimal value) {
     throw new UnsupportedOperationException();
   }
 

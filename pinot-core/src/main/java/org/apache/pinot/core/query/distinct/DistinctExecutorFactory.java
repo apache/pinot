@@ -30,6 +30,8 @@ import org.apache.pinot.core.query.distinct.dictionary.DictionaryBasedMultiColum
 import org.apache.pinot.core.query.distinct.dictionary.DictionaryBasedMultiColumnDistinctOrderByExecutor;
 import org.apache.pinot.core.query.distinct.dictionary.DictionaryBasedSingleColumnDistinctOnlyExecutor;
 import org.apache.pinot.core.query.distinct.dictionary.DictionaryBasedSingleColumnDistinctOrderByExecutor;
+import org.apache.pinot.core.query.distinct.raw.RawBigDecimalSingleColumnDistinctOnlyExecutor;
+import org.apache.pinot.core.query.distinct.raw.RawBigDecimalSingleColumnDistinctOrderByExecutor;
 import org.apache.pinot.core.query.distinct.raw.RawBytesSingleColumnDistinctOnlyExecutor;
 import org.apache.pinot.core.query.distinct.raw.RawBytesSingleColumnDistinctOrderByExecutor;
 import org.apache.pinot.core.query.distinct.raw.RawDoubleSingleColumnDistinctOnlyExecutor;
@@ -94,6 +96,8 @@ public class DistinctExecutorFactory {
             return new RawFloatSingleColumnDistinctOnlyExecutor(expression, dataType, limit);
           case DOUBLE:
             return new RawDoubleSingleColumnDistinctOnlyExecutor(expression, dataType, limit);
+          case BIG_DECIMAL:
+            return new RawBigDecimalSingleColumnDistinctOnlyExecutor(expression, dataType, limit);
           case STRING:
             return new RawStringSingleColumnDistinctOnlyExecutor(expression, dataType, limit);
           case BYTES:
@@ -163,6 +167,8 @@ public class DistinctExecutorFactory {
             return new RawFloatSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit);
           case DOUBLE:
             return new RawDoubleSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit);
+          case BIG_DECIMAL:
+            return new RawBigDecimalSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit);
           case STRING:
             return new RawStringSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit);
           case BYTES:

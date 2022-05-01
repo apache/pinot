@@ -111,6 +111,8 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
           return new FloatMatcher();
         case DOUBLE:
           return new DoubleMatcher();
+        case BIG_DECIMAL:
+          return new BigDecimalMatcher();
         case STRING:
           return new StringMatcher();
         case BYTES:
@@ -166,6 +168,14 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     @Override
     public boolean doesValueMatch(int docId) {
       return _predicateEvaluator.applySV(_reader.getDouble(docId, _readerContext));
+    }
+  }
+
+  private class BigDecimalMatcher implements ValueMatcher {
+
+    @Override
+    public boolean doesValueMatch(int docId) {
+      return _predicateEvaluator.applySV(_reader.getBigDecimal(docId, _readerContext));
     }
   }
 

@@ -61,14 +61,12 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
   private static final BigDecimal BASE_BIG_DECIMAL = BigDecimal.valueOf(RANDOM.nextDouble());
 
   private static final int NUM_RECORDS = 1000;
+  private static List<GenericRow> _records;
+  private static BigDecimal _sum;
 
   private static final String BIG_DECIMAL_COLUMN = "bigDecimalColumn";
   private static final Schema SCHEMA =
       new Schema.SchemaBuilder().addMetric(BIG_DECIMAL_COLUMN, DataType.BIG_DECIMAL).build();
-  private static final TableConfig TABLE_CONFIG =
-      new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
-
-  private BigDecimal _sum;
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
@@ -89,11 +87,8 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
-    FileUtils.deleteDirectory(INDEX_DIR);
-
-    List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
+  private void setUp() {
+    _records = new ArrayList<>(NUM_RECORDS);
     BigDecimal sum = BigDecimal.ZERO;
     for (int i = 0; i < NUM_RECORDS; i++) {
       GenericRow record = new GenericRow();
@@ -107,17 +102,22 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
         record.putValue(BIG_DECIMAL_COLUMN, value.toPlainString());
       }
       sum = sum.add(value);
-      records.add(record);
+      _records.add(record);
     }
     _sum = sum;
+  }
 
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
+  private void setUp(TableConfig tableConfig)
+      throws Exception {
+    FileUtils.deleteDirectory(INDEX_DIR);
+
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
+    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(_records));
     driver.build();
 
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.mmap);
@@ -126,6 +126,26 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
   }
 
   @Test
+  public void testQueriesWithDictColumn()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .build();
+    setUp(tableConfig);
+    testQueries();
+  }
+
+  @Test(priority=1)
+  public void testQueriesWithNoDictColumn()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .setNoDictionaryColumns(List.of(BIG_DECIMAL_COLUMN))
+        .build();
+    setUp(tableConfig);
+    testQueries();
+  }
+
   public void testQueries() {
     {
       String query = "SELECT * FROM testTable";
@@ -196,6 +216,19 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       }
     }
     {
+      // This test case was added to validate path-code for distinct w/o order by. See:
+      //   RawBigDecimalSingleColumnDistinctOnlyExecutor class.
+      int limit = 40;
+      String query = String.format("SELECT DISTINCT %s FROM testTable LIMIT %d", BIG_DECIMAL_COLUMN, limit);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema,
+          new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), limit);
+    }
+    {
       String query = String.format("SELECT COUNT(%s) AS count FROM testTable", BIG_DECIMAL_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query);
       ResultTable resultTable = brokerResponse.getResultTable();
@@ -247,6 +280,57 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 1);
       assertEquals(new BigDecimal((String) rows.get(0)[0]).compareTo(_sum.multiply(BigDecimal.valueOf(4))), 0);
+    }
+    {
+      // Note: defining decimal literals within quotes preserves precision.
+      String query = String.format("SELECT %s FROM testTable WHERE %s > '%s'",
+          BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BASE_BIG_DECIMAL.add(BigDecimal.valueOf(69)));
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema,
+          new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), 10);
+      for (int i = 0; i < 10; i++) {
+        Object[] row = rows.get(i);
+        assertEquals(row.length, 1);
+        assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(69 + i + 1)));
+      }
+    }
+    {
+      // Note: defining decimal literals within quotes preserves precision.
+      String query = String.format("SELECT %s FROM testTable WHERE %s = '%s'",
+          BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BASE_BIG_DECIMAL.add(BigDecimal.valueOf(69)));
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema,
+          new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), 4);
+      for (int i = 0; i < 4; i++) {
+        Object[] row = rows.get(i);
+        assertEquals(row.length, 1);
+        assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(69)));
+      }
+    }
+    {
+      String query = String.format(
+          "SELECT MAX(%s) AS maxValue FROM testTable GROUP BY %s HAVING maxValue < %s ORDER BY maxValue",
+          BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BASE_BIG_DECIMAL.add(BigDecimal.valueOf(5)));
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema,
+          new DataSchema(new String[]{"maxValue"}, new ColumnDataType[]{ColumnDataType.DOUBLE}));
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), 5);
+      for (int i = 0; i < 5; i++) {
+        Object[] row = rows.get(i);
+        assertEquals(row.length, 1);
+        assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i)).doubleValue());
+      }
     }
     {
       // This returns currently 25 rows instead of a single row!
