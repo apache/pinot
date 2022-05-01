@@ -37,6 +37,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -50,6 +51,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -91,7 +93,7 @@ public class JsonUtils {
   public static <T> Pair<T, Map<String, Object>> inputStreamToObjectAndUnrecognizedProperties(
       InputStream jsonInputStream, Class<T> valueType)
       throws IOException {
-    String jsonString = StringUtil.inputStreamToString(jsonInputStream);
+    String jsonString = IOUtils.toString(jsonInputStream, StandardCharsets.UTF_8);
     return stringToObjectAndUnrecognizedProperties(jsonString, valueType);
   }
 
