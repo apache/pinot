@@ -44,7 +44,7 @@ public class TextIndexUtils {
         column + V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION).exists();
   }
 
-  public static boolean isFstTypeNative(Map<String, String> textIndexProperties) {
+  public static boolean isFstTypeNative(@Nullable Map<String, String> textIndexProperties) {
     if (textIndexProperties == null) {
       return false;
     }
