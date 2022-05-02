@@ -87,11 +87,11 @@ public class H3Utils {
     } else {
       potentialH3Cells.addAll(polyfillCells);
     }
-    potentialH3Cells
-        .addAll(potentialH3Cells.stream().flatMap(cell -> H3_CORE.kRing(cell, 1).stream()).collect(Collectors.toSet()));
     LongSet fullyContainedCell = new LongOpenHashSet(
         potentialH3Cells.stream().filter(h3Cell -> polygon.contains(createPolygonFromH3Cell(h3Cell)))
             .collect(Collectors.toSet()));
+    potentialH3Cells
+        .addAll(potentialH3Cells.stream().flatMap(cell -> H3_CORE.kRing(cell, 1).stream()).collect(Collectors.toSet()));
     return Pair.of(fullyContainedCell, potentialH3Cells);
   }
 
