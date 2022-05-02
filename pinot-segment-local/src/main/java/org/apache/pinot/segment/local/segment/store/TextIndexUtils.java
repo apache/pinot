@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
