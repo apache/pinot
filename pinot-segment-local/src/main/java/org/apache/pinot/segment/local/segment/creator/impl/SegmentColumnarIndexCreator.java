@@ -393,21 +393,25 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       // range index
       CombinedInvertedIndexCreator combinedInvertedIndexCreator = _rangeIndexFilterCreatorMap.get(columnName);
       if (combinedInvertedIndexCreator != null) {
-        switch (fieldSpec.getDataType()) {
-          case INT:
-            combinedInvertedIndexCreator.add((Integer) columnValueToIndex);
-            break;
-          case LONG:
-            combinedInvertedIndexCreator.add((Long) columnValueToIndex);
-            break;
-          case FLOAT:
-            combinedInvertedIndexCreator.add((Float) columnValueToIndex);
-            break;
-          case DOUBLE:
-            combinedInvertedIndexCreator.add((Double) columnValueToIndex);
-            break;
-          default:
-            throw new RuntimeException("Unsupported data type " + fieldSpec.getDataType() + " for range index");
+        if (dictionaryCreator != null) {
+          combinedInvertedIndexCreator.add(dictionaryCreator.indexOfSV(columnValueToIndex));
+        } else {
+          switch (fieldSpec.getDataType()) {
+            case INT:
+              combinedInvertedIndexCreator.add((Integer) columnValueToIndex);
+              break;
+            case LONG:
+              combinedInvertedIndexCreator.add((Long) columnValueToIndex);
+              break;
+            case FLOAT:
+              combinedInvertedIndexCreator.add((Float) columnValueToIndex);
+              break;
+            case DOUBLE:
+              combinedInvertedIndexCreator.add((Double) columnValueToIndex);
+              break;
+            default:
+              throw new RuntimeException("Unsupported data type " + fieldSpec.getDataType() + " for range index");
+          }
         }
       }
 
