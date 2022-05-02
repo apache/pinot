@@ -135,7 +135,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
     testQueries();
   }
 
-  @Test(priority=1)
+  @Test(priority = 1)
   public void testQueriesWithNoDictColumn()
       throws Exception {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
