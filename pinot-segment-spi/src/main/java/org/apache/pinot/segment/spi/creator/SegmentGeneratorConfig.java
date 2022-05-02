@@ -203,7 +203,7 @@ public class SegmentGeneratorConfig implements Serializable {
         }
       }
 
-      if (indexingConfig.isCreateAllIndexedDuringSegmentGeneration()) {
+      if (indexingConfig.isCreateAllIndicesDuringSegmentGeneration()) {
         if ((indexingConfig.getBloomFilterColumns() != null || indexingConfig.getBloomFilterConfigs() != null)) {
           if (indexingConfig.getBloomFilterColumns() != null) {
             _bloomFilterCreationColumns.addAll(indexingConfig.getBloomFilterColumns());
