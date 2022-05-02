@@ -230,14 +230,14 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
   private void testSelectionResults(String nativeQuery, String luceneQuery) {
     _indexSegment = _nativeIndexSegment;
     _indexSegments = Arrays.asList(_nativeIndexSegment);
-    Operator<IntermediateResultsBlock> operator = getOperatorForSqlQuery(nativeQuery);
+    Operator<IntermediateResultsBlock> operator = getOperator(nativeQuery);
     IntermediateResultsBlock operatorResult = operator.nextBlock();
     List<Object[]> resultset = (List<Object[]>) operatorResult.getSelectionResult();
     Assert.assertNotNull(resultset);
 
     _indexSegment = _luceneSegment;
     _indexSegments = Arrays.asList(_luceneSegment);
-    operator = getOperatorForSqlQuery(luceneQuery);
+    operator = getOperator(luceneQuery);
     operatorResult = operator.nextBlock();
     List<Object[]> resultset2 = (List<Object[]>) operatorResult.getSelectionResult();
     Assert.assertNotNull(resultset2);
