@@ -153,7 +153,7 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
       int numInstances = instances.size();
       List<String> instancesAssigned = new ArrayList<>(_replication);
       for (int replicaId = 0; replicaId < _replication; replicaId++) {
-        int instanceIndex = Math.abs(partitionGroupId * _replication + replicaId) % numInstances;
+        int instanceIndex = (partitionGroupId * _replication + replicaId) % numInstances;
         instancesAssigned.add(instances.get(instanceIndex));
       }
       return instancesAssigned;
@@ -373,9 +373,11 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
     Integer segmentPartitionId =
         SegmentUtils.getRealtimeSegmentPartitionId(segmentName, _realtimeTableName, _helixManager, _partitionColumn);
     if (segmentPartitionId == null) {
-      // This case is for the uploaded segments for which there's no partition information
-      // Choose a random, but consistent, partition id
-      segmentPartitionId = Math.abs(segmentName.hashCode());
+      // This case is for the uploaded segments for which there's no partition information.
+      // A random, but consistent, partition id is calculated based on the hash code of the segment name.
+      // Note that '% 10K' is used to prevent having partition ids with large value which will be problematic later in
+      // instance assignment formula.
+      segmentPartitionId = Math.abs(segmentName.hashCode() % 10_000);
     }
     return segmentPartitionId;
   }
