@@ -21,6 +21,7 @@ package org.apache.pinot.common.request.context;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.FilterOperator;
@@ -37,6 +38,7 @@ import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
@@ -163,10 +165,37 @@ public class RequestContextUtils {
   /**
    * Converts the given Thrift {@link Expression} into a {@link FilterContext}.
    * <p>NOTE: Currently the query engine only accepts string literals as the right-hand side of the predicate, so we
-   *          always convert the right-hand side expressions into strings.
+   *          always convert the right-hand side expressions into strings. We also update boolean predicates that are
+   *          missing an EQUALS filter operator.
    */
   public static FilterContext getFilter(Expression thriftExpression) {
-    Function thriftFunction = thriftExpression.getFunctionCall();
+    ExpressionType type = thriftExpression.getType();
+    switch (type) {
+      case FUNCTION:
+        Function thriftFunction = thriftExpression.getFunctionCall();
+        return getFilter(thriftFunction);
+      case IDENTIFIER:
+        // Convert "WHERE a" to "WHERE a = true"
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new EqPredicate(getExpression(thriftExpression), getStringValue(RequestUtils.getLiteralExpression(true))));
+      case LITERAL:
+        // TODO: Handle literals.
+        throw new IllegalStateException();
+      default:
+        throw new IllegalStateException();
+    }
+  }
+
+  public static FilterContext getFilter(Function thriftFunction) {
+    String functionOperator = thriftFunction.getOperator();
+
+    // convert "WHERE startsWith(col, 'str')" to "WHERE startsWith(col, 'str') = true"
+    if (!EnumUtils.isValidEnum(FilterKind.class, functionOperator)) {
+      return new FilterContext(FilterContext.Type.PREDICATE, null,
+          new EqPredicate(ExpressionContext.forFunction(getFunction(thriftFunction)),
+              getStringValue(RequestUtils.getLiteralExpression(true))));
+    }
+
     FilterKind filterKind = FilterKind.valueOf(thriftFunction.getOperator().toUpperCase());
     List<Expression> operands = thriftFunction.getOperands();
     int numOperands = operands.size();
@@ -185,7 +214,8 @@ public class RequestContextUtils {
         return new FilterContext(FilterContext.Type.OR, children, null);
       case NOT:
         assert numOperands == 1;
-        return new FilterContext(FilterContext.Type.NOT, new ArrayList<>(Collections.singletonList(getFilter(operands.get(0)))), null);
+        return new FilterContext(FilterContext.Type.NOT,
+            new ArrayList<>(Collections.singletonList(getFilter(operands.get(0)))), null);
       case EQUALS:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new EqPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
@@ -264,10 +294,36 @@ public class RequestContextUtils {
   /**
    * Converts the given filter {@link ExpressionContext} into a {@link FilterContext}.
    * <p>NOTE: Currently the query engine only accepts string literals as the right-hand side of the predicate, so we
-   *          always convert the right-hand side expressions into strings.
+   *          always convert the right-hand side expressions into strings. We also update boolean predicates that are
+   *          missing an EQUALS filter operator.
    */
   public static FilterContext getFilter(ExpressionContext filterExpression) {
-    FunctionContext filterFunction = filterExpression.getFunction();
+    ExpressionContext.Type type = filterExpression.getType();
+    switch (type) {
+      case FUNCTION:
+        FunctionContext filterFunction = filterExpression.getFunction();
+        return getFilter(filterFunction);
+      case IDENTIFIER:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new EqPredicate(filterExpression, getStringValue(RequestUtils.getLiteralExpression(true))));
+      case LITERAL:
+        // TODO: Handle literals
+        throw new IllegalStateException();
+      default:
+        throw new IllegalStateException();
+    }
+  }
+
+  public static FilterContext getFilter(FunctionContext filterFunction) {
+    String functionOperator = filterFunction.getFunctionName().toUpperCase();
+
+    // convert "WHERE startsWith(col, 'str')" to "WHERE startsWith(col, 'str') = true"
+    if (!EnumUtils.isValidEnum(FilterKind.class, functionOperator)) {
+      return new FilterContext(FilterContext.Type.PREDICATE, null,
+          new EqPredicate(ExpressionContext.forFunction(filterFunction),
+              getStringValue(RequestUtils.getLiteralExpression(true))));
+    }
+
     FilterKind filterKind = FilterKind.valueOf(filterFunction.getFunctionName().toUpperCase());
     List<ExpressionContext> operands = filterFunction.getArguments();
     int numOperands = operands.size();
@@ -286,7 +342,8 @@ public class RequestContextUtils {
         return new FilterContext(FilterContext.Type.OR, children, null);
       case NOT:
         assert numOperands == 1;
-        return new FilterContext(FilterContext.Type.NOT, new ArrayList<>(Collections.singletonList(getFilter(operands.get(0)))), null);
+        return new FilterContext(FilterContext.Type.NOT,
+            new ArrayList<>(Collections.singletonList(getFilter(operands.get(0)))), null);
       case EQUALS:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new EqPredicate(operands.get(0), getStringValue(operands.get(1))));
