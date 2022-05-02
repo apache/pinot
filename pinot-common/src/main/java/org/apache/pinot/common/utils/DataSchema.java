@@ -395,6 +395,12 @@ public class DataSchema {
         case TIMESTAMP:
           assert value instanceof Timestamp;
           return value.toString();
+        case BOOLEAN_ARRAY:
+          assert value instanceof Boolean[];
+          return toCsv((Boolean[]) value);
+        case TIMESTAMP_ARRAY:
+          assert value instanceof Timestamp[];
+          return toCsv((Timestamp[]) value);
         case BYTES:
           return BytesUtils.toHexString((byte[]) value);
         default:
@@ -445,6 +451,18 @@ public class DataSchema {
         default:
           throw new IllegalStateException(String.format("Cannot convert and format: '%s' to type: %s", value, this));
       }
+    }
+
+    private Serializable toCsv(Object[] value) {
+      if (value.length <= 0) {
+        return "";
+      }
+      StringBuilder builder = new StringBuilder();
+      for (Object o : value) {
+        builder.append(o).append(",");
+      }
+      builder.deleteCharAt(builder.length() - 1);
+      return builder.toString();
     }
 
     private static double[] toDoubleArray(Object value) {

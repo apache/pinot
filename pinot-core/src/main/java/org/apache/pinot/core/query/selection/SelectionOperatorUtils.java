@@ -268,6 +268,7 @@ public class SelectionOperatorUtils {
             dataTableBuilder.setColumn(i, (int[]) columnValue);
             break;
           case LONG_ARRAY:
+          case TIMESTAMP_ARRAY:
             // LONG_ARRAY type covers INT_ARRAY and LONG_ARRAY
             if (columnValue instanceof int[]) {
               int[] ints = (int[]) columnValue;
@@ -365,6 +366,7 @@ public class SelectionOperatorUtils {
           row[i] = dataTable.getIntArray(rowId, i);
           break;
         case LONG_ARRAY:
+        case TIMESTAMP_ARRAY:
           row[i] = dataTable.getLongArray(rowId, i);
           break;
         case FLOAT_ARRAY:
