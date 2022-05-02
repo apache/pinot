@@ -127,7 +127,7 @@ public class NativeTextIndexCreator implements TextIndexCreator {
 
   public List<String> analyze(String text, Analyzer analyzer)
       throws IOException {
-    List<String> result = new ArrayList<String>();
+    List<String> result = new ArrayList<>();
     TokenStream tokenStream = analyzer.tokenStream(_columnName, text);
     CharTermAttribute attr = tokenStream.addAttribute(CharTermAttribute.class);
     tokenStream.reset();
