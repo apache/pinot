@@ -164,7 +164,7 @@ public class BooleanQueriesTest extends BaseQueriesTest {
     }
     {
       String query = "SELECT booleanColumn FROM testTable WHERE booleanColumn";
-      BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,

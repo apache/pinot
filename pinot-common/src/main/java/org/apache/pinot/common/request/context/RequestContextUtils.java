@@ -170,108 +170,117 @@ public class RequestContextUtils {
    */
   public static FilterContext getFilter(Expression thriftExpression) {
     ExpressionType type = thriftExpression.getType();
-    if (type == ExpressionType.FUNCTION) {
-      Function thriftFunction = thriftExpression.getFunctionCall();
-      String functionOperator = thriftFunction.getOperator();
-
-      // convert "WHERE startsWith(col, 'str')" to "WHERE startsWith(col, 'str') = true"
-      if (!EnumUtils.isValidEnum(FilterKind.class, functionOperator)) {
+    switch (type) {
+      case FUNCTION:
+        Function thriftFunction = thriftExpression.getFunctionCall();
+        return getFilter(thriftFunction);
+      case IDENTIFIER:
+        // Convert "WHERE a" to "WHERE a = true"
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new EqPredicate(getExpression(thriftExpression), getStringValue(RequestUtils.getLiteralExpression(true))));
-      }
+      case LITERAL:
+        // TODO: Handle literals.
+        throw new IllegalStateException();
+      default:
+        throw new IllegalStateException();
+    }
+  }
 
-      FilterKind filterKind = FilterKind.valueOf(thriftFunction.getOperator().toUpperCase());
-      List<Expression> operands = thriftFunction.getOperands();
-      int numOperands = operands.size();
-      switch (filterKind) {
-        case AND:
-          List<FilterContext> children = new ArrayList<>(numOperands);
-          for (Expression operand : operands) {
-            children.add(getFilter(operand));
-          }
-          return new FilterContext(FilterContext.Type.AND, children, null);
-        case OR:
-          children = new ArrayList<>(numOperands);
-          for (Expression operand : operands) {
-            children.add(getFilter(operand));
-          }
-          return new FilterContext(FilterContext.Type.OR, children, null);
-        case NOT:
-          assert numOperands == 1;
-          return new FilterContext(FilterContext.Type.NOT,
-              new ArrayList<>(Collections.singletonList(getFilter(operands.get(0)))), null);
-        case EQUALS:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new EqPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
-        case NOT_EQUALS:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new NotEqPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
-        case IN:
-          List<String> values = new ArrayList<>(numOperands - 1);
-          for (int i = 1; i < numOperands; i++) {
-            values.add(getStringValue(operands.get(i)));
-          }
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new InPredicate(getExpression(operands.get(0)), values));
-        case NOT_IN:
-          values = new ArrayList<>(numOperands - 1);
-          for (int i = 1; i < numOperands; i++) {
-            values.add(getStringValue(operands.get(i)));
-          }
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new NotInPredicate(getExpression(operands.get(0)), values));
-        case GREATER_THAN:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new RangePredicate(getExpression(operands.get(0)), false, getStringValue(operands.get(1)), false,
-                  RangePredicate.UNBOUNDED));
-        case GREATER_THAN_OR_EQUAL:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new RangePredicate(getExpression(operands.get(0)), true, getStringValue(operands.get(1)), false,
-                  RangePredicate.UNBOUNDED));
-        case LESS_THAN:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new RangePredicate(getExpression(operands.get(0)), false, RangePredicate.UNBOUNDED, false,
-                  getStringValue(operands.get(1))));
-        case LESS_THAN_OR_EQUAL:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new RangePredicate(getExpression(operands.get(0)), false, RangePredicate.UNBOUNDED, true,
-                  getStringValue(operands.get(1))));
-        case BETWEEN:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new RangePredicate(getExpression(operands.get(0)), true, getStringValue(operands.get(1)), true,
-                  getStringValue(operands.get(2))));
-        case RANGE:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new RangePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
-        case REGEXP_LIKE:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new RegexpLikePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
-        case LIKE:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new RegexpLikePredicate(getExpression(operands.get(0)),
-                  RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));
-        case TEXT_MATCH:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new TextMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
-        case JSON_MATCH:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new JsonMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
-        case IS_NULL:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new IsNullPredicate(getExpression(operands.get(0))));
-        case IS_NOT_NULL:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new IsNotNullPredicate(getExpression(operands.get(0))));
-        default:
-          throw new IllegalStateException();
-      }
-    } else if (type == ExpressionType.IDENTIFIER) {
-      // Convert "WHERE a" to "WHERE a = true"
+  public static FilterContext getFilter(Function thriftFunction) {
+    String functionOperator = thriftFunction.getOperator();
+
+    // convert "WHERE startsWith(col, 'str')" to "WHERE startsWith(col, 'str') = true"
+    if (!EnumUtils.isValidEnum(FilterKind.class, functionOperator)) {
       return new FilterContext(FilterContext.Type.PREDICATE, null,
-          new EqPredicate(getExpression(thriftExpression), getStringValue(RequestUtils.getLiteralExpression(true))));
+          new EqPredicate(ExpressionContext.forFunction(getFunction(thriftFunction)),
+              getStringValue(RequestUtils.getLiteralExpression(true))));
     }
 
-    throw new IllegalArgumentException();
+    FilterKind filterKind = FilterKind.valueOf(thriftFunction.getOperator().toUpperCase());
+    List<Expression> operands = thriftFunction.getOperands();
+    int numOperands = operands.size();
+    switch (filterKind) {
+      case AND:
+        List<FilterContext> children = new ArrayList<>(numOperands);
+        for (Expression operand : operands) {
+          children.add(getFilter(operand));
+        }
+        return new FilterContext(FilterContext.Type.AND, children, null);
+      case OR:
+        children = new ArrayList<>(numOperands);
+        for (Expression operand : operands) {
+          children.add(getFilter(operand));
+        }
+        return new FilterContext(FilterContext.Type.OR, children, null);
+      case NOT:
+        assert numOperands == 1;
+        return new FilterContext(FilterContext.Type.NOT,
+            new ArrayList<>(Collections.singletonList(getFilter(operands.get(0)))), null);
+      case EQUALS:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new EqPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+      case NOT_EQUALS:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new NotEqPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+      case IN:
+        List<String> values = new ArrayList<>(numOperands - 1);
+        for (int i = 1; i < numOperands; i++) {
+          values.add(getStringValue(operands.get(i)));
+        }
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new InPredicate(getExpression(operands.get(0)), values));
+      case NOT_IN:
+        values = new ArrayList<>(numOperands - 1);
+        for (int i = 1; i < numOperands; i++) {
+          values.add(getStringValue(operands.get(i)));
+        }
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new NotInPredicate(getExpression(operands.get(0)), values));
+      case GREATER_THAN:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RangePredicate(getExpression(operands.get(0)), false, getStringValue(operands.get(1)), false,
+                RangePredicate.UNBOUNDED));
+      case GREATER_THAN_OR_EQUAL:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RangePredicate(getExpression(operands.get(0)), true, getStringValue(operands.get(1)), false,
+                RangePredicate.UNBOUNDED));
+      case LESS_THAN:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RangePredicate(getExpression(operands.get(0)), false, RangePredicate.UNBOUNDED, false,
+                getStringValue(operands.get(1))));
+      case LESS_THAN_OR_EQUAL:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RangePredicate(getExpression(operands.get(0)), false, RangePredicate.UNBOUNDED, true,
+                getStringValue(operands.get(1))));
+      case BETWEEN:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RangePredicate(getExpression(operands.get(0)), true, getStringValue(operands.get(1)), true,
+                getStringValue(operands.get(2))));
+      case RANGE:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RangePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+      case REGEXP_LIKE:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RegexpLikePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+      case LIKE:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RegexpLikePredicate(getExpression(operands.get(0)),
+                RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));
+      case TEXT_MATCH:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new TextMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+      case JSON_MATCH:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new JsonMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+      case IS_NULL:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new IsNullPredicate(getExpression(operands.get(0))));
+      case IS_NOT_NULL:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new IsNotNullPredicate(getExpression(operands.get(0))));
+      default:
+        throw new IllegalStateException();
+    }
   }
 
   private static String getStringValue(Expression thriftExpression) {
@@ -290,103 +299,111 @@ public class RequestContextUtils {
    */
   public static FilterContext getFilter(ExpressionContext filterExpression) {
     ExpressionContext.Type type = filterExpression.getType();
-    if (type == ExpressionContext.Type.FUNCTION) {
-      FunctionContext filterFunction = filterExpression.getFunction();
-      String functionOperator = filterFunction.getFunctionName().toUpperCase();
-
-      // convert "WHERE startsWith(col, 'str')" to "WHERE startsWith(col, 'str') = true"
-      if (!EnumUtils.isValidEnum(FilterKind.class, functionOperator)) {
+    switch (type) {
+      case FUNCTION:
+        FunctionContext filterFunction = filterExpression.getFunction();
+        return getFilter(filterFunction);
+      case IDENTIFIER:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new EqPredicate(filterExpression, getStringValue(RequestUtils.getLiteralExpression(true))));
-      }
+      case LITERAL:
+        // TODO: Handle literals
+        throw new IllegalStateException();
+      default:
+        throw new IllegalStateException();
+    }
+  }
 
-      FilterKind filterKind = FilterKind.valueOf(filterFunction.getFunctionName().toUpperCase());
-      List<ExpressionContext> operands = filterFunction.getArguments();
-      int numOperands = operands.size();
-      switch (filterKind) {
-        case AND:
-          List<FilterContext> children = new ArrayList<>(numOperands);
-          for (ExpressionContext operand : operands) {
-            children.add(getFilter(operand));
-          }
-          return new FilterContext(FilterContext.Type.AND, children, null);
-        case OR:
-          children = new ArrayList<>(numOperands);
-          for (ExpressionContext operand : operands) {
-            children.add(getFilter(operand));
-          }
-          return new FilterContext(FilterContext.Type.OR, children, null);
-        case NOT:
-          assert numOperands == 1;
-          return new FilterContext(FilterContext.Type.NOT,
-              new ArrayList<>(Collections.singletonList(getFilter(operands.get(0)))), null);
-        case EQUALS:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new EqPredicate(operands.get(0), getStringValue(operands.get(1))));
-        case NOT_EQUALS:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new NotEqPredicate(operands.get(0), getStringValue(operands.get(1))));
-        case IN:
-          List<String> values = new ArrayList<>(numOperands - 1);
-          for (int i = 1; i < numOperands; i++) {
-            values.add(getStringValue(operands.get(i)));
-          }
-          return new FilterContext(FilterContext.Type.PREDICATE, null, new InPredicate(operands.get(0), values));
-        case NOT_IN:
-          values = new ArrayList<>(numOperands - 1);
-          for (int i = 1; i < numOperands; i++) {
-            values.add(getStringValue(operands.get(i)));
-          }
-          return new FilterContext(FilterContext.Type.PREDICATE, null, new NotInPredicate(operands.get(0), values));
-        case GREATER_THAN:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new RangePredicate(operands.get(0), false, getStringValue(operands.get(1)), false,
-                  RangePredicate.UNBOUNDED));
-        case GREATER_THAN_OR_EQUAL:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new RangePredicate(operands.get(0), true, getStringValue(operands.get(1)), false,
-                  RangePredicate.UNBOUNDED));
-        case LESS_THAN:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new RangePredicate(operands.get(0), false, RangePredicate.UNBOUNDED, false,
-                  getStringValue(operands.get(1))));
-        case LESS_THAN_OR_EQUAL:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new RangePredicate(operands.get(0), false, RangePredicate.UNBOUNDED, true,
-                  getStringValue(operands.get(1))));
-        case BETWEEN:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new RangePredicate(operands.get(0), true, getStringValue(operands.get(1)), true,
-                  getStringValue(operands.get(2))));
-        case RANGE:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new RangePredicate(operands.get(0), getStringValue(operands.get(1))));
-        case REGEXP_LIKE:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new RegexpLikePredicate(operands.get(0), getStringValue(operands.get(1))));
-        case LIKE:
-          return new FilterContext(FilterContext.Type.PREDICATE, null, new RegexpLikePredicate(operands.get(0),
-              RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));
-        case TEXT_MATCH:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new TextMatchPredicate(operands.get(0), getStringValue(operands.get(1))));
-        case JSON_MATCH:
-          return new FilterContext(FilterContext.Type.PREDICATE, null,
-              new JsonMatchPredicate(operands.get(0), getStringValue(operands.get(1))));
-        case IS_NULL:
-          return new FilterContext(FilterContext.Type.PREDICATE, null, new IsNullPredicate(operands.get(0)));
-        case IS_NOT_NULL:
-          return new FilterContext(FilterContext.Type.PREDICATE, null, new IsNotNullPredicate(operands.get(0)));
-        default:
-          throw new IllegalStateException();
-      }
-    } else if (type == ExpressionContext.Type.IDENTIFIER) {
-      // Convert "WHERE a" to "WHERE a = true"
+  public static FilterContext getFilter(FunctionContext filterFunction) {
+    String functionOperator = filterFunction.getFunctionName().toUpperCase();
+
+    // convert "WHERE startsWith(col, 'str')" to "WHERE startsWith(col, 'str') = true"
+    if (!EnumUtils.isValidEnum(FilterKind.class, functionOperator)) {
       return new FilterContext(FilterContext.Type.PREDICATE, null,
-          new EqPredicate(filterExpression, getStringValue(RequestUtils.getLiteralExpression(true))));
+          new EqPredicate(ExpressionContext.forFunction(filterFunction),
+              getStringValue(RequestUtils.getLiteralExpression(true))));
     }
 
-    throw new IllegalArgumentException();
+    FilterKind filterKind = FilterKind.valueOf(filterFunction.getFunctionName().toUpperCase());
+    List<ExpressionContext> operands = filterFunction.getArguments();
+    int numOperands = operands.size();
+    switch (filterKind) {
+      case AND:
+        List<FilterContext> children = new ArrayList<>(numOperands);
+        for (ExpressionContext operand : operands) {
+          children.add(getFilter(operand));
+        }
+        return new FilterContext(FilterContext.Type.AND, children, null);
+      case OR:
+        children = new ArrayList<>(numOperands);
+        for (ExpressionContext operand : operands) {
+          children.add(getFilter(operand));
+        }
+        return new FilterContext(FilterContext.Type.OR, children, null);
+      case NOT:
+        assert numOperands == 1;
+        return new FilterContext(FilterContext.Type.NOT,
+            new ArrayList<>(Collections.singletonList(getFilter(operands.get(0)))), null);
+      case EQUALS:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new EqPredicate(operands.get(0), getStringValue(operands.get(1))));
+      case NOT_EQUALS:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new NotEqPredicate(operands.get(0), getStringValue(operands.get(1))));
+      case IN:
+        List<String> values = new ArrayList<>(numOperands - 1);
+        for (int i = 1; i < numOperands; i++) {
+          values.add(getStringValue(operands.get(i)));
+        }
+        return new FilterContext(FilterContext.Type.PREDICATE, null, new InPredicate(operands.get(0), values));
+      case NOT_IN:
+        values = new ArrayList<>(numOperands - 1);
+        for (int i = 1; i < numOperands; i++) {
+          values.add(getStringValue(operands.get(i)));
+        }
+        return new FilterContext(FilterContext.Type.PREDICATE, null, new NotInPredicate(operands.get(0), values));
+      case GREATER_THAN:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RangePredicate(operands.get(0), false, getStringValue(operands.get(1)), false,
+                RangePredicate.UNBOUNDED));
+      case GREATER_THAN_OR_EQUAL:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RangePredicate(operands.get(0), true, getStringValue(operands.get(1)), false,
+                RangePredicate.UNBOUNDED));
+      case LESS_THAN:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RangePredicate(operands.get(0), false, RangePredicate.UNBOUNDED, false,
+                getStringValue(operands.get(1))));
+      case LESS_THAN_OR_EQUAL:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RangePredicate(operands.get(0), false, RangePredicate.UNBOUNDED, true,
+                getStringValue(operands.get(1))));
+      case BETWEEN:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RangePredicate(operands.get(0), true, getStringValue(operands.get(1)), true,
+                getStringValue(operands.get(2))));
+      case RANGE:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RangePredicate(operands.get(0), getStringValue(operands.get(1))));
+      case REGEXP_LIKE:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new RegexpLikePredicate(operands.get(0), getStringValue(operands.get(1))));
+      case LIKE:
+        return new FilterContext(FilterContext.Type.PREDICATE, null, new RegexpLikePredicate(operands.get(0),
+            RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));
+      case TEXT_MATCH:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new TextMatchPredicate(operands.get(0), getStringValue(operands.get(1))));
+      case JSON_MATCH:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new JsonMatchPredicate(operands.get(0), getStringValue(operands.get(1))));
+      case IS_NULL:
+        return new FilterContext(FilterContext.Type.PREDICATE, null, new IsNullPredicate(operands.get(0)));
+      case IS_NOT_NULL:
+        return new FilterContext(FilterContext.Type.PREDICATE, null, new IsNotNullPredicate(operands.get(0)));
+      default:
+        throw new IllegalStateException();
+    }
   }
 
   private static String getStringValue(ExpressionContext expressionContext) {
