@@ -19,41 +19,33 @@
 package org.apache.pinot.pql.parsers.pql2.ast;
 
 public enum FilterKind {
-  AND(false, false),
-  OR(false, false),
-  NOT(false, false),
-  EQUALS(true, false),
-  NOT_EQUALS(true, false),
-  GREATER_THAN(true, true),
-  GREATER_THAN_OR_EQUAL(true, true),
-  LESS_THAN(true, true),
-  LESS_THAN_OR_EQUAL(true, true),
-  LIKE(true, false),
-  BETWEEN(true, true),
-  RANGE(true, true),
-  IN(true, false),
-  NOT_IN(true, false),
-  REGEXP_LIKE(true, false),
-  IS_NULL(true, false),
-  IS_NOT_NULL(true, false),
-  TEXT_MATCH(true, false),
-  JSON_MATCH(true, false);
+  AND,
+  OR,
+  NOT,
+  EQUALS,
+  NOT_EQUALS,
+  GREATER_THAN,
+  GREATER_THAN_OR_EQUAL,
+  LESS_THAN,
+  LESS_THAN_OR_EQUAL,
+  LIKE,
+  BETWEEN,
+  RANGE,
+  IN,
+  NOT_IN,
+  REGEXP_LIKE,
+  IS_NULL,
+  IS_NOT_NULL,
+  TEXT_MATCH,
+  JSON_MATCH;
 
-  private final boolean _isPredicate;
-  private final boolean _isRange;
-
-  FilterKind(boolean isPredicate, boolean isRange) {
-    _isPredicate = isPredicate;
-    _isRange = isRange;
-  }
-
-  /** @return true if the enum is of Range type, false otherwise. */
+  /**
+   * Helper method that returns true if the enum maps to a Range.
+   *
+   * @return True if the enum is of Range type, false otherwise.
+   */
   public boolean isRange() {
-    return _isRange;
-  }
-
-  /** @return true if the filter is a predicate. This logic should mimic FilterContext.Type. */
-  public boolean isPredicate() {
-    return _isPredicate;
+    return this == GREATER_THAN || this == GREATER_THAN_OR_EQUAL || this == LESS_THAN || this == LESS_THAN_OR_EQUAL
+        || this == BETWEEN || this == RANGE;
   }
 }
