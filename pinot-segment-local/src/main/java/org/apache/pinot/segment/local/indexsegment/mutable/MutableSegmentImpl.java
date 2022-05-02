@@ -290,7 +290,7 @@ public class MutableSegmentImpl implements MutableSegment {
       if (textIndexColumns.contains(column)) {
         if (_fieldConfigList != null) {
           for (FieldConfig fieldConfig : _fieldConfigList) {
-            if (fieldConfig.getName().equalsIgnoreCase(column)) {
+            if (fieldConfig.getName().equals(column)) {
               Map<String, String> properties = fieldConfig.getProperties();
 
               if (TextIndexUtils.isFstTypeNative(properties)) {
