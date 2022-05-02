@@ -46,19 +46,19 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class NativeTextIndexCreator implements TextIndexCreator {
-  static final String TEMP_DIR_SUFFIX = ".nativetext.idx.tmp";
-  static final String FST_FILE_NAME = "native.fst";
-  static final String INVERTED_INDEX_FILE_NAME = "inverted.index.buf";
+  private static final String TEMP_DIR_SUFFIX = ".nativetext.idx.tmp";
+  private static final String FST_FILE_NAME = "native.fst";
+  private static final String INVERTED_INDEX_FILE_NAME = "inverted.index.buf";
   public static final int HEADER_LENGTH = 24;
 
-  private String _columnName;
-  private FSTBuilder _fstBuilder;
+  private final String _columnName;
+  private final FSTBuilder _fstBuilder;
   private final File _indexFile;
   private final File _tempDir;
   private final File _fstIndexFile;
   private final File _invertedIndexFile;
-  final Map<String, RoaringBitmapWriter<RoaringBitmap>> _postingListMap = new TreeMap<>();
-  final RoaringBitmapWriter.Wizard<Container, RoaringBitmap> _bitmapWriterWizard = RoaringBitmapWriter.writer();
+  private final Map<String, RoaringBitmapWriter<RoaringBitmap>> _postingListMap = new TreeMap<>();
+  private final RoaringBitmapWriter.Wizard<Container, RoaringBitmap> _bitmapWriterWizard = RoaringBitmapWriter.writer();
   private int _nextDocId = 0;
   private int _fstDataSize;
   private int _numBitMaps;
