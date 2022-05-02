@@ -96,7 +96,7 @@ public class NativeTextIndexCreator implements TextIndexCreator {
 
   @Override
   public void add(String[] documents, int length) {
-    throw new UnsupportedOperationException("Not supported yet");
+    throw new UnsupportedOperationException("Native text index is not supported on MV column: " + _columnName);
   }
 
   @Override
