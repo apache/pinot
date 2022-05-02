@@ -22,7 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
-import org.apache.pinot.segment.local.utils.nativefst.NativeTextIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.text.NativeTextIndexCreator;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;

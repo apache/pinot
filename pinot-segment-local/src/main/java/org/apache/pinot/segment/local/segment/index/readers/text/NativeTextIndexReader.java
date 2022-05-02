@@ -30,7 +30,7 @@ import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexR
 import org.apache.pinot.segment.local.utils.nativefst.FST;
 import org.apache.pinot.segment.local.utils.nativefst.FSTHeader;
 import org.apache.pinot.segment.local.utils.nativefst.ImmutableFST;
-import org.apache.pinot.segment.local.utils.nativefst.NativeTextIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.text.NativeTextIndexCreator;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RegexpMatcher;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
