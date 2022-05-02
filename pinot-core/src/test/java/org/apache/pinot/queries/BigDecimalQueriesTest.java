@@ -138,9 +138,11 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
   @Test(priority = 1)
   public void testQueriesWithNoDictColumn()
       throws Exception {
+    List<String> noDictionaryColumns = new ArrayList<String>();
+    noDictionaryColumns.add(BIG_DECIMAL_COLUMN);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(RAW_TABLE_NAME)
-        .setNoDictionaryColumns(List.of(BIG_DECIMAL_COLUMN))
+        .setNoDictionaryColumns(noDictionaryColumns)
         .build();
     setUp(tableConfig);
     testQueries();
