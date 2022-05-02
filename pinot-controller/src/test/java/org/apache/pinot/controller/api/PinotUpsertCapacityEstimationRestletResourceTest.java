@@ -57,12 +57,12 @@ public class PinotUpsertCapacityEstimationRestletResourceTest {
     JsonNode result = JsonUtils.stringToJsonNode(
         ControllerTestUtils.sendPostRequest(estimateHeapUsageUrl, tableAndSchemaConfig.toJsonString()));
     assertEquals(result.get("bytesPerKey").asInt(), 48);
-    assertEquals(result.get("bytesPerValue").asInt(), 64);
+    assertEquals(result.get("bytesPerValue").asInt(), 60);
     assertEquals(result.get("totalKeySpace(bytes)").asLong(), 480000);
-    assertEquals(result.get("totalValueSpace(bytes)").asLong(), 640000);
-    assertEquals(result.get("totalSpace(bytes)").asLong(), 1120000);
+    assertEquals(result.get("totalValueSpace(bytes)").asLong(), 600000);
+    assertEquals(result.get("totalSpace(bytes)").asLong(), 1080000);
     assertEquals(result.get("numPartitions").asInt(), 8);
-    assertEquals(result.get("totalSpacePerPartition(bytes)").asDouble(), 140000.0);
+    assertEquals(result.get("totalSpacePerPartition(bytes)").asDouble(), 135000.0);
   }
 
   @AfterClass
