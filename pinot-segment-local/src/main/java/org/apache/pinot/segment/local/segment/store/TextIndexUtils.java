@@ -40,8 +40,8 @@ public class TextIndexUtils {
   }
 
   static boolean hasTextIndex(File segDir, String column) {
-    return (new File(segDir, column + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION).exists() || new File(segDir,
-        column + V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION).exists());
+    return new File(segDir, column + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION).exists() || new File(segDir,
+        column + V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION).exists();
   }
 
   public static boolean isFstTypeNative(Map<String, String> textIndexProperties) {
