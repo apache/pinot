@@ -90,7 +90,6 @@ public class VarByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexWri
 
   @Override
   public void putBigDecimal(BigDecimal value) {
-    // Note: BigDecimal stores variable length data with very low length-variance withing a single column.
     putBytes(BigDecimalUtils.serialize(value));
   }
 

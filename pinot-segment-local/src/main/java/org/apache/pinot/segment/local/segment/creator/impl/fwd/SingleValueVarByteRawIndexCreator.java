@@ -33,8 +33,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
- * Forward index creator for raw (non-dictionary-encoded) single-value column of variable length data type (STRING,
- * BIG_DECIMAL, BYTES).
+ * Forward index creator for raw (non-dictionary-encoded) single-value column of variable length data type (BIG_DECIMAL,
+ * STRING, BYTES).
  */
 public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
   private static final int DEFAULT_NUM_DOCS_PER_CHUNK = 1000;

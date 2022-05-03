@@ -31,7 +31,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Chunk-based single-value raw (non-dictionary-encoded) forward index reader for values of variable length data type
- * (STRING, BIG_DECIMAL, BYTES).
+ * (BIG_DECIMAL, STRING, BYTES).
  * <p>For data layout, please refer to the documentation for {@link VarByteChunkSVForwardIndexWriter}
  */
 public final class VarByteChunkSVForwardIndexReader extends BaseChunkSVForwardIndexReader {

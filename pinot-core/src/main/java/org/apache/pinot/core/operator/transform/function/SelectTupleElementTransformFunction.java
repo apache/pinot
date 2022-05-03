@@ -20,10 +20,8 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.EnumMap;
 import java.util.EnumSet;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -90,15 +88,11 @@ public abstract class SelectTupleElementTransformFunction extends BaseTransformF
     if (left == null || left == right) {
       return right;
     }
-    Set<FieldSpec.DataType> dataTypes = new HashSet<FieldSpec.DataType>() {{
-      add(left);
-      add(right);
-    }};
-    assert dataTypes.size() == 2;
-    if (dataTypes.contains(FieldSpec.DataType.BIG_DECIMAL)) {
+    if (left == FieldSpec.DataType.BIG_DECIMAL || right == FieldSpec.DataType.BIG_DECIMAL) {
       return FieldSpec.DataType.BIG_DECIMAL;
     }
-    if (dataTypes.contains(FieldSpec.DataType.DOUBLE) || dataTypes.contains(FieldSpec.DataType.FLOAT)) {
+    if (left == FieldSpec.DataType.DOUBLE || left == FieldSpec.DataType.FLOAT || right == FieldSpec.DataType.DOUBLE
+        || right == FieldSpec.DataType.FLOAT) {
       return FieldSpec.DataType.DOUBLE;
     }
     return FieldSpec.DataType.LONG;

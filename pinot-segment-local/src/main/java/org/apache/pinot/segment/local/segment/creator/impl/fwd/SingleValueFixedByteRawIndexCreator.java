@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.creator.impl.fwd;
 
 import java.io.File;
 import java.io.IOException;
-import java.math.BigDecimal;
 import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -31,7 +30,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 /**
  * Forward index creator for raw (non-dictionary-encoded) single-value column of fixed length data type (INT, LONG,
- * FLOAT, DOUBLE, fixed-size BIG_DECIMAL).
+ * FLOAT, DOUBLE).
  */
 public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator {
   private static final int NUM_DOCS_PER_CHUNK = 1000; // TODO: Auto-derive this based on metadata.
@@ -109,12 +108,6 @@ public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator 
   @Override
   public void putDouble(double value) {
     _indexWriter.putDouble(value);
-  }
-
-  @Override
-  public void putBigDecimal(BigDecimal value) {
-    // A BIG_DECIMAL column where all values are of a fixed byte-size (unlikely but possible).
-    _indexWriter.putBigDecimal(value);
   }
 
   @Override

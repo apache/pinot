@@ -92,7 +92,7 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
   abstract protected void applyMathOperator(double[] values, int length);
 
   protected void applyMathOperator(BigDecimal[] values, int length) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException("Math operator does not support BIG_DECIMAL data type");
   }
 
   public static class AbsTransformFunction extends SingleParamMathTransformFunction {

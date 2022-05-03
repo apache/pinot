@@ -21,10 +21,8 @@ package org.apache.pinot.segment.local.io.writer.impl;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.math.BigDecimal;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
-import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
 /**
@@ -100,12 +98,6 @@ public class FixedByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexW
   public void putDouble(double value) {
     _chunkBuffer.putDouble(value);
     _chunkDataOffset += Double.BYTES;
-    flushChunkIfNeeded();
-  }
-
-  public void putBigDecimal(BigDecimal value) {
-    _chunkBuffer.put(BigDecimalUtils.serialize(value));
-    _chunkDataOffset += BigDecimalUtils.byteSize(value);
     flushChunkIfNeeded();
   }
 

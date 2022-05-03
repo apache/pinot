@@ -36,7 +36,6 @@ public class SubtractionTransformFunction extends BaseTransformFunction {
   private double[] _doubleLiterals;
   private BigDecimal[] _bigDecimalLiterals;
   private TransformFunction _firstTransformFunction;
-  private double _secondLiteral;
   private TransformFunction _secondTransformFunction;
   private double[] _doubleDifferences;
   private BigDecimal[] _bigDecimalDifferences;
@@ -54,25 +53,30 @@ public class SubtractionTransformFunction extends BaseTransformFunction {
     }
 
     _resultDataType = DataType.DOUBLE;
-    _doubleLiterals = new double[2];
-    _bigDecimalLiterals = new BigDecimal[2];
+    for (TransformFunction argument : arguments) {
+      if (argument.getResultMetadata().getDataType() == DataType.BIG_DECIMAL) {
+        _resultDataType = DataType.BIG_DECIMAL;
+        break;
+      }
+    }
+    if (_resultDataType == DataType.BIG_DECIMAL) {
+      _bigDecimalLiterals = new BigDecimal[2];
+    } else {
+      _doubleLiterals = new double[2];
+    }
+
     for (int i = 0; i < arguments.size(); i++) {
       TransformFunction argument = arguments.get(i);
       if (argument instanceof LiteralTransformFunction) {
         LiteralTransformFunction literalTransformFunction = (LiteralTransformFunction) argument;
-        DataType dataType = literalTransformFunction.getResultMetadata().getDataType();
-        if (dataType == DataType.BIG_DECIMAL) {
+        if (_resultDataType == DataType.BIG_DECIMAL) {
           _bigDecimalLiterals[i] = new BigDecimal(literalTransformFunction.getLiteral());
-          _resultDataType = DataType.BIG_DECIMAL;
         } else {
           _doubleLiterals[i] = Double.parseDouble(((LiteralTransformFunction) argument).getLiteral());
         }
       } else {
         if (!argument.getResultMetadata().isSingleValue()) {
           throw new IllegalArgumentException("every argument of SUB transform function must be single-valued");
-        }
-        if (argument.getResultMetadata().getDataType() == DataType.BIG_DECIMAL) {
-          _resultDataType = DataType.BIG_DECIMAL;
         }
         if (i == 0) {
           _firstTransformFunction = argument;
