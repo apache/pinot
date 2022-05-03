@@ -562,7 +562,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(executionEndTimeNs - compilationStartTimeNs);
     brokerResponse.setTimeUsedMs(totalTimeMs);
     requestStatistics.setQueryProcessingTime(totalTimeMs);
-    requestStatistics.setStatistics(brokerResponse);
+    augmentStatistics(requestStatistics, brokerResponse);
 
     logBrokerResponse(requestId, query, requestStatistics, brokerRequest, numUnavailableSegments, serverStats,
         brokerResponse, totalTimeMs);
@@ -947,7 +947,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(executionEndTimeNs - compilationStartTimeNs);
     brokerResponse.setTimeUsedMs(totalTimeMs);
     requestStatistics.setQueryProcessingTime(totalTimeMs);
-    requestStatistics.setStatistics(brokerResponse);
+    augmentStatistics(requestStatistics, brokerResponse);
 
     LOGGER.debug("Broker Response: {}", brokerResponse);
 
@@ -1570,7 +1570,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - compilationStartTimeNs);
     brokerResponse.setTimeUsedMs(totalTimeMs);
     requestStatistics.setQueryProcessingTime(totalTimeMs);
-    requestStatistics.setStatistics(brokerResponse);
+    augmentStatistics(requestStatistics, brokerResponse);
     return brokerResponse;
   }
 
@@ -2275,6 +2275,30 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       List<String>> offlineRoutingTable, @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance,
       List<String>> realtimeRoutingTable, long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
       throws Exception;
+
+  private static void augmentStatistics(RequestStatistics statistics, BrokerResponse response) {
+    statistics.setTotalDocs(response.getTotalDocs());
+    statistics.setNumDocsScanned(response.getNumDocsScanned());
+    statistics.setNumEntriesScannedInFilter(response.getNumEntriesScannedInFilter());
+    statistics.setNumEntriesScannedPostFilter(response.getNumEntriesScannedPostFilter());
+    statistics.setNumSegmentsQueried(response.getNumSegmentsQueried());
+    statistics.setNumSegmentsProcessed(response.getNumSegmentsProcessed());
+    statistics.setNumSegmentsMatched(response.getNumSegmentsMatched());
+    statistics.setNumServersQueried(response.getNumServersQueried());
+    statistics.setNumSegmentsProcessed(response.getNumSegmentsProcessed());
+    statistics.setNumServersResponded(response.getNumServersResponded());
+    statistics.setNumGroupsLimitReached(response.isNumGroupsLimitReached());
+    statistics.setNumExceptions(response.getExceptionsSize());
+    statistics.setOfflineThreadCpuTimeNs(response.getOfflineThreadCpuTimeNs());
+    statistics.setRealtimeThreadCpuTimeNs(response.getRealtimeThreadCpuTimeNs());
+    statistics.setOfflineSystemActivitiesCpuTimeNs(response.getOfflineSystemActivitiesCpuTimeNs());
+    statistics.setRealtimeSystemActivitiesCpuTimeNs(response.getRealtimeSystemActivitiesCpuTimeNs());
+    statistics.setOfflineResponseSerializationCpuTimeNs(response.getOfflineResponseSerializationCpuTimeNs());
+    statistics.setRealtimeResponseSerializationCpuTimeNs(response.getRealtimeResponseSerializationCpuTimeNs());
+    statistics.setOfflineTotalCpuTimeNs(response.getOfflineTotalCpuTimeNs());
+    statistics.setRealtimeTotalCpuTimeNs(response.getRealtimeTotalCpuTimeNs());
+    statistics.setNumRowsResultSet(response.getNumRowsResultSet());
+  }
 
   /**
    * Helper class to pass the per server statistics.

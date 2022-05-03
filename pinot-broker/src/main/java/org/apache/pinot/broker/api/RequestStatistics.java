@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.api;
 
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.response.BrokerResponse;
 
 
 /**
@@ -29,13 +28,16 @@ import org.apache.pinot.common.response.BrokerResponse;
  */
 public class RequestStatistics {
 
+  public enum FanoutType {
+    OFFLINE, REALTIME, HYBRID
+  }
+
   private static final String DEFAULT_TABLE_NAME = "NotYetParsed";
 
   private int _errorCode = 0;
   private String _pql;
   private String _tableName = DEFAULT_TABLE_NAME;
   private long _processingTimeMillis = -1;
-
   private long _totalDocs;
   private long _numDocsScanned;
   private long _numEntriesScannedInFilter;
@@ -51,6 +53,23 @@ public class RequestStatistics {
   private long _realtimeResponseSerializationCpuTimeNs;
   private long _offlineTotalCpuTimeNs;
   private long _realtimeTotalCpuTimeNs;
+  private int _numServersQueried;
+  private int _numServersResponded;
+  private boolean _isNumGroupsLimitReached;
+  private int _numExceptions;
+  private String _brokerId;
+  private String _offlineServerTenant;
+  private String _realtimeServerTenant;
+  private long _requestId;
+  private int _numRowsResultSet;
+  private long _requestArrivalTimeMillis;
+  private long _reduceTimeMillis;
+
+  private FanoutType _fanoutType;
+  private int _numUnavailableSegments;
+
+  public RequestStatistics() {
+  }
 
   public long getOfflineSystemActivitiesCpuTimeNs() {
     return _offlineSystemActivitiesCpuTimeNs;
@@ -81,7 +100,7 @@ public class RequestStatistics {
   }
 
   public void setOfflineTotalCpuTimeNs(long offlineTotalCpuTimeNs) {
-    _offlineTotalCpuTimeNs = _offlineTotalCpuTimeNs;
+    _offlineTotalCpuTimeNs = offlineTotalCpuTimeNs;
   }
 
   public long getRealtimeResponseSerializationCpuTimeNs() {
@@ -99,16 +118,6 @@ public class RequestStatistics {
   public void setRealtimeTotalCpuTimeNs(long realtimeTotalCpuTimeNs) {
     _realtimeTotalCpuTimeNs = realtimeTotalCpuTimeNs;
   }
-
-  private int _numServersQueried;
-  private int _numServersResponded;
-  private boolean _isNumGroupsLimitReached;
-  private int _numExceptions;
-  private String _brokerId;
-  private String _offlineServerTenant;
-  private String _realtimeServerTenant;
-  private long _requestId;
-  private int _numRowsResultSet;
 
   public String getBrokerId() {
     return _brokerId;
@@ -134,19 +143,6 @@ public class RequestStatistics {
     return _reduceTimeMillis;
   }
 
-  private long _requestArrivalTimeMillis;
-  private long _reduceTimeMillis;
-
-  public enum FanoutType {
-    OFFLINE, REALTIME, HYBRID
-  }
-
-  private FanoutType _fanoutType;
-  private int _numUnavailableSegments;
-
-  public RequestStatistics() {
-  }
-
   public void setErrorCode(int errorCode) {
     _errorCode = errorCode;
   }
@@ -161,30 +157,6 @@ public class RequestStatistics {
 
   public void setQueryProcessingTime(long processingTimeMillis) {
     _processingTimeMillis = processingTimeMillis;
-  }
-
-  public void setStatistics(BrokerResponse brokerResponse) {
-    _totalDocs = brokerResponse.getTotalDocs();
-    _numDocsScanned = brokerResponse.getNumDocsScanned();
-    _numEntriesScannedInFilter = brokerResponse.getNumEntriesScannedInFilter();
-    _numEntriesScannedPostFilter = brokerResponse.getNumEntriesScannedPostFilter();
-    _numSegmentsQueried = brokerResponse.getNumSegmentsQueried();
-    _numSegmentsProcessed = brokerResponse.getNumSegmentsProcessed();
-    _numSegmentsMatched = brokerResponse.getNumSegmentsMatched();
-    _numServersQueried = brokerResponse.getNumServersQueried();
-    _numSegmentsProcessed = brokerResponse.getNumSegmentsProcessed();
-    _numServersResponded = brokerResponse.getNumServersResponded();
-    _isNumGroupsLimitReached = brokerResponse.isNumGroupsLimitReached();
-    _numExceptions = brokerResponse.getExceptionsSize();
-    _offlineThreadCpuTimeNs = brokerResponse.getOfflineThreadCpuTimeNs();
-    _realtimeThreadCpuTimeNs = brokerResponse.getRealtimeThreadCpuTimeNs();
-    _offlineSystemActivitiesCpuTimeNs = brokerResponse.getOfflineSystemActivitiesCpuTimeNs();
-    _realtimeSystemActivitiesCpuTimeNs = brokerResponse.getRealtimeSystemActivitiesCpuTimeNs();
-    _offlineResponseSerializationCpuTimeNs = brokerResponse.getOfflineResponseSerializationCpuTimeNs();
-    _realtimeResponseSerializationCpuTimeNs = brokerResponse.getRealtimeResponseSerializationCpuTimeNs();
-    _offlineTotalCpuTimeNs = brokerResponse.getOfflineTotalCpuTimeNs();
-    _realtimeTotalCpuTimeNs = brokerResponse.getRealtimeTotalCpuTimeNs();
-    _numRowsResultSet = brokerResponse.getNumRowsResultSet();
   }
 
   public void setBrokerId(String brokerId) {
@@ -301,5 +273,69 @@ public class RequestStatistics {
 
   public int getNumRowsResultSet() {
     return _numRowsResultSet;
+  }
+
+  public void setProcessingTimeMillis(long processingTimeMillis) {
+    _processingTimeMillis = processingTimeMillis;
+  }
+
+  public void setTotalDocs(long totalDocs) {
+    _totalDocs = totalDocs;
+  }
+
+  public void setNumDocsScanned(long numDocsScanned) {
+    _numDocsScanned = numDocsScanned;
+  }
+
+  public void setNumEntriesScannedInFilter(long numEntriesScannedInFilter) {
+    _numEntriesScannedInFilter = numEntriesScannedInFilter;
+  }
+
+  public void setNumEntriesScannedPostFilter(long numEntriesScannedPostFilter) {
+    _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
+  }
+
+  public void setNumSegmentsQueried(long numSegmentsQueried) {
+    _numSegmentsQueried = numSegmentsQueried;
+  }
+
+  public void setNumSegmentsProcessed(long numSegmentsProcessed) {
+    _numSegmentsProcessed = numSegmentsProcessed;
+  }
+
+  public void setNumSegmentsMatched(long numSegmentsMatched) {
+    _numSegmentsMatched = numSegmentsMatched;
+  }
+
+  public void setOfflineThreadCpuTimeNs(long offlineThreadCpuTimeNs) {
+    _offlineThreadCpuTimeNs = offlineThreadCpuTimeNs;
+  }
+
+  public void setRealtimeThreadCpuTimeNs(long realtimeThreadCpuTimeNs) {
+    _realtimeThreadCpuTimeNs = realtimeThreadCpuTimeNs;
+  }
+
+  public void setNumServersQueried(int numServersQueried) {
+    _numServersQueried = numServersQueried;
+  }
+
+  public void setNumServersResponded(int numServersResponded) {
+    _numServersResponded = numServersResponded;
+  }
+
+  public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
+    _isNumGroupsLimitReached = numGroupsLimitReached;
+  }
+
+  public void setNumExceptions(int numExceptions) {
+    _numExceptions = numExceptions;
+  }
+
+  public void setNumRowsResultSet(int numRowsResultSet) {
+    _numRowsResultSet = numRowsResultSet;
+  }
+
+  public void setReduceTimeMillis(long reduceTimeMillis) {
+    _reduceTimeMillis = reduceTimeMillis;
   }
 }
