@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit;
  * This object can be used to publish the query processing statistics to a stream for
  * post-processing at a finer level than metrics.
  */
-public class DefaultRequestStatistics implements RequestScope {
+public class DefaultRequestContext implements RequestScope {
 
   private static final String DEFAULT_TABLE_NAME = "NotYetParsed";
 
@@ -64,7 +64,7 @@ public class DefaultRequestStatistics implements RequestScope {
   private FanoutType _fanoutType;
   private int _numUnavailableSegments;
 
-  public DefaultRequestStatistics() {
+  public DefaultRequestContext() {
   }
 
   @Override

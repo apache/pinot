@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.spi.trace;
 
-public interface RequestStatistics {
+public interface RequestContext {
   long getOfflineSystemActivitiesCpuTimeNs();
 
   void setOfflineSystemActivitiesCpuTimeNs(long offlineSystemActivitiesCpuTimeNs);
@@ -50,6 +50,10 @@ public interface RequestStatistics {
   String getRealtimeServerTenant();
 
   long getRequestId();
+
+  default boolean isSampledRequest() {
+    return false;
+  }
 
   long getRequestArrivalTimeMillis();
 

@@ -30,7 +30,7 @@ import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.trace.RequestStatistics;
+import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -129,7 +129,7 @@ public class LiteralOnlyBrokerRequestTest {
     RANDOM.nextBytes(randBytes);
     String ranStr = BytesUtils.toHexString(randBytes);
     JsonNode request = new ObjectMapper().readTree(String.format("{\"sql\":\"SELECT %d, '%s'\"}", randNum, ranStr));
-    RequestStatistics requestStats = Tracing.getTracer().createRequestScope();
+    RequestContext requestStats = Tracing.getTracer().createRequestScope();
     BrokerResponseNative brokerResponse = requestHandler.handleRequest(request, null, requestStats);
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), String.format("%d", randNum));
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
@@ -154,7 +154,7 @@ public class LiteralOnlyBrokerRequestTest {
     long currentTsMin = System.currentTimeMillis();
     JsonNode request = new ObjectMapper().readTree(
         "{\"sql\":\"SELECT now() as currentTs, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') as firstDayOf2020\"}");
-    RequestStatistics requestStats = Tracing.getTracer().createRequestScope();
+    RequestContext requestStats = Tracing.getTracer().createRequestScope();
     BrokerResponseNative brokerResponse = requestHandler.handleRequest(request, null, requestStats);
     long currentTsMax = System.currentTimeMillis();
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), "currentTs");
@@ -225,7 +225,7 @@ public class LiteralOnlyBrokerRequestTest {
     ObjectMapper objectMapper = new ObjectMapper();
     // Test 1: select constant
     JsonNode request = objectMapper.readTree("{\"sql\":\"EXPLAIN PLAN FOR SELECT 1.5, 'test'\"}");
-    RequestStatistics requestStats = Tracing.getTracer().createRequestScope();
+    RequestContext requestStats = Tracing.getTracer().createRequestScope();
     BrokerResponseNative brokerResponse = requestHandler.handleRequest(request, null, requestStats);
 
     checkExplainResultSchema(brokerResponse.getResultTable().getDataSchema(),
