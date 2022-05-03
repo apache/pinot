@@ -41,7 +41,6 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
@@ -90,6 +89,7 @@ import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.trace.RequestStatistics;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
@@ -207,7 +207,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       @Nullable RequesterIdentity requesterIdentity, RequestStatistics requestStatistics)
       throws Exception {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
-    requestStatistics.setPql(query);
+    requestStatistics.setQuery(query);
 
     // Compile the request
     long compilationStartTimeNs = System.nanoTime();
@@ -706,7 +706,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       @Nullable RequesterIdentity requesterIdentity, RequestStatistics requestStatistics)
       throws Exception {
     LOGGER.debug("PQL query for request {}: {}", requestId, query);
-    requestStatistics.setPql(query);
+    requestStatistics.setQuery(query);
 
     // Compile the request
     long compilationStartTimeNs = System.nanoTime();

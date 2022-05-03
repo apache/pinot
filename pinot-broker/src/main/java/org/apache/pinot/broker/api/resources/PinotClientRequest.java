@@ -42,7 +42,6 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
-import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -50,6 +49,8 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
+import org.apache.pinot.spi.trace.RequestScope;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -105,9 +106,11 @@ public class PinotClientRequest {
       if (debugOptions != null) {
         requestJson.put(Request.DEBUG_OPTIONS, debugOptions);
       }
-      BrokerResponse brokerResponse =
-          _requestHandler.handleRequest(requestJson, makeHttpIdentity(requestContext), new RequestStatistics());
-      asyncResponse.resume(brokerResponse.toJsonString());
+      try (RequestScope requestStatistics = Tracing.getTracer().createRequestScope()) {
+        BrokerResponse brokerResponse =
+            _requestHandler.handleRequest(requestJson, makeHttpIdentity(requestContext), requestStatistics);
+        asyncResponse.resume(brokerResponse.toJsonString());
+      }
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1L);
@@ -135,9 +138,11 @@ public class PinotClientRequest {
       @Context org.glassfish.grizzly.http.server.Request requestContext) {
     try {
       JsonNode requestJson = JsonUtils.stringToJsonNode(query);
-      BrokerResponse brokerResponse =
-          _requestHandler.handleRequest(requestJson, makeHttpIdentity(requestContext), new RequestStatistics());
-      asyncResponse.resume(brokerResponse);
+      try (RequestScope requestStatistics = Tracing.getTracer().createRequestScope()) {
+        BrokerResponse brokerResponse =
+            _requestHandler.handleRequest(requestJson, makeHttpIdentity(requestContext), requestStatistics);
+        asyncResponse.resume(brokerResponse);
+      }
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing POST request", e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
@@ -222,7 +227,9 @@ public class PinotClientRequest {
     }
     switch (sqlType) {
       case DQL:
-        return _requestHandler.handleRequest(sqlRequestJson, httpRequesterIdentity, new RequestStatistics());
+        try (RequestScope requestStatistics = Tracing.getTracer().createRequestScope()) {
+          return _requestHandler.handleRequest(sqlRequestJson, httpRequesterIdentity, requestStatistics);
+        }
       case DML:
         Map<String, String> headers = new HashMap<>();
         httpRequesterIdentity.getHttpHeaders().entries()
