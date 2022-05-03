@@ -286,8 +286,8 @@ public class MutableSegmentImpl implements MutableSegment {
 
       // Text index
       MutableTextIndex textIndex;
-      boolean shouldBuildLuceneIndex = true;
       if (textIndexColumns.contains(column)) {
+        boolean shouldBuildLuceneIndex = true;
         if (_fieldConfigList != null) {
           for (FieldConfig fieldConfig : _fieldConfigList) {
             if (fieldConfig.getName().equals(column)) {
@@ -311,7 +311,12 @@ public class MutableSegmentImpl implements MutableSegment {
           _realtimeLuceneReaders.addReader((RealtimeLuceneTextIndex) textIndex);
         } else {
           //TODO : Add native index
-          textIndex = null;
+          _logger.warn("Real time index is not supported for native text indices. Lucene index will be used");
+          textIndex = new RealtimeLuceneTextIndex(column, new File(config.getConsumerDir()), _segmentName);
+          if (_realtimeLuceneReaders == null) {
+            _realtimeLuceneReaders = new RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders(_segmentName);
+          }
+          _realtimeLuceneReaders.addReader((RealtimeLuceneTextIndex) textIndex);
         }
       } else {
         textIndex = null;

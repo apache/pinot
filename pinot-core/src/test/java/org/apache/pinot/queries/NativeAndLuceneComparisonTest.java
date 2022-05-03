@@ -108,10 +108,15 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
   }
 
   private List<String> getDomainNames() {
-    return Arrays.asList("www.domain1.com", "www.domain1.co.ab", "www.domain1.co.bc", "www.domain1.co.cd",
-        "www.sd.domain1.com", "www.sd.domain1.co.ab", "www.sd.domain1.co.bc", "www.sd.domain1.co.cd", "www.domain2.com",
-        "www.domain2.co.ab", "www.domain2.co.bc", "www.domain2.co.cd", "www.sd.domain2.com", "www.sd.domain2.co.ab",
-        "www.sd.domain2.co.bc", "www.sd.domain2.co.cd");
+    return Arrays.asList("Prince Andrew kept looking with an amused smile from Pierre",
+        "vicomte and from the vicomte to their hostess. In the first moment of",
+        "Pierre’s outburst Anna Pávlovna, despite her social experience, was",
+        "horror-struck. But when she saw that Pierre’s sacrilegious words",
+        "had not exasperated the vicomte, and had convinced herself that it was",
+        "impossible to stop him, she rallied her forces and joined the vicomte in", "a vigorous attack on the orator",
+        "horror-struck. But when she", "she rallied her forces and joined", "outburst Anna Pávlovna",
+        "she rallied her forces and", "despite her social experience", "had not exasperated the vicomte",
+        " despite her social experience", "impossible to stop him", "despite her social experience");
   }
 
   private List<GenericRow> createTestData(int numRows) {
@@ -124,18 +129,6 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
       row.putField(DOMAIN_NAMES_COL_NATIVE, domain);
       rows.add(row);
     }
-
-    String textValue = "\n" + "Prince Andrew kept looking with an amused smile from Pierre to the\n"
-        + "vicomte and from the vicomte to their hostess. In the first moment of\n"
-        + "Pierre’s outburst Anna Pávlovna, despite her social experience, was\n"
-        + "horror-struck. But when she saw that Pierre’s sacrilegious words\n"
-        + "had not exasperated the vicomte, and had convinced herself that it was\n"
-        + "impossible to stop him, she rallied her forces and joined the vicomte in\n"
-        + "a vigorous attack on the orator";
-    GenericRow row = new GenericRow();
-    row.putField(DOMAIN_NAMES_COL_LUCENE, textValue);
-    row.putField(DOMAIN_NAMES_COL_NATIVE, textValue);
-    rows.add(row);
 
     return rows;
   }
@@ -257,38 +250,30 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
 
   @Test
   public void testQueries() {
-    String luceneQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'www.domain1%') LIMIT 50000";
-    String nativeQuery = "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'www.domain1.*' LIMIT 50000";
+    String luceneQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'vico*') LIMIT 50000";
+    String nativeQuery = "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'vico.*' LIMIT 50000";
     testSelectionResults(nativeQuery, luceneQuery);
 
-    nativeQuery = "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS '.*www.domain1' LIMIT 50000";
-    luceneQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, '%www.domain1') LIMIT 50000";
-    testSelectionResults(nativeQuery, luceneQuery);
-
-    nativeQuery = "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS '.*www.domain1.*' LIMIT 50000";
-    luceneQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, '%www.domain1%') LIMIT 50000";
-    testSelectionResults(nativeQuery, luceneQuery);
+    nativeQuery = "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'convi.*ced' LIMIT 50000";
+    luceneQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'convi*ced') LIMIT 50000";
     testSelectionResults(nativeQuery, luceneQuery);
 
     nativeQuery =
-        "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'www.domain1.*' AND DOMAIN_NAMES_NATIVE CONTAINS '"
-            + ".*www.domain1' LIMIT 50000";
+        "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'vicomte' AND DOMAIN_NAMES_NATIVE CONTAINS '"
+            + "hos.*' LIMIT 50000";
     luceneQuery =
-        "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'www.domain1% AND %www.domain1') LIMIT 50000";
-    testSelectionResults(nativeQuery, luceneQuery);
+        "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'vicomte AND hos*') LIMIT 50000";
     testSelectionResults(nativeQuery, luceneQuery);
 
     nativeQuery =
-        "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'www.domain1.*' OR DOMAIN_NAMES_NATIVE CONTAINS '"
-            + ".*www.domain1' LIMIT 50000";
+        "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'sac.*' OR DOMAIN_NAMES_NATIVE CONTAINS '"
+            + "herself' LIMIT 50000";
     luceneQuery =
-        "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'www.domain1% OR %www.domain1') LIMIT 50000";
-    testSelectionResults(nativeQuery, luceneQuery);
+        "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'sac* OR herself') LIMIT 50000";
     testSelectionResults(nativeQuery, luceneQuery);
 
     nativeQuery = "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'vicomte' LIMIT 50000";
     luceneQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'vicomte') LIMIT 50000";
-    testSelectionResults(nativeQuery, luceneQuery);
     testSelectionResults(nativeQuery, luceneQuery);
   }
 }

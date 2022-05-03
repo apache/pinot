@@ -83,10 +83,10 @@ public class BenchmarkNativeVsLuceneTextIndex {
 
   private IndexSegment _indexSegment;
 
-  final String _luceneQuery =
-      "SELECT SUM(INT_COL) FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_COL, 'www.domain1%')";
+  final String _luceneQuery = "SELECT SUM(INT_COL) FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_COL, 'sac* OR vic*')";
   final String _nativeQuery =
-      "SELECT SUM(INT_COL) FROM MyTable WHERE DOMAIN_NAMES_COL CONTAINS 'www.domain1.*'";
+      "SELECT SUM(INT_COL) FROM MyTable WHERE DOMAIN_NAMES_COL CONTAINS 'sac.*' OR DOMAIN_NAMES_COL CONTAINS 'vic.*'";
+
   @Param("1000000")
   int _numRows;
   @Param({"0", "1", "10", "100"})
@@ -119,10 +119,15 @@ public class BenchmarkNativeVsLuceneTextIndex {
   }
 
   private List<String> getDomainNames() {
-    return Arrays.asList("www.domain1.com", "www.domain1.co.ab", "www.domain1.co.bc", "www.domain1.co.cd",
-        "www.sd.domain1.com", "www.sd.domain1.co.ab", "www.sd.domain1.co.bc", "www.sd.domain1.co.cd", "www.domain2.com",
-        "www.domain2.co.ab", "www.domain2.co.bc", "www.domain2.co.cd", "www.sd.domain2.com", "www.sd.domain2.co.ab",
-        "www.sd.domain2.co.bc", "www.sd.domain2.co.cd");
+    return Arrays.asList("Prince Andrew kept looking with an amused smile from Pierre",
+        "vicomte and from the vicomte to their hostess. In the first moment of",
+        "Pierre’s outburst Anna Pávlovna, despite her social experience, was",
+        "horror-struck. But when she saw that Pierre’s sacrilegious words",
+        "had not exasperated the vicomte, and had convinced herself that it was",
+        "impossible to stop him, she rallied her forces and joined the vicomte in", "a vigorous attack on the orator",
+        "horror-struck. But when she", "she rallied her forces and joined", "outburst Anna Pávlovna",
+        "she rallied her forces and", "despite her social experience", "had not exasperated the vicomte",
+        " despite her social experience", "impossible to stop him", "despite her social experience");
   }
 
   private List<GenericRow> createTestData(int numRows) {
@@ -156,8 +161,7 @@ public class BenchmarkNativeVsLuceneTextIndex {
         .setInvertedIndexColumns(Arrays.asList(DOMAIN_NAMES_COL)).setFieldConfigList(fieldConfigs).build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(DOMAIN_NAMES_COL, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(INT_COL, FieldSpec.DataType.INT)
-        .build();
+        .addSingleValueDimension(INT_COL, FieldSpec.DataType.INT).build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
@@ -187,7 +191,6 @@ public class BenchmarkNativeVsLuceneTextIndex {
     Set<String> invertedIndexCols = new HashSet<>();
     invertedIndexCols.add(DOMAIN_NAMES_COL);
     indexLoadingConfig.setInvertedIndexColumns(invertedIndexCols);
-
 
     if (fstType == FSTType.NATIVE) {
       Map<String, Map<String, String>> columnPropertiesParentMap = new HashMap<>();
