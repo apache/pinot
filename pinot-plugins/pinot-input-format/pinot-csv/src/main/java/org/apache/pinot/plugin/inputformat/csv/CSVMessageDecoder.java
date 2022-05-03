@@ -24,7 +24,7 @@ public class CSVMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final String CONFIG_DELIMITER = "csvDelimiter";
   private static final String CONFIG_COMMENT_MARKER = "csvCommentMarker";
   private static final String CONFIG_CSV_ESCAPE_CHARACTER = "csvEscapeCharacter";
-  private static final String CONFIG_CSV_MULTI_VALUE_DELIMITER = "csvEscapeCharacter";
+  private static final String CONFIG_CSV_MULTI_VALUE_DELIMITER = "csvMultiValueDelimiter";
 
   private CSVFormat _format;
   private CSVRecordExtractor _recordExtractor;
@@ -67,9 +67,14 @@ public class CSVMessageDecoder implements StreamMessageDecoder<byte[]> {
       //validate header for the delimiter before splitting
       format = format.withHeader(StringUtils.split(csvHeader, csvDelimiter));
     }
-    Character commentMarker = props.get(CONFIG_COMMENT_MARKER).charAt(0);
-    format = format.withCommentMarker(commentMarker);
-    format = format.withEscape(props.get(CONFIG_CSV_ESCAPE_CHARACTER).charAt(0));
+    if (props.containsKey(CONFIG_COMMENT_MARKER)) {
+      Character commentMarker = props.get(CONFIG_COMMENT_MARKER).charAt(0);
+      format = format.withCommentMarker(commentMarker);
+    }
+
+    if (props.containsKey(CONFIG_CSV_ESCAPE_CHARACTER)) {
+      format = format.withEscape(props.get(CONFIG_CSV_ESCAPE_CHARACTER).charAt(0));
+    }
     _format = format;
     if (props.containsKey(CONFIG_CSV_MULTI_VALUE_DELIMITER)) {
       multiValueDelimiter = props.get(CONFIG_CSV_MULTI_VALUE_DELIMITER).charAt(0);
