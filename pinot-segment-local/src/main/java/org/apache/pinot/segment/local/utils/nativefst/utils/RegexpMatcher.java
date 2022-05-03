@@ -43,35 +43,18 @@ public class RegexpMatcher {
   private final String _regexQuery;
   private final FST _fst;
   private final Automaton _automaton;
-  // We maintain both these return paths to support text index and FST index
   private final IntConsumer _dest;
-  private final List<Integer> _returnList;
 
   public RegexpMatcher(String regexQuery, FST fst, IntConsumer dest) {
     _regexQuery = regexQuery;
     _fst = fst;
     _dest = dest;
-    _returnList = null;
-
-    _automaton = new RegExp(_regexQuery).toAutomaton();
-  }
-
-  public RegexpMatcher(String regexQuery, FST fst, List<Integer> returnList) {
-    _regexQuery = regexQuery;
-    _fst = fst;
-    _dest = null;
-    _returnList = returnList;
 
     _automaton = new RegExp(_regexQuery).toAutomaton();
   }
 
   public static void regexMatch(String regexQuery, FST fst, IntConsumer dest) {
     RegexpMatcher matcher = new RegexpMatcher(regexQuery, fst, dest);
-    matcher.regexMatchOnFST();
-  }
-
-  public static void regexMatch(String regexQuery, FST fst, List<Integer> returnList) {
-    RegexpMatcher matcher = new RegexpMatcher(regexQuery, fst, returnList);
     matcher.regexMatchOnFST();
   }
 
@@ -114,11 +97,7 @@ public class RegexpMatcher {
       if (acceptStates.contains(path._state)) {
         if (_fst.isArcFinal(path._fstArc)) {
           //endNodes.add((long) _fst.getOutputSymbol(path._fstArc));
-          if (_dest != null) {
-            _dest.accept(_fst.getOutputSymbol(path._fstArc));
-          } else if (_returnList != null) {
-            _returnList.add(_fst.getOutputSymbol(path._fstArc));
-          }
+          _dest.accept(_fst.getOutputSymbol(path._fstArc));
         }
       }
 

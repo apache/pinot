@@ -185,8 +185,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           .withMinValue((Comparable<?>) columnIndexCreationInfo.getMin())
           .withMaxValue((Comparable<?>) columnIndexCreationInfo.getMax())
           .withTotalNumberOfEntries(columnIndexCreationInfo.getTotalNumberOfEntries())
-          .withColumnIndexCreationInfo(columnIndexCreationInfo).sorted(columnIndexCreationInfo.isSorted())
-          .onHeap(segmentCreationSpec.isOnHeap()).build();
+          .withColumnIndexCreationInfo(columnIndexCreationInfo)
+          .sorted(columnIndexCreationInfo.isSorted())
+          .onHeap(segmentCreationSpec.isOnHeap())
+          .build();
       // Initialize forward index creator
       ChunkCompressionType chunkCompressionType =
           dictEnabledColumn ? null : getColumnCompressionType(segmentCreationSpec, fieldSpec);

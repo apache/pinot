@@ -164,6 +164,7 @@ public class DefaultIndexReaderProvider implements IndexReaderProvider {
       @Nullable Map<String, String> textIndexProperties) {
     FSTType textIndexFSTType = TextIndexUtils.getFSTTypeOfIndex(file, columnMetadata.getColumnName());
     if (textIndexFSTType == FSTType.NATIVE) {
+      // TODO: Support loading native text index from a PinotDataBuffer
       return new NativeTextIndexReader(columnMetadata.getColumnName(), file);
     }
     return new LuceneTextIndexReader(columnMetadata.getColumnName(), file, columnMetadata.getTotalDocs(),

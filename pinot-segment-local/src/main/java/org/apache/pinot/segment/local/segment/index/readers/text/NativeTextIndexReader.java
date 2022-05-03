@@ -18,13 +18,12 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.text;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
 import org.apache.avro.util.ByteBufferInputStream;
 import org.apache.pinot.segment.local.segment.creator.impl.text.NativeTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
@@ -45,7 +44,6 @@ public class NativeTextIndexReader implements TextIndexReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(NativeTextIndexReader.class);
 
   private final String _column;
-  private final File _indexFile;
   private final PinotDataBuffer _buffer;
 
   private FST _fst;
@@ -54,9 +52,7 @@ public class NativeTextIndexReader implements TextIndexReader {
   public NativeTextIndexReader(String column, File indexDir) {
     _column = column;
     try {
-      _indexFile = getTextIndexFile(indexDir);
-      _buffer = PinotDataBuffer.loadBigEndianFile(_indexFile);
-
+      _buffer = PinotDataBuffer.loadBigEndianFile(getTextIndexFile(indexDir));
       populateIndexes();
     } catch (Exception e) {
       LOGGER.error("Failed to instantiate Lucene text index reader for column {}, exception {}", column,
@@ -76,22 +72,22 @@ public class NativeTextIndexReader implements TextIndexReader {
 
   private void populateIndexes() {
     int fstMagic = _buffer.getInt(0);
+    Preconditions.checkState(fstMagic == FSTHeader.FST_MAGIC, "Invalid native text index magic header: %s", fstMagic);
+    int version = _buffer.getInt(4);
+    Preconditions.checkState(version == NativeTextIndexCreator.VERSION, "Unsupported native text index version: %s",
+        version);
 
-    if (fstMagic != FSTHeader.FST_MAGIC) {
-      throw new IllegalStateException("Native FST declared but header is not matching");
-    }
-
-    long invertedIndexLength = _buffer.getLong(4);
-    long fstDataLength = _buffer.getLong(12);
+    int fstDataLength = _buffer.getInt(8);
+    long invertedIndexLength = _buffer.getLong(12);
     int numBitMaps = _buffer.getInt(20);
 
     long fstDataStartOffset = NativeTextIndexCreator.HEADER_LENGTH;
     long fstDataEndOffset = fstDataStartOffset + fstDataLength;
-    ByteBuffer byteBuffer = _buffer.toDirectByteBuffer(fstDataStartOffset, (int) fstDataLength);
+    ByteBuffer byteBuffer = _buffer.toDirectByteBuffer(fstDataStartOffset, fstDataLength);
     try {
       _fst = FST.read(new ByteBufferInputStream(Collections.singletonList(byteBuffer)), ImmutableFST.class, true);
     } catch (IOException e) {
-      throw new RuntimeException(e.getMessage());
+      throw new RuntimeException(e);
     }
 
     long invertedIndexEndOffset = fstDataEndOffset + invertedIndexLength;
@@ -108,19 +104,9 @@ public class NativeTextIndexReader implements TextIndexReader {
   @Override
   public MutableRoaringBitmap getDocIds(String searchQuery) {
     try {
-      List<Integer> returnList = new ArrayList<>();
-      RegexpMatcher.regexMatch(searchQuery, _fst, returnList);
-      MutableRoaringBitmap matchingDocIds = null;
-
-      for (int dictId : returnList) {
-        ImmutableRoaringBitmap docIds = _invertedIndex.getDocIds(dictId);
-        if (matchingDocIds == null) {
-          matchingDocIds = docIds.toMutableRoaringBitmap();
-        } else {
-          matchingDocIds.or(docIds);
-        }
-      }
-      return matchingDocIds == null ? new MutableRoaringBitmap() : matchingDocIds;
+      MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
+      RegexpMatcher.regexMatch(searchQuery, _fst, dictId -> matchingDocIds.or(_invertedIndex.getDocIds(dictId)));
+      return matchingDocIds;
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while running query: " + searchQuery, e);
     }

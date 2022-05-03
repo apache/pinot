@@ -287,37 +287,33 @@ public class MutableSegmentImpl implements MutableSegment {
       // Text index
       MutableTextIndex textIndex;
       if (textIndexColumns.contains(column)) {
-        boolean shouldBuildLuceneIndex = true;
+        boolean useNativeTextIndex = false;
         if (_fieldConfigList != null) {
           for (FieldConfig fieldConfig : _fieldConfigList) {
             if (fieldConfig.getName().equals(column)) {
               Map<String, String> properties = fieldConfig.getProperties();
-
               if (TextIndexUtils.isFstTypeNative(properties)) {
-                shouldBuildLuceneIndex = false;
+                useNativeTextIndex = true;
               }
             }
           }
         }
 
-        if (shouldBuildLuceneIndex) {
-          // TODO - this logic is in the wrong place and belongs in a Lucene-specific submodule,
-          //  it is beyond the scope of realtime index pluggability to do this refactoring, so realtime
-          //  text indexes remain statically defined. Revisit this after this refactoring has been done.
-          textIndex = new RealtimeLuceneTextIndex(column, new File(config.getConsumerDir()), _segmentName);
-          if (_realtimeLuceneReaders == null) {
-            _realtimeLuceneReaders = new RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders(_segmentName);
-          }
-          _realtimeLuceneReaders.addReader((RealtimeLuceneTextIndex) textIndex);
-        } else {
-          //TODO : Add native index
-          _logger.warn("Real time index is not supported for native text indices. Lucene index will be used");
-          textIndex = new RealtimeLuceneTextIndex(column, new File(config.getConsumerDir()), _segmentName);
-          if (_realtimeLuceneReaders == null) {
-            _realtimeLuceneReaders = new RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders(_segmentName);
-          }
-          _realtimeLuceneReaders.addReader((RealtimeLuceneTextIndex) textIndex);
+        if (useNativeTextIndex) {
+          // TODO: Add native text index support
+          _logger.warn("Mutable native text index is not supported, falling back to the Lucene text index");
         }
+
+        // TODO - this logic is in the wrong place and belongs in a Lucene-specific submodule,
+        //  it is beyond the scope of realtime index pluggability to do this refactoring, so realtime
+        //  text indexes remain statically defined. Revisit this after this refactoring has been done.
+        RealtimeLuceneTextIndex luceneTextIndex =
+            new RealtimeLuceneTextIndex(column, new File(config.getConsumerDir()), _segmentName);
+        if (_realtimeLuceneReaders == null) {
+          _realtimeLuceneReaders = new RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders(_segmentName);
+        }
+        _realtimeLuceneReaders.addReader(luceneTextIndex);
+        textIndex = luceneTextIndex;
       } else {
         textIndex = null;
       }
@@ -370,6 +366,7 @@ public class MutableSegmentImpl implements MutableSegment {
       _upsertComparisonColumn = null;
     }
   }
+
   /**
    * Decide whether a given column should be dictionary encoded or not
    * @param noDictionaryColumns no dictionary column set
@@ -1126,8 +1123,7 @@ public class MutableSegmentImpl implements MutableSegment {
         @Nullable Set<Integer> partitions, NumValuesInfo numValuesInfo, MutableForwardIndex forwardIndex,
         @Nullable MutableDictionary dictionary, @Nullable MutableInvertedIndex invertedIndex,
         @Nullable RangeIndexReader rangeIndex, @Nullable MutableTextIndex textIndex,
-        @Nullable MutableJsonIndex jsonIndex, @Nullable MutableH3Index h3Index,
-        @Nullable BloomFilterReader bloomFilter,
+        @Nullable MutableJsonIndex jsonIndex, @Nullable MutableH3Index h3Index, @Nullable BloomFilterReader bloomFilter,
         @Nullable MutableNullValueVector nullValueVector) {
       _fieldSpec = fieldSpec;
       _partitionFunction = partitionFunction;
