@@ -24,7 +24,6 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
@@ -54,9 +53,7 @@ public class BrokerReduceService extends BaseReduceService {
       return BrokerResponseNative.empty();
     }
 
-    PinotQuery pinotQuery = serverBrokerRequest.getPinotQuery();
-    Map<String, String> queryOptions =
-        pinotQuery != null ? pinotQuery.getQueryOptions() : serverBrokerRequest.getQueryOptions();
+    Map<String, String> queryOptions = serverBrokerRequest.getPinotQuery().getQueryOptions();
     boolean enableTrace =
         queryOptions != null && Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE));
 

@@ -67,9 +67,8 @@ public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
     DistinctTable distinctTable = _distinctExecutor.getResult();
     // TODO: Use a separate way to represent DISTINCT instead of aggregation.
     return new IntermediateResultsBlock(new AggregationFunction[]{_distinctAggregationFunction},
-        Collections.singletonList(distinctTable), false);
+        Collections.singletonList(distinctTable));
   }
-
 
   @Override
   public List<Operator> getChildOperators() {
@@ -91,7 +90,7 @@ public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
 
   @Override
   public String toExplainString() {
-   String[] keys = _distinctAggregationFunction.getColumns();
+    String[] keys = _distinctAggregationFunction.getColumns();
     StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(keyColumns:");
     if (keys.length > 0) {
       stringBuilder.append(keys[0]);

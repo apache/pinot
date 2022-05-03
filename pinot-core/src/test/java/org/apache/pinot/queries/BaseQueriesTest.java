@@ -47,7 +47,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 
@@ -56,7 +55,6 @@ import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
  * Base class for queries tests.
  */
 public abstract class BaseQueriesTest {
-  protected static final CalciteSqlCompiler COMPILER = new CalciteSqlCompiler();
   protected static final PlanMaker PLAN_MAKER = new InstancePlanMakerImplV2();
   protected static final QueryOptimizer OPTIMIZER = new QueryOptimizer();
 
@@ -74,15 +72,7 @@ public abstract class BaseQueriesTest {
    */
   @SuppressWarnings({"rawtypes", "unchecked"})
   protected <T extends Operator> T getOperator(String query) {
-    BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(query);
-    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
-    Map<String, String> queryOptions = pinotQuery.getQueryOptions();
-    if (queryOptions == null) {
-      queryOptions = new HashMap<>();
-      pinotQuery.setQueryOptions(queryOptions);
-    }
-    queryOptions.put(Request.QueryOptionKey.GROUP_BY_MODE, Request.SQL);
-    queryOptions.put(Request.QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
     BrokerRequest serverBrokerRequest = GapfillUtils.stripGapfill(brokerRequest);
     QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(serverBrokerRequest);
     return (T) PLAN_MAKER.makeSegmentPlanNode(getIndexSegment(), queryContext).run();
@@ -140,16 +130,14 @@ public abstract class BaseQueriesTest {
    */
   private BrokerResponseNative getBrokerResponse(String query, PlanMaker planMaker,
       @Nullable Map<String, String> extraQueryOptions) {
-    BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(query);
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
     PinotQuery pinotQuery = brokerRequest.getPinotQuery();
-    Map<String, String> queryOptions = pinotQuery.getQueryOptions();
-    if (queryOptions == null) {
-      queryOptions = new HashMap<>();
-      pinotQuery.setQueryOptions(queryOptions);
-    }
-    queryOptions.put(Request.QueryOptionKey.GROUP_BY_MODE, Request.SQL);
-    queryOptions.put(Request.QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
     if (extraQueryOptions != null) {
+      Map<String, String> queryOptions = pinotQuery.getQueryOptions();
+      if (queryOptions == null) {
+        queryOptions = new HashMap<>();
+        pinotQuery.setQueryOptions(queryOptions);
+      }
       queryOptions.putAll(extraQueryOptions);
     }
     BrokerRequest serverBrokerRequest = GapfillUtils.stripGapfill(brokerRequest);
@@ -203,15 +191,8 @@ public abstract class BaseQueriesTest {
    */
   protected BrokerResponseNative getBrokerResponseForOptimizedQuery(String query, @Nullable TableConfig config,
       @Nullable Schema schema) {
-    BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(query);
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
     PinotQuery pinotQuery = brokerRequest.getPinotQuery();
-    Map<String, String> queryOptions = pinotQuery.getQueryOptions();
-    if (queryOptions == null) {
-      queryOptions = new HashMap<>();
-      pinotQuery.setQueryOptions(queryOptions);
-    }
-    queryOptions.put(Request.QueryOptionKey.GROUP_BY_MODE, Request.SQL);
-    queryOptions.put(Request.QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
     OPTIMIZER.optimize(pinotQuery, config, schema);
     BrokerRequest serverBrokerRequest = GapfillUtils.stripGapfill(brokerRequest);
     QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);

@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.request.context.utils;
 
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 
 
@@ -27,20 +26,10 @@ public class QueryContextConverterUtils {
   private QueryContextConverterUtils() {
   }
 
-  private static final Pql2Compiler PQL_COMPILER = new Pql2Compiler();
-  private static final CalciteSqlCompiler SQL_COMPILER = new CalciteSqlCompiler();
-
   /**
-   * Converts the given PQL query into a {@link QueryContext}.
+   * Converts the given query into a {@link QueryContext}.
    */
-  public static QueryContext getQueryContextFromPQL(String pqlQuery) {
-    return BrokerRequestToQueryContextConverter.convert(PQL_COMPILER.compileToBrokerRequest(pqlQuery));
-  }
-
-  /**
-   * Converts the given SQL query into a {@link QueryContext}.
-   */
-  public static QueryContext getQueryContextFromSQL(String sqlQuery) {
-    return BrokerRequestToQueryContextConverter.convert(SQL_COMPILER.compileToBrokerRequest(sqlQuery));
+  public static QueryContext getQueryContext(String query) {
+    return BrokerRequestToQueryContextConverter.convert(CalciteSqlCompiler.compileToBrokerRequest(query));
   }
 }

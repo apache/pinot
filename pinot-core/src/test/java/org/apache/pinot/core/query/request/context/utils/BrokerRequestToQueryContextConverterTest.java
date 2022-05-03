@@ -18,17 +18,12 @@
  */
 package org.apache.pinot.core.query.request.context.utils;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -42,7 +37,6 @@ import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction
 import org.apache.pinot.core.query.aggregation.function.MinAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.SumAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -66,272 +60,250 @@ public class BrokerRequestToQueryContextConverterTest {
     // Select *
     {
       String query = "SELECT * FROM testTable";
-      QueryContext[] queryContexts = getQueryContexts(query, query);
-      for (QueryContext queryContext : queryContexts) {
-        assertEquals(queryContext.getTableName(), "testTable");
-        List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-        assertEquals(selectExpressions.size(), 1);
-        assertEquals(selectExpressions.get(0), ExpressionContext.forIdentifier("*"));
-        assertEquals(selectExpressions.get(0).toString(), "*");
-        assertEquals(getAliasCount(queryContext.getAliasList()), 0);
-        assertNull(queryContext.getFilter());
-        assertNull(queryContext.getGroupByExpressions());
-        assertNull(queryContext.getOrderByExpressions());
-        assertNull(queryContext.getHavingFilter());
-        assertEquals(queryContext.getLimit(), 10);
-        assertEquals(queryContext.getOffset(), 0);
-        assertTrue(queryContext.getColumns().isEmpty());
-        assertTrue(QueryContextUtils.isSelectionQuery(queryContext));
-        assertFalse(QueryContextUtils.isAggregationQuery(queryContext));
-        assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
-      }
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+      assertEquals(queryContext.getTableName(), "testTable");
+      List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+      assertEquals(selectExpressions.size(), 1);
+      assertEquals(selectExpressions.get(0), ExpressionContext.forIdentifier("*"));
+      assertEquals(selectExpressions.get(0).toString(), "*");
+      assertEquals(getAliasCount(queryContext.getAliasList()), 0);
+      assertNull(queryContext.getFilter());
+      assertNull(queryContext.getGroupByExpressions());
+      assertNull(queryContext.getOrderByExpressions());
+      assertNull(queryContext.getHavingFilter());
+      assertEquals(queryContext.getLimit(), 10);
+      assertEquals(queryContext.getOffset(), 0);
+      assertTrue(queryContext.getColumns().isEmpty());
+      assertTrue(QueryContextUtils.isSelectionQuery(queryContext));
+      assertFalse(QueryContextUtils.isAggregationQuery(queryContext));
+      assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
     }
 
     // Select COUNT(*)
     {
       String query = "SELECT COUNT(*) FROM testTable";
-      QueryContext[] queryContexts = getQueryContexts(query, query);
-      for (QueryContext queryContext : queryContexts) {
-        assertEquals(queryContext.getTableName(), "testTable");
-        List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-        assertEquals(selectExpressions.size(), 1);
-        assertEquals(selectExpressions.get(0), ExpressionContext.forFunction(
-            new FunctionContext(FunctionContext.Type.AGGREGATION, "count",
-                Collections.singletonList(ExpressionContext.forIdentifier("*")))));
-        assertEquals(selectExpressions.get(0).toString(), "count(*)");
-        assertEquals(getAliasCount(queryContext.getAliasList()), 0);
-        assertNull(queryContext.getFilter());
-        assertNull(queryContext.getGroupByExpressions());
-        assertNull(queryContext.getOrderByExpressions());
-        assertNull(queryContext.getHavingFilter());
-        assertEquals(queryContext.getLimit(), 10);
-        assertEquals(queryContext.getOffset(), 0);
-        assertTrue(queryContext.getColumns().isEmpty());
-        assertFalse(QueryContextUtils.isSelectionQuery(queryContext));
-        assertTrue(QueryContextUtils.isAggregationQuery(queryContext));
-        assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
-      }
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+      assertEquals(queryContext.getTableName(), "testTable");
+      List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+      assertEquals(selectExpressions.size(), 1);
+      assertEquals(selectExpressions.get(0), ExpressionContext.forFunction(
+          new FunctionContext(FunctionContext.Type.AGGREGATION, "count",
+              Collections.singletonList(ExpressionContext.forIdentifier("*")))));
+      assertEquals(selectExpressions.get(0).toString(), "count(*)");
+      assertEquals(getAliasCount(queryContext.getAliasList()), 0);
+      assertNull(queryContext.getFilter());
+      assertNull(queryContext.getGroupByExpressions());
+      assertNull(queryContext.getOrderByExpressions());
+      assertNull(queryContext.getHavingFilter());
+      assertEquals(queryContext.getLimit(), 10);
+      assertEquals(queryContext.getOffset(), 0);
+      assertTrue(queryContext.getColumns().isEmpty());
+      assertFalse(QueryContextUtils.isSelectionQuery(queryContext));
+      assertTrue(QueryContextUtils.isAggregationQuery(queryContext));
+      assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
     }
 
     // Order-by
     {
       String query = "SELECT foo, bar FROM testTable ORDER BY bar ASC, foo DESC LIMIT 50, 100";
-      QueryContext[] queryContexts = getQueryContexts(query, query);
-      for (QueryContext queryContext : queryContexts) {
-        assertEquals(queryContext.getTableName(), "testTable");
-        List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-        assertEquals(selectExpressions.size(), 2);
-        assertEquals(selectExpressions.get(0), ExpressionContext.forIdentifier("foo"));
-        assertEquals(selectExpressions.get(0).toString(), "foo");
-        assertEquals(selectExpressions.get(1), ExpressionContext.forIdentifier("bar"));
-        assertEquals(selectExpressions.get(1).toString(), "bar");
-        assertEquals(getAliasCount(queryContext.getAliasList()), 0);
-        assertNull(queryContext.getFilter());
-        List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
-        assertNotNull(orderByExpressions);
-        assertEquals(orderByExpressions.size(), 2);
-        assertEquals(orderByExpressions.get(0),
-            new OrderByExpressionContext(ExpressionContext.forIdentifier("bar"), true));
-        assertEquals(orderByExpressions.get(0).toString(), "bar ASC");
-        assertEquals(orderByExpressions.get(1).toString(), "foo DESC");
-        assertNull(queryContext.getHavingFilter());
-        assertEquals(queryContext.getLimit(), 100);
-        assertEquals(queryContext.getOffset(), 50);
-        assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar")));
-        assertTrue(QueryContextUtils.isSelectionQuery(queryContext));
-        assertFalse(QueryContextUtils.isAggregationQuery(queryContext));
-        assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
-      }
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+      assertEquals(queryContext.getTableName(), "testTable");
+      List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+      assertEquals(selectExpressions.size(), 2);
+      assertEquals(selectExpressions.get(0), ExpressionContext.forIdentifier("foo"));
+      assertEquals(selectExpressions.get(0).toString(), "foo");
+      assertEquals(selectExpressions.get(1), ExpressionContext.forIdentifier("bar"));
+      assertEquals(selectExpressions.get(1).toString(), "bar");
+      assertEquals(getAliasCount(queryContext.getAliasList()), 0);
+      assertNull(queryContext.getFilter());
+      List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+      assertNotNull(orderByExpressions);
+      assertEquals(orderByExpressions.size(), 2);
+      assertEquals(orderByExpressions.get(0),
+          new OrderByExpressionContext(ExpressionContext.forIdentifier("bar"), true));
+      assertEquals(orderByExpressions.get(0).toString(), "bar ASC");
+      assertEquals(orderByExpressions.get(1).toString(), "foo DESC");
+      assertNull(queryContext.getHavingFilter());
+      assertEquals(queryContext.getLimit(), 100);
+      assertEquals(queryContext.getOffset(), 50);
+      assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar")));
+      assertTrue(QueryContextUtils.isSelectionQuery(queryContext));
+      assertFalse(QueryContextUtils.isAggregationQuery(queryContext));
+      assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
     }
 
     // Distinct with order-by
     {
-      String pqlQuery = "SELECT DISTINCT(foo, bar, foobar) FROM testTable ORDER BY bar DESC, foo LIMIT 15";
-      String sqlQuery = "SELECT DISTINCT foo, bar, foobar FROM testTable ORDER BY bar DESC, foo LIMIT 15";
-      QueryContext[] queryContexts = getQueryContexts(pqlQuery, sqlQuery);
-      for (QueryContext queryContext : queryContexts) {
-        assertEquals(queryContext.getTableName(), "testTable");
-        List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-        assertEquals(selectExpressions.size(), 1);
-        assertEquals(selectExpressions.get(0), ExpressionContext.forFunction(
-            new FunctionContext(FunctionContext.Type.AGGREGATION, "distinct",
-                Arrays.asList(ExpressionContext.forIdentifier("foo"), ExpressionContext.forIdentifier("bar"),
-                    ExpressionContext.forIdentifier("foobar")))));
-        assertEquals(selectExpressions.get(0).toString(), "distinct(foo,bar,foobar)");
-        assertEquals(getAliasCount(queryContext.getAliasList()), 0);
-        assertNull(queryContext.getFilter());
-        assertNull(queryContext.getGroupByExpressions());
-        List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
-        assertNotNull(orderByExpressions);
-        assertEquals(orderByExpressions.size(), 2);
-        assertEquals(orderByExpressions.get(0),
-            new OrderByExpressionContext(ExpressionContext.forIdentifier("bar"), false));
-        assertEquals(orderByExpressions.get(0).toString(), "bar DESC");
-        assertEquals(orderByExpressions.get(1),
-            new OrderByExpressionContext(ExpressionContext.forIdentifier("foo"), true));
-        assertEquals(orderByExpressions.get(1).toString(), "foo ASC");
-        assertNull(queryContext.getHavingFilter());
-        assertEquals(queryContext.getLimit(), 15);
-        assertEquals(queryContext.getOffset(), 0);
-        assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar", "foobar")));
-        assertFalse(QueryContextUtils.isSelectionQuery(queryContext));
-        assertFalse(QueryContextUtils.isAggregationQuery(queryContext));
-        assertTrue(QueryContextUtils.isDistinctQuery(queryContext));
-      }
+      String query = "SELECT DISTINCT foo, bar, foobar FROM testTable ORDER BY bar DESC, foo LIMIT 15";
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+      assertEquals(queryContext.getTableName(), "testTable");
+      List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+      assertEquals(selectExpressions.size(), 1);
+      assertEquals(selectExpressions.get(0), ExpressionContext.forFunction(
+          new FunctionContext(FunctionContext.Type.AGGREGATION, "distinct",
+              Arrays.asList(ExpressionContext.forIdentifier("foo"), ExpressionContext.forIdentifier("bar"),
+                  ExpressionContext.forIdentifier("foobar")))));
+      assertEquals(selectExpressions.get(0).toString(), "distinct(foo,bar,foobar)");
+      assertEquals(getAliasCount(queryContext.getAliasList()), 0);
+      assertNull(queryContext.getFilter());
+      assertNull(queryContext.getGroupByExpressions());
+      List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+      assertNotNull(orderByExpressions);
+      assertEquals(orderByExpressions.size(), 2);
+      assertEquals(orderByExpressions.get(0),
+          new OrderByExpressionContext(ExpressionContext.forIdentifier("bar"), false));
+      assertEquals(orderByExpressions.get(0).toString(), "bar DESC");
+      assertEquals(orderByExpressions.get(1),
+          new OrderByExpressionContext(ExpressionContext.forIdentifier("foo"), true));
+      assertEquals(orderByExpressions.get(1).toString(), "foo ASC");
+      assertNull(queryContext.getHavingFilter());
+      assertEquals(queryContext.getLimit(), 15);
+      assertEquals(queryContext.getOffset(), 0);
+      assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar", "foobar")));
+      assertFalse(QueryContextUtils.isSelectionQuery(queryContext));
+      assertFalse(QueryContextUtils.isAggregationQuery(queryContext));
+      assertTrue(QueryContextUtils.isDistinctQuery(queryContext));
     }
 
     // Transform with order-by
     {
       String query =
           "SELECT ADD(foo, ADD(bar, 123)), SUB('456', foobar) FROM testTable ORDER BY SUB(456, foobar) LIMIT 30, 20";
-      QueryContext[] queryContexts = getQueryContexts(query, query);
-      for (QueryContext queryContext : queryContexts) {
-        assertEquals(queryContext.getTableName(), "testTable");
-        List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-        assertEquals(selectExpressions.size(), 2);
-        assertEquals(selectExpressions.get(0), ExpressionContext.forFunction(
-            new FunctionContext(FunctionContext.Type.TRANSFORM, "add",
-                Arrays.asList(ExpressionContext.forIdentifier("foo"), ExpressionContext.forFunction(
-                    new FunctionContext(FunctionContext.Type.TRANSFORM, "add",
-                        Arrays.asList(ExpressionContext.forIdentifier("bar"),
-                            ExpressionContext.forLiteral("123"))))))));
-        assertEquals(selectExpressions.get(0).toString(), "add(foo,add(bar,'123'))");
-        assertEquals(selectExpressions.get(1), ExpressionContext.forFunction(
-            new FunctionContext(FunctionContext.Type.TRANSFORM, "sub",
-                Arrays.asList(ExpressionContext.forLiteral("456"), ExpressionContext.forIdentifier("foobar")))));
-        assertEquals(selectExpressions.get(1).toString(), "sub('456',foobar)");
-        assertEquals(getAliasCount(queryContext.getAliasList()), 0);
-        assertNull(queryContext.getFilter());
-        assertNull(queryContext.getGroupByExpressions());
-        List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
-        assertNotNull(orderByExpressions);
-        assertEquals(orderByExpressions.size(), 1);
-        assertEquals(orderByExpressions.get(0), new OrderByExpressionContext(ExpressionContext.forFunction(
-            new FunctionContext(FunctionContext.Type.TRANSFORM, "sub",
-                Arrays.asList(ExpressionContext.forLiteral("456"), ExpressionContext.forIdentifier("foobar")))), true));
-        assertEquals(orderByExpressions.get(0).toString(), "sub('456',foobar) ASC");
-        assertNull(queryContext.getHavingFilter());
-        assertEquals(queryContext.getLimit(), 20);
-        assertEquals(queryContext.getOffset(), 30);
-        assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar", "foobar")));
-        assertTrue(QueryContextUtils.isSelectionQuery(queryContext));
-        assertFalse(QueryContextUtils.isAggregationQuery(queryContext));
-        assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
-      }
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+      assertEquals(queryContext.getTableName(), "testTable");
+      List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+      assertEquals(selectExpressions.size(), 2);
+      assertEquals(selectExpressions.get(0), ExpressionContext.forFunction(
+          new FunctionContext(FunctionContext.Type.TRANSFORM, "add",
+              Arrays.asList(ExpressionContext.forIdentifier("foo"), ExpressionContext.forFunction(
+                  new FunctionContext(FunctionContext.Type.TRANSFORM, "add",
+                      Arrays.asList(ExpressionContext.forIdentifier("bar"), ExpressionContext.forLiteral("123"))))))));
+      assertEquals(selectExpressions.get(0).toString(), "add(foo,add(bar,'123'))");
+      assertEquals(selectExpressions.get(1), ExpressionContext.forFunction(
+          new FunctionContext(FunctionContext.Type.TRANSFORM, "sub",
+              Arrays.asList(ExpressionContext.forLiteral("456"), ExpressionContext.forIdentifier("foobar")))));
+      assertEquals(selectExpressions.get(1).toString(), "sub('456',foobar)");
+      assertEquals(getAliasCount(queryContext.getAliasList()), 0);
+      assertNull(queryContext.getFilter());
+      assertNull(queryContext.getGroupByExpressions());
+      List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+      assertNotNull(orderByExpressions);
+      assertEquals(orderByExpressions.size(), 1);
+      assertEquals(orderByExpressions.get(0), new OrderByExpressionContext(ExpressionContext.forFunction(
+          new FunctionContext(FunctionContext.Type.TRANSFORM, "sub",
+              Arrays.asList(ExpressionContext.forLiteral("456"), ExpressionContext.forIdentifier("foobar")))), true));
+      assertEquals(orderByExpressions.get(0).toString(), "sub('456',foobar) ASC");
+      assertNull(queryContext.getHavingFilter());
+      assertEquals(queryContext.getLimit(), 20);
+      assertEquals(queryContext.getOffset(), 30);
+      assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar", "foobar")));
+      assertTrue(QueryContextUtils.isSelectionQuery(queryContext));
+      assertFalse(QueryContextUtils.isAggregationQuery(queryContext));
+      assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
     }
 
     // Aggregation group-by with transform, order-by
     {
-      String pqlQuery =
-          "SELECT SUM(ADD(foo, bar)) FROM testTable GROUP BY SUB(foo, bar), bar ORDER BY SUM(ADD(foo, bar)), SUB(foo,"
-              + " bar) DESC LIMIT 20";
-      String sqlQuery =
-          "SELECT SUB(foo, bar), bar, SUM(ADD(foo, bar)) FROM testTable GROUP BY SUB(foo, bar), bar ORDER BY SUM(ADD"
-              + "(foo, bar)), SUB(foo, bar) DESC LIMIT 20";
-      QueryContext[] queryContexts = getQueryContexts(pqlQuery, sqlQuery);
-      for (QueryContext queryContext : queryContexts) {
-        assertEquals(queryContext.getTableName(), "testTable");
-        List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-        int numSelectExpressions = selectExpressions.size();
-        assertTrue(numSelectExpressions == 1 || numSelectExpressions == 3);
-        ExpressionContext aggregationExpression = selectExpressions.get(numSelectExpressions - 1);
-        assertEquals(aggregationExpression, ExpressionContext.forFunction(
-            new FunctionContext(FunctionContext.Type.AGGREGATION, "sum", Collections.singletonList(
-                ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, "add",
-                    Arrays.asList(ExpressionContext.forIdentifier("foo"), ExpressionContext.forIdentifier("bar"))))))));
-        assertEquals(aggregationExpression.toString(), "sum(add(foo,bar))");
-        if (numSelectExpressions == 3) {
-          assertEquals(selectExpressions.get(0), ExpressionContext.forFunction(
-              new FunctionContext(FunctionContext.Type.TRANSFORM, "sub",
-                  Arrays.asList(ExpressionContext.forIdentifier("foo"), ExpressionContext.forIdentifier("bar")))));
-          assertEquals(selectExpressions.get(0).toString(), "sub(foo,bar)");
-          assertEquals(selectExpressions.get(1), ExpressionContext.forIdentifier("bar"));
-          assertEquals(selectExpressions.get(1).toString(), "bar");
-        }
-        assertEquals(getAliasCount(queryContext.getAliasList()), 0);
-        assertNull(queryContext.getFilter());
-        List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
-        assertNotNull(groupByExpressions);
-        assertEquals(groupByExpressions.size(), 2);
-        assertEquals(groupByExpressions.get(0), ExpressionContext.forFunction(
+      String query =
+          "SELECT SUB(foo, bar), bar, SUM(ADD(foo, bar)) FROM testTable GROUP BY SUB(foo, bar), bar ORDER BY "
+              + "SUM(ADD(foo, bar)), SUB(foo, bar) DESC LIMIT 20";
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+      assertEquals(queryContext.getTableName(), "testTable");
+      List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+      int numSelectExpressions = selectExpressions.size();
+      assertTrue(numSelectExpressions == 1 || numSelectExpressions == 3);
+      ExpressionContext aggregationExpression = selectExpressions.get(numSelectExpressions - 1);
+      assertEquals(aggregationExpression, ExpressionContext.forFunction(
+          new FunctionContext(FunctionContext.Type.AGGREGATION, "sum", Collections.singletonList(
+              ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, "add",
+                  Arrays.asList(ExpressionContext.forIdentifier("foo"), ExpressionContext.forIdentifier("bar"))))))));
+      assertEquals(aggregationExpression.toString(), "sum(add(foo,bar))");
+      if (numSelectExpressions == 3) {
+        assertEquals(selectExpressions.get(0), ExpressionContext.forFunction(
             new FunctionContext(FunctionContext.Type.TRANSFORM, "sub",
                 Arrays.asList(ExpressionContext.forIdentifier("foo"), ExpressionContext.forIdentifier("bar")))));
-        assertEquals(groupByExpressions.get(0).toString(), "sub(foo,bar)");
-        assertEquals(groupByExpressions.get(1), ExpressionContext.forIdentifier("bar"));
-        assertEquals(groupByExpressions.get(1).toString(), "bar");
-        List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
-        assertNotNull(orderByExpressions);
-        assertEquals(orderByExpressions.size(), 2);
-        assertEquals(orderByExpressions.get(0), new OrderByExpressionContext(ExpressionContext.forFunction(
-            new FunctionContext(FunctionContext.Type.AGGREGATION, "sum", Collections.singletonList(
-                ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, "add",
-                    Arrays.asList(ExpressionContext.forIdentifier("foo"), ExpressionContext.forIdentifier("bar"))))))),
-            true));
-        assertEquals(orderByExpressions.get(0).toString(), "sum(add(foo,bar)) ASC");
-        assertEquals(orderByExpressions.get(1), new OrderByExpressionContext(ExpressionContext.forFunction(
-            new FunctionContext(FunctionContext.Type.TRANSFORM, "sub",
-                Arrays.asList(ExpressionContext.forIdentifier("foo"), ExpressionContext.forIdentifier("bar")))),
-            false));
-        assertEquals(orderByExpressions.get(1).toString(), "sub(foo,bar) DESC");
-        assertNull(queryContext.getHavingFilter());
-        assertEquals(queryContext.getLimit(), 20);
-        assertEquals(queryContext.getOffset(), 0);
-        assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar")));
-        assertFalse(QueryContextUtils.isSelectionQuery(queryContext));
-        assertTrue(QueryContextUtils.isAggregationQuery(queryContext));
-        assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
+        assertEquals(selectExpressions.get(0).toString(), "sub(foo,bar)");
+        assertEquals(selectExpressions.get(1), ExpressionContext.forIdentifier("bar"));
+        assertEquals(selectExpressions.get(1).toString(), "bar");
       }
+      assertEquals(getAliasCount(queryContext.getAliasList()), 0);
+      assertNull(queryContext.getFilter());
+      List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
+      assertNotNull(groupByExpressions);
+      assertEquals(groupByExpressions.size(), 2);
+      assertEquals(groupByExpressions.get(0), ExpressionContext.forFunction(
+          new FunctionContext(FunctionContext.Type.TRANSFORM, "sub",
+              Arrays.asList(ExpressionContext.forIdentifier("foo"), ExpressionContext.forIdentifier("bar")))));
+      assertEquals(groupByExpressions.get(0).toString(), "sub(foo,bar)");
+      assertEquals(groupByExpressions.get(1), ExpressionContext.forIdentifier("bar"));
+      assertEquals(groupByExpressions.get(1).toString(), "bar");
+      List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+      assertNotNull(orderByExpressions);
+      assertEquals(orderByExpressions.size(), 2);
+      assertEquals(orderByExpressions.get(0), new OrderByExpressionContext(ExpressionContext.forFunction(
+          new FunctionContext(FunctionContext.Type.AGGREGATION, "sum", Collections.singletonList(
+              ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, "add",
+                  Arrays.asList(ExpressionContext.forIdentifier("foo"), ExpressionContext.forIdentifier("bar"))))))),
+          true));
+      assertEquals(orderByExpressions.get(0).toString(), "sum(add(foo,bar)) ASC");
+      assertEquals(orderByExpressions.get(1), new OrderByExpressionContext(ExpressionContext.forFunction(
+          new FunctionContext(FunctionContext.Type.TRANSFORM, "sub",
+              Arrays.asList(ExpressionContext.forIdentifier("foo"), ExpressionContext.forIdentifier("bar")))), false));
+      assertEquals(orderByExpressions.get(1).toString(), "sub(foo,bar) DESC");
+      assertNull(queryContext.getHavingFilter());
+      assertEquals(queryContext.getLimit(), 20);
+      assertEquals(queryContext.getOffset(), 0);
+      assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar")));
+      assertFalse(QueryContextUtils.isSelectionQuery(queryContext));
+      assertTrue(QueryContextUtils.isAggregationQuery(queryContext));
+      assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
     }
 
     // Filter with transform
     {
-      String query =
-          "SELECT * FROM testTable WHERE foo > 15 AND (DIV(bar, foo) BETWEEN 10 AND 20 OR TEXT_MATCH(foobar, "
-              + "'potato'))";
-      QueryContext[] queryContexts = getQueryContexts(query, query);
-      for (QueryContext queryContext : queryContexts) {
-        assertEquals(queryContext.getTableName(), "testTable");
-        List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-        assertEquals(selectExpressions.size(), 1);
-        assertEquals(selectExpressions.get(0), ExpressionContext.forIdentifier("*"));
-        assertEquals(selectExpressions.get(0).toString(), "*");
-        assertEquals(getAliasCount(queryContext.getAliasList()), 0);
-        FilterContext filter = queryContext.getFilter();
-        assertNotNull(filter);
-        assertEquals(filter.getType(), FilterContext.Type.AND);
-        List<FilterContext> children = filter.getChildren();
-        assertEquals(children.size(), 2);
-        assertEquals(children.get(0), new FilterContext(FilterContext.Type.PREDICATE, null,
-            new RangePredicate(ExpressionContext.forIdentifier("foo"), false, "15", false, "*")));
-        FilterContext orFilter = children.get(1);
-        assertEquals(orFilter.getType(), FilterContext.Type.OR);
-        assertEquals(orFilter.getChildren().size(), 2);
-        assertEquals(orFilter.getChildren().get(0), new FilterContext(FilterContext.Type.PREDICATE, null,
-            new RangePredicate(ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, "div",
-                Arrays.asList(ExpressionContext.forIdentifier("bar"), ExpressionContext.forIdentifier("foo")))), true,
-                "10", true, "20")));
-        assertEquals(orFilter.getChildren().get(1), new FilterContext(FilterContext.Type.PREDICATE, null,
-            new TextMatchPredicate(ExpressionContext.forIdentifier("foobar"), "potato")));
-        assertEquals(filter.toString(),
-            "(foo > '15' AND (div(bar,foo) BETWEEN '10' AND '20' OR text_match(foobar,'potato')))");
-        assertNull(queryContext.getGroupByExpressions());
-        assertNull(queryContext.getOrderByExpressions());
-        assertNull(queryContext.getHavingFilter());
-        assertEquals(queryContext.getLimit(), 10);
-        assertEquals(queryContext.getOffset(), 0);
-        assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar", "foobar")));
-        assertTrue(QueryContextUtils.isSelectionQuery(queryContext));
-        assertFalse(QueryContextUtils.isAggregationQuery(queryContext));
-        assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
-      }
+      String query = "SELECT * FROM testTable WHERE foo > 15 AND (DIV(bar, foo) BETWEEN 10 AND 20 OR "
+          + "TEXT_MATCH(foobar, 'potato'))";
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+      assertEquals(queryContext.getTableName(), "testTable");
+      List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+      assertEquals(selectExpressions.size(), 1);
+      assertEquals(selectExpressions.get(0), ExpressionContext.forIdentifier("*"));
+      assertEquals(selectExpressions.get(0).toString(), "*");
+      assertEquals(getAliasCount(queryContext.getAliasList()), 0);
+      FilterContext filter = queryContext.getFilter();
+      assertNotNull(filter);
+      assertEquals(filter.getType(), FilterContext.Type.AND);
+      List<FilterContext> children = filter.getChildren();
+      assertEquals(children.size(), 2);
+      assertEquals(children.get(0), new FilterContext(FilterContext.Type.PREDICATE, null,
+          new RangePredicate(ExpressionContext.forIdentifier("foo"), false, "15", false, "*")));
+      FilterContext orFilter = children.get(1);
+      assertEquals(orFilter.getType(), FilterContext.Type.OR);
+      assertEquals(orFilter.getChildren().size(), 2);
+      assertEquals(orFilter.getChildren().get(0), new FilterContext(FilterContext.Type.PREDICATE, null,
+          new RangePredicate(ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, "div",
+              Arrays.asList(ExpressionContext.forIdentifier("bar"), ExpressionContext.forIdentifier("foo")))), true,
+              "10", true, "20")));
+      assertEquals(orFilter.getChildren().get(1), new FilterContext(FilterContext.Type.PREDICATE, null,
+          new TextMatchPredicate(ExpressionContext.forIdentifier("foobar"), "potato")));
+      assertEquals(filter.toString(),
+          "(foo > '15' AND (div(bar,foo) BETWEEN '10' AND '20' OR text_match(foobar,'potato')))");
+      assertNull(queryContext.getGroupByExpressions());
+      assertNull(queryContext.getOrderByExpressions());
+      assertNull(queryContext.getHavingFilter());
+      assertEquals(queryContext.getLimit(), 10);
+      assertEquals(queryContext.getOffset(), 0);
+      assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar", "foobar")));
+      assertTrue(QueryContextUtils.isSelectionQuery(queryContext));
+      assertFalse(QueryContextUtils.isAggregationQuery(queryContext));
+      assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
     }
 
-    // Alias (only supported in SQL format)
+    // Alias
     // NOTE: All the references to the alias should already be converted to the original expressions.
     {
-      String sqlQuery =
-          "SELECT SUM(foo) AS a, bar AS b FROM testTable WHERE b IN (5, 10, 15) GROUP BY b ORDER BY a DESC";
-      QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(sqlQuery);
+      String query = "SELECT SUM(foo) AS a, bar AS b FROM testTable WHERE b IN (5, 10, 15) GROUP BY b ORDER BY a DESC";
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
       assertEquals(queryContext.getTableName(), "testTable");
       List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
       assertEquals(selectExpressions.size(), 2);
@@ -371,10 +343,10 @@ public class BrokerRequestToQueryContextConverterTest {
       assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
     }
 
-    // Having (only supported in SQL format)
+    // Having
     {
-      String sqlQuery = "SELECT SUM(foo), bar FROM testTable GROUP BY bar HAVING SUM(foo) IN (5, 10, 15)";
-      QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(sqlQuery);
+      String query = "SELECT SUM(foo), bar FROM testTable GROUP BY bar HAVING SUM(foo) IN (5, 10, 15)";
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
       assertEquals(queryContext.getTableName(), "testTable");
       List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
       assertEquals(selectExpressions.size(), 2);
@@ -406,12 +378,11 @@ public class BrokerRequestToQueryContextConverterTest {
       assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
     }
 
-    // Post-aggregation (only supported in SQL format)
+    // Post-aggregation
     {
-      String sqlQuery =
-          "SELECT SUM(col1) * MAX(col2) FROM testTable GROUP BY col3 HAVING SUM(col1) > MIN(col2) AND SUM(col4) + "
-              + "col3 < MAX(col4) ORDER BY MAX(col1) + MAX(col2) - SUM(col4), col3 DESC";
-      QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(sqlQuery);
+      String query = "SELECT SUM(col1) * MAX(col2) FROM testTable GROUP BY col3 HAVING SUM(col1) > MIN(col2) AND "
+          + "SUM(col4) + col3 < MAX(col4) ORDER BY MAX(col1) + MAX(col2) - SUM(col4), col3 DESC";
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
       assertEquals(queryContext.getTableName(), "testTable");
 
       // SELECT clause
@@ -506,77 +477,23 @@ public class BrokerRequestToQueryContextConverterTest {
 
     // DistinctCountThetaSketch (string literal and escape quote)
     {
-      String query =
-          "SELECT DISTINCTCOUNTTHETASKETCH(foo, 'nominalEntries=1000', 'bar=''a''', 'bar=''b''', 'SET_INTERSECT($1, "
-              + "$2)') FROM testTable WHERE bar IN ('a', 'b')";
-      QueryContext[] queryContexts = getQueryContexts(query, query);
-      for (QueryContext queryContext : queryContexts) {
-        FunctionContext function = queryContext.getSelectExpressions().get(0).getFunction();
-        assertEquals(function.getType(), FunctionContext.Type.AGGREGATION);
-        assertEquals(function.getFunctionName(), "distinctcountthetasketch");
-        List<ExpressionContext> arguments = function.getArguments();
-        assertEquals(arguments.get(0), ExpressionContext.forIdentifier("foo"));
-        assertEquals(arguments.get(1), ExpressionContext.forLiteral("nominalEntries=1000"));
-        assertEquals(arguments.get(2), ExpressionContext.forLiteral("bar='a'"));
-        assertEquals(arguments.get(3), ExpressionContext.forLiteral("bar='b'"));
-        assertEquals(arguments.get(4), ExpressionContext.forLiteral("SET_INTERSECT($1, $2)"));
-        assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar")));
-        assertFalse(QueryContextUtils.isSelectionQuery(queryContext));
-        assertTrue(QueryContextUtils.isAggregationQuery(queryContext));
-        assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
-      }
-    }
-
-    // Legacy PQL behaviors
-    // Aggregation group-by with only TOP
-    {
-      String pqlQuery = "SELECT COUNT(*) FROM testTable GROUP BY foo TOP 50";
-      QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(pqlQuery);
-      assertEquals(queryContext.getLimit(), 50);
-    }
-    // Aggregation group-by with both LIMIT and TOP
-    {
-      String pqlQuery = "SELECT COUNT(*) FROM testTable GROUP BY foo LIMIT 0 TOP 50";
-      QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(pqlQuery);
-      assertEquals(queryContext.getLimit(), 50);
-    }
-    // Mixed column, aggregation and transform in select expressions
-    {
-      String pqlQuery = "SELECT foo, ADD(foo, bar), MAX(foo), SUM(bar) FROM testTable";
-      QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(pqlQuery);
-      List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-      assertEquals(selectExpressions.size(), 2);
-      assertEquals(selectExpressions.get(0), ExpressionContext.forFunction(
-          new FunctionContext(FunctionContext.Type.AGGREGATION, "max",
-              Collections.singletonList(ExpressionContext.forIdentifier("foo")))));
-      assertEquals(selectExpressions.get(0).toString(), "max(foo)");
-      assertEquals(selectExpressions.get(1), ExpressionContext.forFunction(
-          new FunctionContext(FunctionContext.Type.AGGREGATION, "sum",
-              Collections.singletonList(ExpressionContext.forIdentifier("bar")))));
-      assertEquals(selectExpressions.get(1).toString(), "sum(bar)");
+      String query = "SELECT DISTINCTCOUNTTHETASKETCH(foo, 'nominalEntries=1000', 'bar=''a''', 'bar=''b''', "
+          + "'SET_INTERSECT($1, $2)') FROM testTable WHERE bar IN ('a', 'b')";
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+      FunctionContext function = queryContext.getSelectExpressions().get(0).getFunction();
+      assertEquals(function.getType(), FunctionContext.Type.AGGREGATION);
+      assertEquals(function.getFunctionName(), "distinctcountthetasketch");
+      List<ExpressionContext> arguments = function.getArguments();
+      assertEquals(arguments.get(0), ExpressionContext.forIdentifier("foo"));
+      assertEquals(arguments.get(1), ExpressionContext.forLiteral("nominalEntries=1000"));
+      assertEquals(arguments.get(2), ExpressionContext.forLiteral("bar='a'"));
+      assertEquals(arguments.get(3), ExpressionContext.forLiteral("bar='b'"));
+      assertEquals(arguments.get(4), ExpressionContext.forLiteral("SET_INTERSECT($1, $2)"));
+      assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar")));
       assertFalse(QueryContextUtils.isSelectionQuery(queryContext));
       assertTrue(QueryContextUtils.isAggregationQuery(queryContext));
       assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
     }
-    // Use string literal as identifier for aggregation
-    {
-      String pqlQuery = "SELECT SUM('foo') FROM testTable";
-      QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(pqlQuery);
-      assertEquals(queryContext.getSelectExpressions().get(0), ExpressionContext.forFunction(
-          new FunctionContext(FunctionContext.Type.AGGREGATION, "sum",
-              Collections.singletonList(ExpressionContext.forIdentifier("foo")))));
-      assertEquals(queryContext.getSelectExpressions().get(0).toString(), "sum(foo)");
-      assertFalse(QueryContextUtils.isSelectionQuery(queryContext));
-      assertTrue(QueryContextUtils.isAggregationQuery(queryContext));
-      assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
-    }
-  }
-
-  private QueryContext[] getQueryContexts(String pqlQuery, String sqlQuery) {
-    return new QueryContext[]{
-        QueryContextConverterUtils.getQueryContextFromPQL(pqlQuery), QueryContextConverterUtils.getQueryContextFromSQL(
-        sqlQuery)
-    };
   }
 
   @Test
@@ -584,7 +501,7 @@ public class BrokerRequestToQueryContextConverterTest {
     {
       String query =
           "SELECT COUNT(*) FILTER(WHERE foo > 5), COUNT(*) FILTER(WHERE foo < 6) FROM testTable WHERE bar > 0";
-      QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
 
       AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
       assertNotNull(aggregationFunctions);
@@ -636,10 +553,9 @@ public class BrokerRequestToQueryContextConverterTest {
     }
 
     {
-      String query =
-          "SELECT SUM(salary), SUM(salary) FILTER(WHERE salary IS NOT NULL), MIN(salary), MIN(salary) FILTER(WHERE "
-              + "salary > 50000) FROM testTable WHERE bar > 0";
-      QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
+      String query = "SELECT SUM(salary), SUM(salary) FILTER(WHERE salary IS NOT NULL), MIN(salary), "
+          + "MIN(salary) FILTER(WHERE salary > 50000) FROM testTable WHERE bar > 0";
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
 
       AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
       assertNotNull(aggregationFunctions);
@@ -714,79 +630,6 @@ public class BrokerRequestToQueryContextConverterTest {
             break;
         }
       }
-    }
-  }
-
-  @Test
-  public void testServerQueryBackwardCompatible() {
-    // Backward compatible: Select query with LIMIT set only in Select
-    // Presto may send a BrokerRequest with LIMIT only set in side brokerRequest.getSelections().getSize()
-    String pqlQuery = "SELECT foo, bar FROM testTable LIMIT 50, 100";
-    BrokerRequest brokerRequest = new Pql2Compiler().compileToBrokerRequest(pqlQuery);
-    brokerRequest.setLimit(0);
-    QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
-    List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-    assertEquals(selectExpressions.size(), 2);
-    assertEquals(selectExpressions.get(0), ExpressionContext.forIdentifier("foo"));
-    assertEquals(selectExpressions.get(0).toString(), "foo");
-    assertEquals(selectExpressions.get(1), ExpressionContext.forIdentifier("bar"));
-    assertEquals(selectExpressions.get(1).toString(), "bar");
-    assertEquals(getAliasCount(queryContext.getAliasList()), 0);
-    assertNull(queryContext.getFilter());
-    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
-    assertNull(orderByExpressions);
-    assertNull(queryContext.getHavingFilter());
-    assertEquals(queryContext.getLimit(), 100);
-    assertEquals(queryContext.getOffset(), 50);
-    assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar")));
-    assertTrue(QueryContextUtils.isSelectionQuery(queryContext));
-    assertFalse(QueryContextUtils.isAggregationQuery(queryContext));
-    assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
-  }
-
-  @Test
-  public void testPqlAndSqlCompatible()
-      throws Exception {
-    ClassLoader classLoader = getClass().getClassLoader();
-    InputStream pqlInputStream = classLoader.getResourceAsStream("pql_queries.list");
-    assertNotNull(pqlInputStream);
-    InputStream sqlInputStream = classLoader.getResourceAsStream("sql_queries.list");
-    assertNotNull(sqlInputStream);
-    try (BufferedReader pqlReader = new BufferedReader(new InputStreamReader(pqlInputStream));
-        BufferedReader sqlReader = new BufferedReader(new InputStreamReader(sqlInputStream))) {
-      String pqlQuery;
-      while ((pqlQuery = pqlReader.readLine()) != null) {
-        String sqlQuery = sqlReader.readLine();
-        assertNotNull(sqlQuery);
-        QueryContext pqlQueryContext = QueryContextConverterUtils.getQueryContextFromPQL(pqlQuery);
-        QueryContext sqlQueryContext = QueryContextConverterUtils.getQueryContextFromSQL(sqlQuery);
-        // NOTE: Do not compare alias and HAVING clause because they are not supported in PQL.
-        // NOTE: Do not compare filter (WHERE clause) because:
-        //       1. It is always generated from the BrokerRequest so there is no compatibility issue.
-        //       2. PQL and SQL compiler have different behavior on AND/OR handling, and require BrokerRequestOptimizer
-        //          to fix the discrepancy. Check PqlAndCalciteSqlCompatibilityTest for more details.
-        List<ExpressionContext> pqlSelectExpressions = pqlQueryContext.getSelectExpressions();
-        List<ExpressionContext> sqlSelectExpressions;
-        if (QueryContextUtils.isAggregationQuery(sqlQueryContext)) {
-          // NOTE: Skip the non-aggregation expressions in the SQL select expressions because they are not contained in
-          //       the PQL select expressions.
-          sqlSelectExpressions = new ArrayList<>();
-          for (ExpressionContext selectExpression : sqlQueryContext.getSelectExpressions()) {
-            if (selectExpression.getType() == ExpressionContext.Type.FUNCTION
-                && selectExpression.getFunction().getType() == FunctionContext.Type.AGGREGATION) {
-              sqlSelectExpressions.add(selectExpression);
-            }
-          }
-        } else {
-          sqlSelectExpressions = sqlQueryContext.getSelectExpressions();
-        }
-        assertEquals(pqlSelectExpressions, sqlSelectExpressions);
-        assertEquals(pqlQueryContext.getGroupByExpressions(), sqlQueryContext.getGroupByExpressions());
-        assertEquals(pqlQueryContext.getOrderByExpressions(), sqlQueryContext.getOrderByExpressions());
-        assertEquals(pqlQueryContext.getLimit(), sqlQueryContext.getLimit());
-        assertEquals(pqlQueryContext.getOffset(), sqlQueryContext.getOffset());
-      }
-      assertNull(sqlReader.readLine());
     }
   }
 }

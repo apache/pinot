@@ -35,7 +35,6 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -53,6 +52,7 @@ import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -70,7 +70,6 @@ public class QueryExecutorTest {
   private static final String TABLE_NAME = "testTable";
   private static final int NUM_SEGMENTS_TO_GENERATE = 2;
   private static final int NUM_EMPTY_SEGMENTS_TO_GENERATE = 2;
-  private static final Pql2Compiler COMPILER = new Pql2Compiler();
   private static final ExecutorService QUERY_RUNNERS = Executors.newFixedThreadPool(20);
 
   private final List<ImmutableSegment> _indexSegments = new ArrayList<>(NUM_SEGMENTS_TO_GENERATE);
@@ -92,8 +91,9 @@ public class QueryExecutorTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     int i = 0;
     for (; i < NUM_SEGMENTS_TO_GENERATE; i++) {
-      SegmentGeneratorConfig config = SegmentTestUtils
-          .getSegmentGeneratorConfig(avroFile, FileFormat.AVRO, INDEX_DIR, TABLE_NAME, tableConfig, schema);
+      SegmentGeneratorConfig config =
+          SegmentTestUtils.getSegmentGeneratorConfig(avroFile, FileFormat.AVRO, INDEX_DIR, TABLE_NAME, tableConfig,
+              schema);
       config.setSegmentNamePostfix(Integer.toString(i));
       SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
       driver.init(config);
@@ -110,8 +110,9 @@ public class QueryExecutorTest {
     Assert.assertNotNull(resourceUrl);
     File jsonFile = new File(resourceUrl.getFile());
     for (; i < NUM_SEGMENTS_TO_GENERATE + NUM_EMPTY_SEGMENTS_TO_GENERATE; i++) {
-      SegmentGeneratorConfig config = SegmentTestUtils
-          .getSegmentGeneratorConfig(jsonFile, FileFormat.JSON, INDEX_DIR, TABLE_NAME, tableConfig, schema);
+      SegmentGeneratorConfig config =
+          SegmentTestUtils.getSegmentGeneratorConfig(jsonFile, FileFormat.JSON, INDEX_DIR, TABLE_NAME, tableConfig,
+              schema);
       config.setSegmentNamePostfix(Integer.toString(i));
       SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
       driver.init(config);
@@ -127,9 +128,9 @@ public class QueryExecutorTest {
     when(tableDataManagerConfig.getTableName()).thenReturn(TABLE_NAME);
     when(tableDataManagerConfig.getDataDir()).thenReturn(FileUtils.getTempDirectoryPath());
     @SuppressWarnings("unchecked")
-    TableDataManager tableDataManager = TableDataManagerProvider
-        .getTableDataManager(tableDataManagerConfig, "testInstance", mock(ZkHelixPropertyStore.class),
-            mock(ServerMetrics.class), mock(HelixManager.class), null);
+    TableDataManager tableDataManager =
+        TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, "testInstance",
+            mock(ZkHelixPropertyStore.class), mock(ServerMetrics.class), mock(HelixManager.class), null);
     tableDataManager.start();
     for (ImmutableSegment indexSegment : _indexSegments) {
       tableDataManager.addSegment(indexSegment);
@@ -150,7 +151,7 @@ public class QueryExecutorTest {
   @Test
   public void testCountQuery() {
     String query = "SELECT COUNT(*) FROM " + TABLE_NAME;
-    InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
+    InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
     DataTable instanceResponse = _queryExecutor.processQuery(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     Assert.assertEquals(instanceResponse.getLong(0, 0), 400002L);
@@ -159,7 +160,7 @@ public class QueryExecutorTest {
   @Test
   public void testSumQuery() {
     String query = "SELECT SUM(met) FROM " + TABLE_NAME;
-    InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
+    InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
     DataTable instanceResponse = _queryExecutor.processQuery(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     Assert.assertEquals(instanceResponse.getDouble(0, 0), 40000200000.0);
@@ -168,7 +169,7 @@ public class QueryExecutorTest {
   @Test
   public void testMaxQuery() {
     String query = "SELECT MAX(met) FROM " + TABLE_NAME;
-    InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
+    InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
     DataTable instanceResponse = _queryExecutor.processQuery(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     Assert.assertEquals(instanceResponse.getDouble(0, 0), 200000.0);
@@ -177,7 +178,7 @@ public class QueryExecutorTest {
   @Test
   public void testMinQuery() {
     String query = "SELECT MIN(met) FROM " + TABLE_NAME;
-    InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
+    InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
     DataTable instanceResponse = _queryExecutor.processQuery(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     Assert.assertEquals(instanceResponse.getDouble(0, 0), 0.0);

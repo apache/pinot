@@ -24,7 +24,6 @@ import java.util.List;
 import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
-import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
@@ -38,16 +37,10 @@ import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.request.context.predicate.TextContainsPredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
-import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
-import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.LiteralAstNode;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
 
@@ -55,17 +48,15 @@ public class RequestContextUtils {
   private RequestContextUtils() {
   }
 
-  private static final Pql2Compiler PQL_COMPILER = new Pql2Compiler();
-
   /**
-   * Converts the given SQL expression into an {@link ExpressionContext}.
+   * Converts the given string expression into an {@link ExpressionContext}.
    */
-  public static ExpressionContext getExpressionFromSQL(String sqlExpression) {
-    if (sqlExpression.equals("*")) {
+  public static ExpressionContext getExpression(String expression) {
+    if (expression.equals("*")) {
       // For 'SELECT *' and 'SELECT COUNT(*)'
       return ExpressionContext.forIdentifier("*");
     } else {
-      return getExpression(CalciteSqlParser.compileToExpression(sqlExpression));
+      return getExpression(CalciteSqlParser.compileToExpression(expression));
     }
   }
 
@@ -86,34 +77,6 @@ public class RequestContextUtils {
   }
 
   /**
-   * Converts the given PQL expression into an {@link ExpressionContext}.
-   */
-  public static ExpressionContext getExpressionFromPQL(String pqlExpression) {
-    if (pqlExpression.equals("*")) {
-      // For 'SELECT *' and 'SELECT COUNT(*)'
-      return ExpressionContext.forIdentifier("*");
-    } else {
-      return getExpression(PQL_COMPILER.parseToAstNode(pqlExpression));
-    }
-  }
-
-  /**
-   * Converts the given {@link AstNode} into an {@link ExpressionContext}.
-   */
-  public static ExpressionContext getExpression(AstNode astNode) {
-    if (astNode instanceof IdentifierAstNode) {
-      return ExpressionContext.forIdentifier(((IdentifierAstNode) astNode).getName());
-    }
-    if (astNode instanceof FunctionCallAstNode) {
-      return ExpressionContext.forFunction(getFunction((FunctionCallAstNode) astNode));
-    }
-    if (astNode instanceof LiteralAstNode) {
-      return ExpressionContext.forLiteral(((LiteralAstNode) astNode).getValueAsString());
-    }
-    throw new IllegalStateException();
-  }
-
-  /**
    * Converts the given Thrift {@link Function} into a {@link FunctionContext}.
    */
   public static FunctionContext getFunction(Function thriftFunction) {
@@ -131,31 +94,6 @@ public class RequestContextUtils {
       List<ExpressionContext> arguments = new ArrayList<>(operands.size());
       for (Expression operand : operands) {
         arguments.add(getExpression(operand));
-      }
-      return new FunctionContext(functionType, functionName, arguments);
-    } else {
-      return new FunctionContext(functionType, functionName, Collections.emptyList());
-    }
-  }
-
-  /**
-   * Converts the given {@link FunctionCallAstNode} into a {@link FunctionContext}.
-   */
-  public static FunctionContext getFunction(FunctionCallAstNode astNode) {
-    String functionName = astNode.getName();
-    if (functionName.equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
-      // NOTE: COUNT always take one single argument "*"
-      return new FunctionContext(FunctionContext.Type.AGGREGATION, AggregationFunctionType.COUNT.getName(),
-          new ArrayList<>(Collections.singletonList(ExpressionContext.forIdentifier("*"))));
-    }
-    FunctionContext.Type functionType =
-        AggregationFunctionType.isAggregationFunction(functionName) ? FunctionContext.Type.AGGREGATION
-            : FunctionContext.Type.TRANSFORM;
-    List<? extends AstNode> children = astNode.getChildren();
-    if (children != null) {
-      List<ExpressionContext> arguments = new ArrayList<>(children.size());
-      for (AstNode child : children) {
-        arguments.add(getExpression(child));
       }
       return new FunctionContext(functionType, functionName, arguments);
     } else {
@@ -419,60 +357,5 @@ public class RequestContextUtils {
           "Pinot does not support column or function on the right-hand side of the predicate");
     }
     return expressionContext.getLiteral();
-  }
-
-  /**
-   * Converts the given {@link FilterQueryTree} into a {@link FilterContext}.
-   */
-  public static FilterContext getFilter(FilterQueryTree node) {
-    FilterOperator filterOperator = node.getOperator();
-    switch (filterOperator) {
-      case AND:
-        List<FilterQueryTree> childNodes = node.getChildren();
-        List<FilterContext> children = new ArrayList<>(childNodes.size());
-        for (FilterQueryTree childNode : childNodes) {
-          children.add(getFilter(childNode));
-        }
-        return new FilterContext(FilterContext.Type.AND, children, null);
-      case OR:
-        childNodes = node.getChildren();
-        children = new ArrayList<>(childNodes.size());
-        for (FilterQueryTree childNode : childNodes) {
-          children.add(getFilter(childNode));
-        }
-        return new FilterContext(FilterContext.Type.OR, children, null);
-      case EQUALITY:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new EqPredicate(getExpressionFromPQL(node.getColumn()), node.getValue().get(0)));
-      case NOT:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new NotEqPredicate(getExpressionFromPQL(node.getColumn()), node.getValue().get(0)));
-      case IN:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new InPredicate(getExpressionFromPQL(node.getColumn()), node.getValue()));
-      case NOT_IN:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new NotInPredicate(getExpressionFromPQL(node.getColumn()), node.getValue()));
-      case RANGE:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new RangePredicate(getExpressionFromPQL(node.getColumn()), node.getValue().get(0)));
-      case REGEXP_LIKE:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new RegexpLikePredicate(getExpressionFromPQL(node.getColumn()), node.getValue().get(0)));
-      case TEXT_MATCH:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new TextMatchPredicate(getExpressionFromPQL(node.getColumn()), node.getValue().get(0)));
-      case JSON_MATCH:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new JsonMatchPredicate(getExpressionFromPQL(node.getColumn()), node.getValue().get(0)));
-      case IS_NULL:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new IsNullPredicate(getExpressionFromPQL(node.getColumn())));
-      case IS_NOT_NULL:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new IsNotNullPredicate(getExpressionFromPQL(node.getColumn())));
-      default:
-        throw new IllegalStateException();
-    }
   }
 }

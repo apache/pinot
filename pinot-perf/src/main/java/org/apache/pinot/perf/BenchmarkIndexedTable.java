@@ -86,7 +86,7 @@ public class BenchmarkIndexedTable {
       _d2.add(i);
     }
 
-    _queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+    _queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT sum(m1), max(m2) FROM testTable GROUP BY d1, d2 ORDER BY sum(m1) LIMIT 500");
     _dataSchema = new DataSchema(new String[]{"d1", "d2", "sum(m1)", "max(m2)"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE,

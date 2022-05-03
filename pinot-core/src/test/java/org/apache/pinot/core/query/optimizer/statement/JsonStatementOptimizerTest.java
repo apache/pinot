@@ -19,13 +19,11 @@
 package org.apache.pinot.core.query.optimizer.statement;
 
 import java.util.Arrays;
-import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.testng.annotations.Test;
 
 
@@ -37,8 +35,6 @@ import org.testng.annotations.Test;
  */
 @Test(enabled = false)
 public class JsonStatementOptimizerTest {
-  private static final QueryOptimizer OPTIMIZER = new QueryOptimizer();
-  private static final CalciteSqlCompiler SQL_COMPILER = new CalciteSqlCompiler();
   private static final Schema SCHEMA =
       new Schema.SchemaBuilder().setSchemaName("testTable").addSingleValueDimension("intColumn", FieldSpec.DataType.INT)
           .addSingleValueDimension("longColumn", FieldSpec.DataType.LONG)

@@ -42,9 +42,6 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
   @CommandLine.Option(names = {"-brokerProtocol"}, required = false, description = "protocol for broker.")
   private String _brokerProtocol = "http";
 
-  @CommandLine.Option(names = {"-queryType"}, required = false, description = "Query use sql or pql.")
-  private String _queryType = Request.PQL;
-
   @CommandLine.Option(names = {"-query"}, required = true, description = "Query string to perform.")
   private String _query;
 
@@ -57,8 +54,8 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
   @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
   private String _authToken;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
+      + "this message.")
   private boolean _help = false;
 
   @Override
@@ -74,7 +71,7 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
   @Override
   public String toString() {
     return ("PostQuery -brokerProtocol " + _brokerProtocol + " -brokerHost " + _brokerHost + " -brokerPort "
-        + _brokerPort + " -queryType " + _queryType + " -query " + _query);
+        + _brokerPort + " -query " + _query);
   }
 
   @Override
@@ -116,11 +113,6 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     return this;
   }
 
-  public PostQueryCommand setQueryType(String queryType) {
-    _queryType = queryType;
-    return this;
-  }
-
   public PostQueryCommand setQuery(String query) {
     _query = query;
     return this;
@@ -131,18 +123,10 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     if (_brokerHost == null) {
       _brokerHost = NetUtils.getHostAddress();
     }
-    LOGGER.info("Executing command: " + toString());
-
-    String request;
-    String urlString = _brokerProtocol + "://" + _brokerHost + ":" + _brokerPort + "/query";
-    if (_queryType.toLowerCase().equals(Request.SQL)) {
-      urlString += "/sql";
-      request = JsonUtils.objectToString(Collections.singletonMap(Request.SQL, _query));
-    } else {
-      request = JsonUtils.objectToString(Collections.singletonMap(Request.PQL, _query));
-    }
-
-    return sendRequest("POST", urlString, request, makeAuthHeader(makeAuthToken(_authToken, _user, _password)));
+    LOGGER.info("Executing command: " + this);
+    String url = _brokerProtocol + "://" + _brokerHost + ":" + _brokerPort + "/query/sql";
+    String request = JsonUtils.objectToString(Collections.singletonMap(Request.SQL, _query));
+    return sendRequest("POST", url, request, makeAuthHeader(makeAuthToken(_authToken, _user, _password)));
   }
 
   @Override

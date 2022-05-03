@@ -37,7 +37,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.BootstrapTableTool;
 import org.apache.pinot.tools.QuickstartTableRequest;
@@ -124,8 +123,8 @@ public class QuickstartRunner {
     for (int i = 0; i < _numControllers; i++) {
       StartControllerCommand controllerStarter = new StartControllerCommand();
       controllerStarter.setControllerPort(String.valueOf(DEFAULT_CONTROLLER_PORT + i))
-          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS)
-          .setClusterName(CLUSTER_NAME).setTenantIsolation(_enableTenantIsolation)
+          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
+          .setTenantIsolation(_enableTenantIsolation)
           .setDataDir(new File(_tempDir, DEFAULT_CONTROLLER_DIR + i).getAbsolutePath())
           .setConfigOverrides(_configOverrides);
       if (!controllerStarter.execute()) {
@@ -140,8 +139,7 @@ public class QuickstartRunner {
     for (int i = 0; i < _numBrokers; i++) {
       StartBrokerCommand brokerStarter = new StartBrokerCommand();
       brokerStarter.setPort(DEFAULT_BROKER_PORT + i)
-          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS)
-          .setClusterName(CLUSTER_NAME)
+          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
           .setConfigOverrides(_configOverrides);
       if (!brokerStarter.execute()) {
         throw new RuntimeException("Failed to start Broker");
@@ -155,8 +153,7 @@ public class QuickstartRunner {
     for (int i = 0; i < _numServers; i++) {
       StartServerCommand serverStarter = new StartServerCommand();
       serverStarter.setPort(DEFAULT_SERVER_NETTY_PORT + i).setAdminPort(DEFAULT_SERVER_ADMIN_API_PORT + i)
-          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS)
-          .setClusterName(CLUSTER_NAME)
+          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
           .setDataDir(new File(_tempDir, DEFAULT_SERVER_DATA_DIR + i).getAbsolutePath())
           .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath())
           .setConfigOverrides(_configOverrides);
@@ -171,8 +168,7 @@ public class QuickstartRunner {
     for (int i = 0; i < _numMinions; i++) {
       StartMinionCommand minionStarter = new StartMinionCommand();
       minionStarter.setMinionPort(DEFAULT_MINION_PORT + i)
-          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS)
-          .setClusterName(CLUSTER_NAME)
+          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
           .setConfigOverrides(_configOverrides);
       if (!minionStarter.execute()) {
         throw new RuntimeException("Failed to start Minion");
@@ -276,8 +272,9 @@ public class QuickstartRunner {
   public JsonNode runQuery(String query)
       throws Exception {
     int brokerPort = _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
-    return JsonUtils.stringToJsonNode(new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort))
-        .setQueryType(CommonConstants.Broker.Request.SQL).setAuthToken(_authToken).setQuery(query).run());
+    return JsonUtils.stringToJsonNode(
+        new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort)).setAuthToken(_authToken).setQuery(query)
+            .run());
   }
 
   public static void registerDefaultPinotFS() {
@@ -294,8 +291,8 @@ public class QuickstartRunner {
       PinotFSFactory.register(scheme, fsClassName, new PinotConfiguration(configs));
       LOGGER.info("Registered PinotFS for scheme: {}", scheme);
     } catch (Exception e) {
-      LOGGER
-          .error("Unable to init PinotFS for scheme: {}, class name: {}, configs: {}", scheme, fsClassName, configs, e);
+      LOGGER.error("Unable to init PinotFS for scheme: {}, class name: {}, configs: {}", scheme, fsClassName, configs,
+          e);
     }
   }
 }

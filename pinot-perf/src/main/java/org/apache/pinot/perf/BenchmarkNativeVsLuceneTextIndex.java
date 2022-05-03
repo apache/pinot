@@ -102,9 +102,9 @@ public class BenchmarkNativeVsLuceneTextIndex {
       throws Exception {
     _planMaker = new InstancePlanMakerImplV2();
     if (_fstType == FSTType.LUCENE) {
-      _queryContext = QueryContextConverterUtils.getQueryContextFromSQL(LUCENE_QUERY);
+      _queryContext = QueryContextConverterUtils.getQueryContext(LUCENE_QUERY);
     } else {
-      _queryContext = QueryContextConverterUtils.getQueryContextFromSQL(NATIVE_QUERY);
+      _queryContext = QueryContextConverterUtils.getQueryContext(NATIVE_QUERY);
     }
     FileUtils.deleteQuietly(INDEX_DIR);
 

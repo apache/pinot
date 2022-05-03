@@ -59,22 +59,27 @@ public class QueriesTestUtils {
   }
 
   public static void testInnerSegmentAggregationGroupByResult(AggregationGroupByResult aggregationGroupByResult,
-      String expectedGroupKey, long... expectedResults) {
-    Iterator<GroupKeyGenerator.StringGroupKey> groupKeyIterator = aggregationGroupByResult.getStringGroupKeyIterator();
+      Object[] expectedGroupKeys, long... expectedResults) {
+    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
     while (groupKeyIterator.hasNext()) {
-      GroupKeyGenerator.StringGroupKey groupKey = groupKeyIterator.next();
-      if (groupKey._stringKey.equals(expectedGroupKey)) {
-        assertEquals(((Number) aggregationGroupByResult.getResultForKey(groupKey, 0)).longValue(), expectedResults[0]);
-        assertEquals(((Number) aggregationGroupByResult.getResultForKey(groupKey, 1)).longValue(), expectedResults[1]);
-        assertEquals(((Number) aggregationGroupByResult.getResultForKey(groupKey, 2)).longValue(), expectedResults[2]);
-        assertEquals(((Number) aggregationGroupByResult.getResultForKey(groupKey, 3)).longValue(), expectedResults[3]);
-        AvgPair avgResult = (AvgPair) aggregationGroupByResult.getResultForKey(groupKey, 4);
+      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
+      if (Arrays.equals(groupKey._keys, expectedGroupKeys)) {
+        int groupId = groupKey._groupId;
+        assertEquals(((Number) aggregationGroupByResult.getResultForGroupId(0, groupId)).longValue(),
+            expectedResults[0]);
+        assertEquals(((Number) aggregationGroupByResult.getResultForGroupId(1, groupId)).longValue(),
+            expectedResults[1]);
+        assertEquals(((Number) aggregationGroupByResult.getResultForGroupId(2, groupId)).longValue(),
+            expectedResults[2]);
+        assertEquals(((Number) aggregationGroupByResult.getResultForGroupId(3, groupId)).longValue(),
+            expectedResults[3]);
+        AvgPair avgResult = (AvgPair) aggregationGroupByResult.getResultForGroupId(4, groupId);
         assertEquals((long) avgResult.getSum(), expectedResults[4]);
         assertEquals(avgResult.getCount(), expectedResults[5]);
         return;
       }
     }
-    fail("Failed to find group key: " + expectedGroupKey);
+    fail("Failed to find group key: " + Arrays.toString(expectedGroupKeys));
   }
 
   public static void testInterSegmentsResult(BrokerResponseNative brokerResponse, Object[] expectedResults) {

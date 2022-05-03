@@ -30,7 +30,6 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
@@ -58,16 +57,15 @@ public class StreamingReduceService extends BaseReduceService {
 
   public BrokerResponseNative reduceOnStreamResponse(BrokerRequest brokerRequest,
       Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> serverResponseMap, long reduceTimeOutMs,
-      @Nullable BrokerMetrics brokerMetrics) throws IOException {
+      @Nullable BrokerMetrics brokerMetrics)
+      throws IOException {
     if (serverResponseMap.isEmpty()) {
       // Empty response.
       return BrokerResponseNative.empty();
     }
 
     // prepare contextual info for reduce.
-    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
-    Map<String, String> queryOptions =
-        pinotQuery != null ? pinotQuery.getQueryOptions() : brokerRequest.getQueryOptions();
+    Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
     boolean enableTrace =
         queryOptions != null && Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE));
 

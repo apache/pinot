@@ -24,18 +24,14 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
-import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Range;
+import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.Test;
 
@@ -44,7 +40,6 @@ import static org.testng.Assert.*;
 
 public class QueryOptimizerTest {
   private static final QueryOptimizer OPTIMIZER = new QueryOptimizer();
-  private static final Pql2Compiler PQL_COMPILER = new Pql2Compiler();
   private static final Schema SCHEMA =
       new Schema.SchemaBuilder().setSchemaName("testTable").addSingleValueDimension("int", DataType.INT)
           .addSingleValueDimension("long", DataType.LONG).addSingleValueDimension("float", DataType.FLOAT)
@@ -54,11 +49,6 @@ public class QueryOptimizerTest {
   @Test
   public void testNoFilter() {
     String query = "SELECT * FROM testTable";
-
-    BrokerRequest brokerRequest = PQL_COMPILER.compileToBrokerRequest(query);
-    OPTIMIZER.optimize(brokerRequest, SCHEMA);
-    assertNull(brokerRequest.getFilterQuery());
-
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     OPTIMIZER.optimize(pinotQuery, SCHEMA);
     assertNull(pinotQuery.getFilterExpression());
@@ -69,28 +59,6 @@ public class QueryOptimizerTest {
     String query =
         "SELECT * FROM testTable WHERE ((int = 4 OR (long = 5 AND (float = 9 AND double = 7.5))) OR string = 'foo') "
             + "OR bytes = 'abc'";
-
-    {
-      BrokerRequest brokerRequest = PQL_COMPILER.compileToBrokerRequest(query);
-      OPTIMIZER.optimize(brokerRequest, SCHEMA);
-      FilterQueryTree filterQueryTree = RequestUtils.buildFilterQuery(brokerRequest.getFilterQuery().getId(),
-          brokerRequest.getFilterSubQueryMap().getFilterQueryMap());
-      assertEquals(filterQueryTree.getOperator(), FilterOperator.OR);
-      List<FilterQueryTree> children = filterQueryTree.getChildren();
-      assertEquals(children.size(), 4);
-      assertEquals(children.get(0).toString(), "int EQUALITY [4]");
-      assertEquals(children.get(2).toString(), "string EQUALITY [foo]");
-      assertEquals(children.get(3).toString(), "bytes EQUALITY [abc]");
-
-      FilterQueryTree andFilter = children.get(1);
-      assertEquals(andFilter.getOperator(), FilterOperator.AND);
-      List<FilterQueryTree> andFilterChildren = andFilter.getChildren();
-      assertEquals(andFilterChildren.size(), 3);
-      assertEquals(andFilterChildren.get(0).toString(), "long EQUALITY [5]");
-      assertEquals(andFilterChildren.get(1).toString(), "float EQUALITY [9]");
-      assertEquals(andFilterChildren.get(2).toString(), "double EQUALITY [7.5]");
-    }
-
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     OPTIMIZER.optimize(pinotQuery, SCHEMA);
     Function filterFunction = pinotQuery.getFilterExpression().getFunctionCall();
@@ -122,45 +90,6 @@ public class QueryOptimizerTest {
     String query =
         "SELECT * FROM testTable WHERE int IN (1, 1) AND (long IN (2, 3) OR long IN (3, 4) OR long = 2) AND (float = "
             + "3.5 OR double IN (1.1, 1.2) OR float = 4.5 OR float > 5.5 OR double = 1.3)";
-
-    {
-      BrokerRequest brokerRequest = PQL_COMPILER.compileToBrokerRequest(query);
-      OPTIMIZER.optimize(brokerRequest, SCHEMA);
-      FilterQueryTree filterQueryTree = RequestUtils.buildFilterQuery(brokerRequest.getFilterQuery().getId(),
-          brokerRequest.getFilterSubQueryMap().getFilterQueryMap());
-      assertEquals(filterQueryTree.getOperator(), FilterOperator.AND);
-      List<FilterQueryTree> children = filterQueryTree.getChildren();
-      assertEquals(children.size(), 3);
-      assertEquals(children.get(0).toString(), "int EQUALITY [1]");
-
-      FilterQueryTree secondChild = children.get(1);
-      assertEquals(secondChild.getColumn(), "long");
-      assertEquals(secondChild.getOperator(), FilterOperator.IN);
-      assertEqualsNoOrder(secondChild.getValue().toArray(), new Object[]{"2", "3", "4"});
-
-      FilterQueryTree thirdChild = children.get(2);
-      assertEquals(thirdChild.getOperator(), FilterOperator.OR);
-      List<FilterQueryTree> orFilterChildren = thirdChild.getChildren();
-      assertEquals(orFilterChildren.size(), 3);
-      assertEquals(orFilterChildren.get(0).toString(), "float RANGE [(5.5\000*)]");
-
-      // Order of second and third child is not deterministic
-      FilterQueryTree secondOrFilterChild = orFilterChildren.get(1);
-      assertEquals(secondOrFilterChild.getOperator(), FilterOperator.IN);
-      FilterQueryTree thirdOrFilterChild = orFilterChildren.get(2);
-      assertEquals(thirdOrFilterChild.getOperator(), FilterOperator.IN);
-      if (secondOrFilterChild.getColumn().equals("float")) {
-        assertEqualsNoOrder(secondOrFilterChild.getValue().toArray(), new Object[]{"3.5", "4.5"});
-        assertEquals(thirdOrFilterChild.getColumn(), "double");
-        assertEqualsNoOrder(thirdOrFilterChild.getValue().toArray(), new Object[]{"1.1", "1.2", "1.3"});
-      } else {
-        assertEquals(secondOrFilterChild.getColumn(), "double");
-        assertEqualsNoOrder(secondOrFilterChild.getValue().toArray(), new Object[]{"1.1", "1.2", "1.3"});
-        assertEquals(thirdOrFilterChild.getColumn(), "float");
-        assertEqualsNoOrder(thirdOrFilterChild.getValue().toArray(), new Object[]{"3.5", "4.5"});
-      }
-    }
-
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     OPTIMIZER.optimize(pinotQuery, SCHEMA);
     Function filterFunction = pinotQuery.getFilterExpression().getFunctionCall();
@@ -211,33 +140,6 @@ public class QueryOptimizerTest {
         "SELECT * FROM testTable WHERE (int > 10 AND int <= 100 AND int BETWEEN 10 AND 20) OR (float BETWEEN 5.5 AND "
             + "7.5 AND float = 6 AND float < 6.5 AND float BETWEEN 6 AND 8) OR (string > '123' AND string > '23') OR "
             + "(mvInt > 5 AND mvInt < 0)";
-
-    {
-      BrokerRequest brokerRequest = PQL_COMPILER.compileToBrokerRequest(query);
-      OPTIMIZER.optimize(brokerRequest, SCHEMA);
-      FilterQueryTree filterQueryTree = RequestUtils.buildFilterQuery(brokerRequest.getFilterQuery().getId(),
-          brokerRequest.getFilterSubQueryMap().getFilterQueryMap());
-      assertEquals(filterQueryTree.getOperator(), FilterOperator.OR);
-      List<FilterQueryTree> children = filterQueryTree.getChildren();
-      assertEquals(children.size(), 4);
-      assertEquals(children.get(0).toString(), "int RANGE [(10\00020]]");
-      // Alphabetical order for STRING column ('23' > '123')
-      assertEquals(children.get(2).toString(), "string RANGE [(23\000*)]");
-
-      FilterQueryTree secondChild = children.get(1);
-      assertEquals(secondChild.getOperator(), FilterOperator.AND);
-      assertEquals(secondChild.getChildren().size(), 2);
-      assertEquals(secondChild.getChildren().get(0).toString(), "float EQUALITY [6]");
-      assertEquals(secondChild.getChildren().get(1).toString(), "float RANGE [[6.0\0006.5)]");
-
-      // Range filter on multi-value column should not be merged ([-5, 10] can match this filter)
-      FilterQueryTree fourthChild = children.get(3);
-      assertEquals(fourthChild.getOperator(), FilterOperator.AND);
-      assertEquals(fourthChild.getChildren().size(), 2);
-      assertEquals(fourthChild.getChildren().get(0).toString(), "mvInt RANGE [(5\000*)]");
-      assertEquals(fourthChild.getChildren().get(1).toString(), "mvInt RANGE [(*\0000)]");
-    }
-
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     OPTIMIZER.optimize(pinotQuery, SCHEMA);
     Function filterFunction = pinotQuery.getFilterExpression().getFunctionCall();
@@ -326,74 +228,12 @@ public class QueryOptimizerTest {
   }
 
   private static void testQuery(String actual, String expected) {
-    BrokerRequest actualBrokerRequest = PQL_COMPILER.compileToBrokerRequest(actual);
-    OPTIMIZER.optimize(actualBrokerRequest, SCHEMA);
-    // Also optimize the expected query because the expected range can only be generate via optimizer
-    BrokerRequest expectedBrokerRequest = PQL_COMPILER.compileToBrokerRequest(expected);
-    OPTIMIZER.optimize(expectedBrokerRequest, SCHEMA);
-    compareBrokerRequest(actualBrokerRequest, expectedBrokerRequest);
-
     PinotQuery actualPinotQuery = CalciteSqlParser.compileToPinotQuery(actual);
     OPTIMIZER.optimize(actualPinotQuery, SCHEMA);
     // Also optimize the expected query because the expected range can only be generate via optimizer
     PinotQuery expectedPinotQuery = CalciteSqlParser.compileToPinotQuery(expected);
     OPTIMIZER.optimize(expectedPinotQuery, SCHEMA);
     comparePinotQuery(actualPinotQuery, expectedPinotQuery);
-  }
-
-  private static void compareBrokerRequest(BrokerRequest actual, BrokerRequest expected) {
-    if (expected.getFilterQuery() == null) {
-      assertNull(actual.getFilterQuery());
-      return;
-    }
-    FilterQueryTree actualFilter = RequestUtils
-        .buildFilterQuery(actual.getFilterQuery().getId(), actual.getFilterSubQueryMap().getFilterQueryMap());
-    FilterQueryTree expectedFilter = RequestUtils
-        .buildFilterQuery(expected.getFilterQuery().getId(), expected.getFilterSubQueryMap().getFilterQueryMap());
-    compareFilterQueryTree(actualFilter, expectedFilter);
-  }
-
-  private static void compareFilterQueryTree(FilterQueryTree actual, FilterQueryTree expected) {
-    assertEquals(actual.getOperator(), expected.getOperator());
-    FilterOperator operator = actual.getOperator();
-    if (operator == FilterOperator.AND || operator == FilterOperator.OR) {
-      assertNull(actual.getColumn());
-      assertNull(actual.getValue());
-      compareFilterQueryTreeChildren(actual.getChildren(), expected.getChildren());
-    } else {
-      assertEquals(actual.getColumn(), expected.getColumn());
-      assertNull(actual.getChildren());
-      if (operator == FilterOperator.IN || operator == FilterOperator.NOT_IN) {
-        assertEqualsNoOrder(actual.getValue().toArray(), expected.getValue().toArray());
-      } else {
-        assertEquals(actual.getValue(), expected.getValue());
-      }
-    }
-  }
-
-  /**
-   * Handles different order of children under AND/OR filter.
-   */
-  private static void compareFilterQueryTreeChildren(List<FilterQueryTree> actual, List<FilterQueryTree> expected) {
-    assertEquals(actual.size(), expected.size());
-    List<FilterQueryTree> unmatchedExpectedChildren = new ArrayList<>(expected);
-    for (FilterQueryTree actualChild : actual) {
-      Iterator<FilterQueryTree> iterator = unmatchedExpectedChildren.iterator();
-      boolean findMatchingChild = false;
-      while (iterator.hasNext()) {
-        try {
-          compareFilterQueryTree(actualChild, iterator.next());
-          iterator.remove();
-          findMatchingChild = true;
-          break;
-        } catch (AssertionError e) {
-          // Ignore
-        }
-      }
-      if (!findMatchingChild) {
-        fail("Failed to find matching child");
-      }
-    }
   }
 
   private static void comparePinotQuery(PinotQuery actual, PinotQuery expected) {

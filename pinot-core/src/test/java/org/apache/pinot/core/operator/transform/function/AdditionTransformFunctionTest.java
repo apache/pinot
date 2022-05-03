@@ -31,8 +31,8 @@ public class AdditionTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test
   public void testAdditionTransformFunction() {
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(String
-        .format("add(%s,%s,%s,%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN, FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN,
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("add(%s,%s,%s,%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN, FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN,
             STRING_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof AdditionTransformFunction);
@@ -45,9 +45,9 @@ public class AdditionTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils.getExpressionFromSQL(String
-        .format("add(add(12,%s),%s,add(add(%s,%s),0.34,%s),%s)", STRING_SV_COLUMN, DOUBLE_SV_COLUMN, FLOAT_SV_COLUMN,
-            LONG_SV_COLUMN, INT_SV_COLUMN, DOUBLE_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(
+        String.format("add(add(12,%s),%s,add(add(%s,%s),0.34,%s),%s)", STRING_SV_COLUMN, DOUBLE_SV_COLUMN,
+            FLOAT_SV_COLUMN, LONG_SV_COLUMN, INT_SV_COLUMN, DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof AdditionTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -57,8 +57,8 @@ public class AdditionTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils.getExpressionFromSQL(String
-        .format("add(%s,%s)", DOUBLE_SV_COLUMN, BIG_DECIMAL_SV_COLUMN));
+    expression =
+        RequestContextUtils.getExpression(String.format("add(%s,%s)", DOUBLE_SV_COLUMN, BIG_DECIMAL_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof AdditionTransformFunction);
     BigDecimal[] expectedBigDecimalValues = new BigDecimal[NUM_ROWS];
@@ -67,8 +67,8 @@ public class AdditionTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedBigDecimalValues);
 
-    expression = RequestContextUtils.getExpressionFromSQL(String
-        .format("add(add(12,%s),%s,add(add(%s,%s),'12110.34556677889901122335678',%s),%s)", STRING_SV_COLUMN,
+    expression = RequestContextUtils.getExpression(
+        String.format("add(add(12,%s),%s,add(add(%s,%s),'12110.34556677889901122335678',%s),%s)", STRING_SV_COLUMN,
             DOUBLE_SV_COLUMN, FLOAT_SV_COLUMN, LONG_SV_COLUMN, INT_SV_COLUMN, BIG_DECIMAL_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof AdditionTransformFunction);
@@ -79,15 +79,15 @@ public class AdditionTransformFunctionTest extends BaseTransformFunctionTest {
       double val2 = _doubleSVValues[i];
       double val3 = (double) _floatSVValues[i] + (double) _longSVValues[i];
       BigDecimal val6 = BigDecimal.valueOf(val3).add(val4).add(BigDecimal.valueOf(_intSVValues[i]));
-      expectedBigDecimalValues[i] = BigDecimal.valueOf(val1).add(BigDecimal.valueOf(val2)).add(val6)
-          .add(_bigDecimalSVValues[i]);
+      expectedBigDecimalValues[i] =
+          BigDecimal.valueOf(val1).add(BigDecimal.valueOf(val2)).add(val6).add(_bigDecimalSVValues[i]);
     }
     testTransformFunction(transformFunction, expectedBigDecimalValues);
   }
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

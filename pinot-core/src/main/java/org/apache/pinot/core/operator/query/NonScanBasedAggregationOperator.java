@@ -68,8 +68,8 @@ public class NonScanBasedAggregationOperator extends BaseOperator<IntermediateRe
   private final DataSource[] _dataSources;
   private final int _numTotalDocs;
 
-  public NonScanBasedAggregationOperator(AggregationFunction[] aggregationFunctions,
-      DataSource[] dataSources, int numTotalDocs) {
+  public NonScanBasedAggregationOperator(AggregationFunction[] aggregationFunctions, DataSource[] dataSources,
+      int numTotalDocs) {
     _aggregationFunctions = aggregationFunctions;
     _dataSources = dataSources;
     _numTotalDocs = numTotalDocs;
@@ -128,7 +128,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<IntermediateRe
     }
 
     // Build intermediate result block based on aggregation result from the executor.
-    return new IntermediateResultsBlock(_aggregationFunctions, aggregationResults, false);
+    return new IntermediateResultsBlock(_aggregationFunctions, aggregationResults);
   }
 
   private static Double getMinValue(DataSource dataSource) {
@@ -238,7 +238,6 @@ public class NonScanBasedAggregationOperator extends BaseOperator<IntermediateRe
       return getDistinctValueSet(dictionary);
     }
   }
-
 
   @Override
   public String toExplainString() {

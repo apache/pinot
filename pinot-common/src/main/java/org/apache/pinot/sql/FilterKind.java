@@ -16,18 +16,37 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.parsers;
+package org.apache.pinot.sql;
 
-import org.apache.pinot.common.request.BrokerRequest;
-
-
-/**
- * Interface for Pinot Query compilers.
- */
-public interface QueryCompiler {
+public enum FilterKind {
+  AND,
+  OR,
+  NOT,
+  EQUALS,
+  NOT_EQUALS,
+  GREATER_THAN,
+  GREATER_THAN_OR_EQUAL,
+  LESS_THAN,
+  LESS_THAN_OR_EQUAL,
+  BETWEEN,
+  RANGE,
+  IN,
+  NOT_IN,
+  LIKE,
+  REGEXP_LIKE,
+  TEXT_CONTAINS,
+  TEXT_MATCH,
+  JSON_MATCH,
+  IS_NULL,
+  IS_NOT_NULL;
 
   /**
-   * Compiles the given query into a broker request.
+   * Helper method that returns true if the enum maps to a Range.
+   *
+   * @return True if the enum is of Range type, false otherwise.
    */
-  BrokerRequest compileToBrokerRequest(String query);
+  public boolean isRange() {
+    return this == GREATER_THAN || this == GREATER_THAN_OR_EQUAL || this == LESS_THAN || this == LESS_THAN_OR_EQUAL
+        || this == BETWEEN || this == RANGE;
+  }
 }

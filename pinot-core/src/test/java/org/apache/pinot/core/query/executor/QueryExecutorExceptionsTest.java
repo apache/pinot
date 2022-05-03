@@ -39,7 +39,6 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
-import org.apache.pinot.parsers.QueryCompiler;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -78,7 +77,6 @@ public class QueryExecutorExceptionsTest {
   private static final String TABLE_NAME = "testTable";
   private static final int NUM_SEGMENTS_TO_GENERATE = 2;
   private static final int NUM_EMPTY_SEGMENTS_TO_GENERATE = 2;
-  private static final QueryCompiler COMPILER = new CalciteSqlCompiler();
   private static final ExecutorService QUERY_RUNNERS = Executors.newFixedThreadPool(20);
 
   private final List<ImmutableSegment> _indexSegments = new ArrayList<>(NUM_SEGMENTS_TO_GENERATE);
@@ -161,7 +159,7 @@ public class QueryExecutorExceptionsTest {
   @Test
   public void testServerSegmentMissingExceptionDetails() {
     String query = "SELECT COUNT(*) FROM " + TABLE_NAME;
-    InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
+    InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
     DataTable instanceResponse = _queryExecutor.processQuery(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     Map<Integer, String> exceptions = instanceResponse.getExceptions();

@@ -218,7 +218,7 @@ abstract class BaseStarTreeV2Test<R, A> {
 
   void testQuery(String query)
       throws IOException {
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
 
     // Aggregations
     AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
