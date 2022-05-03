@@ -26,6 +26,7 @@ import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import java.util.List;
+import java.util.Map;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -137,6 +138,22 @@ public class PinotTableInstances {
     try {
       return _pinotHelixResourceManager.getLiveBrokersForTable(tableName);
     } catch (TableNotFoundException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
+    }
+  }
+
+  @GET
+  @Path("/tables/livebrokers")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "List tables to live brokers mappings", notes = "List tables to live brokers mappings based "
+      + "on EV")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public Map<String, List<InstanceInfo>> getLiveBrokers() {
+    try {
+      return _pinotHelixResourceManager.getTableToLiveBrokersMapping();
+    } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
     }
   }

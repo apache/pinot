@@ -142,6 +142,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "brokers", "tables", "?state=" + state);
   }
 
+  public String forLiveBrokerTablesGet() {
+    return StringUtil.join("/", _baseUrl, "tables", "livebrokers");
+  }
+
   public String forBrokerTableGet(String table, String tableType, String state) {
     StringBuilder params = new StringBuilder();
     if (tableType != null) {
