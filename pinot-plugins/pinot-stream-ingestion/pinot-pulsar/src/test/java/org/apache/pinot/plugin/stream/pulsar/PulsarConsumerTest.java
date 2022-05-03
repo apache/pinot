@@ -20,9 +20,12 @@ package org.apache.pinot.plugin.stream.pulsar;
 
 import com.google.common.base.Function;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.stream.MessageBatch;
@@ -74,6 +77,7 @@ public class PulsarConsumerTest {
   private PulsarContainer _pulsar = null;
   private HashMap<Integer, MessageId> _partitionToFirstMessageIdMap = new HashMap<>();
   private HashMap<Integer, MessageId> _partitionToFirstMessageIdMapBatch = new HashMap<>();
+  private ConcurrentHashMap<Integer, List<BatchMessageIdImpl>> _partitionToMessageIdMapping = new ConcurrentHashMap<>();
 
   @BeforeClass
   public void setUp()
@@ -151,6 +155,7 @@ public class PulsarConsumerTest {
     if (_pulsar != null) {
       _pulsar.stop();
       _pulsarClient.close();
+      _partitionToMessageIdMapping.clear();
       _pulsar = null;
     }
   }
@@ -193,12 +198,17 @@ public class PulsarConsumerTest {
       for (int i = 0; i < NUM_RECORDS_PER_PARTITION; i++) {
         CompletableFuture<MessageId> messageIdCompletableFuture = producer.sendAsync(MESSAGE_PREFIX + "_" + i);
         messageIdCompletableFuture.thenAccept(messageId -> {
+
+          List<BatchMessageIdImpl> batchMessageIdList = _partitionToMessageIdMapping
+              .getOrDefault(partition, new ArrayList<>());
+          batchMessageIdList.add((BatchMessageIdImpl) messageId);
+          _partitionToMessageIdMapping.put(partition, batchMessageIdList);
+
           if (!_partitionToFirstMessageIdMapBatch.containsKey(partition)) {
             _partitionToFirstMessageIdMapBatch.put(partition, messageId);
           }
         });
       }
-
       producer.flush();
     }
   }
@@ -343,10 +353,7 @@ public class PulsarConsumerTest {
   }
 
   private MessageId getBatchMessageIdForPartitionAndIndex(int partitionNum, int index) {
-    MessageId startMessageIdRaw = _partitionToFirstMessageIdMapBatch.get(partitionNum);
-    BatchMessageIdImpl startMessageId = (BatchMessageIdImpl) MessageIdImpl.convertToMessageIdImpl(startMessageIdRaw);
-    return new BatchMessageIdImpl(startMessageId.getLedgerId(), index / BATCH_SIZE, partitionNum, index % BATCH_SIZE,
-        startMessageId.getBatchSize(), startMessageId.getAcker());
+    return _partitionToMessageIdMapping.get(partitionNum).get(index);
   }
 
   private void waitForCondition(Function<Void, Boolean> condition, long checkIntervalMs, long timeoutMs,
