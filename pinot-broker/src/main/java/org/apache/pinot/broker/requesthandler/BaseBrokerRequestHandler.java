@@ -41,7 +41,6 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
@@ -90,6 +89,7 @@ import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.trace.RequestStatistics;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
@@ -207,7 +207,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       @Nullable RequesterIdentity requesterIdentity, RequestStatistics requestStatistics)
       throws Exception {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
-    requestStatistics.setPql(query);
+    requestStatistics.setQuery(query);
 
     // Compile the request
     long compilationStartTimeNs = System.nanoTime();
@@ -562,7 +562,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(executionEndTimeNs - compilationStartTimeNs);
     brokerResponse.setTimeUsedMs(totalTimeMs);
     requestStatistics.setQueryProcessingTime(totalTimeMs);
-    requestStatistics.setStatistics(brokerResponse);
+    augmentStatistics(requestStatistics, brokerResponse);
 
     logBrokerResponse(requestId, query, requestStatistics, brokerRequest, numUnavailableSegments, serverStats,
         brokerResponse, totalTimeMs);
@@ -706,7 +706,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       @Nullable RequesterIdentity requesterIdentity, RequestStatistics requestStatistics)
       throws Exception {
     LOGGER.debug("PQL query for request {}: {}", requestId, query);
-    requestStatistics.setPql(query);
+    requestStatistics.setQuery(query);
 
     // Compile the request
     long compilationStartTimeNs = System.nanoTime();
@@ -947,7 +947,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(executionEndTimeNs - compilationStartTimeNs);
     brokerResponse.setTimeUsedMs(totalTimeMs);
     requestStatistics.setQueryProcessingTime(totalTimeMs);
-    requestStatistics.setStatistics(brokerResponse);
+    augmentStatistics(requestStatistics, brokerResponse);
 
     LOGGER.debug("Broker Response: {}", brokerResponse);
 
@@ -1570,7 +1570,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - compilationStartTimeNs);
     brokerResponse.setTimeUsedMs(totalTimeMs);
     requestStatistics.setQueryProcessingTime(totalTimeMs);
-    requestStatistics.setStatistics(brokerResponse);
+    augmentStatistics(requestStatistics, brokerResponse);
     return brokerResponse;
   }
 
@@ -2275,6 +2275,30 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       List<String>> offlineRoutingTable, @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance,
       List<String>> realtimeRoutingTable, long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
       throws Exception;
+
+  private static void augmentStatistics(RequestStatistics statistics, BrokerResponse response) {
+    statistics.setTotalDocs(response.getTotalDocs());
+    statistics.setNumDocsScanned(response.getNumDocsScanned());
+    statistics.setNumEntriesScannedInFilter(response.getNumEntriesScannedInFilter());
+    statistics.setNumEntriesScannedPostFilter(response.getNumEntriesScannedPostFilter());
+    statistics.setNumSegmentsQueried(response.getNumSegmentsQueried());
+    statistics.setNumSegmentsProcessed(response.getNumSegmentsProcessed());
+    statistics.setNumSegmentsMatched(response.getNumSegmentsMatched());
+    statistics.setNumServersQueried(response.getNumServersQueried());
+    statistics.setNumSegmentsProcessed(response.getNumSegmentsProcessed());
+    statistics.setNumServersResponded(response.getNumServersResponded());
+    statistics.setNumGroupsLimitReached(response.isNumGroupsLimitReached());
+    statistics.setNumExceptions(response.getExceptionsSize());
+    statistics.setOfflineThreadCpuTimeNs(response.getOfflineThreadCpuTimeNs());
+    statistics.setRealtimeThreadCpuTimeNs(response.getRealtimeThreadCpuTimeNs());
+    statistics.setOfflineSystemActivitiesCpuTimeNs(response.getOfflineSystemActivitiesCpuTimeNs());
+    statistics.setRealtimeSystemActivitiesCpuTimeNs(response.getRealtimeSystemActivitiesCpuTimeNs());
+    statistics.setOfflineResponseSerializationCpuTimeNs(response.getOfflineResponseSerializationCpuTimeNs());
+    statistics.setRealtimeResponseSerializationCpuTimeNs(response.getRealtimeResponseSerializationCpuTimeNs());
+    statistics.setOfflineTotalCpuTimeNs(response.getOfflineTotalCpuTimeNs());
+    statistics.setRealtimeTotalCpuTimeNs(response.getRealtimeTotalCpuTimeNs());
+    statistics.setNumRowsResultSet(response.getNumRowsResultSet());
+  }
 
   /**
    * Helper class to pass the per server statistics.

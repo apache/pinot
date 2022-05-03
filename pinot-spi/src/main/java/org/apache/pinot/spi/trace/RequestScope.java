@@ -16,24 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.requesthandler;
+package org.apache.pinot.spi.trace;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import javax.annotation.Nullable;
-import javax.annotation.concurrent.ThreadSafe;
-import org.apache.pinot.broker.api.RequesterIdentity;
-import org.apache.pinot.common.response.BrokerResponse;
-import org.apache.pinot.spi.trace.RequestStatistics;
-
-
-@ThreadSafe
-public interface BrokerRequestHandler {
-
-  void start();
-
-  void shutDown();
-
-  BrokerResponse handleRequest(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
-      RequestStatistics requestStatistics)
-      throws Exception;
+/**
+ * A scope wrapping an end to end synchronous pinot request.
+ * Can be extended by a custom tracer to meter request latency.
+ */
+public interface RequestScope extends Scope, RequestStatistics {
 }
