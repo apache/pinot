@@ -250,29 +250,25 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
 
   @Test
   public void testQueries() {
+    String nativeQuery = "SELECT * FROM MyTable WHERE TEXT_CONTAINS(DOMAIN_NAMES_NATIVE, 'vico.*') LIMIT 50000";
     String luceneQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'vico*') LIMIT 50000";
-    String nativeQuery = "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'vico.*' LIMIT 50000";
     testSelectionResults(nativeQuery, luceneQuery);
 
-    nativeQuery = "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'convi.*ced' LIMIT 50000";
+    nativeQuery = "SELECT * FROM MyTable WHERE TEXT_CONTAINS(DOMAIN_NAMES_NATIVE, 'convi.*ced') LIMIT 50000";
     luceneQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'convi*ced') LIMIT 50000";
     testSelectionResults(nativeQuery, luceneQuery);
 
-    nativeQuery =
-        "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'vicomte' AND DOMAIN_NAMES_NATIVE CONTAINS '"
-            + "hos.*' LIMIT 50000";
-    luceneQuery =
-        "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'vicomte AND hos*') LIMIT 50000";
+    nativeQuery = "SELECT * FROM MyTable WHERE TEXT_CONTAINS(DOMAIN_NAMES_NATIVE, 'vicomte') AND "
+        + "TEXT_CONTAINS(DOMAIN_NAMES_NATIVE, 'hos.*') LIMIT 50000";
+    luceneQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'vicomte AND hos*') LIMIT 50000";
     testSelectionResults(nativeQuery, luceneQuery);
 
-    nativeQuery =
-        "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'sac.*' OR DOMAIN_NAMES_NATIVE CONTAINS '"
-            + "herself' LIMIT 50000";
-    luceneQuery =
-        "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'sac* OR herself') LIMIT 50000";
+    nativeQuery = "SELECT * FROM MyTable WHERE TEXT_CONTAINS(DOMAIN_NAMES_NATIVE, 'sac.*') OR "
+        + "TEXT_CONTAINS(DOMAIN_NAMES_NATIVE, 'herself') LIMIT 50000";
+    luceneQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'sac* OR herself') LIMIT 50000";
     testSelectionResults(nativeQuery, luceneQuery);
 
-    nativeQuery = "SELECT * FROM MyTable WHERE DOMAIN_NAMES_NATIVE CONTAINS 'vicomte' LIMIT 50000";
+    nativeQuery = "SELECT * FROM MyTable WHERE TEXT_CONTAINS(DOMAIN_NAMES_NATIVE, 'vicomte') LIMIT 50000";
     luceneQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_LUCENE, 'vicomte') LIMIT 50000";
     testSelectionResults(nativeQuery, luceneQuery);
   }

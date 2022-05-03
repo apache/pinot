@@ -26,7 +26,6 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
-import org.apache.pinot.common.request.context.predicate.ContainsPredicate;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.IsNotNullPredicate;
@@ -36,6 +35,7 @@ import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
+import org.apache.pinot.common.request.context.predicate.TextContainsPredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
@@ -267,10 +267,9 @@ public class RequestContextUtils {
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new RegexpLikePredicate(getExpression(operands.get(0)),
                 RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));
-      case CONTAINS:
+      case TEXT_CONTAINS:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new ContainsPredicate(getExpression(operands.get(0)),
-                getStringValue(operands.get(1))));
+            new TextContainsPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
       case TEXT_MATCH:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new TextMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
@@ -396,9 +395,9 @@ public class RequestContextUtils {
       case LIKE:
         return new FilterContext(FilterContext.Type.PREDICATE, null, new RegexpLikePredicate(operands.get(0),
             RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));
-      case CONTAINS:
-        return new FilterContext(FilterContext.Type.PREDICATE, null, new ContainsPredicate(operands.get(0),
-            getStringValue(operands.get(1))));
+      case TEXT_CONTAINS:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new TextContainsPredicate(operands.get(0), getStringValue(operands.get(1))));
       case TEXT_MATCH:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new TextMatchPredicate(operands.get(0), getStringValue(operands.get(1))));

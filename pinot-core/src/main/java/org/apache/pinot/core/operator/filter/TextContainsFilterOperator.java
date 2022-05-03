@@ -20,11 +20,11 @@ package org.apache.pinot.core.operator.filter;
 
 import java.util.Collections;
 import java.util.List;
-import org.apache.pinot.common.request.context.predicate.ContainsPredicate;
+import org.apache.pinot.common.request.context.predicate.TextContainsPredicate;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
-import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
+import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.spi.trace.FilterType;
 import org.apache.pinot.spi.trace.InvocationRecording;
 import org.apache.pinot.spi.trace.Tracing;
@@ -32,16 +32,16 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /**
- * Operator for CONTAINS query
+ * Operator for TEXT_CONTAINS query.
  */
-public class ContainsFilterOperator extends BaseFilterOperator {
-  private static final String EXPLAIN_NAME = "FILTER_CONTAINS";
+public class TextContainsFilterOperator extends BaseFilterOperator {
+  private static final String EXPLAIN_NAME = "FILTER_TEXT_INDEX";
 
-  private final NativeTextIndexReader _textIndexReader;
+  private final TextIndexReader _textIndexReader;
   private final int _numDocs;
-  private final ContainsPredicate _predicate;
+  private final TextContainsPredicate _predicate;
 
-  public ContainsFilterOperator(NativeTextIndexReader textIndexReader, ContainsPredicate predicate, int numDocs) {
+  public TextContainsFilterOperator(TextIndexReader textIndexReader, TextContainsPredicate predicate, int numDocs) {
     _textIndexReader = textIndexReader;
     _predicate = predicate;
     _numDocs = numDocs;
@@ -81,7 +81,7 @@ public class ContainsFilterOperator extends BaseFilterOperator {
 
   @Override
   public String toExplainString() {
-    StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(indexLookUp:contains");
+    StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(indexLookUp:text_index");
     stringBuilder.append(",operator:").append(_predicate.getType());
     stringBuilder.append(",predicate:").append(_predicate.toString());
     return stringBuilder.append(')').toString();

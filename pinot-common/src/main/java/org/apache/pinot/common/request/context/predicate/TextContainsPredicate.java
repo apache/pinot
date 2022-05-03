@@ -23,19 +23,19 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 
 
 /**
- * Represents a CONTAINS predicate.
+ * Represents a TEXT_CONTAINS predicate.
  */
-public class ContainsPredicate extends BasePredicate {
+public class TextContainsPredicate extends BasePredicate {
   private final String _value;
 
-  public ContainsPredicate(ExpressionContext lhs, String value) {
+  public TextContainsPredicate(ExpressionContext lhs, String value) {
     super(lhs);
     _value = value;
   }
 
   @Override
   public Type getType() {
-    return Type.CONTAINS;
+    return Type.TEXT_CONTAINS;
   }
 
   @Override
@@ -57,10 +57,10 @@ public class ContainsPredicate extends BasePredicate {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof ContainsPredicate)) {
+    if (!(o instanceof TextContainsPredicate)) {
       return false;
     }
-    ContainsPredicate that = (ContainsPredicate) o;
+    TextContainsPredicate that = (TextContainsPredicate) o;
     return Objects.equals(_lhs, that._lhs) && Objects.equals(_value, that._value);
   }
 
@@ -71,6 +71,6 @@ public class ContainsPredicate extends BasePredicate {
 
   @Override
   public String toString() {
-    return "contains(" + _lhs + ",'" + _value + "')";
+    return "text_contains(" + _lhs + ",'" + _value + "')";
   }
 }

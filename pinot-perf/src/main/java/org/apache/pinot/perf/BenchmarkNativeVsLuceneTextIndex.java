@@ -80,12 +80,12 @@ public class BenchmarkNativeVsLuceneTextIndex {
   private static final String SEGMENT_NAME_NATIVE = "testSegmentNative";
   private static final String DOMAIN_NAMES_COL = "DOMAIN_NAMES_COL";
   private static final String INT_COL = "INT_COL";
+  private static final String NATIVE_QUERY = "SELECT SUM(INT_COL) FROM MyTable "
+      + "WHERE TEXT_CONTAINS(DOMAIN_NAMES_COL, 'sac.*') OR TEXT_CONTAINS(DOMAIN_NAMES_COL, 'vic.*')";
+  private static final String LUCENE_QUERY =
+      "SELECT SUM(INT_COL) FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_COL, 'sac* OR vic*')";
 
   private IndexSegment _indexSegment;
-
-  final String _luceneQuery = "SELECT SUM(INT_COL) FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_COL, 'sac* OR vic*')";
-  final String _nativeQuery =
-      "SELECT SUM(INT_COL) FROM MyTable WHERE DOMAIN_NAMES_COL CONTAINS 'sac.*' OR DOMAIN_NAMES_COL CONTAINS 'vic.*'";
 
   @Param("1000000")
   int _numRows;
@@ -102,9 +102,9 @@ public class BenchmarkNativeVsLuceneTextIndex {
       throws Exception {
     _planMaker = new InstancePlanMakerImplV2();
     if (_fstType == FSTType.LUCENE) {
-      _queryContext = QueryContextConverterUtils.getQueryContextFromSQL(_luceneQuery);
+      _queryContext = QueryContextConverterUtils.getQueryContextFromSQL(LUCENE_QUERY);
     } else {
-      _queryContext = QueryContextConverterUtils.getQueryContextFromSQL(_nativeQuery);
+      _queryContext = QueryContextConverterUtils.getQueryContextFromSQL(NATIVE_QUERY);
     }
     FileUtils.deleteQuietly(INDEX_DIR);
 
