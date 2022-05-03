@@ -87,6 +87,7 @@ public class MinionConstants {
     // Time handling config
     public static final String WINDOW_START_MS_KEY = "windowStartMs";
     public static final String WINDOW_END_MS_KEY = "windowEndMs";
+    public static final String NEGATE_WINDOW_FILTER = "negateWindowFilter";
     public static final String ROUND_BUCKET_TIME_PERIOD_KEY = "roundBucketTimePeriod";
     public static final String PARTITION_BUCKET_TIME_PERIOD_KEY = "partitionBucketTimePeriod";
 
