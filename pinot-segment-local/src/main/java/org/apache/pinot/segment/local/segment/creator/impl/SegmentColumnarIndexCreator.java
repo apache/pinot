@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -396,6 +397,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
               break;
             case DOUBLE:
               forwardIndexCreator.putDouble((double) columnValueToIndex);
+              break;
+            case BIG_DECIMAL:
+              forwardIndexCreator.putBigDecimal((BigDecimal) columnValueToIndex);
               break;
             case STRING:
               forwardIndexCreator.putString((String) columnValueToIndex);

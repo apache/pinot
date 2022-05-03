@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -66,6 +67,8 @@ public class EqualsPredicateEvaluatorFactory {
         return new FloatRawValueBasedEqPredicateEvaluator(eqPredicate, Float.parseFloat(value));
       case DOUBLE:
         return new DoubleRawValueBasedEqPredicateEvaluator(eqPredicate, Double.parseDouble(value));
+      case BIG_DECIMAL:
+        return new BigDecimalRawValueBasedEqPredicateEvaluator(eqPredicate, new BigDecimal(value));
       case BOOLEAN:
         return new IntRawValueBasedEqPredicateEvaluator(eqPredicate, BooleanUtils.toInt(value));
       case TIMESTAMP:
@@ -182,6 +185,25 @@ public class EqualsPredicateEvaluatorFactory {
     @Override
     public boolean applySV(double value) {
       return _matchingValue == value;
+    }
+  }
+
+  private static final class BigDecimalRawValueBasedEqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final BigDecimal _matchingValue;
+
+    BigDecimalRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate, BigDecimal matchingValue) {
+      super(eqPredicate);
+      _matchingValue = matchingValue;
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.BIG_DECIMAL;
+    }
+
+    @Override
+    public boolean applySV(BigDecimal value) {
+      return _matchingValue.compareTo(value) == 0;
     }
   }
 

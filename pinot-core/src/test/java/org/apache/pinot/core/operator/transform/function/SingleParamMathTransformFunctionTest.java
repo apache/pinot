@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.AbsTransformFunction;
@@ -78,6 +80,15 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
       expectedValues[i] = Math.abs(Double.parseDouble(_stringSVValues[i]));
     }
     testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpressionFromSQL(String.format("abs(%s)", BIG_DECIMAL_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof AbsTransformFunction);
+    BigDecimal[] expectedBigDecimalValues = new BigDecimal[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedBigDecimalValues[i] = _bigDecimalSVValues[i].abs();
+    }
+    testTransformFunction(transformFunction, expectedBigDecimalValues);
   }
 
   @Test
@@ -123,6 +134,15 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
       expectedValues[i] = Math.ceil(Double.parseDouble(_stringSVValues[i]));
     }
     testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpressionFromSQL(String.format("ceil(%s)", BIG_DECIMAL_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof CeilTransformFunction);
+    BigDecimal[] expectedBigDecimalValues = new BigDecimal[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedBigDecimalValues[i] = _bigDecimalSVValues[i].setScale(0, RoundingMode.CEILING);
+    }
+    testTransformFunction(transformFunction, expectedBigDecimalValues);
   }
 
   @Test
@@ -166,6 +186,16 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     Assert.assertTrue(transformFunction instanceof ExpTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedValues[i] = Math.exp(Double.parseDouble(_stringSVValues[i]));
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    // exp(x) always return double. Cast BigDecimal values first to double, then call exp(x).
+    expression = RequestContextUtils.getExpressionFromSQL(
+        String.format("exp(CAST(%s AS DOUBLE))", BIG_DECIMAL_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof ExpTransformFunction);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.exp(_bigDecimalSVValues[i].doubleValue());
     }
     testTransformFunction(transformFunction, expectedValues);
   }
@@ -213,6 +243,15 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
       expectedValues[i] = Math.floor(Double.parseDouble(_stringSVValues[i]));
     }
     testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpressionFromSQL(String.format("floor(%s)", BIG_DECIMAL_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof FloorTransformFunction);
+    BigDecimal[] expectedBigDecimalValues = new BigDecimal[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedBigDecimalValues[i] = _bigDecimalSVValues[i].setScale(0, RoundingMode.FLOOR);;
+    }
+    testTransformFunction(transformFunction, expectedBigDecimalValues);
   }
 
   @Test
@@ -256,6 +295,16 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     Assert.assertTrue(transformFunction instanceof LnTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedValues[i] = Math.log(Double.parseDouble(_stringSVValues[i]));
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    // ln(x) always return double. Cast BigDecimal values first to double, then call ln(x).
+    expression = RequestContextUtils.getExpressionFromSQL(String.format("ln(CAST(%s AS DOUBLE))",
+        BIG_DECIMAL_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof LnTransformFunction);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.log(_bigDecimalSVValues[i].doubleValue());
     }
     testTransformFunction(transformFunction, expectedValues);
   }
@@ -303,6 +352,39 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
       expectedValues[i] = Math.sqrt(Double.parseDouble(_stringSVValues[i]));
     }
     testTransformFunction(transformFunction, expectedValues);
+
+    // sqrt(x) always return double. Cast BigDecimal values first to double, then call sqrt(x).
+    expression = RequestContextUtils.getExpressionFromSQL(String.format("sqrt(CAST(%s AS DOUBLE))",
+        BIG_DECIMAL_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof SqrtTransformFunction);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.sqrt(_bigDecimalSVValues[i].doubleValue());
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+
+  @Test
+  public void testCombinationMathTransformFunctions() {
+    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(
+        String.format("add(ceil(%s), abs(floor(%s)))", INT_SV_COLUMN, DOUBLE_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    double[] expectedValues = new double[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.ceil(_intSVValues[i]) + Math.abs(Math.floor(_doubleSVValues[i]));
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpressionFromSQL(
+        String.format("add(ceil(%s), abs(floor(%s)))", INT_SV_COLUMN, BIG_DECIMAL_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    BigDecimal[] expectedBigDecimalValues = new BigDecimal[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedBigDecimalValues[i] = _bigDecimalSVValues[i].setScale(0, RoundingMode.FLOOR).abs()
+          .add(BigDecimal.valueOf(Math.ceil(_intSVValues[i])));
+    }
+    testTransformFunction(transformFunction, expectedBigDecimalValues);
   }
 
   @Test

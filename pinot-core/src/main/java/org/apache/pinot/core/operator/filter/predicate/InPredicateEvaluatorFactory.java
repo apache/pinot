@@ -27,8 +27,10 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -98,6 +100,13 @@ public class InPredicateEvaluatorFactory {
           matchingValues.add(Double.parseDouble(value));
         }
         return new DoubleRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
+      }
+      case BIG_DECIMAL: {
+        TreeSet<BigDecimal> matchingValues = new TreeSet<>();
+        for (String value : values) {
+          matchingValues.add(new BigDecimal(value));
+        }
+        return new BigDecimalRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
       }
       case BOOLEAN: {
         IntSet matchingValues = new IntOpenHashSet(hashSetSize);
@@ -244,6 +253,31 @@ public class InPredicateEvaluatorFactory {
 
     @Override
     public boolean applySV(double value) {
+      return _matchingValues.contains(value);
+    }
+  }
+
+  private static final class BigDecimalRawValueBasedInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    // Note: BigDecimal's compareTo is not consistent with equals (e.g. compareTo(3.0, 3) returns zero when
+    //   equals(3.0, 3) returns false).
+    // - HashSet implementation consider both hashCode() and equals() for the key.
+    // - TreeSet implementation on the other hand decides equality based on compareTo() method, and leaves it to
+    //    the end user to ensure that maintained ordering is consistent with equals if it is to correctly implement
+    //    the Set interface.
+    final TreeSet<BigDecimal> _matchingValues;
+
+    BigDecimalRawValueBasedInPredicateEvaluator(InPredicate inPredicate, TreeSet<BigDecimal> matchingValues) {
+      super(inPredicate);
+      _matchingValues = matchingValues;
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.BIG_DECIMAL;
+    }
+
+    @Override
+    public boolean applySV(BigDecimal value) {
       return _matchingValues.contains(value);
     }
   }

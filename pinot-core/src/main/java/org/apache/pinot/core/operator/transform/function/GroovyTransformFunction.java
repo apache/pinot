@@ -25,6 +25,7 @@ import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
@@ -67,6 +68,7 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   private long[] _longResultSV;
   private double[] _doubleResultSV;
   private float[] _floatResultSV;
+  private BigDecimal[] _bigDecimalResultSV;
   private String[] _stringResultSV;
   private int[][] _intResultMV;
   private long[][] _longResultMV;
@@ -184,6 +186,10 @@ public class GroovyTransformFunction extends BaseTransformFunction {
           case DOUBLE:
             transformToValuesFunction = TransformFunction::transformToDoubleValuesSV;
             getElementFunction = (sourceArray, position) -> ((double[]) sourceArray)[position];
+            break;
+          case BIG_DECIMAL:
+            transformToValuesFunction = TransformFunction::transformToBigDecimalValuesSV;
+            getElementFunction = (sourceArray, position) -> ((BigDecimal[]) sourceArray)[position];
             break;
           case STRING:
             transformToValuesFunction = TransformFunction::transformToStringValuesSV;
@@ -395,6 +401,24 @@ public class GroovyTransformFunction extends BaseTransformFunction {
       }
     }
     return _floatResultMV;
+  }
+
+  @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    if (_bigDecimalResultSV == null) {
+      _bigDecimalResultSV = new BigDecimal[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+    for (int i = 0; i < _numGroovyArgs; i++) {
+      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
+    }
+    int length = projectionBlock.getNumDocs();
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numGroovyArgs; j++) {
+        _bindingValues[j] = _fetchElementFunctions[j].apply(_sourceArrays[j], i);
+      }
+      _bigDecimalResultSV[i] = (BigDecimal) _groovyFunctionEvaluator.evaluate(_bindingValues);
+    }
+    return _bigDecimalResultSV;
   }
 
   @Override

@@ -206,6 +206,7 @@ public final class DefaultIndexCreatorProvider implements IndexCreatorProvider {
       case DOUBLE:
         return new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs, dataType,
             writerVersion);
+      case BIG_DECIMAL:
       case STRING:
       case BYTES:
         return new SingleValueVarByteRawIndexCreator(file, compressionType, column, totalDocs, dataType,

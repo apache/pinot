@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -32,6 +33,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,6 +81,11 @@ public class VarByteChunkSVForwardIndexReaderV4
   @Override
   public FieldSpec.DataType getValueType() {
     return _valueType;
+  }
+
+  @Override
+  public BigDecimal getBigDecimal(int docId, ReaderContext context) {
+    return BigDecimalUtils.deserialize(context.getValue(docId));
   }
 
   @Override

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -66,6 +67,8 @@ public class NotEqualsPredicateEvaluatorFactory {
         return new FloatRawValueBasedNeqPredicateEvaluator(notEqPredicate, Float.parseFloat(value));
       case DOUBLE:
         return new DoubleRawValueBasedNeqPredicateEvaluator(notEqPredicate, Double.parseDouble(value));
+      case BIG_DECIMAL:
+        return new BigDecimalRawValueBasedNeqPredicateEvaluator(notEqPredicate, new BigDecimal(value));
       case BOOLEAN:
         return new IntRawValueBasedNeqPredicateEvaluator(notEqPredicate, BooleanUtils.toInt(value));
       case TIMESTAMP:
@@ -207,6 +210,25 @@ public class NotEqualsPredicateEvaluatorFactory {
     @Override
     public boolean applySV(double value) {
       return _nonMatchingValue != value;
+    }
+  }
+
+  private static final class BigDecimalRawValueBasedNeqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final BigDecimal _nonMatchingValue;
+
+    BigDecimalRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, BigDecimal nonMatchingValue) {
+      super(notEqPredicate);
+      _nonMatchingValue = nonMatchingValue;
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.BIG_DECIMAL;
+    }
+
+    @Override
+    public boolean applySV(BigDecimal value) {
+      return _nonMatchingValue.compareTo(value) != 0;
     }
   }
 
