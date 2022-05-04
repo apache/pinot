@@ -292,11 +292,6 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
     return new GroupKeyIterator();
   }
 
-  @Override
-  public Iterator<StringGroupKey> getStringGroupKeys() {
-    return new StringGroupKeyIterator();
-  }
-
   /**
    * Helper method to get or create group-id for a group key.
    *
@@ -403,52 +398,5 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
       }
     }
     return keys;
-  }
-
-  /**
-   * Iterator for {@link StringGroupKey}.
-   */
-  private class StringGroupKeyIterator implements Iterator<StringGroupKey> {
-    private final ObjectIterator<Object2IntMap.Entry<FixedIntArray>> _iterator;
-    private final StringGroupKey _groupKey;
-
-    public StringGroupKeyIterator() {
-      _iterator = _groupKeyMap.object2IntEntrySet().fastIterator();
-      _groupKey = new StringGroupKey();
-    }
-
-    @Override
-    public boolean hasNext() {
-      return _iterator.hasNext();
-    }
-
-    @Override
-    public StringGroupKey next() {
-      Object2IntMap.Entry<FixedIntArray> entry = _iterator.next();
-      _groupKey._groupId = entry.getIntValue();
-      _groupKey._stringKey = buildStringKeyFromIds(entry.getKey());
-      return _groupKey;
-    }
-
-    @Override
-    public void remove() {
-      throw new UnsupportedOperationException();
-    }
-  }
-
-  private String buildStringKeyFromIds(FixedIntArray keyList) {
-    StringBuilder builder = new StringBuilder();
-    int[] keys = keyList.elements();
-    for (int i = 0; i < _numGroupByExpressions; i++) {
-      if (i > 0) {
-        builder.append(GroupKeyGenerator.DELIMITER);
-      }
-      if (_dictionaries[i] != null) {
-        builder.append(_dictionaries[i].getStringValue(keys[i]));
-      } else {
-        builder.append(_onTheFlyDictionaries[i].getString(keys[i]));
-      }
-    }
-    return builder.toString();
   }
 }

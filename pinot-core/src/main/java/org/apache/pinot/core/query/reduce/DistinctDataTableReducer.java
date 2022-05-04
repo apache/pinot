@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.reduce;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -28,16 +27,13 @@ import java.util.Map;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
-import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.core.util.QueryOptionsUtils;
 
 
 /**
@@ -45,18 +41,13 @@ import org.apache.pinot.core.util.QueryOptionsUtils;
  */
 public class DistinctDataTableReducer implements DataTableReducer {
   private final DistinctAggregationFunction _distinctAggregationFunction;
-  private final boolean _responseFormatSql;
 
-  // TODO: queryOptions.isPreserveType() is ignored for DISTINCT queries.
-  DistinctDataTableReducer(QueryContext queryContext, DistinctAggregationFunction distinctAggregationFunction) {
+  DistinctDataTableReducer(DistinctAggregationFunction distinctAggregationFunction) {
     _distinctAggregationFunction = distinctAggregationFunction;
-    _responseFormatSql = QueryOptionsUtils.isResponseFormatSQL(queryContext.getQueryOptions());
   }
 
   /**
-   * Reduces and sets results of distinct into
-   * 1. ResultTable if _responseFormatSql is true
-   * 2. SelectionResults by default
+   * Reduces and sets results of distinct into ResultTable.
    */
   @Override
   public void reduceAndSetResults(String tableName, DataSchema dataSchema,
@@ -80,19 +71,15 @@ public class DistinctDataTableReducer implements DataTableReducer {
 
     if (nonEmptyDistinctTables.isEmpty()) {
       // All the DistinctTables are empty, construct an empty response
+      // TODO: This returns schema with all STRING data types.
+      //       There's no way currently to get the data types of the distinct columns for empty results
       String[] columns = _distinctAggregationFunction.getColumns();
-      if (_responseFormatSql) {
-        // TODO: This returns schema with all STRING data types.
-        //       There's no way currently to get the data types of the distinct columns for empty results
 
-        int numColumns = columns.length;
-        ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
-        Arrays.fill(columnDataTypes, ColumnDataType.STRING);
-        brokerResponseNative.setResultTable(
-            new ResultTable(new DataSchema(columns, columnDataTypes), Collections.emptyList()));
-      } else {
-        brokerResponseNative.setSelectionResults(new SelectionResults(Arrays.asList(columns), Collections.emptyList()));
-      }
+      int numColumns = columns.length;
+      ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
+      Arrays.fill(columnDataTypes, ColumnDataType.STRING);
+      brokerResponseNative.setResultTable(
+          new ResultTable(new DataSchema(columns, columnDataTypes), Collections.emptyList()));
     } else {
       // Construct a main DistinctTable and merge all non-empty DistinctTables into it
       DistinctTable mainDistinctTable = new DistinctTable(nonEmptyDistinctTables.get(0).getDataSchema(),
@@ -100,35 +87,8 @@ public class DistinctDataTableReducer implements DataTableReducer {
       for (DistinctTable distinctTable : nonEmptyDistinctTables) {
         mainDistinctTable.mergeTable(distinctTable);
       }
-
-      // Up until now, we have treated DISTINCT similar to another aggregation function even in terms
-      // of the result from function and merging results.
-      // However, the DISTINCT query is just another SELECTION style query from the user's point
-      // of view and will return one or records in the result table for the column(s) selected and so
-      // for that reason, response from broker should be a selection query result.
-      if (_responseFormatSql) {
-        brokerResponseNative.setResultTable(reduceToResultTable(mainDistinctTable));
-      } else {
-        brokerResponseNative.setSelectionResults(reduceToSelectionResult(mainDistinctTable));
-      }
+      brokerResponseNative.setResultTable(reduceToResultTable(mainDistinctTable));
     }
-  }
-
-  private SelectionResults reduceToSelectionResult(DistinctTable distinctTable) {
-    List<Serializable[]> rows = new ArrayList<>(distinctTable.size());
-    DataSchema dataSchema = distinctTable.getDataSchema();
-    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
-    int numColumns = columnDataTypes.length;
-    Iterator<Record> iterator = distinctTable.getFinalResult();
-    while (iterator.hasNext()) {
-      Object[] values = iterator.next().getValues();
-      Serializable[] row = new Serializable[numColumns];
-      for (int i = 0; i < numColumns; i++) {
-        row[i] = columnDataTypes[i].convertAndFormat(values[i]);
-      }
-      rows.add(row);
-    }
-    return new SelectionResults(Arrays.asList(dataSchema.getColumnNames()), rows);
   }
 
   private ResultTable reduceToResultTable(DistinctTable distinctTable) {

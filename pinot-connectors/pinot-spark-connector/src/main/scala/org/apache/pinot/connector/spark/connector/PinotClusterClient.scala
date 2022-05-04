@@ -200,8 +200,8 @@ private[pinot] object PinotClusterClient extends Logging {
 
   private def getRoutingTableForQuery(brokerUrl: String, sql: String): Map[String, List[String]] = {
     Try {
-      val encodedPqlQueryParam = URLEncoder.encode(sql, "UTF-8")
-      val uri = new URI(String.format(ROUTING_TABLE_TEMPLATE, brokerUrl, encodedPqlQueryParam))
+      val encodedSqlQueryParam = URLEncoder.encode(sql, "UTF-8")
+      val uri = new URI(String.format(ROUTING_TABLE_TEMPLATE, brokerUrl, encodedSqlQueryParam))
       val response = HttpUtils.sendGetRequest(uri)
       decodeTo[Map[String, List[String]]](response)
     } match {

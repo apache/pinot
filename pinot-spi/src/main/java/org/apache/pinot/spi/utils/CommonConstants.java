@@ -234,7 +234,6 @@ public class CommonConstants {
     public static final String CONTROLLER_URL = "pinot.broker.controller.url";
 
     public static class Request {
-      public static final String PQL = "pql";
       public static final String SQL = "sql";
       public static final String TRACE = "trace";
       public static final String DEBUG_OPTIONS = "debugOptions";
@@ -242,14 +241,19 @@ public class CommonConstants {
 
       public static class QueryOptionKey {
         public static final String TIMEOUT_MS = "timeoutMs";
-        public static final String PRESERVE_TYPE = "preserveType";
-        public static final String RESPONSE_FORMAT = "responseFormat";
-        public static final String GROUP_BY_MODE = "groupByMode";
         public static final String SKIP_UPSERT = "skipUpsert";
         public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";
         public static final String MIN_SEGMENT_GROUP_TRIM_SIZE = "minSegmentGroupTrimSize";
         public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
+
+        // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
+        @Deprecated
+        public static final String PRESERVE_TYPE = "preserveType";
+        @Deprecated
+        public static final String RESPONSE_FORMAT = "responseFormat";
+        @Deprecated
+        public static final String GROUP_BY_MODE = "groupByMode";
       }
     }
 

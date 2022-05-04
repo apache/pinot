@@ -468,8 +468,6 @@ public abstract class ClusterTest extends ControllerTest {
       throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);
-    payload.put("queryOptions", "groupByMode=sql;responseFormat=sql");
-
     return JsonUtils.stringToJsonNode(sendPostRequest(brokerBaseApiUrl + "/query/sql", payload.toString(), headers));
   }
 
@@ -496,7 +494,6 @@ public abstract class ClusterTest extends ControllerTest {
       throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);
-    payload.put("queryOptions", "groupByMode=sql;responseFormat=sql");
     return JsonUtils.stringToJsonNode(
         sendPostRequest(controllerBaseApiUrl + "/sql", JsonUtils.objectToString(payload), headers));
   }

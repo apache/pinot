@@ -31,7 +31,7 @@ public class DefaultRequestStatistics implements RequestScope {
   private static final String DEFAULT_TABLE_NAME = "NotYetParsed";
 
   private int _errorCode = 0;
-  private String _pql;
+  private String _query;
   private String _tableName = DEFAULT_TABLE_NAME;
   private long _processingTimeMillis = -1;
   private long _totalDocs;
@@ -163,8 +163,8 @@ public class DefaultRequestStatistics implements RequestScope {
   }
 
   @Override
-  public void setQuery(String pql) {
-    _pql = pql;
+  public void setQuery(String query) {
+    _query = query;
   }
 
   @Override
@@ -234,7 +234,7 @@ public class DefaultRequestStatistics implements RequestScope {
 
   @Override
   public String getQuery() {
-    return _pql;
+    return _query;
   }
 
   @Override

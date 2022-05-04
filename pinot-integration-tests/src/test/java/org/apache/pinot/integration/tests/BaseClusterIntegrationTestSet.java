@@ -417,7 +417,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    */
   public void testQueryExceptions()
       throws Exception {
-    testQueryException("POTATO", QueryException.PQL_PARSING_ERROR_CODE);
+    testQueryException("POTATO", QueryException.SQL_PARSING_ERROR_CODE);
     testQueryException("SELECT COUNT(*) FROM potato", QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE);
     testQueryException("SELECT POTATO(ArrTime) FROM mytable", QueryException.QUERY_EXECUTION_ERROR_CODE);
     testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'",

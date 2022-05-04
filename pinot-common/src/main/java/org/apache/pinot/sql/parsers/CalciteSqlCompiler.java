@@ -22,16 +22,13 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
-import org.apache.pinot.parsers.QueryCompiler;
 
 
-/**
- * CalciteSqlCompiler is a Calcite SQL compiler.
- */
-public class CalciteSqlCompiler implements QueryCompiler {
+public class CalciteSqlCompiler {
+  private CalciteSqlCompiler() {
+  }
 
-  @Override
-  public BrokerRequest compileToBrokerRequest(String query) {
+  public static BrokerRequest compileToBrokerRequest(String query) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     BrokerRequest brokerRequest = new BrokerRequest();
     brokerRequest.setPinotQuery(pinotQuery);

@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.optimizer.filter;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -29,11 +28,6 @@ import org.apache.pinot.spi.data.Schema;
  * TODO: Support AlwaysTrueFilter and AlwaysFalseFilter
  */
 public interface FilterOptimizer {
-
-  /**
-   * Optimizes the given filter, returns the optimized filter.
-   */
-  FilterQueryTree optimize(FilterQueryTree filterQueryTree, @Nullable Schema schema);
 
   /**
    * Optimizes the given filter, returns the optimized filter.

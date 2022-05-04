@@ -28,7 +28,7 @@ import java.util.regex.Pattern
  * Test num of Spark partitions by routing table and input configs.
  */
 class PinotSplitterTest extends BaseTest {
-  private val generatedPql = GeneratedSQLs("tbl", None, "", "")
+  private val generatedSql = GeneratedSQLs("tbl", None, "", "")
   private val mockInstanceInfoReader = (server: String) => {
     val matcher = Pattern.compile("Server_(.*)_(\\d+)").matcher(server)
     matcher.matches()
@@ -62,7 +62,7 @@ class PinotSplitterTest extends BaseTest {
   test("Total 5 partition splits should be created for maxNumSegmentPerServerRequest = 3") {
     val readOptions = getReadOptionsWithSegmentsPerSplit(3)
     val splitResults =
-      PinotSplitter.generatePinotSplits(generatedPql, routingTable, mockInstanceInfoReader, readOptions)
+      PinotSplitter.generatePinotSplits(generatedSql, routingTable, mockInstanceInfoReader, readOptions)
 
     splitResults.size shouldEqual 5
   }
@@ -70,7 +70,7 @@ class PinotSplitterTest extends BaseTest {
   test("Total 5 partition splits should be created for maxNumSegmentPerServerRequest = 90") {
     val readOptions = getReadOptionsWithSegmentsPerSplit(90)
     val splitResults =
-      PinotSplitter.generatePinotSplits(generatedPql, routingTable, mockInstanceInfoReader, readOptions)
+      PinotSplitter.generatePinotSplits(generatedSql, routingTable, mockInstanceInfoReader, readOptions)
 
     splitResults.size shouldEqual 5
   }
@@ -78,7 +78,7 @@ class PinotSplitterTest extends BaseTest {
   test("Total 10 partition splits should be created for maxNumSegmentPerServerRequest = 1") {
     val readOptions = getReadOptionsWithSegmentsPerSplit(1)
     val splitResults =
-      PinotSplitter.generatePinotSplits(generatedPql, routingTable, mockInstanceInfoReader, readOptions)
+      PinotSplitter.generatePinotSplits(generatedSql, routingTable, mockInstanceInfoReader, readOptions)
 
     splitResults.size shouldEqual 10
   }
@@ -89,10 +89,10 @@ class PinotSplitterTest extends BaseTest {
     )
     val readOptions = getReadOptionsWithSegmentsPerSplit(5)
 
-    val splitResults = PinotSplitter.generatePinotSplits(generatedPql, inputRoutingTable, mockInstanceInfoReader, readOptions)
+    val splitResults = PinotSplitter.generatePinotSplits(generatedSql, inputRoutingTable, mockInstanceInfoReader, readOptions)
     val expectedOutput = List(
       PinotSplit(
-        generatedPql,
+        generatedSql,
         PinotServerAndSegments("192.168.1.100", "9000", -1, List("segment1"), TableType.REALTIME)
       )
     )
@@ -119,10 +119,10 @@ class PinotSplitterTest extends BaseTest {
     }
 
     val splitResults =
-      PinotSplitter.generatePinotSplits(generatedPql, inputRoutingTable, inputGrpcPortReader, inputReadOptions)
+      PinotSplitter.generatePinotSplits(generatedSql, inputRoutingTable, inputGrpcPortReader, inputReadOptions)
     val expectedOutput = List(
       PinotSplit(
-        generatedPql,
+        generatedSql,
         PinotServerAndSegments("192.168.1.100", "9000", 8090, List("segment1"), TableType.REALTIME)
       )
     )

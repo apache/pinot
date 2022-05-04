@@ -39,14 +39,11 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
-import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.utils.CommonConstants.Segment;
+import org.apache.pinot.sql.FilterKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -170,39 +167,19 @@ public class MultiPartitionColumnsSegmentPruner implements SegmentPruner {
 
   @Override
   public Set<String> prune(BrokerRequest brokerRequest, Set<String> segments) {
-    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
-    if (pinotQuery != null) {
-      // SQL
-
-      Expression filterExpression = pinotQuery.getFilterExpression();
-      if (filterExpression == null) {
-        return segments;
-      }
-      Set<String> selectedSegments = new HashSet<>();
-      for (String segment : segments) {
-        Map<String, PartitionInfo> columnPartitionInfoMap = _segmentColumnPartitionInfoMap.get(segment);
-        if (columnPartitionInfoMap == null || columnPartitionInfoMap == INVALID_COLUMN_PARTITION_INFO_MAP
-            || isPartitionMatch(filterExpression, columnPartitionInfoMap)) {
-          selectedSegments.add(segment);
-        }
-      }
-      return selectedSegments;
-    } else {
-      // PQL
-      FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
-      if (filterQueryTree == null) {
-        return segments;
-      }
-      Set<String> selectedSegments = new HashSet<>();
-      for (String segment : segments) {
-        Map<String, PartitionInfo> columnPartitionInfo = _segmentColumnPartitionInfoMap.get(segment);
-        if (columnPartitionInfo == null || columnPartitionInfo == INVALID_COLUMN_PARTITION_INFO_MAP || isPartitionMatch(
-            filterQueryTree, columnPartitionInfo)) {
-          selectedSegments.add(segment);
-        }
-      }
-      return selectedSegments;
+    Expression filterExpression = brokerRequest.getPinotQuery().getFilterExpression();
+    if (filterExpression == null) {
+      return segments;
     }
+    Set<String> selectedSegments = new HashSet<>();
+    for (String segment : segments) {
+      Map<String, PartitionInfo> columnPartitionInfoMap = _segmentColumnPartitionInfoMap.get(segment);
+      if (columnPartitionInfoMap == null || columnPartitionInfoMap == INVALID_COLUMN_PARTITION_INFO_MAP
+          || isPartitionMatch(filterExpression, columnPartitionInfoMap)) {
+        selectedSegments.add(segment);
+      }
+    }
+    return selectedSegments;
   }
 
   @VisibleForTesting
@@ -258,40 +235,6 @@ public class MultiPartitionColumnsSegmentPruner implements SegmentPruner {
           return true;
         }
       }
-      default:
-        return true;
-    }
-  }
-
-  @Deprecated
-  private boolean isPartitionMatch(FilterQueryTree filterQueryTree, Map<String, PartitionInfo> columnPartitionInfoMap) {
-    switch (filterQueryTree.getOperator()) {
-      case AND:
-        for (FilterQueryTree child : filterQueryTree.getChildren()) {
-          if (!isPartitionMatch(child, columnPartitionInfoMap)) {
-            return false;
-          }
-        }
-        return true;
-      case OR:
-        for (FilterQueryTree child : filterQueryTree.getChildren()) {
-          if (isPartitionMatch(child, columnPartitionInfoMap)) {
-            return true;
-          }
-        }
-        return false;
-      case EQUALITY:
-      case IN:
-        PartitionInfo partitionInfo = columnPartitionInfoMap.get(filterQueryTree.getColumn());
-        if (partitionInfo == null) {
-          return true;
-        }
-        for (String value : filterQueryTree.getValue()) {
-          if (partitionInfo._partitions.contains(partitionInfo._partitionFunction.getPartition(value))) {
-            return true;
-          }
-        }
-        return false;
       default:
         return true;
     }

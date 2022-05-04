@@ -33,7 +33,7 @@ public class DivisionTransformFunctionTest extends BaseTransformFunctionTest {
   @Test
   public void testDivisionTransformFunction() {
     ExpressionContext expression =
-        RequestContextUtils.getExpressionFromSQL(String.format("div(%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN));
+        RequestContextUtils.getExpression(String.format("div(%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof DivisionTransformFunction);
     Assert.assertEquals(transformFunction.getName(), DivisionTransformFunction.FUNCTION_NAME);
@@ -43,7 +43,7 @@ public class DivisionTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils.getExpressionFromSQL(String.format("div(%s,%s)", LONG_SV_COLUMN, FLOAT_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("div(%s,%s)", LONG_SV_COLUMN, FLOAT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof DivisionTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -51,8 +51,7 @@ public class DivisionTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        RequestContextUtils.getExpressionFromSQL(String.format("div(%s,%s)", FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("div(%s,%s)", FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof DivisionTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -60,8 +59,7 @@ public class DivisionTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        RequestContextUtils.getExpressionFromSQL(String.format("div(%s,%s)", DOUBLE_SV_COLUMN, STRING_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("div(%s,%s)", DOUBLE_SV_COLUMN, STRING_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof DivisionTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -69,7 +67,7 @@ public class DivisionTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils.getExpressionFromSQL(String.format("div(%s,%s)", STRING_SV_COLUMN, INT_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("div(%s,%s)", STRING_SV_COLUMN, INT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof DivisionTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -77,9 +75,9 @@ public class DivisionTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils.getExpressionFromSQL(String
-        .format("div(div(div(div(div(12,%s),%s),div(div(%s,%s),0.34)),%s),%s)", STRING_SV_COLUMN, DOUBLE_SV_COLUMN,
-            FLOAT_SV_COLUMN, LONG_SV_COLUMN, INT_SV_COLUMN, DOUBLE_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(
+        String.format("div(div(div(div(div(12,%s),%s),div(div(%s,%s),0.34)),%s),%s)", STRING_SV_COLUMN,
+            DOUBLE_SV_COLUMN, FLOAT_SV_COLUMN, LONG_SV_COLUMN, INT_SV_COLUMN, DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof DivisionTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -89,20 +87,20 @@ public class DivisionTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils.getExpressionFromSQL(String.format("div(%s,%s)", DOUBLE_SV_COLUMN,
-        BIG_DECIMAL_SV_COLUMN));
+    expression =
+        RequestContextUtils.getExpression(String.format("div(%s,%s)", DOUBLE_SV_COLUMN, BIG_DECIMAL_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof DivisionTransformFunction);
     BigDecimal[] expectedBigDecimalValues = new BigDecimal[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedBigDecimalValues[i] = BigDecimal.valueOf(_doubleSVValues[i])
-          .divide(_bigDecimalSVValues[i], RoundingMode.HALF_EVEN);
+      expectedBigDecimalValues[i] =
+          BigDecimal.valueOf(_doubleSVValues[i]).divide(_bigDecimalSVValues[i], RoundingMode.HALF_EVEN);
     }
     testTransformFunction(transformFunction, expectedBigDecimalValues);
 
-    expression = RequestContextUtils.getExpressionFromSQL(String
-        .format("div(div(div('3430.34473923874923809',div(%s,0.34)),%s),%s)", STRING_SV_COLUMN, BIG_DECIMAL_SV_COLUMN,
-            INT_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(
+        String.format("div(div(div('3430.34473923874923809',div(%s,0.34)),%s),%s)", STRING_SV_COLUMN,
+            BIG_DECIMAL_SV_COLUMN, INT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof DivisionTransformFunction);
     BigDecimal constant1 = BigDecimal.valueOf(0.34d);
@@ -118,7 +116,7 @@ public class DivisionTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

@@ -97,7 +97,7 @@ public class TrigonometricFunctionsTest extends BaseTransformFunctionTest {
   @Test
   public void testAtan2TransformFunction() {
     ExpressionContext expression =
-        RequestContextUtils.getExpressionFromSQL(String.format("atan2(%s, %s)", DOUBLE_SV_COLUMN, FLOAT_SV_COLUMN));
+        RequestContextUtils.getExpression(String.format("atan2(%s, %s)", DOUBLE_SV_COLUMN, FLOAT_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof Atan2TransformFunction);
     Assert.assertEquals(transformFunction.getName(), Atan2TransformFunction.FUNCTION_NAME);
@@ -110,7 +110,7 @@ public class TrigonometricFunctionsTest extends BaseTransformFunctionTest {
 
   public void testTrigonometricTransformFunction(Class<?> clazz, String sqlFunction, DoubleUnaryOperator op) {
     ExpressionContext expression =
-        RequestContextUtils.getExpressionFromSQL(String.format("%s(%s)", sqlFunction, INT_SV_COLUMN));
+        RequestContextUtils.getExpression(String.format("%s(%s)", sqlFunction, INT_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(clazz.isInstance(transformFunction));
     Assert.assertEquals(transformFunction.getName(), sqlFunction);
@@ -120,7 +120,7 @@ public class TrigonometricFunctionsTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils.getExpressionFromSQL(String.format("%s(%s)", sqlFunction, LONG_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("%s(%s)", sqlFunction, LONG_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(clazz.isInstance(transformFunction));
     Assert.assertEquals(transformFunction.getName(), sqlFunction);
@@ -130,7 +130,7 @@ public class TrigonometricFunctionsTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils.getExpressionFromSQL(String.format("%s(%s)", sqlFunction, FLOAT_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("%s(%s)", sqlFunction, FLOAT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(clazz.isInstance(transformFunction));
     Assert.assertEquals(transformFunction.getName(), sqlFunction);
@@ -140,7 +140,7 @@ public class TrigonometricFunctionsTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils.getExpressionFromSQL(String.format("%s(%s)", sqlFunction, DOUBLE_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("%s(%s)", sqlFunction, DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(clazz.isInstance(transformFunction));
     Assert.assertEquals(transformFunction.getName(), sqlFunction);
@@ -150,7 +150,7 @@ public class TrigonometricFunctionsTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils.getExpressionFromSQL(String.format("%s(%s)", sqlFunction, STRING_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("%s(%s)", sqlFunction, STRING_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(clazz.isInstance(transformFunction));
     Assert.assertEquals(transformFunction.getName(), sqlFunction);

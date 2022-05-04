@@ -383,7 +383,7 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
   }
 
   private TransformFunction testLeastPreconditions(String expressionStr) {
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof LeastTransformFunction);
     assertEquals(transformFunction.getName(), TransformFunctionType.LEAST.getName());
@@ -391,7 +391,7 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
   }
 
   private TransformFunction testGreatestPreconditions(String expressionStr) {
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof GreatestTransformFunction);
     assertEquals(transformFunction.getName(), TransformFunctionType.GREATEST.getName());

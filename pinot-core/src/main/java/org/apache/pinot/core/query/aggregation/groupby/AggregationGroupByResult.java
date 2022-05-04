@@ -47,34 +47,6 @@ public class AggregationGroupByResult {
     return _groupKeyGenerator.getGroupKeys();
   }
 
-  /**
-   * Returns an iterator of {@link GroupKeyGenerator.StringGroupKey}.
-   */
-  public Iterator<GroupKeyGenerator.StringGroupKey> getStringGroupKeyIterator() {
-    return _groupKeyGenerator.getStringGroupKeys();
-  }
-
-  /**
-   *
-   * Given a group-by key and an index into the result holder array, returns
-   * the corresponding aggregation result.
-   *
-   * Clients are expected to order the resultHolder array in the same order in which
-   * the aggregation functions appear in the brokerRequest. This way they can simply
-   * pass the index of aggregation function and get the result. This is purely a
-   * runtime optimization, so that:
-   * - Same groupKey can be re-used for multiple aggregation functions.
-   * - Avoid any name based association (and lookup) between aggregation function
-   *   and its result in this class.
-   *
-   * @param groupKey
-   * @param index
-   * @return
-   */
-  public Object getResultForKey(GroupKeyGenerator.StringGroupKey groupKey, int index) {
-    return getResultForGroupId(index, groupKey._groupId);
-  }
-
   public Object getResultForGroupId(int index, int groupId) {
     return _aggregationFunctions[index].extractGroupByResult(_resultHolders[index], groupId);
   }

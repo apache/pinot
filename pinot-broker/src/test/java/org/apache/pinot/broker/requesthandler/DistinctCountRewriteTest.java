@@ -20,9 +20,7 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.google.common.collect.ImmutableSet;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.Assert;
@@ -30,22 +28,6 @@ import org.testng.annotations.Test;
 
 
 public class DistinctCountRewriteTest {
-  private static final Pql2Compiler PQL_COMPILER = new Pql2Compiler();
-
-  @Test
-  @Deprecated
-  public void testPql() {
-    String pql = "SELECT distinctCount(col1) FROM myTable";
-    BrokerRequest brokerRequest = PQL_COMPILER.compileToBrokerRequest(pql);
-    BaseBrokerRequestHandler.handleSegmentPartitionedDistinctCountOverride(brokerRequest,
-        ImmutableSet.of("col2", "col3"));
-    Assert.assertEquals(brokerRequest.getAggregationsInfo().get(0).getAggregationType().toUpperCase(),
-        AggregationFunctionType.DISTINCTCOUNT.name());
-    BaseBrokerRequestHandler.handleSegmentPartitionedDistinctCountOverride(brokerRequest,
-        ImmutableSet.of("col2", "col3", "col1"));
-    Assert.assertEquals(brokerRequest.getAggregationsInfo().get(0).getAggregationType().toUpperCase(),
-        AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT.name());
-  }
 
   @Test
   public void testSql() {

@@ -43,18 +43,6 @@ public class QueryOptionsUtils {
     }
   }
 
-  public static boolean isGroupByModeSQL(Map<String, String> queryOptions) {
-    return Request.SQL.equalsIgnoreCase(queryOptions.get(Request.QueryOptionKey.GROUP_BY_MODE));
-  }
-
-  public static boolean isResponseFormatSQL(Map<String, String> queryOptions) {
-    return Request.SQL.equalsIgnoreCase(queryOptions.get(Request.QueryOptionKey.RESPONSE_FORMAT));
-  }
-
-  public static boolean isPreserveType(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.PRESERVE_TYPE));
-  }
-
   public static boolean isSkipUpsert(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.SKIP_UPSERT));
   }

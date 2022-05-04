@@ -36,7 +36,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
 import org.apache.pinot.controller.recommender.io.metadata.FieldMetadata;
 import org.apache.pinot.controller.recommender.io.metadata.SchemaWithMetaData;
@@ -53,14 +52,13 @@ import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
-import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
-import org.apache.pinot.parsers.QueryCompiler;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,7 +74,6 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
 @SuppressWarnings("unused")
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.NONE)
 public class InputManager {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(InputManager.class);
 
   /******************************Deserialized from input json*********************************/
@@ -91,7 +88,6 @@ public class InputManager {
   public RulesToExecute _rulesToExecute = new RulesToExecute(); // dictates which rules to execute
   public Schema _schema = new Schema();
   public SchemaWithMetaData _schemaWithMetaData = new SchemaWithMetaData();
-  public String _queryType = SQL; // SQL or PQL
   public Map<String, Double> _queryWeightMap = new HashMap<>(); // {"queryString":"queryWeight"}
   public String _tableType = OFFLINE; // OFFLINE REALTIME HYBRID
   public int _numKafkaPartitions = DEFAULT_NUM_KAFKA_PARTITIONS;
@@ -168,16 +164,10 @@ public class InputManager {
 
   private void validateQueries() {
     List<String> invalidQueries = new LinkedList<>();
-    QueryCompiler compiler = PinotQueryParserFactory.get(getQueryType());
     for (String queryString : _queryWeightMap.keySet()) {
       try {
-        BrokerRequest brokerRequest = compiler.compileToBrokerRequest(queryString);
-        PinotQuery pinotQuery = brokerRequest.getPinotQuery();
-        if (pinotQuery != null) {
-          _queryOptimizer.optimize(pinotQuery, _schema);
-        } else {
-          _queryOptimizer.optimize(brokerRequest, _schema);
-        }
+        BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(queryString);
+        _queryOptimizer.optimize(brokerRequest.getPinotQuery(), _schema);
         QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
         _parsedQueries.put(queryString, Triple.of(_queryWeightMap.get(queryString), brokerRequest, queryContext));
       } catch (SqlCompilationException e) {
@@ -368,11 +358,6 @@ public class InputManager {
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
-  public void setQueryType(String queryType) {
-    _queryType = queryType;
-  }
-
-  @JsonSetter(nulls = Nulls.SKIP)
   public void setInvertedSortedIndexJointRuleParams(
       InvertedSortedIndexJointRuleParams invertedSortedIndexJointRuleParams) {
     _invertedSortedIndexJointRuleParams = invertedSortedIndexJointRuleParams;
@@ -502,10 +487,6 @@ public class InputManager {
   @JsonIgnore
   public Map<String, FieldMetadata> getMetaDataMap() {
     return _metaDataMap;
-  }
-
-  public String getQueryType() {
-    return _queryType;
   }
 
   public InvertedSortedIndexJointRuleParams getInvertedSortedIndexJointRuleParams() {
@@ -640,8 +621,8 @@ public class InputManager {
       return 0;
     } else {
       if (dataType == FieldSpec.DataType.BYTES || dataType == FieldSpec.DataType.STRING) {
-        return (long) Math
-            .ceil(getCardinality(colName) * (_dataTypeSizeMap.get(dataType) * getAverageDataLen(colName)));
+        return (long) Math.ceil(
+            getCardinality(colName) * (_dataTypeSizeMap.get(dataType) * getAverageDataLen(colName)));
       } else {
         return (long) Math.ceil(getCardinality(colName) * (_dataTypeSizeMap.get(dataType)));
       }

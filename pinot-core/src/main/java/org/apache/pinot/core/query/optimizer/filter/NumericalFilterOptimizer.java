@@ -25,11 +25,10 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Literal;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.sql.FilterKind;
 
 
 /**
@@ -63,15 +62,8 @@ import org.apache.pinot.spi.data.Schema;
  * TODO: Add support for BETWEEN, IN, and NOT IN operators.
  */
 public class NumericalFilterOptimizer implements FilterOptimizer {
-
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
   private static final Expression FALSE = RequestUtils.getLiteralExpression(false);
-
-  @Override
-  public FilterQueryTree optimize(FilterQueryTree filterQueryTree, @Nullable Schema schema) {
-    // Don't do anything here since this is for PQL queries which we no longer support.
-    return filterQueryTree;
-  }
 
   @Override
   public Expression optimize(Expression expression, @Nullable Schema schema) {

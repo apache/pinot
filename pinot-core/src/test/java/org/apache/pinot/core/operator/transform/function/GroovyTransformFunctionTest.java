@@ -166,7 +166,7 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
   @Test(dataProvider = "groovyFunctionDataProvider")
   public void testGroovyTransformFunctions(String expressionStr, FieldSpec.DataType resultType,
       boolean isResultSingleValue, Object expectedResult) {
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof GroovyTransformFunction);
     Assert.assertEquals(transformFunction.getName(), GroovyTransformFunction.FUNCTION_NAME);
@@ -267,7 +267,7 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

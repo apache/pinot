@@ -39,7 +39,6 @@ import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -49,8 +48,6 @@ import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 @Path("/")
 // TODO: Add APIs to return the RoutingTable (with unavailable segments)
 public class PinotBrokerDebug {
-  private static final Pql2Compiler PQL_COMPILER = new Pql2Compiler();
-  private static final CalciteSqlCompiler CALCITE_COMPILER = new CalciteSqlCompiler();
 
   @Inject
   private BrokerRoutingManager _routingManager;
@@ -91,16 +88,16 @@ public class PinotBrokerDebug {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType != TableType.REALTIME) {
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-      RoutingTable routingTable =
-          _routingManager.getRoutingTable(PQL_COMPILER.compileToBrokerRequest("SELECT * FROM " + offlineTableName));
+      RoutingTable routingTable = _routingManager.getRoutingTable(
+          CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + offlineTableName));
       if (routingTable != null) {
         result.put(offlineTableName, routingTable.getServerInstanceToSegmentsMap());
       }
     }
     if (tableType != TableType.OFFLINE) {
       String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-      RoutingTable routingTable =
-          _routingManager.getRoutingTable(PQL_COMPILER.compileToBrokerRequest("SELECT * FROM " + realtimeTableName));
+      RoutingTable routingTable = _routingManager.getRoutingTable(
+          CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + realtimeTableName));
       if (routingTable != null) {
         result.put(realtimeTableName, routingTable.getServerInstanceToSegmentsMap());
       }
@@ -114,7 +111,7 @@ public class PinotBrokerDebug {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/debug/routingTable")
+  @Path("/debug/routingTable/sql")
   @ApiOperation(value = "Get the routing table for a query")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Routing table"),
@@ -122,27 +119,8 @@ public class PinotBrokerDebug {
       @ApiResponse(code = 500, message = "Internal server error")
   })
   public Map<ServerInstance, List<String>> getRoutingTableForQuery(
-      @ApiParam(value = "Pql query (table name should have type suffix)") @QueryParam("pql") String pql) {
-    RoutingTable routingTable = _routingManager.getRoutingTable(PQL_COMPILER.compileToBrokerRequest(pql));
-    if (routingTable != null) {
-      return routingTable.getServerInstanceToSegmentsMap();
-    } else {
-      throw new WebApplicationException("Cannot find routing for query: " + pql, Response.Status.NOT_FOUND);
-    }
-  }
-
-  @GET
-  @Produces(MediaType.APPLICATION_JSON)
-  @Path("/debug/routingTable/sql")
-  @ApiOperation(value = "Get the routing table for a SQL query")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Routing table"),
-      @ApiResponse(code = 404, message = "Routing not found"),
-      @ApiResponse(code = 500, message = "Internal server error")
-  })
-  public Map<ServerInstance, List<String>> getRoutingTableForSQLQuery(
       @ApiParam(value = "SQL query (table name should have type suffix)") @QueryParam("query") String query) {
-    RoutingTable routingTable = _routingManager.getRoutingTable(CALCITE_COMPILER.compileToBrokerRequest(query));
+    RoutingTable routingTable = _routingManager.getRoutingTable(CalciteSqlCompiler.compileToBrokerRequest(query));
     if (routingTable != null) {
       return routingTable.getServerInstanceToSegmentsMap();
     } else {

@@ -53,7 +53,7 @@ public final class ResultReducerFactory {
         // Aggregation only query
         if (aggregationFunctions.length == 1 && aggregationFunctions[0].getType() == AggregationFunctionType.DISTINCT) {
           // Distinct query
-          return new DistinctDataTableReducer(queryContext, (DistinctAggregationFunction) aggregationFunctions[0]);
+          return new DistinctDataTableReducer((DistinctAggregationFunction) aggregationFunctions[0]);
         } else {
           return new AggregationDataTableReducer(queryContext);
         }
