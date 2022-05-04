@@ -18,20 +18,20 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.ScalarFunction;
-
 
 public class ObjectFunctions {
   private ObjectFunctions() {
   }
 
   @ScalarFunction(nullableParameters = true)
-  public static boolean isNull(Object obj) {
+  public static boolean isNull(@Nullable Object obj) {
     return obj == null;
   }
 
   @ScalarFunction(nullableParameters = true)
-  public static boolean isNotNull(Object obj) {
+  public static boolean isNotNull(@Nullable Object obj) {
     return !isNull(obj);
   }
 }

@@ -75,7 +75,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
           case "or":
             return new OrExecutionNode(childNodes);
           case "not":
-            Preconditions.checkState(numArguments == 1, "Unsupported number of arguments for NOT operator");
+            Preconditions.checkState(numArguments == 1, "NOT function expects 1 argument, got: %s", numArguments);
             return new NotExecutionNode(childNodes[0]);
           default:
             FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);

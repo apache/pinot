@@ -49,17 +49,17 @@ public class ComparisonFunctions {
 
   @ScalarFunction
   public static boolean notEquals(double a, double b) {
-    return (Math.abs(a - b) >= DOUBLE_COMPARISON_TOLERANCE);
+    return Math.abs(a - b) >= DOUBLE_COMPARISON_TOLERANCE;
   }
 
   @ScalarFunction
   public static boolean equals(double a, double b) {
     // To avoid approximation errors
-    return (Math.abs(a - b) < DOUBLE_COMPARISON_TOLERANCE);
+    return Math.abs(a - b) < DOUBLE_COMPARISON_TOLERANCE;
   }
 
   @ScalarFunction
   public static boolean between(double val, double a, double b) {
-    return (val > a) && (val < b);
+    return val > a && val < b;
   }
 }
