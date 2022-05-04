@@ -48,7 +48,7 @@ public interface Tracer {
      * @return the request record
      */
     default RequestScope createRequestScope() {
-        return new DefaultRequestStatistics();
+        return new DefaultRequestContext();
     }
 
     /**
