@@ -68,8 +68,8 @@ import org.slf4j.LoggerFactory;
  *   </li>
  * </ul>
  */
-public class OfflineSegmentAssignment implements SegmentAssignment {
-  private static final Logger LOGGER = LoggerFactory.getLogger(OfflineSegmentAssignment.class);
+public class OfflineSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
+  private static final Logger LOGGER = LoggerFactory.getLogger(OfflineSegmentAssignmentStrategy.class);
 
   private HelixManager _helixManager;
   private String _offlineTableName;

@@ -43,7 +43,7 @@ import static org.testng.Assert.assertEqualsNoOrder;
 import static org.testng.Assert.assertTrue;
 
 
-public class OfflineDimTableSegmentAssignmentTest {
+public class OfflineDimTableSegmentAssignmentStrategyTest {
   private static final String INSTANCE_NAME_PREFIX = "instance_";
   private static final int NUM_INSTANCES = 10;
   private static final List<String> INSTANCES =
@@ -68,7 +68,7 @@ public class OfflineDimTableSegmentAssignmentTest {
 
   @Test
   public void testFactory() {
-    assertTrue(_segmentAssignment instanceof OfflineDimTableSegmentAssignment);
+    assertTrue(_segmentAssignment.getSegmentAssignmentStrategy() instanceof OfflineDimTableSegmentAssignmentStrategy);
   }
 
   @Test

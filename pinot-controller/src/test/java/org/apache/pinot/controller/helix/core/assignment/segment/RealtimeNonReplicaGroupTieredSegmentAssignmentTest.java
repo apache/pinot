@@ -47,7 +47,7 @@ import static org.testng.Assert.assertTrue;
 
 
 /**
- * Tests the {@link RealtimeSegmentAssignment#rebalanceTable} method for table with tiers
+ * Tests the {@link RealtimeSegmentAssignmentStrategy#rebalanceTable} method for table with tiers
  */
 public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
   private static final int NUM_REPLICAS = 3;

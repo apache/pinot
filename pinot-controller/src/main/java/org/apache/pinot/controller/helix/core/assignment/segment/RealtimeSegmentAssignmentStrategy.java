@@ -80,8 +80,8 @@ import org.slf4j.LoggerFactory;
  *   </li>
  * </ul>
  */
-public class RealtimeSegmentAssignment implements SegmentAssignment {
-  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentAssignment.class);
+public class RealtimeSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
+  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentAssignmentStrategy.class);
 
   private HelixManager _helixManager;
   private String _realtimeTableName;

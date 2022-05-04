@@ -97,7 +97,7 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
 
   @Test
   public void testFactory() {
-    assertTrue(_segmentAssignment instanceof RealtimeSegmentAssignment);
+    assertTrue(_segmentAssignment.getSegmentAssignmentStrategy() instanceof RealtimeSegmentAssignmentStrategy);
   }
 
   @Test

@@ -74,7 +74,7 @@ public class OfflineNonReplicaGroupSegmentAssignmentTest {
 
   @Test
   public void testFactory() {
-    assertTrue(_segmentAssignment instanceof OfflineSegmentAssignment);
+    assertTrue(_segmentAssignment.getSegmentAssignmentStrategy() instanceof OfflineSegmentAssignmentStrategy);
   }
 
   @Test

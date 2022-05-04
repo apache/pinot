@@ -172,8 +172,10 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
 
   @Test
   public void testFactory() {
-    assertTrue(_segmentAssignmentWithoutPartition instanceof OfflineSegmentAssignment);
-    assertTrue(_segmentAssignmentWithPartition instanceof OfflineSegmentAssignment);
+    assertTrue(_segmentAssignmentWithoutPartition.getSegmentAssignmentStrategy()
+        instanceof OfflineSegmentAssignmentStrategy);
+    assertTrue(_segmentAssignmentWithPartition.getSegmentAssignmentStrategy()
+        instanceof OfflineSegmentAssignmentStrategy);
   }
 
   @Test

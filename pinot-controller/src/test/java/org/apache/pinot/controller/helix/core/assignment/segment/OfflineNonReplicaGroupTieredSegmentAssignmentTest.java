@@ -49,7 +49,7 @@ import static org.testng.Assert.assertTrue;
 
 
 /**
- * Tests the {@link OfflineSegmentAssignment#rebalanceTable} method for table with tiers
+ * Tests the {@link OfflineSegmentAssignmentStrategy#rebalanceTable} method for table with tiers
  */
 public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
   private static final int NUM_REPLICAS = 3;

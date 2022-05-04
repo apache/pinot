@@ -24,21 +24,29 @@ import org.apache.pinot.spi.config.table.TableType;
 
 
 /**
- * Factory for the {@link SegmentAssignment}.
+ * Factory for the {@link SegmentAssignmentStrategy}.
  */
 public class SegmentAssignmentFactory {
   private SegmentAssignmentFactory() {
   }
 
-  public static SegmentAssignment getSegmentAssignment(HelixManager helixManager, TableConfig tableConfig) {
-    SegmentAssignment segmentAssignment;
+  private static SegmentAssignmentStrategy getSegmentAssignmentStrategy(HelixManager helixManager,
+      TableConfig tableConfig) {
+    SegmentAssignmentStrategy segmentAssignmentStrategy;
     if (tableConfig.getTableType() == TableType.OFFLINE) {
-      segmentAssignment =
-          tableConfig.isDimTable() ? new OfflineDimTableSegmentAssignment() : new OfflineSegmentAssignment();
+      segmentAssignmentStrategy = tableConfig.isDimTable()
+          ? new OfflineDimTableSegmentAssignmentStrategy() : new OfflineSegmentAssignmentStrategy();
     } else {
-      segmentAssignment = new RealtimeSegmentAssignment();
+      segmentAssignmentStrategy = new RealtimeSegmentAssignmentStrategy();
     }
-    segmentAssignment.init(helixManager, tableConfig);
+    segmentAssignmentStrategy.init(helixManager, tableConfig);
+    return segmentAssignmentStrategy;
+  }
+
+  public static SegmentAssignment getSegmentAssignment(HelixManager helixManager,
+      TableConfig tableConfig) {
+    SegmentAssignment segmentAssignment = new SegmentAssignment();
+    segmentAssignment.init(helixManager, tableConfig, getSegmentAssignmentStrategy(helixManager, tableConfig));
     return segmentAssignment;
   }
 }

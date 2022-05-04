@@ -51,7 +51,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
  *   </li>
  * </ul>
  */
-public class OfflineDimTableSegmentAssignment implements SegmentAssignment {
+public class OfflineDimTableSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
 
   private HelixManager _helixManager;
   private String _offlineTableName;

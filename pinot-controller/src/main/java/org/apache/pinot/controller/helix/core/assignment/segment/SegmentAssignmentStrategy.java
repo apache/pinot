@@ -27,32 +27,20 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
 
 /**
- * Class for segment assignment and table rebalance.
+ * Strategy to assign segment to instances or rebalance all segments in a table.
  */
-public class SegmentAssignment {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentAssignment.class);
-  private SegmentAssignmentStrategy _segmentAssignmentStrategy;
-  private HelixManager _helixManager;
-  private TableConfig _tableConfig;
+public interface SegmentAssignmentStrategy {
 
   /**
-   * Initializes the segment assignment.
+   * Initializes the segment assignment strategy.
    *
    * @param helixManager Helix manager
    * @param tableConfig Table config
-   * @param segmentAssignmentStrategy Segment Assignment strategy
    */
-  public void init(HelixManager helixManager, TableConfig tableConfig,
-      SegmentAssignmentStrategy segmentAssignmentStrategy) {
-    _helixManager = helixManager;
-    _tableConfig = tableConfig;
-    _segmentAssignmentStrategy = segmentAssignmentStrategy;
-  }
+  void init(HelixManager helixManager, TableConfig tableConfig);
 
   /**
    * Assigns segment to instances.
@@ -62,10 +50,8 @@ public class SegmentAssignment {
    * @param instancePartitionsMap Map from type (OFFLINE|CONSUMING|COMPLETED) to instance partitions
    * @return List of instances to assign the segment to
    */
-  public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
-      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
-    return _segmentAssignmentStrategy.assignSegment(segmentName, currentAssignment, instancePartitionsMap);
-  }
+  List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap);
 
   /**
    * Rebalances the segment assignment for a table.
@@ -77,14 +63,7 @@ public class SegmentAssignment {
    * @param config Configuration for the rebalance
    * @return Rebalanced assignment for the segments
    */
-  public Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
+  Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, @Nullable List<Tier> sortedTiers,
-      @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, Configuration config) {
-    return _segmentAssignmentStrategy.
-        rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers, tierInstancePartitionsMap, config);
-  }
-
-  public SegmentAssignmentStrategy getSegmentAssignmentStrategy() {
-    return _segmentAssignmentStrategy;
-  }
+      @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, Configuration config);
 }
