@@ -47,7 +47,7 @@ public class QueryException {
   // TODO: several ProcessingExceptions are never used, clean them up.
   public static final int JSON_PARSING_ERROR_CODE = 100;
   public static final int JSON_COMPILATION_ERROR_CODE = 101;
-  public static final int PQL_PARSING_ERROR_CODE = 150;
+  public static final int SQL_PARSING_ERROR_CODE = 150;
   public static final int SEGMENT_PLAN_EXECUTION_ERROR_CODE = 160;
   public static final int COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR_CODE = 170;
   public static final int ACCESS_DENIED_ERROR_CODE = 180;
@@ -81,7 +81,7 @@ public class QueryException {
 
   public static final ProcessingException JSON_PARSING_ERROR = new ProcessingException(JSON_PARSING_ERROR_CODE);
   public static final ProcessingException JSON_COMPILATION_ERROR = new ProcessingException(JSON_COMPILATION_ERROR_CODE);
-  public static final ProcessingException PQL_PARSING_ERROR = new ProcessingException(PQL_PARSING_ERROR_CODE);
+  public static final ProcessingException SQL_PARSING_ERROR = new ProcessingException(SQL_PARSING_ERROR_CODE);
   public static final ProcessingException ACCESS_DENIED_ERROR = new ProcessingException(ACCESS_DENIED_ERROR_CODE);
   public static final ProcessingException SEGMENT_PLAN_EXECUTION_ERROR =
       new ProcessingException(SEGMENT_PLAN_EXECUTION_ERROR_CODE);
@@ -127,7 +127,7 @@ public class QueryException {
   static {
     JSON_PARSING_ERROR.setMessage("JsonParsingError");
     JSON_COMPILATION_ERROR.setMessage("JsonCompilationError");
-    PQL_PARSING_ERROR.setMessage("PQLParsingError");
+    SQL_PARSING_ERROR.setMessage("SQLParsingError");
     SEGMENT_PLAN_EXECUTION_ERROR.setMessage("SegmentPlanExecutionError");
     COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR.setMessage("CombineSegmentPlanTimeoutError");
     TABLE_DOES_NOT_EXIST_ERROR.setMessage("TableDoesNotExistError");
@@ -206,7 +206,7 @@ public class QueryException {
       case QueryException.JSON_PARSING_ERROR_CODE:
       case QueryException.QUERY_VALIDATION_ERROR_CODE:
       case QueryException.UNKNOWN_COLUMN_ERROR_CODE:
-      case QueryException.PQL_PARSING_ERROR_CODE:
+      case QueryException.SQL_PARSING_ERROR_CODE:
       case QueryException.TOO_MANY_REQUESTS_ERROR_CODE:
       case QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE:
         return true;

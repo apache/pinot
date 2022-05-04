@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
@@ -32,6 +33,7 @@ import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,6 +87,11 @@ public class VarByteChunkSVForwardIndexWriterV4 implements VarByteChunkWriter {
     // reserve a slot to write the data offset into
     _output.writeInt(0);
     _metadataSize += 4 * Integer.BYTES;
+  }
+
+  @Override
+  public void putBigDecimal(BigDecimal bigDecimal) {
+    putBytes(BigDecimalUtils.serialize(bigDecimal));
   }
 
   @Override

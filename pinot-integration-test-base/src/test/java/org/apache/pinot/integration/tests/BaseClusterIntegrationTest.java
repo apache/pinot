@@ -278,7 +278,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     InputStream inputStream =
         BaseClusterIntegrationTest.class.getClassLoader().getResourceAsStream(getSchemaFileName());
     Assert.assertNotNull(inputStream);
-    return Schema.fromInputSteam(inputStream);
+    return Schema.fromInputStream(inputStream);
   }
 
   /**

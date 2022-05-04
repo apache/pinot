@@ -30,6 +30,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -359,24 +360,25 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testJsonMatchMultidimensionalArrayGroupByWithIndex() {
-    Operator operator = getOperator(
+    AggregationGroupByOrderByOperator groupByOperator = getOperator(
         "select json_extract_scalar(jsonColumn, '$.name.first', 'STRING'), count(*) FROM testTable WHERE json_match"
             + "(jsonColumn, '\"$.data[0][1][0]\" = ''3''') GROUP BY json_extract_scalar(jsonColumn, '$.name.first', "
             + "'STRING')");
+    AggregationGroupByResult groupByResult = groupByOperator.nextBlock().getAggregationGroupByResult();
+    Assert.assertNotNull(groupByResult);
+    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupByResult.getGroupKeyIterator();
 
-    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
-    AggregationGroupByResult result = block.getAggregationGroupByResult();
-    Iterator<GroupKeyGenerator.StringGroupKey> iterator = result.getStringGroupKeyIterator();
+    Assert.assertTrue(groupKeyIterator.hasNext());
+    GroupKeyGenerator.GroupKey groupKey1 = groupKeyIterator.next();
+    Assert.assertEquals(groupKey1._keys, new Object[]{"multi-dimensional-2"});
+    Assert.assertEquals(groupByResult.getResultForGroupId(0, groupKey1._groupId), 1L);
 
-    Assert.assertTrue(iterator.hasNext());
-    GroupKeyGenerator.StringGroupKey groupKey1 = iterator.next();
-    Assert.assertEquals(groupKey1._stringKey, "multi-dimensional-2");
-    Assert.assertEquals(((Long) result.getResultForKey(groupKey1, 0)).intValue(), 1L);
+    Assert.assertTrue(groupKeyIterator.hasNext());
+    GroupKeyGenerator.GroupKey groupKey2 = groupKeyIterator.next();
+    Assert.assertEquals(groupKey2._keys, new Object[]{"multi-dimensional-1"});
+    Assert.assertEquals(groupByResult.getResultForGroupId(0, groupKey1._groupId), 2L);
 
-    Assert.assertTrue(iterator.hasNext());
-    GroupKeyGenerator.StringGroupKey groupKey2 = iterator.next();
-    Assert.assertEquals(groupKey2._stringKey, "multi-dimensional-1");
-    Assert.assertEquals(((Long) result.getResultForKey(groupKey1, 0)).intValue(), 2L);
+    Assert.assertFalse(groupKeyIterator.hasNext());
   }
 
   @AfterClass

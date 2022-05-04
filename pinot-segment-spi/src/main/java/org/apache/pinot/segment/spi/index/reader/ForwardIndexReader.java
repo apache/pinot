@@ -133,6 +133,11 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
           values[i] = (int) getDouble(docIds[i], context);
         }
         break;
+      case BIG_DECIMAL:
+        for (int i = 0; i < length; i++) {
+          values[i] = getBigDecimal(docIds[i], context).intValue();
+        }
+        break;
       case STRING:
         for (int i = 0; i < length; i++) {
           values[i] = Integer.parseInt(getString(docIds[i], context));
@@ -170,6 +175,11 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
       case DOUBLE:
         for (int i = 0; i < length; i++) {
           values[i] = (long) getDouble(docIds[i], context);
+        }
+        break;
+      case BIG_DECIMAL:
+        for (int i = 0; i < length; i++) {
+          values[i] = getBigDecimal(docIds[i], context).longValue();
         }
         break;
       case STRING:
@@ -211,6 +221,11 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
           values[i] = (float) getDouble(docIds[i], context);
         }
         break;
+      case BIG_DECIMAL:
+        for (int i = 0; i < length; i++) {
+          values[i] = getBigDecimal(docIds[i], context).floatValue();
+        }
+        break;
       case STRING:
         for (int i = 0; i < length; i++) {
           values[i] = Float.parseFloat(getString(docIds[i], context));
@@ -248,6 +263,11 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
       case DOUBLE:
         for (int i = 0; i < length; i++) {
           values[i] = getDouble(docIds[i], context);
+        }
+        break;
+      case BIG_DECIMAL:
+        for (int i = 0; i < length; i++) {
+          values[i] = getBigDecimal(docIds[i], context).doubleValue();
         }
         break;
       case STRING:
@@ -294,6 +314,11 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
       case STRING:
         for (int i = 0; i < length; i++) {
           values[i] = new BigDecimal(getString(docIds[i], context));
+        }
+        break;
+      case BIG_DECIMAL:
+        for (int i = 0; i < length; i++) {
+          values[i] = getBigDecimal(docIds[i], context);
         }
         break;
       case BYTES:
@@ -347,6 +372,17 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * @return DOUBLE type single-value at the given document id
    */
   default double getDouble(int docId, T context) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Reads the BIG_DECIMAL type single-value at the given document id.
+   *
+   * @param docId Document id
+   * @param context Reader context
+   * @return BIG_DECIMAL type single-value at the given document id
+   */
+  default BigDecimal getBigDecimal(int docId, T context) {
     throw new UnsupportedOperationException();
   }
 

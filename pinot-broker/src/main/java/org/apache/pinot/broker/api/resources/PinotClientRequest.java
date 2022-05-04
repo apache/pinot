@@ -42,7 +42,6 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
-import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -50,6 +49,8 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
+import org.apache.pinot.spi.trace.RequestScope;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -74,82 +75,11 @@ public class PinotClientRequest {
   @Inject
   private BrokerMetrics _brokerMetrics;
 
-  /**
-   * Legacy API to query Pinot using PQL (Pinot Query Language) syntax
-   * and semantics. This API is deprecated and PQL is no longer supported
-   * by Pinot. The API will be removed in the next release. Please use
-   * the standard SQL syntax (API /query/sql) to query Pinot.
-   */
-  @Deprecated
-  @GET
-  @ManagedAsync
-  @Produces(MediaType.APPLICATION_JSON)
-  @Path("query")
-  @ApiOperation(value = "Querying pinot using PQL")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Query response"),
-      @ApiResponse(code = 500, message = "Internal Server Error")
-  })
-  public void processQueryGet(
-      // Query param "bql" is for backward compatibility
-      @ApiParam(value = "Query", required = true) @QueryParam("bql") String query,
-      @ApiParam(value = "Trace enabled") @QueryParam(Request.TRACE) String traceEnabled,
-      @ApiParam(value = "Debug options") @QueryParam(Request.DEBUG_OPTIONS) String debugOptions,
-      @Suspended AsyncResponse asyncResponse, @Context org.glassfish.grizzly.http.server.Request requestContext) {
-    try {
-      ObjectNode requestJson = JsonUtils.newObjectNode();
-      requestJson.put(Request.PQL, query);
-      if (traceEnabled != null) {
-        requestJson.put(Request.TRACE, traceEnabled);
-      }
-      if (debugOptions != null) {
-        requestJson.put(Request.DEBUG_OPTIONS, debugOptions);
-      }
-      BrokerResponse brokerResponse =
-          _requestHandler.handleRequest(requestJson, makeHttpIdentity(requestContext), new RequestStatistics());
-      asyncResponse.resume(brokerResponse.toJsonString());
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while processing GET request", e);
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1L);
-      asyncResponse.resume(new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR));
-    }
-  }
-
-  /**
-   * Legacy API to query Pinot using PQL (Pinot Query Language) syntax
-   * and semantics. This API is deprecated and PQL is no longer supported
-   * by Pinot. The API will be removed in the next release. Please use
-   * the standard SQL syntax (API /query/sql) to query Pinot.
-   */
-  @Deprecated
-  @POST
-  @ManagedAsync
-  @Produces(MediaType.APPLICATION_JSON)
-  @Path("query")
-  @ApiOperation(value = "Querying pinot using PQL")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Query response"),
-      @ApiResponse(code = 500, message = "Internal Server Error")
-  })
-  public void processQueryPost(String query, @Suspended AsyncResponse asyncResponse,
-      @Context org.glassfish.grizzly.http.server.Request requestContext) {
-    try {
-      JsonNode requestJson = JsonUtils.stringToJsonNode(query);
-      BrokerResponse brokerResponse =
-          _requestHandler.handleRequest(requestJson, makeHttpIdentity(requestContext), new RequestStatistics());
-      asyncResponse.resume(brokerResponse);
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while processing POST request", e);
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
-      throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
-    }
-  }
-
   @GET
   @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
   @Path("query/sql")
-  @ApiOperation(value = "Querying pinot using sql")
+  @ApiOperation(value = "Querying pinot")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Query response"),
       @ApiResponse(code = 500, message = "Internal Server Error")
@@ -182,7 +112,7 @@ public class PinotClientRequest {
   @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
   @Path("query/sql")
-  @ApiOperation(value = "Querying pinot using sql")
+  @ApiOperation(value = "Querying pinot")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Query response"),
       @ApiResponse(code = 500, message = "Internal Server Error")
@@ -213,27 +143,30 @@ public class PinotClientRequest {
     try {
       sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlRequestJson.get(Request.SQL).asText());
     } catch (Exception e) {
-      return new BrokerResponseNative(QueryException.getException(QueryException.PQL_PARSING_ERROR, e));
+      return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
     }
     PinotSqlType sqlType = CalciteSqlParser.extractSqlType(sqlNodeAndOptions.getSqlNode());
     if (onlyDql && sqlType != PinotSqlType.DQL) {
-      return new BrokerResponseNative(QueryException.getException(QueryException.PQL_PARSING_ERROR,
+      return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR,
           new UnsupportedOperationException("Unsupported SQL type - " + sqlType + ", GET API only supports DQL.")));
     }
     switch (sqlType) {
       case DQL:
-        return _requestHandler.handleRequest(sqlRequestJson, httpRequesterIdentity, new RequestStatistics());
+        try (RequestScope requestStatistics = Tracing.getTracer().createRequestScope()) {
+          return _requestHandler.handleRequest(sqlRequestJson, httpRequesterIdentity, requestStatistics);
+        }
       case DML:
         Map<String, String> headers = new HashMap<>();
         httpRequesterIdentity.getHttpHeaders().entries()
             .forEach(entry -> headers.put(entry.getKey(), entry.getValue()));
         return _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, headers);
       default:
-        return new BrokerResponseNative(QueryException.getException(QueryException.PQL_PARSING_ERROR,
+        return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR,
             new UnsupportedOperationException("Unsupported SQL type - " + sqlType)));
     }
   }
 
+  // TODO: Remove the SQL query options after releasing 0.11.0
   private String constructSqlQueryOptions() {
     return Request.QueryOptionKey.GROUP_BY_MODE + "=" + Request.SQL + ";" + Request.QueryOptionKey.RESPONSE_FORMAT + "="
         + Request.SQL;

@@ -44,6 +44,7 @@ import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.BadRequestException;
@@ -106,6 +107,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
+import org.apache.pinot.controller.api.resources.InstanceInfo;
 import org.apache.pinot.controller.api.resources.StateType;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -3376,6 +3378,40 @@ public class PinotHelixResourceManager {
     Preconditions.checkState(stat != null, "Failed to read ZK stats for table: %s", tableNameWithType);
     String creationTime = SIMPLE_DATE_FORMAT.format(stat.getCtime());
     return new TableStats(creationTime);
+  }
+
+  /**
+   * Returns map of tableName to list of live brokers
+   * @return Map of tableName to list of ONLINE brokers serving the table
+   */
+  public Map<String, List<InstanceInfo>> getTableToLiveBrokersMapping() {
+    ExternalView ev = _helixDataAccessor.getProperty(_keyBuilder.externalView(Helix.BROKER_RESOURCE_INSTANCE));
+    if (ev == null) {
+      throw new IllegalStateException("Failed to find external view for " + Helix.BROKER_RESOURCE_INSTANCE);
+    }
+
+    // Map of instanceId -> InstanceConfig
+    Map<String, InstanceConfig> instanceConfigMap = HelixHelper.getInstanceConfigs(_helixZkManager)
+        .stream().collect(Collectors.toMap(InstanceConfig::getInstanceName, Function.identity()));
+
+    Map<String, List<InstanceInfo>> result = new HashMap<>();
+    ZNRecord znRecord = ev.getRecord();
+    for (Map.Entry<String, Map<String, String>> tableToBrokersEntry : znRecord.getMapFields().entrySet()) {
+      String tableName = tableToBrokersEntry.getKey();
+      Map<String, String> brokersToState = tableToBrokersEntry.getValue();
+      List<InstanceInfo> hosts = new ArrayList<>();
+      for (Map.Entry<String, String> brokerEntry : brokersToState.entrySet()) {
+        if ("ONLINE".equalsIgnoreCase(brokerEntry.getValue()) && instanceConfigMap.containsKey(brokerEntry.getKey())) {
+          InstanceConfig instanceConfig = instanceConfigMap.get(brokerEntry.getKey());
+          hosts.add(new InstanceInfo(instanceConfig.getInstanceName(), instanceConfig.getHostName(),
+              Integer.parseInt(instanceConfig.getPort())));
+        }
+      }
+      if (!hosts.isEmpty()) {
+        result.put(tableName, hosts);
+      }
+    }
+    return result;
   }
 
   /**

@@ -401,12 +401,14 @@ public abstract class FST implements Iterable<ByteBuffer> {
 
   public abstract boolean isArcLast(int arc);
 
-  public void save(FileOutputStream fileOutputStream) {
+  public int save(FileOutputStream fileOutputStream) {
     try {
       final byte[] fsaData =
           new FSTSerializerImpl().withNumbers().serialize(this, new ByteArrayOutputStream()).toByteArray();
 
       fileOutputStream.write(fsaData);
+
+      return fsaData.length;
     } catch (IOException e) {
       throw new RuntimeException(e.getMessage());
     }

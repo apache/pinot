@@ -36,7 +36,6 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
  * queries: WHERE TEXT_MATCH(column_name, query_string....)
  */
 public class TextMatchFilterOperator extends BaseFilterOperator {
-
   private static final String EXPLAIN_NAME = "FILTER_TEXT_INDEX";
 
   private final TextIndexReader _textIndexReader;
@@ -75,7 +74,6 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
     record(bitmap);
     return new BitmapCollection(_numDocs, false, bitmap);
   }
-
 
   @Override
   public List<Operator> getChildOperators() {

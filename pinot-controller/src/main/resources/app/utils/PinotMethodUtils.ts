@@ -234,10 +234,9 @@ const getAsObject = (str: SQLResult) => {
 // This method is used to display query output in tabular format as well as JSON format on query page
 // API: /:urlName (Eg: sql or pql)
 // Expected Output: {columns: [], records: []}
-const getQueryResults = (params, url, checkedOptions) => {
-  return getQueryResult(params, url).then(({ data }) => {
-    let queryResponse = null;
-    queryResponse = getAsObject(data);
+const getQueryResults = (params, checkedOptions) => {
+  return getQueryResult(params).then(({ data }) => {
+    let queryResponse = getAsObject(data);
 
     let errorStr = '';
     let dataArray = [];

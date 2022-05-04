@@ -40,8 +40,6 @@ import org.apache.thrift.protocol.TCompactProtocol;
  * per segment basis.
  */
 public class ServerQueryRequest {
-  private static final CalciteSqlCompiler SQL_COMPILER = new CalciteSqlCompiler();
-
   private final long _requestId;
   private final String _brokerId;
   private final boolean _enableTrace;
@@ -61,8 +59,9 @@ public class ServerQueryRequest {
     _segmentsToQuery = instanceRequest.getSearchSegments();
     BrokerRequest brokerRequest = instanceRequest.getQuery();
     _queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
-    _explain = brokerRequest != null && brokerRequest.getPinotQuery() != null
-        ? brokerRequest.getPinotQuery().isExplain() : false;
+    _explain =
+        brokerRequest != null && brokerRequest.getPinotQuery() != null ? brokerRequest.getPinotQuery().isExplain()
+            : false;
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
   }
 
@@ -81,11 +80,11 @@ public class ServerQueryRequest {
     BrokerRequest brokerRequest;
     String payloadType = metadata.getOrDefault(Request.MetadataKeys.PAYLOAD_TYPE, Request.PayloadType.SQL);
     if (payloadType.equalsIgnoreCase(Request.PayloadType.SQL)) {
-      brokerRequest = SQL_COMPILER.compileToBrokerRequest(serverRequest.getSql());
+      brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(serverRequest.getSql());
     } else if (payloadType.equalsIgnoreCase(Request.PayloadType.BROKER_REQUEST)) {
       brokerRequest = new BrokerRequest();
-      new TDeserializer(new TCompactProtocol.Factory())
-          .deserialize(brokerRequest, serverRequest.getPayload().toByteArray());
+      new TDeserializer(new TCompactProtocol.Factory()).deserialize(brokerRequest,
+          serverRequest.getPayload().toByteArray());
     } else {
       throw new UnsupportedOperationException("Unsupported payloadType: " + payloadType);
     }

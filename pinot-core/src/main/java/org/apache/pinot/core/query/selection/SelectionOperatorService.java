@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.selection;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -27,7 +26,6 @@ import java.util.List;
 import java.util.PriorityQueue;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
@@ -160,53 +158,10 @@ public class SelectionOperatorService {
   }
 
   /**
-   * Render the selection rows to a {@link SelectionResults} object for selection queries with
-   * <code>ORDER BY</code>. (Broker side)
-   * <p>{@link SelectionResults} object will be used to build the broker response.
-   * <p>Should be called after method "reduceWithOrdering()".
-   *
-   * @return {@link SelectionResults} object results.
-   */
-  public SelectionResults renderSelectionResultsWithOrdering(boolean preserveType) {
-    LinkedList<Serializable[]> rowsInSelectionResults = new LinkedList<>();
-    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(_selectionColumns, _dataSchema);
-    int numColumns = columnIndices.length;
-    ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
-
-    if (preserveType) {
-      while (_rows.size() > _offset) {
-        Object[] row = _rows.poll();
-        assert row != null;
-        Serializable[] extractedRow = new Serializable[numColumns];
-        for (int i = 0; i < numColumns; i++) {
-          int columnIndex = columnIndices[i];
-          extractedRow[i] = columnDataTypes[columnIndex].convertAndFormat(row[columnIndex]);
-        }
-        rowsInSelectionResults.addFirst(extractedRow);
-      }
-    } else {
-      while (_rows.size() > _offset) {
-        Object[] row = _rows.poll();
-        assert row != null;
-        Serializable[] extractedRow = new Serializable[numColumns];
-        for (int i = 0; i < numColumns; i++) {
-          int columnIndex = columnIndices[i];
-          extractedRow[i] = SelectionOperatorUtils.getFormattedValue(row[columnIndex], columnDataTypes[columnIndex]);
-        }
-        rowsInSelectionResults.addFirst(extractedRow);
-      }
-    }
-
-    return new SelectionResults(_selectionColumns, rowsInSelectionResults);
-  }
-
-  /**
-   * Render the selection rows to a {@link ResultTable} object for selection queries with
-   * <code>ORDER BY</code>. (Broker side)
+   * Render the selection rows to a {@link ResultTable} object for selection queries with <code>ORDER BY</code>.
+   * (Broker side)
    * <p>{@link ResultTable} object will be used to build the broker response.
    * <p>Should be called after method "reduceWithOrdering()".
-   *
-   * @return {@link SelectionResults} object results.
    */
   public ResultTable renderResultTableWithOrdering() {
     int[] columnIndices = SelectionOperatorUtils.getColumnIndices(_selectionColumns, _dataSchema);

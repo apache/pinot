@@ -87,7 +87,7 @@ import static org.testng.Assert.assertTrue;
  * Functional tests for text search feature.
  * The tests use two kinds of input data
  * (1) Skills file
- * (2) PQL query log file
+ * (2) Query log file
  * The test table has a SKILLS column and QUERY_LOG column. Text index is created
  * on each of these columns.
  */

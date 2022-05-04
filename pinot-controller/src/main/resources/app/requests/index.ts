@@ -96,8 +96,8 @@ export const getQueryTables = (type?: string): Promise<AxiosResponse<QueryTables
 export const getTableSchema = (name: string): Promise<AxiosResponse<TableSchema>> =>
   baseApi.get(`/tables/${name}/schema`);
 
-export const getQueryResult = (params: Object, url: string): Promise<AxiosResponse<SQLResult>> =>
-  transformApi.post(`/${url}`, params, {headers});
+export const getQueryResult = (params: Object): Promise<AxiosResponse<SQLResult>> =>
+  transformApi.post(`/sql`, params, {headers});
 
 export const getClusterInfo = (): Promise<AxiosResponse<ClusterName>> =>
   baseApi.get('/cluster/info');

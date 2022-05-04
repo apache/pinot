@@ -30,7 +30,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentName;
@@ -151,9 +150,7 @@ public class RealtimeSegmentSelector implements SegmentSelector {
     }
 
     // Handle HLC and LLC coexisting scenario, select HLC segments only if it is forced in the routing options
-    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
-    Map<String, String> debugOptions =
-        pinotQuery != null ? pinotQuery.getDebugOptions() : brokerRequest.getDebugOptions();
+    Map<String, String> debugOptions = brokerRequest.getPinotQuery().getDebugOptions();
     if (debugOptions != null) {
       String routingOptions = debugOptions.get(ROUTING_OPTIONS_KEY);
       if (routingOptions != null && routingOptions.toUpperCase().contains(FORCE_HLC)) {

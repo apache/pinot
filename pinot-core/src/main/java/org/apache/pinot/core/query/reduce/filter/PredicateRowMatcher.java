@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.reduce.filter;
 
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -51,6 +52,8 @@ public class PredicateRowMatcher implements RowMatcher {
         return _predicateEvaluator.applySV((float) value);
       case DOUBLE:
         return _predicateEvaluator.applySV((double) value);
+      case BIG_DECIMAL:
+        return _predicateEvaluator.applySV((BigDecimal) value);
       case BOOLEAN:
         return _predicateEvaluator.applySV((boolean) value ? 1 : 0);
       case TIMESTAMP:

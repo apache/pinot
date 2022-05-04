@@ -70,7 +70,7 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
     }
 
     // Build intermediate result block based on aggregation result from the executor
-    return new IntermediateResultsBlock(_aggregationFunctions, aggregationExecutor.getResult(), false);
+    return new IntermediateResultsBlock(_aggregationFunctions, aggregationExecutor.getResult());
   }
 
   @Override

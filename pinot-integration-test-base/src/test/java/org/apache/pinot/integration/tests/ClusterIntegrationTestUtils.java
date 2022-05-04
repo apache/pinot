@@ -559,7 +559,7 @@ public class ClusterIntegrationTestUtils {
     ResultSet h2ResultSet = h2statement.getResultSet();
 
     // compare results
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(pinotQuery);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
     if (!QueryContextUtils.isAggregationQuery(queryContext)) {
       // selection/distinct
 

@@ -1502,7 +1502,9 @@
             <phase>site</phase>
             <configuration>
               <!-- Specific configuration for the aggregate report -->
-              <excludePackageNames>org.apache.pinot.pql.parsers:org.apache.pinot.common.response</excludePackageNames>
+              <excludePackageNames>
+                org.apache.pinot.common.request:org.apache.pinot.common.response
+              </excludePackageNames>
               <skip>false</skip>
             </configuration>
           </execution>
@@ -1643,7 +1645,6 @@
             <ftl>FTL_STYLE</ftl>
             <MockMaker>SCRIPT_STYLE</MockMaker>
             <appAssemblerScriptTemplate>SCRIPT_STYLE</appAssemblerScriptTemplate>
-            <pql>SCRIPT_STYLE</pql>
             <sql>SCRIPT_STYLE</sql>
             <conf>DOUBLESLASH_STYLE</conf>
             <cfg>DOUBLESLASH_STYLE</cfg>
@@ -1853,7 +1854,9 @@
             <id>non-aggregate</id>
             <configuration>
               <!-- Specific configuration for the non aggregate report -->
-              <excludePackageNames>org.apache.pinot.pql.parsers:org.apache.pinot.common.response</excludePackageNames>
+              <excludePackageNames>
+                org.apache.pinot.common.request:org.apache.pinot.common.response
+              </excludePackageNames>
               <skip>true</skip>
             </configuration>
             <reports>
@@ -1863,7 +1866,9 @@
           <reportSet>
             <id>aggregate</id>
             <configuration>
-              <excludePackageNames>org.apache.pinot.pql.parsers:org.apache.pinot.common.response</excludePackageNames>
+              <excludePackageNames>
+                org.apache.pinot.common.request:org.apache.pinot.common.response
+              </excludePackageNames>
               <skip>true</skip>
             </configuration>
             <reports>

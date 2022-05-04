@@ -44,6 +44,14 @@ public interface Tracer {
     InvocationScope createScope(Class<?> clazz);
 
     /**
+     * Starts
+     * @return the request record
+     */
+    default RequestScope createRequestScope() {
+        return new DefaultRequestContext();
+    }
+
+    /**
      * @return the active recording
      */
     InvocationRecording activeRecording();

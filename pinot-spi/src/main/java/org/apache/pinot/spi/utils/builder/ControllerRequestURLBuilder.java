@@ -142,6 +142,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "brokers", "tables", "?state=" + state);
   }
 
+  public String forLiveBrokerTablesGet() {
+    return StringUtil.join("/", _baseUrl, "tables", "livebrokers");
+  }
+
   public String forBrokerTableGet(String table, String tableType, String state) {
     StringBuilder params = new StringBuilder();
     if (tableType != null) {
@@ -236,6 +240,10 @@ public class ControllerRequestURLBuilder {
 
   public String forTableExternalView(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "externalview");
+  }
+
+  public String forSchemaValidate() {
+    return StringUtil.join("/", _baseUrl, "schemas", "validate");
   }
 
   public String forSchemaCreate() {

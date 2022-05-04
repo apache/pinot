@@ -29,7 +29,7 @@ public class PowerTransformFunctionTest extends BaseTransformFunctionTest {
   @Test
   public void testPowerTransformFunction() {
     ExpressionContext expression =
-        RequestContextUtils.getExpressionFromSQL(String.format("power(%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN));
+        RequestContextUtils.getExpression(String.format("power(%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof PowerTransformFunction);
     Assert.assertEquals(transformFunction.getName(), PowerTransformFunction.FUNCTION_NAME);
@@ -40,7 +40,7 @@ public class PowerTransformFunctionTest extends BaseTransformFunctionTest {
     testTransformFunction(transformFunction, expectedValues);
 
     expression =
-        RequestContextUtils.getExpressionFromSQL(String.format("power(%s,%s)", LONG_SV_COLUMN, FLOAT_SV_COLUMN));
+        RequestContextUtils.getExpression(String.format("power(%s,%s)", LONG_SV_COLUMN, FLOAT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof PowerTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -49,7 +49,7 @@ public class PowerTransformFunctionTest extends BaseTransformFunctionTest {
     testTransformFunction(transformFunction, expectedValues);
 
     expression =
-        RequestContextUtils.getExpressionFromSQL(String.format("power(%s,%s)", FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN));
+        RequestContextUtils.getExpression(String.format("power(%s,%s)", FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof PowerTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -58,7 +58,7 @@ public class PowerTransformFunctionTest extends BaseTransformFunctionTest {
     testTransformFunction(transformFunction, expectedValues);
 
     expression =
-        RequestContextUtils.getExpressionFromSQL(String.format("power(%s,%s)", DOUBLE_SV_COLUMN, STRING_SV_COLUMN));
+        RequestContextUtils.getExpression(String.format("power(%s,%s)", DOUBLE_SV_COLUMN, STRING_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof PowerTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -67,7 +67,7 @@ public class PowerTransformFunctionTest extends BaseTransformFunctionTest {
     testTransformFunction(transformFunction, expectedValues);
 
     expression =
-        RequestContextUtils.getExpressionFromSQL(String.format("power(%s,%s)", STRING_SV_COLUMN, INT_SV_COLUMN));
+        RequestContextUtils.getExpression(String.format("power(%s,%s)", STRING_SV_COLUMN, INT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof PowerTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -80,7 +80,7 @@ public class PowerTransformFunctionTest extends BaseTransformFunctionTest {
   public void testPowerTransformFunctionWithLiteralExponents() {
     Double exponent = 2.5;
     ExpressionContext expression =
-        RequestContextUtils.getExpressionFromSQL(String.format("power(%s, %f)", INT_SV_COLUMN, exponent));
+        RequestContextUtils.getExpression(String.format("power(%s, %f)", INT_SV_COLUMN, exponent));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof PowerTransformFunction);
     Assert.assertEquals(transformFunction.getName(), PowerTransformFunction.FUNCTION_NAME);

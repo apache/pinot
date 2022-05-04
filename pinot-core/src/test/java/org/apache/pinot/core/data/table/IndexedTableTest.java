@@ -49,7 +49,7 @@ public class IndexedTableTest {
   @Test
   public void testConcurrentIndexedTable()
       throws InterruptedException, TimeoutException, ExecutionException {
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT SUM(m1), MAX(m2) FROM testTable GROUP BY d1, d2, d3 ORDER BY SUM(m1)");
     DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"}, new ColumnDataType[]{
         ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
@@ -118,7 +118,7 @@ public class IndexedTableTest {
 
   @Test(dataProvider = "initDataProvider")
   public void testNonConcurrentIndexedTable(String orderBy, List<String> survivors) {
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT SUM(m1), MAX(m2) FROM testTable GROUP BY d1, d2, d3, d4 ORDER BY " + orderBy);
     DataSchema dataSchema =
         new DataSchema(new String[]{"d1", "d2", "d3", "d4", "sum(m1)", "max(m2)"}, new ColumnDataType[]{
@@ -245,7 +245,7 @@ public class IndexedTableTest {
   @Test
   public void testNoMoreNewRecords() {
     QueryContext queryContext =
-        QueryContextConverterUtils.getQueryContextFromSQL("SELECT SUM(m1), MAX(m2) FROM testTable GROUP BY d1, d2, d3");
+        QueryContextConverterUtils.getQueryContext("SELECT SUM(m1), MAX(m2) FROM testTable GROUP BY d1, d2, d3");
     DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"}, new ColumnDataType[]{
         ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
     });

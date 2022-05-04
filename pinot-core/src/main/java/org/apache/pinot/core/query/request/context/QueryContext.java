@@ -582,9 +582,6 @@ public class QueryContext {
           Preconditions.checkState(aggregation != null && aggregation.getType() == FunctionContext.Type.AGGREGATION,
               "First argument of FILTER must be an aggregation function");
           ExpressionContext filterExpression = arguments.get(1);
-          Preconditions.checkState(filterExpression.getFunction() != null
-                  && filterExpression.getFunction().getType() == FunctionContext.Type.TRANSFORM,
-              "Second argument of FILTER must be a filter expression");
           FilterContext filter = RequestContextUtils.getFilter(filterExpression);
           filteredAggregations.add(Pair.of(aggregation, filter));
         } else {

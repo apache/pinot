@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.creator.impl.fwd;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriterV4;
@@ -32,8 +33,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
- * Forward index creator for raw (non-dictionary-encoded) single-value column of variable length data type (STRING,
- * BYTES).
+ * Forward index creator for raw (non-dictionary-encoded) single-value column of variable length data type (BIG_DECIMAL,
+ * STRING, BYTES).
  */
 public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
   private static final int DEFAULT_NUM_DOCS_PER_CHUNK = 1000;
@@ -102,6 +103,11 @@ public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
   @Override
   public DataType getValueType() {
     return _valueType;
+  }
+
+  @Override
+  public void putBigDecimal(BigDecimal value) {
+    _indexWriter.putBigDecimal(value);
   }
 
   @Override

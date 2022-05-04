@@ -18,69 +18,33 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.core.requesthandler.PinotQueryParserFactory;
-import org.apache.pinot.parsers.QueryCompiler;
-import org.testng.Assert;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 public class QueryLimitOverrideTest {
 
   @Test
-  public void testPql() {
-    QueryCompiler pqlCompiler = PinotQueryParserFactory.get("PQL");
-    testFixedQuerySetWithCompiler(pqlCompiler);
-  }
-
-  @Test
-  public void testCalciteSql() {
-    QueryCompiler sqlCompiler = PinotQueryParserFactory.get("SQL");
-    testFixedQuerySetWithCompiler(sqlCompiler);
-  }
-
-  private void testFixedQuerySetWithCompiler(QueryCompiler compiler) {
+  public void testLimitOverride() {
     // Selections
-    testSelectionQueryWithCompiler(compiler, "select * from vegetables LIMIT 999", 1000, 999);
-    testSelectionQueryWithCompiler(compiler, "select * from vegetables LIMIT 1000", 1000, 1000);
-    testSelectionQueryWithCompiler(compiler, "select * from vegetables LIMIT 1001", 1000, 1000);
-    testSelectionQueryWithCompiler(compiler, "select * from vegetables LIMIT 10000", 1000, 1000);
+    testLimitOverride("select * from vegetables LIMIT 999", 1000, 999);
+    testLimitOverride("select * from vegetables LIMIT 1000", 1000, 1000);
+    testLimitOverride("select * from vegetables LIMIT 1001", 1000, 1000);
+    testLimitOverride("select * from vegetables LIMIT 10000", 1000, 1000);
 
-    // GroupBys
-    testGroupByQueryWithCompiler(compiler, "select count(*) from vegetables group by a LIMIT 999", 1000, 999);
-    testGroupByQueryWithCompiler(compiler, "select count(*) from vegetables group by a LIMIT 1000", 1000, 1000);
-    testGroupByQueryWithCompiler(compiler, "select count(*) from vegetables group by a LIMIT 1001", 1000, 1000);
-    testGroupByQueryWithCompiler(compiler, "select count(*) from vegetables group by a LIMIT 10000", 1000, 1000);
+    // Group-bys
+    testLimitOverride("select count(*) from vegetables group by a LIMIT 999", 1000, 999);
+    testLimitOverride("select count(*) from vegetables group by a LIMIT 1000", 1000, 1000);
+    testLimitOverride("select count(*) from vegetables group by a LIMIT 1001", 1000, 1000);
+    testLimitOverride("select count(*) from vegetables group by a LIMIT 10000", 1000, 1000);
   }
 
-  private void testSelectionQueryWithCompiler(QueryCompiler compiler, String query, int maxQuerySelectionLimit,
-      int expectedLimit) {
-    BrokerRequest brokerRequest = compiler.compileToBrokerRequest(query);
-    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
-    if (pinotQuery != null) {
-      // SQL
-      BaseBrokerRequestHandler.handleQueryLimitOverride(pinotQuery, maxQuerySelectionLimit);
-      Assert.assertEquals(pinotQuery.getLimit(), expectedLimit);
-    } else {
-      // PQL
-      BaseBrokerRequestHandler.handleQueryLimitOverride(brokerRequest, maxQuerySelectionLimit);
-      Assert.assertEquals(brokerRequest.getLimit(), expectedLimit);
-    }
-  }
-
-  private void testGroupByQueryWithCompiler(QueryCompiler compiler, String query, int maxQuerySelectionLimit,
-      int expectedLimit) {
-    BrokerRequest brokerRequest = compiler.compileToBrokerRequest(query);
-    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
-    if (pinotQuery != null) {
-      // SQL
-      BaseBrokerRequestHandler.handleQueryLimitOverride(pinotQuery, maxQuerySelectionLimit);
-      Assert.assertEquals(pinotQuery.getLimit(), expectedLimit);
-    } else {
-      // PQL
-      BaseBrokerRequestHandler.handleQueryLimitOverride(brokerRequest, maxQuerySelectionLimit);
-      Assert.assertEquals(brokerRequest.getGroupBy().getTopN(), expectedLimit);
-    }
+  private void testLimitOverride(String query, int maxQuerySelectionLimit, int expectedLimit) {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    BaseBrokerRequestHandler.handleQueryLimitOverride(pinotQuery, maxQuerySelectionLimit);
+    assertEquals(pinotQuery.getLimit(), expectedLimit);
   }
 }

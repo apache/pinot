@@ -25,6 +25,7 @@ import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -69,6 +70,8 @@ public class SegmentSelectorTest {
     RealtimeSegmentSelector segmentSelector = new RealtimeSegmentSelector();
     segmentSelector.init(idealState, externalView, onlineSegments);
     BrokerRequest brokerRequest = mock(BrokerRequest.class);
+    PinotQuery pinotQuery = mock(PinotQuery.class);
+    when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
     assertTrue(segmentSelector.select(brokerRequest).isEmpty());
 
     // For HLC segments, only one group of segments should be selected
@@ -116,7 +119,7 @@ public class SegmentSelectorTest {
     assertEqualsNoOrder(segmentSelector.select(brokerRequest).toArray(), expectedSelectedLLCSegments);
 
     // When HLC is forced, should select the HLC segments from the second group
-    when(brokerRequest.getDebugOptions()).thenReturn(Collections.singletonMap(ROUTING_OPTIONS_KEY, FORCE_HLC));
+    when(pinotQuery.getDebugOptions()).thenReturn(Collections.singletonMap(ROUTING_OPTIONS_KEY, FORCE_HLC));
     assertEqualsNoOrder(segmentSelector.select(brokerRequest).toArray(), hlcSegments[1]);
 
     // Remove all the HLC segments from ideal state, should select the LLC segments even when HLC is forced

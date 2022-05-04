@@ -36,7 +36,6 @@ import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunct
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
-import org.apache.pinot.core.util.QueryOptionsUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -137,43 +136,23 @@ public class DataTableUtils {
     if (groupByExpressions != null) {
       // Aggregation group-by query
 
-      if (QueryOptionsUtils.isGroupByModeSQL(queryContext.getQueryOptions())) {
-        // SQL format
-
-        int numColumns = groupByExpressions.size() + numAggregations;
-        String[] columnNames = new String[numColumns];
-        ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
-        int index = 0;
-        for (ExpressionContext groupByExpression : groupByExpressions) {
-          columnNames[index] = groupByExpression.toString();
-          // Use STRING column data type as default for group-by expressions
-          columnDataTypes[index] = ColumnDataType.STRING;
-          index++;
-        }
-        for (AggregationFunction aggregationFunction : aggregationFunctions) {
-          // NOTE: Use AggregationFunction.getResultColumnName() for SQL format response
-          columnNames[index] = aggregationFunction.getResultColumnName();
-          columnDataTypes[index] = aggregationFunction.getIntermediateResultColumnType();
-          index++;
-        }
-        return new DataTableBuilder(new DataSchema(columnNames, columnDataTypes)).build();
-      } else {
-        // PQL format
-
-        String[] columnNames = new String[]{"functionName", "GroupByResultMap"};
-        ColumnDataType[] columnDataTypes = new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.OBJECT};
-
-        // Build the data table
-        DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnDataTypes));
-        for (AggregationFunction aggregationFunction : aggregationFunctions) {
-          dataTableBuilder.startRow();
-          // NOTE: For backward-compatibility, use AggregationFunction.getColumnName() for PQL format response
-          dataTableBuilder.setColumn(0, aggregationFunction.getColumnName());
-          dataTableBuilder.setColumn(1, Collections.emptyMap());
-          dataTableBuilder.finishRow();
-        }
-        return dataTableBuilder.build();
+      int numColumns = groupByExpressions.size() + numAggregations;
+      String[] columnNames = new String[numColumns];
+      ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
+      int index = 0;
+      for (ExpressionContext groupByExpression : groupByExpressions) {
+        columnNames[index] = groupByExpression.toString();
+        // Use STRING column data type as default for group-by expressions
+        columnDataTypes[index] = ColumnDataType.STRING;
+        index++;
       }
+      for (AggregationFunction aggregationFunction : aggregationFunctions) {
+        // NOTE: Use AggregationFunction.getResultColumnName() for SQL format response
+        columnNames[index] = aggregationFunction.getResultColumnName();
+        columnDataTypes[index] = aggregationFunction.getIntermediateResultColumnType();
+        index++;
+      }
+      return new DataTableBuilder(new DataSchema(columnNames, columnDataTypes)).build();
     } else {
       // Aggregation only query
 

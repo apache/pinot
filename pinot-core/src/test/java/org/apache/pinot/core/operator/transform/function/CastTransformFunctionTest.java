@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.testng.Assert;
@@ -32,7 +33,7 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
   @Test
   public void testCastTransformFunction() {
     ExpressionContext expression =
-        RequestContextUtils.getExpressionFromSQL(String.format("CAST(%s AS string)", INT_SV_COLUMN));
+        RequestContextUtils.getExpression(String.format("CAST(%s AS string)", INT_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CastTransformFunction);
     assertEquals(transformFunction.getName(), CastTransformFunction.FUNCTION_NAME);
@@ -45,8 +46,7 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     testTransformFunction(transformFunction, expectedValues);
     assertEquals(expectedValues, scalarStringValues);
 
-    expression =
-        RequestContextUtils.getExpressionFromSQL(String.format("CAST(CAST(%s as INT) as FLOAT)", FLOAT_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("CAST(CAST(%s as INT) as FLOAT)", FLOAT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CastTransformFunction);
     float[] expectedFloatValues = new float[NUM_ROWS];
@@ -58,19 +58,19 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     testTransformFunction(transformFunction, expectedFloatValues);
     assertEquals(expectedFloatValues, scalarFloatValues);
 
-    expression = RequestContextUtils.getExpressionFromSQL(
+    expression = RequestContextUtils.getExpression(
         String.format("CAST(ADD(CAST(%s AS LONG), %s) AS STRING)", DOUBLE_SV_COLUMN, LONG_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CastTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedValues[i] = Double.toString((double) (long) _doubleSVValues[i] + (double) _longSVValues[i]);
-      scalarStringValues[i] = (String) cast(
-          (double) (long) cast(_doubleSVValues[i], "long") + (double) _longSVValues[i], "string");
+      scalarStringValues[i] =
+          (String) cast((double) (long) cast(_doubleSVValues[i], "long") + (double) _longSVValues[i], "string");
     }
     testTransformFunction(transformFunction, expectedValues);
     assertEquals(expectedValues, scalarStringValues);
 
-    expression = RequestContextUtils.getExpressionFromSQL(
+    expression = RequestContextUtils.getExpression(
         String.format("caSt(cAst(casT(%s as inT) + %s aS sTring) As DouBle)", FLOAT_SV_COLUMN, INT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CastTransformFunction);
@@ -85,8 +85,8 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     testTransformFunction(transformFunction, expectedDoubleValues);
     assertEquals(expectedDoubleValues, scalarDoubleValues);
 
-    expression = RequestContextUtils.getExpressionFromSQL(String
-        .format("CAST(CAST(%s AS INT) - CAST(%s AS FLOAT) / CAST(%s AS DOUBLE) AS LONG)", DOUBLE_SV_COLUMN,
+    expression = RequestContextUtils.getExpression(
+        String.format("CAST(CAST(%s AS INT) - CAST(%s AS FLOAT) / CAST(%s AS DOUBLE) AS LONG)", DOUBLE_SV_COLUMN,
             LONG_SV_COLUMN, INT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CastTransformFunction);
@@ -100,5 +100,34 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedLongValues);
     assertEquals(expectedLongValues, longScalarValues);
+
+    expression = RequestContextUtils.getExpression(String.format("CAST(%s AS BIG_DECIMAL)", LONG_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof CastTransformFunction);
+    BigDecimal[] expectedBigDecimalValues = new BigDecimal[NUM_ROWS];
+    BigDecimal[] bigDecimalScalarValues = new BigDecimal[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedBigDecimalValues[i] = BigDecimal.valueOf(_longSVValues[i]);
+      bigDecimalScalarValues[i] = (BigDecimal) cast(_longSVValues[i], "BIG_DECIMAL");
+    }
+    testTransformFunction(transformFunction, expectedBigDecimalValues);
+    assertEquals(expectedBigDecimalValues, bigDecimalScalarValues);
+
+    expression = RequestContextUtils.getExpression(
+        String.format("CAST(CAST(%s AS DOUBLE) - CAST(%s AS DOUBLE) / CAST(%s AS DOUBLE) AS BIG_DECIMAL)",
+            BIG_DECIMAL_SV_COLUMN, LONG_SV_COLUMN, INT_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof CastTransformFunction);
+    expectedBigDecimalValues = new BigDecimal[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedBigDecimalValues[i] = BigDecimal.valueOf(
+          _bigDecimalSVValues[i].doubleValue() - (double) _longSVValues[i] / (double) _intSVValues[i]);
+      double d =
+          (double) cast(_bigDecimalSVValues[i], "double") - (double) cast(_longSVValues[i], "double") / (double) cast(
+              _intSVValues[i], "double");
+      bigDecimalScalarValues[i] = (BigDecimal) cast(d, "BIG_DECIMAL");
+    }
+    testTransformFunction(transformFunction, expectedBigDecimalValues);
+    assertEquals(expectedBigDecimalValues, bigDecimalScalarValues);
   }
 }

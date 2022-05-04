@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.index.creator;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -29,7 +28,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -161,20 +159,6 @@ public class SegmentPartitionTest {
         JsonUtils.stringToObject(jsonStringWithNewField, SegmentPartitionConfig.class).toJsonString());
   }
 
-  private String buildQuery(String tableName, String columnName, int predicateValue) {
-    return "select count(*) from " + tableName + " where " + columnName + " = " + predicateValue;
-  }
-
-  private String buildAndQuery(String tableName, String partitionColumn, int partitionedColumnValue,
-      String nonPartitionColumn, int nonPartitionedColumnValue, FilterOperator operator) {
-    return "select count(*) from " + tableName + " where " + partitionColumn + " = " + partitionedColumnValue + " "
-        + operator + " " + nonPartitionColumn + " = " + nonPartitionedColumnValue;
-  }
-
-  private List buildPartitionList(int partition) {
-    return Collections.singletonList(partition);
-  }
-
   /**
    * Helper method to build a segment for testing:
    * <ul>
@@ -194,8 +178,8 @@ public class SegmentPartitionTest {
     Random random = new Random();
     Map<String, ColumnPartitionConfig> partitionFunctionMap = new HashMap<>();
 
-    partitionFunctionMap
-        .put(PARTITIONED_COLUMN_NAME, new ColumnPartitionConfig(PARTITION_FUNCTION_NAME, NUM_PARTITIONS));
+    partitionFunctionMap.put(PARTITIONED_COLUMN_NAME,
+        new ColumnPartitionConfig(PARTITION_FUNCTION_NAME, NUM_PARTITIONS));
 
     SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(partitionFunctionMap);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);

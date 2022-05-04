@@ -50,9 +50,8 @@ import static org.testng.Assert.assertNotEquals;
 
 
 public class QueryOverrideWithHintsTest {
-  private static CalciteSqlCompiler _sqlCompiler = new CalciteSqlCompiler();
 
-  private IndexSegment _indexSegment = new IndexSegment() {
+  private final IndexSegment _indexSegment = new IndexSegment() {
     @Override
     public String getSegmentName() {
       return null;
@@ -199,9 +198,8 @@ public class QueryOverrideWithHintsTest {
 
   @Test
   public void testRewriteExpressionsWithHints() {
-    BrokerRequest brokerRequest =
-        _sqlCompiler.compileToBrokerRequest(
-            "SELECT datetrunc('MONTH', ts), count(*), sum(abc) from myTable group by datetrunc('MONTH', ts) ");
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(
+        "SELECT datetrunc('MONTH', ts), count(*), sum(abc) from myTable group by datetrunc('MONTH', ts) ");
     Expression dateTruncFunctionExpr = RequestUtils.getFunctionExpression("datetrunc");
     dateTruncFunctionExpr.getFunctionCall().setOperands(new ArrayList<>(
         ImmutableList.of(RequestUtils.getLiteralExpression("MONTH"), RequestUtils.getIdentifierExpression("ts"))));
@@ -216,9 +214,8 @@ public class QueryOverrideWithHintsTest {
 
   @Test
   public void testNotRewriteExpressionsWithHints() {
-    BrokerRequest brokerRequest =
-        _sqlCompiler.compileToBrokerRequest(
-            "SELECT datetrunc('DAY', ts), count(*), sum(abc) from myTable group by datetrunc('DAY', ts)");
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(
+        "SELECT datetrunc('DAY', ts), count(*), sum(abc) from myTable group by datetrunc('DAY', ts)");
     Expression dateTruncFunctionExpr = RequestUtils.getFunctionExpression("datetrunc");
     dateTruncFunctionExpr.getFunctionCall().setOperands(new ArrayList<>(
         ImmutableList.of(RequestUtils.getLiteralExpression("DAY"), RequestUtils.getIdentifierExpression("ts"))));

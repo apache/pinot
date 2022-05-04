@@ -19,16 +19,26 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
  * A group of commonly used math transformation which has only one single parameter,
- * including abs, exp, ceil, floor, sqrt.
+ * including abs, ceil, exp, floor, ln, sqrt.
+ * Note:
+ * abs(x) -> output data type is either double or BigDecimal.
+ * ceil(x) -> output data type is either double or BigDecimal.
+ * exp(x) -> output data type is always double.
+ * floor(x) -> output data type is either double or BigDecimal.
+ * ln(x) -> output data type is always double.
+ * sqrt(x) -> output data type is always double.
  */
 public abstract class SingleParamMathTransformFunction extends BaseTransformFunction {
   private TransformFunction _transformFunction;
@@ -48,6 +58,9 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
 
   @Override
   public TransformResultMetadata getResultMetadata() {
+    if (_transformFunction.getResultMetadata().getDataType() == DataType.BIG_DECIMAL) {
+      return BIG_DECIMAL_SV_NO_DICTIONARY_METADATA;
+    }
     return DOUBLE_SV_NO_DICTIONARY_METADATA;
   }
 
@@ -64,7 +77,23 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     return _doubleValuesSV;
   }
 
+  @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+    if (_bigDecimalValuesSV == null || _bigDecimalValuesSV.length < length) {
+      _bigDecimalValuesSV = new BigDecimal[length];
+    }
+
+    BigDecimal[] values = _transformFunction.transformToBigDecimalValuesSV(projectionBlock);
+    applyMathOperator(values, projectionBlock.getNumDocs());
+    return _bigDecimalValuesSV;
+  }
+
   abstract protected void applyMathOperator(double[] values, int length);
+
+  protected void applyMathOperator(BigDecimal[] values, int length) {
+    throw new UnsupportedOperationException("Math operator does not support BIG_DECIMAL data type");
+  }
 
   public static class AbsTransformFunction extends SingleParamMathTransformFunction {
     public static final String FUNCTION_NAME = "abs";
@@ -78,6 +107,13 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
         _doubleValuesSV[i] = Math.abs(values[i]);
+      }
+    }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        _bigDecimalValuesSV[i] = values[i].abs();
       }
     }
   }
@@ -94,6 +130,13 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
         _doubleValuesSV[i] = Math.ceil(values[i]);
+      }
+    }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        _bigDecimalValuesSV[i] = values[i].setScale(0, RoundingMode.CEILING);
       }
     }
   }
@@ -126,6 +169,13 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
         _doubleValuesSV[i] = Math.floor(values[i]);
+      }
+    }
+
+    @Override
+    protected void applyMathOperator(BigDecimal[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        _bigDecimalValuesSV[i] = values[i].setScale(0, RoundingMode.FLOOR);
       }
     }
   }

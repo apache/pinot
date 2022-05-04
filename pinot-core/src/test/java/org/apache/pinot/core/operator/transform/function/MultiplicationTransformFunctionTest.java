@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -30,8 +31,8 @@ public class MultiplicationTransformFunctionTest extends BaseTransformFunctionTe
 
   @Test
   public void testMultiplicationTransformFunction() {
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(String
-        .format("mult(%s,%s,%s,%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN, FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN,
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("mult(%s,%s,%s,%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN, FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN,
             STRING_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof MultiplicationTransformFunction);
@@ -44,8 +45,35 @@ public class MultiplicationTransformFunctionTest extends BaseTransformFunctionTe
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils.getExpressionFromSQL(String
-        .format("mult(mult(12,%s),%s,mult(mult(%s,%s),0.34,%s),%s)", STRING_SV_COLUMN, DOUBLE_SV_COLUMN,
+    expression = RequestContextUtils.getExpression(
+        String.format("mult(%s,%s,%s)", INT_SV_COLUMN, FLOAT_SV_COLUMN, BIG_DECIMAL_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof MultiplicationTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), MultiplicationTransformFunction.FUNCTION_NAME);
+    BigDecimal[] expectedBigDecimalValues = new BigDecimal[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedBigDecimalValues[i] = BigDecimal.valueOf(_intSVValues[i]).multiply(BigDecimal.valueOf(_floatSVValues[i]))
+          .multiply(_bigDecimalSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedBigDecimalValues);
+
+    expression = RequestContextUtils.getExpression(
+        String.format("mult(mult(%s,%s,%s),%s,%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN, FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN,
+            STRING_SV_COLUMN, BIG_DECIMAL_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof MultiplicationTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), MultiplicationTransformFunction.FUNCTION_NAME);
+    expectedBigDecimalValues = new BigDecimal[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedBigDecimalValues[i] =
+          BigDecimal.valueOf((double) _intSVValues[i] * (double) _longSVValues[i] * (double) _floatSVValues[i])
+              .multiply(BigDecimal.valueOf(_doubleSVValues[i])).multiply(new BigDecimal(_stringSVValues[i]))
+              .multiply(_bigDecimalSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedBigDecimalValues);
+
+    expression = RequestContextUtils.getExpression(
+        String.format("mult(mult(12,%s),%s,mult(mult(%s,%s),0.34,%s),%s)", STRING_SV_COLUMN, DOUBLE_SV_COLUMN,
             FLOAT_SV_COLUMN, LONG_SV_COLUMN, INT_SV_COLUMN, DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof MultiplicationTransformFunction);
@@ -58,7 +86,7 @@ public class MultiplicationTransformFunctionTest extends BaseTransformFunctionTe
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 
