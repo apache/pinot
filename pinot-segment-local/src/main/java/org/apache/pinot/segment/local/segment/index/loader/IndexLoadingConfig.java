@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index.loader;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -42,6 +43,7 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -70,7 +72,6 @@ public class IndexLoadingConfig {
   private Set<String> _varLengthDictionaryColumns = new HashSet<>();
   private Set<String> _onHeapDictionaryColumns = new HashSet<>();
   private Map<String, BloomFilterConfig> _bloomFilterConfigs = new HashMap<>();
-  private Map<String, List<TimestampIndexGranularity>> _timestampIndexConfigs = new HashMap<>();
   private boolean _enableDynamicStarTreeCreation;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private boolean _enableDefaultStarTree;
@@ -155,21 +156,30 @@ public class IndexLoadingConfig {
     extractTextIndexColumnsFromTableConfig(tableConfig);
     extractFSTIndexColumnsFromTableConfig(tableConfig);
     extractH3IndexConfigsFromTableConfig(tableConfig);
-    _timestampIndexConfigs.putAll(SegmentGeneratorConfig.extractTimestampIndexConfigsFromTableConfig(tableConfig));
 
-    // Apply range index and transform functions for all Timestamp column with granularities columns.
-    for (String timestampColumn : _timestampIndexConfigs.keySet()) {
-      for (TimestampIndexGranularity granularity : _timestampIndexConfigs.get(timestampColumn)) {
-        // Apply range index
-        _rangeIndexColumns.add(TimestampIndexGranularity.getColumnNameWithGranularity(timestampColumn, granularity));
-
-        // Apply transform functions
-        TransformConfig transformConfig =
-            new TransformConfig(TimestampIndexGranularity.getColumnNameWithGranularity(timestampColumn, granularity),
-                TimestampIndexGranularity.getTransformExpression(timestampColumn, granularity));
-        List<TransformConfig> transformConfigs = tableConfig.getIngestionConfig().getTransformConfigs();
-        if (!transformConfigs.contains(transformConfig)) {
+    Map<String, List<TimestampIndexGranularity>> timestampIndexConfigs =
+        SegmentGeneratorConfig.extractTimestampIndexConfigsFromTableConfig(tableConfig);
+    if (!timestampIndexConfigs.isEmpty()) {
+      // Apply transform function and range index to the timestamp with granularity columns
+      IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+      if (ingestionConfig == null) {
+        ingestionConfig = new IngestionConfig();
+        tableConfig.setIngestionConfig(ingestionConfig);
+      }
+      List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
+      if (transformConfigs == null) {
+        transformConfigs = new ArrayList<>();
+        ingestionConfig.setTransformConfigs(transformConfigs);
+      }
+      for (Map.Entry<String, List<TimestampIndexGranularity>> entry : timestampIndexConfigs.entrySet()) {
+        String column = entry.getKey();
+        for (TimestampIndexGranularity granularity : entry.getValue()) {
+          String columnNameWithGranularity =
+              TimestampIndexGranularity.getColumnNameWithGranularity(column, granularity);
+          TransformConfig transformConfig = new TransformConfig(columnNameWithGranularity,
+              TimestampIndexGranularity.getTransformExpression(column, granularity));
           transformConfigs.add(transformConfig);
+          _rangeIndexColumns.add(columnNameWithGranularity);
         }
       }
     }
@@ -345,10 +355,6 @@ public class IndexLoadingConfig {
     return _h3IndexConfigs;
   }
 
-  public Map<String, List<TimestampIndexGranularity>> getTimestampIndexConfigs() {
-    return _timestampIndexConfigs;
-  }
-
   public Map<String, Map<String, String>> getColumnProperties() {
     return _columnProperties;
   }
@@ -407,11 +413,6 @@ public class IndexLoadingConfig {
   @VisibleForTesting
   public void setBloomFilterConfigs(Map<String, BloomFilterConfig> bloomFilterConfigs) {
     _bloomFilterConfigs = bloomFilterConfigs;
-  }
-
-  @VisibleForTesting
-  public void setTimestampIndexColumns(Map<String, List<TimestampIndexGranularity>> timestampIndexConfigs) {
-    _timestampIndexConfigs = timestampIndexConfigs;
   }
 
   @VisibleForTesting

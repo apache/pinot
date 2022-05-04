@@ -104,6 +104,6 @@ public enum TimestampIndexGranularity {
    * @return Time conversion expression
    */
   public static String getTransformExpression(String timeColumn, TimestampIndexGranularity granularity) {
-    return "dateTrunc(\'" + granularity + "\', " + timeColumn + ")";
+    return "dateTrunc('" + granularity + "', " + timeColumn + ")";
   }
 }
