@@ -28,16 +28,17 @@ public enum FilterKind {
   GREATER_THAN_OR_EQUAL,
   LESS_THAN,
   LESS_THAN_OR_EQUAL,
-  LIKE,
   BETWEEN,
   RANGE,
   IN,
   NOT_IN,
+  LIKE,
   REGEXP_LIKE,
-  IS_NULL,
-  IS_NOT_NULL,
+  TEXT_CONTAINS,
   TEXT_MATCH,
-  JSON_MATCH;
+  JSON_MATCH,
+  IS_NULL,
+  IS_NOT_NULL;
 
   /**
    * Helper method that returns true if the enum maps to a Range.

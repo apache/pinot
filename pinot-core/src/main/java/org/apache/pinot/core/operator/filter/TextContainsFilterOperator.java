@@ -20,7 +20,7 @@ package org.apache.pinot.core.operator.filter;
 
 import java.util.Collections;
 import java.util.List;
-import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
+import org.apache.pinot.common.request.context.predicate.TextContainsPredicate;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
@@ -32,17 +32,16 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /**
- * Filter operator for supporting the execution of text search
- * queries: WHERE TEXT_MATCH(column_name, query_string....)
+ * Operator for TEXT_CONTAINS query.
  */
-public class TextMatchFilterOperator extends BaseFilterOperator {
+public class TextContainsFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_TEXT_INDEX";
 
   private final TextIndexReader _textIndexReader;
   private final int _numDocs;
-  private final TextMatchPredicate _predicate;
+  private final TextContainsPredicate _predicate;
 
-  public TextMatchFilterOperator(TextIndexReader textIndexReader, TextMatchPredicate predicate, int numDocs) {
+  public TextContainsFilterOperator(TextIndexReader textIndexReader, TextContainsPredicate predicate, int numDocs) {
     _textIndexReader = textIndexReader;
     _predicate = predicate;
     _numDocs = numDocs;
@@ -93,7 +92,7 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
     if (recording.isEnabled()) {
       recording.setNumDocsMatchingAfterFilter(matches.getCardinality());
       recording.setColumnName(_predicate.getLhs().getIdentifier());
-      recording.setFilter(FilterType.INDEX, "LUCENE_TEXT");
+      recording.setFilter(FilterType.INDEX, "NATIVE_TEXT");
     }
   }
 }

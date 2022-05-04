@@ -19,23 +19,49 @@
 package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
+import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.V1Constants.Indexes;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.config.table.FSTType;
+import org.apache.pinot.spi.config.table.FieldConfig;
 
 
-class TextIndexUtils {
+public class TextIndexUtils {
   private TextIndexUtils() {
   }
 
   static void cleanupTextIndex(File segDir, String column) {
     // Remove the lucene index file and potentially the docId mapping file.
-    File idxFile = new File(segDir, column + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION);
-    FileUtils.deleteQuietly(idxFile);
-    File mapFile = new File(segDir, column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
-    FileUtils.deleteQuietly(mapFile);
+    File luceneIndexFile = new File(segDir, column + Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION);
+    FileUtils.deleteQuietly(luceneIndexFile);
+    File luceneMappingFile = new File(segDir, column + Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+    FileUtils.deleteQuietly(luceneMappingFile);
+
+    // Remove the native index file
+    File nativeIndexFile = new File(segDir, column + Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION);
+    FileUtils.deleteQuietly(nativeIndexFile);
   }
 
   static boolean hasTextIndex(File segDir, String column) {
-    return new File(segDir, column + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION).exists();
+    return new File(segDir, column + Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION).exists() || new File(segDir,
+        column + Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION).exists();
+  }
+
+  public static boolean isFstTypeNative(@Nullable Map<String, String> textIndexProperties) {
+    if (textIndexProperties == null) {
+      return false;
+    }
+    for (Map.Entry<String, String> entry : textIndexProperties.entrySet()) {
+      if (entry.getKey().equalsIgnoreCase(FieldConfig.TEXT_FST_TYPE)) {
+        return entry.getValue().equalsIgnoreCase(FieldConfig.TEXT_NATIVE_FST_LITERAL);
+      }
+    }
+    return false;
+  }
+
+  public static FSTType getFSTTypeOfIndex(File indexDir, String column) {
+    return SegmentDirectoryPaths.findTextIndexIndexFile(indexDir, column) != null ? FSTType.LUCENE : FSTType.NATIVE;
   }
 }

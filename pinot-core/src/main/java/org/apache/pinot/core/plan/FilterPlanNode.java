@@ -31,6 +31,7 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
+import org.apache.pinot.common.request.context.predicate.TextContainsPredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
@@ -42,16 +43,19 @@ import org.apache.pinot.core.operator.filter.H3InclusionIndexFilterOperator;
 import org.apache.pinot.core.operator.filter.H3IndexFilterOperator;
 import org.apache.pinot.core.operator.filter.JsonMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
+import org.apache.pinot.core.operator.filter.TextContainsFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -240,8 +244,19 @@ public class FilterPlanNode implements PlanNode {
             return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs);
           }
           switch (predicate.getType()) {
+            case TEXT_CONTAINS:
+              TextIndexReader textIndexReader = dataSource.getTextIndex();
+              if (!(textIndexReader instanceof NativeTextIndexReader)) {
+                throw new UnsupportedOperationException("TEXT_CONTAINS is supported only on native text index");
+              }
+              return new TextContainsFilterOperator(textIndexReader, (TextContainsPredicate) predicate, numDocs);
             case TEXT_MATCH:
-              return new TextMatchFilterOperator(dataSource.getTextIndex(), (TextMatchPredicate) predicate, numDocs);
+              textIndexReader = dataSource.getTextIndex();
+              // We could check for real time and segment Lucene reader, but easier to check the other way round
+              if (textIndexReader instanceof NativeTextIndexReader) {
+                throw new UnsupportedOperationException("TEXT_MATCH is not supported on native text index");
+              }
+              return new TextMatchFilterOperator(textIndexReader, (TextMatchPredicate) predicate, numDocs);
             case REGEXP_LIKE:
               // FST Index is available only for rolled out segments. So, we use different evaluator for rolled out and
               // consuming segments.

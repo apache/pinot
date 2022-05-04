@@ -27,6 +27,7 @@ import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -35,6 +36,7 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
+import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -52,6 +54,7 @@ import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -216,7 +219,20 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
 
       if (textIndexColumns.contains(columnName)) {
-        _textIndexCreatorMap.put(columnName, _indexCreatorProvider.newTextIndexCreator(context.forTextIndex(true)));
+        FSTType fstType = FSTType.LUCENE;
+        List<FieldConfig> fieldConfigList = _config.getTableConfig().getFieldConfigList();
+        if (fieldConfigList != null) {
+          for (FieldConfig fieldConfig : fieldConfigList) {
+            if (fieldConfig.getName().equals(columnName)) {
+              Map<String, String> properties = fieldConfig.getProperties();
+              if (TextIndexUtils.isFstTypeNative(properties)) {
+                fstType = FSTType.NATIVE;
+              }
+            }
+          }
+        }
+        _textIndexCreatorMap.put(columnName,
+            _indexCreatorProvider.newTextIndexCreator(context.forTextIndex(fstType, true)));
       }
 
       if (fstIndexColumns.contains(columnName)) {

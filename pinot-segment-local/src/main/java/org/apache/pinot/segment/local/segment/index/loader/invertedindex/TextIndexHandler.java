@@ -56,6 +56,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,9 +86,11 @@ public class TextIndexHandler implements IndexHandler {
 
   private final SegmentMetadata _segmentMetadata;
   private final Set<String> _columnsToAddIdx;
+  private final FSTType _fstType;
 
   public TextIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
     _segmentMetadata = segmentMetadata;
+    _fstType = indexLoadingConfig.getFSTIndexType();
     _columnsToAddIdx = new HashSet<>(indexLoadingConfig.getTextIndexColumns());
   }
 
@@ -174,7 +177,7 @@ public class TextIndexHandler implements IndexHandler {
     try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         TextIndexCreator textIndexCreator = indexCreatorProvider.newTextIndexCreator(IndexCreationContext.builder()
-            .withColumnMetadata(columnMetadata).withIndexDir(segmentDirectory).build().forTextIndex(true))) {
+            .withColumnMetadata(columnMetadata).withIndexDir(segmentDirectory).build().forTextIndex(_fstType, true))) {
       if (columnMetadata.isSingleValue()) {
         processSVField(segmentWriter, hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
             columnMetadata);
