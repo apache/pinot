@@ -418,7 +418,7 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forUpsertTableHeapEstimation(long cardinality, int primaryKeySize, int numPartitions) {
-    return StringUtil.join("/", _baseUrl, "estimateHeapUsage",
+    return StringUtil.join("/", _baseUrl, "upsert/estimateHeapUsage",
         "?cardinality=" + cardinality + "&primaryKeySize=" + primaryKeySize + "&numPartitions=" + numPartitions);
   }
 

@@ -33,7 +33,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-public class PinotUpsertCapacityEstimationRestletResourceTest {
+public class PinotUpsertRestletResourceTest {
   @BeforeClass
   public void setUp()
       throws Exception {
