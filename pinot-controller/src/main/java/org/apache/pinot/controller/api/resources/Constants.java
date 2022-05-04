@@ -46,6 +46,7 @@ public class Constants {
   public static final String ZOOKEEPER = "Zookeeper";
   public static final String APP_CONFIGS = "AppConfigs";
   public static final String PERIODIC_TASK_TAG = "PeriodicTask";
+  public static final String UPSERT_RESOURCE_TAG = "Upsert";
 
   public static TableType validateTableType(String tableTypeStr) {
     if (tableTypeStr == null || tableTypeStr.isEmpty()) {

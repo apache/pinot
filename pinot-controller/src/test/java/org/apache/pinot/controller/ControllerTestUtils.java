@@ -471,6 +471,12 @@ public abstract class ControllerTestUtils {
     return schema;
   }
 
+  public static Schema createDummySchemaForUpsertTable(String tableName) {
+    Schema schema = createDummySchema(tableName);
+    schema.setPrimaryKeyColumns(Collections.singletonList("dimA"));
+    return schema;
+  }
+
   public static void addDummySchema(String tableName)
       throws IOException {
     addSchema(createDummySchema(tableName));

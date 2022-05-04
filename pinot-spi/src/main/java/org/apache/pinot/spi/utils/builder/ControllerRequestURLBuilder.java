@@ -425,6 +425,11 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "zk/getChildren", "?path=" + path);
   }
 
+  public String forUpsertTableHeapEstimation(long cardinality, int primaryKeySize, int numPartitions) {
+    return StringUtil.join("/", _baseUrl, "upsert/estimateHeapUsage",
+        "?cardinality=" + cardinality + "&primaryKeySize=" + primaryKeySize + "&numPartitions=" + numPartitions);
+  }
+
   private static String encode(String s) {
     try {
       return URLEncoder.encode(s, "UTF-8");
