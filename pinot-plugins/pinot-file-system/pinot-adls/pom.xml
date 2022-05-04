@@ -66,6 +66,10 @@
           <groupId>io.netty</groupId>
           <artifactId>netty-transport-native-kqueue</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.dataformat</groupId>
+          <artifactId>jackson-dataformat-xml</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
   </dependencies>
