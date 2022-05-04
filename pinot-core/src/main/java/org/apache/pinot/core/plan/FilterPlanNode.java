@@ -49,6 +49,7 @@ import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEv
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeNativeTextIndex;
 import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -228,7 +229,7 @@ public class FilterPlanNode implements PlanNode {
         ExpressionContext lhs = predicate.getLhs();
         if (lhs.getType() == ExpressionContext.Type.FUNCTION) {
           if (canApplyH3IndexForDistanceCheck(predicate, lhs.getFunction())) {
-              return new H3IndexFilterOperator(_indexSegment, predicate, numDocs);
+            return new H3IndexFilterOperator(_indexSegment, predicate, numDocs);
           } else if (canApplyH3IndexForInclusionCheck(predicate, lhs.getFunction())) {
             return new H3InclusionIndexFilterOperator(_indexSegment, predicate, numDocs);
           } else {
@@ -246,7 +247,8 @@ public class FilterPlanNode implements PlanNode {
           switch (predicate.getType()) {
             case TEXT_CONTAINS:
               TextIndexReader textIndexReader = dataSource.getTextIndex();
-              if (!(textIndexReader instanceof NativeTextIndexReader)) {
+              if (!(textIndexReader instanceof NativeTextIndexReader)
+                  && !(textIndexReader instanceof RealtimeNativeTextIndex)) {
                 throw new UnsupportedOperationException("TEXT_CONTAINS is supported only on native text index");
               }
               return new TextContainsFilterOperator(textIndexReader, (TextContainsPredicate) predicate, numDocs);

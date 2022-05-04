@@ -43,6 +43,7 @@ import org.apache.pinot.segment.local.realtime.impl.dictionary.BaseOffHeapMutabl
 import org.apache.pinot.segment.local.realtime.impl.geospatial.MutableH3Index;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeNativeTextIndex;
 import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVector;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
@@ -300,20 +301,20 @@ public class MutableSegmentImpl implements MutableSegment {
         }
 
         if (useNativeTextIndex) {
-          // TODO: Add native text index support
-          _logger.warn("Mutable native text index is not supported, falling back to the Lucene text index");
-        }
+          textIndex = new RealtimeNativeTextIndex(column);
+        } else {
 
-        // TODO - this logic is in the wrong place and belongs in a Lucene-specific submodule,
-        //  it is beyond the scope of realtime index pluggability to do this refactoring, so realtime
-        //  text indexes remain statically defined. Revisit this after this refactoring has been done.
-        RealtimeLuceneTextIndex luceneTextIndex =
-            new RealtimeLuceneTextIndex(column, new File(config.getConsumerDir()), _segmentName);
-        if (_realtimeLuceneReaders == null) {
-          _realtimeLuceneReaders = new RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders(_segmentName);
+          // TODO - this logic is in the wrong place and belongs in a Lucene-specific submodule,
+          //  it is beyond the scope of realtime index pluggability to do this refactoring, so realtime
+          //  text indexes remain statically defined. Revisit this after this refactoring has been done.
+          RealtimeLuceneTextIndex luceneTextIndex =
+              new RealtimeLuceneTextIndex(column, new File(config.getConsumerDir()), _segmentName);
+          if (_realtimeLuceneReaders == null) {
+            _realtimeLuceneReaders = new RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders(_segmentName);
+          }
+          _realtimeLuceneReaders.addReader(luceneTextIndex);
+          textIndex = luceneTextIndex;
         }
-        _realtimeLuceneReaders.addReader(luceneTextIndex);
-        textIndex = luceneTextIndex;
       } else {
         textIndex = null;
       }
