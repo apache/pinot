@@ -41,7 +41,7 @@ import org.apache.pinot.segment.local.customobject.ValueLongPair;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class FirstFloatValueWithTimeAggregationFunction extends FirstWithTimeAggregationFunction<Float> {
 
-  private final static ValueLongPair<Float> DEFAULT_VALUE_TIME_PAIR = new FloatLongPair(Float.NaN, Long.MIN_VALUE);
+  private final static ValueLongPair<Float> DEFAULT_VALUE_TIME_PAIR = new FloatLongPair(Float.NaN, Long.MAX_VALUE);
 
   public FirstFloatValueWithTimeAggregationFunction(
       ExpressionContext dataCol,

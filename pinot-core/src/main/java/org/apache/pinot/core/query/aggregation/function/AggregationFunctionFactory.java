@@ -182,7 +182,7 @@ public class AggregationFunctionFactory {
                 case DOUBLE:
                   return new FirstDoubleValueWithTimeAggregationFunction(firstArgument, timeCol);
                 case STRING:
-                  return new LastStringValueWithTimeAggregationFunction(firstArgument, timeCol);
+                  return new FirstStringValueWithTimeAggregationFunction(firstArgument, timeCol);
                 default:
                   throw new IllegalArgumentException("Unsupported Value Type for firstWithTime Function:" + dataType);
               }

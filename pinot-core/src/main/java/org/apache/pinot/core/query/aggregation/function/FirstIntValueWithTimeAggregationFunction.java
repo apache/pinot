@@ -43,7 +43,7 @@ import org.apache.pinot.segment.local.customobject.ValueLongPair;
 public class FirstIntValueWithTimeAggregationFunction extends FirstWithTimeAggregationFunction<Integer> {
 
   private final static ValueLongPair<Integer> DEFAULT_VALUE_TIME_PAIR
-      = new IntLongPair(Integer.MIN_VALUE, Long.MIN_VALUE);
+      = new IntLongPair(Integer.MIN_VALUE, Long.MAX_VALUE);
   private final boolean _isBoolean;
 
   public FirstIntValueWithTimeAggregationFunction(

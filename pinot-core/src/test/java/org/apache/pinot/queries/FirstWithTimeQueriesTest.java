@@ -23,23 +23,27 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.GroupByResult;
-import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
+import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
-import org.apache.pinot.segment.local.customobject.ValueLongPair;
+import org.apache.pinot.segment.local.customobject.DoubleLongPair;
+import org.apache.pinot.segment.local.customobject.FloatLongPair;
+import org.apache.pinot.segment.local.customobject.IntLongPair;
+import org.apache.pinot.segment.local.customobject.LongLongPair;
+import org.apache.pinot.segment.local.customobject.StringLongPair;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -53,7 +57,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -66,7 +69,6 @@ import static org.testng.Assert.assertTrue;
 /**
  * Queries test for FIRSTWITHTIME queries.
  */
-@SuppressWarnings("rawtypes")
 public class FirstWithTimeQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "FirstQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";
@@ -79,19 +81,15 @@ public class FirstWithTimeQueriesTest extends BaseQueriesTest {
   private static final String BOOL_COLUMN = "boolColumn";
   private static final String BOOL_NO_DICT_COLUMN = "boolNoDictColumn";
   private static final String INT_COLUMN = "intColumn";
-  private static final String INT_MV_COLUMN = "intMvColumn";
+  private static final String INT_MV_COLUMN = "intMVColumn";
   private static final String INT_NO_DICT_COLUMN = "intNoDictColumn";
   private static final String LONG_COLUMN = "longColumn";
-  private static final String LONG_MV_COLUMN = "longMvColumn";
   private static final String LONG_NO_DICT_COLUMN = "longNoDictColumn";
   private static final String FLOAT_COLUMN = "floatColumn";
-  private static final String FLOAT_MV_COLUMN = "floatMvColumn";
   private static final String FLOAT_NO_DICT_COLUMN = "floatNoDictColumn";
   private static final String DOUBLE_COLUMN = "doubleColumn";
-  private static final String DOUBLE_MV_COLUMN = "doubleMvColumn";
   private static final String DOUBLE_NO_DICT_COLUMN = "doubleNoDictColumn";
   private static final String STRING_COLUMN = "stringColumn";
-  private static final String STRING_MV_COLUMN = "stringMvColumn";
   private static final String STRING_NO_DICT_COLUMN = "stringNoDictColumn";
   private static final String TIME_COLUMN = "timestampColumn";
   private static final Schema SCHEMA = new Schema.SchemaBuilder()
@@ -101,23 +99,18 @@ public class FirstWithTimeQueriesTest extends BaseQueriesTest {
       .addMultiValueDimension(INT_MV_COLUMN, DataType.INT)
       .addSingleValueDimension(INT_NO_DICT_COLUMN, DataType.INT)
       .addSingleValueDimension(LONG_COLUMN, DataType.LONG)
-      .addMultiValueDimension(LONG_MV_COLUMN, DataType.LONG)
       .addSingleValueDimension(LONG_NO_DICT_COLUMN, DataType.LONG)
       .addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
-      .addMultiValueDimension(FLOAT_MV_COLUMN, DataType.FLOAT)
       .addSingleValueDimension(FLOAT_NO_DICT_COLUMN, DataType.FLOAT)
       .addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE)
-      .addMultiValueDimension(DOUBLE_MV_COLUMN, DataType.DOUBLE)
       .addSingleValueDimension(DOUBLE_NO_DICT_COLUMN, DataType.DOUBLE)
       .addSingleValueDimension(STRING_COLUMN, DataType.STRING)
-      .addMultiValueDimension(STRING_MV_COLUMN, DataType.STRING)
       .addSingleValueDimension(STRING_NO_DICT_COLUMN, DataType.STRING)
       .addSingleValueDimension(TIME_COLUMN, DataType.LONG).build();
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
       .setNoDictionaryColumns(
           Lists.newArrayList(INT_NO_DICT_COLUMN, LONG_NO_DICT_COLUMN, FLOAT_NO_DICT_COLUMN, DOUBLE_NO_DICT_COLUMN))
       .build();
-  private static final double DELTA = 0.00001;
 
   private Boolean _expectedResultFirstBoolean;
   private Integer _expectedResultFirstInt;
@@ -136,8 +129,7 @@ public class FirstWithTimeQueriesTest extends BaseQueriesTest {
 
   @Override
   protected String getFilter() {
-    // NOTE: Use a match all filter to switch between DictionaryBasedAggregationOperator and AggregationOperator
-    return " WHERE intColumn >= 0";
+    return "";
   }
 
   @Override
@@ -156,7 +148,6 @@ public class FirstWithTimeQueriesTest extends BaseQueriesTest {
     FileUtils.deleteDirectory(INDEX_DIR);
 
     List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
-    int hashMapCapacity = HashUtil.getHashMapCapacity(MAX_VALUE);
     _boolGroupValues = new HashMap<>();
     _intGroupValues = new HashMap<>();
     _longGroupValues = new HashMap<>();
@@ -177,16 +168,12 @@ public class FirstWithTimeQueriesTest extends BaseQueriesTest {
       record.putValue(INT_MV_COLUMN, new Integer[]{intValue, intValue});
       record.putValue(INT_NO_DICT_COLUMN, intValue);
       record.putValue(LONG_COLUMN, longValue);
-      record.putValue(LONG_MV_COLUMN, new Long[]{longValue, longValue});
       record.putValue(LONG_NO_DICT_COLUMN, longValue);
       record.putValue(FLOAT_COLUMN, floatValue);
-      record.putValue(FLOAT_MV_COLUMN, new Float[]{floatValue, floatValue});
       record.putValue(FLOAT_NO_DICT_COLUMN, floatValue);
       record.putValue(DOUBLE_COLUMN, doubleValue);
-      record.putValue(DOUBLE_MV_COLUMN, new Double[]{doubleValue, doubleValue});
       record.putValue(DOUBLE_NO_DICT_COLUMN, doubleValue);
       record.putValue(STRING_COLUMN, strValue);
-      record.putValue(STRING_MV_COLUMN, new String[]{strValue, strValue});
       record.putValue(STRING_NO_DICT_COLUMN, strValue);
       record.putValue(TIME_COLUMN, (long) i);
       if (i == 0) {
@@ -197,12 +184,12 @@ public class FirstWithTimeQueriesTest extends BaseQueriesTest {
         _expectedResultFirstDouble = doubleValue;
         _expectedResultFirstString = strValue;
       }
-      _boolGroupValues.put(intValue, boolValue);
-      _intGroupValues.put(intValue, intValue);
-      _longGroupValues.put(intValue, longValue);
-      _floatGroupValues.put(intValue, floatValue);
-      _doubleGroupValues.put(intValue, doubleValue);
-      _stringGroupValues.put(intValue, strValue);
+      _boolGroupValues.putIfAbsent(intValue, boolValue);
+      _intGroupValues.putIfAbsent(intValue, intValue);
+      _longGroupValues.putIfAbsent(intValue, longValue);
+      _floatGroupValues.putIfAbsent(intValue, floatValue);
+      _doubleGroupValues.putIfAbsent(intValue, doubleValue);
+      _stringGroupValues.putIfAbsent(intValue, strValue);
       records.add(record);
     }
 
@@ -222,248 +209,170 @@ public class FirstWithTimeQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testAggregationOnly() {
-    String query = "SELECT FIRSTWITHTIME(boolColumn,timestampColumn, BOOLEAN),"
-        + " FIRSTWITHTIME(intColumn,timestampColumn, Int),"
-        + " FIRSTWITHTIME(longColumn,timestampColumn, Long),"
-        + " FIRSTWITHTIME(floatColumn,timestampColumn, Float),"
-        + " FIRSTWITHTIME(doubleColumn,timestampColumn, Double),"
-        + " FIRSTWITHTIME(stringColumn,timestampColumn, String) FROM testTable";
+    String query = "SELECT "
+        + "FIRSTWITHTIME(boolColumn, timestampColumn, 'BOOLEAN'), "
+        + "FIRSTWITHTIME(intColumn, timestampColumn, 'INT'), "
+        + "FIRSTWITHTIME(longColumn, timestampColumn, 'LONG'), "
+        + "FIRSTWITHTIME(floatColumn, timestampColumn, 'FLOAT'), "
+        + "FIRSTWITHTIME(doubleColumn, timestampColumn, 'DOUBLE'), "
+        + "FIRSTWITHTIME(stringColumn, timestampColumn, 'STRING') "
+        + "FROM testTable";
 
     // Inner segment
-    Operator operator = getOperatorForPqlQuery(query);
-    assertTrue(operator instanceof AggregationOperator);
-    IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, 7 * NUM_RECORDS,
-            NUM_RECORDS);
-    List<Object> aggregationResultsWithoutFilter = resultsBlock.getAggregationResult();
+    AggregationOperator aggregationOperator = getOperator(query);
+    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, 0,
+        7 * NUM_RECORDS, NUM_RECORDS);
+    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(((IntLongPair) aggregationResult.get(0)).getValue() != 0, _expectedResultFirstBoolean.booleanValue());
+    assertEquals(((IntLongPair) aggregationResult.get(1)).getValue(), _expectedResultFirstInt);
+    assertEquals(((LongLongPair) aggregationResult.get(2)).getValue(), _expectedResultFirstLong);
+    assertEquals(((FloatLongPair) aggregationResult.get(3)).getValue(), _expectedResultFirstFloat);
+    assertEquals(((DoubleLongPair) aggregationResult.get(4)).getValue(), _expectedResultFirstDouble);
+    assertEquals(((StringLongPair) aggregationResult.get(5)).getValue(), _expectedResultFirstString);
 
-    operator = getOperatorForPqlQueryWithFilter(query);
-    assertTrue(operator instanceof AggregationOperator);
-    IntermediateResultsBlock resultsBlockWithFilter = ((AggregationOperator) operator).nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, 7 * NUM_RECORDS,
-            NUM_RECORDS);
-    List<Object> aggregationResultWithFilter = resultsBlockWithFilter.getAggregationResult();
-
-    assertNotNull(aggregationResultsWithoutFilter);
-    assertNotNull(aggregationResultWithFilter);
-    assertEquals(aggregationResultsWithoutFilter.size(), aggregationResultWithFilter.size());
-    for (int i = 0; i < aggregationResultsWithoutFilter.size(); i++) {
-      assertTrue(((ValueLongPair<Integer>) aggregationResultsWithoutFilter.get(i)).compareTo(
-          (ValueLongPair<Integer>) aggregationResultWithFilter.get(i)) == 0);
-    }
-    assertEquals((((ValueLongPair<Integer>) aggregationResultsWithoutFilter.get(0))).getValue() != 0,
-        _expectedResultFirstBoolean.booleanValue());
-    assertEquals(((ValueLongPair<Integer>) aggregationResultsWithoutFilter.get(1)).getValue(), _expectedResultFirstInt);
-    assertEquals(((ValueLongPair<Long>) aggregationResultsWithoutFilter.get(2)).getValue(), _expectedResultFirstLong);
-    assertEquals(((ValueLongPair<Float>) aggregationResultsWithoutFilter.get(3)).getValue(), _expectedResultFirstFloat);
-    assertEquals(((ValueLongPair<Double>) aggregationResultsWithoutFilter.get(4)).getValue(),
-        _expectedResultFirstDouble);
-    assertEquals(((ValueLongPair<String>) aggregationResultsWithoutFilter.get(5)).getValue(),
-        _expectedResultFirstString);
-
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-
-    Assert.assertEquals(brokerResponse.getNumDocsScanned(), 4 * NUM_RECORDS);
-    Assert.assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
-    Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 4 * 7 * NUM_RECORDS);
-    Assert.assertEquals(brokerResponse.getTotalDocs(), 4 * NUM_RECORDS);
-    List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
-    Assert.assertEquals(aggregationResults.size(), 6);
-    Assert.assertEquals(Boolean.parseBoolean(aggregationResults.get(0).getValue().toString()),
-        _expectedResultFirstBoolean.booleanValue());
-    Assert.assertEquals(Integer.parseInt(aggregationResults.get(1).getValue().toString()),
-        _expectedResultFirstInt.intValue());
-    Assert.assertEquals(Long.parseLong(aggregationResults.get(2).getValue().toString()),
-        _expectedResultFirstLong.longValue());
-    Assert.assertEquals(Float.parseFloat(aggregationResults.get(3).getValue().toString()),
-        _expectedResultFirstFloat.floatValue(), DELTA);
-    Assert.assertEquals(Double.parseDouble(aggregationResults.get(4).getValue().toString()),
-        _expectedResultFirstDouble.doubleValue(), DELTA);
-    Assert.assertEquals(aggregationResults.get(5).getValue().toString(),
-        _expectedResultFirstString);
-
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    Assert.assertEquals(brokerResponse.getNumDocsScanned(), 4 * NUM_RECORDS);
-    Assert.assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
-    Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 4 * 7 * NUM_RECORDS);
-    Assert.assertEquals(brokerResponse.getTotalDocs(), 4 * NUM_RECORDS);
-    aggregationResults = brokerResponse.getAggregationResults();
-    Assert.assertEquals(aggregationResults.size(), 6);
-    Assert.assertEquals(Boolean.parseBoolean(aggregationResults.get(0).getValue().toString()),
-        _expectedResultFirstBoolean.booleanValue());
-    Assert.assertEquals(Integer.parseInt(aggregationResults.get(1).getValue().toString()),
-        _expectedResultFirstInt.intValue());
-    Assert.assertEquals(Long.parseLong(aggregationResults.get(2).getValue().toString()),
-        _expectedResultFirstLong.longValue());
-    Assert.assertEquals(Float.parseFloat(aggregationResults.get(3).getValue().toString()),
-        _expectedResultFirstFloat.floatValue(), DELTA);
-    Assert.assertEquals(Double.parseDouble(aggregationResults.get(4).getValue().toString()),
-        _expectedResultFirstDouble.doubleValue(), DELTA);
-    Assert.assertEquals(aggregationResults.get(5).getValue().toString(),
-        _expectedResultFirstString);
+    // Inter segments (expect 4 * inner segment result)
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    DataSchema expectedDataSchema = new DataSchema(new String[]{
+        "firstwithtime(boolColumn,timestampColumn,'BOOLEAN')",
+        "firstwithtime(intColumn,timestampColumn,'INT')",
+        "firstwithtime(longColumn,timestampColumn,'LONG')",
+        "firstwithtime(floatColumn,timestampColumn,'FLOAT')",
+        "firstwithtime(doubleColumn,timestampColumn,'DOUBLE')",
+        "firstwithtime(stringColumn,timestampColumn,'STRING')"
+    }, new ColumnDataType[]{
+        ColumnDataType.BOOLEAN,
+        ColumnDataType.INT,
+        ColumnDataType.LONG,
+        ColumnDataType.FLOAT,
+        ColumnDataType.DOUBLE,
+        ColumnDataType.STRING
+    });
+    Object[] expectedResults = new Object[]{
+        _expectedResultFirstBoolean,
+        _expectedResultFirstInt,
+        _expectedResultFirstLong,
+        _expectedResultFirstFloat,
+        _expectedResultFirstDouble,
+        _expectedResultFirstString
+    };
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 4 * NUM_RECORDS, 0L, 4 * 7 * NUM_RECORDS,
+        4 * NUM_RECORDS, new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults)));
   }
 
   @Test
   public void testAggregationOnlyNoDictionary() {
-    String query =
-        "SELECT FIRSTWITHTIME(boolNoDictColumn,timestampColumn,boolean),"
-            + " FIRSTWITHTIME(intNoDictColumn,timestampColumn,int),"
-            + " FIRSTWITHTIME(longNoDictColumn,timestampColumn,long),"
-            + " FIRSTWITHTIME(floatNoDictColumn,timestampColumn,float),"
-            + " FIRSTWITHTIME(doubleNoDictColumn,timestampColumn,double),"
-            + " FIRSTWITHTIME(stringNoDictColumn,timestampColumn,string) FROM testTable";
+    String query = "SELECT "
+        + "FIRSTWITHTIME(boolNoDictColumn,timestampColumn,'boolean'), "
+        + "FIRSTWITHTIME(intNoDictColumn,timestampColumn,'int'), "
+        + "FIRSTWITHTIME(longNoDictColumn,timestampColumn,'long'), "
+        + "FIRSTWITHTIME(floatNoDictColumn,timestampColumn,'float'), "
+        + "FIRSTWITHTIME(doubleNoDictColumn,timestampColumn,'double'), "
+        + "FIRSTWITHTIME(stringNoDictColumn,timestampColumn,'string') "
+        + "FROM testTable";
 
     // Inner segment
-    Operator operator = getOperatorForPqlQuery(query);
-    assertTrue(operator instanceof AggregationOperator);
-    IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, 7 * NUM_RECORDS,
-            NUM_RECORDS);
-    List<Object> aggregationResultsWithoutFilter = resultsBlock.getAggregationResult();
+    AggregationOperator aggregationOperator = getOperator(query);
+    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, 0,
+        7 * NUM_RECORDS, NUM_RECORDS);
+    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(((IntLongPair) aggregationResult.get(0)).getValue() != 0, _expectedResultFirstBoolean.booleanValue());
+    assertEquals(((IntLongPair) aggregationResult.get(1)).getValue(), _expectedResultFirstInt);
+    assertEquals(((LongLongPair) aggregationResult.get(2)).getValue(), _expectedResultFirstLong);
+    assertEquals(((FloatLongPair) aggregationResult.get(3)).getValue(), _expectedResultFirstFloat);
+    assertEquals(((DoubleLongPair) aggregationResult.get(4)).getValue(), _expectedResultFirstDouble);
+    assertEquals(((StringLongPair) aggregationResult.get(5)).getValue(), _expectedResultFirstString);
 
-    operator = getOperatorForPqlQueryWithFilter(query);
-    assertTrue(operator instanceof AggregationOperator);
-    IntermediateResultsBlock resultsBlockWithFilter = ((AggregationOperator) operator).nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, 7 * NUM_RECORDS,
-            NUM_RECORDS);
-    List<Object> aggregationResultWithFilter = resultsBlockWithFilter.getAggregationResult();
-
-    assertNotNull(aggregationResultsWithoutFilter);
-    assertNotNull(aggregationResultWithFilter);
-    assertEquals(aggregationResultsWithoutFilter.size(), aggregationResultWithFilter.size());
-    for (int i = 0; i < aggregationResultsWithoutFilter.size(); i++) {
-      assertTrue(((ValueLongPair<Integer>) aggregationResultsWithoutFilter.get(i)).compareTo(
-          (ValueLongPair<Integer>) aggregationResultWithFilter.get(i)) == 0);
-    }
-
-    assertEquals(((ValueLongPair<Integer>) aggregationResultsWithoutFilter.get(0)).getValue() != 0,
-        _expectedResultFirstBoolean.booleanValue());
-    assertEquals(((ValueLongPair<Integer>) aggregationResultsWithoutFilter.get(1)).getValue(), _expectedResultFirstInt);
-    assertEquals(((ValueLongPair<Long>) aggregationResultsWithoutFilter.get(2)).getValue(), _expectedResultFirstLong);
-    assertEquals(((ValueLongPair<Float>) aggregationResultsWithoutFilter.get(3)).getValue(), _expectedResultFirstFloat);
-    assertEquals(((ValueLongPair<Double>) aggregationResultsWithoutFilter.get(4)).getValue(),
-        _expectedResultFirstDouble);
-    assertEquals(((ValueLongPair<String>) aggregationResultsWithoutFilter.get(5)).getValue(),
-        _expectedResultFirstString);
-
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-
-    Assert.assertEquals(brokerResponse.getNumDocsScanned(), 4 * NUM_RECORDS);
-    Assert.assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
-    Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 4 * 7 * NUM_RECORDS);
-    Assert.assertEquals(brokerResponse.getTotalDocs(), 4 * NUM_RECORDS);
-    List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
-    Assert.assertEquals(aggregationResults.size(), 6);
-    Assert.assertEquals(Boolean.parseBoolean(aggregationResults.get(0).getValue().toString()),
-        _expectedResultFirstBoolean.booleanValue());
-    Assert.assertEquals(Integer.parseInt(aggregationResults.get(1).getValue().toString()),
-        _expectedResultFirstInt.intValue());
-    Assert.assertEquals(Long.parseLong(aggregationResults.get(2).getValue().toString()),
-        _expectedResultFirstLong.longValue());
-    Assert.assertEquals(Float.parseFloat(aggregationResults.get(3).getValue().toString()),
-        _expectedResultFirstFloat, DELTA);
-    Assert.assertEquals(Double.parseDouble(aggregationResults.get(4).getValue().toString()),
-        _expectedResultFirstDouble, DELTA);
-    Assert.assertEquals(aggregationResults.get(5).getValue().toString(),
-        _expectedResultFirstString);
-
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    Assert.assertEquals(brokerResponse.getNumDocsScanned(), 4 * NUM_RECORDS);
-    Assert.assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
-    Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 4 * 7 * NUM_RECORDS);
-    Assert.assertEquals(brokerResponse.getTotalDocs(), 4 * NUM_RECORDS);
-    aggregationResults = brokerResponse.getAggregationResults();
-    Assert.assertEquals(aggregationResults.size(), 6);
-    Assert.assertEquals(Boolean.parseBoolean(aggregationResults.get(0).getValue().toString()),
-        _expectedResultFirstBoolean.booleanValue());
-    Assert.assertEquals(Integer.parseInt(aggregationResults.get(1).getValue().toString()),
-        _expectedResultFirstInt.intValue());
-    Assert.assertEquals(Long.parseLong(aggregationResults.get(2).getValue().toString()),
-        _expectedResultFirstLong.longValue());
-    Assert.assertEquals(Float.parseFloat(aggregationResults.get(3).getValue().toString()),
-        _expectedResultFirstFloat, DELTA);
-    Assert.assertEquals(Double.parseDouble(aggregationResults.get(4).getValue().toString()),
-        _expectedResultFirstDouble, DELTA);
-    Assert.assertEquals(aggregationResults.get(5).getValue().toString(),
-        _expectedResultFirstString);
+    // Inter segments (expect 4 * inner segment result)
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    DataSchema expectedDataSchema = new DataSchema(new String[]{
+        "firstwithtime(boolNoDictColumn,timestampColumn,'BOOLEAN')",
+        "firstwithtime(intNoDictColumn,timestampColumn,'INT')",
+        "firstwithtime(longNoDictColumn,timestampColumn,'LONG')",
+        "firstwithtime(floatNoDictColumn,timestampColumn,'FLOAT')",
+        "firstwithtime(doubleNoDictColumn,timestampColumn,'DOUBLE')",
+        "firstwithtime(stringNoDictColumn,timestampColumn,'STRING')"
+    }, new ColumnDataType[]{
+        ColumnDataType.BOOLEAN,
+        ColumnDataType.INT,
+        ColumnDataType.LONG,
+        ColumnDataType.FLOAT,
+        ColumnDataType.DOUBLE,
+        ColumnDataType.STRING
+    });
+    Object[] expectedResults = new Object[]{
+        _expectedResultFirstBoolean,
+        _expectedResultFirstInt,
+        _expectedResultFirstLong,
+        _expectedResultFirstFloat,
+        _expectedResultFirstDouble,
+        _expectedResultFirstString
+    };
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 4 * NUM_RECORDS, 0L, 4 * 7 * NUM_RECORDS,
+        4 * NUM_RECORDS, new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults)));
   }
 
   @Test
-  public void testAggregationGroupBySv() {
-    String query =
-        "SELECT FIRSTWITHTIME(boolColumn,timestampColumn,boolean),"
-            + " FIRSTWITHTIME(intColumn,timestampColumn,int),"
-            + " FIRSTWITHTIME(longColumn,timestampColumn,long),"
-            + " FIRSTWITHTIME(floatColumn,timestampColumn,float),"
-            + " FIRSTWITHTIME(doubleColumn,timestampColumn,double),"
-            + " FIRSTWITHTIME(stringColumn,timestampColumn,string) FROM testTable GROUP BY intColumn";
-
-    verifyAggregationResultsFromInnerSegments(query, 7);
-
-    verifyAggregationResultsFromInterSegments(query, 7);
+  public void testAggregationGroupBySV() {
+    String query = "SELECT intColumn AS key, "
+        + "FIRSTWITHTIME(boolColumn,timestampColumn,'boolean') AS v1, "
+        + "FIRSTWITHTIME(intColumn,timestampColumn,'int') AS v2, "
+        + "FIRSTWITHTIME(longColumn,timestampColumn,'long') AS v3, "
+        + "FIRSTWITHTIME(floatColumn,timestampColumn,'float') AS v4, "
+        + "FIRSTWITHTIME(doubleColumn,timestampColumn,'double') AS v5, "
+        + "FIRSTWITHTIME(stringColumn,timestampColumn,'string') AS v6 "
+        + "FROM testTable GROUP BY key";
+    verifyAggregationGroupBy(query, 7);
   }
 
   @Test
-  public void testAggregationGroupBySvNoDictionary() {
-    String query =
-        "SELECT FIRSTWITHTIME(boolNoDictColumn,timestampColumn,boolean),"
-            + " FIRSTWITHTIME(intNoDictColumn,timestampColumn,int),"
-            + " FIRSTWITHTIME(longNoDictColumn,timestampColumn,long),"
-            + " FIRSTWITHTIME(floatNoDictColumn,timestampColumn,float),"
-            + " FIRSTWITHTIME(doubleNoDictColumn,timestampColumn,double),"
-            + " FIRSTWITHTIME(stringNoDictColumn,timestampColumn,string)"
-            + " FROM testTable GROUP BY intNoDictColumn";
-
-    verifyAggregationResultsFromInnerSegments(query, 7);
-
-    verifyAggregationResultsFromInterSegments(query, 7);
+  public void testAggregationGroupBySVNoDictionary() {
+    String query = "SELECT intNoDictColumn AS key, "
+        + "FIRSTWITHTIME(boolNoDictColumn,timestampColumn,'boolean') AS v1, "
+        + "FIRSTWITHTIME(intNoDictColumn,timestampColumn,'int') AS v2, "
+        + "FIRSTWITHTIME(longNoDictColumn,timestampColumn,'long') AS v3, "
+        + "FIRSTWITHTIME(floatNoDictColumn,timestampColumn,'float') AS v4, "
+        + "FIRSTWITHTIME(doubleNoDictColumn,timestampColumn,'double') AS v5, "
+        + "FIRSTWITHTIME(stringNoDictColumn,timestampColumn,'string') AS v6 "
+        + "FROM testTable GROUP BY key";
+    verifyAggregationGroupBy(query, 7);
   }
 
   @Test
-  public void testAggregationGroupByMv() {
-    String query =
-        "SELECT FIRSTWITHTIME(boolColumn,timestampColumn,boolean),"
-            + " FIRSTWITHTIME(intColumn,timestampColumn,int),"
-            + " FIRSTWITHTIME(longColumn,timestampColumn,long),"
-            + " FIRSTWITHTIME(floatColumn,timestampColumn,float),"
-            + " FIRSTWITHTIME(doubleColumn,timestampColumn,double),"
-            + " FIRSTWITHTIME(stringColumn,timestampColumn,string) FROM testTable GROUP BY intMvColumn";
-
-    verifyAggregationResultsFromInnerSegments(query, 8);
-
-    verifyAggregationResultsFromInterSegments(query, 8);
+  public void testAggregationGroupByMV() {
+    String query = "SELECT intMVColumn AS key, "
+        + "FIRSTWITHTIME(boolColumn,timestampColumn,'boolean') AS v1, "
+        + "FIRSTWITHTIME(intColumn,timestampColumn,'int') AS v2, "
+        + "FIRSTWITHTIME(longColumn,timestampColumn,'long') AS v3, "
+        + "FIRSTWITHTIME(floatColumn,timestampColumn,'float') AS v4, "
+        + "FIRSTWITHTIME(doubleColumn,timestampColumn,'double') AS v5, "
+        + "FIRSTWITHTIME(stringColumn,timestampColumn,'string') AS v6 "
+        + "FROM testTable GROUP BY key";
+    verifyAggregationGroupBy(query, 8);
   }
 
   @Test
-  public void testAggregationGroupByMvNoDictionary() {
-    String query =
-        "SELECT FIRSTWITHTIME(boolNoDictColumn,timestampColumn,boolean),"
-            + " FIRSTWITHTIME(intNoDictColumn,timestampColumn,int),"
-            + " FIRSTWITHTIME(longNoDictColumn,timestampColumn,long),"
-            + " FIRSTWITHTIME(floatNoDictColumn,timestampColumn,float),"
-            + " FIRSTWITHTIME(doubleNoDictColumn,timestampColumn,double),"
-            + " FIRSTWITHTIME(stringNoDictColumn,timestampColumn,string) FROM testTable GROUP BY intMvColumn";
-
-    verifyAggregationResultsFromInnerSegments(query, 8);
-
-    verifyAggregationResultsFromInterSegments(query, 8);
+  public void testAggregationGroupByMVNoDictionary() {
+    String query = "SELECT intMVColumn AS key, "
+        + "FIRSTWITHTIME(boolNoDictColumn,timestampColumn,'boolean') AS v1, "
+        + "FIRSTWITHTIME(intNoDictColumn,timestampColumn,'int') AS v2, "
+        + "FIRSTWITHTIME(longNoDictColumn,timestampColumn,'long') AS v3, "
+        + "FIRSTWITHTIME(floatNoDictColumn,timestampColumn,'float') AS v4, "
+        + "FIRSTWITHTIME(doubleNoDictColumn,timestampColumn,'double') AS v5, "
+        + "FIRSTWITHTIME(stringNoDictColumn,timestampColumn,'string') AS v6 "
+        + "FROM testTable GROUP BY key";
+    verifyAggregationGroupBy(query, 8);
   }
 
-  private void verifyAggregationResultsFromInnerSegments(String query, int numOfColumns) {
+  private void verifyAggregationGroupBy(String query, int numProjectedColumns) {
     // Inner segment
-    Operator operator = getOperatorForPqlQuery(query);
-    assertTrue(operator instanceof AggregationGroupByOperator);
-    IntermediateResultsBlock resultsBlock = ((AggregationGroupByOperator) operator).nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(),
-            NUM_RECORDS,
-            0,
-            numOfColumns * NUM_RECORDS,
-            NUM_RECORDS);
+    AggregationGroupByOrderByOperator groupByOperator = getOperator(query);
+    IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
+        numProjectedColumns * (long) NUM_RECORDS, NUM_RECORDS);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(aggregationGroupByResult);
     int numGroups = 0;
@@ -473,69 +382,46 @@ public class FirstWithTimeQueriesTest extends BaseQueriesTest {
       GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
       Integer key = (Integer) groupKey._keys[0];
       assertTrue(_intGroupValues.containsKey(key));
-      assertEquals(
-          ((ValueLongPair<Integer>) aggregationGroupByResult.getResultForGroupId(0, groupKey._groupId)).getValue()
-              != 0,
-          _boolGroupValues.get(key).booleanValue());
-      assertEquals(
-          ((ValueLongPair<Integer>) aggregationGroupByResult.getResultForGroupId(1, groupKey._groupId)).getValue(),
+      assertEquals(((IntLongPair) aggregationGroupByResult.getResultForGroupId(0, groupKey._groupId)).getValue() != 0,
+          (boolean) _boolGroupValues.get(key));
+      assertEquals(((IntLongPair) aggregationGroupByResult.getResultForGroupId(1, groupKey._groupId)).getValue(),
           _intGroupValues.get(key));
-      assertEquals(
-          ((ValueLongPair<Long>) aggregationGroupByResult.getResultForGroupId(2, groupKey._groupId)).getValue(),
+      assertEquals(((LongLongPair) aggregationGroupByResult.getResultForGroupId(2, groupKey._groupId)).getValue(),
           _longGroupValues.get(key));
-      assertEquals(
-          ((ValueLongPair<Float>) aggregationGroupByResult.getResultForGroupId(3, groupKey._groupId)).getValue(),
+      assertEquals(((FloatLongPair) aggregationGroupByResult.getResultForGroupId(3, groupKey._groupId)).getValue(),
           _floatGroupValues.get(key));
-      assertEquals(
-          ((ValueLongPair<Double>) aggregationGroupByResult.getResultForGroupId(4, groupKey._groupId)).getValue(),
+      assertEquals(((DoubleLongPair) aggregationGroupByResult.getResultForGroupId(4, groupKey._groupId)).getValue(),
           _doubleGroupValues.get(key));
-      assertEquals(
-          ((ValueLongPair<String>) aggregationGroupByResult.getResultForGroupId(5, groupKey._groupId)).getValue(),
+      assertEquals(((StringLongPair) aggregationGroupByResult.getResultForGroupId(5, groupKey._groupId)).getValue(),
           _stringGroupValues.get(key));
     }
     assertEquals(numGroups, _intGroupValues.size());
-  }
 
-  private void verifyAggregationResultsFromInterSegments(String query, int numOfColumns) {
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
     // Inter segments (expect 4 * inner segment result)
-    Assert.assertEquals(brokerResponse.getNumDocsScanned(), 4 * NUM_RECORDS);
-    Assert.assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
-    Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 4 * numOfColumns * NUM_RECORDS);
-    Assert.assertEquals(brokerResponse.getTotalDocs(), 4 * NUM_RECORDS);
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    assertEquals(brokerResponse.getNumDocsScanned(), 4 * NUM_RECORDS);
+    assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
+    assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 4 * numProjectedColumns * (long) NUM_RECORDS);
+    assertEquals(brokerResponse.getTotalDocs(), 4 * NUM_RECORDS);
 
-    List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
-    Assert.assertEquals(aggregationResults.size(), 6);
-    Assert.assertNull(aggregationResults.get(0).getValue());
-    for (GroupByResult intGroupByResult : aggregationResults.get(1).getGroupByResult()) {
-      assertEquals(intGroupByResult.getGroup().size(), 1);
-      assertTrue(_intGroupValues.containsKey(Integer.parseInt(intGroupByResult.getGroup().get(0))));
-      assertEquals(Integer.parseInt(intGroupByResult.getValue().toString()),
-          _intGroupValues.get(Integer.parseInt(intGroupByResult.getGroup().get(0))).intValue());
-    }
-
-    Assert.assertNull(aggregationResults.get(1).getValue());
-    for (GroupByResult longGroupByResult : aggregationResults.get(2).getGroupByResult()) {
-      assertEquals(longGroupByResult.getGroup().size(), 1);
-      assertTrue(_longGroupValues.containsKey(Integer.parseInt(longGroupByResult.getGroup().get(0))));
-      assertEquals(Long.parseLong(longGroupByResult.getValue().toString()),
-          _longGroupValues.get(Integer.parseInt(longGroupByResult.getGroup().get(0))), DELTA);
-    }
-
-    Assert.assertNull(aggregationResults.get(2).getValue());
-    for (GroupByResult floatGroupByResult : aggregationResults.get(3).getGroupByResult()) {
-      assertEquals(floatGroupByResult.getGroup().size(), 1);
-      assertTrue(_floatGroupValues.containsKey(Integer.parseInt(floatGroupByResult.getGroup().get(0))));
-      assertEquals(Double.parseDouble(floatGroupByResult.getValue().toString()),
-          _floatGroupValues.get(Integer.parseInt(floatGroupByResult.getGroup().get(0))), DELTA);
-    }
-
-    Assert.assertNull(aggregationResults.get(3).getValue());
-    for (GroupByResult doubleGroupByResult : aggregationResults.get(4).getGroupByResult()) {
-      assertEquals(doubleGroupByResult.getGroup().size(), 1);
-      assertTrue(_doubleGroupValues.containsKey(Integer.parseInt(doubleGroupByResult.getGroup().get(0))));
-      assertEquals(Double.parseDouble(doubleGroupByResult.getValue().toString()),
-          _doubleGroupValues.get(Integer.parseInt(doubleGroupByResult.getGroup().get(0))), DELTA);
+    ResultTable resultTable = brokerResponse.getResultTable();
+    DataSchema expectedDataSchema =
+        new DataSchema(new String[]{"key", "v1", "v2", "v3", "v4", "v5", "v6"}, new ColumnDataType[]{
+            ColumnDataType.INT, ColumnDataType.BOOLEAN, ColumnDataType.INT, ColumnDataType.LONG,
+            ColumnDataType.FLOAT, ColumnDataType.DOUBLE, ColumnDataType.STRING
+        });
+    assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 10);
+    for (Object[] row : rows) {
+      assertEquals(row.length, 7);
+      int key = (Integer) row[0];
+      assertEquals(row[1], _boolGroupValues.get(key));
+      assertEquals(row[2], _intGroupValues.get(key));
+      assertEquals(row[3], _longGroupValues.get(key));
+      assertEquals(row[4], _floatGroupValues.get(key));
+      assertEquals(row[5], _doubleGroupValues.get(key));
+      assertEquals(row[6], _stringGroupValues.get(key));
     }
   }
 

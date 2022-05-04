@@ -40,7 +40,7 @@ import org.apache.pinot.segment.local.customobject.ValueLongPair;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class FirstStringValueWithTimeAggregationFunction extends FirstWithTimeAggregationFunction<String> {
-  private final static ValueLongPair<String> DEFAULT_VALUE_TIME_PAIR = new StringLongPair("", Long.MIN_VALUE);
+  private final static ValueLongPair<String> DEFAULT_VALUE_TIME_PAIR = new StringLongPair("", Long.MAX_VALUE);
 
   public FirstStringValueWithTimeAggregationFunction(
       ExpressionContext dataCol,
